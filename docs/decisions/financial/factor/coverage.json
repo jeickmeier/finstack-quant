@@ -1,0 +1,501 @@
+{
+  "scope": "factor",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "FACTOR-001",
+      "title": "Factor definitions, units, and configuration validation",
+      "path": "factor-configuration.md"
+    },
+    {
+      "id": "FACTOR-002",
+      "title": "Covariance and sensitivity matrix invariants",
+      "path": "matrix-invariants.md"
+    },
+    {
+      "id": "FACTOR-003",
+      "title": "Ordered mapping, hierarchy, and cascade dispatch",
+      "path": "dependency-matching.md"
+    },
+    {
+      "id": "FACTOR-004",
+      "title": "Credit issuer matching and hierarchy factor identifiers",
+      "path": "credit-matching.md"
+    },
+    {
+      "id": "FACTOR-005",
+      "title": "Covariance factor-risk decomposition",
+      "path": "factor-risk.md"
+    },
+    {
+      "id": "FACTOR-006",
+      "title": "Residual variance overlay and contribution rescaling",
+      "path": "residual-risk.md"
+    },
+    {
+      "id": "FACTOR-007",
+      "title": "Normal position VaR, ES, marginals, and removal risk",
+      "path": "position-normal-risk.md"
+    },
+    {
+      "id": "FACTOR-008",
+      "title": "Historical tail mass and ES-proportional VaR allocation",
+      "path": "position-historical-risk.md"
+    },
+    {
+      "id": "FACTOR-009",
+      "title": "Whole-scenario tail stress attribution",
+      "path": "tail-stress.md"
+    },
+    {
+      "id": "FACTOR-010",
+      "title": "Signed VaR budgeting and report orchestration",
+      "path": "risk-budgets-and-reports.md"
+    },
+    {
+      "id": "FACTOR-011",
+      "title": "Credit calibration panel, clock, and DTS preparation",
+      "path": "credit-panel.md"
+    },
+    {
+      "id": "FACTOR-012",
+      "title": "Hierarchy inventory and small-bucket fold-up",
+      "path": "credit-buckets.md"
+    },
+    {
+      "id": "FACTOR-013",
+      "title": "Sequential generic and leave-one-out hierarchy beta fitting",
+      "path": "credit-beta-peel.md"
+    },
+    {
+      "id": "FACTOR-014",
+      "title": "Sample and normalized EWMA credit variance estimation",
+      "path": "credit-variance.md"
+    },
+    {
+      "id": "FACTOR-015",
+      "title": "Issuer residual volatility source cascade",
+      "path": "credit-residual-volatility.md"
+    },
+    {
+      "id": "FACTOR-016",
+      "title": "Credit covariance strategies and correlation repair",
+      "path": "credit-covariance.md"
+    },
+    {
+      "id": "FACTOR-017",
+      "title": "Credit anchor and dated spread decomposition",
+      "path": "credit-snapshots.md"
+    },
+    {
+      "id": "FACTOR-018",
+      "title": "Annualized covariance and idiosyncratic horizon scaling",
+      "path": "credit-horizons.md"
+    },
+    {
+      "id": "FACTOR-019",
+      "title": "Credit artifact semantic boundary, provenance, and schemas",
+      "path": "credit-artifacts.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/factor/src/config.rs",
+      "classification": "algorithm",
+      "records": [
+        "FACTOR-001",
+        "FACTOR-004"
+      ],
+      "reason": "Risk confidence validation/deserialization, unit bump precedence, exact factor-axis and matcher-universe validation, duplicate issuer checks across cascades.",
+      "sha256": "e7642c99f1d079c472be89339fa3f081efe74a986397bd02e2f84f5f5437091b"
+    },
+    {
+      "path": "finstack-quant/factor/src/covariance.rs",
+      "classification": "algorithm",
+      "records": [
+        "FACTOR-002",
+        "FACTOR-005",
+        "FACTOR-007"
+      ],
+      "reason": "Dense covariance construction, relative symmetry/PSD checks, cache rebuilding, missing-ID zero lookup and correlation normalization.",
+      "sha256": "d4c11c817e687d92a69595c808f3c169977bf2f863d3f594a0ab48d773a8da07"
+    },
+    {
+      "path": "finstack-quant/factor/src/credit/calibration/assemble.rs",
+      "classification": "algorithm",
+      "records": [
+        "FACTOR-012",
+        "FACTOR-014",
+        "FACTOR-016",
+        "FACTOR-017",
+        "FACTOR-019"
+      ],
+      "reason": "Shared anchor peel, factor ordering, four covariance strategy branches, model matching/defaults, history alignment, variance state and diagnostic aggregation.",
+      "sha256": "2a92ea3b445e3feea927cc44e073153fc9e74b02c3932bc847bf086b25a6d7ea"
+    },
+    {
+      "path": "finstack-quant/factor/src/credit/calibration/calibrator.rs",
+      "classification": "algorithm",
+      "records": [
+        "FACTOR-011",
+        "FACTOR-013",
+        "FACTOR-014",
+        "FACTOR-015",
+        "FACTOR-016",
+        "FACTOR-017",
+        "FACTOR-019"
+      ],
+      "reason": "Ordered end-to-end validation/unit conversion, modes, weights, inventory/folds, peel, variance-source assignment, anchor/config/artifact assembly and final validation.",
+      "sha256": "d8373f92172c927aba003a3895cd17e28bffbc0b943508f6cf24ad4321a8ae82"
+    },
+    {
+      "path": "finstack-quant/factor/src/credit/calibration/config.rs",
+      "classification": "algorithm",
+      "records": [
+        "FACTOR-011",
+        "FACTOR-012",
+        "FACTOR-013",
+        "FACTOR-014",
+        "FACTOR-016"
+      ],
+      "reason": "Frequency date stepping/annualization, estimator/space/default choices, threshold lookup and statistical control domains.",
+      "sha256": "f84f08cd5344b6194ebf4a65a1f9387bdb4986ec76c0254fad774a19f59948fa"
+    },
+    {
+      "path": "finstack-quant/factor/src/credit/calibration/inputs.rs",
+      "classification": "algorithm",
+      "records": [
+        "FACTOR-011"
+      ],
+      "reason": "Typed panel shape and unit contract plus final-date/as-of-spread extraction without complete calibration validation.",
+      "sha256": "6583969c49dcfdd525262e5fda4d8f3e810d30dccb4dd9dc7263ca2f1d9d8930"
+    },
+    {
+      "path": "finstack-quant/factor/src/credit/calibration/inventory.rs",
+      "classification": "algorithm",
+      "records": [
+        "FACTOR-012"
+      ],
+      "reason": "Tag/path inventory, all-member bucket counts/taxonomy, independent per-level threshold flags and ordered operative fold-up records.",
+      "sha256": "ef15522191401def17848fb6581509451f71cf61613d9256cdcd61a2c5a3aabf"
+    },
+    {
+      "path": "finstack-quant/factor/src/credit/calibration/mod.rs",
+      "classification": "support",
+      "records": [
+        "FACTOR-011"
+      ],
+      "reason": "Calibration module declarations/reexports and dedicated test-module selection; no additional executable numerical path.",
+      "sha256": "c789f82722c585e2a52e37041beb601a548604a0243ec6db5a270f446ec91a40"
+    },
+    {
+      "path": "finstack-quant/factor/src/credit/calibration/panel.rs",
+      "classification": "algorithm",
+      "records": [
+        "FACTOR-011",
+        "FACTOR-013",
+        "FACTOR-014"
+      ],
+      "reason": "Issuer mode override/history classification, decimal-to-bp mutation, sparse differencing and beginning-period/contemporaneous DTS weights.",
+      "sha256": "e7666fcc8bdca68e087cbc63991c8caf6ab54210957bb99367568cf112a969aa"
+    },
+    {
+      "path": "finstack-quant/factor/src/credit/calibration/peel_fit.rs",
+      "classification": "algorithm",
+      "records": [
+        "FACTOR-013"
+      ],
+      "reason": "Sequential generic/level residual peel, inclusive weighted factors, leave-one-out OLS, nonrefining/degenerate fallback, shrinkage and raw-residual quality.",
+      "sha256": "b54e738586cce7edcc40451da251d058c8629c608a4d0c7ba35c7e89fa0a80f5"
+    },
+    {
+      "path": "finstack-quant/factor/src/credit/calibration/statistics.rs",
+      "classification": "algorithm",
+      "records": [
+        "FACTOR-014",
+        "FACTOR-015",
+        "FACTOR-016"
+      ],
+      "reason": "Sample/EWMA variance, residual-history eligibility and peer-source cascade, overlap correlation and complete-case LedoitWolf adapter.",
+      "sha256": "e66a2fe7f612f5bb626ba2b7c47450ca9db770d9a2f4932695d36bf4f3d9e357"
+    },
+    {
+      "path": "finstack-quant/factor/src/credit/calibration/tests.rs",
+      "classification": "test",
+      "records": [
+        "FACTOR-011",
+        "FACTOR-012",
+        "FACTOR-013",
+        "FACTOR-014",
+        "FACTOR-015",
+        "FACTOR-016",
+        "FACTOR-017"
+      ],
+      "reason": "Dedicated calibration tests; selected hand variance/EWMA/LedoitWolf/LOO/DTS fixtures inspected, other boundary cases located; no runtime algorithm owner.",
+      "sha256": "e573a157217b7a515a1d8623ad71c292c1491fc89e6f5b1d302cfa6a6beaaad9"
+    },
+    {
+      "path": "finstack-quant/factor/src/credit/calibration/validation.rs",
+      "classification": "algorithm",
+      "records": [
+        "FACTOR-011"
+      ],
+      "reason": "Config and decimal domains, complete-panel/as-of-universe requirements, exact monthly/quarterly and holiday-tolerant daily date checks.",
+      "sha256": "1040ee5e2080c73fced35637e82f2102de766426c8ce6a9b5479c4665a821e1e"
+    },
+    {
+      "path": "finstack-quant/factor/src/credit/decomposition.rs",
+      "classification": "algorithm",
+      "records": [
+        "FACTOR-017"
+      ],
+      "reason": "Decimal observed snapshot resolution, known/new issuer tags/betas, operative fold lookup, shared peel, finite JSON helpers and intersection-only period differences.",
+      "sha256": "d40f8f07a47e87f2680bd5cd6425c26ee113f9fc622d728763bbb0e594299abd"
+    },
+    {
+      "path": "finstack-quant/factor/src/credit/forecast.rs",
+      "classification": "algorithm",
+      "records": [
+        "FACTOR-018"
+      ],
+      "reason": "Horizon parsing/annualized multipliers, authoritative stored covariance scaling, issuer variance lookup and config cloning.",
+      "sha256": "9a978aa022c7f159a7b5f86ef1dbcff1c93592e4115b9546f893dc71a7ab4562"
+    },
+    {
+      "path": "finstack-quant/factor/src/credit/hierarchy.rs",
+      "classification": "algorithm",
+      "records": [
+        "FACTOR-004",
+        "FACTOR-012",
+        "FACTOR-014",
+        "FACTOR-019"
+      ],
+      "reason": "Hierarchy paths and factor/model wire contracts, unit beta construction, correlation structural checks, strict/from_json loaders and partial model semantic validation.",
+      "sha256": "d82f4333342a78fc802147c707ee1f3758d6a2c43188f4ed02ba33a42ab099a1"
+    },
+    {
+      "path": "finstack-quant/factor/src/credit/mod.rs",
+      "classification": "support",
+      "records": [
+        "FACTOR-011",
+        "FACTOR-017",
+        "FACTOR-018",
+        "FACTOR-019"
+      ],
+      "reason": "Credit module visibility and forecast reexports; no additional calculation.",
+      "sha256": "b54e207bd2ae59d93fee837ecd170caae452e7f7d017fa6def3a626255dc01fd"
+    },
+    {
+      "path": "finstack-quant/factor/src/credit/peel.rs",
+      "classification": "algorithm",
+      "records": [
+        "FACTOR-011",
+        "FACTOR-017"
+      ],
+      "reason": "DTS duration/weight validation and shared single-date weighted residual peel with equal-average fallback.",
+      "sha256": "e343f9b1aea9fd374c9ddf6af95c92690d1b145339c71b1a2e596f0aa93bbd78"
+    },
+    {
+      "path": "finstack-quant/factor/src/credit/units.rs",
+      "classification": "algorithm",
+      "records": [
+        "FACTOR-011",
+        "FACTOR-017"
+      ],
+      "reason": "Decimal spread domain heuristic and 10000 bp conversion shared by calibration and snapshots.",
+      "sha256": "f5c9c6460d9cf609aac9d56627a732b81cef47d2cff163aaa7c39c165bb0bda7"
+    },
+    {
+      "path": "finstack-quant/factor/src/envelope.rs",
+      "classification": "algorithm",
+      "records": [
+        "FACTOR-001",
+        "FACTOR-019"
+      ],
+      "reason": "Exact config schema marker, strict resource-limited decode plus semantic validation and canonical content hash.",
+      "sha256": "c5e18ab5aa706e45a2b5361d31bd789010704c60de9bdf00253ac9fa82d02543"
+    },
+    {
+      "path": "finstack-quant/factor/src/lib.rs",
+      "classification": "support",
+      "records": [
+        "FACTOR-001",
+        "FACTOR-019"
+      ],
+      "reason": "Crate lint/feature declarations, public reexports and README doctest inclusion; no numerical branch.",
+      "sha256": "6cb9f56450795373e849844f859ccbcccc84a7d29fbaff27a146213c1048857c"
+    },
+    {
+      "path": "finstack-quant/factor/src/matching/config.rs",
+      "classification": "algorithm",
+      "records": [
+        "FACTOR-003",
+        "FACTOR-004"
+      ],
+      "reason": "Explicit matcher construction dispatch and recursive sorted declared-factor enumeration.",
+      "sha256": "dd29f3b7d9178b77678d2567e835988b107fb93abd01b4ddbb90a7c392fa68a3"
+    },
+    {
+      "path": "finstack-quant/factor/src/matching/credit.rs",
+      "classification": "algorithm",
+      "records": [
+        "FACTOR-004"
+      ],
+      "reason": "Credit-only selection, issuer cache/binary search, beta shape/tag failures, generic/unit fallback, folded-level omission and bucket ID formatting/parsing.",
+      "sha256": "c1d7ab766a01548145faf63a375a32956839d3179b59bf2ac2ab29e86f654885"
+    },
+    {
+      "path": "finstack-quant/factor/src/matching/filter.rs",
+      "classification": "algorithm",
+      "records": [
+        "FACTOR-003"
+      ],
+      "reason": "Conjunctive exact attribute and dependency filtering with unconstrained optional fields.",
+      "sha256": "8527172dd36134636ce047b6531da69d68bd2409375d0ce0f95dc113fc0403a2"
+    },
+    {
+      "path": "finstack-quant/factor/src/matching/matchers.rs",
+      "classification": "algorithm",
+      "records": [
+        "FACTOR-003"
+      ],
+      "reason": "Indexed first-rule mapping preserving wildcard order, deepest-first-tie hierarchy traversal, and first-nonempty/error-propagating cascade; runtime below early test helper inspected.",
+      "sha256": "b9920fccc0c8fb117d125d5cf9c4c054ada0694bda827507883cb3557ce95836"
+    },
+    {
+      "path": "finstack-quant/factor/src/matching/mod.rs",
+      "classification": "support",
+      "records": [
+        "FACTOR-003",
+        "FACTOR-004"
+      ],
+      "reason": "Matcher/filter module declarations and public reexports only.",
+      "sha256": "13a2e1f650470a5fe7d355ec487d1adc797bf2e92fdeb753623f60191c4318a7"
+    },
+    {
+      "path": "finstack-quant/factor/src/primitives/definition.rs",
+      "classification": "algorithm",
+      "records": [
+        "FACTOR-001"
+      ],
+      "reason": "Financial mapping contract selecting parallel/bucketed curves, equity spot, FX pair or volatility shifts and factor-type association.",
+      "sha256": "15a0efaf9deaa8338308ba0bfd5bddf28911c458d4ad2c9015c566c38f616f64"
+    },
+    {
+      "path": "finstack-quant/factor/src/primitives/dependency.rs",
+      "classification": "algorithm",
+      "records": [
+        "FACTOR-001",
+        "FACTOR-003"
+      ],
+      "reason": "Dependency type/curve type/exact ID dispatch including credit-index distinction and directional FX string matching.",
+      "sha256": "745e762249f0fabff3d6d3372220276fa3bd5b7e3b2295588d1aca0971042b20"
+    },
+    {
+      "path": "finstack-quant/factor/src/primitives/factor_types.rs",
+      "classification": "algorithm",
+      "records": [
+        "FACTOR-001"
+      ],
+      "reason": "Canonical factor identity and factor-type-to-bump-unit/default semantics including custom/rates and volatility Percent tag.",
+      "sha256": "c46cba9902d98bceb99b9fba9adaed94691300a2ab5ba17de1bf3457b4972963"
+    },
+    {
+      "path": "finstack-quant/factor/src/primitives/mod.rs",
+      "classification": "support",
+      "records": [
+        "FACTOR-001"
+      ],
+      "reason": "Primitive module declarations and reexports only.",
+      "sha256": "f6bb1a3d521469b5afcaa12ffb4d09fcad46e10889bc88a460a532377800d797"
+    },
+    {
+      "path": "finstack-quant/factor/src/risk/budget.rs",
+      "classification": "algorithm",
+      "records": [
+        "FACTOR-010"
+      ],
+      "reason": "Signed component budget consumption, target tolerance, threshold/default handling, zero-target sentinels and overbudget aggregation.",
+      "sha256": "4f0509db0c70d09192b18fe3891eaf52c0e74b82aa428e997a2865be6d9b57d6"
+    },
+    {
+      "path": "finstack-quant/factor/src/risk/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "FACTOR-005",
+        "FACTOR-007",
+        "FACTOR-008",
+        "FACTOR-009"
+      ],
+      "reason": "Shared normal tail multipliers, absolute variance tolerance and empirical tail-count integer snapping.",
+      "sha256": "f0caf89bfe8286b9579c717be9c2122d335927fbc57060afb372bf53c6df7e29"
+    },
+    {
+      "path": "finstack-quant/factor/src/risk/parametric.rs",
+      "classification": "algorithm",
+      "records": [
+        "FACTOR-005"
+      ],
+      "reason": "Exact axis/finite-sensitivity checks, covariance exposure aggregation and variance/vol/VaR/ES factor/position contributions.",
+      "sha256": "7fbd045ccbff9fea671792eb0d99dedcc8b78bc19070a9dc306275625a914c31"
+    },
+    {
+      "path": "finstack-quant/factor/src/risk/position.rs",
+      "classification": "algorithm",
+      "records": [
+        "FACTOR-007",
+        "FACTOR-008",
+        "FACTOR-009"
+      ],
+      "reason": "Normal Euler/marginal/removal risk, empirical fractional/tie ES and proportional VaR, whole-count stress attribution and nested P&L transpose.",
+      "sha256": "6b248d60c53b23929f5d781677a8a06600b97db10191d18cef5efb4cd7c29ef4"
+    },
+    {
+      "path": "finstack-quant/factor/src/risk/report.rs",
+      "classification": "algorithm",
+      "records": [
+        "FACTOR-010"
+      ],
+      "reason": "Parametric/historical request dispatch, common confidence propagation, historical stress attachment and optional VaR budget joining.",
+      "sha256": "61bef786e8d57cbca01f63d6af693d273a9d89aaea359ce847b4cf3d59d83698"
+    },
+    {
+      "path": "finstack-quant/factor/src/risk/residual.rs",
+      "classification": "algorithm",
+      "records": [
+        "FACTOR-006"
+      ],
+      "reason": "Single residual overlay, signed allocation aggregation, risk-to-variance inversion and contribution rescaling.",
+      "sha256": "e0d9505fb7a9f13b7b7152c0f5fc77d440d035d343b39900bcb47fa1667c44d8"
+    },
+    {
+      "path": "finstack-quant/factor/src/risk/types.rs",
+      "classification": "support",
+      "records": [
+        "FACTOR-005",
+        "FACTOR-006"
+      ],
+      "reason": "Result/source data contracts and variance-unit residual fields; no separate numerical calculation.",
+      "sha256": "af4549a8944aa0eb667dcd810661204f65d4340369a68d60fcfc77faa63fb26b"
+    },
+    {
+      "path": "finstack-quant/factor/src/schema.rs",
+      "classification": "algorithm",
+      "records": [
+        "FACTOR-019"
+      ],
+      "reason": "Feature-gated schema registration, real calibrated examples, and bounded canonical float roundtrip stabilization.",
+      "sha256": "cdf4c2a8af4d9ebddf677512f69186d900116827aa2d86537faa6c0f1ca33e85"
+    },
+    {
+      "path": "finstack-quant/factor/src/sensitivity_matrix.rs",
+      "classification": "algorithm",
+      "records": [
+        "FACTOR-002"
+      ],
+      "reason": "Validated row-wise input/serde flattening, zero construction, row-major access/set behavior and bounds/finiteness distinctions.",
+      "sha256": "a87cdd6a22ad6bea27dae4766a0e5613e07734c8c81d9e842b18947fbf753f32"
+    }
+  ]
+}

@@ -23,6 +23,11 @@ A mistaken reference can be corrected with evidence and explicit
 authorization. Refactoring a test is ordinary work when the meaning of its
 assertions is preserved.
 
+[ADR 0048](0048-reference-provenance-and-version-pinning.md) defines the
+detailed requirements for case-attributable golden metadata, shared fixture
+locations, methodology and calibration version pinning, and execution evidence
+for published error bands.
+
 ## Rationale
 
 Changing implementation and expected output together can produce a passing
@@ -57,6 +62,6 @@ already describes provenance and review practices. Metadata or a `certified`
 label alone is not proof of independent calculation or authorization. A skip
 with an explanation alone does not authorize disabling a protected test.
 
-The approved [CAGR default change](../financial/0008-financial-defaults-and-cagr.md)
+The approved [CAGR default change](../financial/conventions/0008-financial-defaults-and-cagr.md)
 is a concrete authorized reference update. This documentation does not change
 existing fixtures or certify the independence of every current golden case.

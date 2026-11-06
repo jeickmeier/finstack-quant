@@ -1,0 +1,1190 @@
+{
+  "scope": "valuations-fx-and-exotics",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "VALUATIONS-FX-AND-EXOTICS-FX-DELIVERY-CIP",
+      "title": "FX cash positions, covered-interest-parity forwards and two-leg swaps",
+      "path": "fx-delivery-cip.md"
+    },
+    {
+      "id": "VALUATIONS-FX-AND-EXOTICS-NDF-FIXING-SETTLEMENT",
+      "title": "NDF quote direction, fixing transition and settlement value",
+      "path": "ndf-fixing-settlement.md"
+    },
+    {
+      "id": "VALUATIONS-FX-AND-EXOTICS-FX-LISTED-CONTRACTS",
+      "title": "FX listed futures and futures-option delegation",
+      "path": "fx-listed-contracts.md"
+    },
+    {
+      "id": "VALUATIONS-FX-AND-EXOTICS-FX-VANILLA-DELTA",
+      "title": "FX European option valuation, implied volatility and delta conventions",
+      "path": "fx-vanilla-delta.md"
+    },
+    {
+      "id": "VALUATIONS-FX-AND-EXOTICS-FX-DIGITAL",
+      "title": "FX cash-or-nothing and asset-or-nothing digitals",
+      "path": "fx-digital.md"
+    },
+    {
+      "id": "VALUATIONS-FX-AND-EXOTICS-FX-BARRIERS",
+      "title": "FX barrier monitoring, rebate state and analytic/Monte Carlo pricing",
+      "path": "fx-barriers.md"
+    },
+    {
+      "id": "VALUATIONS-FX-AND-EXOTICS-FX-TOUCH",
+      "title": "FX one-touch/no-touch probabilities and payout timing",
+      "path": "fx-touch.md"
+    },
+    {
+      "id": "VALUATIONS-FX-AND-EXOTICS-FX-VARIANCE",
+      "title": "FX variance swap observation estimator and smile-based forecast",
+      "path": "fx-variance.md"
+    },
+    {
+      "id": "VALUATIONS-FX-AND-EXOTICS-QUANTO-DRIFT",
+      "title": "Quanto option drift adjustment, fixed conversion and correlation risk",
+      "path": "quanto-drift.md"
+    },
+    {
+      "id": "VALUATIONS-FX-AND-EXOTICS-COMMODITY-DELIVERY-LISTED",
+      "title": "Commodity forwards, listed futures and delivery/fixing state",
+      "path": "commodity-delivery-listed.md"
+    },
+    {
+      "id": "VALUATIONS-FX-AND-EXOTICS-COMMODITY-SPOT-OPTION",
+      "title": "Commodity spot-option Black pricing, exercise trees and Schwartz\u2013Smith simulation",
+      "path": "commodity-spot-option.md"
+    },
+    {
+      "id": "VALUATIONS-FX-AND-EXOTICS-COMMODITY-AVERAGE-SWAP",
+      "title": "Commodity business-day averaging and fixed-for-floating swaps",
+      "path": "commodity-average-swap.md"
+    },
+    {
+      "id": "VALUATIONS-FX-AND-EXOTICS-COMMODITY-SWAPTION",
+      "title": "Commodity swaption discounted-forward averaging and annuity Black-76",
+      "path": "commodity-swaption.md"
+    },
+    {
+      "id": "VALUATIONS-FX-AND-EXOTICS-COMMODITY-ASIAN",
+      "title": "Commodity Asian exact geometric and arithmetic moment matching",
+      "path": "commodity-asian.md"
+    },
+    {
+      "id": "VALUATIONS-FX-AND-EXOTICS-COMMODITY-SPREAD",
+      "title": "Commodity spread option Kirk approximation and leg risk",
+      "path": "commodity-spread.md"
+    },
+    {
+      "id": "VALUATIONS-FX-AND-EXOTICS-ASSET-ASIAN",
+      "title": "Asset Asian seasoning, exact geometric control and GBM/Heston alternatives",
+      "path": "asset-asian.md"
+    },
+    {
+      "id": "VALUATIONS-FX-AND-EXOTICS-ASSET-BARRIER",
+      "title": "Asset barrier analytic, Monte Carlo and log-space PDE algorithms",
+      "path": "asset-barrier.md"
+    },
+    {
+      "id": "VALUATIONS-FX-AND-EXOTICS-ASSET-LOOKBACK",
+      "title": "Lookback extrema, continuous formulas and monitored GBM paths",
+      "path": "asset-lookback.md"
+    },
+    {
+      "id": "VALUATIONS-FX-AND-EXOTICS-ASSET-RANGE-ACCRUAL",
+      "title": "Asset range-accrual digital-spread replication, GBM and quanto carry",
+      "path": "asset-range-accrual.md"
+    },
+    {
+      "id": "VALUATIONS-FX-AND-EXOTICS-CALLABLE-RANGE-HW",
+      "title": "Callable rate range-accrual HW1F projection and issuer LSMC",
+      "path": "callable-range-hw.md"
+    },
+    {
+      "id": "VALUATIONS-FX-AND-EXOTICS-SNOWBALL-HW",
+      "title": "Snowball and inverse-floater coupon recursion and HW1F discounting",
+      "path": "snowball-hw.md"
+    },
+    {
+      "id": "VALUATIONS-FX-AND-EXOTICS-TARN-TARGET",
+      "title": "TARN target truncation, early redemption and HW1F term rates",
+      "path": "tarn-target.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/valuations/exotics/src/commodity/averaging.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-AVERAGE-SWAP"
+      ],
+      "reason": "Implements Commodity business-day averaging and fixed-for-floating swaps, including ordered calculation branches, numerical parameters and failure/fallback behavior.",
+      "sha256": "626a4f124e7de9ce0bb4c21dec03b886f770db453fab57fc9dae1aa15946644f"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/commodity/commodity_asian_option/metrics/greeks.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-ASIAN"
+      ],
+      "reason": "Metric calculation or calculator selection and bump/sign/unit conventions for Commodity Asian exact geometric and arithmetic moment matching.",
+      "sha256": "e4e87c7664f4ecabdefaa54607555f6dbf1dff7936704f33d4ee1ba740bef5a0"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/commodity/commodity_asian_option/metrics/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-ASIAN"
+      ],
+      "reason": "Metric calculation or calculator selection and bump/sign/unit conventions for Commodity Asian exact geometric and arithmetic moment matching.",
+      "sha256": "257f8fdf725bbb4e883972ffbc80f095049d880a3e82893dcd97e7dcf02f4fd9"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/commodity/commodity_asian_option/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-ASIAN"
+      ],
+      "reason": "Module declarations, public reexports and explanatory/example documentation only; inspected for executable financial defaults. Owning behavior is documented in Commodity Asian exact geometric and arithmetic moment matching.",
+      "sha256": "d60697dee2c294dcf68be15430a2233d2f0d5cf8bc0820317e1967d08cb30c4d"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/commodity/commodity_asian_option/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-ASIAN"
+      ],
+      "reason": "Implements Commodity Asian exact geometric and arithmetic moment matching, including ordered calculation branches, numerical parameters and failure/fallback behavior.",
+      "sha256": "adab60aa113bcc9132d16a8ec281193c92fdb22f7dca9dffab20de1390f5ebe4"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/commodity/commodity_asian_option/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-ASIAN"
+      ],
+      "reason": "Financial input domains/defaults, lifecycle or fixing state, default-model dispatch and instrument/Greek evaluation for Commodity Asian exact geometric and arithmetic moment matching.",
+      "sha256": "589dacb8f09ade9e5b173ab808a97c216a46060cc0165dcc85519e1af1fa0794"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/commodity/commodity_forward/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-DELIVERY-LISTED"
+      ],
+      "reason": "Metric calculation or calculator selection and bump/sign/unit conventions for Commodity forwards, listed futures and delivery/fixing state.",
+      "sha256": "9c486aca56d392b20b5ae09bfdf110102a8d07e145cfe73d9062d908d88c2276"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/commodity/commodity_forward/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-DELIVERY-LISTED"
+      ],
+      "reason": "Module declarations, public reexports and explanatory/example documentation only; inspected for executable financial defaults. Owning behavior is documented in Commodity forwards, listed futures and delivery/fixing state.",
+      "sha256": "acfe2449eb9ec98dc9e9f2b73cab2a571bfc108c4eab7a69ac3831eae9706e21"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/commodity/commodity_forward/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-DELIVERY-LISTED"
+      ],
+      "reason": "Financial input domains/defaults, lifecycle or fixing state, default-model dispatch and instrument/Greek evaluation for Commodity forwards, listed futures and delivery/fixing state.",
+      "sha256": "60c4777c9ce47c27221e910ae4f69870f7446cc23f86abc04e90569af14968df"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/commodity/commodity_future/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-DELIVERY-LISTED"
+      ],
+      "reason": "Metric calculation or calculator selection and bump/sign/unit conventions for Commodity forwards, listed futures and delivery/fixing state.",
+      "sha256": "c8509817a22c135d287b014f5a1163377b0ff41ac1b7146fe2837dec46123ca2"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/commodity/commodity_future/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-DELIVERY-LISTED"
+      ],
+      "reason": "Module declarations, public reexports and explanatory/example documentation only; inspected for executable financial defaults. Owning behavior is documented in Commodity forwards, listed futures and delivery/fixing state.",
+      "sha256": "7180863eb07834d5b6bda535df88ea66038e3a648580e8682aa22f48c5b78f44"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/commodity/commodity_future/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-DELIVERY-LISTED"
+      ],
+      "reason": "Financial input domains/defaults, lifecycle or fixing state, default-model dispatch and instrument/Greek evaluation for Commodity forwards, listed futures and delivery/fixing state.",
+      "sha256": "190246e93d9a1c7a5f1cc2b0cb33d9f3dc63a1c2621b402e2f1f9c1cc8852b1f"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/commodity/commodity_future_option.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-DELIVERY-LISTED"
+      ],
+      "reason": "Instantiates the shared listed futures-option macro, selecting its contract/pricing/risk semantics for this family; not generated output.",
+      "sha256": "c716239bf4cabae4a9c2b095642dc466a70ebb0f9fe18e8870fbfffacf4d017a"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/commodity/commodity_spot_option/metrics/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-SPOT-OPTION"
+      ],
+      "reason": "Metric calculation or calculator selection and bump/sign/unit conventions for Commodity spot-option Black pricing, exercise trees and Schwartz\u2013Smith simulation.",
+      "sha256": "d5a2c47aab0a6dbb277d57a632b4deaaa705022d4cb6c3cd14ad1809dcb93b36"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/commodity/commodity_spot_option/metrics/selected_model.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-SPOT-OPTION"
+      ],
+      "reason": "Metric calculation or calculator selection and bump/sign/unit conventions for Commodity spot-option Black pricing, exercise trees and Schwartz\u2013Smith simulation.",
+      "sha256": "30c1f2c499f8310d77e16e028445794173d22a784243c91523bbd91846c414c8"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/commodity/commodity_spot_option/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-SPOT-OPTION"
+      ],
+      "reason": "Module declarations, public reexports and explanatory/example documentation only; inspected for executable financial defaults. Owning behavior is documented in Commodity spot-option Black pricing, exercise trees and Schwartz\u2013Smith simulation.",
+      "sha256": "0d4b8e27b25eb5cae39bc826884ded23389f965c75c336a97d300b04314e634c"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/commodity/commodity_spot_option/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-SPOT-OPTION"
+      ],
+      "reason": "Implements Commodity spot-option Black pricing, exercise trees and Schwartz\u2013Smith simulation, including ordered calculation branches, numerical parameters and failure/fallback behavior.",
+      "sha256": "678539dbf402426f93e6c7f73f26c19ae220b318da5bebabd8e62dd5f06fc83c"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/commodity/commodity_spot_option/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-SPOT-OPTION"
+      ],
+      "reason": "Financial input domains/defaults, lifecycle or fixing state, default-model dispatch and instrument/Greek evaluation for Commodity spot-option Black pricing, exercise trees and Schwartz\u2013Smith simulation.",
+      "sha256": "76bfbeac4909a21b22303d9ee065396871fe310b86a0b4e7b7d9823caf8710e3"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/commodity/commodity_spread_option/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-SPREAD"
+      ],
+      "reason": "Metric calculation or calculator selection and bump/sign/unit conventions for Commodity spread option Kirk approximation and leg risk.",
+      "sha256": "f172b6b21eaaa419bd045bc6a9682ce31ed15b2b604c112c216ab60ba2122338"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/commodity/commodity_spread_option/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-SPREAD"
+      ],
+      "reason": "Module declarations, public reexports and explanatory/example documentation only; inspected for executable financial defaults. Owning behavior is documented in Commodity spread option Kirk approximation and leg risk.",
+      "sha256": "56359b8eba81dab15b2001b2655d4702a062c39bbf1fdb829e750eaa71b7d49b"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/commodity/commodity_spread_option/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-SPREAD"
+      ],
+      "reason": "Implements Commodity spread option Kirk approximation and leg risk, including ordered calculation branches, numerical parameters and failure/fallback behavior.",
+      "sha256": "56fa0989e05c19caf8f6c92ada56e585867e9415128528fda4101ccc264838aa"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/commodity/commodity_spread_option/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-SPREAD"
+      ],
+      "reason": "Financial input domains/defaults, lifecycle or fixing state, default-model dispatch and instrument/Greek evaluation for Commodity spread option Kirk approximation and leg risk.",
+      "sha256": "87053c326728b6435f6d3f63f92f37f8e00d0c520bfb860264d4bb35f9460f02"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/commodity/commodity_swap/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-AVERAGE-SWAP"
+      ],
+      "reason": "Metric calculation or calculator selection and bump/sign/unit conventions for Commodity business-day averaging and fixed-for-floating swaps.",
+      "sha256": "940c181fb85dbae317fe3bfba7fb6355366f77344e40e93a73c3e915facf5af8"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/commodity/commodity_swap/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-AVERAGE-SWAP"
+      ],
+      "reason": "Module declarations, public reexports and explanatory/example documentation only; inspected for executable financial defaults. Owning behavior is documented in Commodity business-day averaging and fixed-for-floating swaps.",
+      "sha256": "640a4ce75a2896f944f107e95550026cff8e29493df1702d9c64f74a4cbbdd2b"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/commodity/commodity_swap/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-AVERAGE-SWAP"
+      ],
+      "reason": "Financial input domains/defaults, lifecycle or fixing state, default-model dispatch and instrument/Greek evaluation for Commodity business-day averaging and fixed-for-floating swaps.",
+      "sha256": "83caf6a9c548247f75872bfa44635120745f85468151a3372248215d891d7293"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/commodity/commodity_swaption/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-SWAPTION"
+      ],
+      "reason": "Metric calculation or calculator selection and bump/sign/unit conventions for Commodity swaption discounted-forward averaging and annuity Black-76.",
+      "sha256": "af9425ccdc7add45154c1c74d5e9a49eb57c0708a0eb6502ac069cbd54a702d4"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/commodity/commodity_swaption/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-SWAPTION"
+      ],
+      "reason": "Module declarations, public reexports and explanatory/example documentation only; inspected for executable financial defaults. Owning behavior is documented in Commodity swaption discounted-forward averaging and annuity Black-76.",
+      "sha256": "e587c92f0ee5575409a3e4a48686d4493a9da5cb8cbbb416eeb062f06c90e173"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/commodity/commodity_swaption/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-SWAPTION"
+      ],
+      "reason": "Financial input domains/defaults, lifecycle or fixing state, default-model dispatch and instrument/Greek evaluation for Commodity swaption discounted-forward averaging and annuity Black-76.",
+      "sha256": "c45371c2ac97bde542aa5b3cbcc1de6f8c55bd08c3f67bb41d52747e0f04cd62"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/commodity/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-AVERAGE-SWAP"
+      ],
+      "reason": "Implements Commodity business-day averaging and fixed-for-floating swaps, including ordered calculation branches, numerical parameters and failure/fallback behavior.",
+      "sha256": "d124daa1fa451a0603294ce88f85b1bc2e3095a18b13dda5b5c365f8565959a5"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/asian_option/heston_mc_pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-ASSET-ASIAN"
+      ],
+      "reason": "Implements Asset Asian seasoning, exact geometric control and GBM/Heston alternatives, including ordered calculation branches, numerical parameters and failure/fallback behavior.",
+      "sha256": "473cf3db6039f4c4dce11cf57b841ac20aece369aea04c5d5918f9e722430ef7"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/asian_option/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-ASSET-ASIAN"
+      ],
+      "reason": "Metric calculation or calculator selection and bump/sign/unit conventions for Asset Asian seasoning, exact geometric control and GBM/Heston alternatives.",
+      "sha256": "8544113ed94bf4cf1fe0eb24138b796189558810a369b2c9dc7c7e2b10114b0e"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/asian_option/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-ASSET-ASIAN"
+      ],
+      "reason": "Module declarations, public reexports and explanatory/example documentation only; inspected for executable financial defaults. Owning behavior is documented in Asset Asian seasoning, exact geometric control and GBM/Heston alternatives.",
+      "sha256": "91dc37d84b673b4177712d9409a9e66efc3a66fa6ee5679af939c08c82c2c649"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/asian_option/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-ASSET-ASIAN"
+      ],
+      "reason": "Implements Asset Asian seasoning, exact geometric control and GBM/Heston alternatives, including ordered calculation branches, numerical parameters and failure/fallback behavior.",
+      "sha256": "62c0ee6e1cdcb73f6eddfdfd94f60aa280e2a9f12e92fcc06ce3bbade565ba48"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/asian_option/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-ASSET-ASIAN"
+      ],
+      "reason": "Financial input domains/defaults, lifecycle or fixing state, default-model dispatch and instrument/Greek evaluation for Asset Asian seasoning, exact geometric control and GBM/Heston alternatives.",
+      "sha256": "85cdb54c5b66e6fabedc841e25ece5bc7de3e7fdd09e64a96983e319d651401b"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/barrier_option/heston_mc_pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-ASSET-BARRIER"
+      ],
+      "reason": "Implements Asset barrier analytic, Monte Carlo and log-space PDE algorithms, including ordered calculation branches, numerical parameters and failure/fallback behavior.",
+      "sha256": "d3d15127be1f14a22a6bbc1da18e76076f80e81a0411970073c51e5730d7d53d"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/barrier_option/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-ASSET-BARRIER"
+      ],
+      "reason": "Metric calculation or calculator selection and bump/sign/unit conventions for Asset barrier analytic, Monte Carlo and log-space PDE algorithms.",
+      "sha256": "2f2411e0f84b5665a31b290d091b6f21ded0513097975c1bf8204468047af0bd"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/barrier_option/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-ASSET-BARRIER"
+      ],
+      "reason": "Module declarations, public reexports and explanatory/example documentation only; inspected for executable financial defaults. Owning behavior is documented in Asset barrier analytic, Monte Carlo and log-space PDE algorithms.",
+      "sha256": "6dd664721cb2b73b9dec8f8055d467eac304d0bf12f85f61d79071e340852bb4"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/barrier_option/pde_pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-ASSET-BARRIER"
+      ],
+      "reason": "Implements Asset barrier analytic, Monte Carlo and log-space PDE algorithms, including ordered calculation branches, numerical parameters and failure/fallback behavior.",
+      "sha256": "4c9483c2ff50c7385c7a3ea17bfcc228822f3d76349663c4f8cc141bdb78e170"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/barrier_option/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-ASSET-BARRIER"
+      ],
+      "reason": "Implements Asset barrier analytic, Monte Carlo and log-space PDE algorithms, including ordered calculation branches, numerical parameters and failure/fallback behavior.",
+      "sha256": "ed35cc34e7630181fccfe368b9331a4696a3b804c698304e688dfd09f6ef0993"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/barrier_option/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-ASSET-BARRIER"
+      ],
+      "reason": "Financial input domains/defaults, lifecycle or fixing state, default-model dispatch and instrument/Greek evaluation for Asset barrier analytic, Monte Carlo and log-space PDE algorithms.",
+      "sha256": "7be20660284cf81acd40fbdc8293c175e6c2c0dcc9f7c79a4443e360cb5b03ad"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/callable_range_accrual/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-CALLABLE-RANGE-HW"
+      ],
+      "reason": "Metric calculation or calculator selection and bump/sign/unit conventions for Callable rate range-accrual HW1F projection and issuer LSMC.",
+      "sha256": "f1bd25d2a626f94b049e2bc68e4494320f2638590c0759249f3de48fa93830c4"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/callable_range_accrual/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-CALLABLE-RANGE-HW"
+      ],
+      "reason": "Module declarations, public reexports and explanatory/example documentation only; inspected for executable financial defaults. Owning behavior is documented in Callable rate range-accrual HW1F projection and issuer LSMC.",
+      "sha256": "17db586e5635ed812d5ac51ab0403930f0065f8010206ffc3df3555b0451f5f7"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/callable_range_accrual/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-CALLABLE-RANGE-HW"
+      ],
+      "reason": "Implements Callable rate range-accrual HW1F projection and issuer LSMC, including ordered calculation branches, numerical parameters and failure/fallback behavior.",
+      "sha256": "c99bc877fa55ca5bdb7df5adb01efdade6e68c1761de4e7b260247b90b3c081e"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/callable_range_accrual/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-CALLABLE-RANGE-HW"
+      ],
+      "reason": "Financial input domains/defaults, lifecycle or fixing state, default-model dispatch and instrument/Greek evaluation for Callable rate range-accrual HW1F projection and issuer LSMC.",
+      "sha256": "c41e0cef0acde1408e2313ac84d2999b6d35f981a06aaccf021de98629120b80"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/hw1f_note.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-CALLABLE-RANGE-HW",
+        "VALUATIONS-FX-AND-EXOTICS-SNOWBALL-HW",
+        "VALUATIONS-FX-AND-EXOTICS-TARN-TARGET"
+      ],
+      "reason": "Implements Callable rate range-accrual HW1F projection and issuer LSMC, Snowball and inverse-floater coupon recursion and HW1F discounting, TARN target truncation, early redemption and HW1F term rates, including ordered calculation branches, numerical parameters and failure/fallback behavior.",
+      "sha256": "3715e7f3d3fa9b9f03726d3fdd84c7ac677b06557fc2941df2398012f2d7cb4b"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/lookback_option/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-ASSET-LOOKBACK"
+      ],
+      "reason": "Metric calculation or calculator selection and bump/sign/unit conventions for Lookback extrema, continuous formulas and monitored GBM paths.",
+      "sha256": "10b5c8bfb1cfd763f6da2ae8b1ef7d035d642b26e1fc9817c27cf34fd77e8e9c"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/lookback_option/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-ASSET-LOOKBACK"
+      ],
+      "reason": "Module declarations, public reexports and explanatory/example documentation only; inspected for executable financial defaults. Owning behavior is documented in Lookback extrema, continuous formulas and monitored GBM paths.",
+      "sha256": "6204f55e60041bb519ae0623916950a2db9735196053b7e672bd4349d30ebb0f"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/lookback_option/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-ASSET-LOOKBACK"
+      ],
+      "reason": "Implements Lookback extrema, continuous formulas and monitored GBM paths, including ordered calculation branches, numerical parameters and failure/fallback behavior.",
+      "sha256": "2688eadb22911bcdced71c7187a4970b662537314243bd3cc85c5087eab08cfa"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/lookback_option/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-ASSET-LOOKBACK"
+      ],
+      "reason": "Financial input domains/defaults, lifecycle or fixing state, default-model dispatch and instrument/Greek evaluation for Lookback extrema, continuous formulas and monitored GBM paths.",
+      "sha256": "8150fab16933178202cbc2281e5ce35178f0cbd239beb1edbb9424fa7e0c5b8b"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-DELIVERY-LISTED",
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-SPOT-OPTION",
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-AVERAGE-SWAP",
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-SWAPTION",
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-ASIAN",
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-SPREAD",
+        "VALUATIONS-FX-AND-EXOTICS-ASSET-ASIAN",
+        "VALUATIONS-FX-AND-EXOTICS-ASSET-BARRIER",
+        "VALUATIONS-FX-AND-EXOTICS-ASSET-LOOKBACK",
+        "VALUATIONS-FX-AND-EXOTICS-ASSET-RANGE-ACCRUAL",
+        "VALUATIONS-FX-AND-EXOTICS-CALLABLE-RANGE-HW",
+        "VALUATIONS-FX-AND-EXOTICS-SNOWBALL-HW",
+        "VALUATIONS-FX-AND-EXOTICS-TARN-TARGET"
+      ],
+      "reason": "Module declarations, public reexports and explanatory/example documentation only; inspected for executable financial defaults. Owning behavior is documented in Commodity forwards, listed futures and delivery/fixing state, Commodity spot-option Black pricing, exercise trees and Schwartz\u2013Smith simulation, Commodity business-day averaging and fixed-for-floating swaps, Commodity swaption discounted-forward averaging and annuity Black-76, Commodity Asian exact geometric and arithmetic moment matching, Commodity spread option Kirk approximation and leg risk, Asset Asian seasoning, exact geometric control and GBM/Heston alternatives, Asset barrier analytic, Monte Carlo and log-space PDE algorithms, Lookback extrema, continuous formulas and monitored GBM paths, Asset range-accrual digital-spread replication, GBM and quanto carry, Callable rate range-accrual HW1F projection and issuer LSMC, Snowball and inverse-floater coupon recursion and HW1F discounting, TARN target truncation, early redemption and HW1F term rates.",
+      "sha256": "c1b165643c0b973a68a7524fe5a29741a0ec5954e7098adcd855775408f5dd93"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/range_accrual/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-ASSET-RANGE-ACCRUAL"
+      ],
+      "reason": "Metric calculation or calculator selection and bump/sign/unit conventions for Asset range-accrual digital-spread replication, GBM and quanto carry.",
+      "sha256": "94403f5c34e8de1fd0f5959aa2219a04cc20402ffd500ec899bdcce7ba1478de"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/range_accrual/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-ASSET-RANGE-ACCRUAL"
+      ],
+      "reason": "Module declarations, public reexports and explanatory/example documentation only; inspected for executable financial defaults. Owning behavior is documented in Asset range-accrual digital-spread replication, GBM and quanto carry.",
+      "sha256": "3e35d6632305673b15aa0c2be9ab978f6ea90a2a7b0424f5c24a8d2e5c208976"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/range_accrual/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-ASSET-RANGE-ACCRUAL"
+      ],
+      "reason": "Implements Asset range-accrual digital-spread replication, GBM and quanto carry, including ordered calculation branches, numerical parameters and failure/fallback behavior.",
+      "sha256": "978b83d8f8f48f3b2ccdc5651ab933e93d4fabfaa026435b8cf4df7d254c1c8f"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/range_accrual/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-ASSET-RANGE-ACCRUAL"
+      ],
+      "reason": "Financial input domains/defaults, lifecycle or fixing state, default-model dispatch and instrument/Greek evaluation for Asset range-accrual digital-spread replication, GBM and quanto carry.",
+      "sha256": "59b06f2d5d90368574b98cbe4749f907191c7e61c0978588411bae0df25647a1"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/snowball/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-SNOWBALL-HW"
+      ],
+      "reason": "Metric calculation or calculator selection and bump/sign/unit conventions for Snowball and inverse-floater coupon recursion and HW1F discounting.",
+      "sha256": "946f9e3a0c7762544c0f2439e3f52abf03f26331bace198f82fe0f96c67e1c88"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/snowball/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-SNOWBALL-HW"
+      ],
+      "reason": "Module declarations, public reexports and explanatory/example documentation only; inspected for executable financial defaults. Owning behavior is documented in Snowball and inverse-floater coupon recursion and HW1F discounting.",
+      "sha256": "47bb21422c9cadd5c7ada896ecd9969cd2c128dddd3f9d13080cb6ca27def9bc"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/snowball/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-SNOWBALL-HW"
+      ],
+      "reason": "Implements Snowball and inverse-floater coupon recursion and HW1F discounting, including ordered calculation branches, numerical parameters and failure/fallback behavior.",
+      "sha256": "e45253a4ef28abad3812124089ecefcd73faf5521b0885e6be7e33e02e352393"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/snowball/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-SNOWBALL-HW"
+      ],
+      "reason": "Financial input domains/defaults, lifecycle or fixing state, default-model dispatch and instrument/Greek evaluation for Snowball and inverse-floater coupon recursion and HW1F discounting.",
+      "sha256": "0017fc61b9a58c3ffbe60118ff8c9ec7f175f0e07c37ae889a4352c93ad3308b"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/tarn/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-TARN-TARGET"
+      ],
+      "reason": "Metric calculation or calculator selection and bump/sign/unit conventions for TARN target truncation, early redemption and HW1F term rates.",
+      "sha256": "0cf5aefd2fb46d7a890e1bafe40f5784e1d5eba8a8ecd16b6c53251f9f92e3a6"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/tarn/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-TARN-TARGET"
+      ],
+      "reason": "Module declarations, public reexports and explanatory/example documentation only; inspected for executable financial defaults. Owning behavior is documented in TARN target truncation, early redemption and HW1F term rates.",
+      "sha256": "c63d110f6e44da471f7b0145a213a1ab1e47be17a6642a989c1a0e78db041dec"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/tarn/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-TARN-TARGET"
+      ],
+      "reason": "Implements TARN target truncation, early redemption and HW1F term rates, including ordered calculation branches, numerical parameters and failure/fallback behavior.",
+      "sha256": "75ae993e0d8e44f839cc8fcabec6501fa8c22dc666090239bfde3367513cdf39"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/exotics/tarn/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-TARN-TARGET"
+      ],
+      "reason": "Financial input domains/defaults, lifecycle or fixing state, default-model dispatch and instrument/Greek evaluation for TARN target truncation, early redemption and HW1F term rates.",
+      "sha256": "412ef448088dc1df35d4251f9cafc58f20bcdb37125ead5ebb84fe920e29f532"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/family.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-DELIVERY-LISTED",
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-SPOT-OPTION",
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-AVERAGE-SWAP",
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-SWAPTION",
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-ASIAN",
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-SPREAD",
+        "VALUATIONS-FX-AND-EXOTICS-ASSET-ASIAN",
+        "VALUATIONS-FX-AND-EXOTICS-ASSET-BARRIER",
+        "VALUATIONS-FX-AND-EXOTICS-ASSET-LOOKBACK",
+        "VALUATIONS-FX-AND-EXOTICS-ASSET-RANGE-ACCRUAL",
+        "VALUATIONS-FX-AND-EXOTICS-CALLABLE-RANGE-HW",
+        "VALUATIONS-FX-AND-EXOTICS-SNOWBALL-HW",
+        "VALUATIONS-FX-AND-EXOTICS-TARN-TARGET"
+      ],
+      "reason": "Registers concrete pricing engines, generic model keys, default MC constructor parameters and metric calculators; materially controls reachable methodologies.",
+      "sha256": "0c23664b7287b9b5fc9e3e6108897a72f79e2a9a6cb375faea5b5b8e566bb638"
+    },
+    {
+      "path": "finstack-quant/valuations/exotics/src/lib.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-DELIVERY-LISTED",
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-SPOT-OPTION",
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-AVERAGE-SWAP",
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-SWAPTION",
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-ASIAN",
+        "VALUATIONS-FX-AND-EXOTICS-COMMODITY-SPREAD",
+        "VALUATIONS-FX-AND-EXOTICS-ASSET-ASIAN",
+        "VALUATIONS-FX-AND-EXOTICS-ASSET-BARRIER",
+        "VALUATIONS-FX-AND-EXOTICS-ASSET-LOOKBACK",
+        "VALUATIONS-FX-AND-EXOTICS-ASSET-RANGE-ACCRUAL",
+        "VALUATIONS-FX-AND-EXOTICS-CALLABLE-RANGE-HW",
+        "VALUATIONS-FX-AND-EXOTICS-SNOWBALL-HW",
+        "VALUATIONS-FX-AND-EXOTICS-TARN-TARGET"
+      ],
+      "reason": "Module declarations, public reexports and explanatory/example documentation only; inspected for executable financial defaults. Owning behavior is documented in Commodity forwards, listed futures and delivery/fixing state, Commodity spot-option Black pricing, exercise trees and Schwartz\u2013Smith simulation, Commodity business-day averaging and fixed-for-floating swaps, Commodity swaption discounted-forward averaging and annuity Black-76, Commodity Asian exact geometric and arithmetic moment matching, Commodity spread option Kirk approximation and leg risk, Asset Asian seasoning, exact geometric control and GBM/Heston alternatives, Asset barrier analytic, Monte Carlo and log-space PDE algorithms, Lookback extrema, continuous formulas and monitored GBM paths, Asset range-accrual digital-spread replication, GBM and quanto carry, Callable rate range-accrual HW1F projection and issuer LSMC, Snowball and inverse-floater coupon recursion and HW1F discounting, TARN target truncation, early redemption and HW1F term rates.",
+      "sha256": "83da2cfcb58ba36952c1ec9ecb15337c8b72f7027f11d00cc911560697e01841"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/family.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-DELIVERY-CIP",
+        "VALUATIONS-FX-AND-EXOTICS-NDF-FIXING-SETTLEMENT",
+        "VALUATIONS-FX-AND-EXOTICS-FX-LISTED-CONTRACTS",
+        "VALUATIONS-FX-AND-EXOTICS-FX-VANILLA-DELTA",
+        "VALUATIONS-FX-AND-EXOTICS-FX-DIGITAL",
+        "VALUATIONS-FX-AND-EXOTICS-FX-BARRIERS",
+        "VALUATIONS-FX-AND-EXOTICS-FX-TOUCH",
+        "VALUATIONS-FX-AND-EXOTICS-FX-VARIANCE",
+        "VALUATIONS-FX-AND-EXOTICS-QUANTO-DRIFT"
+      ],
+      "reason": "Registers concrete pricing engines, generic model keys, default MC constructor parameters and metric calculators; materially controls reachable methodologies.",
+      "sha256": "7b0bb378f1dee0e867508ad43fa97e828ac9ca36d0eb8e99a1c8720c0cbc2b6b"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_barrier_option/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-BARRIERS"
+      ],
+      "reason": "Metric calculation or calculator selection and bump/sign/unit conventions for FX barrier monitoring, rebate state and analytic/Monte Carlo pricing.",
+      "sha256": "9c6f77f5e2b4852b507cb687ab37f3cf479e368a4c80ddc807738e26fa198cf7"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_barrier_option/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-BARRIERS"
+      ],
+      "reason": "Module declarations, public reexports and explanatory/example documentation only; inspected for executable financial defaults. Owning behavior is documented in FX barrier monitoring, rebate state and analytic/Monte Carlo pricing.",
+      "sha256": "e1abc48eef256a4af655a3fb8f342dc1ad6de833df16dba45b695e8b5e26d11a"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_barrier_option/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-BARRIERS"
+      ],
+      "reason": "Implements FX barrier monitoring, rebate state and analytic/Monte Carlo pricing, including ordered calculation branches, numerical parameters and failure/fallback behavior.",
+      "sha256": "005224b1eac2ddbb8aa69a18a91eed974049b39870fcf7e117c18251f6ebf074"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_barrier_option/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-BARRIERS"
+      ],
+      "reason": "Financial input domains/defaults, lifecycle or fixing state, default-model dispatch and instrument/Greek evaluation for FX barrier monitoring, rebate state and analytic/Monte Carlo pricing.",
+      "sha256": "d2d9a0b4df59261a61f5d0fa15ae60e1727493a7c776d1000956e50c6689eeb1"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_digital_option/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-DIGITAL"
+      ],
+      "reason": "Metric calculation or calculator selection and bump/sign/unit conventions for FX cash-or-nothing and asset-or-nothing digitals.",
+      "sha256": "a83116c369dfe973c50d1c84e7f8589effd95581e5aedc99379e00be0e0ca2e8"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_digital_option/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-DIGITAL"
+      ],
+      "reason": "Module declarations, public reexports and explanatory/example documentation only; inspected for executable financial defaults. Owning behavior is documented in FX cash-or-nothing and asset-or-nothing digitals.",
+      "sha256": "4eeca23fc7e5232100626a7b9d3ea005823053521b3612baad24976d7ca232a6"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_digital_option/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-DIGITAL"
+      ],
+      "reason": "Implements FX cash-or-nothing and asset-or-nothing digitals, including ordered calculation branches, numerical parameters and failure/fallback behavior.",
+      "sha256": "d9b19ce11741569e6224b20b6a8efac18092b1167e438fef42da30fb71b92bda"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_digital_option/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-DIGITAL"
+      ],
+      "reason": "Financial input domains/defaults, lifecycle or fixing state, default-model dispatch and instrument/Greek evaluation for FX cash-or-nothing and asset-or-nothing digitals.",
+      "sha256": "a92858a28e94acaa3dd874bfc69c0a0b868165a7e0e43de92970ab609f8feb74"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_forward/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-DELIVERY-CIP"
+      ],
+      "reason": "Metric calculation or calculator selection and bump/sign/unit conventions for FX cash positions, covered-interest-parity forwards and two-leg swaps.",
+      "sha256": "6133d2a05074ad181ce298a8e4db3e21e72c109fc90d30d95c1d88cb1d75c7e8"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_forward/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-DELIVERY-CIP"
+      ],
+      "reason": "Module declarations, public reexports and explanatory/example documentation only; inspected for executable financial defaults. Owning behavior is documented in FX cash positions, covered-interest-parity forwards and two-leg swaps.",
+      "sha256": "4ee18af95788e90ef6e04692bc30dd6ae3a6d803618d1baab69582038dc7f748"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_forward/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-DELIVERY-CIP"
+      ],
+      "reason": "Financial input domains/defaults, lifecycle or fixing state, default-model dispatch and instrument/Greek evaluation for FX cash positions, covered-interest-parity forwards and two-leg swaps.",
+      "sha256": "dedc048e62be193569bbc7bf51ae442a6bf0d6fa8913491f9651c3aa24f17ec6"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_future/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-LISTED-CONTRACTS"
+      ],
+      "reason": "Metric calculation or calculator selection and bump/sign/unit conventions for FX listed futures and futures-option delegation.",
+      "sha256": "55da2600ef46038a18fd711cad2f5f1b2a38fb4c4843cb9b64a4e9300a2f2fe4"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_future/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-LISTED-CONTRACTS"
+      ],
+      "reason": "Module declarations, public reexports and explanatory/example documentation only; inspected for executable financial defaults. Owning behavior is documented in FX listed futures and futures-option delegation.",
+      "sha256": "3dfda8a556d069a32bd8122f01e06596b9515cbd0b59301aa061164c3603adfb"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_future/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-LISTED-CONTRACTS"
+      ],
+      "reason": "Financial input domains/defaults, lifecycle or fixing state, default-model dispatch and instrument/Greek evaluation for FX listed futures and futures-option delegation.",
+      "sha256": "3616149507f252a812d6d384fd558dba2cb270804e825facca9de6f19e881496"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_future_option.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-LISTED-CONTRACTS"
+      ],
+      "reason": "Instantiates the shared listed futures-option macro, selecting its contract/pricing/risk semantics for this family; not generated output.",
+      "sha256": "4a04ecf82deb55c8a3dec166386d30678606077a8950083970fa794a107a4f29"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_option/metrics/delta_conventions.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-VANILLA-DELTA"
+      ],
+      "reason": "Metric calculation or calculator selection and bump/sign/unit conventions for FX European option valuation, implied volatility and delta conventions.",
+      "sha256": "f93d7fb03fea7312c8c1b96000cc397208a059ff503c9a90f9ef9eb712b61579"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_option/metrics/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-VANILLA-DELTA"
+      ],
+      "reason": "Metric calculation or calculator selection and bump/sign/unit conventions for FX European option valuation, implied volatility and delta conventions.",
+      "sha256": "c0bb307b0789a96c5d2a4368cd5921a7d5a3a7df15bae59b22fd5473d7034e34"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_option/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-VANILLA-DELTA"
+      ],
+      "reason": "Module declarations, public reexports and explanatory/example documentation only; inspected for executable financial defaults. Owning behavior is documented in FX European option valuation, implied volatility and delta conventions.",
+      "sha256": "151a3d82f5ff5b0b1b6c6e90645c070be92299f8de2c4fd4deb0da53e8feb522"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_option/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-VANILLA-DELTA"
+      ],
+      "reason": "Implements FX European option valuation, implied volatility and delta conventions, including ordered calculation branches, numerical parameters and failure/fallback behavior.",
+      "sha256": "e726ca6d0d6346f339b5b21de5c2c85c2837178fc51dbccca9b0077a727b1fff"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_option/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-VANILLA-DELTA"
+      ],
+      "reason": "Financial input domains/defaults, lifecycle or fixing state, default-model dispatch and instrument/Greek evaluation for FX European option valuation, implied volatility and delta conventions.",
+      "sha256": "86abc2003fd5c4dd636ce8af605177e5733bff5f8c9226d7aad472c9b4421f46"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_spot/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-DELIVERY-CIP"
+      ],
+      "reason": "Metric calculation or calculator selection and bump/sign/unit conventions for FX cash positions, covered-interest-parity forwards and two-leg swaps.",
+      "sha256": "fccba168ba566f383340be30d4b56c54ce8acd059f4018ffaf0faff1c9864887"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_spot/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-DELIVERY-CIP"
+      ],
+      "reason": "Module declarations, public reexports and explanatory/example documentation only; inspected for executable financial defaults. Owning behavior is documented in FX cash positions, covered-interest-parity forwards and two-leg swaps.",
+      "sha256": "c9b0cf2712da8952d442a60181399bcaa3d3feaab93b8a99595a7b3140f20825"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_spot/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-DELIVERY-CIP"
+      ],
+      "reason": "Financial input domains/defaults, lifecycle or fixing state, default-model dispatch and instrument/Greek evaluation for FX cash positions, covered-interest-parity forwards and two-leg swaps.",
+      "sha256": "40614d691b0587430dfae2b2bc5dfefcfa907ea55f7e157c913c888572ddbd0c"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_swap/metrics/ir01.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-DELIVERY-CIP"
+      ],
+      "reason": "Metric calculation or calculator selection and bump/sign/unit conventions for FX cash positions, covered-interest-parity forwards and two-leg swaps.",
+      "sha256": "6a917225723366bc9262ad26483c49a425f27a086332c1c4b8a147ef63f17cc3"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_swap/metrics/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-DELIVERY-CIP"
+      ],
+      "reason": "Metric calculation or calculator selection and bump/sign/unit conventions for FX cash positions, covered-interest-parity forwards and two-leg swaps.",
+      "sha256": "a08c1f6b4b02451dd81240a946fb1bb6720b8e302a0f106dbb33b2e7227cb4a3"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_swap/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-DELIVERY-CIP"
+      ],
+      "reason": "Module declarations, public reexports and explanatory/example documentation only; inspected for executable financial defaults. Owning behavior is documented in FX cash positions, covered-interest-parity forwards and two-leg swaps.",
+      "sha256": "103b7ca36189dae405cd07b6a51e7366d3a612dfbd216948ae2fa07b6062017d"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_swap/pricing_helper.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-DELIVERY-CIP"
+      ],
+      "reason": "Implements FX cash positions, covered-interest-parity forwards and two-leg swaps, including ordered calculation branches, numerical parameters and failure/fallback behavior.",
+      "sha256": "3c0a76ee68e8d11d731984c19e2d2276e483c354930859873ff6e95c31dd5dd5"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_swap/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-DELIVERY-CIP"
+      ],
+      "reason": "Financial input domains/defaults, lifecycle or fixing state, default-model dispatch and instrument/Greek evaluation for FX cash positions, covered-interest-parity forwards and two-leg swaps.",
+      "sha256": "7a068e181d9a991ebcdb67c3a0164602b453cfe7199c1bd35915a2cebfb39ba5"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_touch_option/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-TOUCH"
+      ],
+      "reason": "Metric calculation or calculator selection and bump/sign/unit conventions for FX one-touch/no-touch probabilities and payout timing.",
+      "sha256": "02005f950e0ec7d0f747e343357d583e699f0906b2c8e6ff3d50bb2dcdeca657"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_touch_option/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-TOUCH"
+      ],
+      "reason": "Module declarations, public reexports and explanatory/example documentation only; inspected for executable financial defaults. Owning behavior is documented in FX one-touch/no-touch probabilities and payout timing.",
+      "sha256": "a3724f10bb2e5b0e3a636b54ed4fc83bfbf724cedeabc7f980915512b697e2a7"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_touch_option/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-TOUCH"
+      ],
+      "reason": "Implements FX one-touch/no-touch probabilities and payout timing, including ordered calculation branches, numerical parameters and failure/fallback behavior.",
+      "sha256": "d285a2b6493efcb021d557d4f715d14d79ee3fb8eeff2c642461e3edb1e7d50c"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_touch_option/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-TOUCH"
+      ],
+      "reason": "Financial input domains/defaults, lifecycle or fixing state, default-model dispatch and instrument/Greek evaluation for FX one-touch/no-touch probabilities and payout timing.",
+      "sha256": "4c9a7b95996e5f60bec49012315fc0deba2888e556e66668f755c1a61c139f3d"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_variance_swap/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-VARIANCE"
+      ],
+      "reason": "Metric calculation or calculator selection and bump/sign/unit conventions for FX variance swap observation estimator and smile-based forecast.",
+      "sha256": "f628a591dc88b9993d1c68f861292db1d8cbdeb134a05519e4e0429a4bb4ab18"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_variance_swap/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-VARIANCE"
+      ],
+      "reason": "Module declarations, public reexports and explanatory/example documentation only; inspected for executable financial defaults. Owning behavior is documented in FX variance swap observation estimator and smile-based forecast.",
+      "sha256": "ec65d550b4fba55719198ef33104b8e1cc500a2140c765347f75b209bb6ab388"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_variance_swap/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-VARIANCE"
+      ],
+      "reason": "Implements FX variance swap observation estimator and smile-based forecast, including ordered calculation branches, numerical parameters and failure/fallback behavior.",
+      "sha256": "c1c84a3a1ace110f65b9defdb5f6dec2a912428c4b3d056f3a40d1dcfa8de70b"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/fx_variance_swap/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-VARIANCE"
+      ],
+      "reason": "Financial input domains/defaults, lifecycle or fixing state, default-model dispatch and instrument/Greek evaluation for FX variance swap observation estimator and smile-based forecast.",
+      "sha256": "f3c02f85e530470f8d99e54c420f10f8f0b28f8a7f16037a0663a2f4e3cbfc2e"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/lib.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-DELIVERY-CIP",
+        "VALUATIONS-FX-AND-EXOTICS-NDF-FIXING-SETTLEMENT",
+        "VALUATIONS-FX-AND-EXOTICS-FX-LISTED-CONTRACTS",
+        "VALUATIONS-FX-AND-EXOTICS-FX-VANILLA-DELTA",
+        "VALUATIONS-FX-AND-EXOTICS-FX-DIGITAL",
+        "VALUATIONS-FX-AND-EXOTICS-FX-BARRIERS",
+        "VALUATIONS-FX-AND-EXOTICS-FX-TOUCH",
+        "VALUATIONS-FX-AND-EXOTICS-FX-VARIANCE",
+        "VALUATIONS-FX-AND-EXOTICS-QUANTO-DRIFT"
+      ],
+      "reason": "Module declarations, public reexports and explanatory/example documentation only; inspected for executable financial defaults. Owning behavior is documented in FX cash positions, covered-interest-parity forwards and two-leg swaps, NDF quote direction, fixing transition and settlement value, FX listed futures and futures-option delegation, FX European option valuation, implied volatility and delta conventions, FX cash-or-nothing and asset-or-nothing digitals, FX barrier monitoring, rebate state and analytic/Monte Carlo pricing, FX one-touch/no-touch probabilities and payout timing, FX variance swap observation estimator and smile-based forecast, Quanto option drift adjustment, fixed conversion and correlation risk.",
+      "sha256": "2443648f24d55341d1dbbc14312fcee02caa4c18617691da7f50ed6d5771e603"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/ndf/metrics/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-NDF-FIXING-SETTLEMENT"
+      ],
+      "reason": "Metric calculation or calculator selection and bump/sign/unit conventions for NDF quote direction, fixing transition and settlement value.",
+      "sha256": "3ac19afe0fdaf6d9db39efc83f9251a5bd21035db3411d19011650ed64888aee"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/ndf/metrics/tests.rs",
+      "classification": "test",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-NDF-FIXING-SETTLEMENT"
+      ],
+      "reason": "Only NDF metric test fixtures/assertions: quotation-direction FX01 and observed-fixing behavior; no production calculation.",
+      "sha256": "11598c37fd47e5a2036e8d31bf478e7f5b0f5e1a95ae2eceabbf2944bf418c2f"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/ndf/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-NDF-FIXING-SETTLEMENT"
+      ],
+      "reason": "Module declarations, public reexports and explanatory/example documentation only; inspected for executable financial defaults. Owning behavior is documented in NDF quote direction, fixing transition and settlement value.",
+      "sha256": "1e3f1533d8ef00f79340dfe0466e7120c47ffb1f6313ef587b2e81b6ad1a64c6"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/ndf/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-NDF-FIXING-SETTLEMENT"
+      ],
+      "reason": "Financial input domains/defaults, lifecycle or fixing state, default-model dispatch and instrument/Greek evaluation for NDF quote direction, fixing transition and settlement value.",
+      "sha256": "a419715d6afd2d269c7e7cb7e0e4630efc1c948ffa0706f039136e037db5cbc0"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/quanto_option/metrics/correlation01.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-QUANTO-DRIFT"
+      ],
+      "reason": "Metric calculation or calculator selection and bump/sign/unit conventions for Quanto option drift adjustment, fixed conversion and correlation risk.",
+      "sha256": "06b600e431b2a25071c89a162dd1a12955f47ec43556143979c88efb3ed757c6"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/quanto_option/metrics/fx_vega.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-QUANTO-DRIFT"
+      ],
+      "reason": "Metric calculation or calculator selection and bump/sign/unit conventions for Quanto option drift adjustment, fixed conversion and correlation risk.",
+      "sha256": "e258802f4c5bd4ae7a2458f699a46592ea93ac52232a628498ba60deb3547e33"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/quanto_option/metrics/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-QUANTO-DRIFT"
+      ],
+      "reason": "Metric calculation or calculator selection and bump/sign/unit conventions for Quanto option drift adjustment, fixed conversion and correlation risk.",
+      "sha256": "d0336611dba11adf1b5ff5e22e8809fe78fd44d711c5581d41697a7d5bcb6966"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/quanto_option/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-QUANTO-DRIFT"
+      ],
+      "reason": "Module declarations, public reexports and explanatory/example documentation only; inspected for executable financial defaults. Owning behavior is documented in Quanto option drift adjustment, fixed conversion and correlation risk.",
+      "sha256": "afab74eb3ce7771c22c8ae0d20fc8c5abfa8af34344c48f6c93b26773c5b473c"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/quanto_option/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-QUANTO-DRIFT"
+      ],
+      "reason": "Implements Quanto option drift adjustment, fixed conversion and correlation risk, including ordered calculation branches, numerical parameters and failure/fallback behavior.",
+      "sha256": "91b693f6ed973cc002e432488fed7a49e32d1977cec16e40f31b133e2a94d2f9"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/quanto_option/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-QUANTO-DRIFT"
+      ],
+      "reason": "Financial input domains/defaults, lifecycle or fixing state, default-model dispatch and instrument/Greek evaluation for Quanto option drift adjustment, fixed conversion and correlation risk.",
+      "sha256": "e2c5047a209fb45beedbba55d12c54705a9e1767dbb1cb6c56112929b1a5f720"
+    },
+    {
+      "path": "finstack-quant/valuations/fx/src/shared.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-FX-AND-EXOTICS-FX-DELIVERY-CIP"
+      ],
+      "reason": "Implements FX cash positions, covered-interest-parity forwards and two-leg swaps, including ordered calculation branches, numerical parameters and failure/fallback behavior.",
+      "sha256": "a555f0160fb0dba5a6707fec7a957f23d544b822b027b023a72d79a9a52a4914"
+    }
+  ]
+}

@@ -41,9 +41,9 @@ Cargo's dependency graph, including optional features. Test-only dependencies
 need explicit allowances. The policy receives the same protection as the
 architecture it describes.
 
-Creating a complete policy and wiring its validation into required checks is
-follow-up enforcement work. This ADR does not claim that such a gate is
-already installed or that the current graph has been exhaustively audited.
+Acceptance does not establish that the dependency policy is fully enforced.
+Implementation and graph-audit work is tracked in
+[FOLLOW_UPS.md](../FOLLOW_UPS.md#implementation-and-lifecycle-follow-up).
 
 ## Implementation notes and references
 

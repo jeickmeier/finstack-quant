@@ -1,0 +1,423 @@
+{
+  "scope": "cashflows",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "CASHFLOWS-001",
+      "title": "Contractual periods, calendars and day-count context",
+      "path": "01-schedule-periods.md"
+    },
+    {
+      "id": "CASHFLOWS-002",
+      "title": "Coupon and payment program compilation",
+      "path": "02-program-compilation.md"
+    },
+    {
+      "id": "CASHFLOWS-003",
+      "title": "Principal events and date-by-date emission order",
+      "path": "03-principal-and-emission-order.md"
+    },
+    {
+      "id": "CASHFLOWS-004",
+      "title": "Scheduled principal amortization",
+      "path": "04-amortization.md"
+    },
+    {
+      "id": "CASHFLOWS-005",
+      "title": "Balance-segment coupon amounts and cash/PIK allocation",
+      "path": "05-coupon-cash-and-pik.md"
+    },
+    {
+      "id": "CASHFLOWS-006",
+      "title": "Term projection, fixing selection and rate constraints",
+      "path": "06-floating-rate-projection.md"
+    },
+    {
+      "id": "CASHFLOWS-007",
+      "title": "Overnight observation grids, compounding and balance allocation",
+      "path": "07-overnight-compounding.md"
+    },
+    {
+      "id": "CASHFLOWS-008",
+      "title": "Compiled floating coupon replay and settlement",
+      "path": "08-floating-replay.md"
+    },
+    {
+      "id": "CASHFLOWS-009",
+      "title": "Fixed, periodic and utilization-tier fees",
+      "path": "09-fees.md"
+    },
+    {
+      "id": "CASHFLOWS-010",
+      "title": "Mortality conversions and prepayment assumptions",
+      "path": "10-prepayment-and-mortality.md"
+    },
+    {
+      "id": "CASHFLOWS-011",
+      "title": "Default curves, original-balance loss targets and recovery severity",
+      "path": "11-default-and-recovery-assumptions.md"
+    },
+    {
+      "id": "CASHFLOWS-012",
+      "title": "Canonical schedules, balance replay and residual normalization",
+      "path": "12-schedule-lifecycle.md"
+    },
+    {
+      "id": "CASHFLOWS-013",
+      "title": "Schedule-driven accrued interest and ex-coupon entitlement",
+      "path": "13-accrued-interest.md"
+    },
+    {
+      "id": "CASHFLOWS-014",
+      "title": "Currency-preserving reporting, calendar ladders and weighted life",
+      "path": "14-aggregation-and-life.md"
+    },
+    {
+      "id": "CASHFLOWS-015",
+      "title": "Survival-adjusted reporting PV and funded-principal recovery",
+      "path": "15-credit-adjusted-pv.md"
+    },
+    {
+      "id": "CASHFLOWS-016",
+      "title": "Projected fixing metadata and realized-forward rolls",
+      "path": "16-fixing-materialization.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/cashflows/src/accrual.rs",
+      "classification": "algorithm",
+      "records": [
+        "CASHFLOWS-013"
+      ],
+      "reason": "Builds accrual identity buckets and elapsed fractions; applies linear/compounded growth, full-period day-count context, PIK inclusion and strict ex-coupon entitlement.",
+      "sha256": "34f62f2a0bf2b87a48e474f9923cbd5b2dbadaab453dc14191d2fdce9a12cec6"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/aggregation.rs",
+      "classification": "algorithm",
+      "records": [
+        "CASHFLOWS-014",
+        "CASHFLOWS-015"
+      ],
+      "reason": "Validates half-open reporting periods; compensates native-currency sums; computes year ladders/WAL and conditional-survival PV with FIFO funded-principal recovery.",
+      "sha256": "cebea0ca5678e74c218548991111b5b142ae1062c3cdec787b5c5de88de434ec"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/bin/gen_schemas.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Reads schema-generation command and delegates artifact generation to core; no pricing, probability, schedule or financial selection algorithm.",
+      "sha256": "61878a43b02e88d2687053ea7d2835be2ffd7e180346d14c1e728d18f48b37b9"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/builder/compiler.rs",
+      "classification": "algorithm",
+      "records": [
+        "CASHFLOWS-001",
+        "CASHFLOWS-002",
+        "CASHFLOWS-009"
+      ],
+      "reason": "Resolves coupon/payment coverage, independent window grids, nesting selection, step-up rate groups and fee schedules; rejects conflicting dates and unsupported coverage.",
+      "sha256": "a83e43545b745dd493166b6bfec605f7bb57ab4cbb9370aff97eb4b7d5029857"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/builder/coupon_api.rs",
+      "classification": "algorithm",
+      "records": [
+        "CASHFLOWS-002",
+        "CASHFLOWS-003",
+        "CASHFLOWS-005"
+      ],
+      "reason": "Defines deferred-error behavior, from/until step-window semantics, coupon/payment dispatch and principal-event sign/currency rules.",
+      "sha256": "db9b2a4f6ede74019583b0f66a213ac582ad4683548086e8ac18849bb2c8f32b"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/builder/credit_rates.rs",
+      "classification": "algorithm",
+      "records": [
+        "CASHFLOWS-010",
+        "CASHFLOWS-011"
+      ],
+      "reason": "Implements checked annual/monthly mortality conversion, explicit clamped conversion after inline tests, PSA ramp and ABS depletion formula.",
+      "sha256": "bb60484790244703c41db8f573310cffeb0513e73c17761798cf9aba9cc139f1"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/builder/date_generation.rs",
+      "classification": "algorithm",
+      "records": [
+        "CASHFLOWS-001"
+      ],
+      "reason": "Compiles adjusted/unadjusted anchors, lagged cash dates, contractual stub/reference periods, IMM/CDS overrides and duplicate-payment checks; production code after test-only helper inspected.",
+      "sha256": "a31c85239589913a1ec525149bd7f43b404159dba87d20689b22e0796d724642"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/builder/emission/amortization.rs",
+      "classification": "algorithm",
+      "records": [
+        "CASHFLOWS-004"
+      ],
+      "reason": "Executes all prepared amortization variants against live Decimal principal, with terminal sweeps, explicit excess errors and economic/payment date separation.",
+      "sha256": "bdcf4c3375642e86f85e9e52774031348e5c52ee98584d03eaf5d294e45d13b3"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/builder/emission/balances.rs",
+      "classification": "algorithm",
+      "records": [
+        "CASHFLOWS-005",
+        "CASHFLOWS-009"
+      ],
+      "reason": "Partitions coupon/fee accrual at economic balance changes using last balance on or before start and excludes end-date movements.",
+      "sha256": "a0d27b5339c5d31c94c0c73a784691c0ff431324cfa26637a1219af90cf00bca"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/builder/emission/coupons.rs",
+      "classification": "algorithm",
+      "records": [
+        "CASHFLOWS-005",
+        "CASHFLOWS-006",
+        "CASHFLOWS-007",
+        "CASHFLOWS-008",
+        "CASHFLOWS-016"
+      ],
+      "reason": "Computes fixed and floating balance-segment amounts; resolves term/overnight fixings and fallback; allocates cumulative overnight increments and bounds; emits signed cash/PIK metadata.",
+      "sha256": "b0eb697788e29dc9ddddb9e71e60e528baf1370857e2c34e4e9fc76b914fd21a"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/builder/emission/fees.rs",
+      "classification": "algorithm",
+      "records": [
+        "CASHFLOWS-009"
+      ],
+      "reason": "Computes opening-balance or integrated-balance drawn/undrawn fees using contractual segment day count and magnitude-ordered checked Decimal products.",
+      "sha256": "f4b9ea301618b5eb4a6f302403eb6610623e0346b0460ff2f8974673643781db"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/builder/emission/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Declares emission modules and re-exports their functions; contains no additional branch, default or arithmetic.",
+      "sha256": "336603387ffb2659fde6e85b46e0c069192a75beb11920ce4a43e528ece24655"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/builder/floating_replay.rs",
+      "classification": "algorithm",
+      "records": [
+        "CASHFLOWS-005",
+        "CASHFLOWS-008"
+      ],
+      "reason": "Validates compiled coupon economics/accrual, locks term fixing separately from notional, advances overnight state, settles/splits coupons and computes replay accrued amounts.",
+      "sha256": "dfa20ba033ef08f91755b1d5b98e8be12c18843f3f24245052831486450076f4"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/builder/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Declares builder modules and re-exports existing types/kernels; clarifies credit specifications are not consumed by builder without introducing another selection path.",
+      "sha256": "913376a0b042aa3c0d76b53cace3464a81859caf6f28a564e2e01133b1762463"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/builder/orchestrator.rs",
+      "classification": "algorithm",
+      "records": [
+        "CASHFLOWS-002",
+        "CASHFLOWS-003",
+        "CASHFLOWS-004"
+      ],
+      "reason": "Validates core horizon/event domain, prepares amortization cadence, initializes pre-issue balance history and chooses terminal economic/payment dates.",
+      "sha256": "472d91c20d42b00046e8c66701d5a07f188cdec5e966b9eef42ca3aae2853b15"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/builder/overnight.rs",
+      "classification": "algorithm",
+      "records": [
+        "CASHFLOWS-007",
+        "CASHFLOWS-008"
+      ],
+      "reason": "Compiles lookback/shift/cutoff/leading-carry observation grids and implements atomic incremental weighted-average/product accumulators and daily/period constraints.",
+      "sha256": "fad431baca099884c61866550317a1cd8d7210089c7831c4294fb267d70c9a28"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/builder/periods.rs",
+      "classification": "algorithm",
+      "records": [
+        "CASHFLOWS-001",
+        "CASHFLOWS-005",
+        "CASHFLOWS-013"
+      ],
+      "reason": "Builds enriched periods and reset dates; creates contractual day-count/reference context and partial ACT/365L proration with domain checks.",
+      "sha256": "2e878f9b5a0549842ec525468c9715d098ef4b6401b7230cf2c4683234883a89"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/builder/pipeline.rs",
+      "classification": "algorithm",
+      "records": [
+        "CASHFLOWS-003",
+        "CASHFLOWS-004",
+        "CASHFLOWS-006",
+        "CASHFLOWS-016"
+      ],
+      "reason": "Orders coupon/PIK/principal/amortization/fee/redemption stages, updates later-draw installments, resolves curve/fixing dependencies and normalizes metadata.",
+      "sha256": "e01406183f2e77685e18ce949c746f0bc52af127be2667d7fc4a017a8c87023c"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/builder/rate_helpers.rs",
+      "classification": "algorithm",
+      "records": [
+        "CASHFLOWS-006",
+        "CASHFLOWS-007"
+      ],
+      "reason": "Validates rate controls; applies bounds/spread/gearing, exact-fixing cutoff rules, term reset-date projection and overnight curve/index annualization conversion.",
+      "sha256": "908c6281269d43c32dd8755594a8981ea70356d8ce7db87ae8692e5bad489530"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/builder/schedule.rs",
+      "classification": "algorithm",
+      "records": [
+        "CASHFLOWS-012",
+        "CASHFLOWS-014",
+        "CASHFLOWS-015",
+        "CASHFLOWS-016"
+      ],
+      "reason": "Defines total row ordering, economic balance replay, principal validation, residual normalization, merge/scale semantics, cash filtering and WAL/PV/reporting wrappers.",
+      "sha256": "1097ed98ca7b4ac498d64b6777ad39d495331309affc27ece8ba865b21c5add0"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/builder/specs/amortization.rs",
+      "classification": "algorithm",
+      "records": [
+        "CASHFLOWS-004"
+      ],
+      "reason": "Selects seven amortization rules and enforces principal/target currency, percentage, date-order and amount domains; hash is ancillary.",
+      "sha256": "d233ce39793861f59a2932c722d577faa19b70aa2c6149ea8bb51119dee169ca"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/builder/specs/coupon.rs",
+      "classification": "algorithm",
+      "records": [
+        "CASHFLOWS-005",
+        "CASHFLOWS-006",
+        "CASHFLOWS-007",
+        "CASHFLOWS-008"
+      ],
+      "reason": "Defines split tolerance, fallback index substitution, compounding modes, daily-bound selection and material floating-rate/market preset defaults and validators.",
+      "sha256": "a3d03d8e942a3d53ffb6bc108b1af7027f6c4cac048b0043d1029f2a67229f05"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/builder/specs/default.rs",
+      "classification": "algorithm",
+      "records": [
+        "CASHFLOWS-011"
+      ],
+      "reason": "Computes constant/vector/SDA MDR and original-balance cumulative-loss/timing defaults with optional actual survival denominator and model validation.",
+      "sha256": "03783ab1d5309a755f67a30d5875f5d873cd058a4c148863fb214c1294fa0045"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/builder/specs/fees.rs",
+      "classification": "algorithm",
+      "records": [
+        "CASHFLOWS-009"
+      ],
+      "reason": "Sets opening-balance fee default and evaluates inclusive whole-utilization fee tiers with ascending-threshold validation.",
+      "sha256": "ba037adac2c41b9181751173768090d73aa2ea7b6cf79fe9c6db8f353b39c0f6"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/builder/specs/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "CASHFLOWS-010",
+        "CASHFLOWS-011"
+      ],
+      "reason": "In addition to exports, implements month-zero/one vector indexing, final-value continuation and selected-value/whole-vector probability validation.",
+      "sha256": "a83365bc233297721dac0cfe1e763d6e52c21ee4f317a9333ebd86b5e0388a7f"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/builder/specs/prepayment.rs",
+      "classification": "algorithm",
+      "records": [
+        "CASHFLOWS-010"
+      ],
+      "reason": "Dispatches constant/PSA/CMBS lockout/ABS/vector prepayment curves and enforces whole-model versus per-request probability domains.",
+      "sha256": "59b818ce3be8daa949ce718854e78d90ee62947f40f14f72d85ffebee3430d59"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/builder/specs/principal.rs",
+      "classification": "algorithm",
+      "records": [
+        "CASHFLOWS-003"
+      ],
+      "reason": "Selects default initial/final principal exchange and resolves omitted event cash from delta with kind-specific sign conventions.",
+      "sha256": "51844ebea3881b9f859ad0c7b388a60adbcf5357f3647f6dac743730711b5f4f"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/builder/specs/rate.rs",
+      "classification": "algorithm",
+      "records": [
+        "CASHFLOWS-006"
+      ],
+      "reason": "Selects fixed/term floating facility rates; requires exact fixings on or before valuation, rejects explicit compounding and projects future reset quotes.",
+      "sha256": "ef3143bc91532c51367629a5c13afffb539872b49d0b109fa9e9fff416b8bb9c"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/builder/specs/recovery.rs",
+      "classification": "algorithm",
+      "records": [
+        "CASHFLOWS-011"
+      ],
+      "reason": "Evaluates constant/vector severity recovery with clamping and invalid selected-vector fallback; separately validates full recovery inputs and carries lag metadata.",
+      "sha256": "84dcd87b1bf651178c284ee08181f7f9759f80f2ff1191e763fe990e26662d85"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/builder/specs/schedule.rs",
+      "classification": "algorithm",
+      "records": [
+        "CASHFLOWS-001"
+      ],
+      "reason": "Defines material tenor/day-count/BDC/calendar/lag/accrual-adjustment presets and short-front default; validates calendar and payment-lag domain.",
+      "sha256": "1ecb5cd0204d7fcdeee1e822f66082d2afa36f24761fb348460065cfbb69d094"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/fixings.rs",
+      "classification": "algorithm",
+      "records": [
+        "CASHFLOWS-016"
+      ],
+      "reason": "Normalizes raw observations and materializes inclusive advancing-window fixings with exact-data precedence, conflict tolerance and immutable market merge.",
+      "sha256": "6539963606872b5e15e06347e996c9bfbb9a51c1fa37b9c71dadb1763658c977"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/json.rs",
+      "classification": "algorithm",
+      "records": [
+        "CASHFLOWS-002",
+        "CASHFLOWS-012"
+      ],
+      "reason": "Maps wire program variants/defaults into canonical builder calls and selects separate economic-validation and native-settlement views; parsing itself is support.",
+      "sha256": "5eacfa07ab1f9948971ace696463135ddb9734ae050e07b5ce57baa08e044983"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/lib.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Crate lint settings, modules, re-exports and documentation/doctest wrapper only; no additional financial computation.",
+      "sha256": "72516aec1602b372331dd73f3e5685033d7cb601b2df10d17598509e4d6aefe8"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/schema.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Packages schema registry/resources and serialized examples through existing public kernels; feature-gated caching/generation does not add financial selection or arithmetic.",
+      "sha256": "1c7c0c5950a197e6f0be8af1189df85d1cbbac3ca9f86f72aa5aad04025db61b"
+    },
+    {
+      "path": "finstack-quant/cashflows/src/traits.rs",
+      "classification": "algorithm",
+      "records": [
+        "CASHFLOWS-012"
+      ],
+      "reason": "Owns mandatory provider residual normalization and cash view; wraps classified/dated rows with zero-notional/first-currency/USD empty defaults.",
+      "sha256": "a6cf4f4ec3d3810bfa5aad373f71244fbd19cd5e0dfebceb1044db441e46fde4"
+    }
+  ]
+}

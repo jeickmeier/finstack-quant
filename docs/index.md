@@ -20,6 +20,8 @@ notes.
 
 - [`REFERENCES.md`](REFERENCES.md): canonical sources for formulas, conventions,
   and market practice.
+- [Financial methodologies](decisions/financial/README.md): calculation-to-method
+  inventory, adoption rationale, selection behavior, and open evidence gaps.
 - [`superpowers/specs/`](superpowers/specs/): design specs for planned or
   recently landed work.
 - [`SERDE_STABILITY.md`](SERDE_STABILITY.md): canonical serde contract rules,
@@ -65,8 +67,8 @@ mise run python-examples
 ## Development Notes
 
 - [`decisions/`](decisions/README.md): accepted project policies, code standards,
-  specific code decisions, and financial conventions, with examples,
-  enforcement requirements, and known implementation gaps.
+  specific code decisions, financial conventions, and labeled methodology drafts, with examples,
+  enforcement requirements, and separate follow-up registers for outstanding work.
 - [`../CONTRIBUTING.md`](../CONTRIBUTING.md): contribution workflow, project
   principles, and binding-change checklist.
 - [`../INVARIANTS.md`](../INVARIANTS.md): cross-crate numerical and API

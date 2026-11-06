@@ -47,7 +47,7 @@ core data model or introducing duplicate export contracts.
   and host adapters.
 - Keep serialized meaning aligned with
   [ADR 0012](../standards/0012-serialized-contracts.md) and missing-data
-  semantics aligned with [ADR 0009](../financial/0009-missing-and-invalid-data.md).
+  semantics aligned with [ADR 0009](../financial/conventions/0009-missing-and-invalid-data.md).
 - Test the conversion directions that are actually supported; do not infer a
   bidirectional or zero-copy promise from the existence of an export adapter.
 
@@ -60,6 +60,7 @@ defines ordered columns, column roles, and metadata.
 
 The [Arrow adapter](../../../finstack-quant/arrow-interchange/README.md) is
 currently export-only. Arrow import, IPC support, and zero-copy guarantees
-require separate scope and evidence. Audit existing exports and conversion
-tests against the agreed contract; this record does not certify every
-conversion as lossless or add unsupported import capabilities.
+require separate scope and evidence. Acceptance does not certify every
+conversion as lossless or add unsupported import capabilities. Export audits
+and conversion coverage are tracked in
+[FOLLOW_UPS.md](../FOLLOW_UPS.md#implementation-and-lifecycle-follow-up).

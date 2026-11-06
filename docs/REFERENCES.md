@@ -5,6 +5,12 @@ This file provides stable anchors for canonical references used across the
 when an API implements a market convention, pricing model, numerical method, or
 risk calculation with a standard reference.
 
+A reference explains a method; its presence here does not approve the method
+for every instrument or caller. The
+[financial methodology inventory and decisions](decisions/financial/README.md)
+record adoption rationale, applicable scope, selection behavior, limitations,
+and implementation and validation evidence.
+
 ## Usage
 
 - Prefer links of the form `docs/REFERENCES.md#anchor-name` in rustdoc

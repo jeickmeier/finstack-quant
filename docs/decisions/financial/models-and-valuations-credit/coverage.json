@@ -1,0 +1,1275 @@
+{
+  "scope": "models-and-valuations-credit",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "MODELS-AND-VALUATIONS-CREDIT-01",
+      "title": "Financial distress scores and classification",
+      "path": "01-financial-distress-scores.md"
+    },
+    {
+      "id": "MODELS-AND-VALUATIONS-CREDIT-02",
+      "title": "PD cycle adjustment, master scales and rating calibration data",
+      "path": "02-pd-scales-and-rating-data.md"
+    },
+    {
+      "id": "MODELS-AND-VALUATIONS-CREDIT-03",
+      "title": "Rating transition, generator recovery and path simulation",
+      "path": "03-rating-migration.md"
+    },
+    {
+      "id": "MODELS-AND-VALUATIONS-CREDIT-04",
+      "title": "Structural default, asset calibration, survival export and simulation",
+      "path": "04-structural-default.md"
+    },
+    {
+      "id": "MODELS-AND-VALUATIONS-CREDIT-05",
+      "title": "Leverage-driven hazard and issuer PIK exercise",
+      "path": "05-hazard-and-toggle.md"
+    },
+    {
+      "id": "MODELS-AND-VALUATIONS-CREDIT-06",
+      "title": "Recovery dilution, LGD, EAD and priority allocation",
+      "path": "06-recovery-and-lgd.md"
+    },
+    {
+      "id": "MODELS-AND-VALUATIONS-CREDIT-07",
+      "title": "Monthly pool defaults and per-name copula sampling",
+      "path": "07-pool-defaults.md"
+    },
+    {
+      "id": "MODELS-AND-VALUATIONS-CREDIT-08",
+      "title": "Stochastic prepayment, burnout and pool-correlation controls",
+      "path": "08-prepayment-and-pool-correlation.md"
+    },
+    {
+      "id": "MODELS-AND-VALUATIONS-CREDIT-09",
+      "title": "Copula thresholds, factor conditioning and numerical integration",
+      "path": "09-copula-kernels.md"
+    },
+    {
+      "id": "MODELS-AND-VALUATIONS-CREDIT-10",
+      "title": "Portfolio loss simulation, tail statistics and correlated recovery",
+      "path": "10-portfolio-loss-and-correlated-recovery.md"
+    },
+    {
+      "id": "MODELS-AND-VALUATIONS-CREDIT-11",
+      "title": "Liquidity estimators, execution impact and liquidity VaR",
+      "path": "11-liquidity.md"
+    },
+    {
+      "id": "MODELS-AND-VALUATIONS-CREDIT-12",
+      "title": "CDS conditional survival, premium accrual and protection integration",
+      "path": "12-cds-legs.md"
+    },
+    {
+      "id": "MODELS-AND-VALUATIONS-CREDIT-13",
+      "title": "CDS and index quote risk, default exposure and margin proxy",
+      "path": "13-cds-and-index-risk.md"
+    },
+    {
+      "id": "MODELS-AND-VALUATIONS-CREDIT-14",
+      "title": "Index constituent aggregation and informational cashflow projection",
+      "path": "14-index-valuation.md"
+    },
+    {
+      "id": "MODELS-AND-VALUATIONS-CREDIT-15",
+      "title": "CDS option forward calibration and spread quadrature",
+      "path": "15-cds-option-quadrature.md"
+    },
+    {
+      "id": "MODELS-AND-VALUATIONS-CREDIT-16",
+      "title": "CDS option screen risk, quote risk and volatility inversion",
+      "path": "16-cds-option-risk-and-inversion.md"
+    },
+    {
+      "id": "MODELS-AND-VALUATIONS-CREDIT-17",
+      "title": "Finite-pool tranche losses and base correlation integration",
+      "path": "17-tranche-loss-distribution.md"
+    },
+    {
+      "id": "MODELS-AND-VALUATIONS-CREDIT-18",
+      "title": "Tranche premium, protection, recovery writedown and settlement",
+      "path": "18-tranche-projection.md"
+    },
+    {
+      "id": "MODELS-AND-VALUATIONS-CREDIT-19",
+      "title": "Tranche spread, quote, rate, correlation, recovery and default risk",
+      "path": "19-tranche-risk.md"
+    },
+    {
+      "id": "MODELS-AND-VALUATIONS-CREDIT-20",
+      "title": "Exchange and liability-management arithmetic",
+      "path": "20-liability-management.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/models/src/correlation/copula/gaussian.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-09"
+      ],
+      "reason": "Normal threshold, conditional probability, endpoint branches and Hermite factor integration.",
+      "sha256": "de19bee94d883a184a17c127ccf3e627a30998d8bf5d0cb1541537745ed35db1"
+    },
+    {
+      "path": "finstack-quant/models/src/correlation/copula/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-09"
+      ],
+      "reason": "Copula trait checked input contract, marginal thresholds and specification-to-kernel dispatch.",
+      "sha256": "5cee19e30c7b7f6763e7ce3fbe0ae27f63db998482814b0d225b64b9e2e85be6"
+    },
+    {
+      "path": "finstack-quant/models/src/correlation/copula/multi_factor.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-09"
+      ],
+      "reason": "Fixed global/sector loading decomposition and two-factor integration.",
+      "sha256": "3c5196e189cd8f14817387868814bc0bbdfbe349235637d5e5798245d09f99dd"
+    },
+    {
+      "path": "finstack-quant/models/src/correlation/copula/random_factor_loading.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-09"
+      ],
+      "reason": "Clipped-normal beta loading, second-moment calibration, nested integration and tail mass.",
+      "sha256": "6dde5cfa65b9ae45dfc9750851d0faa0b40c6d66f05d8135d7f427c548bd3265"
+    },
+    {
+      "path": "finstack-quant/models/src/correlation/copula/student_t.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-09"
+      ],
+      "reason": "Student-t marginals, conditional/mixing laws, gamma quadrature and latent sampling; runtime after early test helper included.",
+      "sha256": "13fccd591ba31a52994337e9bd5ef014ec4c26ec5636080ae09c4f01fbbe23b5"
+    },
+    {
+      "path": "finstack-quant/models/src/correlation/error.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Error variants and formatting for correlation validation; no numerical or financial calculation.",
+      "sha256": "78956d847747732d775eda6862cacd832194da0004f3bee8a245586f07f8a04d"
+    },
+    {
+      "path": "finstack-quant/models/src/correlation/latent_factor.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-09"
+      ],
+      "reason": "Factor presets, dimensions, correlation validation and Cholesky-correlated factor generation.",
+      "sha256": "9e01a151d7416e013c527d21f18170369a5f28f14026a6fe89e4ea94f98dd624"
+    },
+    {
+      "path": "finstack-quant/models/src/correlation/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Correlation module declarations and public exports only.",
+      "sha256": "568363798c20d7b56f87865b804dd60af248ce7a2ed78e57c1a5eb98b930d445"
+    },
+    {
+      "path": "finstack-quant/models/src/correlation/portfolio_loss.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-10"
+      ],
+      "reason": "Indexed Philox default/recovery simulation, loss aggregation, empirical VaR/ES and tranche statistics.",
+      "sha256": "de586da192ecd3dd00b14c457db93558efc2aa6a1251a2cb54fe4859f01296fd"
+    },
+    {
+      "path": "finstack-quant/models/src/correlation/recovery/constant.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-10"
+      ],
+      "reason": "Constant recovery validation and deterministic moments/sampling.",
+      "sha256": "e1d89968c643f067a4d0b5637305fc3fe5e415aecd4cc0d592b0163a9034053e"
+    },
+    {
+      "path": "finstack-quant/models/src/correlation/recovery/correlated.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-10"
+      ],
+      "reason": "Logistic-normal correlated recovery, quadrature expected recovery and sampled recovery.",
+      "sha256": "9b7367920736b0ee8fc4d078bf8e9491d8a63853945288238bf4b85961170558"
+    },
+    {
+      "path": "finstack-quant/models/src/correlation/recovery/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-10"
+      ],
+      "reason": "Recovery law trait, specification defaults and constant/stochastic construction dispatch.",
+      "sha256": "2c6beb1f317eb013b6a0ef3c2580bceeb570cdf9c86cd6d2506f4cceace552ca"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/dynamic_recovery.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-06"
+      ],
+      "reason": "Notional-dilution recovery functions, floors, clamps and model validation.",
+      "sha256": "919da9b0cd3db1e046a2ac907d39eb2eee323111feb509b52a755793398d3d38"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/endogenous_hazard.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-05"
+      ],
+      "reason": "Power/exponential/tabular leverage-to-hazard maps and capped results.",
+      "sha256": "281491618b127762350a7ca345f260dfacc7f10efa6c1da44a4f615b9b912aef"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/lgd/downturn.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-06"
+      ],
+      "reason": "Stress-quantile LGD adjustment and additive/floor variant with registry defaults.",
+      "sha256": "8dce2963d402fa056fd23084f4c6ecd1e192cfa6ebda844ada7729fc3b2bbabf"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/lgd/ead.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-06"
+      ],
+      "reason": "Drawn/undrawn EAD, CCF presets, utilization and realized LEQ.",
+      "sha256": "92a0cceb00444648dc17fdc1e05328ebbe3c37d5823841e6b108df198c3d3999"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/lgd/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-06"
+      ],
+      "reason": "Exact seniority/calibration selection and default-first calibration ID ordering, plus LGD exports.",
+      "sha256": "6684e87bdff90afe38369389aace385fbaf487710661803df994da43ef4cff82"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/lgd/seniority.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-06"
+      ],
+      "reason": "Seniority calibration lookup, beta moment conversion, sampling and quantiles.",
+      "sha256": "0fde181aeb550389b81eb2cdf6d2bb449b99230f98e52abd36b8c245ffcdf226"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/lgd/workout.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-06"
+      ],
+      "reason": "Collateral haircuts, costs, recovery discounting and final workout LGD.",
+      "sha256": "1cebd895d09669848abfde3e22779a29cc57676c2c3d1fcd763f6827f103791a"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/liability_management.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-20"
+      ],
+      "reason": "Tender recommendation hurdle, exchange PV comparison, LME cash/debt arithmetic and leverage effects.",
+      "sha256": "6ae63b998024442b3fa4658f79bd8456e061d93027fc0a7dea8c50ebf19f2c50"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/market_anchored.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-05"
+      ],
+      "reason": "Conditional average hazard extraction and fractional-volatility-to-CIR coefficient conversion.",
+      "sha256": "7127c4239b0a9f9d033374bdb3493d544a619741198ef1715c2ea93182a7d43d"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/merton/calibration.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-04"
+      ],
+      "reason": "Equity fixed-point inversion, scanned CDS-volatility brackets, target-PD barrier and KMV default point.",
+      "sha256": "92658bf15fb5552615a94c1ed5fef8559a107c75930618ad4abd3c3fad3625b9"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/merton/default_probability.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-04"
+      ],
+      "reason": "Terminal, first-passage, jump-mixture and CreditGrades default/survival laws.",
+      "sha256": "4fadf8dda5d410af26c7173eb87a22d3336c6c2dd95063c583bf51bfa19abd9e"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/merton/dynamics.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-04"
+      ],
+      "reason": "Barrier/dynamics specification, jump compensator and domain constraints selecting supported laws.",
+      "sha256": "8116289ebed0da4116eea394c9cdecddaa2ce3743040bc7e3c6d6c40e9943413"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/merton/hazard_curve.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-04"
+      ],
+      "reason": "Structural survival sampling, tenor/domain validation and piecewise-constant hazard export.",
+      "sha256": "ba1aa223bb2518de306bc45fcb7f82d64afdd61bf44c4e8d92f1c9d8eef7578d"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/merton/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Merton implementation module declarations and exports only.",
+      "sha256": "33b9bc88e635f5b928a9acbc5c5d195dd2f440bf309a1e31a5f250017904eb43"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/merton/model.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-04"
+      ],
+      "reason": "Validated structural model construction, distance/default delegation and implied equity setup.",
+      "sha256": "c7e6cb3cfb37a5683a838b3c496dbe445ffb8080bf84b02774b336e152e1dbf0"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/merton/report.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-02",
+        "MODELS-AND-VALUATIONS-CREDIT-04"
+      ],
+      "reason": "Explicit model/equity report source, default master-scale grade mapping and per-measure error capture.",
+      "sha256": "ee905a9fda6f9186796315f643a101896dd187cc1d26b82b15e7701224b4cd53"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/merton/simulation.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-04"
+      ],
+      "reason": "Exact GBM/jump steps, PCG streams, Poisson uniforms and antithetic asset paths.",
+      "sha256": "d2503e77e83da46e113c84db75fa2f6e58760e64295e49f6bbf6e47014da442a"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/merton/spreads.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-04"
+      ],
+      "reason": "Default-loss implied spread, option-theoretic debt spread and approximate quarterly CDS par spread.",
+      "sha256": "e1e100a6af3c328b1c4fe8de1fe6cb8438b881c0479337d9fbe745b991408c97"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/migration/error.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Migration error variants and formatting only.",
+      "sha256": "cd3dad342e6d35b7c83e2cfb49fb1ec1953ff07e5e948f64514c70719ab3a0a8"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/migration/generator.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-03"
+      ],
+      "reason": "Generator invariants, Schur/log-series recovery, intensity repair and reconstruction tolerance.",
+      "sha256": "b502d590aacc1cc6e6d2bf41730acc0abb7252bdbe9bbed6c1d477fd7ff1de00"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/migration/matrix.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-03"
+      ],
+      "reason": "Transition stochasticity/absorption validation, small clipping and matrix composition.",
+      "sha256": "046a5ef1daa0b372b441d979bb4a11f4006632c19d6ee8b9cee2f4ebf54c4f47"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/migration/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Migration implementation module declarations and exports only.",
+      "sha256": "fe99a5f5f54fa95c0a6a4ffd900e7c75852a0bd829b765a838d97cb1ca49192e"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/migration/projection.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-03"
+      ],
+      "reason": "Pade scaling-and-squaring exponential and row-probability repair.",
+      "sha256": "bd9b9d7cf98a68f6a48db6ca27c8d50d2e0eb99db8d40ab77b2ee707f27030f3"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/migration/scale.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-02",
+        "MODELS-AND-VALUATIONS-CREDIT-03"
+      ],
+      "reason": "Default-state selection, exact rating-factor mappings and nearest-WARF inversion.",
+      "sha256": "1b2b39ee52539bba0a300573fcc9f8757222fcad793bfdb25202740d86c5bfda"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/migration/simulation.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-03"
+      ],
+      "reason": "Gillespie holding-time/destination simulation, path lookup and empirical transition/default estimates.",
+      "sha256": "49753ff1a5d3da5e7328d3fd2b682d977f93537dfdf4d5034a0dcb24069dd8da"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/migration/tests.rs",
+      "classification": "test",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-03"
+      ],
+      "reason": "Migration invariant, generator roundtrip, projection, simulation and serde test modules only.",
+      "sha256": "d6a9121c453cf57affb602d3fe9592807110d6198b8de4288509ce6b9319b7e4"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Credit-domain module declarations and public exports only.",
+      "sha256": "7127069a3d8a24cddf38e07c22e5671cb388a1996494d4f4e69d491454f7a7bc"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/pd/calibration.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-02"
+      ],
+      "reason": "TTC/PIT Gaussian transformations, annual central tendency and fixed PD-floor helper.",
+      "sha256": "0407adbcbdbd53022f253d055d2f2e54d3acf514b49687e015537176c82413d7"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/pd/error.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "PD/calibration error variants and formatting only.",
+      "sha256": "1ca755c73276efef3381283e1d4bcfc6eb1ab3b3aff8aa51947d637da997dfe5"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/pd/master_scale.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-02"
+      ],
+      "reason": "Validated PD-bin lookup, score-implied-PD requirement and registry scale loading.",
+      "sha256": "7bb1392e8d6a77a1bf0ce0be6522a76e02c6dd77fd274c53cdcb60b2db3d0f8b"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/pd/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "PD implementation module declarations and public exports only.",
+      "sha256": "b4f2a4fc688d7ddfb96a9ceab19f9f3ef8e204a30320524ef124927c496d39a4"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/pd/tests.rs",
+      "classification": "test",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-02"
+      ],
+      "reason": "PD transformation, central tendency, master-scale and serde tests only.",
+      "sha256": "439ace9f553118f96ab164ecd21bb5b7a470c127bfe686f134060acf7507292a"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/pool/correlation.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-08"
+      ],
+      "reason": "Scalar/sectored/matrix correlation reduction, defaults, validation and bump behavior.",
+      "sha256": "b687bf3d7a2b51dc45ce3ae5119778cd0b64d19e648825d64bb23112cf884a3e"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/pool/default/copula_based.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-07",
+        "MODELS-AND-VALUATIONS-CREDIT-09"
+      ],
+      "reason": "Annual-to-monthly conversion, threshold clipping and copula conditional default rate.",
+      "sha256": "34c22a29b1546d6a2f59755611986efc226b1e3b40953d6c8f606b0257c49e19"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/pool/default/factor_correlated.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-07"
+      ],
+      "reason": "Factor-shocked capped lognormal monthly defaults and analytic expected capped rate.",
+      "sha256": "3d9c712c39c288dd5c2a3d7127c49744453b05512c7c05bf43c9a91695956435"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/pool/default/intensity_process.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-07"
+      ],
+      "reason": "Static lognormal intensity factor shock and mean-intensity monthly plug-in expectation.",
+      "sha256": "d3f8a0656a74d03134096583541bfc34ab41fda772c58b43f208e476c02a843a"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/pool/default/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Default-model module declarations and public exports only.",
+      "sha256": "728e9ffe829aefa38f123b110e99df4de66b8f9351c1d7944c1dc338138a1572"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/pool/default/per_name.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-07",
+        "MODELS-AND-VALUATIONS-CREDIT-09"
+      ],
+      "reason": "Per-name marginal thresholds, common mixing, idiosyncratic latent sampling and copula support restrictions.",
+      "sha256": "e7728297ead6daf7f98244555d10471422dc0efcf2ac7c448a57da6361fcf7bb"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/pool/default/spec.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-07"
+      ],
+      "reason": "Default model variants, helpers/clamps, deterministic dispatch and unused intensity mean-reversion field.",
+      "sha256": "c3dd5a25846f3f965d94f71cff43a0e8e59998d74d1cf2fe2331d7ded3c51680"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/pool/default/traits.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-07"
+      ],
+      "reason": "Monthly default-rate, factor sign, correlation and unconditional expectation contract; no numerical default method body.",
+      "sha256": "dc3ef917e8218889c926b9e91b7fae2f98d2ca6890b17d86358b1fcc9c44acb5"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/pool/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-08"
+      ],
+      "reason": "Nonlinear capped CPR-to-SMM normal expectation quadrature and pool module exports.",
+      "sha256": "2996479497b14b66b8682b64b4ec450d4dc2e7136746fbc689a16740a61c87a3"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/pool/prepayment/factor_correlated.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-08"
+      ],
+      "reason": "Burnout/factor CPR shock, monthly conversion and unconditional nonlinear expectation.",
+      "sha256": "2b72d6c4722cd4b387fcb832e73248dd61ee7f1cfe5fd03038fc0ba443e461f1"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/pool/prepayment/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Prepayment implementation module declarations and exports only.",
+      "sha256": "9090a4febfa62d7c036f582bdc3b16a313302321b74b56e9d240c59acb6b2f11"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/pool/prepayment/regime_switching.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-08"
+      ],
+      "reason": "Two-state transition probabilities, stateful regime sampling and mixture expectations.",
+      "sha256": "a75104f7770e3b7dbbb28bc08fccd47439e59640145f70f3ecddb2bf6d912428"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/pool/prepayment/richard_roll.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-08"
+      ],
+      "reason": "Refinance arctangent, seasoning, factor volatility and caller-updated burnout.",
+      "sha256": "f02fe1428dae819925b4ee40ee8b636fa8e49584a22ea8d3258a18b7a5168587"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/pool/prepayment/spec.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-08"
+      ],
+      "reason": "Prepayment variant dispatch, deterministic PSA default and helper parameter clamps.",
+      "sha256": "5c5d58e7c4777aa3d3920f208ca1b2b73e42e4b5d1af5b4c91ae0a41790cc3da"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/pool/prepayment/traits.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-08"
+      ],
+      "reason": "Prepayment contract and default conversion/burnout/no-op path-state semantics.",
+      "sha256": "0e71b669072a9a97dd0cec6a32bf57bd304fc9361560db482c25542bb84f28ea"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/rating_factors.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-02"
+      ],
+      "reason": "Rating-factor table validation, exact rating lookup and registry selection.",
+      "sha256": "9783bd2b187054b5ec8bdf95cc87db8e223be86bd3c5485e8a147f02be45161c"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/recovery_waterfall.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-06"
+      ],
+      "reason": "Collateral-first payouts, priority sorting, deficiency pro rata and conservation repair.",
+      "sha256": "c56d37134423cc84ce459d47bf35d52b2b38a2ba8f41b6c0fc96b231daae646c"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/registry.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-02",
+        "MODELS-AND-VALUATIONS-CREDIT-06"
+      ],
+      "reason": "Embedded credit table parsing/default IDs and validation for rating, PD, LGD and seniority calibrations.",
+      "sha256": "cb6c01f514e23bfb39bd37b09332408f1e72af8123bf49b255f36f8ff2b741e6"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/scoring/altman.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-01"
+      ],
+      "reason": "Four Altman coefficient/threshold variants and input finiteness checks.",
+      "sha256": "cadc2950baaba3529e5ed89cf67a468a6a0b3b9747437395b8c1b866e9116fae"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/scoring/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Scoring module declarations and public exports; cfg(test) covers only the tests module.",
+      "sha256": "7a14dc62b226185c2200c2622064c77d7372a4ed018bbeb051606423e9f56e5a"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/scoring/ohlson.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-01"
+      ],
+      "reason": "Nine-factor Ohlson score, stable logistic PD and fixed zones.",
+      "sha256": "71f974ec59d8bd1209e3911cdc074ed940a3ebe0d4684ab116f33521dad891bd"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/scoring/report.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-01",
+        "MODELS-AND-VALUATIONS-CREDIT-02"
+      ],
+      "reason": "Explicit score-model dispatch and optional default-master-scale grade for score-implied PD.",
+      "sha256": "17c9c73dd0e53ef3c016d0c310b205bcc24a8d34b6bb790bda399857be2f7f3d"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/scoring/tests.rs",
+      "classification": "test",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-01"
+      ],
+      "reason": "Distress-score formulas, zone boundaries and input-validation tests only.",
+      "sha256": "e76a93d9d5c482edbd5e35dce6f05a1917521ba2df896dd3402965c8bec00ea5"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/scoring/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-01"
+      ],
+      "reason": "Shared scoring result/zone interpretation and finite-input validation.",
+      "sha256": "3a7cae9395aefefbe65f4a042cd405ff8187351701bfb1aafb91882db473a320"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/scoring/zmijewski.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-01"
+      ],
+      "reason": "Three-factor probit score, normal PD and fixed classification thresholds.",
+      "sha256": "29d5b12d40e506a014b3c69ffc5a694c1b44c175648f899862768c685a1786ba"
+    },
+    {
+      "path": "finstack-quant/models/src/credit/toggle_exercise.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-05"
+      ],
+      "reason": "Threshold/logistic/one-action nested equity PIK decisions, state substitutions and shared-stream monthly barriers.",
+      "sha256": "a3b86f5a37409530c62c8ac97810cf173f44cc38f8d1b091a609483f549a9074"
+    },
+    {
+      "path": "finstack-quant/models/src/liquidity/almgren_chriss.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-11"
+      ],
+      "reason": "Temporary/permanent costs, profile calibration and linear-impact hyperbolic optimal trajectory.",
+      "sha256": "6e9ca7c8870274714e5e694fa499c94786a7587c0c4e4aca70f7dc4355e1bd29"
+    },
+    {
+      "path": "finstack-quant/models/src/liquidity/estimators.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-11"
+      ],
+      "reason": "Roll lag covariance spread and Amihud illiquidity ratio estimates.",
+      "sha256": "9e0f32934c0cf1ae0cd8e1d6af8499827023e5d7b0372ce7e34c822703d8e1d0"
+    },
+    {
+      "path": "finstack-quant/models/src/liquidity/impact.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-11"
+      ],
+      "reason": "Impact calculation contract, execution schedules and piecewise-linear inventory variance.",
+      "sha256": "2c42223c7b5f2b4a9e6222b9a8fe21aa36ab8ddf070b107ecebc45d6d361b89c"
+    },
+    {
+      "path": "finstack-quant/models/src/liquidity/kyle.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-11"
+      ],
+      "reason": "Linear price impact, Amihud coefficient proxy and uniform execution schedule.",
+      "sha256": "2ddae84d7ca0bdf38d3df97d4db5cce44520993c108995da4d735c350e379c34"
+    },
+    {
+      "path": "finstack-quant/models/src/liquidity/lvar.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-11"
+      ],
+      "reason": "Spread-adjusted signed-loss VaR, liquidation capacity and tier threshold classification.",
+      "sha256": "7febf203a91b23a7ae3ab3be99eb89bd1b382459dbdd171b378ed3de689bfacb"
+    },
+    {
+      "path": "finstack-quant/models/src/liquidity/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-11"
+      ],
+      "reason": "Public impact helper synthesizes a 20bp spread, selects square-root impact and scales ADV-derived coefficients; exports.",
+      "sha256": "8c9ad3baccc9a731ee674e4279bf687420d147925ecbe2264aa8c8aad75688d5"
+    },
+    {
+      "path": "finstack-quant/models/src/liquidity/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-11"
+      ],
+      "reason": "Liquidity profile constraints, relative/absolute spread volatility and window defaults.",
+      "sha256": "fc4db979a6f53972a3fb848ff72697427b23099b8ef504245a65801cef6cea68"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds/marginable.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-13"
+      ],
+      "reason": "SIMM CS01 attempt, duration-proxy fallback and expired-tenor substitution.",
+      "sha256": "b54dd3e4d46ea2c2aed51e86d62d785317e4985ec6892ca8408e8f696b1c4156"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds/metrics/cs_gamma.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-13"
+      ],
+      "reason": "Quote-rebootstrap second difference and decimal-spread-squared normalization.",
+      "sha256": "da4a5ad23eafae46adf054b3b6eace88ab35b41139c05ae7338acebefae6e1ae"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds/metrics/dv01.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-13"
+      ],
+      "reason": "Rate quote/direct-curve bump selection and dependent hazard replay.",
+      "sha256": "69deefe2b19266529c2730c5fb519207c5fcc941475bde4c5dc9a6304b1f745d"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds/metrics/jump_to_default.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-13"
+      ],
+      "reason": "JTD payout/accrual, protection-window gating and default exposure after MTM.",
+      "sha256": "4a8e72b2b2d6a4ebd5180abff3a7d59452a105cec612ce9a9ca360e8a67f39f4"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds/metrics/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-12",
+        "MODELS-AND-VALUATIONS-CREDIT-13"
+      ],
+      "reason": "CDS metric registration, expected loss, risky PV01 and quote-replay convention selection.",
+      "sha256": "078119148bd2991ce3174f4aa6cf78da92ca8031944af6692bd664640b685b93"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds/metrics/recovery01.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-13"
+      ],
+      "reason": "Contract/curve recovery finite differences and quote-preserving replay terms.",
+      "sha256": "af2e0813c93534cf8e2bc8ff0d7d9517953888096865a019bc3fbe23d101b248"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "CDS module declarations and public exports only.",
+      "sha256": "218bb00e5a1b311ad30a5123f27f19d818c58c73d69f80a438f757309e712f03"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds/pricing/engine.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-12"
+      ],
+      "reason": "Conditional CDS leg engine, accrual/protection/upfront/clean conventions and hazard-bump cache.",
+      "sha256": "afb83b37013bfb5c7170466b79913d3bba47f00933d762828ba401369494e75b"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds/pricing/helpers.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-12"
+      ],
+      "reason": "Hazard/discount time mapping, settlement delays, integration mesh and survival normalization.",
+      "sha256": "b34aac3ec2e1324339ce617e2b09d1c5e25fe1150d5e7f191bf09be797b132a8"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds/pricing/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-12",
+        "MODELS-AND-VALUATIONS-CREDIT-13"
+      ],
+      "reason": "Selected risky-annuity/par-spread convention and scalar credit measures.",
+      "sha256": "9c560d8f244850965357efe4b6fbd1929bf77a4bc39e59930c66c23486b25ba2"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds/pricing/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Pricing implementation declarations and CdsPricer export only.",
+      "sha256": "37687ee3d21cf48af65955a46019623aca1513e0d318bc7d2ae87136c1d323af"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds/pricing/tests.rs",
+      "classification": "test",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-12"
+      ],
+      "reason": "CDS pricing formula/convention/regression tests only.",
+      "sha256": "abae17e70dbc2469eb617ae934e9fdbe3d44180c1be96ce53f815de9edf53e67"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-12"
+      ],
+      "reason": "Contract defaults/invariants, premium schedules, lifecycle and expected-cashflow projection.",
+      "sha256": "871133e5c6c5d9229e25533a709989f8dadaeb14526d86a97f203268d79dd879"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_index/marginable.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-13"
+      ],
+      "reason": "Index-factor CS01 margin sensitivity and duration-proxy fallback.",
+      "sha256": "8883a7c077c848bdbd1af2310ccc84c1445e76415cc1922060c0206c3c95448d"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_index/metrics/cs01.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-13"
+      ],
+      "reason": "Index quote-risk adapters, active hazards and shared recalibration CS01 behavior.",
+      "sha256": "61bac0d0038d99c4f5830c8e74c0afa486dac7d97837af659a06592c18ec9581"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_index/metrics/dv01.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-13"
+      ],
+      "reason": "Discount bump and deduplicated active-constituent hazard replay.",
+      "sha256": "32a17322588f9e1002144e683e455c7fc5d294db9803f30c61e0b699401bf05f"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_index/metrics/expected_loss.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-13"
+      ],
+      "reason": "Synthetic or active-weight constituent conditional default-loss exposure.",
+      "sha256": "9a69f46f5bfd28a70cf4048703ac6069286b744652adf1ba33edaec0b1cd692d"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_index/metrics/jump_to_default.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-13"
+      ],
+      "reason": "One-name index JTD, constituent weighting and name-inferred index counts.",
+      "sha256": "cf525eeaca62ddd5f2bc0870f4f1c94f9e299ca499cfb56e63c4cccade35d910"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_index/metrics/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-13"
+      ],
+      "reason": "Index metric registration and bucketed risk selection.",
+      "sha256": "d97b810da7be711227a84d42f21b02a417c811ab08744eb3a653132668f4a28e"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_index/metrics/recovery01.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-13"
+      ],
+      "reason": "Recovery bumps and active-constituent replay with weighted boundary normalization.",
+      "sha256": "034f78e94ba4163e93190189cb819019b88df0dc4b9809514ded84b87f642129"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_index/metrics/simple.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-13",
+        "MODELS-AND-VALUATIONS-CREDIT-14"
+      ],
+      "reason": "Par spread, risky PV01 and protection measures aggregated from selected index mode.",
+      "sha256": "fbb9089d9a9e9050895739bc1a9ef199ea729d3f4d61d21b0079e664e393990f"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_index/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Index module declarations and public exports only.",
+      "sha256": "90b52044513755a144f0e6a4078f8deff9cf53e0d054eec83ad43eafd47aee15"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_index/parameters.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-14"
+      ],
+      "reason": "Index pricing-mode/default configuration and constituent/factor input contracts.",
+      "sha256": "d3636caed8a045e1201d40ff4ea3881cc89e3865f6941446c35a9ca45aa91d73"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_index/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-14"
+      ],
+      "reason": "Synthetic versus active-constituent weighting, analytic aggregation and maturity early-exit.",
+      "sha256": "884254e22fbe8d09cce73d5c16551c9b12c2a97cc471d4be20deff1cb33d6226"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_index/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-14"
+      ],
+      "reason": "Index invariants, source curve selection and midpoint/half-AoD informational cashflows.",
+      "sha256": "a51301ab8bb3f916523c47e4e26fc6747c3af89d92ef33fa8962f0482ebb22bb"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_option/bloomberg_quadrature.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-15",
+        "MODELS-AND-VALUATIONS-CREDIT-16"
+      ],
+      "reason": "Forward annuity, lognormal mean inversion, exercise quadrature, FEP and fixed-model Theta.",
+      "sha256": "c2cf4e05aee731ddfb89fc6855391c8d291d99c53e300879f98c3280c97f888b"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_option/metrics/delta.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-16"
+      ],
+      "reason": "Strike-dependent Black Delta or symmetric quote-rebootstrap hedge ratio.",
+      "sha256": "c2c93c33af89dd0be2eb1797b83e7ee9a88aa70a91815ff9b1a01246e772d21f"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_option/metrics/dv01.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-16"
+      ],
+      "reason": "Discount-rate finite difference with hazard held fixed.",
+      "sha256": "9e500971cdc4a08f0e338b14d2b8ad2d1c0325c40d6efede7cd4f22a3358826e"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_option/metrics/gamma.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-16"
+      ],
+      "reason": "Unnormalized Delta change under fixed plus/minus five-basis-point screen bumps.",
+      "sha256": "0b20540d9f091a830c63fbc0d20875f487c8ed238d5b3d98572040920ccd72d9"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_option/metrics/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-16"
+      ],
+      "reason": "Metric selection, CS01 expiry gate, one-sided underlying spread risk and one-vol-point Vega.",
+      "sha256": "527696426ed3d6a2b264136a407c85d72fda85ac4ecac26cbcce5bb163b98350"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_option/metrics/recovery01.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-16"
+      ],
+      "reason": "Contract recovery bump and conditional hazard calibration replay.",
+      "sha256": "b67af81248fdb411ed61f3f70865c2bacdd092cd77cf3c60d6e4ee8c0941337f"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_option/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "CDS option implementation declarations and public exports only.",
+      "sha256": "d876faa1f48184d2eaa2717b4e24bd7b83a30bf1891c7e4bae06174e1b9987cc"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_option/parameters.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-15"
+      ],
+      "reason": "Strike/maturity/factor constraints and cash/spot/no-index constructor defaults.",
+      "sha256": "9947fa3ca81499691878a7c149e3cc7fbfab410a7c068a2118c56e6fcbd5e4f6"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_option/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-15",
+        "MODELS-AND-VALUATIONS-CREDIT-16"
+      ],
+      "reason": "Lifecycle rejection, volatility source selection, synthetic CDS conventions and log-vol inversion.",
+      "sha256": "19cca5abfb9ca0b4734448136dabe7fa240392abf41b5aff455c0c602255d2ce"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_option/strike.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-15"
+      ],
+      "reason": "Spread-decimal versus clean-price-percent native coordinates and conversion.",
+      "sha256": "befd714ed7330acf2ea0b7a9db81c48e770bff5acddd91d95688cf352364760f"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_option/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-15",
+        "MODELS-AND-VALUATIONS-CREDIT-16"
+      ],
+      "reason": "Option financial invariants, factor/loss consistency, dates, coupon default and direct risk entry points.",
+      "sha256": "1fd1f2ca1cbcefdc7dd2f081f9b083babf8b3c289ea227fbde904574b4e56993"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_tranche/metrics/cs01.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-19"
+      ],
+      "reason": "Active hazard quote-rebootstrap CS01 and cloned index-data curve replacement.",
+      "sha256": "1a6d1a4d8ed645e14f34228e76c0c1932bedf46eefdb2d510cdd19674c545c0c"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_tranche/metrics/dv01.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-19"
+      ],
+      "reason": "Discount quote bump, eligible constituent hazard replay and dispatch repricing.",
+      "sha256": "f7acc83ce5a13d841da3d3cffedf4d984a5a711f79f39dede08a569374754f90"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_tranche/metrics/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-19"
+      ],
+      "reason": "Specialized Gaussian metric construction, spread/par/EL/correlation/JTD and bucketed risk registration.",
+      "sha256": "3ed591b3e766f29e3b4b719e70970eb9c984de88aefb42b0e8eec9cf3aab69f2"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_tranche/metrics/recovery01.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-19"
+      ],
+      "reason": "Index-level recovery and index-hazard replay without issuer-override bumps.",
+      "sha256": "d2cec055c4cd9c507965d353f512051ed9eb7466b070b1c2e5b0527a32c5ad5d"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_tranche/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Tranche module declarations and public exports only.",
+      "sha256": "aa64894e8d203c8abd64175b4f35e8155f3f17c66a0d527cfe27028e8cdd0edd"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_tranche/parameters.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-17",
+        "MODELS-AND-VALUATIONS-CREDIT-18"
+      ],
+      "reason": "Percent attachment/detachment, schedule and realized-loss constructor defaults/constraints.",
+      "sha256": "42983507a9e943dc96edb441415fb2e97213dfa626cbefe55993eec2c3f2557f"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_tranche/pricing/engine.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-17",
+        "MODELS-AND-VALUATIONS-CREDIT-18"
+      ],
+      "reason": "Loss curve assembly, surviving boundaries, coupon/protection/upfront projected rows and discount timing.",
+      "sha256": "f18ed297a39bfe36d3a0a35ca7be56cce8d4adbeb5fa797827310978a4a942a4"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_tranche/pricing/expected_loss.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-17"
+      ],
+      "reason": "Base-correlation equity-loss differences and finite-pool cumulative loss/recovery expectations.",
+      "sha256": "a74cb2538dffd141f90eecbc4c11310363ec0b3c864cdf999fa3f537460eec93"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_tranche/pricing/heterogeneous.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-17"
+      ],
+      "reason": "Homogeneous equivalence, exact small-state enumeration and bounded discretized heterogeneous convolution.",
+      "sha256": "ad71e3a747bd53cf61daad292d70cf6fbe6038707c358a44320aebd0e94e3e7c"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_tranche/pricing/integration.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-17"
+      ],
+      "reason": "Gaussian/RFL/multi-factor adaptive integration and specialized Student-t expectation dispatch.",
+      "sha256": "578434e18617171dff918397e68a5dceb27e4121bba85b45046f495d826afad1"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_tranche/pricing/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Tranche pricing implementation declarations and pricer export only.",
+      "sha256": "19c43bb543dbe98dd7fe81950565480f057f0525045340f93fb12a0196187148"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_tranche/pricing/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-17"
+      ],
+      "reason": "Gaussian default or explicit copula construction, runtime index validation and pricing dispatch.",
+      "sha256": "6e3b200ddd96006798d074d3f538be56154c47f488c42f08461e4b88a3de9e78"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_tranche/pricing/sensitivities.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-17",
+        "MODELS-AND-VALUATIONS-CREDIT-18",
+        "MODELS-AND-VALUATIONS-CREDIT-19"
+      ],
+      "reason": "Correlation smoothing, finite binomial kernel, realized-state erosion, coupon schedules and spread/par/EL/correlation/JTD calculations; runtime after test-only helpers included.",
+      "sha256": "7e53aede69373bfaa968c72a5d3318a6bf875d41f61d46e37c9aff91055c89b2"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_tranche/pricing/tests.rs",
+      "classification": "test",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-17",
+        "MODELS-AND-VALUATIONS-CREDIT-18",
+        "MODELS-AND-VALUATIONS-CREDIT-19"
+      ],
+      "reason": "Tranche loss, schedule, copula and risk unit/regression tests only.",
+      "sha256": "8c8b1948707b85f907a40cd047a401b6a6db0abcfc09c8e1f70990f07b168507"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cds_tranche/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-17",
+        "MODELS-AND-VALUATIONS-CREDIT-18"
+      ],
+      "reason": "Tranche domain, percent guard, public schedule maturity behavior and internal discount-timing omission.",
+      "sha256": "82cc1934332524152ead81e3f494318cfba9b040d0fff39cef12eca2141acd86"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/cs01.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-13",
+        "MODELS-AND-VALUATIONS-CREDIT-16"
+      ],
+      "reason": "Shared CDS/index/option quote-space parallel and bucketed CS01 replay conventions and components.",
+      "sha256": "aef795f894c528069a316d0b3cd1054d0a993180c4dc1a4873da5b55cfd10865"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/family.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-AND-VALUATIONS-CREDIT-12",
+        "MODELS-AND-VALUATIONS-CREDIT-14",
+        "MODELS-AND-VALUATIONS-CREDIT-15",
+        "MODELS-AND-VALUATIONS-CREDIT-17"
+      ],
+      "reason": "Family registration selects HazardRate CDS/index/tranche and BloombergCdso options.",
+      "sha256": "1f738b2b5ebc4801f85af6dace46ffd9a9c1284e6dd008e077e31e297c394fb0"
+    },
+    {
+      "path": "finstack-quant/valuations/credit/src/lib.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Crate attributes, modules and public type reexports; no financial dispatch implementation.",
+      "sha256": "568e4d08bc6cdd39e05d5cb7ac38450426a5751af48f56cb5a8513fda2c2a06a"
+    }
+  ]
+}

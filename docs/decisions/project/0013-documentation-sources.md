@@ -56,7 +56,6 @@ Existing mechanisms include the [Python documentation style](../../../finstack-q
 [runtime documentation tests](../../../finstack-quant-py/tests/test_runtime_docs.py),
 and documentation/generation tasks in [mise.toml](../../../mise.toml).
 
-The stale `JsValue::from_str` instruction in [AGENTS.md](../../../AGENTS.md)
-requires correction to the accepted
-[structured-error decision](../standards/0006-structured-errors.md). Recording this
-ADR does not itself make that edit or implement additional checks.
+Guidance reconciliation is tracked in
+[FOLLOW_UPS.md](../FOLLOW_UPS.md#reconciliation-items). Acceptance establishes
+documentation ownership; it does not certify complete guidance or check coverage.

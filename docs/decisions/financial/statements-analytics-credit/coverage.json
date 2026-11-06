@@ -1,0 +1,394 @@
+{
+  "scope": "statements-analytics-credit",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "STATEMENTS-ANALYTICS-CREDIT-01",
+      "title": "Mapping-driven check selection and pass semantics",
+      "path": "01-suite-selection.md"
+    },
+    {
+      "id": "STATEMENTS-ANALYTICS-CREDIT-02",
+      "title": "Capex, PPE, dividends and working-capital identities",
+      "path": "02-stock-flow-reconciliation.md"
+    },
+    {
+      "id": "STATEMENTS-ANALYTICS-CREDIT-03",
+      "title": "Direct and balance-implied interest checks",
+      "path": "03-interest-reconciliation.md"
+    },
+    {
+      "id": "STATEMENTS-ANALYTICS-CREDIT-04",
+      "title": "Signed-denominator period-growth plausibility",
+      "path": "04-growth-plausibility.md"
+    },
+    {
+      "id": "STATEMENTS-ANALYTICS-CREDIT-05",
+      "title": "Effective-tax-rate informational bands",
+      "path": "05-tax-plausibility.md"
+    },
+    {
+      "id": "STATEMENTS-ANALYTICS-CREDIT-06",
+      "title": "Debt/TTM earnings and current-period coverage checks",
+      "path": "06-leverage-and-coverage.md"
+    },
+    {
+      "id": "STATEMENTS-ANALYTICS-CREDIT-07",
+      "title": "Cash-burn runway and period-to-month conversion",
+      "path": "07-liquidity-runway.md"
+    },
+    {
+      "id": "STATEMENTS-ANALYTICS-CREDIT-08",
+      "title": "Negative-FCF runs and adverse-trend counters",
+      "path": "08-sequential-credit-signals.md"
+    },
+    {
+      "id": "STATEMENTS-ANALYTICS-CREDIT-09",
+      "title": "Seniority-grouped debt, trailing coverage and maturity wall",
+      "path": "09-capital-structure-summary.md"
+    },
+    {
+      "id": "STATEMENTS-ANALYTICS-CREDIT-10",
+      "title": "Instrument DSCR, interest coverage and reference-value LTV",
+      "path": "10-credit-context.md"
+    },
+    {
+      "id": "STATEMENTS-ANALYTICS-CREDIT-11",
+      "title": "Statement-period covenant evaluation and forecast delegation",
+      "path": "11-covenant-statement-adapter.md"
+    },
+    {
+      "id": "STATEMENTS-ANALYTICS-CREDIT-12",
+      "title": "Exposure schedules, raw cumulative PD and conditional default",
+      "path": "12-ecl-exposure-and-pd.md"
+    },
+    {
+      "id": "STATEMENTS-ANALYTICS-CREDIT-13",
+      "title": "SICR comparison, default backstops and probationary curing",
+      "path": "13-ecl-staging.md"
+    },
+    {
+      "id": "STATEMENTS-ANALYTICS-CREDIT-14",
+      "title": "Embedded impairment policy selection and provenance",
+      "path": "14-ecl-policy-defaults.md"
+    },
+    {
+      "id": "STATEMENTS-ANALYTICS-CREDIT-15",
+      "title": "Stage-specific PD/LGD/EAD integration and impaired recovery",
+      "path": "15-ecl-bucket-measurement.md"
+    },
+    {
+      "id": "STATEMENTS-ANALYTICS-CREDIT-16",
+      "title": "Scenario weights, LGD precedence and schedule request normalization",
+      "path": "16-ecl-scenario-weighting.md"
+    },
+    {
+      "id": "STATEMENTS-ANALYTICS-CREDIT-17",
+      "title": "Lifetime CECL with forecast-to-history hazard reversion",
+      "path": "17-cecl-forecast-reversion.md"
+    },
+    {
+      "id": "STATEMENTS-ANALYTICS-CREDIT-18",
+      "title": "WARM exposure-years loss-rate measurement",
+      "path": "18-cecl-warm.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/checks/consistency/growth_rate.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-CREDIT-04"
+      ],
+      "reason": "Signed-denominator adjacent-period growth, actual/forecast scope and finite/tiny-base skips.",
+      "sha256": "272e99d7901293ec4ba3a5d5b46605c344fd5542527acea1b39ac2882650807b"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/checks/consistency/mod.rs",
+      "classification": "support",
+      "records": [
+        "STATEMENTS-ANALYTICS-CREDIT-02",
+        "STATEMENTS-ANALYTICS-CREDIT-04",
+        "STATEMENTS-ANALYTICS-CREDIT-05"
+      ],
+      "reason": "Reexports the three consistency check types; no calculation or selection.",
+      "sha256": "5ac6d803daed125db68ab04cf816f757a76e7274a3bfae826f70dadb2e24026f"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/checks/consistency/tax_rate.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-CREDIT-05"
+      ],
+      "reason": "Positive-pretax-income effective tax ratio, informational bands and excluded observations.",
+      "sha256": "65cb2bdb14828b528171f63481fc2ba7fbad220e552053d75edec70615cb016d"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/checks/consistency/working_capital.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-CREDIT-02"
+      ],
+      "reason": "NWC sums and negative balance-sheet delta, unit validation, optional-zero components and tolerance comparison.",
+      "sha256": "c675a9f5229694aec66083d8ca2a537da4869a31311bbcc7761e1c9ff78356cd"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/checks/credit/coverage.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-CREDIT-06"
+      ],
+      "reason": "Current-period coverage ratio, unit/finite checks and negative/zero denominator and error-floor behavior.",
+      "sha256": "e006a19c4d5e0bc3d7081fd52b9e4d0f79078dbe81f747ea58b67a4c5fd70979"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/checks/credit/fcf_sign.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-CREDIT-08"
+      ],
+      "reason": "Consecutive negative-FCF state, reset rules and severity count selection.",
+      "sha256": "7856b9944dcaf9c09dfb99d6b029364f077cbc153a8d3b7813c2b853057d9f90"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/checks/credit/leverage.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-CREDIT-06"
+      ],
+      "reason": "Current debt versus full trailing-year earnings, missing-window and nonpositive earnings policy and bands.",
+      "sha256": "77ede940a16279ebac2c351c1bdb1e6bdcb8562d72c5e0d8ebcbbceddf810a4c"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/checks/credit/liquidity.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-CREDIT-07"
+      ],
+      "reason": "Cash-to-positive-period-burn runway, nominal frequency-to-month conversion and severity thresholds.",
+      "sha256": "911d123b84555e031acc0eb30ca871c877f2e9ec704181c367ff42c440ed8a2e"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/checks/credit/mod.rs",
+      "classification": "support",
+      "records": [
+        "STATEMENTS-ANALYTICS-CREDIT-06",
+        "STATEMENTS-ANALYTICS-CREDIT-07",
+        "STATEMENTS-ANALYTICS-CREDIT-08"
+      ],
+      "reason": "Credit-check module declarations and type reexports only.",
+      "sha256": "a347529e56a46eb55bcbbb9a1a77a9b3b3037d1e00162aa7d11a122703f17404"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/checks/credit/trend.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-CREDIT-08"
+      ],
+      "reason": "Direction-dependent adverse-transition counter, equality/missing resets and non-finite warning.",
+      "sha256": "1adf00efd556b0e6ed4413a3f4ea82df0a4a56850925ecf2523f3fda668162a7"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/checks/mappings.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-CREDIT-01",
+        "STATEMENTS-ANALYTICS-CREDIT-07"
+      ],
+      "reason": "Typed node mappings, material input defaults and all_nodes collection used to select plausibility/data-quality coverage.",
+      "sha256": "c9379528194b06857ca3cdda0e5b367f0e1127a3b9a93a5b6afb157f780ba544"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/checks/mod.rs",
+      "classification": "support",
+      "records": [
+        "STATEMENTS-ANALYTICS-CREDIT-01"
+      ],
+      "reason": "Exports financial check, mapping, suite and renderer surfaces; no numerical algorithm.",
+      "sha256": "bb7bc9de8c4defe1c5d29e5be612ebefc073a69d575efc7cbaaa95f4909a68e2"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/checks/reconciliation/capex.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-CREDIT-02"
+      ],
+      "reason": "Capex versus component-addition identity, sign warnings, optional-zero substitutions and tolerance diagnostics.",
+      "sha256": "e1de8c03707760899675c403f79b610d788d364b77d4e230241689eebefa1bfc"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/checks/reconciliation/depreciation.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-CREDIT-02"
+      ],
+      "reason": "Adjacent-period PPE roll-forward with capex, depreciation and optional disposals; sign/tolerance policy.",
+      "sha256": "9071e0142fabfc56cf81ff782386f7c0629546031daa22385611ab07029e6043"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/checks/reconciliation/dividends.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-CREDIT-02"
+      ],
+      "reason": "Cash/equity dividend equality, sign and non-finite warnings and absolute comparison diagnostics.",
+      "sha256": "02b4f54baae4a91f03a32d827188f185bbc6310025d2460ea4a2cb19a90d3231"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/checks/reconciliation/interest.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-CREDIT-03"
+      ],
+      "reason": "Direct CS-interest precedence or average/current-balance-times-rate estimate with partial-pair skips.",
+      "sha256": "210d661a3062c4c6fd9df420add94602e7673bb07526c52f5dbb7a0e90eacd5e"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/checks/reconciliation/mod.rs",
+      "classification": "support",
+      "records": [
+        "STATEMENTS-ANALYTICS-CREDIT-02",
+        "STATEMENTS-ANALYTICS-CREDIT-03"
+      ],
+      "reason": "Reconciliation module declarations and exports only.",
+      "sha256": "8fdfa58cde931673f84dc18dbbcbeeb6096948a3dc498d375844e7380b970ca0"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/checks/renderer.rs",
+      "classification": "support",
+      "records": [
+        "STATEMENTS-ANALYTICS-CREDIT-01"
+      ],
+      "reason": "Formats existing check report values/severities as text/HTML and escapes HTML; no financial recomputation.",
+      "sha256": "0ae27bce3a95d9d7d37597321a4b0be8b70c08013c899c05397ff77eab63069d"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/checks/suites.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-CREDIT-01",
+        "STATEMENTS-ANALYTICS-CREDIT-02",
+        "STATEMENTS-ANALYTICS-CREDIT-03",
+        "STATEMENTS-ANALYTICS-CREDIT-04",
+        "STATEMENTS-ANALYTICS-CREDIT-05",
+        "STATEMENTS-ANALYTICS-CREDIT-06",
+        "STATEMENTS-ANALYTICS-CREDIT-07",
+        "STATEMENTS-ANALYTICS-CREDIT-08"
+      ],
+      "reason": "Mapping-conditioned suite assembly, fixed plausibility/credit thresholds, data-quality coverage and LBO override.",
+      "sha256": "09fe69bba5732ebf0ac84a76c4fb7098272ccb1bce9aa3b8ef96a9978fce65e6"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/credit/capital_structure.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-CREDIT-09"
+      ],
+      "reason": "Debt-kind filtering, seniority grouping, currency-safe balances, full-LTM earnings/interest ratios, maturity wall and table projection.",
+      "sha256": "a54c772eb9cc28c33fb08399f1eae11170449ea07408a7b2eba46644522930ea"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/credit/covenants.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-CREDIT-11"
+      ],
+      "reason": "Statement metric adapter, stored fiscal-period inclusive-end conversion and all-period covenant/forecast delegation.",
+      "sha256": "877541d9d8a2158e16e56a09c230674fccca82aee68e09b88fb74569f33550f2"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/credit/credit_context.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-CREDIT-10"
+      ],
+      "reason": "Instrument cash/total/fee DSCR, interest coverage and LTV with reporting-currency checks and available-only minima.",
+      "sha256": "79b8ca8cbd7b09b14c40543e3015a2d329183ddb849f4900da2d21a36de28473"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/credit/mod.rs",
+      "classification": "support",
+      "records": [
+        "STATEMENTS-ANALYTICS-CREDIT-09",
+        "STATEMENTS-ANALYTICS-CREDIT-10",
+        "STATEMENTS-ANALYTICS-CREDIT-11"
+      ],
+      "reason": "Credit analysis module declarations and public reexports only.",
+      "sha256": "093dd8e78bb42e42e40ea3ba6ec4035e9c85a296a5c195760bf81bad49f76aee"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/ecl/cecl.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-CREDIT-17",
+        "STATEMENTS-ANALYTICS-CREDIT-18"
+      ],
+      "reason": "CECL dispatch, impaired allowance, survival weighting, forecast/history hazard reversion, discount toggle and WARM exposure-years integration.",
+      "sha256": "3bf46a7f966438bde1d79ccbff45531d1b15da6efa267591b4aabc3b1cb87074"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/ecl/engine.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-CREDIT-15",
+        "STATEMENTS-ANALYTICS-CREDIT-16"
+      ],
+      "reason": "LGD mode validation/selection, stage horizon, midpoint unconditional-PD measurement, impaired recovery and weighted scenario aggregation.",
+      "sha256": "1b25eb80efea564bff4c42cfc03316fea22e501a99ff8d683001ea015a48978e"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/ecl/mod.rs",
+      "classification": "support",
+      "records": [
+        "STATEMENTS-ANALYTICS-CREDIT-12",
+        "STATEMENTS-ANALYTICS-CREDIT-13",
+        "STATEMENTS-ANALYTICS-CREDIT-14",
+        "STATEMENTS-ANALYTICS-CREDIT-15",
+        "STATEMENTS-ANALYTICS-CREDIT-16",
+        "STATEMENTS-ANALYTICS-CREDIT-17",
+        "STATEMENTS-ANALYTICS-CREDIT-18"
+      ],
+      "reason": "ECL module declarations, reexports and usage example; no runtime numerical algorithm.",
+      "sha256": "7522a683588ed19722f16d2359819b4bab4e2decb4e4c0f3f9482f62dd4f0985"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/ecl/policy.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-CREDIT-14"
+      ],
+      "reason": "Embedded policy validation, default-ID/alias lookup, numerical default resolution and implicit embedded-data failure assumptions.",
+      "sha256": "7cfb64239a46339b82296e97f935b6d66096a3c71873b538a2eed2ae1f5f4c94"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/ecl/request.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-CREDIT-13",
+        "STATEMENTS-ANALYTICS-CREDIT-16"
+      ],
+      "reason": "Direct PD staging validation, synthetic-rating schedule normalization, default controls and single/weighted measurement delegation.",
+      "sha256": "109ea26185e535c50ef000da7397a9fe0493da0f0dc5f045ada356a847578b01"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/ecl/staging.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-CREDIT-13"
+      ],
+      "reason": "Default/SICR priority, conditional origination-window comparison, PD/rating/DPD triggers and probationary stage transitions.",
+      "sha256": "33aebb72622833de1fed739bbddcd138e2ff69490ec213bbc4dc01db95b89ff7"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/ecl/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-CREDIT-12",
+        "STATEMENTS-ANALYTICS-CREDIT-13"
+      ],
+      "reason": "Exposure/CCF/EAD schedule invariants, cumulative-PD interpolation and serde validation, marginal survival probabilities and qualitative flags.",
+      "sha256": "3290b8ca70bfaff7481ade8ba6a22807d6c346e4263606628a3855f872ef22e5"
+    }
+  ]
+}

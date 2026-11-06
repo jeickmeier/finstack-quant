@@ -1,0 +1,883 @@
+{
+  "scope": "models-monte-carlo",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "MODELS-MONTE-CARLO-01",
+      "title": "Engine execution, discounting and independent estimators",
+      "path": "01-engine-and-estimation.md"
+    },
+    {
+      "id": "MODELS-MONTE-CARLO-02",
+      "title": "Philox normals and stable stream seeds",
+      "path": "02-random-streams.md"
+    },
+    {
+      "id": "MODELS-MONTE-CARLO-03",
+      "title": "Whole-path Sobol points, Brownian bridge and replicate uncertainty",
+      "path": "03-randomized-qmc.md"
+    },
+    {
+      "id": "MODELS-MONTE-CARLO-04",
+      "title": "GBM, curve-implied interval coefficients and local volatility",
+      "path": "04-lognormal-diffusions.md"
+    },
+    {
+      "id": "MODELS-MONTE-CARLO-05",
+      "title": "Euler, log-Euler, proportional Milstein and Gaussian processes",
+      "path": "05-generic-steppers.md"
+    },
+    {
+      "id": "MODELS-MONTE-CARLO-06",
+      "title": "Exact GBM subintervals and discrete dividend jumps",
+      "path": "06-cash-dividend-jumps.md"
+    },
+    {
+      "id": "MODELS-MONTE-CARLO-07",
+      "title": "Hull\u2013White exact transition and curve-fitted theta levels",
+      "path": "07-hull-white.md"
+    },
+    {
+      "id": "MODELS-MONTE-CARLO-08",
+      "title": "CIR/CIR++ dynamics and quadratic-exponential sampling",
+      "path": "08-cir-qe.md"
+    },
+    {
+      "id": "MODELS-MONTE-CARLO-09",
+      "title": "Heston QE variance, integrated-variance approximation and martingale correction",
+      "path": "09-heston-qe.md"
+    },
+    {
+      "id": "MODELS-MONTE-CARLO-10",
+      "title": "Displaced terminal-measure LMM predictor-corrector",
+      "path": "10-lmm.md"
+    },
+    {
+      "id": "MODELS-MONTE-CARLO-11",
+      "title": "Bounded utilization, short-rate and CIR spread joint process",
+      "path": "11-credit-line.md"
+    },
+    {
+      "id": "MODELS-MONTE-CARLO-12",
+      "title": "Schwartz\u2013Smith joint Gaussian transition and futures expectation",
+      "path": "12-schwartz-smith.md"
+    },
+    {
+      "id": "MODELS-MONTE-CARLO-13",
+      "title": "Fractional Brownian and Riemann\u2013Liouville noise generation",
+      "path": "13-fractional-noise.md"
+    },
+    {
+      "id": "MODELS-MONTE-CARLO-14",
+      "title": "Rough Bergomi adapted variance and log-Euler spot",
+      "path": "14-rough-bergomi.md"
+    },
+    {
+      "id": "MODELS-MONTE-CARLO-15",
+      "title": "Rough Heston Volterra-history hybrid discretization",
+      "path": "15-rough-heston.md"
+    },
+    {
+      "id": "MODELS-MONTE-CARLO-16",
+      "title": "Cheyette rough-volatility rate state and deterministic shift",
+      "path": "16-rough-cheyette.md"
+    },
+    {
+      "id": "MODELS-MONTE-CARLO-17",
+      "title": "Terminal payoffs and weighted historical Asian fixings",
+      "path": "17-vanilla-and-asian.md"
+    },
+    {
+      "id": "MODELS-MONTE-CARLO-18",
+      "title": "Barrier observation, Brownian-bridge crossing and rebate timing",
+      "path": "18-barrier-monitoring.md"
+    },
+    {
+      "id": "MODELS-MONTE-CARLO-19",
+      "title": "Lookback extrema and conditional lognormal bridge sampling",
+      "path": "19-lookback-monitoring.md"
+    },
+    {
+      "id": "MODELS-MONTE-CARLO-20",
+      "title": "Autocall observation ordering, coupon memory and redemption",
+      "path": "20-autocallable.md"
+    },
+    {
+      "id": "MODELS-MONTE-CARLO-21",
+      "title": "Cliquet local/global clamps and seasoned return aggregation",
+      "path": "21-cliquet.md"
+    },
+    {
+      "id": "MODELS-MONTE-CARLO-22",
+      "title": "Observation-count range accrual with history and carry multipliers",
+      "path": "22-range-accrual.md"
+    },
+    {
+      "id": "MODELS-MONTE-CARLO-23",
+      "title": "LSMC exercise fitting, replay and statistical interpretation",
+      "path": "23-lsmc-exercise.md"
+    },
+    {
+      "id": "MODELS-MONTE-CARLO-24",
+      "title": "LSMC bases, SVD cutoff and standardized polynomial reduction",
+      "path": "24-regression-policies.md"
+    },
+    {
+      "id": "MODELS-MONTE-CARLO-25",
+      "title": "Paired common-random-number delta and gamma",
+      "path": "25-finite-difference-greeks.md"
+    },
+    {
+      "id": "MODELS-MONTE-CARLO-26",
+      "title": "GBM likelihood-ratio delta and vega density scores",
+      "path": "26-likelihood-ratio-greeks.md"
+    },
+    {
+      "id": "MODELS-MONTE-CARLO-27",
+      "title": "Control-variate coefficient and adjusted uncertainty",
+      "path": "27-control-variate.md"
+    },
+    {
+      "id": "MODELS-MONTE-CARLO-28",
+      "title": "Captured-path diagnostics and public process/scheme dispatch",
+      "path": "28-capture-and-simulation-contracts.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/models/src/monte_carlo/captured_path_stats.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-28"
+      ],
+      "reason": "Computes interpolated quartiles, median and min/max from only the retained discounted path values.",
+      "sha256": "5d1cc614fe21fb9ab83fc26927fb1e019ef7e11696a48872f5e8e152dd2c96aa"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/control_variate.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-27"
+      ],
+      "reason": "Computes covariance/variance beta, control-adjusted price/variance, zero variance floor and normal uncertainty.",
+      "sha256": "49a413fdac4f0e40ecf4fb65334a4d044bf1be8f4c1161b499f809428ab7290e"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/convenience.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-01"
+      ],
+      "reason": "Resolves omitted count, seed, currency, QMC/bridge and antithetic controls into concrete pricing defaults.",
+      "sha256": "c9a0155c67f42d6bab0fab54ec65ff08ae3278764b7e4651ecdcd862c69eac4b"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/discretization/cheyette_rough.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-16"
+      ],
+      "reason": "Uses compensated rough volatility to Euler-step x/y and updates fractional history after adapted diffusion.",
+      "sha256": "b8c3b264fd0fb499e6c2752a51088d776603738d679ee8364156a9699abba7ac"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/discretization/credit_line.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-11"
+      ],
+      "reason": "Applies correlation, spread-linked bounded exact-OU utilization, exact Hull-White rate and CIR QE spread updates in order.",
+      "sha256": "13233196b40e9137b29b4ef5baab862b621a0b6c54a30e9df96d56281fe8ed29"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/discretization/euler.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-05"
+      ],
+      "reason": "Implements left-point Euler and exponential log-Euler including the positive-denominator floor.",
+      "sha256": "33cd85c50e69090e79d6722b43ab93eec0a10bbac0b185da03318108cd645572"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/discretization/exact.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-04"
+      ],
+      "reason": "Implements exact GBM and proportional multi-GBM transitions including scheduled cumulative drift and subnormal coefficient recovery.",
+      "sha256": "62146bdb183fc67db008c2cf0fa9a1616433ab85ca483bec37fb52abd4d57a73"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/discretization/exact_gbm_dividends.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-06"
+      ],
+      "reason": "Splits time steps at dividends, consumes distinct subinterval normals and applies exact diffusion then jumps.",
+      "sha256": "4f85112ef4f736e339219efc32c3b8bbe864e3cc0026c7aa49d13dafbf94ad6d"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/discretization/exact_hw1f.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-07"
+      ],
+      "reason": "Computes exact Gaussian short-rate means/variances across theta/sigma knots with a small-kappa expansion and cached constants.",
+      "sha256": "a37caa2d48d020b7933ee0adbea26aef92a8d70e3812ebe02145baa8875685a2"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/discretization/lmm_predictor_corrector.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-10"
+      ],
+      "reason": "Performs two-stage displaced lognormal drift correction and enforces fixing/volatility grid alignment.",
+      "sha256": "7911a1138cae43e81e3f6ddcaa0044c9b9efecc2b1cac5704205f51bf2268dd7"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/discretization/milstein.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-05"
+      ],
+      "reason": "Implements proportional-diffusion Milstein correction and the small-state derivative cutoff.",
+      "sha256": "47e5aaf7267b84607e7caa7acedf3b7e3f5eb60b70cc6036b8958bdc9fba4519"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/discretization/mod.rs",
+      "classification": "support",
+      "records": [
+        "MODELS-MONTE-CARLO-05",
+        "MODELS-MONTE-CARLO-13"
+      ],
+      "reason": "Scheme module declarations plus a test-only workspace layout contract; no production numerical kernel.",
+      "sha256": "caaa967be3ea5b353bd0095d2732a8f02e81516b76c004b7464f587547386d41"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/discretization/qe_cir.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-08"
+      ],
+      "reason": "Selects and applies nonnegative QE factor sampling with configurable threshold and unshifted CIR++ state.",
+      "sha256": "545ed86a7a37c360c2e14786a503166c48664afcd51ff17b56bb6d25d723ac43"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/discretization/qe_common.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-08",
+        "MODELS-MONTE-CARLO-09"
+      ],
+      "reason": "Computes stable CIR conditional moments, quadratic/exponential-mixture regimes, zero mass, inverse sampling and conditional MGFs.",
+      "sha256": "a11b52137ec8a731e80138b88f89fbb70f4d072f323f7e830e2d29abdf92ef0b"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/discretization/qe_heston.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-09"
+      ],
+      "reason": "Samples variance, selects integrated-variance approximation, applies conditional MGF martingale correction or fallback and internal leverage.",
+      "sha256": "299bb0c89af6fdb69d2fa5ec2a5eb3846ff3c9dcee080be5fea4b6832b8b3ee3"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/discretization/rough_bergomi.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-14"
+      ],
+      "reason": "Reconstructs adapted compensated variance, correlates Brownian driver and evolves lognormal spot before history update.",
+      "sha256": "dd02d823aedcad319ff17afc303244f7c47abf00431f78f118edfc39397a1ddc"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/discretization/rough_heston.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-15"
+      ],
+      "reason": "Precomputes triangular Volterra drift/noise weights, newest-cell correction, history-based nonnegative variance and adapted spot.",
+      "sha256": "db1e24690ca5e1ccb399b61ce41467307e0da36021d7bd2c1425399015c76f19"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/discretization/schwartz_smith.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-12"
+      ],
+      "reason": "Samples exact joint OU/Brownian transitions with finite-step covariance rather than instantaneous correlation.",
+      "sha256": "ea80d8ddc0425867d34004eff221b77a551ecee660eb7d8c53bd8378b0e0cb18"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/engine/config.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-01"
+      ],
+      "reason": "Independent-estimator counts, serial stopping restrictions, antithetic and execution defaults are financially material controls.",
+      "sha256": "c57efeadd174df43bbedc61dee57141e02dc028127ebdc78cb53a3b29ce8dfbc"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/engine/fractional.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-13"
+      ],
+      "reason": "Validates fractional-noise injection buffers/pairing and drives the event loop with injected noise.",
+      "sha256": "7461a6bf82cf81724225db2abdd0a212f8ae5083e0d18ce735b378f71780db42"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/engine/mod.rs",
+      "classification": "support",
+      "records": [
+        "MODELS-MONTE-CARLO-01"
+      ],
+      "reason": "Module assembly and public/private engine reexports; production algorithms reside in sibling files.",
+      "sha256": "4f5e10ed6f300160845b1008c0021b68d407175f3323c6444572aaa8be4f2ae1"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/engine/path_capture.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-28"
+      ],
+      "reason": "Defines deterministic hash-threshold path sampling with expected rather than exact retained count.",
+      "sha256": "45bf55eb5a4e999b3935705e122ab223905fe0987ac9ad660aee139d9b3638fa"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/engine/pricing.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-01"
+      ],
+      "reason": "Validates process/scheme/payoff pairing, applies correlation and scalar discounting, reduces independent estimators and implements optional stopping.",
+      "sha256": "b038bc6c2d5ffb429fc973f5cd997507a2a5f5136c704b66b1cfe58afb16d519"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/engine/simulation.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-01"
+      ],
+      "reason": "Orders time-zero and step events, resets history, drives correlated shocks and antithetic uniforms, captures payoff/cashflow/periodic-IRR diagnostics.",
+      "sha256": "85f39263fde6ae9228bcc7c1ddd87635ec9145bfc503d3d83fa9bf23927a9a01"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/engine/tests.rs",
+      "classification": "test",
+      "records": [
+        "MODELS-MONTE-CARLO-01",
+        "MODELS-MONTE-CARLO-08",
+        "MODELS-MONTE-CARLO-09",
+        "MODELS-MONTE-CARLO-28"
+      ],
+      "reason": "Test-only dummy streams/payoffs and assertions for estimator counts, deterministic reduction, correlation, validation, capture and history reset.",
+      "sha256": "51c5c19139e26d2f34710c67acfb922ae4cf415d39c31a5140a398346f304b61"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/estimate.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-01"
+      ],
+      "reason": "Builds pair-mean statistics, Student-t confidence estimates, sample-count reporting and relative-error thresholds.",
+      "sha256": "db15456960b26995d829cb206cbe4ad355049ef7d0443977a019be2e7623a373"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/greeks/finite_diff.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-25"
+      ],
+      "reason": "Validates symmetric spot stencils and computes covariance-aware per-path CRN delta/gamma including antithetic pair statistics.",
+      "sha256": "866cfc494a8dfdd60cdf89e19fd13a8459fff825068aeda102f1a5f0a6886c14"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/greeks/gbm_european.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-25"
+      ],
+      "reason": "Constructs registry-defaulted exact-GBM FD experiments and normal-interval/unit/path-count reporting.",
+      "sha256": "ac69df198b92c91a94623def5dcb85c69bbc6e8129920a9f93fdfcf73fb0f18a"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/greeks/lrm.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-26"
+      ],
+      "reason": "Computes likelihood-ratio GBM delta and per-percentage-point vega from density scores and online statistics.",
+      "sha256": "36c674af79e33c6bf0f45abfb919ebedeceefb4b9fac019978e41facb0a1f58e"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/greeks/mod.rs",
+      "classification": "support",
+      "records": [
+        "MODELS-MONTE-CARLO-25",
+        "MODELS-MONTE-CARLO-26"
+      ],
+      "reason": "Greek estimator module declarations and guidance only; no calculation body.",
+      "sha256": "99c315ce927c94cb7ecbfb188ce01f23554f5667cc34a96b3ffdfb242dcb0aa1"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/mc_process_params_serialization.rs",
+      "classification": "test",
+      "records": [
+        "MODELS-MONTE-CARLO-04",
+        "MODELS-MONTE-CARLO-05",
+        "MODELS-MONTE-CARLO-07",
+        "MODELS-MONTE-CARLO-08",
+        "MODELS-MONTE-CARLO-09",
+        "MODELS-MONTE-CARLO-12",
+        "MODELS-MONTE-CARLO-28"
+      ],
+      "reason": "Test-only parameter JSON roundtrips and retired-key rejection; serialization evidence is not price validation.",
+      "sha256": "3a0b55789f8c3a467b4d88db265ad6363101655387ad5a849cbcdce125fdb345"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-01"
+      ],
+      "reason": "Contains the strictly-positive convenience-volatility validation in addition to module assembly.",
+      "sha256": "025c7212242db03ad9a621cb93eecae4127bccd67b3efb614dfac02696748457"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/paths.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-28"
+      ],
+      "reason": "Aggregates typed/time-stamped path cashflows and validates/provides state metadata and dataset completeness.",
+      "sha256": "0959b3981a5f91ea85e7e767821e727d9d03076c241e06011f28e7322ebc5c9c"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/payoff/asian.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-17"
+      ],
+      "reason": "Implements historical arithmetic/log-geometric averaging, repeated fixing multiplicities, carry multipliers and Kahan sums.",
+      "sha256": "ce1ff4f9b60ce912eea12299e9081a617e2c65eebff015fbc5f3ebca8578fa5f"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/payoff/autocallable.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-20"
+      ],
+      "reason": "Implements scheduled coupon-memory-before-autocall ordering, payment ratios, discrete knock-in and three final redemption formulas.",
+      "sha256": "8d731e74957704dfeae556c2cab533e3f559ee2267d3a1e59efe00dc96c151a8"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/payoff/barrier.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-18"
+      ],
+      "reason": "Implements discrete/continuous monitoring, inclusive touch, lognormal crossing probability, path-variance override and rebate timing.",
+      "sha256": "3a40410cac498967aa874af6f390868be7acef6a43fd052a46ad0586d70e7443"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/payoff/cliquet.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-21"
+      ],
+      "reason": "Implements reset sampling, local/global return clamps, additive/multiplicative locked histories and final call floor.",
+      "sha256": "ea970ba2ad4e341176a5fd72d8678e90ff83cb1558efdb15269b2fc0ffa01c6c"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/payoff/lookback.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-19"
+      ],
+      "reason": "Implements fixed/floating extrema, historical seeds, discrete observations and conditional continuous lognormal extrema.",
+      "sha256": "3b2c016ef1cbd0f6589c1649e41bf8e31a2c84cc2f3697ac3fec61f2f06bd402"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/payoff/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-17"
+      ],
+      "reason": "Contains common missing/nonfinite payoff-state rejection as well as payoff module assembly.",
+      "sha256": "711117319de53b3443985905a55d58d48ece39762142444435cf86a8141d6d9f"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/payoff/range_accrual.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-22"
+      ],
+      "reason": "Implements equal-count inclusive range accrual, history, duplicate observation multipliers and deferred missing-state behavior.",
+      "sha256": "2821ff113564a0857cb5cc236665e737892f7546e4caaa3a89144548c95ade6b"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/payoff/vanilla.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-17"
+      ],
+      "reason": "Implements terminal European/digital/forward exercise signs, strict digital equality rule and event-index/density-score contracts.",
+      "sha256": "1fd97106ce0097683b3a5d18d3ec11246f13cde1a3500315b6c77ee268281dae"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/pricer/basis.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-24"
+      ],
+      "reason": "Constructs raw/normalized power or Laguerre regression basis with explicit degree/scale domains.",
+      "sha256": "2e59144de1a80bcf8a8165fdf5392111f3b0d125f0a8e13958027002445a18f3"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/pricer/european.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-01"
+      ],
+      "reason": "Selects Philox/exact GBM, scalar flat-rate discounting and European convenience payoff/grid defaults.",
+      "sha256": "0869e332ba5638f53a8b4ce198c81de0096aac3d74fb3c60d9896374fff7067b"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/pricer/heston.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-09"
+      ],
+      "reason": "Selects convenience QE-Heston, Philox, unit European notional, scalar discount and registry-backed grid/count defaults.",
+      "sha256": "7e6e815bdc5d6c91f6d32194736d0ac474b82e7a4236ba5735c879b97e92ba65"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/pricer/lsmc.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-23"
+      ],
+      "reason": "Generates stored GBM antithetic paths, fits ITM continuation backward, skips sparse dates, fits/replays time-zero exercise and independent policies.",
+      "sha256": "74ad469b4cacb466cdb67bff6ee3cd3c8ada76405d5be2a32bcc02a482b49fc1"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/pricer/lsq.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-24"
+      ],
+      "reason": "Builds design matrices and solves continuation least squares by scale-relative truncated SVD.",
+      "sha256": "94e9933aca154154ef3708b30035ba582420f9aea2879b34f56e92c6a53425e7"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/pricer/mod.rs",
+      "classification": "support",
+      "records": [
+        "MODELS-MONTE-CARLO-23",
+        "MODELS-MONTE-CARLO-24"
+      ],
+      "reason": "High-level pricer module declarations and navigation documentation only.",
+      "sha256": "2e97e1067fe49e1ad5ca9762985fe1730bab7a07490a8a2cde1f507c8e85c001"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/pricer/path_dependent.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-03",
+        "MODELS-MONTE-CARLO-26"
+      ],
+      "reason": "Selects exact-GBM Philox/QMC paths, whole-point Sobol/bridge construction, scramble-based uncertainty and captured GBM likelihood-ratio scores.",
+      "sha256": "e4c9a6038a2dbb7ca81699c8fe35a907c1e214ff426265295b4c30bdfc92c899"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/pricer/polynomial.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-24"
+      ],
+      "reason": "Standardizes multivariate features, drops constant dimensions and reduces cubic/quadratic/linear/intercept candidate bases.",
+      "sha256": "0fb721ac97be97e42bdfcbe38a3635ae2f16f38f0c363db48601e885ef1e1c37"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/process/brownian.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-05"
+      ],
+      "reason": "Defines validated additive Gaussian dynamics and multivariate driver correlation.",
+      "sha256": "76c5684f58c7cee48ffff2febb22f5c7fe989dadaec4983ac45a91a5626040e0"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/process/cheyette_rough.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-16"
+      ],
+      "reason": "Validates required baseline and shift curves and projects short rate x+phi with linear/flat shift interpolation.",
+      "sha256": "a905b1850fb67a565d3910879989949dcb00a00f340aaa581d5ee80ff61b4663"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/process/cir.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-08"
+      ],
+      "reason": "Defines full-truncation CIR coefficients, permissive Feller diagnostics, shifted-rate projection and CIR++ shift schedules.",
+      "sha256": "bc9d045dee80c8c229b76d0b9bad09da13fdfed556e123509e437f6023937981"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/process/credit_line.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-11"
+      ],
+      "reason": "Defines utilization/rate/spread economic parameters, initial clamps, deterministic rate interpolation and curve-clock offset.",
+      "sha256": "2d8515568ec7d544bfc319752c452866c8db0d6b73d5bbf032758148d38508d7"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/process/gbm.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-04"
+      ],
+      "reason": "Defines single/multi-GBM drifts/diffusions, correlation, cumulative drift interpolation/extrapolation and indexed spot projection.",
+      "sha256": "ace13daabeccef5de59f3f281d63bfc8c77922d8df17f31247ed88aa3b6ad884"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/process/gbm_dividends.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-06"
+      ],
+      "reason": "Validates and sorts dividends, defines clamped cash/proportional jumps and interval boundary/factor-budget conventions.",
+      "sha256": "6a57091d32da6c7490c7b25331050025e6eaedb7d8d783695901a85b9ef8a150"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/process/heston.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-09"
+      ],
+      "reason": "Defines spot/variance dynamics, full-truncation coefficients, optional drift schedule and factor correlation.",
+      "sha256": "531ad21e55a01603b527d90ab22b2c438239fa67b4478180d0ace790ea9f2247"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/process/lmm.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-10"
+      ],
+      "reason": "Validates displaced forward domains, computes terminal-measure drift/diffusion, freezes fixings and projects terminal numeraire.",
+      "sha256": "38e82b566bdcf19c5b6684e70c46438588f4d01d3b61e8e9eecb0cd074295800"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/process/local_vol.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-04"
+      ],
+      "reason": "Uses constant carry and supplied local-volatility surface at current time/spot, with explicit process validation.",
+      "sha256": "50f3e0a242d5222858ab0c61c01143adf67dd553e41e8fbe79eb1a9accb079cb"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/process/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-07",
+        "MODELS-MONTE-CARLO-08",
+        "MODELS-MONTE-CARLO-11",
+        "MODELS-MONTE-CARLO-16"
+      ],
+      "reason": "Contains shared finite ordered-knot validation and piecewise-constant evaluation, in addition to process exports.",
+      "sha256": "1d079c8aeba853b16ff5460df4642f372458742d9423825b4ad571024b69c1b1"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/process/multi_ou.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-05"
+      ],
+      "reason": "Defines coordinatewise OU drift with finite but unrestricted-sign mean-reversion speeds and correlated additive diffusion.",
+      "sha256": "3aaf5da29f472e63d4041319dd46388dc9d5fbe744965b4ea989487b95292064"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/process/ou.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-07"
+      ],
+      "reason": "Defines theta/sigma schedules, exact mean contribution and curve-fitted Hull-White theta levels using finite-difference forwards.",
+      "sha256": "f3ca816cbcbd7a7cc6be36d9d3274bc57a97c252b4f14d45ff8fdf2f7667d722"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/process/piecewise_gbm.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-04"
+      ],
+      "reason": "Bootstraps forward rates/variance from DFs and maturity-volatility samples and freezes interval coefficients for exact lognormal stepping.",
+      "sha256": "25b28eebb44bf51780c25fa83b3c2af8a574f74c08100c1d118a66b51f2fb433"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/process/rough_bergomi.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-14"
+      ],
+      "reason": "Validates forward-variance/rough-volatility parameters and requires dedicated externally driven dynamics.",
+      "sha256": "4ca56a4e9f90eec8be2853263a8bc54e986cac4369741b82c2928aa39a497340"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/process/rough_heston.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-15"
+      ],
+      "reason": "Defines rough-Heston parameters, variance/spot state projection and dedicated history-scheme contract.",
+      "sha256": "895f4723553f79fc9aeb06d29463d2b1187d25399ea2f124b288447ec247fa3c"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/process/schwartz_smith.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-12"
+      ],
+      "reason": "Defines two-factor log commodity dynamics, risk-premium term, spot projection and Gaussian futures expectation.",
+      "sha256": "11f2b9342e71f3f776d4221582910dea3f814dcc02111071468e479609d0106e"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/registry.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-01"
+      ],
+      "reason": "Loads and validates versioned path/seed/grid/Greek/LSMC defaults that determine numerical work and method selection.",
+      "sha256": "fa1516b1c100eaec5755e4166c43090cc7e9c3d5b1b2a4aaf9d888f3860e7eb3"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/results.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-28"
+      ],
+      "reason": "Converts estimates to currency-tagged results and applies the near-zero-mean relative-standard-error convention.",
+      "sha256": "a08be3ba59d64e9f068a39e226efeb085f25a50accf85525a6a2e87186ad9762"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/rng/fbm.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-13"
+      ],
+      "reason": "Constructs exact full fBM increment covariance or finite-window conditional covariance with variance repair.",
+      "sha256": "1cd5e45fa0c3c731866bd0ed532496f84e040d60bd2b6c876a0c89253b3ab92f"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/rng/mod.rs",
+      "classification": "support",
+      "records": [
+        "MODELS-MONTE-CARLO-02",
+        "MODELS-MONTE-CARLO-13"
+      ],
+      "reason": "RNG module declarations and explanatory documentation only; generators are in leaf files.",
+      "sha256": "80eb7b2e421c5d3693a6cd014da3bff4a0b9ab33a16df79d102685473332411a"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/rng/philox.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-02"
+      ],
+      "reason": "Implements ten-round counter-based Philox, open uniforms, cached Box-Muller normals and deterministic stream/offset selection.",
+      "sha256": "5522f16aac94c38d9e415eaadc536dffb4d9d2d575764846bfe52ba9e9138952"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/rng/sobol.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-02",
+        "MODELS-MONTE-CARLO-03"
+      ],
+      "reason": "Adapts core Sobol to RandomStream and explicitly disables splitting while flagging quasi-random dependence.",
+      "sha256": "d4bbeb99c1241fc1b0f8474f1773f226af4fb1db1808a0ac2d934f2545b895c7"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/rng/volterra.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-13"
+      ],
+      "reason": "Constructs joint near-field kernel/Brownian increments and far-field RL Volterra convolution on uniform grids.",
+      "sha256": "495b65e48eb41c2aa38ffc26e150e1e4448878b59fff5ad14324df78fab4c65f"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/seed.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-02"
+      ],
+      "reason": "Derives stable scenario/instrument RNG seeds through delimited FNV-1a-64 hashing.",
+      "sha256": "cafdc2760300c391426cc3714b82b8e0705104a2a2ed050b59f58df64f7fbb28"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/simulate/fractional.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-13"
+      ],
+      "reason": "Selects default RL versus alternative fBM generators, enforces grid/storage limits and maps driving normals.",
+      "sha256": "1c2d5a61644805cdc28aa8286ddb98f9df9f9632438be70712fd0e5b85c90a20"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/simulate/non_markov_tests.rs",
+      "classification": "test",
+      "records": [
+        "MODELS-MONTE-CARLO-10",
+        "MODELS-MONTE-CARLO-13",
+        "MODELS-MONTE-CARLO-14",
+        "MODELS-MONTE-CARLO-15",
+        "MODELS-MONTE-CARLO-16",
+        "MODELS-MONTE-CARLO-28"
+      ],
+      "reason": "Test-only LMM and rough process fixtures, dedicated-kernel equality, martingale/compensated-mean checks, generator selection and invalid-grid cases.",
+      "sha256": "c943d0df34a47db6306326a526c75cbe7a4d1eca7ca4f167d4cfac0f83ebfe28"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/simulate/tests.rs",
+      "classification": "test",
+      "records": [
+        "MODELS-MONTE-CARLO-04",
+        "MODELS-MONTE-CARLO-05",
+        "MODELS-MONTE-CARLO-06",
+        "MODELS-MONTE-CARLO-07",
+        "MODELS-MONTE-CARLO-08",
+        "MODELS-MONTE-CARLO-09",
+        "MODELS-MONTE-CARLO-12",
+        "MODELS-MONTE-CARLO-28"
+      ],
+      "reason": "Test-only process/scheme matrix, direct transition-moment/correlation formulas, deterministic path pins, serialization and domain/budget rejections.",
+      "sha256": "6581469fe79d85aa5a0589501b9b38d8b3f2d40bc2e17f513b0e8c4eac017d68"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/simulate.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-28"
+      ],
+      "reason": "Dispatches every serialized process/scheme pair, validates economic domains/work budgets, records finite coordinates and maps shifted-rate outputs.",
+      "sha256": "0be3c1adf16f6c8b6b145304a6a18217b6f7362c39b5814aab27ab8da31faef9"
+    },
+    {
+      "path": "finstack-quant/models/src/monte_carlo/traits.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-MONTE-CARLO-01",
+        "MODELS-MONTE-CARLO-28"
+      ],
+      "reason": "Defines financially meaningful default state projection, payoff event and density-score contracts, RNG/correlation/mandatory-scheme behavior.",
+      "sha256": "c5f773b7dc8df4cff0da7b9c1288ee8a5ba10ecbffbdbccc4b8b9b17111a17f3"
+    }
+  ]
+}

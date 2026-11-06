@@ -42,9 +42,9 @@ Required enforcement checks Rust-to-host naming correspondence and documented
 exceptions. Contract-change reporting must expose established public-name
 changes even when Python and WASM remain mutually consistent.
 
-Existing naming and parity tests provide coverage, but are not proof of
-complete Rust-to-host coverage for every namespace. Extend them where gaps
-remain; do not treat passing host-to-host parity alone as sufficient.
+Passing host-to-host parity alone does not establish complete Rust-to-host
+naming coverage. Coverage work is tracked in
+[FOLLOW_UPS.md](../FOLLOW_UPS.md#implementation-and-lifecycle-follow-up).
 
 ## Implementation notes and references
 

@@ -70,6 +70,24 @@ Documentation should describe current behavior, not implementation history.
 Prefer concrete inputs, outputs, units, market conventions, errors, and examples.
 For Python users, `.pyi` docstrings are the primary IDE-facing API docs.
 
+Material financial methodology changes update the relevant
+[decision record and inventory](docs/decisions/financial/README.md) alongside
+code, tests, and references, as required by
+[ADR 0026](docs/decisions/financial/governance/0026-methodology-decisions-and-inventory.md).
+This includes model defaults and dispatch, calibration, exercise treatment,
+conventions, material numerical settings, approximations, and failure or
+fallback behavior. State whether the change implements an accepted choice or
+proposes a new one. Keep decision, implementation, and validation statuses
+separate; existing code and passing tests alone do not approve a methodology.
+
+For the crates covered by the methodology audit, maintain the
+[algorithm catalogue and source ledgers](docs/decisions/financial/README.md).
+After reviewing changed algorithms, update their records and inspected source
+hashes, then regenerate the readable map with
+`uv run --no-sync python scripts/check_methodology_coverage.py --write`.
+Run the same checker with `--verify-source` to check exact coverage and source
+drift. Refreshing a hash alone does not establish that a change was reviewed.
+
 Useful entry points:
 
 - [`README.md`](README.md)

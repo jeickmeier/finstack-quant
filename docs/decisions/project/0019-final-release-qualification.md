@@ -66,6 +66,6 @@ to rebuild packages for the selected version.
 
 Exact final-artifact qualification is the accepted requirement. This record
 does not establish that the current workflow captures independent approval of
-those artifacts or that any particular release has been qualified. The
-concrete qualification criteria and their enforcement still need to be made
-explicit and verified.
+those artifacts or that any particular release has been qualified.
+Qualification and enforcement work is tracked in
+[FOLLOW_UPS.md](../FOLLOW_UPS.md#implementation-and-lifecycle-follow-up).

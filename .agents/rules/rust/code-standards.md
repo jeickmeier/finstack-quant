@@ -152,14 +152,17 @@ impl CurveBuilder {
 ### Newtype Pattern
 
 ```rust
-// Use for type safety and zero-cost abstraction
+// Use for type safety and zero-cost abstraction; validate fallibly rather than panicking
 #[repr(transparent)]
-pub struct CurveId(&'static str);
+pub struct CurveId(String);
 
 impl CurveId {
-    pub const fn new(id: &'static str) -> Self {
-        assert!(!id.is_empty(), "CurveId cannot be empty");
-        Self(id)
+    pub fn new(id: impl Into<String>) -> Result<Self> {
+        let id = id.into();
+        if id.is_empty() {
+            return Err(Error::Validation("CurveId cannot be empty".into()));
+        }
+        Ok(Self(id))
     }
 }
 ```
@@ -363,13 +366,11 @@ use super::traits::Discount;
 
 ## Unsafe Code
 
-### Guidelines
+### Policy ([ADR 0036](../../../docs/decisions/standards/0036-safe-rust-and-recoverable-failures.md))
 
-- Avoid `unsafe` unless absolutely necessary
-- When used, must have:
-  - `// SAFETY:` comment explaining invariants
-  - Debug assertions validating preconditions
-  - Comprehensive tests including edge cases
+- Unsafe code is forbidden (`#![forbid(unsafe_code)]` / workspace `unsafe_code = "deny"`) across project-authored library and binding sources.
+- Do not add `unsafe` blocks or `// SAFETY:` exemptions in project library or binding code.
+- Handle invalid caller inputs, out-of-range indices, incompatible shapes, and numerical failures by returning typed `Result` errors rather than panicking (`unwrap`, `expect`, `panic!`, or input-dependent `assert!`).
 
 ## Benchmarking
 

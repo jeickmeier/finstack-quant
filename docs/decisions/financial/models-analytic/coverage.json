@@ -1,0 +1,721 @@
+{
+  "scope": "models-analytic",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "MODELS-ANALYTIC-01",
+      "title": "Spot Black\u2013Scholes price, Greeks and calculation dispatch",
+      "path": "spot-vanilla-and-greeks.md"
+    },
+    {
+      "id": "MODELS-ANALYTIC-02",
+      "title": "Forward Black, normal and shifted pricing and sensitivities",
+      "path": "forward-normal-shifted.md"
+    },
+    {
+      "id": "MODELS-ANALYTIC-03",
+      "title": "Black and Bachelier volatility inversion",
+      "path": "implied-volatility-solvers.md"
+    },
+    {
+      "id": "MODELS-ANALYTIC-04",
+      "title": "Geometric Asian law and arithmetic lognormal moment matching",
+      "path": "asian-moments.md"
+    },
+    {
+      "id": "MODELS-ANALYTIC-05",
+      "title": "Continuous single barriers, touch probability and rebate timing",
+      "path": "barriers-and-rebates.md"
+    },
+    {
+      "id": "MODELS-ANALYTIC-06",
+      "title": "Continuous fixed and floating lookbacks with observed extrema",
+      "path": "lookback-extrema.md"
+    },
+    {
+      "id": "MODELS-ANALYTIC-07",
+      "title": "Quanto drift and domestic discounting",
+      "path": "quanto-drift.md"
+    },
+    {
+      "id": "MODELS-ANALYTIC-08",
+      "title": "Heston affine characteristic function and parameter domain",
+      "path": "heston-characteristic-function.md"
+    },
+    {
+      "id": "MODELS-ANALYTIC-09",
+      "title": "Heston probability inversion, strip caching and convergence budget",
+      "path": "heston-fourier-integration.md"
+    },
+    {
+      "id": "MODELS-ANALYTIC-10",
+      "title": "COS truncation, payoff coefficients and strip inversion",
+      "path": "cos-inversion.md"
+    },
+    {
+      "id": "MODELS-ANALYTIC-11",
+      "title": "Black, Merton jump and variance-gamma characteristic laws",
+      "path": "jump-characteristic-laws.md"
+    },
+    {
+      "id": "MODELS-ANALYTIC-12",
+      "title": "Fractional Riccati rough-Heston characteristic function and Lewis pricing",
+      "path": "rough-heston-riccati.md"
+    },
+    {
+      "id": "MODELS-ANALYTIC-13",
+      "title": "SABR normal, lognormal and shifted asymptotic quotes",
+      "path": "sabr-expansions.md"
+    },
+    {
+      "id": "MODELS-ANALYTIC-14",
+      "title": "Deterministic multistart SABR fit, weights, shifts and ATM pinning",
+      "path": "sabr-calibration.md"
+    },
+    {
+      "id": "MODELS-ANALYTIC-15",
+      "title": "SABR delta strikes and discrete smile arbitrage repair",
+      "path": "sabr-smile-repair.md"
+    },
+    {
+      "id": "MODELS-ANALYTIC-16",
+      "title": "Volatility source interpolation, quote conventions and materialization",
+      "path": "volatility-source-interpolation.md"
+    },
+    {
+      "id": "MODELS-ANALYTIC-17",
+      "title": "FX RR/BF conversion, delta strikes and smile interpolation",
+      "path": "fx-delta-smiles.md"
+    },
+    {
+      "id": "MODELS-ANALYTIC-18",
+      "title": "Raw SVI evaluation, bounded transformations and fit acceptance",
+      "path": "svi-fit-and-density.md"
+    },
+    {
+      "id": "MODELS-ANALYTIC-19",
+      "title": "Finite-difference Dupire extraction, smoothing and local-vol interpolation",
+      "path": "dupire-local-volatility.md"
+    },
+    {
+      "id": "MODELS-ANALYTIC-20",
+      "title": "Surface arbitrage scans, severity and pass policy",
+      "path": "surface-arbitrage-diagnostics.md"
+    },
+    {
+      "id": "MODELS-ANALYTIC-21",
+      "title": "Discrete variance replication, log-contract anchor and wing extension",
+      "path": "variance-replication.md"
+    },
+    {
+      "id": "MODELS-ANALYTIC-22",
+      "title": "Price-equivalent ATM volatility convention conversion",
+      "path": "atm-volatility-conversion.md"
+    },
+    {
+      "id": "MODELS-ANALYTIC-23",
+      "title": "Hull\u2013White affine bonds, caplets and covariance corrections",
+      "path": "hull-white-analytic-kernels.md"
+    },
+    {
+      "id": "MODELS-ANALYTIC-24",
+      "title": "Rate model clocks, curve fitting and conditional forward projection",
+      "path": "rate-clock-and-projection.md"
+    },
+    {
+      "id": "MODELS-ANALYTIC-25",
+      "title": "HW1F event grid, antithetic streams and bank-account estimator",
+      "path": "hw1f-monte-carlo-discounting.md"
+    },
+    {
+      "id": "MODELS-ANALYTIC-26",
+      "title": "Issuer-call LSMC continuation, sample split and sparse-regression fallback",
+      "path": "hw1f-issuer-lsmc.md"
+    },
+    {
+      "id": "MODELS-ANALYTIC-27",
+      "title": "Nelson\u2013Siegel factor extraction and Diebold\u2013Li VAR forecast",
+      "path": "diebold-li-var.md"
+    },
+    {
+      "id": "MODELS-ANALYTIC-28",
+      "title": "Yield-change PCA, reconstruction and standardized scenarios",
+      "path": "yield-pca.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/models/src/closed_form/asian.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-04"
+      ],
+      "reason": "Geometric lognormal average, O(n) arithmetic moments, explicit fixing-time validation and pricing clamps.",
+      "sha256": "c2381d23b4003c23e3158e184e2499fb4fd2638a1ecbd709ef7622ac0b33e582"
+    },
+    {
+      "path": "finstack-quant/models/src/closed_form/bachelier.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-02"
+      ],
+      "reason": "Normal call/put, delta/gamma/vega, degenerate branches and annuity multiplication.",
+      "sha256": "db36f88b64ae56f42e3ab97235a61d0d6741909509570edba5644aa2b95dff7f"
+    },
+    {
+      "path": "finstack-quant/models/src/closed_form/barrier.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-05"
+      ],
+      "reason": "Image formula regime table, continuous touch probabilities, expiry/hit rebates and negative-rate quadrature.",
+      "sha256": "742d196d0a094cefa689419ef592ca80cbd2cfb7d1115299cced2e011d56c159"
+    },
+    {
+      "path": "finstack-quant/models/src/closed_form/black.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-01",
+        "MODELS-ANALYTIC-02"
+      ],
+      "reason": "Spot/forward d1,d2, Black prices/Greeks and deterministic moneyness branches.",
+      "sha256": "e57d40ee2bb2cb3248d2c3c434f4b19c0d8959120ada5b16a502090e23020cf6"
+    },
+    {
+      "path": "finstack-quant/models/src/closed_form/calculation.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-01",
+        "MODELS-ANALYTIC-02",
+        "MODELS-ANALYTIC-03"
+      ],
+      "reason": "Explicit model and price/IV dispatch followed by mandatory model-specific Greeks, including default theta units.",
+      "sha256": "16e7ec12bd2dd6f2f3eafd53d5e6bf42d068a361b8a890e1b535b8e2d9f515e4"
+    },
+    {
+      "path": "finstack-quant/models/src/closed_form/dispatch.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-04",
+        "MODELS-ANALYTIC-05",
+        "MODELS-ANALYTIC-06",
+        "MODELS-ANALYTIC-07"
+      ],
+      "reason": "Public domain checks, product selectors and arithmetic/fixed-lookback default constants.",
+      "sha256": "4b342aebcf744fd72d7ec93f5cdc5f9765ebd3b323aaf094e2a41614e58d7816"
+    },
+    {
+      "path": "finstack-quant/models/src/closed_form/forward.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-02"
+      ],
+      "reason": "Checked Black76, normal and shifted pricing/Greek wrappers with domain and discount rules.",
+      "sha256": "97a297f222276282ec25fe2d999e5877e7c18e8bd3c1ef71e1e8beb47d1a7f52"
+    },
+    {
+      "path": "finstack-quant/models/src/closed_form/heston/fourier_prices.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-09"
+      ],
+      "reason": "Adaptive Heston settings, six-grid convergence, input validation and parity puts; production code after cfg(test) import inspected.",
+      "sha256": "727f438647be8440ab17f3a5eed707bd579ee5c3cbdaf7cfb5299d8084e19461"
+    },
+    {
+      "path": "finstack-quant/models/src/closed_form/heston/mod.rs",
+      "classification": "support",
+      "records": [
+        "MODELS-ANALYTIC-08",
+        "MODELS-ANALYTIC-09"
+      ],
+      "reason": "Module declarations and reexports only; test imports do not implement production pricing.",
+      "sha256": "a5e48fe11fda5d165a2d7d3162b1977d17d46549203332665d5f6c0a388bf89f"
+    },
+    {
+      "path": "finstack-quant/models/src/closed_form/heston/params.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-08",
+        "MODELS-ANALYTIC-09"
+      ],
+      "reason": "Validated pricing parameters and quadrature limits, default orders and maturity-tail settings.",
+      "sha256": "045689ae6bb44a46efd9e6516e932949a76f556cda5e1936238f25cff656c454"
+    },
+    {
+      "path": "finstack-quant/models/src/closed_form/heston/strip_pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-09"
+      ],
+      "reason": "Cached CF quadrature, probability/price bound diagnostics, corruption and tail rejection; test-only diagnostics identified.",
+      "sha256": "c9708b1960b358e14693eb562c063397f08e759df0cc5be7e223c8e7153dd80e"
+    },
+    {
+      "path": "finstack-quant/models/src/closed_form/heston/tests.rs",
+      "classification": "test",
+      "records": [
+        "MODELS-ANALYTIC-08",
+        "MODELS-ANALYTIC-09"
+      ],
+      "reason": "Test-only Heston identity, limiting-case, strip, corruption, grid and reference-price checks; no production algorithm.",
+      "sha256": "f6f2fcd13fd96d1df8274259773f7a1a9eed267930c64abfef1b09e6b21e3866"
+    },
+    {
+      "path": "finstack-quant/models/src/closed_form/implied_vol.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-03"
+      ],
+      "reason": "Discounted-coordinate BS/Black76 IV adapters and strict above-intrinsic policy.",
+      "sha256": "f53b7458387ac3b7a829d1e66737c7cfca9b2d4a4c2aa4ece6f1085c42fa98b8"
+    },
+    {
+      "path": "finstack-quant/models/src/closed_form/lookback.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-06"
+      ],
+      "reason": "Four continuous lookback formulas, historical-extremum repair and near-zero-carry limits.",
+      "sha256": "44569150cd58a7043b1d58ae48a94760705db79423c9462cb4f7bf8be81d298c"
+    },
+    {
+      "path": "finstack-quant/models/src/closed_form/mod.rs",
+      "classification": "support",
+      "records": [
+        "MODELS-ANALYTIC-01",
+        "MODELS-ANALYTIC-02",
+        "MODELS-ANALYTIC-03",
+        "MODELS-ANALYTIC-04",
+        "MODELS-ANALYTIC-05",
+        "MODELS-ANALYTIC-06",
+        "MODELS-ANALYTIC-07",
+        "MODELS-ANALYTIC-08",
+        "MODELS-ANALYTIC-09"
+      ],
+      "reason": "Module declarations and explicit reexports; no production selection logic.",
+      "sha256": "81bcf78a290af8f4c7bbf664cc4bd04024bccd5abacb827ccf7ae758abf55294"
+    },
+    {
+      "path": "finstack-quant/models/src/closed_form/quanto.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-07"
+      ],
+      "reason": "Domestic-measure covariance drift correction, foreign carry and domestic discounting.",
+      "sha256": "6f3a32525581ede692dad54f66b4b58da88b10c8de6868a050e240b12ad3abd5"
+    },
+    {
+      "path": "finstack-quant/models/src/closed_form/vanilla.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-01"
+      ],
+      "reason": "BS price/Greeks, spot-domain validation, expiry behavior and percentage-point/day units.",
+      "sha256": "32beb731d17624792a9c3baa1169b23a6f65e888aaa19792cead3bfb74436885"
+    },
+    {
+      "path": "finstack-quant/models/src/fourier/characteristic_function/black_scholes.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-11"
+      ],
+      "reason": "Gaussian log-return characteristic exponent and cumulants.",
+      "sha256": "d1d12a0634ac47ff9d164033c98e117709867f0f7e938113929012b4bd4051d5"
+    },
+    {
+      "path": "finstack-quant/models/src/fourier/characteristic_function/merton.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-11"
+      ],
+      "reason": "Compensated compound-Poisson lognormal jumps, cumulants and parameter validation.",
+      "sha256": "166946345fb41a0d80bedba405041e9e2ebe457e9c73f9a8dace0b316cf0d846"
+    },
+    {
+      "path": "finstack-quant/models/src/fourier/characteristic_function/mod.rs",
+      "classification": "support",
+      "records": [
+        "MODELS-ANALYTIC-10",
+        "MODELS-ANALYTIC-11"
+      ],
+      "reason": "CharacteristicFunction/Cumulants contracts and reexports; numerical cumulant estimator is cfg(test)-only.",
+      "sha256": "aa28b483cb59ceeee81e4a357cd0ca70fc488da973e8f7e223521400fe675cd3"
+    },
+    {
+      "path": "finstack-quant/models/src/fourier/characteristic_function/variance_gamma.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-11"
+      ],
+      "reason": "VG gamma-time exponent/cumulants and martingale-argument validation.",
+      "sha256": "0b6da4163f73fac748419c49dfda7dc57472d551f662a8a460eabcc4d0d55dfe"
+    },
+    {
+      "path": "finstack-quant/models/src/fourier/cos.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-10",
+        "MODELS-ANALYTIC-11"
+      ],
+      "reason": "Cumulant truncation, cosine payoff coefficients, model wrappers, cached strips, parity and price floors.",
+      "sha256": "f68a1260d165d608d3434252a7245a2b5a286ab94a77778afb45dc60c094c767"
+    },
+    {
+      "path": "finstack-quant/models/src/fourier/mod.rs",
+      "classification": "support",
+      "records": [
+        "MODELS-ANALYTIC-10"
+      ],
+      "reason": "Reexports and validation/calibration error construction only.",
+      "sha256": "8c2dc04af9061de0528a8b8525ea1302e073813c68aaa9ae75bf50fdbbaccde9"
+    },
+    {
+      "path": "finstack-quant/models/src/rates/clock.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-24"
+      ],
+      "reason": "Actual-days/365 model clock, fractional calendar-date mapping and rebased positive discount ratios.",
+      "sha256": "1f628cd7b51b00615a074a4ea4f096a7fed7ac6bbfe5d6b6be418b0575eba24b"
+    },
+    {
+      "path": "finstack-quant/models/src/rates/dtsm/diebold_li.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-27"
+      ],
+      "reason": "NS Cholesky extraction, VAR intercept/mean/covariance fit, forecasts and marginal bands.",
+      "sha256": "3231dcc08f29e03b23a16160bea78a91b4cc2343b622f0a7608bf41eac5b0838"
+    },
+    {
+      "path": "finstack-quant/models/src/rates/dtsm/mod.rs",
+      "classification": "support",
+      "records": [
+        "MODELS-ANALYTIC-27",
+        "MODELS-ANALYTIC-28"
+      ],
+      "reason": "Module declarations and explicit DTSM reexports only.",
+      "sha256": "dde63542ba4742bd4c09623e8da57f8c6152e39aaed253af3dae852b26c42199"
+    },
+    {
+      "path": "finstack-quant/models/src/rates/dtsm/pca.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-28"
+      ],
+      "reason": "Centered yield-change covariance, sorted/repaired eigensystem, reconstruction and scenarios.",
+      "sha256": "c70cebb4d00a0de7ce66c86294383234abb82f59d64c45e0c35d9e453765ac62"
+    },
+    {
+      "path": "finstack-quant/models/src/rates/dtsm/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-27",
+        "MODELS-ANALYTIC-28"
+      ],
+      "reason": "Financial panel/tenor/fitted-state validation and adjacent yield changes, not just storage.",
+      "sha256": "34f44e33dda1429a9993913d86f498f7dd9f60a8e3a653c943db666c76c3b917"
+    },
+    {
+      "path": "finstack-quant/models/src/rates/hull_white.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-23",
+        "MODELS-ANALYTIC-24"
+      ],
+      "reason": "Scalar/scheduled HW domains, affine bonds/options, multi-curve caplets, convexity and delayed-payment corrections, forward finite differences.",
+      "sha256": "63189774d0c922fcbdf92a006dfa1696eb75b8aa8f25b157e5f05d1edc508b1c"
+    },
+    {
+      "path": "finstack-quant/models/src/rates/hw1f/bank_account.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-25"
+      ],
+      "reason": "Trapezoidal short-rate bank-account accumulation and path/grid contract.",
+      "sha256": "a17d5c076316243582ad6e10d4d8fd58074fc7b4cc0023be4d78f214cdf7b852"
+    },
+    {
+      "path": "finstack-quant/models/src/rates/hw1f/config.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-25",
+        "MODELS-ANALYTIC-26"
+      ],
+      "reason": "Embedded defaults, instrument seed overrides, antithetic multiplicity and train/price split.",
+      "sha256": "a74ba2ac9ffb0d2387ad536d760d64130afb51cb794e25cccd6b4b12446a1c4e"
+    },
+    {
+      "path": "finstack-quant/models/src/rates/hw1f/coupon_event.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-24",
+        "MODELS-ANALYTIC-25"
+      ],
+      "reason": "Coupon financial data contract: accrual, discount, conditional-forward coefficients and path-sample flag.",
+      "sha256": "85287b14971a6245fb31e6736061f18603be70c0e635e7c34bc248daad893631"
+    },
+    {
+      "path": "finstack-quant/models/src/rates/hw1f/curve.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-24"
+      ],
+      "reason": "Curve rebasing, monthly theta preparation and conditional simple-forward/discount coefficients.",
+      "sha256": "9aa1dd82b772b41bc06721f60984a9b91059d59f59898f44390b6de0b86c3c1e"
+    },
+    {
+      "path": "finstack-quant/models/src/rates/hw1f/exercise.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-26"
+      ],
+      "reason": "Exercise amount/pre-coupon contract, inactive defaults and polynomial basis selection.",
+      "sha256": "23e9dd966a56d104d3ba338ca3bf3482c46b7c7a680e446f275245bcbd110cfc"
+    },
+    {
+      "path": "finstack-quant/models/src/rates/hw1f/lsmc.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-26"
+      ],
+      "reason": "Issuer backward continuation regression, coupon preservation, OOS selection and pathwise sparse-fit fallback.",
+      "sha256": "61740d2430f996e23ce13a77d064564a7a661d1798a77c3001ceb411fd1f4687"
+    },
+    {
+      "path": "finstack-quant/models/src/rates/hw1f/mc.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-25",
+        "MODELS-ANALYTIC-26"
+      ],
+      "reason": "Event-aligned grid, Philox antithetic rate paths, trapezoid discounting and pair-estimator aggregation.",
+      "sha256": "b7203690cb561d655fc70e451e08aa376d683f50c247e11789b0a0fbf4907857"
+    },
+    {
+      "path": "finstack-quant/models/src/rates/hw1f/mod.rs",
+      "classification": "support",
+      "records": [
+        "MODELS-ANALYTIC-24",
+        "MODELS-ANALYTIC-25",
+        "MODELS-ANALYTIC-26"
+      ],
+      "reason": "Module declarations and public reexports of HW helper interfaces only.",
+      "sha256": "d04022f05108101367b514aca978ff98d0d65ed1a0a94422b05640e2e274004d"
+    },
+    {
+      "path": "finstack-quant/models/src/rates/mod.rs",
+      "classification": "support",
+      "records": [
+        "MODELS-ANALYTIC-23",
+        "MODELS-ANALYTIC-24",
+        "MODELS-ANALYTIC-25",
+        "MODELS-ANALYTIC-26",
+        "MODELS-ANALYTIC-27",
+        "MODELS-ANALYTIC-28"
+      ],
+      "reason": "Rate-domain module declarations only.",
+      "sha256": "2bf5f6a47521dbe72dabf931b577365977e5fadfed25117a682c93ca4c140b3b"
+    },
+    {
+      "path": "finstack-quant/models/src/volatility/arbitrage/checks.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-19",
+        "MODELS-ANALYTIC-20"
+      ],
+      "reason": "Discrete butterfly/calendar/Dupire checks, low-level skips and severity thresholds.",
+      "sha256": "f6ff030b5bbc0866dd982889d7f5428f3e7e8258c77f5e5566f24858dab5ad3b"
+    },
+    {
+      "path": "finstack-quant/models/src/volatility/arbitrage/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-20"
+      ],
+      "reason": "Check configuration, forward expansion, quote enforcement, filtering and pass/fail aggregation.",
+      "sha256": "f600c60720641ed1c6216df28f7a71328356fb8f8bfc679f4656f6cc73fb06c7"
+    },
+    {
+      "path": "finstack-quant/models/src/volatility/arbitrage/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-20"
+      ],
+      "reason": "Ordered severity enum materially drives filtering/pass status; violation units and report contract inspected.",
+      "sha256": "d1ac2261f786f69c3c893105f73164529878d84b287d1dfa05151304f454941c"
+    },
+    {
+      "path": "finstack-quant/models/src/volatility/convert.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-22"
+      ],
+      "reason": "ATM price-equivalent convention conversion, seed scaling and Brent/shortcut policies.",
+      "sha256": "3dec2e5380457e7ae1670085453bfb511e9cecd9c12758072d318eac9b21d822"
+    },
+    {
+      "path": "finstack-quant/models/src/volatility/dupire.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-19",
+        "MODELS-ANALYTIC-20"
+      ],
+      "reason": "Matched-moneyness time differences, unequal-strike derivatives and density formula.",
+      "sha256": "f084dd5ea4fc0b40f5999f8a9e372c9ebfc7770e6984860d7a9d6d0f581f5f40"
+    },
+    {
+      "path": "finstack-quant/models/src/volatility/fx.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-17"
+      ],
+      "reason": "RR/BF wing recovery, DNS/delta strike transform, merged-grid and direct expiry evaluation.",
+      "sha256": "17e93d12d0e8c1fda4a04699724ebe53d6c804804e3a7f99b9c18d3c696ca31f"
+    },
+    {
+      "path": "finstack-quant/models/src/volatility/heston.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-08"
+      ],
+      "reason": "Heston/Feller validation, deterministic variance and stable two-measure CF/status logic.",
+      "sha256": "7443611ff2bd1bb7c5b3280cfa9b8a0f890fc5dc401b121f94583b1818eb0fff"
+    },
+    {
+      "path": "finstack-quant/models/src/volatility/implied.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-03"
+      ],
+      "reason": "OTM transformation, bracket/bisection/Halley IV solve, caps and residual verification.",
+      "sha256": "98f1f96f780b399cef7bec4b7474a65860df4f95a01b41ca9a3272599c1857a9"
+    },
+    {
+      "path": "finstack-quant/models/src/volatility/local_vol.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-19"
+      ],
+      "reason": "Dupire extraction acceptance, Gaussian strike smoothing and clamped local-vol interpolation; test-support section identified.",
+      "sha256": "4a18b526440d72731a4a7ade27cac166fe072758457a74ceb87444e50ef9b85b"
+    },
+    {
+      "path": "finstack-quant/models/src/volatility/mod.rs",
+      "classification": "support",
+      "records": [
+        "MODELS-ANALYTIC-03",
+        "MODELS-ANALYTIC-08",
+        "MODELS-ANALYTIC-12",
+        "MODELS-ANALYTIC-13",
+        "MODELS-ANALYTIC-16",
+        "MODELS-ANALYTIC-17",
+        "MODELS-ANALYTIC-18",
+        "MODELS-ANALYTIC-19",
+        "MODELS-ANALYTIC-20",
+        "MODELS-ANALYTIC-21",
+        "MODELS-ANALYTIC-22"
+      ],
+      "reason": "Module declarations and evaluator reexports only.",
+      "sha256": "ebbea6e47355a41d59cfa8e823028acda004890973abb88ddf4f9ec14988308c"
+    },
+    {
+      "path": "finstack-quant/models/src/volatility/rough_heston.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-12"
+      ],
+      "reason": "Fractional product integration, Riccati root, fractional integral, fixed Lewis quadrature and time convergence.",
+      "sha256": "20a91eccb5b360aed1f96b50158688764c18435757053dc089fe43478609472d"
+    },
+    {
+      "path": "finstack-quant/models/src/volatility/sabr/calibration.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-14"
+      ],
+      "reason": "Multistart transformed LM, normalized weights, fit acceptance, auto shifts and numerical ATM alpha pin; production after test helper inspected.",
+      "sha256": "114c6ac10b9bb980e0f111050dbb70c20196e5d3820b6fbe5a7ea43bff62b4a1"
+    },
+    {
+      "path": "finstack-quant/models/src/volatility/sabr/expansion.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-13"
+      ],
+      "reason": "Normal/lognormal SABR formulas, shifted inputs, beta snapping and stable chi/ATM branches.",
+      "sha256": "dc8b05957d428a6657d048a0fe66fb1f1bc81201eeb5c16392eee4bd235c2cbe"
+    },
+    {
+      "path": "finstack-quant/models/src/volatility/sabr/mod.rs",
+      "classification": "support",
+      "records": [
+        "MODELS-ANALYTIC-13",
+        "MODELS-ANALYTIC-14",
+        "MODELS-ANALYTIC-15"
+      ],
+      "reason": "Module declarations and explicit SABR reexports only.",
+      "sha256": "967ee150de8186dcb1e77855ace63668b2cc48dd1b0cb9e03162b2314c59269a"
+    },
+    {
+      "path": "finstack-quant/models/src/volatility/sabr/parameters.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-13",
+        "MODELS-ANALYTIC-14"
+      ],
+      "reason": "Parameter/serde domain, shift policy and equity/rates convenience defaults.",
+      "sha256": "a4f3e1ac1173033b244d953de4f9a8d97d7b81cb16f7642e2007239e7c4a2254"
+    },
+    {
+      "path": "finstack-quant/models/src/volatility/sabr/smile.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-15"
+      ],
+      "reason": "ATM-vol delta strike approximation, discrete arbitrage diagnostics, greedy price repair and IV reinversion.",
+      "sha256": "1f3c807461759cc5abeec4b4fe7a3a149a79d682548e91a6c985c6451ba06701"
+    },
+    {
+      "path": "finstack-quant/models/src/volatility/sabr/tests.rs",
+      "classification": "test",
+      "records": [
+        "MODELS-ANALYTIC-13",
+        "MODELS-ANALYTIC-14",
+        "MODELS-ANALYTIC-15"
+      ],
+      "reason": "Test-only SABR formula, known-smile calibration, shifts, stability, delta and arbitrage evidence; no runtime algorithm.",
+      "sha256": "441b65c511196d9844cf10d401cfa8aa1221154af7485a0bf92c0ed32a9773e7"
+    },
+    {
+      "path": "finstack-quant/models/src/volatility/source.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-16",
+        "MODELS-ANALYTIC-17"
+      ],
+      "reason": "Quote-aware source dispatch, strict/clamped interpolation, SABR cube evaluation and materialization, surface-shift measurement.",
+      "sha256": "b0580e3d6c32892cb2d8e332b8e1f26d6ce4d49e3a23d87e9a6534e4f9007565"
+    },
+    {
+      "path": "finstack-quant/models/src/volatility/svi.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-18"
+      ],
+      "reason": "Raw SVI law/derivatives, moment bounds, transformed LM and maturity-dependent fit threshold.",
+      "sha256": "d4ff4d85c8bb798302df61a6e1ca9f8dae29ee67b624a2dd502a1de4fae23a39"
+    },
+    {
+      "path": "finstack-quant/models/src/volatility/variance_replication.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-ANALYTIC-21"
+      ],
+      "reason": "Discrete OTM replication, exact log anchor, finite flat-vol tails and failure policy.",
+      "sha256": "6ca174effe78da970e722b13b3f4a897f3aecd1ab4611ef2abbab5bdb18d6ed8"
+    }
+  ]
+}

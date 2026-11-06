@@ -1,0 +1,443 @@
+{
+  "scope": "statements-contracts",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "STATEMENTS-CONTRACTS-001",
+      "title": "Model timeline and explicit-value invariants",
+      "path": "01-model-timeline-and-values.md"
+    },
+    {
+      "id": "STATEMENTS-CONTRACTS-002",
+      "title": "Builder composition and observation availability",
+      "path": "02-authoring-and-availability.md"
+    },
+    {
+      "id": "STATEMENTS-CONTRACTS-003",
+      "title": "Typed forecast parameters and validation staging",
+      "path": "03-forecast-parameter-contract.md"
+    },
+    {
+      "id": "STATEMENTS-CONTRACTS-004",
+      "title": "Formula grammar, bounded parsing and function dispatch",
+      "path": "04-dsl-syntax-and-lowering.md"
+    },
+    {
+      "id": "STATEMENTS-CONTRACTS-005",
+      "title": "Formula units, unknown dimensions and capital-structure currencies",
+      "path": "05-currency-dimensions.md"
+    },
+    {
+      "id": "STATEMENTS-CONTRACTS-006",
+      "title": "Metric registration, dependency discovery and namespace rewriting",
+      "path": "06-registry-and-dependencies.md"
+    },
+    {
+      "id": "STATEMENTS-CONTRACTS-007",
+      "title": "Bundled earnings and margin formulas",
+      "path": "07-earnings-and-margins.md"
+    },
+    {
+      "id": "STATEMENTS-CONTRACTS-008",
+      "title": "Bundled balance leverage and trailing-flow coverage",
+      "path": "08-leverage-and-coverage.md"
+    },
+    {
+      "id": "STATEMENTS-CONTRACTS-009",
+      "title": "Bundled period returns and reported-tax ROIC approximation",
+      "path": "09-returns-on-capital.md"
+    },
+    {
+      "id": "STATEMENTS-CONTRACTS-010",
+      "title": "Balance-sheet summation, materiality and missing-input behavior",
+      "path": "10-balance-sheet-articulation.md"
+    },
+    {
+      "id": "STATEMENTS-CONTRACTS-011",
+      "title": "Cash roll-forward and independent cash-flow components",
+      "path": "11-cash-reconciliation.md"
+    },
+    {
+      "id": "STATEMENTS-CONTRACTS-012",
+      "title": "Retained earnings, dividends and signed adjustments",
+      "path": "12-retained-earnings-reconciliation.md"
+    },
+    {
+      "id": "STATEMENTS-CONTRACTS-013",
+      "title": "Missing cells, non-finite values and sign diagnostics",
+      "path": "13-data-quality-checks.md"
+    },
+    {
+      "id": "STATEMENTS-CONTRACTS-014",
+      "title": "Numeric check tolerances, filtering and suite verdicts",
+      "path": "14-comparison-and-suite-policy.md"
+    },
+    {
+      "id": "STATEMENTS-CONTRACTS-015",
+      "title": "Formula checks, residual tolerances and insufficient-data classification",
+      "path": "15-formula-checks.md"
+    },
+    {
+      "id": "STATEMENTS-CONTRACTS-016",
+      "title": "Persisted model loading, schema publication and error taxonomy",
+      "path": "16-wire-schema-and-errors.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/statements/src/bin/gen_schemas.rs",
+      "classification": "support",
+      "records": [
+        "STATEMENTS-CONTRACTS-016"
+      ],
+      "reason": "Thin CLI delegates schema rendering/checking to core; no statement financial formula.",
+      "sha256": "833f24838e140dab74f83781fbf9dba4a337c135f81654aaa30b525a6138f86f"
+    },
+    {
+      "path": "finstack-quant/statements/src/builder/mod.rs",
+      "classification": "support",
+      "records": [
+        "STATEMENTS-CONTRACTS-002"
+      ],
+      "reason": "Builder module declarations and reexports only.",
+      "sha256": "e65d5de4851e67a0b101018dd4ec168b333f15c3c5711b14cf4083db0485410e"
+    },
+    {
+      "path": "finstack-quant/statements/src/builder/model_builder.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CONTRACTS-001",
+        "STATEMENTS-CONTRACTS-002",
+        "STATEMENTS-CONTRACTS-006"
+      ],
+      "reason": "Inspected period authoring, replacement semantics, node promotion, last-node predicates, registry inclusion and semantic-build boundary.",
+      "sha256": "e287a6c3b7f4aaa8dc44eaba15bcd84efe99c5792009afed2df530df9fae9132"
+    },
+    {
+      "path": "finstack-quant/statements/src/checks/builtins/balance_sheet.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CONTRACTS-010",
+        "STATEMENTS-CONTRACTS-014"
+      ],
+      "reason": "Inspected nonempty account groups, finite operands, sums, scaled tolerance, materiality, overflow and skip/failure behavior.",
+      "sha256": "82af69495ebbefe77f9e987688f536454621500035bb5be7a356bad3e1f6bd73"
+    },
+    {
+      "path": "finstack-quant/statements/src/checks/builtins/cash_reconciliation.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CONTRACTS-011",
+        "STATEMENTS-CONTRACTS-014"
+      ],
+      "reason": "Inspected adjacent-period cash roll-forward and independently evaluated CFO/CFI/CFF components, references and missingness.",
+      "sha256": "4765f2fa846fe3ba2f2ae27a64c51fe470c99ce55b231a3b5baf0214c53c3555"
+    },
+    {
+      "path": "finstack-quant/statements/src/checks/builtins/missing_values.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CONTRACTS-013"
+      ],
+      "reason": "Inspected absent-cell predicate, actual/forecast scope and Error-versus-Warning policy.",
+      "sha256": "6bd093da470e83905823c16584ecb66af889846c4494fbb396608111f9eaaff0"
+    },
+    {
+      "path": "finstack-quant/statements/src/checks/builtins/mod.rs",
+      "classification": "support",
+      "records": [
+        "STATEMENTS-CONTRACTS-010",
+        "STATEMENTS-CONTRACTS-011",
+        "STATEMENTS-CONTRACTS-012",
+        "STATEMENTS-CONTRACTS-013"
+      ],
+      "reason": "Built-in check module declarations and reexports only.",
+      "sha256": "899305acc3c5fc798d1e6c941e01c4f1c8ca872a14048f767af2ed7ba46bb780"
+    },
+    {
+      "path": "finstack-quant/statements/src/checks/builtins/non_finite.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CONTRACTS-013"
+      ],
+      "reason": "Inspected all-result versus selected-node scan, missing-node omission and non-finite Error findings.",
+      "sha256": "2bbd6cea239753e52cb06460babae3d069987783e49721298b4b00f7d830050f"
+    },
+    {
+      "path": "finstack-quant/statements/src/checks/builtins/retained_earnings.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CONTRACTS-012",
+        "STATEMENTS-CONTRACTS-014"
+      ],
+      "reason": "Inspected adjacent retained-earnings identity, dividend sign modes, optional-input guards, adjustments and overflow checks.",
+      "sha256": "67fd747fc04b1555a8345b400e7e6ad46b11d0669253bc42ed9f8a41a84ffacd"
+    },
+    {
+      "path": "finstack-quant/statements/src/checks/builtins/sign_convention.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CONTRACTS-013"
+      ],
+      "reason": "Inspected sign groups, zero acceptance, missing-cell omission and advisory non-finite handling.",
+      "sha256": "a97fbccda0b746edfa78b5c74e4d6cd9767502ee9c0d314005cd6c3ce1bd2071"
+    },
+    {
+      "path": "finstack-quant/statements/src/checks/formula.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CONTRACTS-015"
+      ],
+      "reason": "Inspected dimension validation, full history, syntactic preflight, canonical evaluation, residual/boolean tests and insufficient-data classification.",
+      "sha256": "66b03c6e59f206a4dd11dc7f2494a74f2815c92603fb3d5d6efcc60a90f6e0a2"
+    },
+    {
+      "path": "finstack-quant/statements/src/checks/helpers.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CONTRACTS-010",
+        "STATEMENTS-CONTRACTS-011",
+        "STATEMENTS-CONTRACTS-012",
+        "STATEMENTS-CONTRACTS-014",
+        "STATEMENTS-CONTRACTS-015"
+      ],
+      "reason": "Inspected result/model unit reconciliation, capital-structure currency invariants, finite lookup, naive sums and arithmetic-error construction.",
+      "sha256": "290cc3d5e0b8001608e7aec621b9f78e94da516262e7e46672532f6d0aa94cb7"
+    },
+    {
+      "path": "finstack-quant/statements/src/checks/mod.rs",
+      "classification": "support",
+      "records": [
+        "STATEMENTS-CONTRACTS-014"
+      ],
+      "reason": "Check modules and public reexports only.",
+      "sha256": "b1a2c04a5f63800665285eb771917875f884306b55bef784f7335b0e1525f671"
+    },
+    {
+      "path": "finstack-quant/statements/src/checks/suite.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CONTRACTS-014",
+        "STATEMENTS-CONTRACTS-015"
+      ],
+      "reason": "Inspected ordered execution, error propagation, severity/materiality filters, verdict recomputation, merge and spec resolution.",
+      "sha256": "00aafe740cc925272a5304c324782655b3d8eeeefb02f75d64d4bb33efe1d48d"
+    },
+    {
+      "path": "finstack-quant/statements/src/checks/traits.rs",
+      "classification": "support",
+      "records": [
+        "STATEMENTS-CONTRACTS-014"
+      ],
+      "reason": "Check trait/context wiring delegates numeric defaults to CheckConfig; no additional identity or financial selection.",
+      "sha256": "48f04f032936a9aa8f4778e61e2274566905be55db6e70c792f76f049f52d7b1"
+    },
+    {
+      "path": "finstack-quant/statements/src/checks/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CONTRACTS-012",
+        "STATEMENTS-CONTRACTS-013",
+        "STATEMENTS-CONTRACTS-014"
+      ],
+      "reason": "Inspected sign policy, comparison arithmetic, absolute/relative tolerances, configuration validation and summary accessors.",
+      "sha256": "94c5b77c6778d06bc6b0325f23265ef6f9eede19d8d55e72d50f3584516cb2df"
+    },
+    {
+      "path": "finstack-quant/statements/src/dsl/ast.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CONTRACTS-004"
+      ],
+      "reason": "Inspected AST construction and precedence-aware formula rendering that preserves arithmetic grouping.",
+      "sha256": "24e44ea2d31b8498b1e1bea43fa50f4ba457d1539d1926cc0d1ba9f221dbff85"
+    },
+    {
+      "path": "finstack-quant/statements/src/dsl/compiler.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CONTRACTS-004",
+        "STATEMENTS-CONTRACTS-005"
+      ],
+      "reason": "Inspected operator/function lowering, arity checks, capital-structure whitelist and currency/unknown-dimension propagation.",
+      "sha256": "b036bee88c70705810d589c8bacf254322521fec4a4aabef17184a8014a08c71"
+    },
+    {
+      "path": "finstack-quant/statements/src/dsl/mod.rs",
+      "classification": "support",
+      "records": [
+        "STATEMENTS-CONTRACTS-004"
+      ],
+      "reason": "Reexports and parse-then-compile wrapper; numerical reference documentation compared with compiler arities.",
+      "sha256": "20625a1ac5ef84c16cf5e2c71f6ba26e2345455d052ca19714c24fe7dbbb1923"
+    },
+    {
+      "path": "finstack-quant/statements/src/dsl/parser.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CONTRACTS-004"
+      ],
+      "reason": "Inspected complete-input grammar, operator associativity, identifier/CS parsing, finite literals and nesting/term budgets.",
+      "sha256": "4638a853a32aa8106e1e74d378f2c4c77e5bb28ec6b27e85d3826ec8f55d8de2"
+    },
+    {
+      "path": "finstack-quant/statements/src/error.rs",
+      "classification": "support",
+      "records": [
+        "STATEMENTS-CONTRACTS-016"
+      ],
+      "reason": "Explicit public error-kind and core-error mapping; no numerical or economic transformation.",
+      "sha256": "e60a2c1e532f537e4370577790a1c95d715f903b2e8b046b12c0e6c23696354e"
+    },
+    {
+      "path": "finstack-quant/statements/src/lib.rs",
+      "classification": "support",
+      "records": [
+        "STATEMENTS-CONTRACTS-016"
+      ],
+      "reason": "Crate policy attributes, module visibility, reexports and doctest/test wiring only.",
+      "sha256": "bebd9370945f0351535197f915475705aa495673b609931595f7a7bab727fd51"
+    },
+    {
+      "path": "finstack-quant/statements/src/registry/builtins.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CONTRACTS-007",
+        "STATEMENTS-CONTRACTS-008",
+        "STATEMENTS-CONTRACTS-009"
+      ],
+      "reason": "Inspected fixed compile-time selection/order of four metric data documents and their stated ex-D&A accounting convention.",
+      "sha256": "4557b48e676748d193ecec27daf4752e019d603cd49d4db8ceba7b3005194e6f"
+    },
+    {
+      "path": "finstack-quant/statements/src/registry/dynamic.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CONTRACTS-006"
+      ],
+      "reason": "Inspected document atomicity, namespace validation, formula-derived dependency graph and transitive metric inclusion.",
+      "sha256": "abef6e52fd728986c60e3952f3630b2ab9b30b513ad1d78b0b8552bfce6732c4"
+    },
+    {
+      "path": "finstack-quant/statements/src/registry/mod.rs",
+      "classification": "support",
+      "records": [
+        "STATEMENTS-CONTRACTS-006"
+      ],
+      "reason": "Registry module declarations/reexports and namespace documentation, with no additional runtime resolution path.",
+      "sha256": "b18c389c48de6643bad39d0e0ecbb0b65aeb0b124098201d9b162232dd962cb4"
+    },
+    {
+      "path": "finstack-quant/statements/src/registry/schema.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CONTRACTS-006",
+        "STATEMENTS-CONTRACTS-007",
+        "STATEMENTS-CONTRACTS-008",
+        "STATEMENTS-CONTRACTS-009"
+      ],
+      "reason": "Inspected exact qualified-ID construction and financial unit/required-input metadata semantics of reusable definitions.",
+      "sha256": "6db6937bbc56b6a84b88d4fe48a98484d0b56c938477a3ac3a4eb0a74b750e22"
+    },
+    {
+      "path": "finstack-quant/statements/src/registry/validation.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CONTRACTS-006"
+      ],
+      "reason": "Inspected metric identifier/name/formula validity and compiler-based acceptance, without economic unit enforcement.",
+      "sha256": "3af8db883153931c2f9f1357baa9b1a4aec2d1d6674002d1ec36623112882471"
+    },
+    {
+      "path": "finstack-quant/statements/src/schema.rs",
+      "classification": "support",
+      "records": [
+        "STATEMENTS-CONTRACTS-016"
+      ],
+      "reason": "Ten artifact registrations and typed examples delegate generation to core; no financial runtime calculations.",
+      "sha256": "d58cac12e01db476939c1b5d71f4bf9d71ea20720594511c58fe59c4fa1617a9"
+    },
+    {
+      "path": "finstack-quant/statements/src/types/forecast_params.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CONTRACTS-003"
+      ],
+      "reason": "Inspected typed method selection, defaults, bounds/seed access and integer/float seed decoding constraints.",
+      "sha256": "be9388f4bbd1f01022a47e193d5f32c9ba9fa51a82970166b664ade4b8a28d8f"
+    },
+    {
+      "path": "finstack-quant/statements/src/types/mod.rs",
+      "classification": "support",
+      "records": [
+        "STATEMENTS-CONTRACTS-001",
+        "STATEMENTS-CONTRACTS-003",
+        "STATEMENTS-CONTRACTS-005",
+        "STATEMENTS-CONTRACTS-016"
+      ],
+      "reason": "Type modules and reexports only.",
+      "sha256": "8db80817a384f753c815b93845b0b19dc5d50b93c8c21639e5cf136d404d689e"
+    },
+    {
+      "path": "finstack-quant/statements/src/types/model.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CONTRACTS-001",
+        "STATEMENTS-CONTRACTS-005",
+        "STATEMENTS-CONTRACTS-016"
+      ],
+      "reason": "Inspected timeline/value/type validation, fixed-point inference, unknown-reference graph handling, currency resolution and instrument eligibility.",
+      "sha256": "1b1d915f8703d3fdab3b076602e9565697c05f0f94908d31622f33d79875fe48"
+    },
+    {
+      "path": "finstack-quant/statements/src/types/node.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CONTRACTS-002",
+        "STATEMENTS-CONTRACTS-003"
+      ],
+      "reason": "Inspected observation availability/cutoff predicates, node and rollup choices, forecast constructors and typed parameter conversion.",
+      "sha256": "a83f62fb384abe8bf557a0c383f7cd9e80757c8bd6a90d373db187a5a1d900b7"
+    },
+    {
+      "path": "finstack-quant/statements/src/types/value.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CONTRACTS-001",
+        "STATEMENTS-CONTRACTS-005"
+      ],
+      "reason": "Inspected amount/scalar construction, numeric extraction and homogeneous-currency/type series inference.",
+      "sha256": "c08465bd359ab95cb3758c337719bc970cf3eda5d5c3b879b1c2a8f982d787df"
+    },
+    {
+      "path": "finstack-quant/statements/src/utils/formula.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CONTRACTS-004",
+        "STATEMENTS-CONTRACTS-006",
+        "STATEMENTS-CONTRACTS-015"
+      ],
+      "reason": "Inspected AST dependency extraction with lag/shift handling and bounded textual namespace replacement.",
+      "sha256": "18ae528026e7216c67c61867cc025312618673b1b2686bfbc335e483af536205"
+    },
+    {
+      "path": "finstack-quant/statements/src/utils/graph.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CONTRACTS-006"
+      ],
+      "reason": "Inspected deterministic Kahn sorting, external dependency omission and residual-cycle diagnostics.",
+      "sha256": "e2de362bab702a94f62b223cfe6c90b02e64929794a25a1fa75b947378ff1346"
+    },
+    {
+      "path": "finstack-quant/statements/src/utils/mod.rs",
+      "classification": "support",
+      "records": [
+        "STATEMENTS-CONTRACTS-006"
+      ],
+      "reason": "Utility module declarations only.",
+      "sha256": "269d380793c68d2a91e5987b84f349cddcbe5e1ed418bc54711405656cb901c5"
+    }
+  ]
+}
