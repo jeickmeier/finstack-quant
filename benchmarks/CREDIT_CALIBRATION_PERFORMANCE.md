@@ -142,7 +142,7 @@ reference, 15 base-correlation tests, 91 umbrella tranche tests, and the scoped
 public-input documentation check passed. One nextest process-leak report cleared
 on a focused rerun. No independent references or tolerances changed.
 
-Execution status: S0 and BC1–BC3 complete; BC4 in progress. Later slices remain
+Execution status: S0 and BC1–BC4 complete; BC5 in progress. Later slices remain
 pending. The fixed implementation plan is unchanged.
 
 ## BC3: bounded raw attachment reuse
@@ -190,3 +190,75 @@ samples and identical reports are in `credit-calibration-evidence/bc3`;
 `bc2-noncontiguous`, `bc2-student-control` and `bc3-control-repeat` retain the
 matched control evidence. Financial tolerances and generated outputs did not
 change.
+
+## BC4: evaluated-bracket Brent with residual acceptance
+
+The authoritative scan still chooses the same bracket. The shared Brent
+implementation now accepts previously evaluated endpoints and can require
+strict residual convergence. Bootstrap uses that mode and retains bounded
+Illinois recovery from the last feasible bracket. An infeasible interpolation
+gets one midpoint attempt charged to the existing recovery budget. Neither
+iteration settings nor tolerances changed. Existing Brent entry points retain
+their documented width-based behavior.
+
+| Workload (mean ms) | S0 quiet | BC3 | BC4 |
+| --- | ---: | ---: | ---: |
+| Base correlation: isolated | 8239.613 | 2304.735 | 535.936 |
+| Base correlation: full plan | 8315.811 | 2373.561 | 576.218 |
+| Hazard: isolated | — | 49.069 | 36.146 |
+| Hazard: full plan | — | 71.707 | 43.916 |
+| Hazard: parallel rebootstrap | — | 98.612 | 72.219 |
+| Discount step | — | 0.981 | 0.241 |
+| Discount + forward | — | 0.995 | 0.253 |
+| Global hazard, 6 quotes | — | 72.599 | 54.001 |
+| Bootstrap hazard, 6 quotes | — | 109.300 | 67.219 |
+| Global rate control, 16 quotes | — | 183.987 | 32.373 |
+| Bootstrap rate control, 16 quotes | — | 103.857 | 24.739 |
+
+Base calibration is 76.7% faster than BC3 in isolation and 93.5% faster than
+S0. Full-plan improvement is 75.7% over BC3 and 93.1% over S0. Base objective
+calls fell from 180 to 31, with ten additional commit/final repricings in both
+versions. Hazard objective calls fell from 478 to 344. The base maximum quote
+residual fell from 6.2788e-13 to 9.2838e-14; the hazard residual fell from
+8.1963e-13 to 3.5479e-15. Maximum knot changes versus BC3 were 4.8440e-11
+(base correlation) and 1.7559e-12 (hazard). Approximate knots remain absent.
+
+Fixed-price S0 checks and BC1 bitwise snapshots pass. A new off-grid regression
+prices the original S0 calibrated smile and the current smile on identical
+market inputs at 1–5%, 6–6.1% and 12–25%. It uses the existing S0 pool-error /
+tranche-width / cashflow bound, not a tolerance selected from the observed
+change. All three pass. This isolates the smile change; the separate fixed-
+price checks cover the pricing kernel.
+
+Pricing controls: Student-t was 11.907 ms, unchanged within 1%; ordinary
+homogeneous prices were stable or modestly faster. Heterogeneous pricing was
+noisy: the first 459.956 ms run suggested a regression. Retained executable
+comparisons gave BC3/BC4 means of 429.754/452.871 ms in one order and
+426.776/432.051 ms in the reverse order. The latter difference is 1.2%; the
+larger slowdown was not stable, and background `mediaanalysisd` was active.
+Keep this control under observation in subsequent slices; do not attribute
+its fluctuations to a pricing algorithm change. No heterogeneous pricing code
+changed in BC4.
+
+Validation: 2,205 core tests, 567 enabled calibration tests, the additional
+off-grid test, scoped core/calibration lint, core public-input documentation,
+and the fixed-price bitwise test passed. Both full credit/pricing benchmark
+targets and the selected rate/global controls ran with successful-fit gates.
+The global benchmark improvements include bootstrap-based initialization.
+
+Evidence: `bc4` contains the fresh hazard/base and tranche groups;
+`bc4-rate-controls` and `bc4-global-controls` contain the fresh shared-solver
+controls. The discount groups incidentally copied into `bc4` are stale BC3
+records and are not BC4 results. `bc3-hetero-adjacent`, `bc4-hetero-adjacent`,
+`bc3-hetero-reverse` and `bc4-hetero-reverse` retain both longer comparisons.
+Raw confidence intervals and samples are preserved. The initial BC4 log
+`bench.log` predates the accepted repeat in `calibration.log`; use the saved
+samples and the latter log for the table above.
+
+BC4 integration: `mise run gen-write` completed. The affected UI tests passed
+(30), Python calibration parity passed after a fresh dev build (42), and
+WASM calibration parity/error tests passed (62). The shared cross-host golden
+changed only its iteration count from 64 to 13; financial reference values
+and tolerances were preserved. Generated UI/gallery residual digits and work
+counts were regenerated together with the solver change. BC4 adds no
+persistent pricing-cache memory.

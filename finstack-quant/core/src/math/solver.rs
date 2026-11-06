@@ -428,7 +428,7 @@ impl BrentSolver {
         Func: FnMut(f64) -> Result<f64>,
     {
         let bracket = self.find_bracket(&mut f, initial_guess)?;
-        self.brent_method(f, bracket)
+        self.brent_method(f, bracket, false)
     }
 
     /// Solve within a user-provided bracket `[a, b]` without running the
@@ -462,13 +462,65 @@ impl BrentSolver {
         } else {
             f(hi)
         };
-        self.brent_method(|x| Ok(f(x)), [(lo, flo), (hi, fhi)])
+        self.brent_method(|x| Ok(f(x)), [(lo, flo), (hi, fhi)], false)
+    }
+
+    /// Solve an already evaluated bracket, requiring residual-space convergence.
+    ///
+    /// Reuses the supplied endpoint evaluations without calling `f` there.
+    /// Unlike the bracket-width stopping rule of [`Self::solve_in_bracket`],
+    /// success requires `|f(x)| < self.tolerance`. A narrow interval alone is
+    /// an error, allowing callers to retain their own final acceptance rules.
+    ///
+    /// # Arguments
+    /// * `f` - Fallible scalar residual at an interior trial point, in the same
+    ///   units as `self.tolerance`. Callback errors propagate unchanged; a
+    ///   non-finite residual terminates the solve without updating its bracket.
+    /// * `bracket` - Two finite `(x, f(x))` pairs from this same objective and
+    ///   immutable inputs. Endpoints may be in either order. Their residuals
+    ///   must have opposite signs, unless an endpoint already meets tolerance.
+    ///   The caller is responsible for the supplied values' accuracy.
+    ///
+    /// # Returns
+    /// An endpoint or interior root satisfying the configured residual tolerance.
+    ///
+    /// # Errors
+    /// Returns an input-validation error for non-finite endpoints or a tolerance
+    /// that is not positive and finite. Returns a convergence error for an
+    /// invalid bracket, non-finite interior residual, exhausted iteration budget,
+    /// or bracket-width termination before the residual meets tolerance.
+    /// Callback errors preserve their original type and message.
+    pub fn solve_evaluated_bracket<Func>(
+        &self,
+        f: Func,
+        mut bracket: [(f64, f64); 2],
+    ) -> Result<f64>
+    where
+        Func: FnMut(f64) -> Result<f64>,
+    {
+        if !self.tolerance.is_finite()
+            || self.tolerance <= 0.0
+            || bracket.iter().any(|(x, _)| !x.is_finite())
+        {
+            return Err(crate::Error::Validation(
+                "evaluated Brent solve requires finite endpoints and a positive finite residual tolerance".into(),
+            ));
+        }
+        if bracket[0].0 > bracket[1].0 {
+            bracket.swap(0, 1);
+        }
+        self.brent_method(f, bracket, true)
     }
 
     /// Core Brent's method implementation.
     ///
     /// Requirements: `f(lo)` and `f(hi)` must have opposite signs.
-    fn brent_method<Func>(&self, mut f: Func, bracket: [(f64, f64); 2]) -> Result<f64>
+    fn brent_method<Func>(
+        &self,
+        mut f: Func,
+        bracket: [(f64, f64); 2],
+        require_residual: bool,
+    ) -> Result<f64>
     where
         Func: FnMut(f64) -> Result<f64>,
     {
@@ -496,10 +548,10 @@ impl BrentSolver {
             .into());
         }
         // Early exit if an endpoint is already a root
-        if flo == 0.0 {
+        if flo == 0.0 || (require_residual && flo.abs() < self.tolerance) {
             return Ok(lo);
         }
-        if fhi == 0.0 {
+        if fhi == 0.0 || (require_residual && fhi.abs() < self.tolerance) {
             return Ok(hi);
         }
         // Require a valid bracket
@@ -551,9 +603,21 @@ impl BrentSolver {
             // Convergence checks
             let tol1 = 2.0 * f64::EPSILON * b.abs() + 0.5 * self.tolerance;
             let xm = 0.5 * (c - b);
-            if xm.abs() <= tol1 || fb == 0.0 {
+            if fb == 0.0
+                || (require_residual && fb.abs() < self.tolerance)
+                || (!require_residual && xm.abs() <= tol1)
+            {
                 tracing::debug!(x = b, residual = fb.abs(), "brent: converged");
                 return Ok(b);
+            }
+            if require_residual && xm.abs() <= tol1 {
+                return Err(InputError::SolverConvergenceFailed {
+                    iterations: iteration,
+                    residual: fb.abs(),
+                    last_x: b,
+                    reason: "bracket width reached tolerance before residual convergence".into(),
+                }
+                .into());
             }
 
             if e.abs() >= tol1 && fa.abs() > fb.abs() {
@@ -988,5 +1052,67 @@ mod tests {
             .solve(|x| (x - 0.05) * (x - 0.45), 0.025)
             .expect("should bracket root on the right expansion segment");
         assert!((root - 0.05).abs() < 1e-10 || (root - 0.45).abs() < 1e-10);
+    }
+    #[test]
+    fn evaluated_brent_reuses_endpoints_and_requires_residual_convergence() {
+        let calls = std::cell::Cell::new(0);
+        let solver = BrentSolver::new().with_tolerance(1e-12);
+        let root = solver
+            .solve_evaluated_bracket(
+                |x| {
+                    assert!(
+                        x > 1.0 && x < 2.0,
+                        "known endpoints must not be reevaluated"
+                    );
+                    calls.set(calls.get() + 1);
+                    Ok(x * x - 2.0)
+                },
+                [(2.0, 2.0), (1.0, -1.0)],
+            )
+            .expect("root");
+        assert!((root * root - 2.0).abs() < 1e-12);
+        assert!(
+            calls.get() < 15,
+            "interpolation should beat a full bisection"
+        );
+
+        // A discontinuity is a valid sign bracket but has no residual-space root.
+        let error = solver
+            .solve_evaluated_bracket(
+                |x| Ok(if x < 0.37 { -1.0 } else { 1.0 }),
+                [(0.0, -1.0), (1.0, 1.0)],
+            )
+            .expect_err("width convergence is insufficient");
+        assert!(error.to_string().contains("residual"));
+    }
+
+    #[test]
+    fn evaluated_brent_preserves_callback_errors_and_validates_inputs() {
+        let solver = BrentSolver::new();
+        let err = solver
+            .solve_evaluated_bracket(
+                |_| Err(crate::Error::Validation("original failure".into())),
+                [(0.0, -1.0), (2.0, 1.0)],
+            )
+            .expect_err("callback failure");
+        assert!(matches!(err, crate::Error::Validation(message) if message == "original failure"));
+        for bracket in [
+            [(0.0, -1.0), (f64::INFINITY, 1.0)],
+            [(0.0, f64::NAN), (2.0, 1.0)],
+            [(0.0, 1.0), (2.0, 2.0)],
+        ] {
+            assert!(
+                solver
+                    .solve_evaluated_bracket(|_| unreachable!("invalid bracket"), bracket)
+                    .is_err()
+            );
+        }
+        let root = solver
+            .solve_evaluated_bracket(
+                |_| unreachable!("accepted endpoint"),
+                [(0.0, -0.0), (2.0, 1.0)],
+            )
+            .expect("signed-zero root");
+        assert_eq!(root, 0.0);
     }
 }

@@ -1,11 +1,13 @@
 //! Validated full-plan and isolated credit calibration workloads.
 //! Parsing and prerequisite solves are outside isolated timings; market restoration,
 //! preparation, solving, validation and report construction remain inside.
+#[path = "support/checked_calibration.rs"]
+mod checked;
+use checked::checked_calibrate;
+
 use criterion::{Criterion, criterion_group, criterion_main};
 use finstack_quant_calibration::api::{
-    engine,
-    prior_market::PriorMarketObject,
-    schema::{CalibrationEnvelope, CalibrationResultEnvelope},
+    engine, prior_market::PriorMarketObject, schema::CalibrationEnvelope,
 };
 use finstack_quant_calibration::recalibration::bump_hazard_spreads;
 use finstack_quant_core::{
@@ -22,23 +24,6 @@ fn load_example(json: &str) -> CalibrationEnvelope {
     CalibrationEnvelope::from_slice_strict(json.as_bytes(), &LoadLimits::default())
         .expect("valid benchmark envelope")
         .0
-}
-
-fn checked_calibrate(envelope: &CalibrationEnvelope) -> CalibrationResultEnvelope {
-    let output = engine::calibrate(envelope).expect("calibration must execute");
-    assert!(
-        output.result.report.success,
-        "calibration must fit: {:?}",
-        output.result.report
-    );
-    assert!(
-        output
-            .result
-            .step_reports
-            .values()
-            .all(|report| report.success)
-    );
-    output
 }
 
 // Optional untimed diagnostics. Save the full output, including per-quote

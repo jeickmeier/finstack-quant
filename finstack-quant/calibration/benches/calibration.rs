@@ -2,16 +2,17 @@
 //!
 //! This benchmark suite focuses on the plan-driven calibration step engine.
 
+#[path = "support/checked_calibration.rs"]
+mod checked;
+use checked::checked_calibrate;
+
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use finstack_quant_calibration::CalibrationConfig;
 use finstack_quant_calibration::CalibrationMethod;
 use finstack_quant_calibration::api::market_datum::MarketDatum;
-use finstack_quant_calibration::api::{
-    engine,
-    schema::{
-        CalibrationEnvelope, CalibrationPlan, CalibrationStep, DiscountCurveParams,
-        ForwardCurveParams, StepParams,
-    },
+use finstack_quant_calibration::api::schema::{
+    CalibrationEnvelope, CalibrationPlan, CalibrationStep, DiscountCurveParams, ForwardCurveParams,
+    StepParams,
 };
 use finstack_quant_calibration::quotes::MarketQuote;
 use finstack_quant_calibration::quotes::RateQuote;
@@ -154,7 +155,7 @@ fn bench_discount_and_forward_steps(c: &mut Criterion) {
                 prior_market: Vec::new(),
                 plan,
             };
-            engine::calibrate(black_box(&envelope)).unwrap()
+            checked_calibrate(black_box(&envelope))
         })
     });
 
@@ -190,7 +191,7 @@ fn bench_discount_and_forward_steps(c: &mut Criterion) {
                 prior_market: Vec::new(),
                 plan,
             };
-            engine::calibrate(black_box(&envelope)).unwrap()
+            checked_calibrate(black_box(&envelope))
         })
     });
 }
@@ -272,7 +273,7 @@ fn bench_residual_normalization(c: &mut Criterion) {
                 prior_market: Vec::new(),
                 plan,
             };
-            engine::calibrate(black_box(&envelope)).unwrap()
+            checked_calibrate(black_box(&envelope))
         })
     });
 
@@ -313,7 +314,7 @@ fn bench_residual_normalization(c: &mut Criterion) {
                 prior_market: Vec::new(),
                 plan,
             };
-            engine::calibrate(black_box(&envelope)).unwrap()
+            checked_calibrate(black_box(&envelope))
         })
     });
 }
@@ -328,8 +329,7 @@ fn bench_rate_quote_risk_cache(c: &mut Criterion) {
     let envelope = load_example(include_str!(
         "../examples/market_bootstrap/02_usd_3m_forward_curve.json"
     ));
-    let result =
-        engine::calibrate(&envelope).expect("rate replay benchmark market should calibrate");
+    let result = checked_calibrate(&envelope);
     let market =
         MarketContext::try_from(result.result.final_market).expect("market state should rebuild");
     let as_of = Date::from_calendar_date(2026, Month::May, 8).expect("base date");

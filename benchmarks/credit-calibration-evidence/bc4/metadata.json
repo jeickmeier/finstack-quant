@@ -1,0 +1,32 @@
+{
+  "starting_revision": "07863617d9",
+  "slice": "BC4",
+  "sample_size": 10,
+  "warmup_seconds": 1,
+  "measurement_seconds": 10,
+  "nresamples": 10000,
+  "long_controls": {
+    "sample_size": 20,
+    "warmup_seconds": 3,
+    "measurement_seconds": 20
+  },
+  "accepted_calibration_log": "calibration.log",
+  "fresh_groups": [
+    "calibration_base_correlation_*",
+    "calibration_hazard_*",
+    "cds_tranche_*"
+  ],
+  "stale_groups": [
+    "calibration_discount_*"
+  ],
+  "numerical_checks": [
+    "S0 fixed error bounds",
+    "BC1 bitwise fixed-price snapshot",
+    "S0 smile off-grid bounds",
+    "existing independent references"
+  ],
+  "input_sha256": {
+    "03_single_name_hazard.json": "b815e12ecc33c23ddb15bdd88a974a3fa29f6d38b69b7eb2364d2046ea8c56f1",
+    "05_cdx_base_correlation.json": "ac094f2f8b7ce90b1d44127c22d6e5b8aa1ab7ca3d3e0705c535317cfe192cbf"
+  }
+}
