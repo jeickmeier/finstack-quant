@@ -1,4 +1,4 @@
-# Optimization reconstruction, diagnostics and portfolio rebalance
+# PORTFOLIO-ATTRIBUTION-016: Optimization reconstruction, diagnostics and portfolio rebalance
 
 - ID: PORTFOLIO-ATTRIBUTION-016
 - Decision status: Draft (observed implementation; adoption pending).

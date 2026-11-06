@@ -1,4 +1,4 @@
-# Corporate DCF terminal value, equity bridge and dilution
+# VALUATIONS-EQUITY-AND-COMPOSITION-17: Corporate DCF terminal value, equity bridge and dilution
 
 - **Record:** `VALUATIONS-EQUITY-AND-COMPOSITION-17`.
 - **Decision status:** Draft — observed implementation; adoption pending.

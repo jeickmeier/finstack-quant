@@ -1,4 +1,4 @@
-# Private-fund residual valuation, LP performance and parameter shocks
+# VALUATIONS-EQUITY-AND-COMPOSITION-19: Private-fund residual valuation, LP performance and parameter shocks
 
 - **Record:** `VALUATIONS-EQUITY-AND-COMPOSITION-19`.
 - **Decision status:** Draft — observed implementation; adoption pending.

@@ -1,4 +1,4 @@
-# Continuous-factor Brinson attribution with benchmark completeness
+# PORTFOLIO-ATTRIBUTION-006: Continuous-factor Brinson attribution with benchmark completeness
 
 - ID: PORTFOLIO-ATTRIBUTION-006
 - Decision status: Draft (observed implementation; adoption pending).

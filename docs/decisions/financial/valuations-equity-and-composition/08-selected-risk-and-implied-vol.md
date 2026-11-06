@@ -1,4 +1,4 @@
-# Selected-model Greeks, higher derivatives, Dividend01 and implied volatility
+# VALUATIONS-EQUITY-AND-COMPOSITION-08: Selected-model Greeks, higher derivatives, Dividend01 and implied volatility
 
 - **Record:** `VALUATIONS-EQUITY-AND-COMPOSITION-08`.
 - **Decision status:** Draft — observed implementation; adoption pending.

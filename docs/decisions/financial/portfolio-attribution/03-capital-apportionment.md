@@ -1,4 +1,4 @@
-# Decimal largest-remainder capital apportionment
+# PORTFOLIO-ATTRIBUTION-003: Decimal largest-remainder capital apportionment
 
 - ID: PORTFOLIO-ATTRIBUTION-003
 - Decision status: Draft (observed implementation; adoption pending).

@@ -1,4 +1,4 @@
-# FX cash-or-nothing and asset-or-nothing digitals
+# VALUATIONS-FX-AND-EXOTICS-FX-DIGITAL: FX cash-or-nothing and asset-or-nothing digitals
 
 - Record: `VALUATIONS-FX-AND-EXOTICS-FX-DIGITAL`
 - Decision status: **Draft — observed implementation, adoption pending**.

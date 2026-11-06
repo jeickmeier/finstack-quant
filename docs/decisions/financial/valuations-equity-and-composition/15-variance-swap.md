@@ -1,4 +1,4 @@
-# Equity variance swap replication, seasoning and variance risk
+# VALUATIONS-EQUITY-AND-COMPOSITION-15: Equity variance swap replication, seasoning and variance risk
 
 - **Record:** `VALUATIONS-EQUITY-AND-COMPOSITION-15`.
 - **Decision status:** Draft — observed implementation; adoption pending.

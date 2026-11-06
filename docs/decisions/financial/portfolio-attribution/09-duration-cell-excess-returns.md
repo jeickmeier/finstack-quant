@@ -1,4 +1,4 @@
-# Duration-cell base returns and credit excess-return aggregation
+# PORTFOLIO-ATTRIBUTION-009: Duration-cell base returns and credit excess-return aggregation
 
 - ID: PORTFOLIO-ATTRIBUTION-009
 - Decision status: Draft (observed implementation; adoption pending).

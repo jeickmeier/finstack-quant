@@ -1,4 +1,4 @@
-# Deposit cashflows and quote/discount inversion
+# VALUATIONS-RATES-01-DEPOSITS: Deposit cashflows and quote/discount inversion
 
 - ID: VALUATIONS-RATES-01-DEPOSITS
 - Decision status: Draft (observed implementation; adoption pending).

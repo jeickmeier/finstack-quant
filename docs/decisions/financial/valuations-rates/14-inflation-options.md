@@ -1,4 +1,4 @@
-# Inflation option forward proxy and information expiry
+# VALUATIONS-RATES-14-INFLATION-OPTIONS: Inflation option forward proxy and information expiry
 
 - ID: VALUATIONS-RATES-14-INFLATION-OPTIONS
 - Decision status: Draft (observed implementation; adoption pending).

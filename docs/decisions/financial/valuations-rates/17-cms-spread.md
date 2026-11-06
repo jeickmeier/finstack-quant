@@ -1,4 +1,4 @@
-# CMS spread conditional lognormal integration
+# VALUATIONS-RATES-17-CMS-SPREAD: CMS spread conditional lognormal integration
 
 - ID: VALUATIONS-RATES-17-CMS-SPREAD
 - Decision status: Draft (observed implementation; adoption pending).

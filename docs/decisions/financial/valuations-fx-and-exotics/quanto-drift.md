@@ -1,4 +1,4 @@
-# Quanto option drift adjustment, fixed conversion and correlation risk
+# VALUATIONS-FX-AND-EXOTICS-QUANTO-DRIFT: Quanto option drift adjustment, fixed conversion and correlation risk
 
 - Record: `VALUATIONS-FX-AND-EXOTICS-QUANTO-DRIFT`
 - Decision status: **Draft — observed implementation, adoption pending**.

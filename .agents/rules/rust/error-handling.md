@@ -21,19 +21,22 @@ A library crate **SHOULD** reuse `finstack_quant_core::Error` unless it has a
 genuinely distinct failure domain.
 
 Today, five crates define their own root `Error`: `core` (the shared base itself),
-`valuations`, `portfolio`, `scenarios` and `statements`. The other nine reuse
-core's at the root: `analytics`, `attribution`, `calibration`, `cashflows`,
-`covenants`, `features`, `margin`, `models`, `statements-analytics`
-(`statements-analytics` mostly propagates `finstack_quant_statements::Result`,
-which wraps it). That reuse is the default, not drift.
+`valuations-core` (re-exported by the `valuations` umbrella), `portfolio`,
+`scenarios` and `statements`. Every other library crate reuses core's at the
+root, including `analytics`, `attribution`, `calibration`, `cashflows`,
+`covenants`, `features`, `margin`, `models`, `factor`, `arrow-interchange` and
+the `valuations/*` family crates (`statements-analytics` mostly propagates
+`finstack_quant_statements::Result`, which wraps it). That reuse is the default,
+not drift. Treat this list as a snapshot to re-check against each crate's
+`error` module rather than as a fixed count.
 
 Module-scoped `thiserror` enums for a narrow failure domain are a separate,
 allowed thing and do not make a crate a root-`Error` crate — for example
 `core::math::linalg::CorrelationError`, `models::correlation::Error`,
-`models::factor::FactorMatchError`, and
-`models::factor::credit::decomposition::DecompositionError`. (`test-utils` is a
-dev-only supporting crate, not one of the 14 domain crates; it has a small
-`Error` of its own.)
+`finstack_quant_factor::FactorMatchError`, and
+`finstack_quant_factor::credit::decomposition::DecompositionError`.
+(`test-utils` is a dev-only supporting crate rather than a domain crate; it has
+a small `Error` of its own.)
 
 Introduce a new crate-level `Error` only when the crate's failure modes are not
 expressible as core variants, and say why in the PR description. `thiserror` is
@@ -45,12 +48,18 @@ used where a crate-specific enum is justified.
 - Crates reusing `finstack_quant_core::Error` should propagate it directly with `?`.
 - Do not add wrapper variants solely to hide another workspace crate's error type.
 
-### Example: `finstack-quant/core/src/errors.rs`
+### Example: a crate-level `thiserror` root error
+
+Illustrative shape only; the real shared type is in
+`finstack-quant/core/src/error/mod.rs` (`#[non_exhaustive]`, with `ErrorKind`
+classification and `InputError` for input failures).
 
 ```rust
 use thiserror::Error;
+use time::Date;
 
 #[derive(Error, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum Error {
     #[error("Invalid currency code: {0}")]
     InvalidCurrency(String),
@@ -62,12 +71,8 @@ pub enum Error {
     FxRateNotFound {
         base: String,
         quote: String,
-        date: chrono::NaiveDate,
+        date: Date,
     },
-
-    // Example of wrapping an error from another crate (e.g., an I/O error)
-    #[error("I/O error")]
-    Io(#[from] std::io::Error),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -75,10 +80,11 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 ### Usage
 
-Functions within the library will return `crate::errors::Result<T>`.
+Functions within a crate with its own root error return `crate::Result<T>`;
+crates reusing core's error return `finstack_quant_core::Result<T>`.
 
 ```rust
-use crate::errors::{Error, Result};
+use crate::{Error, Result};
 
 pub fn do_something(currency_code: &str) -> Result<()> {
     if currency_code.len() != 3 {

@@ -1,4 +1,4 @@
-# Cash equity valuation and dividend-adjusted carry
+# VALUATIONS-EQUITY-AND-COMPOSITION-02: Cash equity valuation and dividend-adjusted carry
 
 - **Record:** `VALUATIONS-EQUITY-AND-COMPOSITION-02`.
 - **Decision status:** Draft — observed implementation; adoption pending.

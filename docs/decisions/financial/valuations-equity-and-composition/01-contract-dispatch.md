@@ -1,4 +1,4 @@
-# Instrument contracts, model dispatch and metric interpretation
+# VALUATIONS-EQUITY-AND-COMPOSITION-01: Instrument contracts, model dispatch and metric interpretation
 
 - **Record:** `VALUATIONS-EQUITY-AND-COMPOSITION-01`.
 - **Decision status:** Draft — observed implementation; adoption pending.

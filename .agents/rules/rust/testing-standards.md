@@ -9,7 +9,7 @@ These standards apply to all Rust crates in the Finstack Quant workspace (`finst
 
 ### Guiding principles
 
-- **Deterministic and reproducible**: Tests must not depend on wall‑clock time, locale, or network. Randomness must be seeded. Serial and parallel execution must produce identical Decimal results.
+- **Deterministic and reproducible**: Tests must not depend on wall‑clock time, locale, or network. Randomness must be seeded. Within each API's declared reproducibility tier ([ADR 0021](../../../docs/decisions/standards/0021-reproducibility-guarantees.md)), serial and parallel execution must agree, and `Decimal`/`Money` results must match exactly.
 - **Public API first**: Prioritize coverage on public, user‑facing APIs; internal details are covered as needed to protect invariants.
 - **Pragmatic coverage**: Aim for **80%+** line/branch coverage overall. Do not chase 100% if it materially increases complexity or brittles tests.
 - **Currency safety and serde stability**: Assert currency‑safe behaviors and strict deserialization with denied unknown fields where applicable.
@@ -25,10 +25,10 @@ These standards apply to all Rust crates in the Finstack Quant workspace (`finst
 - **Integration tests (`tests/` per crate)**
   - Treat as example‑equivalent end‑to‑end scenarios that exercise the public surface area.
   - Build objects via public constructors/builders; do not reach into private internals.
-  - Ensure results capture our policy stamps (numeric mode, parallel flag, rounding context; FX policy where relevant).
+  - Where a result carries `ResultsMeta`, assert its stamps: `numeric_mode` (always `"f64"` today), `rounding`, `parallel`, and `fx_policy_applied` where relevant.
 - **Golden/parity tests**
   - Validate against market‑standard sources (e.g., Bloomberg, QuantLib, FinancePy) and standards bodies (e.g., ISDA) when legally and practically feasible.
-  - Store canonical inputs plus expected outputs (CSV/JSON/Arrow) under `tests/data/` with provenance notes.
+  - Store canonical inputs plus expected outputs (CSV/JSON/Arrow) in the crate's `tests/data/` or `tests/golden/` directory, or in a fixture shared with the Python/WASM suites. Each case records provenance, methodology and version, valuation date, conventions, units, and tolerance rationale ([ADR 0048](../../../docs/decisions/project/0048-reference-provenance-and-version-pinning.md)).
   - Assert values within documented tolerances; Decimal paths should match exactly unless rounding policy dictates otherwise.
 - **Doc tests**
   - Include only when they provide a useful, copy‑pasteable working example of a public API and ensure it compiles.
@@ -39,7 +39,7 @@ These standards apply to all Rust crates in the Finstack Quant workspace (`finst
 - **Fixed seeds** for any randomized logic; prefer explicit seed injection in APIs used in tests.
 - **Clock isolation**: Use explicit dates/calendars from `core/dates`; never read system time.
 - **Stable ordering**: When comparing collections/frames, enforce stable sort and strict schemas before assertions.
-- **Parallel parity**: Where parallel features exist, include tests that assert serial ≡ parallel Decimal results and stamp the parallel flag consistently in metadata.
+- **Parallel parity**: Where an API promises thread-count independence, compare serial and parallel runs for each promised thread-count class, and check the `ResultsMeta.parallel` stamp where the result carries it. Compare `f64::to_bits()` for bit-identity claims and use justified tolerances otherwise ([ADR 0042](../../../docs/decisions/standards/0042-numerical-accumulation-and-comparisons.md)); single-target tests do not establish cross-target bit identity.
 
 ### Coverage policy
 
@@ -49,13 +49,13 @@ These standards apply to all Rust crates in the Finstack Quant workspace (`finst
 
 ### Assertions and tolerances
 
-- **Decimal mode**: Expect exact equality unless rounding policy explicitly allows tolerance.
-- **Float mode/testing against external sources**: Use tight, documented tolerances appropriate for the instrument/domain and data granularity.
-- **Policy visibility**: Assert presence and correctness of `RoundingContext`, FX policy stamps, and numeric mode in result envelopes where applicable.
+- **`Decimal`/`Money` paths**: Expect exact equality unless a rounding policy explicitly allows tolerance. Use exact `f64` equality only for intended IEEE semantics such as exact-zero sentinels.
+- **`f64` results and external sources**: Use tight, documented tolerances appropriate for the instrument/domain and data granularity.
+- **Policy visibility**: Assert presence and correctness of the `ResultsMeta` fields (`rounding`, `fx_policy_applied`, `numeric_mode`) in result envelopes where applicable.
 
 ### Test data and fixtures
 
-- Place small fixtures under `tests/data/` within each crate. Prefer CSV/JSON/Arrow for tabular/time‑series data.
+- Place small fixtures under the crate's `tests/data/` or `tests/golden/` directory, or share one fixture between host suites (location does not establish independence of the expected values). Prefer CSV/JSON/Arrow for tabular/time‑series data.
 - Document fixture provenance, units, currencies, calendars, and rounding assumptions in a short README alongside data when non‑obvious.
 - Keep fixtures minimal but representative; avoid embedding large blobs in source.
 
@@ -80,7 +80,7 @@ These standards apply to all Rust crates in the Finstack Quant workspace (`finst
   - See `.agents/rules/selective-test-running.mdc` for the path → package table.
 - **Before commit or at plan end:** `mise run rust-lint` and `mise run rust-test` (full workspace).
 - Tests must be hermetic: no network, no external services, no reliance on machine configuration.
-- If enabling new features behind flags (e.g., parallel), ensure CI executes representative test matrices.
+- This workspace has no `parallel` feature; vary thread counts and compilation targets (native vs wasm32) in the relevant tests rather than adding feature gates, and keep CI covering each promised configuration.
 - Do not run `cargo test` directly; use the `mise run rust-test-*` tasks (nextest, no doc tests).
 
 ### Integration test guidance (example‑equivalent rule)
