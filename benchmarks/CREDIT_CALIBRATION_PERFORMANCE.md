@@ -1,9 +1,86 @@
 # Credit calibration performance
 
-Implementation starts from `2270da9537` on `codex/credit-calibrator-performance`.
+Implemented from `2270da9537` on `codex/credit-calibrator-performance`.
 The fixed implementation brief is `.plans/CREDIT-CALIBRATOR-PERFORMANCE-PLAN.md`;
-execution status is tracked separately there. No solver tolerances, quadrature
+current execution status is recorded below. No solver tolerances, quadrature
 budgets, or quote-acceptance thresholds are relaxed by this work.
+
+## Final results
+
+All main phases are accepted: S0, BC1–BC5, H1–H3 and V1–V3. BC6 was evaluated
+and rejected because BC1 leaves no representative Gaussian both-binding-cap
+workload to justify paired-quadrature complexity. The CDS-option implied-vol
+preparation remains the plan's separate follow-up. The fixed plan is unchanged;
+the acceptance history and current status are recorded in this report.
+
+| Workload | Baseline phase | Baseline ms | Final ms | Reduction |
+|---|---|---:|---:|---:|
+| Base correlation, isolated | s0-quiet | 8239.613 | 265.961 | 96.8% |
+| Base correlation, full plan | s0-quiet | 8315.811 | 276.656 | 96.7% |
+| Hazard, isolated | s0-quiet | 48.914 | 3.479 | 92.9% |
+| Hazard, full plan | s0-quiet | 73.644 | 10.843 | 85.3% |
+| Five distinct hazard bumps | h2 | 36.078 | 21.417 | 40.6% |
+| Credit vol, 3×3 | v0 | 0.538 | 0.298 | 44.6% |
+| Credit vol, 10×21 | v0 | 1.964 | 0.889 | 54.8% |
+
+Base/hazard final measurements are a fresh repeat at `779e1ed192`, with ten
+samples, a 3 s warmup, a 10 s requested measurement and 10,000 resamples.
+S0 used a 1 s warmup; the final repeat deliberately warms longer. Earlier
+accepted same-setting slice comparisons are retained below, and the
+final values agree with H3's accepted timings. Criterion extended the two base
+measurement windows to about 15 s to collect ten linear samples. Volatility
+uses V3's twenty-sample, 3 s warmup run. H2 is the new bump-batch baseline and
+V0 is the pre-volatility-change baseline; neither is mislabeled as original S0.
+All raw samples and confidence intervals are retained in their phase folders.
+
+Final explained reports exactly match V3. Base-correlation solver calls fall
+from 177 to 31, plus the same ten commit/final repricings. Hazard calls fall
+from 478 to 344. Five distinct nonzero bump requests perform six replay solves
+instead of ten. These counts are separate from elapsed-time gains and from
+SABR Jacobian work described in V3.
+
+Compared with S0, maximum correlation-knot movement is `1.805e-10`, and maximum
+hazard-knot movement is `1.756e-12`. Final maximum absolute quote residuals are
+`9.284e-14` and `3.548e-15`, respectively. Original finite-pool references,
+S0-derived PV/erosion bounds, solver tolerances, quadrature budgets and final
+acceptance policies remain intact. Numerical and memory details for each
+accepted slice are documented below.
+
+### Final validation
+
+The complete PR-gate stages passed, followed by `mise run rust-doc`. One
+`mise run all` invocation ran the full lint stage; after the issues below were
+corrected, the remaining stages were resumed individually rather than repeating
+full workspace Rust lint/test.
+
+- Full Rust lint, Python lint/typecheck/docs, WASM lint/boundary checks and
+  repository convention/security hooks passed.
+- Generation checks passed and confirmed idempotent generated artifacts.
+- Workspace Rust tests: **16,269 passed**, 86 intentionally skipped.
+- WASM validation and all four TypeScript declaration configurations passed;
+  **1,089 facade tests passed**, including a repeat after the fixture refresh.
+- Python: **13,945 passed** initially, 112 intentionally skipped, with one stale
+  integration fixture failure. After the reviewed refresh, all **seven focused
+  valuations-parity tests passed** without update mode, clearing that failure.
+- UI: **1,525 tests across 125 files passed**, together with fixture, registry,
+  style, token, arithmetic-boundary and type checks.
+- Dependency audits passed; Rust documentation, input-argument, deprecation and
+  canonical-public-path checks passed.
+
+The first generation check rejected the abbreviated local name `dc` in a new
+CDS cache test. Renaming it to `day_count` passed scoped lint and the affected
+test; production code did not change. Python then identified the generated
+cross-host valuations fixture's old serialized calibrated market. Reviewing its
+21 changed leaves found only intended credit-curve/derived-value changes:
+maximum curve movement below `9.52e-13`, CDS price movement `2.57e-6`, and index
+CS01 movement below `9.57e-7`. The fixture was refreshed through its documented
+generator, then verified through Python and WASM with the existing tolerances.
+The independent financial references and S0 snapshot were not regenerated.
+
+Final raw samples, numerical reports, integration-fixture deltas and validation
+metadata are in `benchmarks/credit-calibration-evidence/final`. Per-slice
+acceptance history follows. No performance claim relies on the optional
+CDS-option follow-up or the rejected BC6 optimization.
 
 ## Reproduction
 

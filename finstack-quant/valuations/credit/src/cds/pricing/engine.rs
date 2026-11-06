@@ -968,7 +968,7 @@ mod prepared_cds_tests {
             "rate changes must not rebuild grids"
         );
         let retained = prepared.grids.retained_windows();
-        for (base, dc, knots) in [
+        for (base, day_count, knots) in [
             (date!(2025 - 01 - 01), DayCount::Act365F, vec![(1.0, 0.02)]),
             (
                 date!(2025 - 01 - 01),
@@ -993,7 +993,7 @@ mod prepared_cds_tests {
         ] {
             let curve = HazardCurve::builder("trial")
                 .base_date(base)
-                .day_count(dc)
+                .day_count(day_count)
                 .recovery_rate(0.4)
                 .knots(knots)
                 .build()?;
