@@ -1324,7 +1324,7 @@ mod tests {
         assert!(
             serde_json::from_str::<CreditFactorModel>(&with_root_key).is_err(),
             "unknown root key must fail: root uses deny_unknown_fields, so \
-             additive root fields require a new schema version"
+             adding a root field is a coordinated v1 contract change"
         );
 
         // Unknown diagnostics key: open extension point must accept.

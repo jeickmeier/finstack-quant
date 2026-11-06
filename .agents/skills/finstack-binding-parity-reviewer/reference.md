@@ -258,7 +258,7 @@ Both Python and WASM bindings should expose identical functionality:
 |--------|---------------|---------------------|
 | Wrapper struct | `pub(crate) inner: T` | `pub(crate) inner: T` |
 | Constructor | `from_inner(inner: T)` | `from_inner(inner: T)` |
-| Error handling | `.map_err(map_error)` | `.map_err(core_to_js)` |
+| Error handling | `.map_err(core_to_py)` | `.map_err(to_js_err)` |
 | String parsing | `FromPyObject` trait | `ParseFromString` trait |
 | Module structure | Submodules via `register()` | Flat exports in `lib.rs` |
 

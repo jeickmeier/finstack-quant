@@ -75,7 +75,7 @@
       "description": "Valuation date used for forward-start and remaining-maturity calculations."
     },
     "collateral": {
-      "description": "Net current collateral held (positive = bank holds collateral).",
+      "description": "Net variation margin held, excluding NICA (positive = bank holds\ncollateral). Total recognized adjusted collateral `C` is\n`collateral + nica`, formed by the replacement-cost kernel, so NICA must\nnot also be included here.",
       "format": "double",
       "type": "number"
     },
@@ -99,7 +99,7 @@
       "description": "Netting set identifier."
     },
     "nica": {
-      "description": "Net independent collateral amount (NICA).",
+      "description": "Net independent collateral amount (NICA), held separately from\n`collateral` and added to it when forming `C`.",
       "format": "double",
       "type": "number"
     },

@@ -18,14 +18,14 @@
 //!
 //! # Pricing Models
 //!
-//! `CapFloorVolType` defaults to `Auto`: the surface is treated as a
-//! lognormal quote. Each caplet uses Black-76 when forward and strike are
-//! positive; otherwise the lognormal vol is converted to an equivalent
-//! normal vol and priced with Bachelier. A normal-vol surface must set
-//! `vol_type = Normal`. `Lognormal` uses Black (1976),
+//! `CapFloorVolType` defaults to `Auto`: the volatility source's own quote
+//! convention metadata selects the model, and quotes are never converted
+//! between conventions. A source without convention metadata is rejected, and
+//! a lognormal quote with a non-positive forward or strike returns an error
+//! instead of falling back to a normal model. `Lognormal` uses Black (1976),
 //! `ShiftedLognormal` applies Black to `F + shift` and `K + shift`,
-//! and `Normal` uses Bachelier. Normal pricing
-//! supports zero and negative forwards.
+//! and `Normal` uses Bachelier; each overrides the source convention. Normal
+//! pricing supports zero and negative forwards.
 //!
 //! For Black (1976), each caplet/floorlet is priced as:
 //!

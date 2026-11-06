@@ -40,8 +40,8 @@ pub(super) const AUTO_STOP_MIN_SAMPLES: usize = 5_000;
 /// This is a **pure function of `num_paths`** by design: the chunk partition
 /// fixes the `OnlineStats::merge` reduction tree, and floating-point merges
 /// are order-sensitive, so any dependence on `rayon::current_num_threads()`
-/// would make results differ across machines, `RAYON_NUM_THREADS` settings,
-/// and native-vs-wasm hosts for the same `(seed, num_paths, num_steps)`.
+/// would make results differ across `RAYON_NUM_THREADS` settings for the same
+/// `(seed, num_paths, num_steps)` on one build target.
 ///
 /// Targets 64 chunks for large runs (ample work-stealing granularity up to
 /// 64 threads), with a 100-path floor to amortize per-chunk overhead and a
@@ -369,7 +369,9 @@ impl McEngine {
     /// per-path values themselves come from `rng.split(path_id)`, independent of
     /// thread count. The default chunk size is a pure function of `num_paths`
     /// (never of the thread count), so results are also bit-identical across
-    /// machines, `RAYON_NUM_THREADS` settings, and native-vs-wasm hosts.
+    /// `RAYON_NUM_THREADS` settings on one build target. Cross-target (native
+    /// versus wasm32) bit identity is not promised; compare those results with
+    /// justified tolerances.
     ///
     /// # Examples
     ///

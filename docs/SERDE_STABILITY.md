@@ -109,6 +109,12 @@ omission is a documented canonical behavior.
 Open content is limited to named extension maps such as metadata. An open map
 does not make its containing object open.
 
+The one declared open object is `CreditCalibrationDiagnostics`: unknown
+diagnostic keys are accepted and discarded on deserialization. Its known fields
+keep their requiredness and meaning, including the computational `fold_ups`,
+and an addition that affects computation requires a coordinated semantic
+contract change. The enclosing `CreditFactorModel` root stays closed.
+
 The three pricing-override maps are distinct fields:
 `instrument_pricing_overrides`, `metric_pricing_overrides`, and
 `scenario_pricing_overrides`. They default to empty when omitted, are omitted

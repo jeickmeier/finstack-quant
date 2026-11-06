@@ -1397,7 +1397,7 @@ export default [
     "path": "#/$defs/d_6603e4c082f6540152f1/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cap_floor.schema.json#/$defs/CapFloorVolType/oneOf/3",
     "const": "auto",
-    "description": "Lognormal (Black) surface quote with a negative-rate fallback.\n\nTreats the volatility surface as a **lognormal** quote. Each\ncaplet/floorlet uses Black-76 when the forward and strike are\npositive; otherwise the lognormal vol is converted to an equivalent\nnormal vol and priced with Bachelier.\n\nThis does **not** inspect the surface quote type. A normal-vol\nsurface must set `vol_type = Normal`. Explicit `Lognormal`,\n`ShiftedLognormal`, and `Normal` remain explicit."
+    "description": "Follow the volatility source's own convention metadata.\n\nThe surface's quote type (and displacement, if any) selects Black,\nshifted Black or Bachelier for each caplet/floorlet; no quote is\nconverted between conventions. A source without convention metadata\nis rejected. A lognormal quote requires a positive (shifted) forward\nand strike and returns an error otherwise; it is not repriced with a\nnormal model. Explicit `Lognormal`, `ShiftedLognormal`, and `Normal`\noverride the source convention."
   },
   {
     "path": "#/$defs/d_69148dfad1155676d8a6",

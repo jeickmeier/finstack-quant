@@ -17,7 +17,7 @@ valuations-core only; no other instrument family.
 | `cds/` | Single-name credit default swaps | ISDA Standard Model conventions (IMM rolls, ACT/360 premium leg, accrual on default, step-in `T+1`), `CdsValuationConvention` for the Bloomberg CDSW clean/dirty presentation, upfront and quoted-spread quoting |
 | `cds_index/` | CDX / iTraxx indices | Constituent-level or index-curve pricing, factor and IMM-roll handling |
 | `cds_tranche/` | Synthetic CDO tranches | Gaussian copula with base-correlation interpolation, expected-loss and tranche-spread metrics |
-| `cds_option/` | Payer / receiver options on CDS and indices | Lognormal spread (Black) and price-strike forms, knock-out convention, Bloomberg CDSO quadrature reconciliation |
+| `cds_option/` | Payer / receiver options on CDS and indices | Single registered model, `BloombergCdso`: a mean-calibrated lognormal spread distribution with annuity-aware payoff quadrature, driven by an implied-vol override or a Black-lognormal strike-axis surface read at the native strike; knock-out convention. There is no separate closed-form Black option pricer in the dispatch |
 | `cs01.rs` | Not an instrument | The shared CS01 fast path: hazard-curve bump and reprice without rebuilding the schedule |
 | `family.rs` | Not an instrument | `CREDIT`, the family's pricer and metric registrations |
 

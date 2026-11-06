@@ -6,10 +6,11 @@ use super::types::{SaCcrNettingSetConfig, SaCcrTrade};
 
 /// Compute replacement cost for a netting set (BCBS 279 paragraph 135).
 ///
-/// In this codebase `config.collateral` represents the variation margin
-/// (VM) posted, and `config.nica` is the net independent collateral
-/// amount held separately. The Basel formula uses total net collateral
-/// `C = VM + NICA`.
+/// In this codebase `config.collateral` represents the net variation margin
+/// (VM) held, excluding NICA, and `config.nica` is the net independent
+/// collateral amount held separately. The Basel formula uses total recognized
+/// adjusted collateral `C = VM + NICA`, which this kernel forms by adding
+/// `config.nica` to `config.collateral`.
 ///
 /// Unmargined:
 ///   `RC = max(V - C, 0)` with `C = VM + NICA`

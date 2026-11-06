@@ -135,9 +135,11 @@ Hagan et al. (2002) expansion **with the Obloj (2008) correction applied** to
 the z/χ(z) ratio: geometric-mean moneyness replaces the difference-of-powers
 form, cutting the error from O(ε²) to O(ε³) for intermediate β.
 
-Residual accuracy limits after the correction:
+Residual accuracy limits after the correction. No error size is published
+because no reproducible benchmark (revision, command, inputs, comparator, error
+units) defines one:
 
-- `T > 10Y`: still ~5-10 bp of error.
+- `T > 10Y`: material residual error remains.
 - `ν > 1.0`: extreme vol-of-vol.
 - Strikes 3+ standard deviations from ATM.
 

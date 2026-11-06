@@ -19761,8 +19761,9 @@ export interface ProcessParams {
  *
  * Records the execution policy that produced an estimate so results are
  * auditable and replayable: the same `(seed, num_paths, num_steps,
- * chunk_size)` reproduces the run bit-for-bit regardless of thread count or
- * host (see the determinism notes on [`crate::monte_carlo::engine::McEngine::price`]).
+ * chunk_size)` reproduces the run bit-for-bit regardless of thread count on
+ * the same build target; cross-target bit identity is not promised (see the
+ * determinism notes on [`crate::monte_carlo::engine::McEngine::price`]).
  */
 export interface RunMetadata {
   /**

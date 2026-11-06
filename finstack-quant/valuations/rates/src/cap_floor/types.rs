@@ -70,16 +70,15 @@ pub enum CapFloorVolType {
     /// Required for negative rate environments.
     Normal,
 
-    /// Lognormal (Black) surface quote with a negative-rate fallback.
+    /// Follow the volatility source's own convention metadata.
     ///
-    /// Treats the volatility surface as a **lognormal** quote. Each
-    /// caplet/floorlet uses Black-76 when the forward and strike are
-    /// positive; otherwise the lognormal vol is converted to an equivalent
-    /// normal vol and priced with Bachelier.
-    ///
-    /// This does **not** inspect the surface quote type. A normal-vol
-    /// surface must set `vol_type = Normal`. Explicit `Lognormal`,
-    /// `ShiftedLognormal`, and `Normal` remain explicit.
+    /// The surface's quote type (and displacement, if any) selects Black,
+    /// shifted Black or Bachelier for each caplet/floorlet; no quote is
+    /// converted between conventions. A source without convention metadata
+    /// is rejected. A lognormal quote requires a positive (shifted) forward
+    /// and strike and returns an error otherwise; it is not repriced with a
+    /// normal model. Explicit `Lognormal`, `ShiftedLognormal`, and `Normal`
+    /// override the source convention.
     #[default]
     Auto,
 }

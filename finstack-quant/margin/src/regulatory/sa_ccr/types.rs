@@ -195,13 +195,17 @@ pub struct SaCcrNettingSetConfig {
     pub netting_set_id: NettingSetId,
     /// Whether the netting set is subject to a margin agreement.
     pub is_margined: bool,
-    /// Net current collateral held (positive = bank holds collateral).
+    /// Net variation margin held, excluding NICA (positive = bank holds
+    /// collateral). Total recognized adjusted collateral `C` is
+    /// `collateral + nica`, formed by the replacement-cost kernel, so NICA must
+    /// not also be included here.
     pub collateral: f64,
     /// Threshold amount (TH) under the margin agreement.
     pub threshold: f64,
     /// Minimum transfer amount (MTA).
     pub mta: f64,
-    /// Net independent collateral amount (NICA).
+    /// Net independent collateral amount (NICA), held separately from
+    /// `collateral` and added to it when forming `C`.
     pub nica: f64,
     /// Margin period of risk in business days (default: 10 for bilateral).
     pub mpor_days: u32,
@@ -210,8 +214,9 @@ pub struct SaCcrNettingSetConfig {
 impl SaCcrNettingSetConfig {
     /// Validate collateral and margin-agreement inputs.
     ///
-    /// Collateral and NICA are signed net amounts (positive means the bank holds
-    /// collateral); threshold and MTA are non-negative agreement amounts.
+    /// Collateral (variation margin, excluding NICA) and NICA are signed net
+    /// amounts (positive means the bank holds collateral); threshold and MTA
+    /// are non-negative agreement amounts.
     /// Margined sets require at least ten business days for bilateral exposures
     /// or five for cleared exposures. Supply any longer period required by the
     /// trade count, liquidity, disputes or remargining frequency. Unmargined
@@ -272,8 +277,8 @@ impl SaCcrNettingSetConfig {
     /// # Arguments
     ///
     /// * `netting_set_id` - Bilateral or cleared netting-set key.
-    /// * `collateral` - Net collateral held, in the reporting currency
-    ///   (positive = bank holds collateral).
+    /// * `collateral` - Net variation margin held, excluding NICA, in the
+    ///   reporting currency (positive = bank holds collateral).
     /// * `as_of` - Valuation date for forward-start and remaining-maturity
     ///   calculations.
     #[must_use]
@@ -295,8 +300,8 @@ impl SaCcrNettingSetConfig {
     /// # Arguments
     ///
     /// * `netting_set_id` - Bilateral or cleared netting-set key.
-    /// * `collateral` - Net collateral held, in the reporting currency
-    ///   (positive = bank holds collateral).
+    /// * `collateral` - Net variation margin held, excluding NICA, in the
+    ///   reporting currency (positive = bank holds collateral).
     /// * `threshold` - CSA threshold (TH), non-negative, reporting currency.
     /// * `mta` - Minimum transfer amount, non-negative, reporting currency.
     /// * `nica` - Net independent collateral amount, signed, reporting currency.

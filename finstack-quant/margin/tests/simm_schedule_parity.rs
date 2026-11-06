@@ -71,8 +71,7 @@ fn published_ir_weights_and_correlations() {
 
 #[test]
 fn published_non_ir_weights_and_historical_ratios() {
-    let calc = SimmCalculator::new(finstack_quant_margin::SimmVersion::default())
-        .expect("embedded registry");
+    let calc = SimmCalculator::new(SimmVersion::V2_6).expect("embedded registry");
     let p = calc.get_params();
     // E through I: selected supported residual classes and every commodity bucket.
     assert_eq!(p.cnq_delta_weight, 1300.0);
@@ -111,8 +110,7 @@ fn published_non_ir_weights_and_historical_ratios() {
 
 #[test]
 fn published_raw_concentration_thresholds() {
-    let calc = SimmCalculator::new(finstack_quant_margin::SimmVersion::default())
-        .expect("embedded registry");
+    let calc = SimmCalculator::new(SimmVersion::V2_6).expect("embedded registry");
     let p = calc.get_params();
     // J, printed pages 26-28. Table units USD millions, per bp/% for delta.
     for (key, delta, vega) in [
@@ -172,8 +170,7 @@ fn published_raw_concentration_thresholds() {
 #[test]
 fn published_cross_risk_class_correlations() {
     use SimmRiskClass::*;
-    let calc = SimmCalculator::new(finstack_quant_margin::SimmVersion::default())
-        .expect("embedded registry");
+    let calc = SimmCalculator::new(SimmVersion::V2_6).expect("embedded registry");
     let p = calc.get_params();
     let classes = [
         InterestRate,
