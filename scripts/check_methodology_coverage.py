@@ -67,7 +67,11 @@ def _orphan_documents(scope: Path, record_paths: set[str]) -> list[str]:
     for name in roots:
         document = scope / name
         if document.is_file():
-            linked.update(Path(link).name for link in MARKDOWN_LINK.findall(document.read_text()) if "/" not in link)
+            linked.update(
+                target.name
+                for link in MARKDOWN_LINK.findall(document.read_text())
+                if (target := (document.parent / link).resolve()).parent == scope.resolve()
+            )
     return [
         document.name
         for document in sorted(scope.glob("*.md"))
