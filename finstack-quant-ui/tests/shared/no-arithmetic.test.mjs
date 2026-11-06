@@ -82,6 +82,7 @@ describe("check-no-arithmetic", () => {
     ["const x = a * b; // finstack-arith:"],
     ["// finstack-arith:   \nconst x = a * b;"],
     ["{/* finstack-arith: */}\nconst x = a * b;"],
+    ["// finstack-arith: */ }} */\nconst x = a * b;"],
   ])("fails a comment with no reason: %j", (source) => {
     const errors = errorsIn(source);
     expect(errors[0]).toContain("finstack-arith comment has no reason");

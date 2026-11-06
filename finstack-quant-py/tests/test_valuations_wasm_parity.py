@@ -621,7 +621,13 @@ def build_cases() -> dict[str, Any]:
 
 
 def _assert_close(actual: Any, expected: Any, path: str) -> None:
-    if isinstance(expected, dict):
+    if isinstance(expected, str) and expected.lstrip().startswith(("{", "[")):
+        # Serialized market/instrument documents contain the same floating-point
+        # outputs as ordinary objects. Apply the existing numerical tolerance
+        # inside them too; native platforms need not serialize identical bits.
+        assert isinstance(actual, str), path
+        _assert_close(json.loads(actual), json.loads(expected), path)
+    elif isinstance(expected, dict):
         assert isinstance(actual, dict), path
         assert sorted(actual) == sorted(expected), path
         for key, value in expected.items():
@@ -635,6 +641,29 @@ def _assert_close(actual: Any, expected: Any, path: str) -> None:
         assert math.isclose(actual, expected, rel_tol=1e-12, abs_tol=1e-12), f"{path}: {actual} != {expected}"
     else:
         assert actual == expected, path
+
+
+def test_cross_host_comparison_accepts_roundoff_inside_json() -> None:
+    # Actual Linux CI and macOS golden discount factors from the credit market.
+    expected = '{"id":"USD-OIS","knot_points":[[5.016438356164383,0.8002608829570502]]}'
+    actual = '{"id":"USD-OIS","knot_points":[[5.016438356164383,0.8002608829570532]]}'
+    _assert_close(actual, expected, "golden.credit.market")
+
+
+@pytest.mark.parametrize(
+    "actual",
+    [
+        '{"id":"USD-OIS","knot_points":[[5.0,0.800001]]}',
+        '{"id":"EUR-OIS","knot_points":[[5.0,0.8]]}',
+        '{"id":"USD-OIS","knot_points":[]}',
+        '{"id":"USD-OIS","knot_points":[[5.0,0.8]],"extra":true}',
+        '{"id":"USD-OIS","knot_points":[[5.0,"0.8"]]}',
+    ],
+)
+def test_cross_host_comparison_rejects_json_mismatches(actual: str) -> None:
+    expected = '{"id":"USD-OIS","knot_points":[[5.0,0.8]]}'
+    with pytest.raises(AssertionError, match=r"golden\.credit\.market"):
+        _assert_close(actual, expected, "golden.credit.market")
 
 
 def test_python_matches_the_cross_host_golden() -> None:

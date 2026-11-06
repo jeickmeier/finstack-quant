@@ -463,7 +463,7 @@
   },
   "step_report": {
     "success": true,
-    "iterations": 64,
+    "iterations": 13,
     "residual_ids": [
       "USD-DEP-3M",
       "USD-SWAP-2Y"

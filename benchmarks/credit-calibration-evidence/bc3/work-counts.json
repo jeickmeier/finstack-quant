@@ -1,0 +1,17 @@
+{
+  "test": "prepared_attachment_cache_tracks_effective_interpolated_correlation",
+  "units": "PMF kernel invocations per valuation",
+  "flat_correlation": 0.25,
+  "cases": [
+    {
+      "attachment_pct": 3,
+      "first": 33400,
+      "repeat": 17408
+    },
+    {
+      "attachment_pct": 4,
+      "first": 34004,
+      "repeat": 17408
+    }
+  ]
+}

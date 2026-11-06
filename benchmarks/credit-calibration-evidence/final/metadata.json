@@ -1,0 +1,17 @@
+{
+  "revision": "779e1ed192",
+  "phase": "final",
+  "samples": 10,
+  "warmup_seconds": 3,
+  "measurement_seconds_requested": 10,
+  "resamples": 10000,
+  "baseline_warmup_seconds": 1,
+  "volatility_results": "v3, 20 samples with 3-second warmup",
+  "input_sha256": {
+    "Cargo.lock": "7c9e488420c675f1acd4c9bb1f81293f4f8f012de57ec2a61ebe05b3ffc14bd1",
+    "finstack-quant/calibration/benches/credit_calibration.rs": "e402b774d43e8154a3d3c252a4b3f65027850dba5f27384bae072261e849d92b",
+    "finstack-quant/calibration/examples/market_bootstrap/03_single_name_hazard.json": "b815e12ecc33c23ddb15bdd88a974a3fa29f6d38b69b7eb2364d2046ea8c56f1",
+    "finstack-quant/calibration/examples/market_bootstrap/05_cdx_base_correlation.json": "ac094f2f8b7ce90b1d44127c22d6e5b8aa1ab7ca3d3e0705c535317cfe192cbf"
+  },
+  "numerical_reports": "Exactly match V3"
+}

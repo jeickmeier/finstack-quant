@@ -1,0 +1,13 @@
+{
+  "starting_revision": "b3fb34e55b",
+  "samples": 20,
+  "warmup_seconds": 3,
+  "measurement_seconds": 10,
+  "resamples": 10000,
+  "phase": "v2-beta",
+  "input_sha256": {
+    "finstack-quant/calibration/benches/credit_calibration.rs": "e402b774d43e8154a3d3c252a4b3f65027850dba5f27384bae072261e849d92b",
+    "finstack-quant/calibration/benches/sabr_slice.rs": "c148075296aa313760529ff3979778aec1732b367486401621347aa94a55cfa7"
+  },
+  "numerics": "All saved reports including counters exactly equal to V1; value and fit snapshots exact."
+}

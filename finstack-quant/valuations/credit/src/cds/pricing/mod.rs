@@ -71,14 +71,15 @@
 //! - Hull, J.C. & White, A. "Valuing Credit Default Swaps I: No Counterparty Default Risk" `docs/REFERENCES.md#hull-white-2000-cds`
 
 mod engine;
+mod grid_cache;
 mod helpers;
 mod metrics;
 
 #[cfg(test)]
 mod tests;
 
-pub(crate) use engine::CdsHazardRepriceCache;
 #[doc(hidden)]
 pub use engine::CdsPricer;
+pub use engine::PreparedCds;
 pub(crate) use helpers::date_from_hazard_time;
 pub(crate) use metrics::AccrualDayCountPolicy;

@@ -1,0 +1,20 @@
+{
+  "starting_revision": "39680d8d3c",
+  "samples": 10,
+  "warmup_seconds": 1,
+  "measurement_seconds": 10,
+  "resamples": 10000,
+  "numerics": "Five reports exactly equal H2; cached/uncached canonical bumped curves equal",
+  "identity_and_bump_solves": {
+    "five_distinct_before": 10,
+    "five_distinct_after": 6,
+    "one_bump": 2
+  },
+  "input_sha256": {
+    "03_single_name_hazard.json": "b815e12ecc33c23ddb15bdd88a974a3fa29f6d38b69b7eb2364d2046ea8c56f1"
+  },
+  "excluded_stale_groups": [
+    "calibration_discount_step",
+    "calibration_discount_then_forward_steps"
+  ]
+}

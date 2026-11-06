@@ -663,7 +663,7 @@
           "currency": "USD"
         },
         "credit_curves_pnl": {
-          "amount": "-63.5046028625197",
+          "amount": "-63.5046028977001",
           "currency": "USD"
         },
         "inflation_curves_pnl": {
@@ -699,7 +699,7 @@
           "currency": "USD"
         },
         "residual": {
-          "amount": "2.9819806520507349",
+          "amount": "2.9819806872311349",
           "currency": "USD"
         },
         "carry_detail": {
@@ -829,7 +829,7 @@
               {
                 "tenor_years": 0.9805555555555555,
                 "sensitivity": {
-                  "amount": "-0.000996439775008184",
+                  "amount": "-0.000996439531945725",
                   "currency": "USD"
                 },
                 "market_move": 150
@@ -837,7 +837,7 @@
               {
                 "tenor_years": 3.0083333333333333,
                 "sensitivity": {
-                  "amount": "-0.004392960218524422",
+                  "amount": "-0.004392961006033147",
                   "currency": "USD"
                 },
                 "market_move": 150
@@ -845,7 +845,7 @@
               {
                 "tenor_years": 5.038888888888889,
                 "sensitivity": {
-                  "amount": "-0.4083544508685009",
+                  "amount": "-0.4083544505595",
                   "currency": "USD"
                 },
                 "market_move": 150
@@ -853,7 +853,7 @@
               {
                 "tenor_years": 7.066666666666666,
                 "sensitivity": {
-                  "amount": "-0.00962016822143141",
+                  "amount": "-0.00962016822052192",
                   "currency": "USD"
                 },
                 "market_move": 150
@@ -868,7 +868,7 @@
               }
             ],
             "explained_pnl": {
-              "amount": "-63.5046028625197",
+              "amount": "-63.5046028977001",
               "currency": "USD"
             }
           },
@@ -920,7 +920,7 @@
           "num_repricings": 2,
           "tolerance_abs": 10,
           "tolerance_pct": 1,
-          "residual_pct": -4.935209294510255,
+          "residual_pct": -4.935209352734186,
           "rounding": {
             "mode": "bankers",
             "ingest_scale_by_currency": {},
@@ -960,10 +960,10 @@
         {
           "field": "credit_curves_pnl",
           "amount": {
-            "amount": "-63.5046028625197",
+            "amount": "-63.5046028977001",
             "currency": "USD"
           },
-          "pct_of_total": 105.10078463311152
+          "pct_of_total": 105.10078469133548
         },
         {
           "field": "inflation_curves_pnl",
@@ -1032,10 +1032,10 @@
         {
           "field": "residual",
           "amount": {
-            "amount": "2.9819806520507349",
+            "amount": "2.9819806872311349",
             "currency": "USD"
           },
-          "pct_of_total": -4.935209294510255
+          "pct_of_total": -4.935209352734186
         }
       ]
     },
@@ -1070,7 +1070,7 @@
           "currency": "USD"
         },
         "credit_curves_pnl": {
-          "amount": "-63.5046028625197",
+          "amount": "-63.5046028977001",
           "currency": "USD"
         },
         "inflation_curves_pnl": {
@@ -1106,7 +1106,7 @@
           "currency": "USD"
         },
         "residual": {
-          "amount": "2.9819806520507349",
+          "amount": "2.9819806872311349",
           "currency": "USD"
         },
         "carry_detail": {
@@ -1242,7 +1242,7 @@
               {
                 "tenor_years": 0.9805555555555555,
                 "sensitivity": {
-                  "amount": "-0.000996439775008184",
+                  "amount": "-0.000996439531945725",
                   "currency": "USD"
                 },
                 "market_move": 150
@@ -1250,7 +1250,7 @@
               {
                 "tenor_years": 3.0083333333333333,
                 "sensitivity": {
-                  "amount": "-0.004392960218524422",
+                  "amount": "-0.004392961006033147",
                   "currency": "USD"
                 },
                 "market_move": 150
@@ -1258,7 +1258,7 @@
               {
                 "tenor_years": 5.038888888888889,
                 "sensitivity": {
-                  "amount": "-0.4083544508685009",
+                  "amount": "-0.4083544505595",
                   "currency": "USD"
                 },
                 "market_move": 150
@@ -1266,7 +1266,7 @@
               {
                 "tenor_years": 7.066666666666666,
                 "sensitivity": {
-                  "amount": "-0.00962016822143141",
+                  "amount": "-0.00962016822052192",
                   "currency": "USD"
                 },
                 "market_move": 150
@@ -1281,7 +1281,7 @@
               }
             ],
             "explained_pnl": {
-              "amount": "-63.5046028625197",
+              "amount": "-63.5046028977001",
               "currency": "USD"
             }
           },
@@ -1345,7 +1345,7 @@
           "num_repricings": 29,
           "tolerance_abs": 10,
           "tolerance_pct": 5,
-          "residual_pct": -4.935209294510255,
+          "residual_pct": -4.935209352734186,
           "rounding": {
             "mode": "bankers",
             "ingest_scale_by_currency": {},
@@ -1385,10 +1385,10 @@
         {
           "field": "credit_curves_pnl",
           "amount": {
-            "amount": "-63.5046028625197",
+            "amount": "-63.5046028977001",
             "currency": "USD"
           },
-          "pct_of_total": 105.10078463311152
+          "pct_of_total": 105.10078469133548
         },
         {
           "field": "inflation_curves_pnl",
@@ -1457,10 +1457,10 @@
         {
           "field": "residual",
           "amount": {
-            "amount": "2.9819806520507349",
+            "amount": "2.9819806872311349",
             "currency": "USD"
           },
-          "pct_of_total": -4.935209294510255
+          "pct_of_total": -4.935209352734186
         }
       ]
     }

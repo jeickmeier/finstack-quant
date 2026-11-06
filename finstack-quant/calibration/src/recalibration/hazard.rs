@@ -24,6 +24,9 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
 
+#[cfg(test)]
+thread_local! {static HAZARD_REPLAY_CALLS: std::cell::Cell<usize> = const {std::cell::Cell::new(0)};}
+
 #[derive(Clone, Copy)]
 struct HazardParRecalibration<'a> {
     hazard: &'a HazardCurve,
@@ -72,17 +75,38 @@ fn hazard_bump_key(request: &HazardParRecalibration<'_>) -> HazardBumpKey {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-struct HazardRecalibrationKey {
-    hazard_id: String,
-    discount_id: String,
-    discount_fingerprint: String,
-    identity_discount_fingerprint: Option<String>,
-    recovery_rate: u64,
+struct HazardDependencies {
+    discount: String,
+    // Global calibration uses this market curve for initial guesses. Bootstrap
+    // does not, but a conservative dependency keeps recipe dispatch explicit.
+    seed: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+struct HazardSourceKey {
+    source: String,
+    discount_id: CurveId,
+    dependencies: HazardDependencies,
     doc_clause: Option<CdsDocClause>,
     cds_valuation_convention: Option<CdsValuationConvention>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+struct HazardRecalibrationKey {
+    source: HazardSourceKey,
+    target: HazardDependencies,
+    distinct_identity_context: bool,
+    recovery_rate: u64,
     bump: HazardBumpKey,
-    /// Canonical hash of the complete source curve, including replay and FX policy.
-    source_fingerprint: String,
+    replay_spread_risk_center: bool,
+}
+
+struct ValidatedHazardSource {
+    params: HazardCurveParams,
+    calibration_inputs: Vec<ReplayQuote>,
+    spread_risk_inputs: Vec<ReplayQuote>,
+    config: CalibrationConfig,
+    replayed_base: HazardCurve,
 }
 
 /// Batch-local cache for hazard-curve recalibrations used by spread risk and
@@ -99,45 +123,66 @@ struct HazardRecalibrationKey {
 #[derive(Default)]
 pub(crate) struct HazardRecalibrationCache {
     entries: KeyedOnceCache<HazardRecalibrationKey, HazardCurve>,
+    sources: KeyedOnceCache<HazardSourceKey, ValidatedHazardSource>,
 }
 
 impl std::fmt::Debug for HazardRecalibrationCache {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("HazardRecalibrationCache")
             .field("entries", &self.entries.len())
+            .field("sources", &self.sources.len())
             .finish()
     }
 }
 
-fn discount_fingerprint(
+fn hazard_dependencies(
     context: &MarketContext,
-    id: &CurveId,
-) -> finstack_quant_core::Result<String> {
-    finstack_quant_core::canonical::content_hash(context.get_discount(id)?.as_ref())
+    discount_id: &CurveId,
+    hazard_id: &CurveId,
+) -> finstack_quant_core::Result<HazardDependencies> {
+    Ok(HazardDependencies {
+        discount: finstack_quant_core::canonical::content_hash(
+            context.get_discount(discount_id)?.as_ref(),
+        )?,
+        seed: context
+            .get_hazard(hazard_id)
+            .ok()
+            .map(|curve| finstack_quant_core::canonical::content_hash(curve.as_ref()))
+            .transpose()?,
+    })
 }
 
-/// Recalibrate `request`, memoising through its batch-local cache.
+/// Recalibrate `request`, sharing validated source replay across distinct bumps.
 fn recalibrate_from_par_spreads_cached(
     cache: &HazardRecalibrationCache,
     request: HazardParRecalibration<'_>,
 ) -> finstack_quant_core::Result<Arc<HazardCurve>> {
-    let key = HazardRecalibrationKey {
-        hazard_id: request.hazard.id().to_string(),
-        discount_id: request.discount_id.to_string(),
-        discount_fingerprint: discount_fingerprint(request.context, request.discount_id)?,
-        identity_discount_fingerprint: request
-            .identity_context
-            .map(|context| discount_fingerprint(context, request.discount_id))
-            .transpose()?,
-        recovery_rate: request.recovery_rate.to_bits(),
+    let target = hazard_dependencies(request.context, request.discount_id, request.hazard.id())?;
+    let dependencies = match request.identity_context {
+        Some(context) => hazard_dependencies(context, request.discount_id, request.hazard.id())?,
+        None => target.clone(),
+    };
+    let source = HazardSourceKey {
+        source: finstack_quant_core::canonical::content_hash(request.hazard)?,
+        discount_id: request.discount_id.clone(),
+        dependencies,
         doc_clause: request.doc_clause,
         cds_valuation_convention: request.cds_valuation_convention,
-        bump: hazard_bump_key(&request),
-        source_fingerprint: finstack_quant_core::canonical::content_hash(request.hazard)?,
     };
-    cache
-        .entries
-        .get_or_compute(key, || recalibrate_from_par_spreads(request))
+    let key = HazardRecalibrationKey {
+        source: source.clone(),
+        target,
+        distinct_identity_context: request.identity_context.is_some(),
+        recovery_rate: request.recovery_rate.to_bits(),
+        bump: hazard_bump_key(&request),
+        replay_spread_risk_center: request.replay_spread_risk_center,
+    };
+    cache.entries.get_or_compute(key, || {
+        let validated = cache
+            .sources
+            .get_or_compute(source, || validate_replay_source(request))?;
+        replay_from_source(request, &validated)
+    })
 }
 
 pub(super) fn get_hazard_discount_curve_id(
@@ -350,6 +395,8 @@ fn replay_once(
         })
         .collect::<finstack_quant_core::Result<Vec<_>>>()?;
     let step = StepParams::Hazard(params.clone());
+    #[cfg(test)]
+    HAZARD_REPLAY_CALLS.set(HAZARD_REPLAY_CALLS.get() + 1);
     let (context, report) =
         step_runtime::execute_params_and_apply(&step, &market_quotes, request.context, config)?;
     ensure_replay_fit_accepted(params.curve_id.as_str(), config, &report)?;
@@ -411,9 +458,9 @@ fn same_doc_clause_family(
     Ok(family(requested) == family(stored))
 }
 
-fn recalibrate_from_par_spreads(
+fn validate_replay_source(
     request: HazardParRecalibration<'_>,
-) -> finstack_quant_core::Result<HazardCurve> {
+) -> finstack_quant_core::Result<ValidatedHazardSource> {
     let (params, calibration_inputs, spread_risk_inputs, config) = recipe_inputs(request.hazard)?;
     if &params.curve_id != request.hazard.id() {
         return Err(finstack_quant_core::Error::Validation(format!(
@@ -466,6 +513,33 @@ fn recalibrate_from_par_spreads(
     )?;
     require_zero_shock_identity(request.hazard, &replayed_base)?;
 
+    Ok(ValidatedHazardSource {
+        params,
+        calibration_inputs,
+        spread_risk_inputs,
+        config,
+        replayed_base,
+    })
+}
+
+fn recalibrate_from_par_spreads(
+    request: HazardParRecalibration<'_>,
+) -> finstack_quant_core::Result<HazardCurve> {
+    let source = validate_replay_source(request)?;
+    replay_from_source(request, &source)
+}
+
+fn replay_from_source(
+    request: HazardParRecalibration<'_>,
+    source: &ValidatedHazardSource,
+) -> finstack_quant_core::Result<HazardCurve> {
+    let ValidatedHazardSource {
+        params,
+        calibration_inputs,
+        spread_risk_inputs,
+        config,
+        replayed_base,
+    } = source;
     if let Some((index, _)) = request.exact_spread_bump
         && index >= spread_risk_inputs.len()
     {
@@ -483,22 +557,22 @@ fn recalibrate_from_par_spreads(
         && !request.replay_spread_risk_center
         && request.identity_context.is_none()
     {
-        return Ok(replayed_base);
+        return Ok(replayed_base.clone());
     }
     let replay_inputs = if request.replay_spread_risk_center
         || request.spread_bump.is_some()
         || request.exact_spread_bump.is_some()
         || request.recovery_rate.to_bits() != params.recovery_rate.to_bits()
     {
-        &spread_risk_inputs
+        spread_risk_inputs
     } else {
-        &calibration_inputs
+        calibration_inputs
     };
     replay_once(
         &request,
-        params,
+        params.clone(),
         replay_inputs,
-        &config,
+        config,
         request.spread_bump,
         request.exact_spread_bump,
     )
@@ -511,14 +585,18 @@ pub(crate) fn bump_hazard_on_target_market(
     hazard: &HazardCurve,
     bump: &QuoteBump,
 ) -> finstack_quant_core::Result<Arc<HazardCurve>> {
-    let source_discount = request
-        .source_market
-        .get_discount(&request.discount_curve_id)?;
-    let target_discount = request
-        .target_market
-        .get_discount(&request.discount_curve_id)?;
-    let identity_context = (!Arc::ptr_eq(&source_discount, &target_discount))
-        .then_some(request.source_market.as_ref());
+    let source_dependencies = hazard_dependencies(
+        &request.source_market,
+        &request.discount_curve_id,
+        hazard.id(),
+    )?;
+    let target_dependencies = hazard_dependencies(
+        &request.target_market,
+        &request.discount_curve_id,
+        hazard.id(),
+    )?;
+    let identity_context =
+        (source_dependencies != target_dependencies).then_some(request.source_market.as_ref());
     recalibrate_from_par_spreads_cached(
         cache,
         HazardParRecalibration {
@@ -1110,6 +1188,277 @@ mod tests {
         assert_eq!(
             low_then_high, high_then_low,
             "cache results must be independent of deal evaluation order"
+        );
+    }
+    fn source_cache_fixture() -> (MarketContext, Arc<HazardCurve>, CurveId) {
+        let envelope = crate::api::validate::parse_envelope(include_str!(
+            "../../examples/market_bootstrap/03_single_name_hazard.json"
+        ))
+        .expect("fixture");
+        let output = crate::api::engine::calibrate(&envelope).expect("fit");
+        assert!(output.result.report.success);
+        let market = MarketContext::try_from(output.result.final_market).expect("market");
+        let hazard = market.get_hazard("ISSUER-A-CDS").expect("hazard");
+        (market, hazard, CurveId::new("USD-OIS"))
+    }
+
+    #[test]
+    fn source_cache_shares_identity_across_bucket_order_and_zero_bumps() {
+        let (market, hazard, discount_id) = source_cache_fixture();
+        let request = HazardParRecalibration {
+            hazard: &hazard,
+            context: &market,
+            identity_context: None,
+            discount_id: &discount_id,
+            recovery_rate: hazard.recovery_rate(),
+            doc_clause: None,
+            cds_valuation_convention: None,
+            spread_bump: None,
+            exact_spread_bump: None,
+            replay_spread_risk_center: false,
+        };
+        let expected: Vec<_> = (0..5)
+            .map(|index| {
+                recalibrate_from_par_spreads(HazardParRecalibration {
+                    exact_spread_bump: Some((index, 1.0)),
+                    ..request
+                })
+                .expect("uncached")
+            })
+            .collect();
+        HAZARD_REPLAY_CALLS.set(0);
+        let cache = HazardRecalibrationCache::default();
+        let actual: Vec<_> = (0..5)
+            .map(|index| {
+                recalibrate_from_par_spreads_cached(
+                    &cache,
+                    HazardParRecalibration {
+                        exact_spread_bump: Some((index, 1.0)),
+                        ..request
+                    },
+                )
+                .expect("cached")
+            })
+            .collect();
+        assert_eq!(
+            HAZARD_REPLAY_CALLS.get(),
+            6,
+            "B+1 actual full replay solves"
+        );
+        for index in (0..5).rev() {
+            let again = recalibrate_from_par_spreads_cached(
+                &cache,
+                HazardParRecalibration {
+                    exact_spread_bump: Some((index, 1.0)),
+                    ..request
+                },
+            )
+            .expect("repeat");
+            assert!(Arc::ptr_eq(&again, &actual[index]));
+            assert_eq!(
+                finstack_quant_core::canonical::content_hash(actual[index].as_ref()).expect("hash"),
+                finstack_quant_core::canonical::content_hash(&expected[index]).expect("hash")
+            );
+        }
+        let zero = recalibrate_from_par_spreads_cached(&cache, request).expect("zero");
+        require_zero_shock_identity(&hazard, &zero).expect("identity");
+        assert_eq!(HAZARD_REPLAY_CALLS.get(), 6, "zero and hits do not replay");
+        assert_eq!(cache.sources.len(), 1);
+        let invalid = HazardParRecalibration {
+            exact_spread_bump: Some((100, 1.0)),
+            ..request
+        };
+        let first = recalibrate_from_par_spreads_cached(&cache, invalid)
+            .expect_err("bad index")
+            .to_string();
+        let second = recalibrate_from_par_spreads_cached(&cache, invalid)
+            .expect_err("retry bad index")
+            .to_string();
+        assert_eq!(first, second);
+        assert_eq!(HAZARD_REPLAY_CALLS.get(), 6);
+    }
+
+    #[test]
+    fn source_cache_concurrent_distinct_and_duplicate_bumps_solve_b_plus_one() {
+        let (market, hazard, discount_id) = source_cache_fixture();
+        let cache = HazardRecalibrationCache::default();
+        let results = std::thread::scope(|scope| {
+            let workers: Vec<_> = (0..10)
+                .map(|i| {
+                    let (market, hazard, discount_id, cache) =
+                        (&market, &hazard, &discount_id, &cache);
+                    scope.spawn(move || {
+                        HAZARD_REPLAY_CALLS.set(0);
+                        let curve = recalibrate_from_par_spreads_cached(
+                            cache,
+                            HazardParRecalibration {
+                                hazard,
+                                context: market,
+                                identity_context: None,
+                                discount_id,
+                                recovery_rate: hazard.recovery_rate(),
+                                doc_clause: None,
+                                cds_valuation_convention: None,
+                                spread_bump: None,
+                                exact_spread_bump: Some((i % 5, 1.0)),
+                                replay_spread_risk_center: false,
+                            },
+                        )
+                        .expect("concurrent fit");
+                        (curve, HAZARD_REPLAY_CALLS.get())
+                    })
+                })
+                .collect();
+            workers
+                .into_iter()
+                .map(|w| w.join().expect("worker"))
+                .collect::<Vec<_>>()
+        });
+        assert_eq!(results.iter().map(|(_, calls)| calls).sum::<usize>(), 6);
+        assert_eq!(cache.sources.len(), 1);
+        for i in 0..5 {
+            assert!(Arc::ptr_eq(&results[i].0, &results[i + 5].0));
+        }
+    }
+
+    #[test]
+    fn source_cache_separates_identity_and_target_dependencies_and_retries_failures() {
+        use finstack_quant_core::market_data::term_structures::DiscountCurve;
+        let (market, hazard, discount_id) = source_cache_fixture();
+        let cache = HazardRecalibrationCache::default();
+        let request = HazardParRecalibration {
+            hazard: &hazard,
+            context: &market,
+            identity_context: None,
+            discount_id: &discount_id,
+            recovery_rate: hazard.recovery_rate(),
+            doc_clause: None,
+            cds_valuation_convention: None,
+            spread_bump: None,
+            exact_spread_bump: Some((0, 1.0)),
+            replay_spread_risk_center: false,
+        };
+        let base = recalibrate_from_par_spreads_cached(&cache, request).expect("warm");
+        let replacement = DiscountCurve::builder(discount_id.clone())
+            .base_date(hazard.base_date())
+            .knots([(0.0, 1.0), (20.0, 0.7)])
+            .build()
+            .expect("discount");
+        let changed = market.clone().insert(replacement);
+        HAZARD_REPLAY_CALLS.set(0);
+        let shocked = recalibrate_from_par_spreads_cached(
+            &cache,
+            HazardParRecalibration {
+                context: &changed,
+                identity_context: Some(&market),
+                ..request
+            },
+        )
+        .expect("target discount");
+        assert_eq!(
+            HAZARD_REPLAY_CALLS.get(),
+            1,
+            "identity uses original market and is reused"
+        );
+        assert_eq!(cache.sources.len(), 1);
+        assert_ne!(
+            base.knot_points().collect::<Vec<_>>(),
+            shocked.knot_points().collect::<Vec<_>>()
+        );
+        let wrong_identity = HazardParRecalibration {
+            identity_context: Some(&changed),
+            ..request
+        };
+        HAZARD_REPLAY_CALLS.set(0);
+        let first = recalibrate_from_par_spreads_cached(&cache, wrong_identity)
+            .expect_err("identity changed")
+            .to_string();
+        let second = recalibrate_from_par_spreads_cached(&cache, wrong_identity)
+            .expect_err("failed identity retries")
+            .to_string();
+        assert_eq!(first, second);
+        assert!(first.contains("zero-shock hazard replay"));
+        assert_eq!(
+            HAZARD_REPLAY_CALLS.get(),
+            2,
+            "failed computations are not cached"
+        );
+        assert!(Arc::ptr_eq(
+            &base,
+            &recalibrate_from_par_spreads_cached(&cache, request).expect("healthy key")
+        ));
+
+        let different_seed = market
+            .clone()
+            .insert(hazard.with_parallel_hazard_rate_bump_bp(1.0).expect("seed"));
+        HAZARD_REPLAY_CALLS.set(0);
+        recalibrate_from_par_spreads_cached(
+            &cache,
+            HazardParRecalibration {
+                context: &different_seed,
+                identity_context: Some(&market),
+                ..request
+            },
+        )
+        .expect("target seed");
+        assert_eq!(
+            HAZARD_REPLAY_CALLS.get(),
+            1,
+            "target seed invalidates only target result"
+        );
+        HAZARD_REPLAY_CALLS.set(0);
+        recalibrate_from_par_spreads_cached(
+            &cache,
+            HazardParRecalibration {
+                context: &different_seed,
+                ..request
+            },
+        )
+        .expect("identity seed");
+        assert_eq!(
+            HAZARD_REPLAY_CALLS.get(),
+            2,
+            "identity seed invalidates source proof"
+        );
+        HAZARD_REPLAY_CALLS.set(0);
+        let recovery = recalibrate_from_par_spreads_cached(
+            &cache,
+            HazardParRecalibration {
+                recovery_rate: 0.3,
+                ..request
+            },
+        )
+        .expect("recovery target");
+        assert_eq!(
+            HAZARD_REPLAY_CALLS.get(),
+            1,
+            "target recovery shares source proof"
+        );
+        assert_eq!(recovery.recovery_rate(), 0.3);
+
+        HAZARD_REPLAY_CALLS.set(0);
+        recalibrate_from_par_spreads_cached(
+            &cache,
+            HazardParRecalibration {
+                exact_spread_bump: None,
+                ..request
+            },
+        )
+        .expect("zero");
+        assert_eq!(HAZARD_REPLAY_CALLS.get(), 0);
+        recalibrate_from_par_spreads_cached(
+            &cache,
+            HazardParRecalibration {
+                exact_spread_bump: None,
+                replay_spread_risk_center: true,
+                ..request
+            },
+        )
+        .expect("risk center");
+        assert_eq!(
+            HAZARD_REPLAY_CALLS.get(),
+            1,
+            "risk-center mode has a distinct result key"
         );
     }
 }
