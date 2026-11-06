@@ -181,6 +181,15 @@
       "type_name": "CosConfig"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/models/1/cos_market_params.schema.json",
+      "bytes": 1878,
+      "kind": "input",
+      "path": "schemas/models/1/cos_market_params.schema.json",
+      "summary": "Option and market inputs of the COS Fourier pricers.",
+      "title": "CosMarketParams",
+      "type_name": "CosMarketParams"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/models/1/credit_exposure.schema.json",
       "bytes": 1145,
       "kind": "component",
@@ -325,6 +334,15 @@
       "type_name": "ForwardGreeks"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/models/1/gbm_european_fd_spec.schema.json",
+      "bytes": 22576,
+      "kind": "input",
+      "path": "schemas/models/1/gbm_european_fd_spec.schema.json",
+      "summary": "Inputs of the GBM European Monte Carlo finite-difference Greeks.",
+      "title": "GbmEuropeanFdSpec",
+      "type_name": "GbmEuropeanFdSpec"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/models/1/gbm_params.schema.json",
       "bytes": 703,
       "kind": "input",
@@ -332,6 +350,15 @@
       "summary": "Geometric Brownian Motion parameters.",
       "title": "GbmParams",
       "type_name": "GbmParams"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/heston_mc_settings.schema.json",
+      "bytes": 20568,
+      "kind": "input",
+      "path": "schemas/models/1/heston_mc_settings.schema.json",
+      "summary": "Monte Carlo run settings of the Heston European pricer.",
+      "title": "HestonMcSettings",
+      "type_name": "HestonMcSettings"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/heston_params.schema.json",
@@ -604,6 +631,15 @@
       "type_name": "OptionCalculationResult"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/models/1/option_market_params.schema.json",
+      "bytes": 1898,
+      "kind": "input",
+      "path": "schemas/models/1/option_market_params.schema.json",
+      "summary": "Spot, strike, rates, volatility, expiry and payoff direction of an option model call.",
+      "title": "OptionMarketParams",
+      "type_name": "OptionMarketParams"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/models/1/option_type.schema.json",
       "bytes": 468,
       "kind": "component",
@@ -731,7 +767,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/recovery_claim.schema.json",
-      "bytes": 1556,
+      "bytes": 1589,
       "kind": "component",
       "path": "schemas/models/1/recovery_claim.schema.json",
       "summary": "A claim participating in a recovery waterfall.",
@@ -911,7 +947,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/trade_params.schema.json",
-      "bytes": 5814,
+      "bytes": 5889,
       "kind": "input",
       "path": "schemas/models/1/trade_params.schema.json",
       "summary": "Input parameters for a market impact calculation.",

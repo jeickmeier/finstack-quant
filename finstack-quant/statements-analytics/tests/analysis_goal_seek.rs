@@ -5,7 +5,7 @@ use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::{AmountOrScalar, ForecastSpec};
-use finstack_quant_statements_analytics::analysis::goal_seek;
+use finstack_quant_statements_analytics::analysis::{GoalSeekSpec, goal_seek};
 
 #[test]
 fn test_goal_seek_simple_linear() {
@@ -27,13 +27,15 @@ fn test_goal_seek_simple_linear() {
 
     let solved = goal_seek(
         &model,
-        "net_income",
-        period,
-        20_000.0,
-        "revenue",
-        period,
-        false,
-        None,
+        &GoalSeekSpec {
+            target_node: "net_income".to_string(),
+            target_period: period,
+            target_value: 20_000.0,
+            driver_node: "revenue".to_string(),
+            driver_period: period,
+            update_model: false,
+            bounds: None,
+        },
     )
     .expect("goal seek should succeed");
 
@@ -64,13 +66,15 @@ fn test_goal_seek_with_update() {
 
     let solved = goal_seek(
         &model,
-        "gross_profit",
-        period,
-        50_000.0,
-        "revenue",
-        period,
-        true,
-        None,
+        &GoalSeekSpec {
+            target_node: "gross_profit".to_string(),
+            target_period: period,
+            target_value: 50_000.0,
+            driver_node: "revenue".to_string(),
+            driver_period: period,
+            update_model: true,
+            bounds: None,
+        },
     )
     .expect("goal seek should succeed");
 
@@ -125,13 +129,15 @@ fn test_goal_seek_interest_coverage() {
 
     let solved = goal_seek(
         &model,
-        "interest_coverage",
-        q4,
-        2.0,
-        "revenue",
-        q4,
-        true,
-        None,
+        &GoalSeekSpec {
+            target_node: "interest_coverage".to_string(),
+            target_period: q4,
+            target_value: 2.0,
+            driver_node: "revenue".to_string(),
+            driver_period: q4,
+            update_model: true,
+            bounds: None,
+        },
     )
     .expect("goal seek should succeed");
 
@@ -162,13 +168,15 @@ fn test_goal_seek_invalid_target_node() {
 
     let result = goal_seek(
         &model,
-        "nonexistent",
-        period,
-        1000.0,
-        "revenue",
-        period,
-        false,
-        None,
+        &GoalSeekSpec {
+            target_node: "nonexistent".to_string(),
+            target_period: period,
+            target_value: 1000.0,
+            driver_node: "revenue".to_string(),
+            driver_period: period,
+            update_model: false,
+            bounds: None,
+        },
     );
 
     assert!(result.is_err());
@@ -188,13 +196,15 @@ fn test_goal_seek_invalid_driver_node() {
 
     let result = goal_seek(
         &model,
-        "revenue",
-        period,
-        1000.0,
-        "nonexistent",
-        period,
-        false,
-        None,
+        &GoalSeekSpec {
+            target_node: "revenue".to_string(),
+            target_period: period,
+            target_value: 1000.0,
+            driver_node: "nonexistent".to_string(),
+            driver_period: period,
+            update_model: false,
+            bounds: None,
+        },
     );
 
     assert!(result.is_err());
@@ -217,13 +227,15 @@ fn test_goal_seek_with_explicit_bounds() {
 
     let solution = goal_seek(
         &model,
-        "target",
-        period,
-        0.75,
-        "driver",
-        period,
-        false,
-        Some((0.5, 1.5)),
+        &GoalSeekSpec {
+            target_node: "target".to_string(),
+            target_period: period,
+            target_value: 0.75,
+            driver_node: "driver".to_string(),
+            driver_period: period,
+            update_model: false,
+            bounds: Some((0.5, 1.5)),
+        },
     )
     .expect("goal seek should succeed");
 
@@ -258,13 +270,15 @@ fn test_goal_seek_reports_residual_and_evaluations() {
 
     let solved = goal_seek(
         &model,
-        "gross_profit",
-        period,
-        target,
-        "revenue",
-        period,
-        true,
-        None,
+        &GoalSeekSpec {
+            target_node: "gross_profit".to_string(),
+            target_period: period,
+            target_value: target,
+            driver_node: "revenue".to_string(),
+            driver_period: period,
+            update_model: true,
+            bounds: None,
+        },
     )
     .expect("goal seek should succeed");
 
@@ -310,7 +324,16 @@ fn test_goal_seek_result_wire_form() {
     };
 
     let bare = goal_seek(
-        &model, "profit", period, 60.0, "revenue", period, false, None,
+        &model,
+        &GoalSeekSpec {
+            target_node: "profit".to_string(),
+            target_period: period,
+            target_value: 60.0,
+            driver_node: "revenue".to_string(),
+            driver_period: period,
+            update_model: false,
+            bounds: None,
+        },
     )
     .expect("goal seek should succeed");
     let json = serde_json::to_value(&bare).expect("serialize");
@@ -318,7 +341,16 @@ fn test_goal_seek_result_wire_form() {
     assert!((json["solved_value"].as_f64().expect("number") - 120.0).abs() < 1e-6);
 
     let updated = goal_seek(
-        &model, "profit", period, 60.0, "revenue", period, true, None,
+        &model,
+        &GoalSeekSpec {
+            target_node: "profit".to_string(),
+            target_period: period,
+            target_value: 60.0,
+            driver_node: "revenue".to_string(),
+            driver_period: period,
+            update_model: true,
+            bounds: None,
+        },
     )
     .expect("goal seek should succeed");
     let text = serde_json::to_string(&updated).expect("serialize");

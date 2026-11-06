@@ -2,7 +2,8 @@ import * as wasm from '../pkg/finstack_quant_wasm.js';
 import { schema } from './portfolio/schema.js';
 
 // Rust `Portfolio::from_materialization` / `validate_materialization` borrow a
-// cache; the published statics make it optional. wasm-bindgen 0.2.126 cannot
+// cache; the published statics make it optional (the Rust parameter is
+// declared optional for TypeScript). wasm-bindgen 0.2.130 cannot
 // express an optional borrowed handle (`Option<&T>`), and an owned
 // `Option<InstrumentArtifactCache>` would consume the caller's reusable JS
 // handle, so the omitted case lives here. Omitted, `undefined` or `null` means
@@ -30,6 +31,17 @@ wasm.Portfolio.validateMaterialization = withCache(
   wasm.Portfolio.validateMaterialization.bind(wasm.Portfolio)
 );
 
+/**
+ * Namespaced TypeScript entry points for portfolio calculations and types.
+ * @example
+ * ```typescript
+ * import init, { portfolio } from "finstack-quant-wasm";
+ * await init();
+ * const cache = new portfolio.InstrumentArtifactCache(32);
+ * console.log(cache.size);
+ * cache.free();
+ * ```
+ */
 export const portfolio = {
   InstrumentArtifactCache: wasm.InstrumentArtifactCache,
   Portfolio: wasm.Portfolio,

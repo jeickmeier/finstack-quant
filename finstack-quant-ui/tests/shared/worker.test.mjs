@@ -8,6 +8,7 @@ import { formatMoney, formatRawMoney } from "../../src/format/format";
 import { priceOptions } from "@/hooks/valuations/use-price-instrument/use-price-instrument";
 import { errorValue, unwrap } from "@/workers/finstack-contract";
 import { budget } from "./budget.ts";
+import { priceExtras } from "./price-extras.mjs";
 const native = createRequire(import.meta.url)(
   "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
 );
@@ -50,13 +51,15 @@ function direct(request) {
     return {
       ok: true,
       value: native.priceInstrument(
-        request.instrumentJson,
+        native.validateInstrumentJson(
+          request.instrumentJson,
+          request.metricPricingOverrides,
+        ),
         request.marketJson,
         request.asOf,
         request.model,
         request.metrics,
-        request.metricPricingOverrides,
-        request.marketHistory,
+        priceExtras({ marketHistory: request.marketHistory }),
       ),
     };
   } catch (error) {

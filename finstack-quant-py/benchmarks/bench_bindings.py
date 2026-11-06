@@ -649,15 +649,15 @@ class TestMonteCarloBenchmarks:
         pricer = LsmcPricer(num_paths=5_000, seed=42, num_steps=50)
 
         def _price():
-            return pricer.price_american(
-                spot=100.0,
-                strike=100.0,
-                rate=0.05,
-                div_yield=0.0,
-                vol=0.3,
-                expiry=1.0,
-                is_call=False,
-            )
+            return pricer.price_american({
+                "spot": 100.0,
+                "strike": 100.0,
+                "rate": 0.05,
+                "dividend_yield": 0.0,
+                "volatility": 0.3,
+                "time_to_expiry": 1.0,
+                "option_type": "put",
+            })
 
         benchmark.pedantic(_price, rounds=5, warmup_rounds=1)
 
@@ -666,14 +666,16 @@ class TestMonteCarloBenchmarks:
 
         def _price():
             return pricer.price_gbm(
-                spot=100.0,
-                strike=100.0,
-                rate=0.05,
-                div_yield=0.0,
-                vol=0.2,
-                expiry=1.0,
+                {
+                    "spot": 100.0,
+                    "strike": 100.0,
+                    "rate": 0.05,
+                    "dividend_yield": 0.0,
+                    "volatility": 0.2,
+                    "time_to_expiry": 1.0,
+                    "option_type": "call",
+                },
                 num_steps=252,
-                is_call=True,
             )
 
         benchmark.pedantic(_price, rounds=5, warmup_rounds=1)
@@ -683,14 +685,16 @@ class TestMonteCarloBenchmarks:
 
         def _price():
             return pricer.price_asian(
-                spot=100.0,
-                strike=100.0,
-                rate=0.05,
-                div_yield=0.0,
-                vol=0.2,
-                expiry=1.0,
+                {
+                    "spot": 100.0,
+                    "strike": 100.0,
+                    "rate": 0.05,
+                    "dividend_yield": 0.0,
+                    "volatility": 0.2,
+                    "time_to_expiry": 1.0,
+                    "option_type": "call",
+                },
                 num_steps=50,
-                is_call=True,
             )
 
         benchmark.pedantic(_price, rounds=5, warmup_rounds=1)
@@ -833,12 +837,14 @@ class TestStatementsAnalyticsBenchmarks:
         def _seek():
             return goal_seek(
                 _MODEL_JSON,
-                target_node="gross_profit",
-                target_period="2025Q1",
-                target_value=50.0,
-                driver_node="revenue",
-                driver_period="2025Q1",
-                update_model=False,
+                {
+                    "target_node": "gross_profit",
+                    "target_period": "2025Q1",
+                    "target_value": 50.0,
+                    "driver_node": "revenue",
+                    "driver_period": "2025Q1",
+                    "update_model": False,
+                },
             )
 
         benchmark.pedantic(_seek, rounds=10, warmup_rounds=1)
@@ -847,12 +853,14 @@ class TestStatementsAnalyticsBenchmarks:
         def _seek():
             return goal_seek(
                 _MODEL_SPEC,
-                target_node="gross_profit",
-                target_period="2025Q1",
-                target_value=50.0,
-                driver_node="revenue",
-                driver_period="2025Q1",
-                update_model=False,
+                {
+                    "target_node": "gross_profit",
+                    "target_period": "2025Q1",
+                    "target_value": 50.0,
+                    "driver_node": "revenue",
+                    "driver_period": "2025Q1",
+                    "update_model": False,
+                },
             )
 
         benchmark.pedantic(_seek, rounds=10, warmup_rounds=1)

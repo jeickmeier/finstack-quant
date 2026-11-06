@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import init, { core, scenarios, valuations } from '../../index.js';
+import init, { scenarios, valuations } from '../../index.js';
 
 await init({
   module_or_path: readFileSync(new URL('../../pkg/finstack_quant_wasm_bg.wasm', import.meta.url)),
@@ -40,17 +40,17 @@ test('time roll preserves the raw crossed fixing and supports repeated rolls', (
     [1, 1],
     [10, 1],
   ];
-  const bond = valuations.instruments.Bond.floating(
-    'ROLL-FRN',
-    new core.Money(1000000, new core.Currency('USD')),
-    'USD-SOFR-3M',
-    new core.Bps(150),
-    '2025-01-03',
-    '2026-01-03',
-    core.Tenor.quarterly(),
-    core.DayCount.act360(),
-    'USD-OIS'
-  );
+  const bond = valuations.instruments.Bond.floating({
+    id: 'ROLL-FRN',
+    notional: { amount: '1000000', currency: 'USD' },
+    forward_curve_id: 'USD-SOFR-3M',
+    spread_bp: 150,
+    issue_date: '2025-01-03',
+    maturity: '2026-01-03',
+    frequency: { count: 3, unit: 'months' },
+    day_count: 'act_360',
+    discount_curve_id: 'USD-OIS',
+  });
   const instrument = JSON.parse(bond.toJson());
   instrument.instrument.spec.cashflow_spec.floating.rate_spec.reset_lag_days = 0;
   f.market.curves.push({

@@ -297,15 +297,17 @@ fn b12_dm_inversion_applies_settlement_once() {
     use std::sync::Arc;
     let as_of = date!(2025 - 01 - 01);
     let mut bond = Bond::floating(
-        "DM-SETTLEMENT",
-        Money::from((1_000_000_i64, Currency::USD)),
-        "USD-SOFR-3M",
-        150,
-        date!(2025 - 01 - 03),
-        date!(2028 - 01 - 03),
-        Tenor::quarterly(),
-        DayCount::Act360,
-        "USD-OIS",
+        finstack_quant_valuations::instruments::fixed_income::bond::FloatingBondParams {
+            id: "DM-SETTLEMENT".into(),
+            notional: Money::from((1_000_000_i64, Currency::USD)),
+            forward_curve_id: "USD-SOFR-3M".into(),
+            spread_bp: 150.into(),
+            issue_date: date!(2025 - 01 - 03),
+            maturity: date!(2028 - 01 - 03),
+            frequency: Tenor::quarterly(),
+            day_count: DayCount::Act360,
+            discount_curve_id: "USD-OIS".into(),
+        },
     )
     .expect("bond");
     assert!(bond.settlement_convention.is_some());
@@ -576,17 +578,19 @@ fn b2_cap_auto_uses_normal_quote_metadata_and_rejects_black_mismatch() {
                 .expect("surface"),
         );
     let mut option = CapFloor::new(
-        "CAP-NORMAL",
-        RateOptionType::Caplet,
-        Money::from((1_000_000_i64, Currency::USD)),
-        0.02,
-        date!(2025 - 01 - 02),
-        date!(2025 - 04 - 02),
-        Some(Tenor::quarterly()),
-        DayCount::Act360,
-        "DISC",
-        "FWD",
-        "NORMAL",
+        finstack_quant_valuations::instruments::rates::cap_floor::CapFloorParams {
+            id: "CAP-NORMAL".into(),
+            rate_option_type: RateOptionType::Caplet,
+            notional: Money::from((1_000_000_i64, Currency::USD)),
+            strike: 0.02,
+            start_date: date!(2025 - 01 - 02),
+            maturity: date!(2025 - 04 - 02),
+            frequency: Some(Tenor::quarterly()),
+            day_count: DayCount::Act360,
+            discount_curve_id: "DISC".into(),
+            forward_curve_id: "FWD".into(),
+            vol_surface_id: "NORMAL".into(),
+        },
     )
     .expect("cap");
     option.business_day_convention = BusinessDayConvention::Unadjusted;

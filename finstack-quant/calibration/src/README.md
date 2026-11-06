@@ -288,8 +288,8 @@ variant plus its params struct in `api/schema.rs`, and wire it through
 [`quotes/`](quotes/), add a builder under `build/`, then teach the
 relevant target to build and price it.
 
-Regenerate schemas after any public wire change: `mise run rust-gen-schemas`,
-verify with `mise run rust-check-schemas`.
+Regenerate schemas after any public wire change: `mise run gen-write`,
+verify with `mise run gen-check`.
 
 ## Verification
 

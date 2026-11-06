@@ -42,7 +42,16 @@ def test_european_serial_parallel_and_seed_replay_are_identical() -> None:
     """Both runtime paths return the same estimate, interval, and sample counts."""
     estimates = [
         EuropeanPricer(num_paths=4096, seed=17, use_parallel=parallel).price_gbm(
-            100.0, 100.0, 0.05, 0.0, 0.2, 1.0, True, num_steps=1
+            {
+                "spot": 100.0,
+                "strike": 100.0,
+                "rate": 0.05,
+                "dividend_yield": 0.0,
+                "volatility": 0.2,
+                "time_to_expiry": 1.0,
+                "option_type": "call",
+            },
+            num_steps=1,
         )
         for parallel in (False, True, False)
     ]
@@ -78,7 +87,15 @@ def test_maturity_only_lsmc_counts_pairs_and_uses_pair_mean_standard_error() -> 
     for antithetic, count, payoffs in ((True, pairs, paired_payoffs), (False, 2 * pairs, plain_payoffs)):
         result = LsmcPricer(
             num_paths=count, seed=seed, use_parallel=False, num_steps=1, antithetic=antithetic
-        ).price_american(spot, strike, rate, 0.0, vol, expiry, False)
+        ).price_american({
+            "spot": spot,
+            "strike": strike,
+            "rate": rate,
+            "dividend_yield": 0.0,
+            "volatility": vol,
+            "time_to_expiry": expiry,
+            "option_type": "put",
+        })
         assert result.num_paths == count
         assert result.num_simulated_paths == 2 * pairs
         assert result.mean.amount == pytest.approx(statistics.mean(payoffs), abs=1e-12)
@@ -140,7 +157,20 @@ def test_nested_barrier_monitoring_on_identical_paths_has_pathwise_order() -> No
     assert np.all(monitored[0] >= monitored[1])
     assert np.all(monitored[1] >= monitored[2])
     assert monitored[0].mean() > monitored[2].mean()
-    continuous = barrier_option_price(100, 100, 120, 0.05, 0.0, 0.2, 1.0, "up", "out")
+    continuous = barrier_option_price(
+        {
+            "spot": 100,
+            "strike": 100,
+            "rate": 0.05,
+            "dividend_yield": 0.0,
+            "volatility": 0.2,
+            "time_to_expiry": 1.0,
+            "option_type": "call",
+        },
+        120,
+        "up",
+        "out",
+    )
     assert 0 < continuous < bs_price(100, 100, 0.05, 0.0, 0.2, 1.0, True)
     fine_se = monitored[-1].std(ddof=1) / math.sqrt(len(paths))
     # Continuous <= discrete is an expectation ordering; allow sampling error.
@@ -150,11 +180,20 @@ def test_nested_barrier_monitoring_on_identical_paths_has_pathwise_order() -> No
 def test_asian_exact_one_fixing_and_geometric_benchmark() -> None:
     """Arithmetic TW is approximate; one terminal fixing reduces exactly to BS."""
     args = (100.0, 100.0, 0.05, 0.0, 0.2, 1.0)
+    call = {
+        "spot": 100.0,
+        "strike": 100.0,
+        "rate": 0.05,
+        "dividend_yield": 0.0,
+        "volatility": 0.2,
+        "time_to_expiry": 1.0,
+        "option_type": "call",
+    }
     vanilla = bs_price(*args, True)
     for convention in ("arithmetic", "geometric"):
-        assert asian_option_price(*args, 1, convention, True) == pytest.approx(vanilla, abs=1e-12)
-    european = EuropeanPricer(4096, 17, False).price_gbm(*args, is_call=True, num_steps=1)
-    asian = PathDependentPricer(4096, 17, False, False).price_asian(*args, True, num_steps=1)
+        assert asian_option_price(call, 1, convention) == pytest.approx(vanilla, abs=1e-12)
+    european = EuropeanPricer(4096, 17, False).price_gbm(call, num_steps=1)
+    asian = PathDependentPricer(4096, 17, False, False).price_asian(call, num_steps=1)
     assert asian.mean.amount == european.mean.amount
     # The two payoff reducers may round their sample variance one ulp apart.
     assert asian.stderr == pytest.approx(european.stderr, abs=1e-14)
@@ -164,19 +203,27 @@ def test_asian_exact_one_fixing_and_geometric_benchmark() -> None:
     arithmetic = math.exp(-0.05) * np.maximum(fixings.mean(axis=1) - 100, 0)
     geometric = math.exp(-0.05) * np.maximum(np.exp(np.log(fixings).mean(axis=1)) - 100, 0)
     assert np.all(arithmetic + 1e-12 >= geometric)
-    exact_geometric = asian_option_price(*args, 12, "geometric", True)
+    exact_geometric = asian_option_price(call, 12, "geometric")
     geometric_se = geometric.std(ddof=1) / math.sqrt(len(paths))
     assert abs(geometric.mean() - exact_geometric) < 4 * geometric_se
 
 
 def test_lsmc_holdout_seed_is_independent_and_replayable() -> None:
     """Two-pass pricing rejects reuse of training shocks and replays held-out runs."""
-    args = (100.0, 100.0, 0.05, 0.0, 0.3, 1.0)
+    put = {
+        "spot": 100.0,
+        "strike": 100.0,
+        "rate": 0.05,
+        "dividend_yield": 0.0,
+        "volatility": 0.3,
+        "time_to_expiry": 1.0,
+        "option_type": "put",
+    }
     pricer = LsmcPricer(2048, 17, False, 20, "polynomial", 3, True)
     with pytest.raises(ValueError, match="pricing_seed"):
-        pricer.price_american_unbiased(*args, False, pricing_seed=17)
-    first = pricer.price_american_unbiased(*args, False, pricing_seed=1017)
-    second = pricer.price_american_unbiased(*args, False, pricing_seed=1017)
+        pricer.price_american_unbiased(put, pricing_seed=17)
+    first = pricer.price_american_unbiased(put, pricing_seed=1017)
+    second = pricer.price_american_unbiased(put, pricing_seed=1017)
     assert first.mean.amount == second.mean.amount
     assert first.stderr == second.stderr
     assert first.num_paths == 2048

@@ -14,14 +14,21 @@
 //!
 //! ```
 //! use finstack_quant_models::monte_carlo::convenience;
-//! use finstack_quant_models::types::OptionType;
+//! use finstack_quant_models::types::{OptionMarketParams, OptionType};
 //!
 //! let pricer = convenience::european_pricer(Some(1_000), Some(7), Some(false))
 //!     .expect("valid path count");
+//! let params = OptionMarketParams {
+//!     option_type: OptionType::Call,
+//!     spot: 100.0,
+//!     strike: 100.0,
+//!     rate: 0.05,
+//!     dividend_yield: 0.0,
+//!     volatility: 0.2,
+//!     time_to_expiry: 1.0,
+//! };
 //! // `None` step count and currency resolve to the registry defaults.
-//! let estimate = pricer
-//!     .price_gbm(OptionType::Call, 100.0, 100.0, 0.05, 0.0, 0.2, 1.0, None, None)
-//!     .expect("valid inputs");
+//! let estimate = pricer.price_gbm(&params, None, None).expect("valid inputs");
 //! assert!(estimate.mean.amount() > 0.0);
 //! ```
 

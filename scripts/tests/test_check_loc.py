@@ -1,4 +1,4 @@
-"""Tests for the source line-count check."""
+"""Tests for the Rust source-file size check."""
 
 from __future__ import annotations
 
@@ -13,38 +13,64 @@ assert _SPEC.loader is not None
 _MODULE = importlib.util.module_from_spec(_SPEC)
 sys.modules[_SPEC.name] = _MODULE
 _SPEC.loader.exec_module(_MODULE)
-collect_violations = _MODULE.collect_violations
 
 
-def _write_long_file(path: Path, *, lines: int = 2000) -> None:
+def _write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join("x" for _ in range(lines)), encoding="utf-8")
+    path.write_text(text, encoding="utf-8")
 
 
-def test_excludes_exact_wasm_index_d_ts(tmp_path: Path) -> None:
-    """The hand-maintained WASM facade declaration file is not counted."""
-    _write_long_file(tmp_path / "finstack-quant-wasm" / "index.d.ts")
-
-    violation_paths = [path for path, _ in collect_violations(tmp_path, 1500)]
-
-    assert "finstack-quant-wasm/index.d.ts" not in violation_paths
+def _measured(root: Path) -> dict[str, int]:
+    return dict(_MODULE.measure(root))
 
 
-def test_counts_other_d_ts_files(tmp_path: Path) -> None:
-    """Other .d.ts files still count because Path.suffix is .ts."""
-    relative_path = "finstack-quant-wasm/types.d.ts"
-    _write_long_file(tmp_path / relative_path)
+def test_counts_only_rust_under_crate_src(tmp_path: Path) -> None:
+    """Only `.rs` files under a crate's `src/` count; other languages are ignored."""
+    _write(tmp_path / "finstack-quant/core/src/lib.rs", "fn a() {}\n")
+    _write(tmp_path / "finstack-quant/core/build/gen.rs", "fn b() {}\n")
+    _write(tmp_path / "finstack-quant-wasm/index.d.ts", "x\n" * 5000)
+    _write(tmp_path / "finstack-quant-ui/src/generated/types.ts", "x\n" * 5000)
 
-    violation_paths = [path for path, _ in collect_violations(tmp_path, 1500)]
-
-    assert relative_path in violation_paths
+    assert _measured(tmp_path) == {"finstack-quant/core/src/lib.rs": 1}
 
 
-def test_counts_similarly_named_index_d_ts_elsewhere(tmp_path: Path) -> None:
-    """Only the exact wasm facade path is excluded, not homonyms elsewhere."""
-    relative_path = "other-package/index.d.ts"
-    _write_long_file(tmp_path / relative_path)
+def test_excludes_test_files_and_generated_sources(tmp_path: Path) -> None:
+    """Sibling test files, `tests/` directories and generated code are not source."""
+    for rel in (
+        "finstack-quant/core/src/money/tests.rs",
+        "finstack-quant/core/src/tests/helpers.rs",
+        "finstack-quant/core/src/generated/iso.rs",
+        "finstack-quant/core/tests/integration.rs",
+    ):
+        _write(tmp_path / rel, "fn f() {}\n")
 
-    violation_paths = [path for path, _ in collect_violations(tmp_path, 1500)]
+    assert _measured(tmp_path) == {}
 
-    assert relative_path in violation_paths
+
+def test_strips_test_only_items_but_not_cfg_not_test(tmp_path: Path) -> None:
+    """`#[cfg(test)]` items are excluded; `#[cfg(not(test))]` code still counts."""
+    source = "\n".join([
+        "fn production() {}",  # 1
+        "#[cfg(not(test))]",  # 2
+        "fn only_outside_tests() {}",  # 3
+        "#[cfg(test)]",
+        "mod tests {",
+        "    #[test]",
+        "    fn t() {}",
+        "}",
+        "",
+    ])
+    _write(tmp_path / "finstack-quant/core/src/lib.rs", source)
+
+    assert _measured(tmp_path) == {"finstack-quant/core/src/lib.rs": 3}
+
+
+def test_ci_fails_only_above_the_hard_limit(tmp_path: Path, monkeypatch, capsys) -> None:
+    """`--ci` exits 1 for a file over the hard limit and 0 for one between the limits."""
+    monkeypatch.setattr(_MODULE, "__file__", str(tmp_path / "scripts" / "check_loc.py"))
+    _write(tmp_path / "finstack-quant/core/src/big.rs", "fn f() {}\n" * 1500)
+    assert _MODULE.main(["--ci"]) == 0
+    assert "1 Rust source file(s) between 1000 and 2000 lines" in capsys.readouterr().out
+
+    _write(tmp_path / "finstack-quant/core/src/big.rs", "fn f() {}\n" * 2001)
+    assert _MODULE.main(["--ci"]) == 1

@@ -4,7 +4,7 @@ use super::helpers::*;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_models::types::ExerciseStyle;
+use finstack_quant_models::types::{ExerciseStyle, OptionMarketParams};
 use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::pricer::ModelKey;
@@ -43,13 +43,15 @@ fn cash_dividend_theta_matches_smooth_calendar_repricing() {
                     })
                     .sum();
                 let base = finstack_quant_models::closed_form::bs_greeks(
-                    100.0 - dividend_pv,
-                    option.strike,
-                    rate,
-                    0.0,
-                    0.25,
-                    1.0,
-                    option.option_type,
+                    &OptionMarketParams {
+                        spot: 100.0 - dividend_pv,
+                        strike: option.strike,
+                        rate,
+                        volatility: 0.25,
+                        time_to_expiry: 1.0,
+                        dividend_yield: 0.0,
+                        option_type: option.option_type,
+                    },
                     option.metric_pricing_overrides.theta_days_per_year(),
                 )
                 .unwrap();

@@ -15,6 +15,7 @@ use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::cashflow_export::InstrumentCashflowEnvelope;
 use finstack_quant_valuations::instruments::pricing_overrides::MetricPricingOverrides;
 use finstack_quant_valuations::metrics::risk::{MarketHistory, MarketScenario};
+use finstack_quant_valuations::pricer::PriceExtras;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
 
@@ -304,12 +305,12 @@ crate::bindings::macros::py_getters!(PyMarketHistory |s| {
     window_days -> u32 = s.inner.window_days;
 });
 
-/// Coerce ``MetricPricingOverrides | dict | str | None`` into the JSON the
-/// Rust pricing entry points accept.
+/// Coerce ``MetricPricingOverrides | dict | str | None`` into the JSON patch
+/// ``validate_instrument_json`` merges before validation.
 ///
-/// The single conversion path for the ``metric_pricing_overrides`` keyword of
-/// ``price_instrument``, every typed ``.price()`` and
-/// ``validate_instrument_json``.
+/// The pricing entry points read the same patch from the
+/// ``metric_pricing_overrides`` key of their ``extras`` object instead
+/// (see [`price_extras_from_py`]).
 ///
 /// # Arguments
 ///
@@ -353,36 +354,28 @@ pub(crate) fn metric_pricing_overrides_from_py(
     spec_from_py(py, obj, "metric_pricing_overrides")
 }
 
-/// Coerce ``dict | str | MarketHistory | None`` into the JSON the Rust
-/// pricing entry point accepts.
-pub(crate) fn market_history_json(
+/// Read the optional ``extras`` argument of the pricing entry points.
+///
+/// Accepts ``None`` (no extras), a dict or JSON text in the shape of the Rust
+/// `PriceExtras`; typed ``MetricPricingOverrides`` / ``MarketHistory``
+/// wrappers inside a dict serialize through the shared ``json.dumps`` hook.
+///
+/// # Arguments
+///
+/// * `py` - GIL token used for ``json.dumps`` on dict inputs.
+/// * `extras` - The caller's ``extras`` argument; unknown keys are rejected
+///   with ``ValueError``.
+pub(crate) fn price_extras_from_py(
     py: Python<'_>,
-    obj: Option<&Bound<'_, PyAny>>,
-) -> PyResult<Option<String>> {
-    let Some(obj) = obj else {
-        return Ok(None);
-    };
-    if obj.is_none() {
-        return Ok(None);
-    }
-    if let Ok(typed) = obj.cast::<PyMarketHistory>() {
-        return typed.borrow().to_json().map(Some);
-    }
-    if let Ok(text) = obj.cast::<PyString>() {
-        return Ok(Some(text.to_str()?.to_owned()));
-    }
-    py_to_json_string(py, obj, "market_history").map(Some)
+    extras: Option<&Bound<'_, PyAny>>,
+) -> PyResult<PriceExtras> {
+    Ok(opt_spec_from_py(py, extras, "PriceExtras")?.unwrap_or_default())
 }
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "price_instrument")]
 #[pyfunction]
-#[pyo3(signature = (instrument, market, as_of, model="default", metrics=None, metric_pricing_overrides=None, market_history=None, explain=false))]
-#[pyo3(
-    text_signature = "(instrument, market, as_of, model='default', metrics=None, metric_pricing_overrides=None, market_history=None, explain=False)"
-)]
-// PyO3 binding: the argument list mirrors the Python keyword-argument API, so
-// it cannot be collapsed into a parameter struct without changing that API.
-#[allow(clippy::too_many_arguments)]
+#[pyo3(signature = (instrument, market, as_of, model="default", metrics=None, extras=None))]
+#[pyo3(text_signature = "(instrument, market, as_of, model='default', metrics=None, extras=None)")]
 fn price_instrument(
     py: Python<'_>,
     instrument: &Bound<'_, PyAny>,
@@ -390,25 +383,15 @@ fn price_instrument(
     as_of: &Bound<'_, PyAny>,
     model: &str,
     metrics: Option<Vec<String>>,
-    metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
-    market_history: Option<&Bound<'_, PyAny>>,
-    explain: bool,
+    extras: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyValuationResult> {
-    let overrides = metric_pricing_overrides_json(py, metric_pricing_overrides)?;
+    let extras = price_extras_from_py(py, extras)?;
+    let overrides = extras.metric_pricing_overrides_json();
     let instrument = extract_instrument(instrument)?;
     let prepared = py
         .detach(move || instrument.into_parsed(overrides.as_deref()))
         .map_err(core_to_py)?;
-    price_prepared(
-        py,
-        prepared,
-        market,
-        as_of,
-        model,
-        metrics,
-        market_history,
-        explain,
-    )
+    price_prepared(py, prepared, market, as_of, model, metrics, extras)
 }
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._pricing", "list_standard_metrics")]
@@ -461,7 +444,7 @@ fn standard_deal_families(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
 fn tranche_solve_field_units(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
     serde_to_py(
         py,
-        &finstack_quant_valuations::pricer::tranche_solve_field_units(),
+        &finstack_quant_valuations::results::tranche_solve_field_units(),
     )
 }
 
@@ -475,7 +458,7 @@ fn tranche_metric_field_units<'py>(
     let currency = crate::bindings::core::currency::extract_currency(currency)?;
     serde_to_py(
         py,
-        &finstack_quant_valuations::pricer::tranche_metric_field_units(currency),
+        &finstack_quant_valuations::results::tranche_metric_field_units(currency),
     )
 }
 
@@ -489,7 +472,7 @@ fn scenario_table_field_units<'py>(
     let currency = crate::bindings::core::currency::extract_currency(currency)?;
     serde_to_py(
         py,
-        &finstack_quant_valuations::pricer::scenario_table_field_units(currency),
+        &finstack_quant_valuations::results::scenario_table_field_units(currency),
     )
 }
 
@@ -503,7 +486,7 @@ fn simulation_field_units<'py>(
     let currency = crate::bindings::core::currency::extract_currency(currency)?;
     serde_to_py(
         py,
-        &finstack_quant_valuations::pricer::simulation_field_units(currency),
+        &finstack_quant_valuations::results::simulation_field_units(currency),
     )
 }
 
@@ -517,7 +500,7 @@ fn equity_metrics_field_units<'py>(
     let currency = crate::bindings::core::currency::extract_currency(currency)?;
     serde_to_py(
         py,
-        &finstack_quant_valuations::pricer::equity_metrics_field_units(currency),
+        &finstack_quant_valuations::results::equity_metrics_field_units(currency),
     )
 }
 
@@ -531,7 +514,7 @@ fn bond_quote_set_field_units<'py>(
     let currency = crate::bindings::core::currency::extract_currency(currency)?;
     serde_to_py(
         py,
-        &finstack_quant_valuations::pricer::bond_quote_set_field_units(currency),
+        &finstack_quant_valuations::results::bond_quote_set_field_units(currency),
     )
 }
 
@@ -545,7 +528,7 @@ fn pool_report_field_units<'py>(
     let currency = crate::bindings::core::currency::extract_currency(currency)?;
     serde_to_py(
         py,
-        &finstack_quant_valuations::pricer::pool_report_field_units(currency),
+        &finstack_quant_valuations::results::pool_report_field_units(currency),
     )
 }
 
@@ -801,14 +784,9 @@ pub(crate) const EXPORTS: &[&str] = &[
 /// * `as_of` - Valuation date (date-like or ISO 8601 string).
 /// * `model` - Model key (`"default"` selects the instrument-native model).
 /// * `metrics` - Metric identifiers to compute; `None` means valuation only.
-/// * `metric_pricing_overrides` - Optional `MetricPricingOverrides | dict |
-///   str` merged into `instrument.spec.metric_pricing_overrides` before
-///   validation; `None` keeps the instrument's own overrides.
-/// * `market_history` - Optional `MarketHistory | dict | str` scenarios for
-///   the historical risk metrics (`hvar`, `expected_shortfall`).
-/// * `explain` - When `true`, attaches a step trace as `result.explanation`.
-// PyO3 binding helper: mirrors the keyword surface of `price_instrument`.
-#[allow(clippy::too_many_arguments)]
+/// * `extras` - The parsed `extras` argument: its `metric_pricing_overrides`
+///   patch is merged into `instrument.spec.metric_pricing_overrides` before
+///   validation, and its `market_history` and `explain` go to the price call.
 pub(crate) fn price_typed(
     py: Python<'_>,
     instrument: Box<dyn Instrument>,
@@ -816,11 +794,9 @@ pub(crate) fn price_typed(
     as_of: &Bound<'_, PyAny>,
     model: &str,
     metrics: Option<Vec<String>>,
-    metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
-    market_history: Option<&Bound<'_, PyAny>>,
-    explain: bool,
+    extras: PriceExtras,
 ) -> PyResult<PyValuationResult> {
-    let overrides = metric_pricing_overrides_json(py, metric_pricing_overrides)?;
+    let overrides = extras.metric_pricing_overrides_json();
     let instrument = py.detach(move || {
         finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(
             instrument,
@@ -828,16 +804,7 @@ pub(crate) fn price_typed(
         )
         .map_err(core_to_py)
     })?;
-    price_prepared(
-        py,
-        instrument,
-        market,
-        as_of,
-        model,
-        metrics,
-        market_history,
-        explain,
-    )
+    price_prepared(py, instrument, market, as_of, model, metrics, extras)
 }
 /// Pricing options shared by the host entry points: the recalibration
 /// provider, plus a step trace on the result when `explain` is set.
@@ -851,7 +818,9 @@ fn pricing_options(explain: bool) -> finstack_quant_valuations::instruments::Pri
 }
 
 /// Price a prepared instrument after host market/date conversion.
-#[allow(clippy::too_many_arguments)]
+///
+/// `extras` supplies the market history and the `explain` flag; its
+/// metric-pricing override patch was already merged into `instrument`.
 pub(crate) fn price_prepared(
     py: Python<'_>,
     instrument: finstack_quant_valuations::pricer::ParsedInstrument,
@@ -859,14 +828,12 @@ pub(crate) fn price_prepared(
     as_of: &Bound<'_, PyAny>,
     model: &str,
     metrics: Option<Vec<String>>,
-    market_history: Option<&Bound<'_, PyAny>>,
-    explain: bool,
+    extras: PriceExtras,
 ) -> PyResult<PyValuationResult> {
     let market = extract_market(py, market)?;
     let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
     let model = model.to_owned();
     let metrics = metrics.unwrap_or_default();
-    let market_history = market_history_json(py, market_history)?;
     let inner = py
         .detach(move || {
             finstack_quant_valuations::pricer::price_instrument(
@@ -875,8 +842,8 @@ pub(crate) fn price_prepared(
                 &as_of,
                 &model,
                 &metrics,
-                market_history.as_deref(),
-                pricing_options(explain),
+                extras.market_history.as_ref(),
+                pricing_options(extras.explain),
             )
         })
         .map_err(core_to_py)?;

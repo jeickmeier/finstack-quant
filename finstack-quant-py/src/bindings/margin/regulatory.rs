@@ -684,7 +684,7 @@ impl PySaCcrTrade {
 
 #[pymethods]
 impl PySaCcrTrade {
-    /// Create and validate a trade.
+    /// Create and validate a trade; every field is keyword-only.
     ///
     /// Parameters
     /// ----------
@@ -716,47 +716,17 @@ impl PySaCcrTrade {
     ///     ``"call_long"``, ``"call_short"``, ``"put_long"`` or
     ///     ``"put_short"``; required when ``is_option`` is ``True``.
     ///
-    /// Raises ``ValueError`` when a label is unknown or the trade fails the
-    /// BCBS 279 coherence checks, ``TypeError`` for a non-date-like date.
+    /// Raises ``ValueError`` when a field is missing or unknown, a label or
+    /// date string is malformed, or the trade fails the BCBS 279 coherence
+    /// checks; ``TypeError`` when a value is not JSON-encodable.
     #[new]
-    #[pyo3(signature = (trade_id, asset_class, notional, start_date, end_date, underlier, hedging_set, direction, supervisory_delta, mtm, is_option, option_type = None, supervisory_category = None, option_maturity_date = None))]
-    #[allow(clippy::too_many_arguments)]
-    fn new(
-        trade_id: &str,
-        asset_class: &str,
-        notional: f64,
-        start_date: &Bound<'_, PyAny>,
-        end_date: &Bound<'_, PyAny>,
-        underlier: &str,
-        hedging_set: &str,
-        direction: f64,
-        supervisory_delta: f64,
-        mtm: f64,
-        is_option: bool,
-        option_type: Option<&str>,
-        supervisory_category: Option<&str>,
-        option_maturity_date: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<Self> {
-        let inner = SaCcrTrade {
-            supervisory_category: supervisory_category
-                .map(parse_label::<SaCcrSupervisoryCategory>)
-                .transpose()?,
-            option_maturity_date: option_maturity_date.map(py_to_date).transpose()?,
-            trade_id: trade_id.to_string(),
-            asset_class: parse_label::<SaCcrAssetClass>(asset_class)?,
-            notional,
-            start_date: py_to_date(start_date)?,
-            end_date: py_to_date(end_date)?,
-            underlier: underlier.to_string(),
-            hedging_set: hedging_set.to_string(),
-            direction,
-            supervisory_delta,
-            mtm,
-            is_option,
-            option_type: option_type
-                .map(parse_label::<SaCcrOptionType>)
-                .transpose()?,
-        };
+    #[pyo3(
+        signature = (**fields),
+        text_signature = "(*, trade_id, asset_class, notional, start_date, end_date, underlier, hedging_set, direction, supervisory_delta, mtm, is_option, option_type=None, supervisory_category=None, option_maturity_date=None)"
+    )]
+    fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
+        let inner: SaCcrTrade =
+            crate::bindings::module_utils::fields_from_py(py, fields, "SaCcrTrade")?;
         inner.validate().map_err(core_to_py)?;
         Ok(Self { inner })
     }

@@ -76,15 +76,17 @@ fn test_dm_missing_forward_curve_returns_error() {
 
     // Floating-rate bond referencing a discount curve that will be missing in the market
     let bond = Bond::floating(
-        "DM-FRN-MISSING-FWD",
-        Money::new(100.0, Currency::USD).expect("valid money fixture"),
-        "USD-SOFR-3M",
-        200,
-        as_of,
-        date!(2030 - 01 - 01),
-        finstack_quant_core::dates::Tenor::quarterly(),
-        finstack_quant_core::dates::DayCount::Act360,
-        "USD-OIS",
+        finstack_quant_valuations_fixed_income::bond::FloatingBondParams {
+            id: "DM-FRN-MISSING-FWD".into(),
+            notional: Money::new(100.0, Currency::USD).expect("valid money fixture"),
+            forward_curve_id: "USD-SOFR-3M".into(),
+            spread_bp: 200.into(),
+            issue_date: as_of,
+            maturity: date!(2030 - 01 - 01),
+            frequency: finstack_quant_core::dates::Tenor::quarterly(),
+            day_count: finstack_quant_core::dates::DayCount::Act360,
+            discount_curve_id: "USD-OIS".into(),
+        },
     )
     .unwrap();
 
@@ -166,43 +168,49 @@ fn test_dm_solver_convergence_across_spread_regimes() {
     // Base FRNs for different maturities.
     let frn_ig = prepare_dm_roundtrip_frn(
         Bond::floating(
-            "DM-CONV-IG",
-            notional,
-            "USD-SOFR-3M",
-            150,
-            as_of,
-            maturity_ig,
-            Tenor::quarterly(),
-            DayCount::Act360,
-            "USD-OIS",
+            finstack_quant_valuations_fixed_income::bond::FloatingBondParams {
+                id: "DM-CONV-IG".into(),
+                notional,
+                forward_curve_id: "USD-SOFR-3M".into(),
+                spread_bp: 150.into(),
+                issue_date: as_of,
+                maturity: maturity_ig,
+                frequency: Tenor::quarterly(),
+                day_count: DayCount::Act360,
+                discount_curve_id: "USD-OIS".into(),
+            },
         )
         .unwrap(),
     );
     let frn_hy = prepare_dm_roundtrip_frn(
         Bond::floating(
-            "DM-CONV-HY",
-            notional,
-            "USD-SOFR-3M",
-            300,
-            as_of,
-            maturity_hy,
-            Tenor::quarterly(),
-            DayCount::Act360,
-            "USD-OIS",
+            finstack_quant_valuations_fixed_income::bond::FloatingBondParams {
+                id: "DM-CONV-HY".into(),
+                notional,
+                forward_curve_id: "USD-SOFR-3M".into(),
+                spread_bp: 300.into(),
+                issue_date: as_of,
+                maturity: maturity_hy,
+                frequency: Tenor::quarterly(),
+                day_count: DayCount::Act360,
+                discount_curve_id: "USD-OIS".into(),
+            },
         )
         .unwrap(),
     );
     let frn_distressed = prepare_dm_roundtrip_frn(
         Bond::floating(
-            "DM-CONV-DIST",
-            notional,
-            "USD-SOFR-3M",
-            500,
-            as_of,
-            maturity_distressed,
-            Tenor::quarterly(),
-            DayCount::Act360,
-            "USD-OIS",
+            finstack_quant_valuations_fixed_income::bond::FloatingBondParams {
+                id: "DM-CONV-DIST".into(),
+                notional,
+                forward_curve_id: "USD-SOFR-3M".into(),
+                spread_bp: 500.into(),
+                issue_date: as_of,
+                maturity: maturity_distressed,
+                frequency: Tenor::quarterly(),
+                day_count: DayCount::Act360,
+                discount_curve_id: "USD-OIS".into(),
+            },
         )
         .unwrap(),
     );
@@ -307,15 +315,17 @@ fn flat_market_frn(
     spread_bp: i32,
 ) -> Bond {
     Bond::floating(
-        "DM-PAR-PIN",
-        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-        "USD-SOFR-3M",
-        spread_bp,
-        as_of,
-        maturity,
-        finstack_quant_core::dates::Tenor::quarterly(),
-        finstack_quant_core::dates::DayCount::Act360,
-        "USD-OIS",
+        finstack_quant_valuations_fixed_income::bond::FloatingBondParams {
+            id: "DM-PAR-PIN".into(),
+            notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            forward_curve_id: "USD-SOFR-3M".into(),
+            spread_bp: spread_bp.into(),
+            issue_date: as_of,
+            maturity,
+            frequency: finstack_quant_core::dates::Tenor::quarterly(),
+            day_count: finstack_quant_core::dates::DayCount::Act360,
+            discount_curve_id: "USD-OIS".into(),
+        },
     )
     .expect("FRN construction should succeed")
 }
@@ -412,15 +422,17 @@ fn test_dm_monotone_residual_does_not_break_valid_solve() {
 
     let bond = prepare_dm_roundtrip_frn(
         Bond::floating(
-            "DM-MONOTONE-HAPPY-PATH",
-            notional,
-            "USD-SOFR-3M",
-            150,
-            as_of,
-            date!(2028 - 01 - 01),
-            Tenor::quarterly(),
-            DayCount::Act360,
-            "USD-OIS",
+            finstack_quant_valuations_fixed_income::bond::FloatingBondParams {
+                id: "DM-MONOTONE-HAPPY-PATH".into(),
+                notional,
+                forward_curve_id: "USD-SOFR-3M".into(),
+                spread_bp: 150.into(),
+                issue_date: as_of,
+                maturity: date!(2028 - 01 - 01),
+                frequency: Tenor::quarterly(),
+                day_count: DayCount::Act360,
+                discount_curve_id: "USD-OIS".into(),
+            },
         )
         .expect("bond should build"),
     );
@@ -482,15 +494,17 @@ fn test_dm_amortizing_frn_is_supported() {
 
     let as_of = date!(2025 - 01 - 01);
     let mut bond = Bond::floating(
-        "DM-AMORT-FRN",
-        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-        "USD-SOFR-3M",
-        100,
-        as_of,
-        date!(2027 - 01 - 01),
-        finstack_quant_core::dates::Tenor::quarterly(),
-        finstack_quant_core::dates::DayCount::Act360,
-        "USD-OIS",
+        finstack_quant_valuations_fixed_income::bond::FloatingBondParams {
+            id: "DM-AMORT-FRN".into(),
+            notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            forward_curve_id: "USD-SOFR-3M".into(),
+            spread_bp: 100.into(),
+            issue_date: as_of,
+            maturity: date!(2027 - 01 - 01),
+            frequency: finstack_quant_core::dates::Tenor::quarterly(),
+            day_count: finstack_quant_core::dates::DayCount::Act360,
+            discount_curve_id: "USD-OIS".into(),
+        },
     )
     .expect("FRN construction should succeed");
     // Wrap the floating spec into a linear amortizer paying down to 50% of par.

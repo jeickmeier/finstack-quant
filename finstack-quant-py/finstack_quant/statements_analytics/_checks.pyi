@@ -9,7 +9,16 @@ class CreditMapping:
     """
     Node-id mapping for the credit-underwriting check suite.
 
-    The constructor stores the supplied values and does not raise.
+    Every parameter is keyword-only: Rust reads the keywords as the
+    ``CreditMapping`` serde struct, whose optional ids default to ``None``.
+
+    Raises
+    ------
+    ValueError
+        If a required field is missing, a keyword is unknown, or a value
+        does not have its wire form.
+    TypeError
+        If a positional argument is passed.
 
     Parameters
     ----------
@@ -35,11 +44,17 @@ class CreditMapping:
     Examples
     --------
     >>> from finstack_quant.statements_analytics import CreditMapping
-    >>> CreditMapping("total_debt", "ebitda", "interest_expense", leverage_warn=(4.0, 6.0)).leverage_warn
+    >>> CreditMapping(
+    ...     debt_node="total_debt",
+    ...     ebitda_node="ebitda",
+    ...     interest_expense_node="interest_expense",
+    ...     leverage_warn=(4.0, 6.0),
+    ... ).leverage_warn
     (4.0, 6.0)
     """
     def __init__(
         self,
+        *,
         debt_node: str,
         ebitda_node: str,
         interest_expense_node: str,
@@ -197,7 +212,17 @@ class ThreeStatementMapping:
     on the reconciliation checks that need them (depreciation, interest, tax,
     cash-flow subtotals, capex, dividends, working capital, debt roll-forwards).
 
-    The constructor stores the supplied values and does not raise.
+    Every parameter is keyword-only: Rust reads the keywords as the
+    ``ThreeStatementMapping`` serde struct, whose optional ids default to ``None`` and whose
+    optional lists default to ``[]``.
+
+    Raises
+    ------
+    ValueError
+        If a required field is missing, a keyword is unknown, or a value
+        does not have its wire form.
+    TypeError
+        If a positional argument is passed.
 
     Parameters
     ----------
@@ -243,24 +268,33 @@ class ThreeStatementMapping:
         Dividends recorded in the equity roll-forward.
     debt_balance_nodes : list[tuple[str, str | None]]
         ``(balance_node, rate_node)`` pairs for interest reconciliation.
+        Default ``[]``.
     cs_interest_node : str | None
         Capital-structure interest node.
     wc_change_cf_node : str | None
         Working-capital change node on the cash-flow statement.
     current_assets_nodes : list[str]
-        Current-asset nodes for the working-capital check.
+        Current-asset nodes for the working-capital check. Default ``[]``.
     current_liabilities_nodes : list[str]
-        Current-liability nodes for the working-capital check.
+        Current-liability nodes for the working-capital check. Default ``[]``.
 
     Examples
     --------
     >>> from finstack_quant.statements_analytics import ThreeStatementMapping
-    >>> m = ThreeStatementMapping("cash", "retained_earnings", "net_income", ["cash"], [], ["retained_earnings"])
+    >>> m = ThreeStatementMapping(
+    ...     cash_node="cash",
+    ...     retained_earnings_node="retained_earnings",
+    ...     net_income_node="net_income",
+    ...     assets_nodes=["cash"],
+    ...     liabilities_nodes=[],
+    ...     equity_nodes=["retained_earnings"],
+    ... )
     >>> m.cash_node
     'cash'
     """
     def __init__(
         self,
+        *,
         cash_node: str,
         retained_earnings_node: str,
         net_income_node: str,
@@ -281,7 +315,7 @@ class ThreeStatementMapping:
         ppe_additions_node: str | None = None,
         intangible_additions_node: str | None = None,
         dividends_equity_node: str | None = None,
-        debt_balance_nodes: list[Any] = ...,
+        debt_balance_nodes: list[tuple[str, str | None]] = ...,
         cs_interest_node: str | None = None,
         wc_change_cf_node: str | None = None,
         current_assets_nodes: list[str] = ...,
@@ -782,7 +816,7 @@ def run_credit_underwriting_checks(model: Any, mapping: Any, results: Any | None
     Examples
     --------
     >>> from finstack_quant.statements_analytics import CreditMapping, run_credit_underwriting_checks
-    >>> mapping = CreditMapping("total_debt", "ebitda", "interest_expense")
+    >>> mapping = CreditMapping(debt_node="total_debt", ebitda_node="ebitda", interest_expense_node="interest_expense")
     >>> callable(run_credit_underwriting_checks)
     True
     """
@@ -821,7 +855,12 @@ def run_three_statement_checks(model: Any, mapping: Any, results: Any | None = N
     --------
     >>> from finstack_quant.statements_analytics import ThreeStatementMapping, run_three_statement_checks
     >>> mapping = ThreeStatementMapping(
-    ...     "cash", "retained_earnings", "net_income", ["assets"], ["liabilities"], ["equity"]
+    ...     cash_node="cash",
+    ...     retained_earnings_node="retained_earnings",
+    ...     net_income_node="net_income",
+    ...     assets_nodes=["assets"],
+    ...     liabilities_nodes=["liabilities"],
+    ...     equity_nodes=["equity"],
     ... )
     >>> callable(run_three_statement_checks)
     True

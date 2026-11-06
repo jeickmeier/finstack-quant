@@ -70,8 +70,14 @@ impl std::fmt::Display for Stage {
 /// (`bankruptcy`, `distressed_modification`, `cross_default`,
 /// `other_default_evidence`) represent objective evidence of default
 /// and should trigger Stage 3 independently of the 90-DPD backstop.
+///
+/// Every field may be omitted from the serde document: an omitted flag is
+/// off and an omitted list is empty, so `{}` (the [`Default`]) carries no
+/// flags. Unknown keys are rejected, so a misspelt flag is an error rather
+/// than a silently dropped trigger.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(default, deny_unknown_fields)]
 pub struct QualitativeFlags {
     /// On internal watchlist.
     pub watchlist: bool,
@@ -177,7 +183,8 @@ pub struct Exposure {
     pub id: String,
 
     /// Segment keys for portfolio aggregation (product type, geography, rating
-    /// bucket, etc.). Empty vec means "unclassified".
+    /// bucket, etc.). Empty vec means "unclassified". Default empty.
+    #[serde(default)]
     pub segments: Vec<String>,
 
     /// Outstanding balance (drawn amount) at the reporting date.
@@ -224,6 +231,8 @@ pub struct Exposure {
     pub origination_rating: Option<String>,
 
     /// Qualitative flags that can trigger Stage 2 classification.
+    /// Default: no flags ([`QualitativeFlags::default`]).
+    #[serde(default)]
     pub qualitative_flags: QualitativeFlags,
 
     /// Number of consecutive performing periods since last Stage 2/3

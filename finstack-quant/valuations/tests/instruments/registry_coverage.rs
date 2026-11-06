@@ -5,11 +5,13 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use finstack_quant_valuations::instruments::json_loader::InstrumentEnvelope;
 use finstack_quant_valuations::instruments::json_loader::instrument_json_of;
 use finstack_quant_valuations::instruments::json_loader::instrument_registry;
-use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
+use finstack_quant_valuations::pricer::InstrumentType;
 use finstack_quant_valuations::schema::instrument_types;
 use serde::Deserialize;
+use strum::IntoEnumIterator;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -22,8 +24,8 @@ struct CoverageManifest {
 #[serde(deny_unknown_fields)]
 struct CoverageEntry {
     tag: String,
-    fixture: String,
-    lossless: bool,
+    /// `Type.field: NestedType` naming the field whose type lacks `PartialEq`;
+    /// absent exactly when `InstrumentJson::semantic_eq` compares the type.
     #[serde(default)]
     partial_eq_blocker: Option<String>,
     required_keys: Vec<String>,
@@ -45,11 +47,16 @@ fn load_manifest() -> CoverageManifest {
     toml::from_str(&contents).unwrap_or_else(|error| panic!("parse {}: {error}", path.display()))
 }
 
+/// The canonical fixture `gen-write` writes for a tag, relative to `tests/instruments/`.
+fn fixture_relative(tag: &str) -> String {
+    format!("json_examples/{tag}.json")
+}
+
 fn fixture_path(entry: &CoverageEntry) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
         .join("instruments")
-        .join(&entry.fixture)
+        .join(fixture_relative(&entry.tag))
 }
 
 fn fixture_envelope(entry: &CoverageEntry) -> InstrumentEnvelope {
@@ -67,225 +74,6 @@ fn dependencies_are_empty(
         && dependencies.volatility_dependencies.is_empty()
         && dependencies.fx_pairs.is_empty()
         && dependencies.series_ids.is_empty()
-}
-
-fn typed_semantic_equality(
-    tag: &str,
-    first: &InstrumentEnvelope,
-    second: &InstrumentEnvelope,
-) -> Option<bool> {
-    match (tag, &first.instrument, &second.instrument) {
-        (
-            "inflation_linked_bond",
-            InstrumentJson::InflationLinkedBond(first),
-            InstrumentJson::InflationLinkedBond(second),
-        ) => Some(first == second),
-        (
-            "agency_mbs_passthrough",
-            InstrumentJson::AgencyMbsPassthrough(first),
-            InstrumentJson::AgencyMbsPassthrough(second),
-        ) => Some(first == second),
-        ("agency_tba", InstrumentJson::AgencyTba(first), InstrumentJson::AgencyTba(second)) => {
-            Some(first == second)
-        }
-        ("dollar_roll", InstrumentJson::DollarRoll(first), InstrumentJson::DollarRoll(second)) => {
-            Some(first == second)
-        }
-        (
-            "inflation_swap",
-            InstrumentJson::InflationSwap(first),
-            InstrumentJson::InflationSwap(second),
-        ) => Some(first == second),
-        (
-            "yoy_inflation_swap",
-            InstrumentJson::YoYInflationSwap(first),
-            InstrumentJson::YoYInflationSwap(second),
-        ) => Some(first == second),
-        (
-            "inflation_cap_floor",
-            InstrumentJson::InflationCapFloor(first),
-            InstrumentJson::InflationCapFloor(second),
-        ) => Some(first == second),
-        (
-            "forward_rate_agreement",
-            InstrumentJson::ForwardRateAgreement(first),
-            InstrumentJson::ForwardRateAgreement(second),
-        ) => Some(first == second),
-        (
-            "interest_rate_future",
-            InstrumentJson::InterestRateFuture(first),
-            InstrumentJson::InterestRateFuture(second),
-        ) => Some(first == second),
-        (
-            "commodity_future",
-            InstrumentJson::CommodityFuture(first),
-            InstrumentJson::CommodityFuture(second),
-        ) => Some(first == second),
-        ("fx_future", InstrumentJson::FxFuture(first), InstrumentJson::FxFuture(second)) => {
-            Some(first == second)
-        }
-        (
-            "volatility_index_future",
-            InstrumentJson::VolatilityIndexFuture(first),
-            InstrumentJson::VolatilityIndexFuture(second),
-        ) => Some(first == second),
-        (
-            "equity_future",
-            InstrumentJson::EquityFuture(first),
-            InstrumentJson::EquityFuture(second),
-        ) => Some(first == second),
-        (
-            "equity_total_return_future",
-            InstrumentJson::EquityTotalReturnFuture(first),
-            InstrumentJson::EquityTotalReturnFuture(second),
-        ) => Some(first == second),
-        (
-            "interest_rate_future_option",
-            InstrumentJson::InterestRateFutureOption(first),
-            InstrumentJson::InterestRateFutureOption(second),
-        ) => Some(first == second),
-        (
-            "equity_future_option",
-            InstrumentJson::EquityFutureOption(first),
-            InstrumentJson::EquityFutureOption(second),
-        ) => Some(first == second),
-        (
-            "volatility_index_future_option",
-            InstrumentJson::VolatilityIndexFutureOption(first),
-            InstrumentJson::VolatilityIndexFutureOption(second),
-        ) => Some(first == second),
-        (
-            "fx_future_option",
-            InstrumentJson::FxFutureOption(first),
-            InstrumentJson::FxFutureOption(second),
-        ) => Some(first == second),
-        (
-            "commodity_future_option",
-            InstrumentJson::CommodityFutureOption(first),
-            InstrumentJson::CommodityFutureOption(second),
-        ) => Some(first == second),
-        ("cap_floor", InstrumentJson::CapFloor(first), InstrumentJson::CapFloor(second)) => {
-            Some(first == second)
-        }
-        ("cms_option", InstrumentJson::CmsOption(first), InstrumentJson::CmsOption(second)) => {
-            Some(first == second)
-        }
-        ("deposit", InstrumentJson::Deposit(first), InstrumentJson::Deposit(second)) => {
-            Some(first == second)
-        }
-        ("repo", InstrumentJson::Repo(first), InstrumentJson::Repo(second)) => {
-            Some(first == second)
-        }
-        ("cds_tranche", InstrumentJson::CdsTranche(first), InstrumentJson::CdsTranche(second)) => {
-            Some(first == second)
-        }
-        ("cds_option", InstrumentJson::CdsOption(first), InstrumentJson::CdsOption(second)) => {
-            Some(first == second)
-        }
-        ("equity", InstrumentJson::Equity(first), InstrumentJson::Equity(second)) => {
-            Some(first == second)
-        }
-        (
-            "equity_option",
-            InstrumentJson::EquityOption(first),
-            InstrumentJson::EquityOption(second),
-        ) => Some(first == second),
-        (
-            "asian_option",
-            InstrumentJson::AsianOption(first),
-            InstrumentJson::AsianOption(second),
-        ) => Some(first == second),
-        (
-            "barrier_option",
-            InstrumentJson::BarrierOption(first),
-            InstrumentJson::BarrierOption(second),
-        ) => Some(first == second),
-        (
-            "lookback_option",
-            InstrumentJson::LookbackOption(first),
-            InstrumentJson::LookbackOption(second),
-        ) => Some(first == second),
-        (
-            "variance_swap",
-            InstrumentJson::VarianceSwap(first),
-            InstrumentJson::VarianceSwap(second),
-        ) => Some(first == second),
-        ("fx_spot", InstrumentJson::FxSpot(first), InstrumentJson::FxSpot(second)) => {
-            Some(first == second)
-        }
-        ("fx_swap", InstrumentJson::FxSwap(first), InstrumentJson::FxSwap(second)) => {
-            Some(first == second)
-        }
-        ("fx_forward", InstrumentJson::FxForward(first), InstrumentJson::FxForward(second)) => {
-            Some(first == second)
-        }
-        ("ndf", InstrumentJson::Ndf(first), InstrumentJson::Ndf(second)) => Some(first == second),
-        ("fx_option", InstrumentJson::FxOption(first), InstrumentJson::FxOption(second)) => {
-            Some(first == second)
-        }
-        (
-            "fx_digital_option",
-            InstrumentJson::FxDigitalOption(first),
-            InstrumentJson::FxDigitalOption(second),
-        ) => Some(first == second),
-        (
-            "fx_touch_option",
-            InstrumentJson::FxTouchOption(first),
-            InstrumentJson::FxTouchOption(second),
-        ) => Some(first == second),
-        (
-            "fx_barrier_option",
-            InstrumentJson::FxBarrierOption(first),
-            InstrumentJson::FxBarrierOption(second),
-        ) => Some(first == second),
-        (
-            "fx_variance_swap",
-            InstrumentJson::FxVarianceSwap(first),
-            InstrumentJson::FxVarianceSwap(second),
-        ) => Some(first == second),
-        (
-            "quanto_option",
-            InstrumentJson::QuantoOption(first),
-            InstrumentJson::QuantoOption(second),
-        ) => Some(first == second),
-        (
-            "commodity_spread_option",
-            InstrumentJson::CommoditySpreadOption(first),
-            InstrumentJson::CommoditySpreadOption(second),
-        ) => Some(first == second),
-        (
-            "autocallable",
-            InstrumentJson::Autocallable(first),
-            InstrumentJson::Autocallable(second),
-        ) => Some(first == second),
-        (
-            "cliquet_option",
-            InstrumentJson::CliquetOption(first),
-            InstrumentJson::CliquetOption(second),
-        ) => Some(first == second),
-        ("tarn", InstrumentJson::Tarn(first), InstrumentJson::Tarn(second)) => {
-            Some(first == second)
-        }
-        ("snowball", InstrumentJson::Snowball(first), InstrumentJson::Snowball(second)) => {
-            Some(first == second)
-        }
-        (
-            "cms_spread_option",
-            InstrumentJson::CmsSpreadOption(first),
-            InstrumentJson::CmsSpreadOption(second),
-        ) => Some(first == second),
-        (
-            "private_markets_fund",
-            InstrumentJson::PrivateMarketsFund(first),
-            InstrumentJson::PrivateMarketsFund(second),
-        ) => Some(first == second),
-        (
-            "real_estate_asset",
-            InstrumentJson::RealEstateAsset(first),
-            InstrumentJson::RealEstateAsset(second),
-        ) => Some(first == second),
-        _ => None,
-    }
 }
 
 fn panic_message(payload: Box<dyn std::any::Any + Send>) -> String {
@@ -313,7 +101,6 @@ fn registry_coverage_manifest_is_checked_in() {
 /// Kept in Rust so `mise run rust-test` / CI Test Rust do not require `uv` or a
 /// Python runtime. The Python script remains the mise/`gen-check` entry point.
 fn generated_fixtures_are_valid(root: &Path) -> bool {
-    const EXPECTED_CANONICAL_FIXTURES: usize = 78;
     let manifest_path = root
         .join("finstack-quant")
         .join("valuations")
@@ -326,7 +113,7 @@ fn generated_fixtures_are_valid(root: &Path) -> bool {
     let Ok(manifest) = toml::from_str::<CoverageManifest>(&contents) else {
         return false;
     };
-    if manifest.instrument.len() != EXPECTED_CANONICAL_FIXTURES {
+    if manifest.instrument.len() != instrument_types().len() {
         return false;
     }
 
@@ -337,7 +124,7 @@ fn generated_fixtures_are_valid(root: &Path) -> bool {
     let mut expected_paths = BTreeSet::new();
     let mut entries = Vec::new();
     for entry in &manifest.instrument {
-        let relative = instruments_dir.join(&entry.fixture);
+        let relative = instruments_dir.join(fixture_relative(&entry.tag));
         if !expected_paths.insert(relative.clone()) {
             return false;
         }
@@ -416,7 +203,7 @@ fn generator_freshness_check_rejects_non_registry_fixtures() {
     )
     .expect("copy coverage manifest");
     for entry in &manifest.instrument {
-        let destination = manifest_dir.join(&entry.fixture);
+        let destination = manifest_dir.join(fixture_relative(&entry.tag));
         if let Some(parent) = destination.parent() {
             fs::create_dir_all(parent).expect("create canonical fixture directory");
         }
@@ -447,7 +234,11 @@ fn generator_freshness_check_rejects_non_registry_fixtures() {
 #[test]
 fn public_registry_lists_only_canonical_tags() {
     let registry = instrument_types();
-    assert_eq!(registry.len(), 78, "canonical registry tag count drifted");
+    assert_eq!(
+        registry.len(),
+        InstrumentType::iter().count(),
+        "every InstrumentType has exactly one canonical registry tag"
+    );
     assert!(registry.contains(&"snowball"));
     assert!(!registry.contains(&"inverse_floater"));
 }
@@ -501,16 +292,10 @@ fn registry_manifest_and_fixtures_are_consistent() {
             "{} must document its persistence policy",
             entry.tag
         );
-        assert!(
-            entry.lossless || !entry.rationale.trim().is_empty(),
-            "{} must explain byte-equality-only coverage",
-            entry.tag
-        );
-        if !entry.lossless {
-            let blocker = entry
-                .partial_eq_blocker
-                .as_deref()
-                .unwrap_or_else(|| panic!("{} requires a concrete partial_eq_blocker", entry.tag));
+        let typed_equality = fixture_envelope(entry)
+            .instrument
+            .semantic_eq(&fixture_envelope(entry).instrument);
+        if let Some(blocker) = entry.partial_eq_blocker.as_deref() {
             let (field, blocker_type) = blocker.split_once(':').unwrap_or_else(|| {
                 panic!("{} blocker must use `Type.field: NestedType`", entry.tag)
             });
@@ -542,22 +327,11 @@ fn registry_manifest_and_fixtures_are_consistent() {
                 "{} duplicates another no-PartialEq rationale",
                 entry.tag
             );
-        } else {
-            assert!(
-                entry.partial_eq_blocker.is_none(),
-                "{} has typed equality and must not declare a blocker",
-                entry.tag
-            );
         }
-        assert!(
-            entry.lossless
-                == typed_semantic_equality(
-                    &entry.tag,
-                    &fixture_envelope(entry),
-                    &fixture_envelope(entry)
-                )
-                .is_some(),
-            "{} lossless policy must exactly match concrete typed PartialEq coverage",
+        assert_eq!(
+            entry.partial_eq_blocker.is_none(),
+            typed_equality.is_some(),
+            "{}: partial_eq_blocker must be set exactly when the Rust type lacks PartialEq",
             entry.tag
         );
         assert!(
@@ -573,11 +347,7 @@ fn registry_manifest_and_fixtures_are_consistent() {
             entry.tag,
             fixture_path.display()
         );
-        assert!(
-            declared_fixtures.insert(entry.fixture.as_str()),
-            "fixture {} is declared more than once",
-            entry.fixture
-        );
+        declared_fixtures.insert(fixture_relative(&entry.tag));
         let fixture: serde_json::Value = serde_json::from_slice(
             &fs::read(&fixture_path)
                 .unwrap_or_else(|error| panic!("read {}: {error}", fixture_path.display())),
@@ -617,8 +387,6 @@ fn registry_manifest_and_fixtures_are_consistent() {
             )
         })
         .collect();
-    let declared_fixtures: BTreeSet<String> =
-        declared_fixtures.into_iter().map(str::to_string).collect();
     assert_eq!(
         actual_fixtures, declared_fixtures,
         "every checked-in JSON fixture must be owned by one canonical registry tag"
@@ -710,16 +478,13 @@ fn every_registered_instrument_satisfies_persistence_contract() {
                 "{tag}: canonical bytes changed after strict decode"
             );
 
-            if entry.lossless {
-                assert_eq!(
-                    typed_semantic_equality(tag, &first_envelope, &second_envelope),
-                    Some(true),
-                    "{tag}: concrete typed PartialEq detected a semantic round-trip change"
-                );
-            } else {
+            if let Some(equal) = first_envelope
+                .instrument
+                .semantic_eq(&second_envelope.instrument)
+            {
                 assert!(
-                    !entry.rationale.trim().is_empty(),
-                    "{tag}: byte-equality-only policy requires a rationale"
+                    equal,
+                    "{tag}: concrete typed PartialEq detected a semantic round-trip change"
                 );
             }
 

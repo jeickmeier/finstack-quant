@@ -55,11 +55,20 @@ fn parse_metrics(metrics: Option<JsValue>) -> Result<Vec<MetricId>, JsValue> {
 ///
 /// Throws for malformed JSON, invalid specifications, missing market/history
 /// inputs, unsupported metrics/notionals, or non-finite resolved quantities.
-#[wasm_bindgen(js_name = initializeComposite)]
+/// @param specJson - Bare canonical `CompositeSpec` object or JSON string.
+/// @param marketJson - Complete market-context object or JSON string at `asOf`.
+/// @param asOf - ISO-8601 state effective date; no later history is permitted.
+/// @param historyJson - Optional chronological market-observation array or JSON for volatility or expression inputs.
+#[wasm_bindgen(js_name = initializeComposite, unchecked_return_type = "CompositeRebalanceResult")]
 pub fn initialize_composite(
-    spec_json: JsValue,
+    #[wasm_bindgen(js_name = "specJson", unchecked_param_type = "JsonInput")] spec_json: JsValue,
+    #[wasm_bindgen(js_name = "marketJson", unchecked_param_type = "JsonInput")]
     market_json: JsValue,
-    as_of: JsValue,
+    #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
+    #[wasm_bindgen(
+        js_name = "historyJson",
+        unchecked_optional_param_type = "Record<string, unknown>[] | string"
+    )]
     history_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let spec_json: &str = &json_text(&spec_json, "specJson")?;
@@ -99,11 +108,20 @@ pub fn initialize_composite(
 ///
 /// Throws for malformed inputs, a non-composite envelope, invalid history,
 /// missing market data, or quantity-resolution failures.
-#[wasm_bindgen(js_name = rebalanceComposite)]
+/// @param instrumentJson - Canonical resolved composite envelope object or JSON.
+/// @param marketJson - Complete rebalance-date market-context object or JSON.
+/// @param asOf - ISO-8601 effective date for the new state.
+/// @param historyJson - Optional chronological market-observation array or JSON; required for volatility weighting and must end on `asOf`.
+#[wasm_bindgen(js_name = rebalanceComposite, unchecked_return_type = "CompositeRebalanceResult")]
 pub fn rebalance_composite(
-    instrument_json: JsValue,
+    #[wasm_bindgen(js_name = "instrumentJson", unchecked_param_type = "JsonInput")] instrument_json: JsValue,
+    #[wasm_bindgen(js_name = "marketJson", unchecked_param_type = "JsonInput")]
     market_json: JsValue,
-    as_of: JsValue,
+    #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
+    #[wasm_bindgen(
+        js_name = "historyJson",
+        unchecked_optional_param_type = "Record<string, unknown>[] | string"
+    )]
     history_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
@@ -143,12 +161,17 @@ pub fn rebalance_composite(
 ///
 /// Throws for invalid input, non-additive metrics, missing market data, or
 /// primitive valuation failures.
-#[wasm_bindgen(js_name = compositePrimitiveExposures)]
+/// @param instrumentJson - Canonical resolved composite envelope object or JSON.
+/// @param marketJson - Complete valuation and FX context object or JSON.
+/// @param asOf - ISO-8601 valuation date used for prices, metrics, and FX.
+/// @param metrics - Optional additive metric identifiers; omit or pass `[]` to report value only.
+#[wasm_bindgen(js_name = compositePrimitiveExposures, unchecked_return_type = "CompositeExposureReport")]
 pub fn composite_primitive_exposures(
-    instrument_json: JsValue,
+    #[wasm_bindgen(js_name = "instrumentJson", unchecked_param_type = "JsonInput")] instrument_json: JsValue,
+    #[wasm_bindgen(js_name = "marketJson", unchecked_param_type = "JsonInput")]
     market_json: JsValue,
-    as_of: JsValue,
-    metrics: Option<JsValue>,
+    #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
+    #[wasm_bindgen(unchecked_optional_param_type = "string[]")] metrics: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
     let instrument = parse_composite(instrument_json)?;
@@ -179,9 +202,15 @@ pub fn composite_primitive_exposures(
 ///
 /// Throws for malformed or non-composite envelopes, conflicting primitive
 /// definitions, or invalid frozen states.
-#[wasm_bindgen(js_name = compositeExecutionTrades)]
+/// @param instrumentJson - Canonical target resolved composite envelope.
+/// @param previousInstrumentJson - Optional prior resolved envelope; omit for establishment trades.
+#[wasm_bindgen(js_name = compositeExecutionTrades, unchecked_return_type = "CompositeTrade[]")]
 pub fn composite_execution_trades(
-    instrument_json: JsValue,
+    #[wasm_bindgen(js_name = "instrumentJson", unchecked_param_type = "JsonInput")] instrument_json: JsValue,
+    #[wasm_bindgen(
+        js_name = "previousInstrumentJson",
+        unchecked_optional_param_type = "JsonInput"
+    )]
     previous_instrument_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
@@ -223,12 +252,24 @@ pub fn composite_execution_trades(
 ///
 /// Throws for empty, duplicate, or unordered observations; overlapping warmup;
 /// noncanonical metric keys; initialization/rebalance failures; or missing market/history inputs.
-#[wasm_bindgen(js_name = compositeHistoryFromSpec)]
+/// @param specJson - Bare canonical `CompositeSpec` object or JSON string.
+/// @param observationsJson - Non-empty strictly increasing complete observation array or JSON.
+/// @param warmupJson - Optional complete observations strictly before the output period.
+/// @param metrics - Optional additive primitive metrics reported on every row; omit or pass `[]` for value only.
+#[wasm_bindgen(js_name = compositeHistoryFromSpec, unchecked_return_type = "CompositeHistoryRow[]")]
 pub fn composite_history_from_spec(
-    spec_json: JsValue,
+    #[wasm_bindgen(js_name = "specJson", unchecked_param_type = "JsonInput")] spec_json: JsValue,
+    #[wasm_bindgen(
+        js_name = "observationsJson",
+        unchecked_param_type = "Record<string, unknown>[] | string"
+    )]
     observations_json: JsValue,
+    #[wasm_bindgen(
+        js_name = "warmupJson",
+        unchecked_optional_param_type = "Record<string, unknown>[] | string"
+    )]
     warmup_json: Option<JsValue>,
-    metrics: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "string[]")] metrics: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let spec_json: &str = &json_text(&spec_json, "specJson")?;
     let observations_json: &str = &json_text(&observations_json, "observationsJson")?;
@@ -269,11 +310,18 @@ pub fn composite_history_from_spec(
 ///
 /// Throws for invalid states, empty/duplicate/unordered observations, missing
 /// market data, or valuation and rebalance failures.
-#[wasm_bindgen(js_name = compositeHistory)]
+/// @param instrumentJson - Canonical resolved composite envelope object or JSON.
+/// @param observationsJson - Non-empty strictly increasing complete observation array or JSON.
+/// @param metrics - Optional additive primitive metrics reported on every row; omit or pass `[]` for value only.
+#[wasm_bindgen(js_name = compositeHistory, unchecked_return_type = "CompositeHistoryRow[]")]
 pub fn composite_history(
-    instrument_json: JsValue,
+    #[wasm_bindgen(js_name = "instrumentJson", unchecked_param_type = "JsonInput")] instrument_json: JsValue,
+    #[wasm_bindgen(
+        js_name = "observationsJson",
+        unchecked_param_type = "Record<string, unknown>[] | string"
+    )]
     observations_json: JsValue,
-    metrics: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "string[]")] metrics: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
     let observations_json: &str = &json_text(&observations_json, "observationsJson")?;
@@ -308,17 +356,19 @@ use finstack_quant_valuations::instruments::json_loader::InstrumentEnvelope;
 
 /// `WeightingMethod::MetricWeighted`: size the legs by an additive metric.
 /// @param metric - Canonical additive metric identifier, e.g. `"dv01"` or `"delta"`.
-/// @param anchor_leg_id - Leg whose quantity is fixed at `anchorQuantity`.
-/// @param anchor_quantity - Quantity of the anchor leg.
+/// @param anchorLegId - Leg whose quantity is fixed at `anchorQuantity`.
+/// @param anchorQuantity - Quantity of the anchor leg.
 /// @param neutralize - Required; `true` sizes the other legs so the net metric is zero (the `weightingMethodDv01Neutral` / `weightingMethodDeltaNeutral` presets), `false` scales them by score.
 /// @returns The `WeightingMethod` plain object.
 /// @throws Error - Throws with kind `validation` if `metric` is not a canonical metric identifier, and kind `invalid_type` for a wrong argument type.
-#[wasm_bindgen(js_name = weightingMethodMetricWeighted)]
+#[wasm_bindgen(js_name = weightingMethodMetricWeighted, unchecked_return_type = "generated.valuations.WeightingMethod")]
 pub fn weighting_method_metric_weighted(
-    metric: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] metric: JsValue,
+    #[wasm_bindgen(js_name = "anchorLegId", unchecked_param_type = "string")]
     anchor_leg_id: JsValue,
+    #[wasm_bindgen(js_name = "anchorQuantity", unchecked_param_type = "number")]
     anchor_quantity: JsValue,
-    neutralize: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "boolean")] neutralize: JsValue,
 ) -> Result<JsValue, JsValue> {
     to_js_value(&WeightingMethod::MetricWeighted {
         metric: js_string(&metric, "metric")?.parse().map_err(to_js_err)?,
@@ -331,13 +381,17 @@ pub fn weighting_method_metric_weighted(
 /// One anchored weighting preset `(anchorLegId, anchorQuantity)`.
 macro_rules! anchored_weighting {
     ($(#[$doc:meta])* $name:ident as $js_name:ident => $method:ident) => {
+        #[finstack_quant_wasm_macros::plain_docs]
         $(#[$doc])*
-        /// @param anchor_leg_id - Leg whose quantity is fixed at `anchorQuantity`.
-        /// @param anchor_quantity - Quantity of the anchor leg.
+        /// @param anchorLegId - Leg whose quantity is fixed at `anchorQuantity`.
+        /// @param anchorQuantity - Quantity of the anchor leg.
         /// @returns The `WeightingMethod` plain object.
         /// @throws Error - Throws with kind `invalid_type` if `anchorLegId` is not a string or `anchorQuantity` is not a number.
-        #[wasm_bindgen(js_name = $js_name)]
-        pub fn $name(anchor_leg_id: JsValue, anchor_quantity: JsValue) -> Result<JsValue, JsValue> {
+        #[wasm_bindgen(js_name = $js_name, unchecked_return_type = "generated.valuations.WeightingMethod")]
+        pub fn $name(
+            #[wasm_bindgen(js_name = "anchorLegId", unchecked_param_type = "string")] anchor_leg_id: JsValue,
+            #[wasm_bindgen(js_name = "anchorQuantity", unchecked_param_type = "number")] anchor_quantity: JsValue,
+        ) -> Result<JsValue, JsValue> {
             to_js_value(&WeightingMethod::$method(
                 js_string(&anchor_leg_id, "anchorLegId")?,
                 js_f64(&anchor_quantity, "anchorQuantity")?,
@@ -360,19 +414,22 @@ anchored_weighting!(
 );
 
 /// Inverse-volatility weighting (mirrors Rust `WeightingMethod::volatility_weighted`).
-/// @param anchor_leg_id - Leg whose quantity is fixed at `anchorQuantity`.
-/// @param anchor_quantity - Quantity of the anchor leg.
+/// @param anchorLegId - Leg whose quantity is fixed at `anchorQuantity`.
+/// @param anchorQuantity - Quantity of the anchor leg.
 /// @param lookback - Number of return observations in the volatility window.
-/// @param min_observations - Minimum observations required to estimate a volatility.
-/// @param annualization_factor - Periods per year used to annualize volatility (252 for daily data).
+/// @param minObservations - Minimum observations required to estimate a volatility.
+/// @param annualizationFactor - Periods per year used to annualize volatility (252 for daily data).
 /// @returns The `WeightingMethod` plain object.
 /// @throws Error - Throws with kind `invalid_type` if a count is not a non-negative whole number or another argument has the wrong type.
-#[wasm_bindgen(js_name = weightingMethodVolatilityWeighted)]
+#[wasm_bindgen(js_name = weightingMethodVolatilityWeighted, unchecked_return_type = "generated.valuations.WeightingMethod")]
 pub fn weighting_method_volatility_weighted(
+    #[wasm_bindgen(js_name = "anchorLegId", unchecked_param_type = "string")]
     anchor_leg_id: JsValue,
+    #[wasm_bindgen(js_name = "anchorQuantity", unchecked_param_type = "number")]
     anchor_quantity: JsValue,
-    lookback: JsValue,
-    min_observations: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] lookback: JsValue,
+    #[wasm_bindgen(js_name = "minObservations", unchecked_param_type = "number")] min_observations: JsValue,
+    #[wasm_bindgen(js_name = "annualizationFactor", unchecked_param_type = "number")]
     annualization_factor: JsValue,
 ) -> Result<JsValue, JsValue> {
     to_js_value(&WeightingMethod::volatility_weighted(
@@ -394,8 +451,10 @@ fn rebalance_rule(rule: RebalanceRule) -> Result<JsValue, JsValue> {
 /// @param dates - Strictly increasing ISO-8601 rebalance dates.
 /// @returns The `RebalanceRule` plain object.
 /// @throws Error - Throws with kind `validation` if a date is malformed or the dates are duplicated or unordered, and kind `invalid_type` if `dates` is not an array of strings.
-#[wasm_bindgen(js_name = rebalanceRuleDates)]
-pub fn rebalance_rule_dates(dates: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = rebalanceRuleDates, unchecked_return_type = "generated.valuations.RebalanceRule")]
+pub fn rebalance_rule_dates(
+    #[wasm_bindgen(unchecked_param_type = "string[]")] dates: JsValue,
+) -> Result<JsValue, JsValue> {
     rebalance_rule(RebalanceRule::Dates {
         dates: arg::dates(&dates, "dates")?,
     })
@@ -404,18 +463,22 @@ pub fn rebalance_rule_dates(dates: JsValue) -> Result<JsValue, JsValue> {
 /// `RebalanceRule::Calendar`: rebalance on a business-day adjusted schedule.
 /// @param start - First rebalance date as an ISO-8601 string.
 /// @param frequency - Rebalance cadence as a `Tenor` plain object, e.g. `{ count: 1, unit: "months" }`.
-/// @param calendar_id - Registered holiday-calendar identifier, e.g. `"nyse"`.
-/// @param business_day_convention - Business-day adjustment serde name, e.g. `"modified_following"`.
+/// @param calendarId - Registered holiday-calendar identifier, e.g. `"nyse"`.
+/// @param businessDayConvention - Business-day adjustment serde name, e.g. `"modified_following"`.
 /// @param end - Optional last rebalance date as an ISO-8601 string; omit for an open-ended schedule.
 /// @returns The `RebalanceRule` plain object.
 /// @throws Error - Throws with kind `validation` if a date, the tenor or the convention is malformed, `end` precedes `start`, or the calendar is unknown; and kind `invalid_type` for a wrong argument type.
-#[wasm_bindgen(js_name = rebalanceRuleCalendar)]
+#[wasm_bindgen(js_name = rebalanceRuleCalendar, unchecked_return_type = "generated.valuations.RebalanceRule")]
 pub fn rebalance_rule_calendar(
-    start: JsValue,
-    frequency: JsValue,
-    calendar_id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] start: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.valuations.Tenor")] frequency: JsValue,
+    #[wasm_bindgen(js_name = "calendarId", unchecked_param_type = "string")] calendar_id: JsValue,
+    #[wasm_bindgen(
+        js_name = "businessDayConvention",
+        unchecked_param_type = "generated.valuations.BusinessDayConvention"
+    )]
     business_day_convention: JsValue,
-    end: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "string | null")] end: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     rebalance_rule(RebalanceRule::Calendar {
         start: js_date(&start, "start")?,
@@ -432,8 +495,11 @@ pub fn rebalance_rule_calendar(
 /// @param leg - `CompositeLegSpec` plain object or JSON string.
 /// @returns The leg's `finstack_quant.instrument/1` envelope as a plain object.
 /// @throws Error - Throws with kind `validation` if `leg` does not match the `CompositeLegSpec` schema.
-#[wasm_bindgen(js_name = compositeLegSpecInstrumentDict)]
-pub fn composite_leg_spec_instrument_dict(leg: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = compositeLegSpecInstrumentDict, unchecked_return_type = "Record<string, unknown>")]
+pub fn composite_leg_spec_instrument_dict(
+    #[wasm_bindgen(unchecked_param_type = "generated.valuations.CompositeLegSpec | string")]
+    leg: JsValue,
+) -> Result<JsValue, JsValue> {
     let leg: CompositeLegSpec = from_js_json(&leg, "leg")?;
     to_js_value(&InstrumentEnvelope::new(*leg.instrument))
 }
@@ -446,7 +512,10 @@ pub fn composite_leg_spec_instrument_dict(leg: JsValue) -> Result<JsValue, JsVal
 /// @returns Canonical `CompositeHistoryRow` JSON text.
 /// @throws Error - Throws with kind `validation` if `rows` does not match the `CompositeHistoryRow` schema or `index` is out of range, and kind `invalid_type` if `index` is not a non-negative whole number.
 #[wasm_bindgen(js_name = compositeHistoryResultRowJson)]
-pub fn composite_history_result_row_json(rows: JsValue, index: JsValue) -> Result<String, JsValue> {
+pub fn composite_history_result_row_json(
+    #[wasm_bindgen(unchecked_param_type = "CompositeHistoryRow[] | string")] rows: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] index: JsValue,
+) -> Result<String, JsValue> {
     let rows: Vec<CompositeHistoryRow> = from_js_json(&rows, "rows")?;
     let index: usize = js_uint(&index, "index")?;
     let row = rows.get(index).ok_or_else(|| {

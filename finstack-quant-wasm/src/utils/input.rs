@@ -35,7 +35,7 @@ const MAX_DEPTH: usize = 256;
 ///
 /// # Arguments
 ///
-/// * `label` - The camelCase argument name as documented in `index.d.ts`.
+/// * `label` - The parameter's camelCase JavaScript name, as its `js_name` declares it.
 /// * `problem` - What was expected and what was found.
 pub fn invalid_type(label: &str, problem: &str) -> JsValue {
     let message = format!("{label}: {problem}");

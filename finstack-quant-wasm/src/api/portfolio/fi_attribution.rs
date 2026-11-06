@@ -26,9 +26,9 @@ use wasm_bindgen::prelude::*;
 /// present on either side has `|net sector weight| <= 1e-6 * gross absolute
 /// sector weight`. Spread-basis provenance cannot be validated from numeric
 /// JSON alone.
-/// @param portfolio_json - Canonical JSON array of `FiPositionSnapshot` objects describing the portfolio side on the quote-reproducing Z-spread basis; weights must sum to 1.
-/// @param benchmark_json - Canonical JSON array of `FiPositionSnapshot` objects describing the benchmark side on the quote-reproducing Z-spread basis; weights must sum to 1.
-/// @param config_json - Canonical JSON `FiAttributionConfig`; `period_years` is its only field, is required (no default), and unknown keys are rejected.
+/// @param portfolioJson - Canonical JSON array of `FiPositionSnapshot` objects describing the portfolio side on the quote-reproducing Z-spread basis; weights must sum to 1.
+/// @param benchmarkJson - Canonical JSON array of `FiPositionSnapshot` objects describing the benchmark side on the quote-reproducing Z-spread basis; weights must sum to 1.
+/// @param configJson - Canonical JSON `FiAttributionConfig`; `period_years` is its only field, is required (no default), and unknown keys are rejected.
 ///
 /// # Errors
 ///
@@ -36,10 +36,14 @@ use wasm_bindgen::prelude::*;
 /// empty; a value is non-finite; weights do not sum to one; `periodYears` is not
 /// finite and positive; a sector has a zero or near-zero net weight relative to
 /// gross weight; or the result cannot be converted to a JavaScript value.
-#[wasm_bindgen(js_name = campisiAttribution)]
+/// @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
+#[wasm_bindgen(js_name = campisiAttribution, unchecked_return_type = "FiAttributionResult")]
 pub fn campisi_attribution(
+    #[wasm_bindgen(js_name = "portfolioJson", unchecked_param_type = "JsonInput")]
     portfolio_json: JsValue,
+    #[wasm_bindgen(js_name = "benchmarkJson", unchecked_param_type = "JsonInput")]
     benchmark_json: JsValue,
+    #[wasm_bindgen(js_name = "configJson", unchecked_param_type = "JsonInput")]
     config_json: JsValue,
 ) -> Result<JsValue, JsValue> {
     let portfolio: Vec<finstack_quant_portfolio::fi_attribution::FiPositionSnapshot> =
@@ -70,7 +74,7 @@ pub fn campisi_attribution(
 /// totals do not reconcile to `active_return` within the overflow-safe
 /// scaled-L1 tolerance, a reconciliation residual is non-finite, or a return
 /// is outside the Carino domain.
-/// @param periods_json - Canonical JSON array of `FiAttributionResult` objects in chronological order, as returned by `campisiAttribution`.
+/// @param periodsJson - Canonical JSON array of `FiAttributionResult` objects in chronological order, as returned by `campisiAttribution`.
 ///
 /// # Errors
 ///
@@ -78,8 +82,12 @@ pub fn campisi_attribution(
 /// empty or changes sector ordering, a consumed value or reconciliation is
 /// non-finite or inconsistent, a return is at most `-1`, or the linked result
 /// cannot be converted to a JavaScript value.
-#[wasm_bindgen(js_name = campisiCarinoLink)]
-pub fn campisi_carino_link(periods_json: JsValue) -> Result<JsValue, JsValue> {
+/// @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
+#[wasm_bindgen(js_name = campisiCarinoLink, unchecked_return_type = "FiCarinoLinkedResult")]
+pub fn campisi_carino_link(
+    #[wasm_bindgen(js_name = "periodsJson", unchecked_param_type = "JsonInput")]
+    periods_json: JsValue,
+) -> Result<JsValue, JsValue> {
     let periods: Vec<finstack_quant_portfolio::fi_attribution::FiAttributionResult> =
         from_js_json(&periods_json, "periodsJson")?;
     let result = finstack_quant_portfolio::fi_attribution::campisi_carino_link(&periods)
@@ -104,10 +112,11 @@ pub fn campisi_carino_link(periods_json: JsValue) -> Result<JsValue, JsValue> {
 /// Throws a JavaScript exception if `result` is malformed or does not match
 /// `FiAttributionResult`, or if the reconciliation report cannot be converted to
 /// a JavaScript value.
-#[wasm_bindgen(js_name = fiAttributionResultReconciliationCheck)]
+/// @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
+#[wasm_bindgen(js_name = fiAttributionResultReconciliationCheck, unchecked_return_type = "ReconciliationReport")]
 pub fn fi_attribution_result_reconciliation_check(
-    result: JsValue,
-    tolerance: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "FiAttributionResult | string")] result: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] tolerance: JsValue,
 ) -> Result<JsValue, JsValue> {
     let tolerance = js_f64(&tolerance, "tolerance")?;
     let result: finstack_quant_portfolio::fi_attribution::FiAttributionResult =

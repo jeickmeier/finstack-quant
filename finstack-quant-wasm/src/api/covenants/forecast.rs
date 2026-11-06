@@ -32,10 +32,14 @@ fn forecast_config(config: Option<&JsValue>) -> Result<CovenantForecastConfig, J
 /// @param config - Optional `CovenantForecastConfig` wire object; omitted means the deterministic Rust default.
 /// @returns `CovenantForecast` wire object: per-date projected values, thresholds, headroom and breach probabilities, with the first breach date and minimum headroom.
 /// @throws If `metrics` is empty or repeats a date, the covenant is not numeric, the configuration is invalid or an observation is non-finite (kind `validation`), or the covenant's metric is missing on a date (kind `not_found`).
-#[wasm_bindgen(js_name = forecastCovenant)]
+#[wasm_bindgen(js_name = forecastCovenant, unchecked_return_type = "generated.covenants.CovenantForecast")]
 pub fn forecast_covenant(
-    spec: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.covenants.CovenantSpec")] spec: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "readonly generated.covenants.DatedMetrics[]")]
     metrics: JsValue,
+    #[wasm_bindgen(
+        unchecked_optional_param_type = "generated.covenants.CovenantForecastConfig | null"
+    )]
     config: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let spec = js_wire::<CovenantSpec>(&spec, "spec")?;
@@ -59,10 +63,14 @@ pub fn forecast_covenant(
 /// @param config - Optional `CovenantForecastConfig` wire object; omitted means deterministic maintenance-scope forecasting.
 /// @returns `FutureBreach` wire objects sorted by breach date, then covenant id.
 /// @throws If `metrics` is empty or repeats a date, the engine or configuration is invalid or an observation is non-finite (kind `validation`), or a required metric is missing on a date (kind `not_found`).
-#[wasm_bindgen(js_name = forecastBreaches)]
+#[wasm_bindgen(js_name = forecastBreaches, unchecked_return_type = "generated.covenants.FutureBreach[]")]
 pub fn forecast_breaches(
     engine: &JsCovenantEngine,
+    #[wasm_bindgen(unchecked_param_type = "readonly generated.covenants.DatedMetrics[]")]
     metrics: JsValue,
+    #[wasm_bindgen(
+        unchecked_optional_param_type = "generated.covenants.CovenantForecastConfig | null"
+    )]
     config: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let series = metric_series(&metrics)?;
@@ -79,10 +87,11 @@ pub fn forecast_breaches(
 /// @param scope - `"maintenance"` (scheduled tests) or `"incurrence"` (hypothetical capacity for a contemplated action).
 /// @returns The updated `CovenantForecastConfig`.
 /// @throws If `config` is not a `CovenantForecastConfig` or `scope` is not one of the listed strings (kind `validation`).
-#[wasm_bindgen(js_name = covenantForecastConfigWithScope)]
+#[wasm_bindgen(js_name = covenantForecastConfigWithScope, unchecked_return_type = "generated.covenants.CovenantForecastConfig")]
 pub fn covenant_forecast_config_with_scope(
+    #[wasm_bindgen(unchecked_param_type = "generated.covenants.CovenantForecastConfig")]
     config: JsValue,
-    scope: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.covenants.CovenantScope")] scope: JsValue,
 ) -> Result<JsValue, JsValue> {
     let config = js_wire::<CovenantForecastConfig>(&config, "config")?;
     to_js_value(&config.with_scope(js_wire::<CovenantScope>(&scope, "scope")?))

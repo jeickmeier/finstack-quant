@@ -309,17 +309,17 @@ fn test_bond_floating_value() {
         .expect("CashFlowSchedule builder should succeed with valid test data");
     let ctx = MarketContext::new().insert(disc).insert(fwd);
 
-    let bond = Bond::floating(
-        "FRN-TEST",
+    let bond = Bond::floating(crate::bond::FloatingBondParams {
+        id: "FRN-TEST".into(),
         notional,
-        "USD-SOFR-3M",
-        150,
-        issue,
+        forward_curve_id: "USD-SOFR-3M".into(),
+        spread_bp: 150.into(),
+        issue_date: issue,
         maturity,
-        Tenor::quarterly(),
-        DayCount::Act360,
-        "USD-OIS",
-    )
+        frequency: Tenor::quarterly(),
+        day_count: DayCount::Act360,
+        discount_curve_id: "USD-OIS".into(),
+    })
     .unwrap();
 
     // Price should be finite and positive under positive forwards
@@ -353,17 +353,17 @@ fn test_bond_frn_ex_coupon_accrual_negative_in_window() {
         .expect("ForwardCurve builder should succeed in test");
     let ctx = MarketContext::new().insert(disc).insert(fwd);
 
-    let mut bond = Bond::floating(
-        "FRN-EX-COUPON",
+    let mut bond = Bond::floating(crate::bond::FloatingBondParams {
+        id: "FRN-EX-COUPON".into(),
         notional,
-        "USD-SOFR-3M",
-        150,
-        issue,
+        forward_curve_id: "USD-SOFR-3M".into(),
+        spread_bp: 150.into(),
+        issue_date: issue,
         maturity,
-        Tenor::quarterly(),
-        DayCount::Act360,
-        "USD-OIS",
-    )
+        frequency: Tenor::quarterly(),
+        day_count: DayCount::Act360,
+        discount_curve_id: "USD-OIS".into(),
+    })
     .unwrap();
     bond.settlement_convention = Some(BondSettlementConvention {
         ex_coupon_days: 5,
@@ -558,17 +558,17 @@ fn test_bond_frn_dated_cashflows_uses_builder() {
     let maturity = Date::from_calendar_date(2026, Month::January, 1).expect("Valid test date");
 
     // Create FRN
-    let frn = Bond::floating(
-        "FRN-BUILDER-TEST",
-        Money::from((1_000_000_i64, Currency::USD)),
-        "USD-SOFR",
-        100,
-        issue,
+    let frn = Bond::floating(crate::bond::FloatingBondParams {
+        id: "FRN-BUILDER-TEST".into(),
+        notional: Money::from((1_000_000_i64, Currency::USD)),
+        forward_curve_id: "USD-SOFR".into(),
+        spread_bp: 100.into(),
+        issue_date: issue,
         maturity,
-        Tenor::quarterly(),
-        DayCount::Act360,
-        "USD-OIS",
-    )
+        frequency: Tenor::quarterly(),
+        day_count: DayCount::Act360,
+        discount_curve_id: "USD-OIS".into(),
+    })
     .unwrap();
 
     // Create market with forward curve
@@ -869,17 +869,17 @@ fn floating_test_dates() -> (Date, Date) {
 #[test]
 fn bond_floating_usd_uses_us_corporate_settlement() {
     let (issue, maturity) = floating_test_dates();
-    let bond = Bond::floating(
-        "FRN-USD",
-        Money::from((1000000_i64, Currency::USD)),
-        "USD-SOFR-3M",
-        100,
-        issue,
+    let bond = Bond::floating(crate::bond::FloatingBondParams {
+        id: "FRN-USD".into(),
+        notional: Money::from((1000000_i64, Currency::USD)),
+        forward_curve_id: "USD-SOFR-3M".into(),
+        spread_bp: 100.into(),
+        issue_date: issue,
         maturity,
-        Tenor::quarterly(),
-        DayCount::Act360,
-        "USD-OIS",
-    )
+        frequency: Tenor::quarterly(),
+        day_count: DayCount::Act360,
+        discount_curve_id: "USD-OIS".into(),
+    })
     .expect("USD FRN");
     assert_eq!(bond.settlement_days(), Some(1));
     let CashflowSpec::Floating(spec) = &bond.cashflow_spec else {
@@ -895,17 +895,17 @@ fn bond_floating_usd_uses_us_corporate_settlement() {
 #[test]
 fn bond_floating_eur_uses_eur_corporate_settlement() {
     let (issue, maturity) = floating_test_dates();
-    let bond = Bond::floating(
-        "FRN-EUR",
-        Money::from((1000000_i64, Currency::EUR)),
-        "EUR-EURIBOR-3M",
-        100,
-        issue,
+    let bond = Bond::floating(crate::bond::FloatingBondParams {
+        id: "FRN-EUR".into(),
+        notional: Money::from((1000000_i64, Currency::EUR)),
+        forward_curve_id: "EUR-EURIBOR-3M".into(),
+        spread_bp: 100.into(),
+        issue_date: issue,
         maturity,
-        Tenor::quarterly(),
-        DayCount::Act360,
-        "EUR-OIS",
-    )
+        frequency: Tenor::quarterly(),
+        day_count: DayCount::Act360,
+        discount_curve_id: "EUR-OIS".into(),
+    })
     .expect("EUR FRN");
     assert_eq!(bond.settlement_days(), Some(2));
     let CashflowSpec::Floating(spec) = &bond.cashflow_spec else {
@@ -921,17 +921,17 @@ fn bond_floating_eur_uses_eur_corporate_settlement() {
 #[test]
 fn bond_floating_gbp_uses_uk_gilt_t1_not_t2() {
     let (issue, maturity) = floating_test_dates();
-    let bond = Bond::floating(
-        "FRN-GBP",
-        Money::from((1000000_i64, Currency::GBP)),
-        "GBP-SONIA",
-        100,
-        issue,
+    let bond = Bond::floating(crate::bond::FloatingBondParams {
+        id: "FRN-GBP".into(),
+        notional: Money::from((1000000_i64, Currency::GBP)),
+        forward_curve_id: "GBP-SONIA".into(),
+        spread_bp: 100.into(),
+        issue_date: issue,
         maturity,
-        Tenor::quarterly(),
-        DayCount::Act365F,
-        "GBP-SONIA",
-    )
+        frequency: Tenor::quarterly(),
+        day_count: DayCount::Act365F,
+        discount_curve_id: "GBP-SONIA".into(),
+    })
     .expect("GBP FRN");
     assert_eq!(bond.settlement_days(), Some(1));
     let CashflowSpec::Floating(spec) = &bond.cashflow_spec else {
@@ -946,17 +946,17 @@ fn bond_floating_gbp_uses_uk_gilt_t1_not_t2() {
 #[test]
 fn bond_floating_unmapped_currency_requires_convention() {
     let (issue, maturity) = floating_test_dates();
-    let err = Bond::floating(
-        "FRN-CHF",
-        Money::from((1000000_i64, Currency::CHF)),
-        "CHF-SARON",
-        100,
-        issue,
+    let err = Bond::floating(crate::bond::FloatingBondParams {
+        id: "FRN-CHF".into(),
+        notional: Money::from((1000000_i64, Currency::CHF)),
+        forward_curve_id: "CHF-SARON".into(),
+        spread_bp: 100.into(),
+        issue_date: issue,
         maturity,
-        Tenor::quarterly(),
-        DayCount::Act360,
-        "CHF-SARON",
-    )
+        frequency: Tenor::quarterly(),
+        day_count: DayCount::Act360,
+        discount_curve_id: "CHF-SARON".into(),
+    })
     .expect_err("CHF has no mapped FRN convention");
     assert!(
         err.to_string().contains("floating_with_convention"),

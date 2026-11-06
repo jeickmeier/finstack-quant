@@ -232,19 +232,21 @@ pub fn synthetic_underlying_cds(
     };
 
     let mut cds = CreditDefaultSwap::new_isda(
-        option.id.to_owned(),
-        Money::new(
-            option.notional.amount() * notional_scale,
-            option.notional.currency(),
-        )?,
-        PayReceive::Pay,
         option.underlying_convention,
         coupon_bp,
-        option.effective_underlying_effective_date(as_of),
-        option.underlying_maturity,
-        option.recovery_rate,
-        option.discount_curve_id.to_owned(),
-        option.credit_curve_id.to_owned(),
+        crate::cds::CdsTradeParams {
+            id: option.id.to_owned(),
+            notional: Money::new(
+                option.notional.amount() * notional_scale,
+                option.notional.currency(),
+            )?,
+            side: PayReceive::Pay,
+            start: option.effective_underlying_effective_date(as_of),
+            end: option.underlying_maturity,
+            recovery_rate: option.recovery_rate,
+            discount_curve_id: option.discount_curve_id.to_owned(),
+            credit_curve_id: option.credit_curve_id.to_owned(),
+        },
     )?;
 
     // Bloomberg CDSO ATM Fwd uses Default_Leg(0, T_mat) — the spot

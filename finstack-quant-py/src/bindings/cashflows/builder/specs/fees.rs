@@ -2,17 +2,13 @@
 
 use crate::bindings::macros::wire_methods;
 use crate::bindings::pydoc::pydoc;
-use finstack_quant_cashflows::builder::{FeeAccrualBasis, FeeBase, FeeSpec, ScheduleParams};
-use finstack_quant_core::dates::BusinessDayConvention;
+use finstack_quant_cashflows::builder::{FeeAccrualBasis, FeeBase, FeeSpec};
 use pyo3::prelude::*;
 
-use super::*;
-use crate::bindings::core::dates::calendar::{
-    PyBusinessDayConvention, extract_business_day_convention,
-};
+use crate::bindings::core::dates::calendar::PyBusinessDayConvention;
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::dates::schedule::PyStubKind;
-use crate::bindings::core::dates::tenor::{PyTenor, extract_tenor};
+use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::core::money::{PyMoney, decimal_to_py};
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::repr_support::enum_repr_from_serde as enum_repr;
@@ -149,35 +145,25 @@ impl PyFeeSpec {
     #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.periodic_bp")]
     #[staticmethod]
     #[pyo3(
-        signature = (base, bp, frequency, day_count, calendar_id, business_day_convention=None, stub=None, accrual_basis=None),
-        text_signature = "(base, bp, frequency, day_count, calendar_id, business_day_convention=None, stub=None, accrual_basis=None)"
+        signature = (**fields),
+        text_signature = "(*, base, bp, frequency, day_count, calendar_id, business_day_convention='modified_following', stub='short_front', accrual_basis='point_in_time')"
     )]
-    #[allow(clippy::too_many_arguments)]
     fn periodic_bp(
-        base: PyRef<'_, PyFeeBase>,
-        bp: &Bound<'_, PyAny>,
-        frequency: &Bound<'_, PyAny>,
-        day_count: PyRef<'_, PyDayCount>,
-        calendar_id: &str,
-        business_day_convention: Option<&Bound<'_, PyAny>>,
-        stub: Option<PyRef<'_, PyStubKind>>,
-        accrual_basis: Option<PyRef<'_, PyFeeAccrualBasis>>,
+        py: Python<'_>,
+        fields: Option<&Bound<'_, pyo3::types::PyDict>>,
     ) -> PyResult<Self> {
-        Ok(Self {
-            inner: FeeSpec::PeriodicBp {
-                base: base.inner.clone(),
-                bp: decimal_from_any(bp)?,
-                frequency: extract_tenor(frequency)?,
-                day_count: day_count.inner,
-                business_day_convention: match business_day_convention {
-                    Some(obj) => extract_business_day_convention(obj)?,
-                    None => BusinessDayConvention::default(),
-                },
-                calendar_id: calendar_id.to_string(),
-                stub: stub.map_or(ScheduleParams::DEFAULT_STUB, |s| s.inner),
-                accrual_basis: accrual_basis.map(|a| a.inner.clone()).unwrap_or_default(),
-            },
-        })
+        // The fields are the `periodic_bp` variant of the externally tagged `FeeSpec`.
+        let variant = pyo3::types::PyDict::new(py);
+        match fields {
+            Some(fields) => variant.set_item("periodic_bp", fields)?,
+            None => variant.set_item("periodic_bp", pyo3::types::PyDict::new(py))?,
+        }
+        let inner: FeeSpec = crate::bindings::module_utils::py_to_serde(
+            py,
+            variant.as_any(),
+            "FeeSpec.periodic_bp",
+        )?;
+        Ok(Self { inner })
     }
 
     #[doc = pydoc!("finstack_quant.cashflows.builder._specs.fees", "FeeSpec.kind")]

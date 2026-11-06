@@ -577,24 +577,17 @@ pub fn hw1f_zcb_option_price(
 /// * `kappa` - Mean-reversion speed κ in inverse years.
 /// * `sigma` - Constant short-rate volatility σ in absolute rate units per
 ///   square-root year.
-/// * `pf_fix` - Projection-curve discount factor to fixing.
-/// * `pf_pay` - Projection-curve discount factor to payment.
-/// * `pd_pay` - Discount-curve discount factor to payment.
-/// * `t_fix` - Fixing time in years.
-/// * `t_pay` - Payment time in years.
-/// * `accrual` - Positive coupon accrual fraction in years.
+/// * `(pf_fix, pf_pay, pd_pay)` - Projection-curve discount factors to
+///   fixing and to payment, and the discount-curve discount factor to payment.
+/// * `(t_fix, t_pay, accrual)` - Fixing and payment times in years and the
+///   positive coupon accrual fraction in years.
 /// * `strike` - Caplet or floorlet strike as a decimal rate.
 /// * `is_cap` - `true` for a caplet and `false` for a floorlet.
-#[allow(clippy::too_many_arguments)]
 fn hw1f_caplet_price_from_dfs(
     kappa: f64,
     sigma: f64,
-    pf_fix: f64,
-    pf_pay: f64,
-    pd_pay: f64,
-    t_fix: f64,
-    t_pay: f64,
-    accrual: f64,
+    (pf_fix, pf_pay, pd_pay): (f64, f64, f64),
+    (t_fix, t_pay, accrual): (f64, f64, f64),
     strike: f64,
     is_cap: bool,
 ) -> f64 {
@@ -627,21 +620,39 @@ fn hw1f_caplet_price_from_dfs(
     basis * gearing * zcb_option
 }
 
+/// Discount factors and model times of one term-index caplet period, priced
+/// by [`hw1f_term_caplet_price_from_dfs_with_model`].
+///
+/// All times are on the same model clock (ACT/365F years from valuation).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TermCapletPeriod {
+    /// Projection-curve discount factor to coupon-period start.
+    pub pf_start: f64,
+    /// Projection-curve discount factor to coupon-period end.
+    pub pf_end: f64,
+    /// Discount-curve discount factor to payment.
+    pub pd_pay: f64,
+    /// Contractual fixing time in years.
+    pub t_fix: f64,
+    /// Coupon-period start time in years, at or after `t_fix`.
+    pub t_start: f64,
+    /// Coupon-period end time in years, after `t_start`.
+    pub t_end: f64,
+    /// Contractual payment time in years, at or after `t_start`.
+    /// Business-day adjustment may place it before `t_end`; either payment
+    /// timing changes the projected ratio under the payment measure.
+    pub t_pay: f64,
+    /// Positive coupon accrual fraction in years.
+    pub accrual: f64,
+}
+
 /// Price an exact term-index caplet or floorlet under scheduled σ(t).
 ///
 /// # Arguments
 ///
 /// * `params` - Validated mean reversion and piecewise volatility schedule.
-/// * `pf_start` - Projection-curve discount factor to coupon-period start.
-/// * `pf_end` - Projection-curve discount factor to coupon-period end.
-/// * `pd_pay` - Discount-curve discount factor to payment.
-/// * `t_fix` - Contractual fixing time in years.
-/// * `t_start` - Coupon-period start time in years.
-/// * `t_end` - Coupon-period end time in ACT/365F model years.
-/// * `t_pay` - Contractual payment time on the same model clock, at or after
-///   `t_start`. Business-day adjustment may place it before `t_end`; either
-///   payment timing changes the projected ratio under the payment measure.
-/// * `accrual` - Positive coupon accrual fraction in years.
+/// * `period` - Projection and discount factors, fixing/start/end/payment
+///   times in model years and the accrual fraction; see [`TermCapletPeriod`].
 /// * `strike` - Caplet or floorlet strike as a decimal rate.
 /// * `is_cap` - `true` for a caplet and `false` for a floorlet.
 ///
@@ -649,20 +660,22 @@ fn hw1f_caplet_price_from_dfs(
 ///
 /// Returns [`Error::Validation`] when discount factors, times, or accrual are
 /// invalid, or when scheduled bond-volatility integration fails.
-#[allow(clippy::too_many_arguments)]
 pub fn hw1f_term_caplet_price_from_dfs_with_model(
     params: &HullWhiteParams,
-    pf_start: f64,
-    pf_end: f64,
-    pd_pay: f64,
-    t_fix: f64,
-    t_start: f64,
-    t_end: f64,
-    t_pay: f64,
-    accrual: f64,
+    period: &TermCapletPeriod,
     strike: f64,
     is_cap: bool,
 ) -> Result<f64> {
+    let &TermCapletPeriod {
+        pf_start,
+        pf_end,
+        pd_pay,
+        t_fix,
+        t_start,
+        t_end,
+        t_pay,
+        accrual,
+    } = period;
     let valid_df = |value: f64| value.is_finite() && value > 0.0;
     if !valid_df(pf_start)
         || !valid_df(pf_end)
@@ -741,12 +754,8 @@ pub fn hw1f_cap_floor_price(
             hw1f_caplet_price_from_dfs(
                 params.kappa,
                 params.sigma,
-                forward_df(t_fix),
-                forward_df(t_pay),
-                discount_df(t_pay),
-                t_fix,
-                t_pay,
-                accrual,
+                (forward_df(t_fix), forward_df(t_pay), discount_df(t_pay)),
+                (t_fix, t_pay, accrual),
                 strike,
                 is_cap,
             )
@@ -944,10 +953,20 @@ mod tests {
         let accrual = 1.0;
         let strike = 0.025;
         let caplet = hw1f_caplet_price_from_dfs(
-            kappa, sigma, pf_fix, pf_pay, pd_pay, 1.0, 2.0, accrual, strike, true,
+            kappa,
+            sigma,
+            (pf_fix, pf_pay, pd_pay),
+            (1.0, 2.0, accrual),
+            strike,
+            true,
         );
         let floorlet = hw1f_caplet_price_from_dfs(
-            kappa, sigma, pf_fix, pf_pay, pd_pay, 1.0, 2.0, accrual, strike, false,
+            kappa,
+            sigma,
+            (pf_fix, pf_pay, pd_pay),
+            (1.0, 2.0, accrual),
+            strike,
+            false,
         );
         let forward = (pf_fix / pf_pay - 1.0) / accrual;
         assert!((caplet - floorlet - pd_pay * accrual * (forward - strike)).abs() < 1.0e-14);
@@ -992,14 +1011,16 @@ mod tests {
             let expected = df(payment) * (ratio * norm_cdf(d1) - gearing * norm_cdf(d1 - vol));
             let actual = hw1f_term_caplet_price_from_dfs_with_model(
                 &model,
-                df(start),
-                df(end),
-                df(payment),
-                fixing,
-                start,
-                end,
-                payment,
-                accrual,
+                &TermCapletPeriod {
+                    pf_start: df(start),
+                    pf_end: df(end),
+                    pd_pay: df(payment),
+                    t_fix: fixing,
+                    t_start: start,
+                    t_end: end,
+                    t_pay: payment,
+                    accrual,
+                },
                 strike,
                 true,
             )
@@ -1007,14 +1028,16 @@ mod tests {
             assert!((actual - expected).abs() < 1e-12, "{actual} vs {expected}");
             let no_measure_adjustment = hw1f_term_caplet_price_from_dfs_with_model(
                 &model,
-                df(start),
-                df(end),
-                df(payment),
-                fixing,
-                start,
-                end,
-                end,
-                accrual,
+                &TermCapletPeriod {
+                    pf_start: df(start),
+                    pf_end: df(end),
+                    pd_pay: df(payment),
+                    t_fix: fixing,
+                    t_start: start,
+                    t_end: end,
+                    t_pay: end,
+                    accrual,
+                },
                 strike,
                 true,
             )
@@ -1031,28 +1054,32 @@ mod tests {
         let strike = 0.025;
         let cap = hw1f_term_caplet_price_from_dfs_with_model(
             &model,
-            df(1.0),
-            df(2.0),
-            df(2.0),
-            1.0,
-            1.0,
-            2.0,
-            2.0,
-            1.0,
+            &TermCapletPeriod {
+                pf_start: df(1.0),
+                pf_end: df(2.0),
+                pd_pay: df(2.0),
+                t_fix: 1.0,
+                t_start: 1.0,
+                t_end: 2.0,
+                t_pay: 2.0,
+                accrual: 1.0,
+            },
             strike,
             true,
         )
         .expect("caplet");
         let floor = hw1f_term_caplet_price_from_dfs_with_model(
             &model,
-            df(1.0),
-            df(2.0),
-            df(2.0),
-            1.0,
-            1.0,
-            2.0,
-            2.0,
-            1.0,
+            &TermCapletPeriod {
+                pf_start: df(1.0),
+                pf_end: df(2.0),
+                pd_pay: df(2.0),
+                t_fix: 1.0,
+                t_start: 1.0,
+                t_end: 2.0,
+                t_pay: 2.0,
+                accrual: 1.0,
+            },
             strike,
             false,
         )
@@ -1060,12 +1087,8 @@ mod tests {
         let bond_option = hw1f_caplet_price_from_dfs(
             kappa,
             sigma,
-            df(1.0),
-            df(2.0),
-            df(2.0),
-            1.0,
-            2.0,
-            1.0,
+            (df(1.0), df(2.0), df(2.0)),
+            (1.0, 2.0, 1.0),
             strike,
             true,
         );

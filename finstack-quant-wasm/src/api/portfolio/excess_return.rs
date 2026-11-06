@@ -25,10 +25,13 @@ use wasm_bindgen::prelude::*;
 /// reference universe is empty or contains an invalid duration or return, the
 /// cell width is not finite and positive, labels collide, the grid exceeds its
 /// safety bound, or the result cannot be converted to a JavaScript value.
-#[wasm_bindgen(js_name = cellReturnsFromReference)]
+/// @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
+#[wasm_bindgen(js_name = cellReturnsFromReference, unchecked_return_type = "DurationCellTable")]
 pub fn cell_returns_from_reference(
+    #[wasm_bindgen(js_name = "referenceJson", unchecked_param_type = "JsonInput")]
     reference_json: JsValue,
-    base_label: JsValue,
+    #[wasm_bindgen(js_name = "baseLabel", unchecked_param_type = "string")] base_label: JsValue,
+    #[wasm_bindgen(js_name = "configJson", unchecked_param_type = "JsonInput")]
     config_json: JsValue,
 ) -> Result<JsValue, JsValue> {
     let base_label: &str = &js_string(&base_label, "baseLabel")?;
@@ -66,13 +69,16 @@ pub fn cell_returns_from_reference(
 /// period; the grid is too large or has duplicate labels; a required discount
 /// factor is not finite and positive; or the result cannot be converted to a
 /// JavaScript value.
-#[wasm_bindgen(js_name = cellReturnsFromCurves)]
+/// @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
+#[wasm_bindgen(js_name = cellReturnsFromCurves, unchecked_return_type = "DurationCellTable")]
 pub fn cell_returns_from_curves(
     start: &JsDiscountCurve,
     end: &JsDiscountCurve,
+    #[wasm_bindgen(js_name = "horizonYears", unchecked_param_type = "number")]
     horizon_years: JsValue,
-    max_duration: JsValue,
-    base_label: JsValue,
+    #[wasm_bindgen(js_name = "maxDuration", unchecked_param_type = "number")] max_duration: JsValue,
+    #[wasm_bindgen(js_name = "baseLabel", unchecked_param_type = "string")] base_label: JsValue,
+    #[wasm_bindgen(js_name = "configJson", unchecked_param_type = "JsonInput")]
     config_json: JsValue,
 ) -> Result<JsValue, JsValue> {
     let horizon_years = js_f64(&horizon_years, "horizonYears")?;
@@ -110,8 +116,13 @@ pub fn cell_returns_from_curves(
 /// table is invalid, a position is invalid or falls in no cell, position
 /// weights do not sum to one, or the result cannot be converted to a JavaScript
 /// value.
-#[wasm_bindgen(js_name = excessReturns)]
-pub fn excess_returns(positions_json: JsValue, table_json: JsValue) -> Result<JsValue, JsValue> {
+/// @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
+#[wasm_bindgen(js_name = excessReturns, unchecked_return_type = "ExcessReturnResult")]
+pub fn excess_returns(
+    #[wasm_bindgen(js_name = "positionsJson", unchecked_param_type = "JsonInput")]
+    positions_json: JsValue,
+    #[wasm_bindgen(js_name = "tableJson", unchecked_param_type = "JsonInput")] table_json: JsValue,
+) -> Result<JsValue, JsValue> {
     let positions: Vec<finstack_quant_portfolio::excess_return::ExcessReturnPosition> =
         from_js_json(&positions_json, "positionsJson")?;
     let table: finstack_quant_portfolio::excess_return::DurationCellTable =

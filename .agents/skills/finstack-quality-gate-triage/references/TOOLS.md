@@ -41,9 +41,8 @@ Use repo-native checks first. External scanners are optional only when installed
 ## Broad Gates
 
 - Format: `mise run all-fmt`
-- Lint: `mise run all-lint`
-- Tests: `mise run all-test`
-- CI-style gate: `mise run all-ci`
+- The gate (equals CI): `mise run all`
+- Nightly tier: `mise run all --full`
 - Pre-commit: `mise pre-commit-run`
 
 ## Triage Tips

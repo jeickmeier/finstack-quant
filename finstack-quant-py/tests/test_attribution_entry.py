@@ -77,6 +77,11 @@ def _market_json(as_of: str, shift: float = 0.0) -> str:
     return mc.to_json()
 
 
+def _market_state(as_of: str, shift: float = 0.0) -> dict:
+    """The ``_market_json`` snapshot as the serde dict ``AttributionInputs`` takes."""
+    return json.loads(_market_json(as_of, shift))
+
+
 def test_attribute_pnl_accepts_bare_method_strings() -> None:
     """The documented canonical ``method="parallel"`` form must work.
 
@@ -86,11 +91,13 @@ def test_attribute_pnl_accepts_bare_method_strings() -> None:
     """
     attr = attribute_pnl(
         _bond_json(),
-        _market_json(AS_OF_T0),
-        _market_json(AS_OF_T1, shift=0.002),
-        AS_OF_T0,
-        AS_OF_T1,
-        "parallel",
+        {
+            "market_t0": _market_state(AS_OF_T0),
+            "market_t1": _market_state(AS_OF_T1, shift=0.002),
+            "as_of_t0": AS_OF_T0,
+            "as_of_t1": AS_OF_T1,
+            "method": "parallel",
+        },
     )
     assert isinstance(attr, PnlAttribution)
     assert attr.method == "parallel"
@@ -103,11 +110,13 @@ def test_attribution_rejects_legacy_pascal_case_method() -> None:
     with pytest.raises(ValueError, match="unknown variant"):
         attribute_pnl(
             _bond_json(),
-            _market_json(AS_OF_T0),
-            _market_json(AS_OF_T1),
-            AS_OF_T0,
-            AS_OF_T1,
-            "Parallel",
+            {
+                "market_t0": _market_state(AS_OF_T0),
+                "market_t1": _market_state(AS_OF_T1),
+                "as_of_t0": AS_OF_T0,
+                "as_of_t1": AS_OF_T1,
+                "method": "Parallel",
+            },
         )
 
 
@@ -128,11 +137,13 @@ def test_default_waterfall_order_uses_canonical_factor_names() -> None:
 def test_attribute_pnl_accepts_dict_method_forms() -> None:
     attr = attribute_pnl(
         _bond_json(),
-        _market_json(AS_OF_T0),
-        _market_json(AS_OF_T1, shift=0.002),
-        AS_OF_T0,
-        AS_OF_T1,
-        {"waterfall": ["carry", "rates_curves"]},
+        {
+            "market_t0": _market_state(AS_OF_T0),
+            "market_t1": _market_state(AS_OF_T1, shift=0.002),
+            "as_of_t0": AS_OF_T0,
+            "as_of_t1": AS_OF_T1,
+            "method": {"waterfall": ["carry", "rates_curves"]},
+        },
     )
     assert attr.rates_curves_pnl != 0.0
 
@@ -145,15 +156,17 @@ def test_attribute_pnl_missing_market_data_raises_key_error() -> None:
     ``KeyError`` per the binding error taxonomy, so pipelines catching
     ``ValueError`` for malformed user input do not silently swallow it.
     """
-    empty_market = MarketContext().to_json()
+    empty_market = MarketContext()
     with pytest.raises(KeyError):
         attribute_pnl(
             _bond_json(),
-            empty_market,
-            empty_market,
-            AS_OF_T0,
-            AS_OF_T1,
-            "parallel",
+            {
+                "market_t0": empty_market,
+                "market_t1": empty_market,
+                "as_of_t0": AS_OF_T0,
+                "as_of_t1": AS_OF_T1,
+                "method": "parallel",
+            },
         )
 
 
@@ -186,11 +199,13 @@ def test_empty_detail_dataframes_keep_schema_columns() -> None:
     """
     attr = attribute_pnl(
         _bond_json(),
-        _market_json(AS_OF_T0),
-        _market_json(AS_OF_T1),
-        AS_OF_T0,
-        AS_OF_T1,
-        "parallel",
+        {
+            "market_t0": _market_state(AS_OF_T0),
+            "market_t1": _market_state(AS_OF_T1),
+            "as_of_t0": AS_OF_T0,
+            "as_of_t1": AS_OF_T1,
+            "method": "parallel",
+        },
     )
     expected_columns = ["kind", "factor", "sub", "key_a", "key_b", "amount", "currency"]
     for df in (
@@ -209,17 +224,28 @@ def test_attribute_pnl_typed_inputs_many_and_bridge() -> None:
     market_t1 = MarketContext.from_json(_market_json(AS_OF_T1, shift=0.002))
     attr = attribute_pnl(
         _bond_json(),
-        market_t0,
-        market_t1,
-        date.fromisoformat(AS_OF_T0),
-        date.fromisoformat(AS_OF_T1),
-        "parallel",
+        {
+            "market_t0": market_t0,
+            "market_t1": market_t1,
+            "as_of_t0": date.fromisoformat(AS_OF_T0),
+            "as_of_t1": date.fromisoformat(AS_OF_T1),
+            "method": "parallel",
+        },
     )
     assert attr.t0 == date.fromisoformat(AS_OF_T0)
     assert attr.required_metrics() == []
     assert "sub" in attr.to_long_dataframe().columns
 
-    table = attribute_pnl_many([_bond_json(), _bond_json()], market_t0, market_t1, AS_OF_T0, AS_OF_T1, "parallel")
+    table = attribute_pnl_many(
+        {
+            "market_t0": market_t0,
+            "market_t1": market_t1,
+            "as_of_t0": AS_OF_T0,
+            "as_of_t1": AS_OF_T1,
+            "method": "parallel",
+        },
+        [_bond_json(), _bond_json()],
+    )
     assert len(table) == 2
     assert table["total_pnl"].iloc[0] == pytest.approx(attr.total_pnl)
 
@@ -300,8 +326,17 @@ def test_principal_redemption_is_total_return_without_coupon_income(method: obje
     instrument = json.loads(_bond_json())
     instrument["instrument"]["spec"]["maturity"] = "2025-01-15"
     instrument["instrument"]["spec"]["cashflow_spec"]["fixed"]["rate"] = "0.0"
-    market = _market_json("2025-01-14")
-    result = attribute_pnl(json.dumps(instrument), market, market, "2025-01-14", "2025-01-16", method)
+    market = _market_state("2025-01-14")
+    result = attribute_pnl(
+        json.dumps(instrument),
+        {
+            "market_t0": market,
+            "market_t1": market,
+            "as_of_t0": "2025-01-14",
+            "as_of_t1": "2025-01-16",
+            "method": method,
+        },
+    )
     payload = json.loads(result.to_json())
     detail = payload["carry_detail"]
     assert float(detail["coupon_income"]["total"]["amount"]) == 0.0
@@ -327,8 +362,17 @@ def test_deposit_principal_redemption_is_not_coupon_income() -> None:
             },
         },
     }
-    market = _market_json("2025-01-14")
-    result = attribute_pnl(json.dumps(instrument), market, market, "2025-01-14", "2025-01-16", "parallel")
+    market = _market_state("2025-01-14")
+    result = attribute_pnl(
+        json.dumps(instrument),
+        {
+            "market_t0": market,
+            "market_t1": market,
+            "as_of_t0": "2025-01-14",
+            "as_of_t1": "2025-01-16",
+            "method": "parallel",
+        },
+    )
     payload = json.loads(result.to_json())
     assert float(payload["carry_detail"]["coupon_income"]["total"]["amount"]) == 0.0
     assert result.mark_to_market_pnl + 1_000_000.0 == pytest.approx(result.total_pnl, abs=1e-8)
@@ -340,12 +384,14 @@ def test_requested_reporting_currency_requires_fx() -> None:
     with pytest.raises(KeyError, match="fx"):
         attribute_pnl(
             _bond_json(),
-            _market_json(AS_OF_T0),
-            _market_json(AS_OF_T1),
-            AS_OF_T0,
-            AS_OF_T1,
-            "parallel",
-            config={"target_currency": "EUR"},
+            {
+                "market_t0": _market_state(AS_OF_T0),
+                "market_t1": _market_state(AS_OF_T1),
+                "as_of_t0": AS_OF_T0,
+                "as_of_t1": AS_OF_T1,
+                "method": "parallel",
+                "config": {"target_currency": "EUR"},
+            },
         )
 
 
@@ -353,12 +399,14 @@ def test_requested_reporting_currency_requires_fx() -> None:
 def test_spec_methods_preserve_configured_rounding(method: object) -> None:
     attr = attribute_pnl(
         _bond_json(),
-        _market_json(AS_OF_T0),
-        _market_json(AS_OF_T1),
-        AS_OF_T0,
-        AS_OF_T1,
-        method,
-        config={"rounding_scale": 4, "metrics": ["dv01"]},
+        {
+            "market_t0": _market_state(AS_OF_T0),
+            "market_t1": _market_state(AS_OF_T1),
+            "as_of_t0": AS_OF_T0,
+            "as_of_t1": AS_OF_T1,
+            "method": method,
+            "config": {"rounding_scale": 4, "metrics": ["dv01"]},
+        },
     )
     assert json.loads(attr.to_json())["meta"]["rounding"]["output_scale_by_currency"]["USD"] == 4
 
@@ -461,11 +509,13 @@ def test_waterfall_steps_chain_from_pv_t0_and_rebuild_buckets() -> None:
     """The exported step chain reproduces every waterfall bucket."""
     attr = attribute_pnl(
         _bond_json(),
-        _market_json(AS_OF_T0),
-        _market_json(AS_OF_T1, shift=0.002),
-        AS_OF_T0,
-        AS_OF_T1,
-        {"waterfall": ["carry", "rates_curves"]},
+        {
+            "market_t0": _market_state(AS_OF_T0),
+            "market_t1": _market_state(AS_OF_T1, shift=0.002),
+            "as_of_t0": AS_OF_T0,
+            "as_of_t1": AS_OF_T1,
+            "method": {"waterfall": ["carry", "rates_curves"]},
+        },
     )
     assert attr.pv_t0 is not None
     assert attr.pv_t1 is not None
@@ -502,11 +552,13 @@ def test_taylor_sensitivity_steps_rebuild_rates_bucket() -> None:
     """Per-tenor sensitivity × observed move reproduces the Taylor rates P&L."""
     attr = attribute_pnl(
         _bond_json(),
-        _market_json(AS_OF_T0),
-        _market_json(AS_OF_T1, shift=0.002),
-        AS_OF_T0,
-        AS_OF_T1,
-        {"taylor": {"include_gamma": True}},
+        {
+            "market_t0": _market_state(AS_OF_T0),
+            "market_t1": _market_state(AS_OF_T1, shift=0.002),
+            "as_of_t0": AS_OF_T0,
+            "as_of_t1": AS_OF_T1,
+            "method": {"taylor": {"include_gamma": True}},
+        },
     )
     assert attr.waterfall_steps == []
     assert attr.to_waterfall_steps_dataframe().empty

@@ -22,7 +22,9 @@ use wasm_bindgen::prelude::*;
 /// `validation` error when it does not match the `RateBindingSpec` contract,
 /// `node_id` or `curve_id` is blank, or `tenor` is not a valid tenor string.
 #[wasm_bindgen(js_name = rateBindingSpecValidate)]
-pub fn rate_binding_spec_validate(binding: JsValue) -> Result<(), JsValue> {
+pub fn rate_binding_spec_validate(
+    #[wasm_bindgen(unchecked_param_type = "RateBindingSpec | string")] binding: JsValue,
+) -> Result<(), JsValue> {
     from_js_json::<RateBindingSpec>(&binding, "binding")?
         .validate()
         .map_err(to_js_err)

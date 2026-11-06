@@ -1,0 +1,91 @@
+{
+  "$defs": {
+    "PayReceive": {
+      "description": "Direction for instrument legs (universal for IRS, CDS, variance swaps, etc.)\n\nFor interest rate swaps: Pay = pay fixed/receive floating, Receive = receive fixed/pay floating\nFor credit default swaps: Pay = buy protection (pay premium), Receive = sell protection (receive premium)\nFor variance swaps: Pay = short variance, Receive = long variance",
+      "oneOf": [
+        {
+          "const": "pay",
+          "description": "Pay the primary leg (fixed rate in IRS, protection premium in CDS, short variance)",
+          "type": "string"
+        },
+        {
+          "const": "receive",
+          "description": "Receive the primary leg (fixed rate in IRS, protection premium in CDS, long variance)",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/common/1/convention_swap_params.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Identifier, notional, side, fixed rate, dates, rate index and curves of a vanilla swap built from market conventions.",
+  "examples": [
+    {
+      "discount_curve_id": "USD-OIS",
+      "fixed_rate": 0.04,
+      "forward_curve_id": "USD-SOFR-OIS",
+      "id": "USD-SOFR-OIS-5Y",
+      "index_id": "USD-SOFR-OIS",
+      "maturity": "2030-01-13",
+      "notional": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "side": "pay",
+      "start_date": "2025-01-13"
+    }
+  ],
+  "properties": {
+    "discount_curve_id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Discount curve identifier."
+    },
+    "fixed_rate": {
+      "description": "Fixed coupon rate (as a decimal, e.g. 0.03 = 3%).",
+      "format": "double",
+      "type": "number"
+    },
+    "forward_curve_id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Forward projection curve identifier."
+    },
+    "id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Unique instrument identifier."
+    },
+    "index_id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Rate index identifier used to resolve conventions (e.g. `\"USD-SOFR\"`)."
+    },
+    "maturity": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+      "description": "Maturity (end) date."
+    },
+    "notional": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+      "description": "Notional principal amount; its currency is the payment currency."
+    },
+    "side": {
+      "$ref": "#/$defs/PayReceive",
+      "description": "`pay` or `receive` the fixed leg."
+    },
+    "start_date": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+      "description": "Effective (start) date."
+    }
+  },
+  "required": [
+    "id",
+    "notional",
+    "side",
+    "fixed_rate",
+    "start_date",
+    "maturity",
+    "index_id",
+    "discount_curve_id",
+    "forward_curve_id"
+  ],
+  "title": "ConventionSwapParams",
+  "type": "object"
+}

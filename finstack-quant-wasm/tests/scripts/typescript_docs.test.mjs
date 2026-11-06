@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { copyFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -17,135 +17,6 @@ function run(script, ...args) {
   });
 }
 
-function temporaryFixture(t, fixture) {
-  const directory = mkdtempSync(join(tmpdir(), 'finstack-typescript-docs-'));
-  t.after(() => rmSync(directory, { recursive: true, force: true }));
-  const target = join(directory, fixture);
-  copyFileSync(join(fixtures, fixture), target);
-  return target;
-}
-
-test('synchronizer replaces contract tags while preserving prose and examples', (t) => {
-  const facade = temporaryFixture(t, 'facade.stale.d.ts');
-  const result = run(
-    'sync-facade-jsdoc.mjs',
-    `--facade=${facade}`,
-    `--raw=${join(fixtures, 'raw.d.ts')}`,
-    '--write'
-  );
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(
-    readFileSync(facade, 'utf8'),
-    readFileSync(join(fixtures, 'facade.expected.d.ts'), 'utf8')
-  );
-});
-
-test('synchronizer check mode detects stale declarations', () => {
-  const raw = `--raw=${join(fixtures, 'raw.d.ts')}`;
-  const clean = run(
-    'sync-facade-jsdoc.mjs',
-    `--facade=${join(fixtures, 'facade.expected.d.ts')}`,
-    raw,
-    '--check'
-  );
-  assert.equal(clean.status, 0, clean.stderr);
-
-  const stale = run(
-    'sync-facade-jsdoc.mjs',
-    `--facade=${join(fixtures, 'facade.stale.d.ts')}`,
-    raw,
-    '--check'
-  );
-  assert.equal(stale.status, 1);
-  assert.match(stale.stderr, /facade JSDoc is not synchronized/);
-});
-
-test('namespace properties do not inherit same-named function contracts', (t) => {
-  const directory = mkdtempSync(join(tmpdir(), 'finstack-typescript-docs-'));
-  t.after(() => rmSync(directory, { recursive: true, force: true }));
-  const facade = join(directory, 'facade.d.ts');
-  const raw = join(directory, 'raw.d.ts');
-  writeFileSync(
-    facade,
-    `export interface ModelsNamespace {
-  /** Credit correlation models. */
-  correlation: CorrelationNamespace;
-}
-export interface MathNamespace {
-  /** Compute sample correlation. */
-  correlation(values: number[]): number;
-}
-`
-  );
-  writeFileSync(
-    raw,
-    `/**
- * Compute sample correlation.
- * @returns Sample correlation in [-1, 1].
- */
-export function correlation(values: number[]): number;
-`
-  );
-  const result = run('sync-facade-jsdoc.mjs', `--facade=${facade}`, `--raw=${raw}`, '--write');
-  assert.equal(result.status, 0, result.stderr);
-  const updated = readFileSync(facade, 'utf8');
-  const [models, math] = updated.split('export interface MathNamespace');
-  assert.doesNotMatch(models, /@returns/);
-  assert.match(math, /@returns Sample correlation in \[-1, 1\]/);
-});
-
-test('completer removes only legacy fabricated documentation', (t) => {
-  const declaration = temporaryFixture(t, 'checker.legacy.d.ts');
-  const result = run('complete-facade-jsdoc.mjs', `--declaration=${declaration}`, '--write');
-  assert.equal(result.status, 0, result.stderr);
-  const completed = readFileSync(declaration, 'utf8');
-  assert.doesNotMatch(completed, /supplied values are malformed, violate/);
-  assert.doesNotMatch(completed, /void (?:api|factory);/);
-  assert.doesNotMatch(completed, /Supply the documented arguments/);
-  assert.match(completed, /@returns Returns a `Calculator` handle\./);
-});
-
-test('completer does not emit residual generic boilerplate', (t) => {
-  const directory = mkdtempSync(join(tmpdir(), 'finstack-typescript-docs-'));
-  t.after(() => rmSync(directory, { recursive: true, force: true }));
-  const target = join(directory, 'thin.d.ts');
-  writeFileSync(
-    target,
-    `export interface SampleResult {
-  intercept: number;
-}
-export interface Sample {
-  delta(spot: number): number;
-  items(): Float64Array;
-}
-`
-  );
-  const result = run('complete-facade-jsdoc.mjs', `--declaration=${target}`, '--write');
-  assert.equal(result.status, 0, result.stderr);
-  const completed = readFileSync(target, 'utf8');
-  assert.doesNotMatch(completed, /exposed by this/);
-  assert.doesNotMatch(completed, /units described above/);
-  assert.doesNotMatch(completed, /in the documented order/);
-  assert.doesNotMatch(completed, /Perform delta for this/);
-  assert.doesNotMatch(completed, /declared TypeScript shape/);
-  assert.doesNotMatch(completed, /or WebAssembly handle/);
-  assert.doesNotMatch(completed, /requested string representation or JSON payload/);
-  assert.doesNotMatch(completed, /TypeScript view of the/);
-  assert.doesNotMatch(completed, /consumed by this/);
-  assert.doesNotMatch(completed, /documented condition/);
-  assert.doesNotMatch(completed, /Create a new `/);
-  assert.doesNotMatch(completed, /Create the object from its inputs/);
-  assert.doesNotMatch(completed, /Whether to enable/);
-  assert.doesNotMatch(completed, /accepted by this operation/);
-  assert.doesNotMatch(completed, /Construction and factory entry points/);
-  assert.doesNotMatch(completed, /Compute delta for this/);
-  // No unit is derived from the method name: the missing `@returns` repeats the summary.
-  assert.doesNotMatch(completed, /change in value per|per 1\.0 absolute|per year of calendar/);
-  assert.match(completed, /@returns Delta for this `Sample`\./);
-  // An undocumented parameter stays undocumented so the checker reports it.
-  assert.doesNotMatch(completed, /@param spot/);
-});
-
 function temporaryDeclarations(t, files) {
   const directory = mkdtempSync(join(tmpdir(), 'finstack-typescript-docs-'));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
@@ -157,80 +28,6 @@ function temporaryDeclarations(t, files) {
     })
   );
 }
-
-test('synchronizer maps renamed JSON parameters and keeps facade-only parameters', (t) => {
-  const paths = temporaryDeclarations(t, {
-    'facade.d.ts': `export interface CalibrationNamespace {
-  /**
-   * Fit the loading scale from the market surface.
-   * @param instrument - Stale facade text.
-   * @param extra - Facade-only option with its own description.
-   * @returns Stale return text.
-   */
-  fit(instrument: object | string, asOf: string, extra?: boolean): number;
-}
-`,
-    'raw.d.ts': `/**
- * Fit the loading scale from the market surface.
- * @param instrument_json - Bermudan swaption instrument envelope.
- * @param as_of - ISO-8601 valuation date.
- * @returns Positive finite base volatility.
- */
-export function fit(instrument_json: any, as_of: any): number;
-`,
-  });
-  const args = [`--facade=${paths['facade.d.ts']}`, `--raw=${paths['raw.d.ts']}`];
-  const result = run('sync-facade-jsdoc.mjs', ...args, '--write');
-  assert.equal(result.status, 0, result.stderr);
-  const updated = readFileSync(paths['facade.d.ts'], 'utf8');
-  assert.match(updated, /@param instrument - Bermudan swaption instrument envelope\./);
-  assert.match(updated, /@param asOf - ISO-8601 valuation date\./);
-  assert.match(updated, /@param extra - Facade-only option with its own description\./);
-  assert.match(updated, /@returns Positive finite base volatility\./);
-  assert.doesNotMatch(updated, /Stale/);
-  // The written file is a fixed point: the check gate passes on it.
-  assert.equal(run('sync-facade-jsdoc.mjs', ...args, '--check').status, 0);
-});
-
-test('synchronizer reads macro-forwarded raw-string doc lines as plain text', (t) => {
-  const paths = temporaryDeclarations(t, {
-    'facade.d.ts': `export interface FxOption {
-  /**
-   * Vega of the option.
-   * @returns Stale return text.
-   */
-  vega(): number;
-  /**
-   * Strike of the option.
-   * @returns Stale return text.
-   */
-  readonly strike: number;
-}
-`,
-    'raw.d.ts': `export class FxOption {
-  /**
-   * r" Vega of the option.
-   * r"
-   * r" @returns Cash vega: PV change for a 1 vol-point (0.01 absolute) move in implied volatility.
-   */
-  vega(): number;
-  /**
-   * r#" Strike of the option, e.g. \`"1.12"\`."#
-   * r#" @returns Strike, quote currency per unit of base (\`"quote/base"\`)."#
-   */
-  readonly strike: number;
-}
-`,
-  });
-  const args = [`--facade=${paths['facade.d.ts']}`, `--raw=${paths['raw.d.ts']}`];
-  const result = run('sync-facade-jsdoc.mjs', ...args, '--write');
-  assert.equal(result.status, 0, result.stderr);
-  const updated = readFileSync(paths['facade.d.ts'], 'utf8');
-  assert.match(updated, /@returns Cash vega: PV change for a 1 vol-point/);
-  assert.match(updated, /@returns Strike, quote currency per unit of base \(`"quote\/base"`\)\.\n/);
-  assert.doesNotMatch(updated, /r#?"|Stale/);
-  assert.equal(run('sync-facade-jsdoc.mjs', ...args, '--check').status, 0);
-});
 
 test('checker rejects placeholders, template units, internal names, repeats and orphan blocks', (t) => {
   const paths = temporaryDeclarations(t, {
@@ -299,63 +96,38 @@ test('checker accepts concrete contracts and rejects exact legacy shapes', () =>
   assert.match(legacy.stderr, /non-executable placeholder @example/);
 });
 
-test('write and check modes are mutually exclusive', () => {
-  const completed = run(
-    'complete-facade-jsdoc.mjs',
-    `--declaration=${join(fixtures, 'checker.valid.d.ts')}`,
-    '--write',
-    '--check'
-  );
-  assert.equal(completed.status, 2);
-  assert.match(completed.stderr, /mutually exclusive/);
-
-  const synchronized = run(
-    'sync-facade-jsdoc.mjs',
-    `--facade=${join(fixtures, 'facade.expected.d.ts')}`,
-    `--raw=${join(fixtures, 'raw.d.ts')}`,
-    '--write',
-    '--check'
-  );
-  assert.equal(synchronized.status, 2);
-  assert.match(synchronized.stderr, /mutually exclusive/);
-});
-
-test('sample extractor reads comment and Markdown fences and honours no-run', async () => {
-  const { PRELUDE, collectExamples, fencedBlocks } = await import(
-    join(scripts, 'doc-examples.mjs')
-  );
-  const declaration = [
-    '/**',
-    ' * Summary.',
-    ' * @example',
-    ' * ```typescript',
-    ' * const a: number = 1;',
-    ' * ```',
-    ' * ```text',
-    ' * not code',
-    ' * ```',
-    ' */',
-  ].join('\n');
-  assert.deepEqual(fencedBlocks(declaration, true), [
-    { line: 4, language: 'ts', code: 'const a: number = 1;' },
-  ]);
-  const markdown = [
-    '```javascript no-run',
-    'wrong();',
-    '```',
-    '```js',
-    'right();',
-    '```',
-    '```bash',
-    'ls',
-    '```',
-  ].join('\n');
-  assert.deepEqual(fencedBlocks(markdown, false), [{ line: 4, language: 'js', code: 'right();' }]);
-  assert.throws(() => fencedBlocks('```js\nopen();', false), /unterminated code fence/);
-
-  // A sample with no import continues from the standard setup.
-  const examples = collectExamples();
-  assert.ok(examples.every((example) => /^\s*import\s/m.test(example.code)));
-  assert.ok(examples.some((example) => example.code.startsWith(PRELUDE)));
-  assert.match(PRELUDE, /import init, \{ analytics, .*valuations \} from "finstack-quant-wasm";/);
+test('checker requires class examples and skips wasm-bindgen glue', (t) => {
+  const paths = temporaryDeclarations(t, {
+    'pkg.d.ts': `/**
+ * Handle without a runnable sample on the class or its constructor.
+ */
+export class Bare {
+  private constructor();
+  free(): void;
+  [Symbol.dispose](): void;
+}
+/**
+ * Handle whose constructor carries the runnable sample.
+ */
+export class Sampled {
+  free(): void;
+  /**
+   * Build a handle from its finite seed value.
+   * @param seed - Finite seed value.
+   * @example
+   * \`\`\`typescript
+   * new Sampled(1);
+   * \`\`\`
+   */
+  constructor(seed: number);
+}
+export type InitInput = RequestInfo | URL;
+export function initSync(module: unknown): unknown;
+`,
+  });
+  const result = run('check-typescript-docs.mjs', `--declaration=${paths['pkg.d.ts']}`);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /class Bare: missing @example/);
+  assert.doesNotMatch(result.stderr, /Sampled|free|Symbol\.dispose|InitInput|initSync/);
+  assert.match(result.stderr, /1 error\(s\)/);
 });

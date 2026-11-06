@@ -12,6 +12,7 @@ import json
 import pytest
 
 from finstack_quant.cashflows.builder import abs_to_smm
+from finstack_quant.core.dates import Tenor
 from finstack_quant.core.market_data import DiscountCurve, MarketContext
 from finstack_quant.core.money import Money
 from finstack_quant.portfolio import (
@@ -87,9 +88,19 @@ def test_breach_probability_survives_from_json_with_path_data() -> None:
 
 
 def test_fx_forward_from_trade_date_defaults_spot_lag_in_rust() -> None:
-    args = ("EURUSD-3M", "EUR", "USD", "2025-01-15", "3M", 1_000_000.0, "USD-OIS", "EUR-OIS")
-    defaulted = FxForward.from_trade_date(*args)
-    explicit = FxForward.from_trade_date(*args, settlement_days=2)
+    params = {
+        "id": "EURUSD-3M",
+        "base_currency": "EUR",
+        "quote_currency": "USD",
+        "trade_date": "2025-01-15",
+        "tenor": Tenor.parse("3M"),
+        "notional": Money(1_000_000.0, "EUR"),
+        "domestic_discount_curve_id": "USD-OIS",
+        "foreign_discount_curve_id": "EUR-OIS",
+        "end_of_month": False,
+    }
+    defaulted = FxForward.from_trade_date(params)
+    explicit = FxForward.from_trade_date({**params, "settlement_days": 2})
     assert defaulted.maturity == datetime.date(2025, 4, 17)
     assert defaulted.to_json() == explicit.to_json()
 

@@ -2,13 +2,14 @@
 
 use crate::autocallable::types::Autocallable;
 use crate::past_fixings::fixing_on;
-use crate::piecewise_gbm::{PiecewiseGbmMc, bootstrap_forward_gbm};
+use crate::piecewise_gbm::{GbmVolSource, PiecewiseGbmMc, bootstrap_forward_gbm};
 use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::money::Money;
+use finstack_quant_models::monte_carlo::payoff::autocallable::AutocallableParams;
 use finstack_quant_models::monte_carlo::payoff::autocallable::AutocallablePayoff;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricerConfig;
 use finstack_quant_valuations_core::instruments::Instrument;
@@ -137,19 +138,19 @@ impl AutocallableMcPricer {
                     inst.id, last_obs
                 ))
             })?;
-            let payoff = AutocallablePayoff::new(
-                vec![],
-                vec![],
-                vec![],
-                vec![],
-                inst.memory_coupons,
-                inst.final_barrier,
-                inst.final_payoff_type,
-                inst.cap_level,
-                inst.notional.amount(),
-                s0,
-                vec![],
-            )?;
+            let payoff = AutocallablePayoff::new(AutocallableParams {
+                observation_dates: vec![],
+                autocall_barriers: vec![],
+                coupon_barriers: vec![],
+                coupons: vec![],
+                memory_coupons: inst.memory_coupons,
+                final_barrier: inst.final_barrier,
+                final_payoff_type: inst.final_payoff_type,
+                cap_level: inst.cap_level,
+                notional: inst.notional.amount(),
+                initial_spot: s0,
+                payment_df_ratios: vec![],
+            })?;
             let redemption_ratio = payoff.final_payoff_ratio(final_fixing, past_min_spot);
             let pv = (redemption_ratio + fixed_coupon_expiry_ratio)
                 * inst.notional.amount()
@@ -196,9 +197,11 @@ impl AutocallableMcPricer {
         check_points.dedup_by(|a, b| (a.0 - b.0).abs() < 1e-10);
         let process = bootstrap_forward_gbm(
             disc_curve.as_ref(),
-            curves,
-            &inst.instrument_pricing_overrides.market_quotes,
-            inst.vol_surface_id.as_str(),
+            GbmVolSource {
+                curves,
+                market_quotes: &inst.instrument_pricing_overrides.market_quotes,
+                vol_surface_id: inst.vol_surface_id.as_str(),
+            },
             as_of,
             initial_spot,
             q,
@@ -216,19 +219,19 @@ impl AutocallableMcPricer {
             })
             .collect::<finstack_quant_core::Result<Vec<_>>>()?;
 
-        let payoff = AutocallablePayoff::new(
-            observation_times.clone(),
-            future_barriers,
-            future_coupon_barriers,
-            future_coupons,
-            inst.memory_coupons,
-            inst.final_barrier,
-            inst.final_payoff_type,
-            inst.cap_level,
-            inst.notional.amount(),
-            s0,
+        let payoff = AutocallablePayoff::new(AutocallableParams {
+            observation_dates: observation_times.clone(),
+            autocall_barriers: future_barriers,
+            coupon_barriers: future_coupon_barriers,
+            coupons: future_coupons,
+            memory_coupons: inst.memory_coupons,
+            final_barrier: inst.final_barrier,
+            final_payoff_type: inst.final_payoff_type,
+            cap_level: inst.cap_level,
+            notional: inst.notional.amount(),
+            initial_spot: s0,
             payment_df_ratios,
-        )?
+        })?
         .with_seasoned_state(
             past_min_spot,
             prior_memory_coupons,
@@ -251,7 +254,7 @@ impl AutocallableMcPricer {
             &observation_times,
         )?;
 
-        // Mirror `PathDependentPricer::price_with_grid` (non-Sobol path) but drive
+        // Mirror `PathDependentPricer::price` (non-Sobol path) but drive
         // the piecewise process with its exact discretization.
         let result = PiecewiseGbmMc {
             config: &merged_cfg,

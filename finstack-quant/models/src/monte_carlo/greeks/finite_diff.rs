@@ -499,15 +499,15 @@ mod tests {
         // combining the three valuations' standard errors as if independent.
         let stencil_stderr = |spot: f64| {
             engine
-                .price(
-                    &rng,
-                    &gbm,
-                    &disc,
-                    &[spot],
-                    &call,
-                    Currency::USD,
+                .price(crate::monte_carlo::engine::McPricingInputs {
+                    rng: &rng,
+                    process: &gbm,
+                    disc: &disc,
+                    initial_state: &[spot],
+                    payoff: &call,
+                    currency: Currency::USD,
                     discount_factor,
-                )
+                })
                 .expect("stencil valuation")
                 .stderr
         };
@@ -666,15 +666,15 @@ mod tests {
         let (down, base, up, h) = validate_central_bump(SPOT, 0.01).unwrap();
         let price = |spot: f64| {
             engine
-                .price(
-                    &rng,
-                    &process,
-                    &disc,
-                    &[spot],
-                    &payoff,
-                    Currency::USD,
-                    inputs.discount_factor,
-                )
+                .price(crate::monte_carlo::engine::McPricingInputs {
+                    rng: &rng,
+                    process: &process,
+                    disc: &disc,
+                    initial_state: &[spot],
+                    payoff: &payoff,
+                    currency: Currency::USD,
+                    discount_factor: inputs.discount_factor,
+                })
                 .unwrap()
                 .mean
                 .amount()

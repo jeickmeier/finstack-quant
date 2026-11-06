@@ -37,7 +37,7 @@ Independent market/covariance and out-of-sample regression validation was not es
 ## Evidence
 
 - [LMM product adapter](../../../../finstack-quant/valuations/rates/src/swaption/lmm_pricer.rs), [LSMC/numeraire kernel](../../../../finstack-quant/valuations/rates/src/swaption/pricing/lmm_bermudan.rs), [product defaults](../../../../finstack-quant/valuations/core/data/defaults/product_mc_defaults.v1.json), [shared metric registration](../../../../finstack-quant/valuations/rates/src/swaption/metrics/mod.rs).
-- [Numeraire tests](../../../../finstack-quant/valuations/rates/src/swaption/pricing/numeraire_tests.rs) compare single-exercise terminal-measure estimates and a co-terminal lower bound using shared process primitives. Inline adapter/kernel tests locate contract gates, parameter shape, grid and sampling checks. They were not executed and do not qualify the low-ITM fallback as unbiased.
+- [Numeraire tests](../../../../finstack-quant/valuations/rates/src/swaption/pricing/tests/numeraire.rs) compare single-exercise terminal-measure estimates and a co-terminal lower bound using shared process primitives. Inline adapter/kernel tests locate contract gates, parameter shape, grid and sampling checks. They were not executed and do not qualify the low-ITM fallback as unbiased.
 - [Andersen/Piterbarg](../../../REFERENCES.md#andersen-piterbarg-interest-rate-modeling) and [Glasserman](../../../REFERENCES.md#glasserman-2004-monte-carlo) give general context. A product-specific factor-shape rationale/adoption record and canonical LMM-paper citation were not established.
 
 ## Follow-up tracking

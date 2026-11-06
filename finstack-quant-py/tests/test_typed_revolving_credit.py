@@ -76,7 +76,7 @@ def builder(draw_repay_spec: dict[str, object] | None = None, *, credit: bool = 
         .builder()
         .id("RCF-PY")
         .commitment(Money(50_000_000.0, Currency("USD")))
-        .drawn(10_000_000.0, currency="USD")
+        .drawn(Money(10_000_000.0, "USD"))
         .issue_date(AS_OF)
         .maturity(MATURITY)
         .rate(RevolvingCredit.example().rate)

@@ -35,7 +35,7 @@
     },
     {
       "id": "CALIBRATION-RATE-MODELS-007",
-      "title": "Fixed-\u03ba cap/floor price least squares by segmented golden-section search",
+      "title": "Fixed-κ cap/floor price least squares by segmented golden-section search",
       "path": "07-fixed-kappa-cap-fit.md"
     },
     {
@@ -72,7 +72,7 @@
       "sha256": "1beb775a8e7ab4b49ce645ad0dd54df85dff1a0777cb32415dea4cb814ebdd10"
     },
     {
-      "path": "finstack-quant/calibration/src/hull_white/cap_schedule_tests.rs",
+      "path": "finstack-quant/calibration/src/hull_white/cap_schedule/tests.rs",
       "classification": "test",
       "records": [
         "CALIBRATION-RATE-MODELS-002",

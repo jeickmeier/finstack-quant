@@ -108,10 +108,7 @@ it(
         serializeHost(
           native.evaluateDcf(
             modelJson,
-            0.1,
-            gordon,
-            "ufcf",
-            undefined,
+            { wacc: 0.1, terminal_value: gordon, ufcf_node: "ufcf" },
             optionsJson,
           ),
         ),
@@ -146,11 +143,11 @@ it(
       ]);
       const fails = (request: EvaluateDcfRequest) =>
         query.fetchQuery(evaluateDcfOptions(client, 1, request));
-      // A cleared WACC reaches Rust as NaN and Rust rejects it.
+      // A cleared WACC or terminal field is NaN, which the facade's JSON
+      // boundary rejects before Rust sees the inputs object.
       await expect(
         fails({ modelJson, wacc: Number.NaN, terminalValue: gordon }),
-      ).rejects.toMatchObject({ kind: "validation" });
-      // A cleared terminal field is rejected at the facade boundary.
+      ).rejects.toMatchObject({ name: "TypeError", kind: "invalid_type" });
       await expect(
         fails({
           modelJson,

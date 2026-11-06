@@ -241,7 +241,16 @@ class PeerFilter:
 
     All non-empty criteria are AND-ed; list criteria are OR-ed within.
 
-    The constructor stores the supplied values and does not raise.
+    Every parameter is keyword-only: Rust reads the keywords as the
+    ``PeerFilter`` serde struct, in which every criterion is optional: an omitted
+    list is ``[]`` and an omitted bound ``None`` (no constraint).
+
+    Raises
+    ------
+    ValueError
+        If a keyword is unknown or a value does not have its wire form.
+    TypeError
+        If a positional argument is passed.
 
     Parameters
     ----------
@@ -272,6 +281,7 @@ class PeerFilter:
     """
     def __init__(
         self,
+        *,
         gics_sectors: list[str] = ...,
         gics_industries: list[str] = ...,
         countries: list[str] = ...,

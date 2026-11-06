@@ -76,17 +76,17 @@ def test_frn_time_roll_preserves_raw_index_excluding_coupon_spread() -> None:
         "rate_calibration": None,
         "fx_policy": None,
     })
-    bond = Bond.floating(
-        "ROLL-FRN",
-        Money(1_000_000, "USD"),
-        "USD-SOFR-3M",
-        150,
-        "2025-01-03",
-        "2026-01-03",
-        Tenor.quarterly(),
-        DayCount.ACT_360,
-        "USD-OIS",
-    )
+    bond = Bond.floating({
+        "id": "ROLL-FRN",
+        "notional": Money(1_000_000, "USD"),
+        "forward_curve_id": "USD-SOFR-3M",
+        "spread_bp": 150,
+        "issue_date": "2025-01-03",
+        "maturity": "2026-01-03",
+        "frequency": Tenor.quarterly(),
+        "day_count": DayCount.ACT_360,
+        "discount_curve_id": "USD-OIS",
+    })
     instrument = json.loads(bond.to_json())
     instrument["instrument"]["spec"]["cashflow_spec"]["floating"]["rate_spec"]["reset_lag_days"] = 0
     scenario = {

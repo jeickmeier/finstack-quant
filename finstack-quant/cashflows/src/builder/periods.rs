@@ -196,19 +196,50 @@ impl<'a> BuildPeriodsParams<'a> {
     }
 }
 
+/// Schedule conventions that resolve a period's [`DayCountContext`]: the
+/// coupon frequency, accrual day count, stub, end-of-month flag and roll rule.
+#[derive(Clone, Copy)]
+pub(crate) struct AccrualConventions {
+    /// Coupon frequency of the regular grid.
+    pub(crate) frequency: Tenor,
+    /// Accrual day count.
+    pub(crate) day_count: DayCount,
+    /// Stub treatment of off-grid boundaries.
+    pub(crate) stub: StubKind,
+    /// Whether nominal dates roll to month-end.
+    pub(crate) end_of_month: bool,
+    /// Roll-date rule of the schedule anchors.
+    pub(crate) roll_rule: RollRule,
+}
+
+impl AccrualConventions {
+    /// Take the accrual conventions of a schedule specification unchanged.
+    pub(crate) fn from_schedule(schedule: &ScheduleParams) -> Self {
+        Self {
+            frequency: schedule.frequency,
+            day_count: schedule.day_count,
+            stub: schedule.stub,
+            end_of_month: schedule.end_of_month,
+            roll_rule: schedule.roll_rule,
+        }
+    }
+}
+
 /// Build a [`DayCountContext`] for `period`, resolving `Act365L` full-period
 /// bounds vs ICMA reference coupon dates.
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn period_day_count_context<'a>(
     period: &SchedulePeriod,
     calendar: &'a dyn finstack_quant_core::dates::HolidayCalendar,
-    frequency: Tenor,
-    day_count: DayCount,
-    stub: StubKind,
-    end_of_month: bool,
-    roll_rule: RollRule,
+    conventions: AccrualConventions,
     end_is_termination_date: bool,
 ) -> DayCountContext<'a> {
+    let AccrualConventions {
+        frequency,
+        day_count,
+        stub,
+        end_of_month,
+        roll_rule,
+    } = conventions;
     // Regularity uses unadjusted dates (ISDA 2006 §4.16(c)); ICMA stubs use the adjacent regular coupon.
     let coupon_period = if day_count == DayCount::Act365L {
         Some((period.accrual_start, period.accrual_end))
@@ -259,11 +290,13 @@ pub fn period_accrual(
     let day_count_context = period_day_count_context(
         period,
         cal,
-        params.frequency,
-        params.day_count,
-        params.stub,
-        params.end_of_month,
-        params.roll_rule,
+        AccrualConventions {
+            frequency: params.frequency,
+            day_count: params.day_count,
+            stub: params.stub,
+            end_of_month: params.end_of_month,
+            roll_rule: params.roll_rule,
+        },
         period.unadjusted_end == params.end,
     );
     contractual_accrual(
@@ -490,18 +523,7 @@ pub fn build_periods(
     params: BuildPeriodsParams<'_>,
 ) -> finstack_quant_core::Result<Vec<SchedulePeriod>> {
     let params = params.validated_effective()?;
-    let periods = generate_periods_with_adjustment(
-        params.start,
-        params.end,
-        params.frequency,
-        params.stub,
-        params.business_day_convention,
-        params.end_of_month,
-        params.payment_lag_days,
-        params.calendar_id,
-        params.adjust_accrual_dates,
-        params.roll_rule,
-    )?;
+    let periods = generate_periods_with_adjustment(&params)?;
     enrich_periods(periods, &params)
 }
 

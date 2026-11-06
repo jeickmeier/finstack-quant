@@ -35,7 +35,7 @@
     },
     {
       "id": "MODELS-MONTE-CARLO-07",
-      "title": "Hull\u2013White exact transition and curve-fitted theta levels",
+      "title": "Hull–White exact transition and curve-fitted theta levels",
       "path": "07-hull-white.md"
     },
     {
@@ -60,12 +60,12 @@
     },
     {
       "id": "MODELS-MONTE-CARLO-12",
-      "title": "Schwartz\u2013Smith joint Gaussian transition and futures expectation",
+      "title": "Schwartz–Smith joint Gaussian transition and futures expectation",
       "path": "12-schwartz-smith.md"
     },
     {
       "id": "MODELS-MONTE-CARLO-13",
-      "title": "Fractional Brownian and Riemann\u2013Liouville noise generation",
+      "title": "Fractional Brownian and Riemann–Liouville noise generation",
       "path": "13-fractional-noise.md"
     },
     {
@@ -422,7 +422,7 @@
       "sha256": "99c315ce927c94cb7ecbfb188ce01f23554f5667cc34a96b3ffdfb242dcb0aa1"
     },
     {
-      "path": "finstack-quant/models/src/monte_carlo/mc_process_params_serialization.rs",
+      "path": "finstack-quant/models/src/monte_carlo/tests/process_params_serialization.rs",
       "classification": "test",
       "records": [
         "MODELS-MONTE-CARLO-04",
@@ -831,7 +831,7 @@
       "sha256": "1c2d5a61644805cdc28aa8286ddb98f9df9f9632438be70712fd0e5b85c90a20"
     },
     {
-      "path": "finstack-quant/models/src/monte_carlo/simulate/non_markov_tests.rs",
+      "path": "finstack-quant/models/src/monte_carlo/simulate/tests/non_markov.rs",
       "classification": "test",
       "records": [
         "MODELS-MONTE-CARLO-10",

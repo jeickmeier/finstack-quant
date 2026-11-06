@@ -232,15 +232,17 @@ mod bond_contract {
         let maturity = d(2030, 1, 15);
 
         let bond = Bond::floating(
-            "TEST-FLOAT-BOND",
-            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-            "USD-SOFR-3M",
-            200, // 200 bp spread
-            issue,
-            maturity,
-            Tenor::quarterly(),
-            DayCount::Act360,
-            "USD-OIS",
+            finstack_quant_valuations::instruments::fixed_income::bond::FloatingBondParams {
+                id: "TEST-FLOAT-BOND".into(),
+                notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+                forward_curve_id: "USD-SOFR-3M".into(),
+                spread_bp: 200.into(),
+                issue_date: issue,
+                maturity,
+                frequency: Tenor::quarterly(),
+                day_count: DayCount::Act360,
+                discount_curve_id: "USD-OIS".into(),
+            },
         )
         .unwrap();
 

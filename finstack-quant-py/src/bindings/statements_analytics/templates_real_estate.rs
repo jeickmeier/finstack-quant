@@ -264,16 +264,17 @@ impl PyLeaseGrowthConvention {
 }
 
 impl PyLeaseGrowthConvention {
-    fn to_rust(self) -> PyResult<rust_re::LeaseGrowthConvention> {
-        crate::bindings::statements_analytics::enum_convert(&self)
-    }
-
     fn from_rust(value: rust_re::LeaseGrowthConvention) -> PyResult<Self> {
         crate::bindings::statements_analytics::enum_convert(&value)
     }
 }
 
 /// Rich lease spec for rent-roll generation.
+///
+/// Every parameter is keyword-only and read by Rust as the serde
+/// ``LeaseSpec``: periods are period-id strings (``"2025Q1"``),
+/// ``growth_convention`` is a ``LeaseGrowthConvention`` or its serde name,
+/// Rust supplies the defaults and an unknown keyword raises ``ValueError``.
 #[pyclass(
     name = "LeaseSpec",
     module = "finstack_quant.statements_analytics",
@@ -287,46 +288,13 @@ pub struct PyLeaseSpec {
 #[pymethods]
 impl PyLeaseSpec {
     #[new]
-    #[pyo3(signature = (
-        node_id,
-        start,
-        base_rent,
-        end=None,
-        growth_rate=0.0,
-        growth_convention=PyLeaseGrowthConvention::AnnualEscalator,
-        rent_steps=Vec::new(),
-        free_rent_periods=0,
-        free_rent_windows=Vec::new(),
-        occupancy=1.0,
-        renewal=None,
-    ))]
-    #[allow(clippy::too_many_arguments)]
-    fn new(
-        node_id: &str,
-        start: &str,
-        base_rent: f64,
-        end: Option<&str>,
-        growth_rate: f64,
-        growth_convention: PyLeaseGrowthConvention,
-        rent_steps: Vec<PyRentStepSpec>,
-        free_rent_periods: u32,
-        free_rent_windows: Vec<PyFreeRentWindowSpec>,
-        occupancy: f64,
-        renewal: Option<PyRenewalSpec>,
-    ) -> PyResult<Self> {
-        let inner = rust_re::LeaseSpec {
-            node_id: node_id.to_string(),
-            start: parse_period_id(start)?,
-            end: end.map(parse_period_id).transpose()?,
-            base_rent,
-            growth_rate,
-            growth_convention: growth_convention.to_rust()?,
-            rent_steps: rent_steps.into_iter().map(|s| s.inner).collect(),
-            free_rent_periods,
-            free_rent_windows: free_rent_windows.into_iter().map(|w| w.inner).collect(),
-            occupancy,
-            renewal: renewal.map(|r| r.inner),
-        };
+    #[pyo3(
+        signature = (**fields),
+        text_signature = "(*, node_id, start, base_rent, end=None, growth_rate=0.0, growth_convention='annual_escalator', rent_steps=[], free_rent_periods=0, free_rent_windows=[], occupancy=1.0, renewal=None)"
+    )]
+    fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
+        let inner: rust_re::LeaseSpec =
+            crate::bindings::module_utils::fields_from_py(py, fields, "LeaseSpec")?;
         Ok(Self { inner })
     }
 
@@ -646,6 +614,10 @@ wire_methods!(
 );
 
 /// Standard node ids for the full property operating-statement template.
+///
+/// Every parameter is keyword-only and optional; Rust reads them as the serde
+/// ``PropertyTemplateNodes`` (defaults ``RentRollOutputNodes()`` and the
+/// standard node names) and rejects unknown keywords.
 #[pyclass(
     name = "PropertyTemplateNodes",
     module = "finstack_quant.statements_analytics",
@@ -659,39 +631,14 @@ pub struct PyPropertyTemplateNodes {
 #[pymethods]
 impl PyPropertyTemplateNodes {
     #[new]
-    #[pyo3(signature = (
-        rent_roll=None,
-        other_income_total_node="other_income_total",
-        egi_node="egi",
-        management_fee_node="management_fee",
-        opex_total_node="opex_total",
-        noi_node="noi",
-        capex_total_node="capex_total",
-        ncf_node="ncf",
-    ))]
-    #[allow(clippy::too_many_arguments)]
-    fn new(
-        rent_roll: Option<PyRentRollOutputNodes>,
-        other_income_total_node: &str,
-        egi_node: &str,
-        management_fee_node: &str,
-        opex_total_node: &str,
-        noi_node: &str,
-        capex_total_node: &str,
-        ncf_node: &str,
-    ) -> Self {
-        Self {
-            inner: rust_re::PropertyTemplateNodes {
-                rent_roll: rent_roll.map(|r| r.inner).unwrap_or_default(),
-                other_income_total_node: other_income_total_node.to_string(),
-                egi_node: egi_node.to_string(),
-                management_fee_node: management_fee_node.to_string(),
-                opex_total_node: opex_total_node.to_string(),
-                noi_node: noi_node.to_string(),
-                capex_total_node: capex_total_node.to_string(),
-                ncf_node: ncf_node.to_string(),
-            },
-        }
+    #[pyo3(
+        signature = (**fields),
+        text_signature = "(*, rent_roll=..., other_income_total_node='other_income_total', egi_node='egi', management_fee_node='management_fee', opex_total_node='opex_total', noi_node='noi', capex_total_node='capex_total', ncf_node='ncf')"
+    )]
+    fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
+        let inner: rust_re::PropertyTemplateNodes =
+            crate::bindings::module_utils::fields_from_py(py, fields, "PropertyTemplateNodes")?;
+        Ok(Self { inner })
     }
 
     /// Rent-roll output node ids (PGI, free rent, vacancy loss, effective

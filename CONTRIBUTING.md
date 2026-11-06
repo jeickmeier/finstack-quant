@@ -20,26 +20,31 @@ mise install
 mise run python-sync
 ```
 
-Run the full local quality gate before opening larger changes:
+Before opening a pull request, format and run the gate. `mise run all` runs
+exactly what CI runs on a pull request:
 
 ```bash
 mise run all-fmt
-mise run all-lint
-mise run all-test
+mise run all
 ```
 
-For narrower changes, use the smallest relevant task first:
+After changing a generator, a JSON wire type, a binding, or the WASM facade,
+run `mise run gen-write` first; it regenerates every generated file.
+
+While iterating, use the smallest relevant task:
 
 | Area | Commands |
 |---|---|
-| Rust libraries | `mise run rust-build`, `mise run rust-test` |
-| Python bindings | `mise run python-build`, `mise run python-test` |
-| WASM bindings | `mise run wasm-pkg`, `mise run wasm-test` |
-| UI registry | `mise run ui-fmt`, `mise run ui-typecheck`, `mise run ui-test` |
+| Rust libraries | `mise run rust-lint-crate -- <package>`, `mise run rust-test-crate -- <package>` |
+| Python bindings | `mise run python-build`, then `mise run python-test-file -- <file>` |
+| WASM bindings | `mise run wasm-test`, then `mise run wasm-test-built` |
+| UI registry | `mise run ui-fmt`, `mise run ui-check` |
 | Examples | `mise run python-examples` |
-| Schemas | `mise run rust-check-schemas` |
+| Generated files | `mise run gen-write`, `mise run gen-check` |
 
 Run `mise tasks` to see the full task list.
+[`scripts/README.md`](scripts/README.md) maps every checker to the convention
+it enforces and the stage that runs it.
 
 ## Project Principles
 
@@ -111,13 +116,13 @@ blocks direct pushes, force-pushes, and deletion of `master`.
 3. Open a pull request into `master`. The PR workflow
    ([`.github/workflows/pr.yml`](.github/workflows/pr.yml)) runs the fast
    check tier: lint, generated-artifact drift, the fast Rust, Python, and WASM
-   tests, and the supply-chain audit, in under 15 minutes. It reports one
-   status check, `PR gate`, which must pass before the pull request can merge.
-   `mise run all-ci` runs the same checks locally. The full tier (coverage,
-   docs and doctests, the slow suites) runs nightly on `master`; for a change
-   that needs it before merging, run
+   tests, the UI registry check, and the supply-chain audit, in under 15
+   minutes. It reports one status check, `PR gate`, which must pass before the
+   pull request can merge. `mise run all` runs the same checks locally. The
+   full tier (coverage, docs and doctests, the slow suites) runs nightly on
+   `master`; for a change that needs it before merging, run
    `gh workflow run full-checks.yml --ref <branch>`, or
-   `mise run all-ci --full` locally (without coverage). A test that needs more
+   `mise run all --full` locally (without coverage). A test that needs more
    than 60 s belongs in the slow suite: mark it `#[ignore = "slow: <reason>"]`.
 4. Title the pull request as a conventional commit, such as
    `fix(credit): accrue premium on default`. Pull requests are squash-merged,
@@ -132,10 +137,9 @@ together.
 Branches worked on in parallel often conflict in generated files: JSON schemas,
 WASM contract types, the UI registry, and the pinned UI fixtures. Resolve such a
 conflict by taking `master`'s version and regenerating, not by editing the
-file. `mise run gen-write` regenerates the schemas, contract types, and UI
-registry; [`AGENTS.md`](AGENTS.md) lists the commands for the UI fixtures. The
-Generated artifacts job (`mise run gen-check`) fails on any generated file left
-stale.
+file. `mise run gen-write` regenerates all of them, the UI fixtures included.
+The Generated artifacts job (`mise run gen-check`) and the test stages fail on
+any generated file left stale.
 
 ### Pull Request Descriptions
 
@@ -192,14 +196,18 @@ both enforce this (`mise run release-check-upstream` runs the check locally).
    refreshes `Cargo.lock`) in a pull request, so nightly builds order above
    everything on this line.
 2. **Write the release notes on `master`.** In a pull request into `master`,
-   labeled `backport release/X.Y`, add the `## [X.Y.Z]` section to
-   `CHANGELOG.md` and `release_notes/RELEASE_NOTES_X.Y.Z.md`.
+   labeled `backport release/X.Y`, rename `changelog/unreleased.md` to
+   `changelog/X.Y.Z.md`, write its release notes (title, date, summary,
+   breaking changes, migration checklist) above its `## Itemized changes`
+   section, start a fresh `changelog/unreleased.md`, and add the row to
+   `changelog/README.md`. The GitHub Release body is the part above
+   `## Itemized changes`.
 
    The tag sets the version: the release workflow stamps `X.Y.Z` or
    `X.Y.Z-rc.N` into the manifests before building, so a patch release or
    candidate needs no version commit. Its Version metadata gate checks that the
    committed version is on the tag's `X.Y` line, and, for the final tag, the
-   changelog section and notes file. `mise run all-ci --release` runs both
+   changelog section and notes file. `mise run all --release` runs both
    check tiers (without coverage) and the release gates locally.
 3. **Choose the pull requests.** Label each pull request into `master` that
    should ship on this line `backport release/X.Y`, before or after it merges.

@@ -45,7 +45,7 @@
     },
     {
       "id": "VALUATIONS-EQUITY-AND-COMPOSITION-09",
-      "title": "Equity Black\u2013Scholes and Heston PDE adapters",
+      "title": "Equity Black–Scholes and Heston PDE adapters",
       "path": "09-equity-pde.md"
     },
     {
@@ -1006,6 +1006,22 @@
       ],
       "reason": "Schema registry/artifact generation, cached compiled schema validators and schema examples; shape validation is separate from runtime pricing invariants.",
       "sha256": "c321e5499b847dd82bf6f2822204389f0027a1073a71c321849b42a42dcf0001"
+    },
+    {
+      "path": "finstack-quant/valuations/src/pricer/catalog.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-01"
+      ],
+      "reason": "Registry listing split from pricer/json.rs: standard metric and model catalogues, metric metadata, coordinates and display groups."
+    },
+    {
+      "path": "finstack-quant/valuations/core/src/results/field_units.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-01"
+      ],
+      "reason": "Metric field-unit tables split from pricer/json.rs (the metadata units of its record); depend only on Currency."
     }
   ]
 }

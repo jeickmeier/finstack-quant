@@ -575,7 +575,10 @@ finstack-quant-ui/src/generated/types/xccy_swap.ts
 finstack-quant-ui/src/generated/types/yoy_inflation_swap.ts
 finstack-quant-ui/src/generated/types/zmijewski_input.ts
 finstack-quant-ui/tests/valuations/instruments/encoding-report.json
+finstack-quant-wasm/facade-surface.json
+finstack-quant-wasm/index.d.ts
 finstack-quant-wasm/schemas/host/1/valuation_result.schema.json
+finstack-quant-wasm/tests/facade/schema_parity.golden.json
 finstack-quant-wasm/types/generated/analytics/analytics.ts
 finstack-quant-wasm/types/generated/analytics/index.ts
 finstack-quant-wasm/types/generated/attribution/attribution.ts
@@ -606,6 +609,7 @@ finstack-quant-wasm/types/generated/statements_analytics/statements_analytics.ts
 finstack-quant-wasm/types/generated/valuations/index.ts
 finstack-quant-wasm/types/generated/valuations/valuations.ts
 finstack-quant-wasm/types/valuation-result.d.ts
+finstack-quant/valuations/tests/data/registry_snapshot.json
 finstack-quant/valuations/tests/instruments/json_examples/agency_cmo.json
 finstack-quant/valuations/tests/instruments/json_examples/agency_mbs_passthrough.json
 finstack-quant/valuations/tests/instruments/json_examples/agency_tba.json

@@ -26,7 +26,7 @@ Ratios are multiples (1.2 = 120%); haircut fractions differ from pct thresholds.
 
 ## Implementation and validation evidence
 
-- [structured_credit/pricing/coverage_tests.rs](../../../../finstack-quant/valuations/structured-credit/src/structured_credit/pricing/coverage_tests.rs)
+- [structured_credit/pricing/coverage.rs](../../../../finstack-quant/valuations/structured-credit/src/structured_credit/pricing/coverage.rs)
 - [structured_credit/pricing/waterfall.rs](../../../../finstack-quant/valuations/structured-credit/src/structured_credit/pricing/waterfall.rs)
 - [structured_credit/pricing/simulation_engine/triggers.rs](../../../../finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/triggers.rs)
 - [structured_credit/pricing/simulation_engine/simulate_period/losses.rs](../../../../finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/simulate_period/losses.rs)

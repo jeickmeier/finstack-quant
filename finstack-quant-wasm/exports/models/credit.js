@@ -6,6 +6,18 @@ import { pd } from './credit/pd.js';
 import { recoveryWaterfall } from './credit/recoveryWaterfall.js';
 import { scoring } from './credit/scoring.js';
 
+/**
+ * Structural credit models, LGD / EAD / PD calibration, rating migration,
+ * credit scoring, recovery waterfalls and liability-management analytics.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const model = new models.credit.MertonModel(100, 0.25, 60, 0.03);
+ * console.log(model.defaultProbability(1), models.credit.pd.pitToTtc(0.02, 0.15, -1.0));
+ * model.free();
+ * ```
+ */
 export const credit = {
   // Structural (Merton-family) models and PIK specifications
   MertonModel: wasm.MertonModel,

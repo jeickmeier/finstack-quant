@@ -22,19 +22,21 @@ use wasm_bindgen::prelude::*;
 ///
 /// The wire carries the two amounts; the ratio is derived from them (see
 /// `marginUtilizationRatio`).
-/// @param posted_amount - Margin posted, in major units of `currency`; finite and non-negative.
-/// @param required_amount - Margin required, in major units of `currency`; finite and non-negative.
+/// @param postedAmount - Margin posted, in major units of `currency`; finite and non-negative.
+/// @param requiredAmount - Margin required, in major units of `currency`; finite and non-negative.
 /// @param currency - ISO-4217 currency of both amounts.
 /// @returns The `MarginUtilization` (`posted`, `required`) as a plain object.
 ///
 /// # Errors
 ///
 /// Throws for an unknown currency or a non-finite or negative amount.
-#[wasm_bindgen(js_name = marginUtilization)]
+#[wasm_bindgen(js_name = marginUtilization, unchecked_return_type = "MarginUtilization")]
 pub fn margin_utilization(
+    #[wasm_bindgen(js_name = "postedAmount", unchecked_param_type = "number")]
     posted_amount: JsValue,
+    #[wasm_bindgen(js_name = "requiredAmount", unchecked_param_type = "number")]
     required_amount: JsValue,
-    currency: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
 ) -> Result<JsValue, JsValue> {
     let currency = js_currency(&currency, "currency")?;
     let posted = js_money(&posted_amount, "postedAmount", currency)?;
@@ -50,7 +52,9 @@ pub fn margin_utilization(
 ///
 /// Throws if `utilization` is malformed, mixes currencies, or has a non-finite or negative amount.
 #[wasm_bindgen(js_name = marginUtilizationRatio)]
-pub fn margin_utilization_ratio(utilization: JsValue) -> Result<f64, JsValue> {
+pub fn margin_utilization_ratio(
+    #[wasm_bindgen(unchecked_param_type = "MarginUtilization | string")] utilization: JsValue,
+) -> Result<f64, JsValue> {
     let utilization: metrics::MarginUtilization = from_js_json(&utilization, "utilization")?;
     Ok(utilization.ratio)
 }
@@ -63,7 +67,9 @@ pub fn margin_utilization_ratio(utilization: JsValue) -> Result<f64, JsValue> {
 ///
 /// Throws if `utilization` is malformed, mixes currencies, or has a non-finite or negative amount.
 #[wasm_bindgen(js_name = marginUtilizationIsAdequate)]
-pub fn margin_utilization_is_adequate(utilization: JsValue) -> Result<bool, JsValue> {
+pub fn margin_utilization_is_adequate(
+    #[wasm_bindgen(unchecked_param_type = "MarginUtilization | string")] utilization: JsValue,
+) -> Result<bool, JsValue> {
     let utilization: metrics::MarginUtilization = from_js_json(&utilization, "utilization")?;
     Ok(utilization.is_adequate())
 }
@@ -76,7 +82,9 @@ pub fn margin_utilization_is_adequate(utilization: JsValue) -> Result<bool, JsVa
 ///
 /// Throws if `utilization` is malformed, mixes currencies, or has a non-finite or negative amount.
 #[wasm_bindgen(js_name = marginUtilizationShortfall)]
-pub fn margin_utilization_shortfall(utilization: JsValue) -> Result<f64, JsValue> {
+pub fn margin_utilization_shortfall(
+    #[wasm_bindgen(unchecked_param_type = "MarginUtilization | string")] utilization: JsValue,
+) -> Result<f64, JsValue> {
     let utilization: metrics::MarginUtilization = from_js_json(&utilization, "utilization")?;
     Ok(utilization.shortfall().map_err(to_js_err)?.amount())
 }
@@ -88,19 +96,20 @@ pub fn margin_utilization_shortfall(utilization: JsValue) -> Result<f64, JsValue
 /// Excess collateral: collateral value against the required value.
 ///
 /// `excess = collateral_value - required_value`; negative means a shortfall.
-/// @param collateral_value - Collateral market value, in major units of `currency`.
-/// @param required_value - Required collateral value, in major units of `currency`.
+/// @param collateralValue - Collateral market value, in major units of `currency`.
+/// @param requiredValue - Required collateral value, in major units of `currency`.
 /// @param currency - ISO-4217 currency of both amounts.
 /// @returns The `ExcessCollateral` (`collateral_value`, `required_value`, `excess`) as a plain object.
 ///
 /// # Errors
 ///
 /// Throws for an unknown currency or a non-finite amount.
-#[wasm_bindgen(js_name = excessCollateral)]
+#[wasm_bindgen(js_name = excessCollateral, unchecked_return_type = "ExcessCollateral")]
 pub fn excess_collateral(
-    collateral_value: JsValue,
+    #[wasm_bindgen(js_name = "collateralValue", unchecked_param_type = "number")] collateral_value: JsValue,
+    #[wasm_bindgen(js_name = "requiredValue", unchecked_param_type = "number")]
     required_value: JsValue,
-    currency: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
 ) -> Result<JsValue, JsValue> {
     let currency = js_currency(&currency, "currency")?;
     let collateral = js_money(&collateral_value, "collateralValue", currency)?;
@@ -109,40 +118,58 @@ pub fn excess_collateral(
 }
 
 /// Whether collateral exceeds the requirement.
-/// @param excess_collateral - `ExcessCollateral` (object or JSON).
+/// @param excessCollateral - `ExcessCollateral` (object or JSON).
 /// @returns `true` when the excess amount is positive.
 ///
 /// # Errors
 ///
 /// Throws if `excess_collateral` is malformed.
 #[wasm_bindgen(js_name = excessCollateralHasExcess)]
-pub fn excess_collateral_has_excess(excess_collateral: JsValue) -> Result<bool, JsValue> {
+pub fn excess_collateral_has_excess(
+    #[wasm_bindgen(
+        js_name = "excessCollateral",
+        unchecked_param_type = "ExcessCollateral | string"
+    )]
+    excess_collateral: JsValue,
+) -> Result<bool, JsValue> {
     let value: metrics::ExcessCollateral = from_js_json(&excess_collateral, "excessCollateral")?;
     Ok(value.has_excess())
 }
 
 /// Whether collateral falls short of the requirement.
-/// @param excess_collateral - `ExcessCollateral` (object or JSON).
+/// @param excessCollateral - `ExcessCollateral` (object or JSON).
 /// @returns `true` when the excess amount is negative.
 ///
 /// # Errors
 ///
 /// Throws if `excess_collateral` is malformed.
 #[wasm_bindgen(js_name = excessCollateralHasShortfall)]
-pub fn excess_collateral_has_shortfall(excess_collateral: JsValue) -> Result<bool, JsValue> {
+pub fn excess_collateral_has_shortfall(
+    #[wasm_bindgen(
+        js_name = "excessCollateral",
+        unchecked_param_type = "ExcessCollateral | string"
+    )]
+    excess_collateral: JsValue,
+) -> Result<bool, JsValue> {
     let value: metrics::ExcessCollateral = from_js_json(&excess_collateral, "excessCollateral")?;
     Ok(value.has_shortfall())
 }
 
 /// Excess as a fraction of the required value.
-/// @param excess_collateral - `ExcessCollateral` (object or JSON).
+/// @param excessCollateral - `ExcessCollateral` (object or JSON).
 /// @returns `excess / required_value` as a decimal (0.05 is 5% over-collateralized); zero when nothing is required.
 ///
 /// # Errors
 ///
 /// Throws if `excess_collateral` is malformed.
 #[wasm_bindgen(js_name = excessCollateralExcessPercentage)]
-pub fn excess_collateral_excess_percentage(excess_collateral: JsValue) -> Result<f64, JsValue> {
+pub fn excess_collateral_excess_percentage(
+    #[wasm_bindgen(
+        js_name = "excessCollateral",
+        unchecked_param_type = "ExcessCollateral | string"
+    )]
+    excess_collateral: JsValue,
+) -> Result<f64, JsValue> {
     let value: metrics::ExcessCollateral = from_js_json(&excess_collateral, "excessCollateral")?;
     Ok(value.excess_percentage())
 }
@@ -154,9 +181,9 @@ pub fn excess_collateral_excess_percentage(excess_collateral: JsValue) -> Result
 /// Annualized cost of funding posted margin.
 ///
 /// `annual_cost = margin_posted * (funding_rate - collateral_rate)`.
-/// @param margin_posted - Margin posted, in major units of `currency`.
-/// @param funding_rate - Unsecured funding rate as an annualized decimal (0.05 is 5%).
-/// @param collateral_rate - Rate earned on posted collateral as an annualized decimal.
+/// @param marginPosted - Margin posted, in major units of `currency`.
+/// @param fundingRate - Unsecured funding rate as an annualized decimal (0.05 is 5%).
+/// @param collateralRate - Rate earned on posted collateral as an annualized decimal.
 /// @param currency - ISO-4217 currency of the posted margin.
 /// @returns The `MarginFundingCost` (`margin_posted`, `funding_rate`, `collateral_rate`, `annual_cost`) as a plain object.
 ///
@@ -164,12 +191,14 @@ pub fn excess_collateral_excess_percentage(excess_collateral: JsValue) -> Result
 ///
 /// Throws for an unknown currency, a non-finite margin amount or funding
 /// spread, or an annual cost outside the Decimal range.
-#[wasm_bindgen(js_name = marginFundingCost)]
+#[wasm_bindgen(js_name = marginFundingCost, unchecked_return_type = "MarginFundingCost")]
 pub fn margin_funding_cost(
+    #[wasm_bindgen(js_name = "marginPosted", unchecked_param_type = "number")]
     margin_posted: JsValue,
-    funding_rate: JsValue,
+    #[wasm_bindgen(js_name = "fundingRate", unchecked_param_type = "number")] funding_rate: JsValue,
+    #[wasm_bindgen(js_name = "collateralRate", unchecked_param_type = "number")]
     collateral_rate: JsValue,
-    currency: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
 ) -> Result<JsValue, JsValue> {
     let currency = js_currency(&currency, "currency")?;
     let margin_posted = js_money(&margin_posted, "marginPosted", currency)?;
@@ -182,21 +211,27 @@ pub fn margin_funding_cost(
 }
 
 /// Funding spread: funding rate minus collateral rate.
-/// @param funding_cost - `MarginFundingCost` (object or JSON).
+/// @param fundingCost - `MarginFundingCost` (object or JSON).
 /// @returns The spread as an annualized decimal.
 ///
 /// # Errors
 ///
 /// Throws if `funding_cost` is malformed.
 #[wasm_bindgen(js_name = marginFundingCostSpread)]
-pub fn margin_funding_cost_spread(funding_cost: JsValue) -> Result<f64, JsValue> {
+pub fn margin_funding_cost_spread(
+    #[wasm_bindgen(
+        js_name = "fundingCost",
+        unchecked_param_type = "MarginFundingCost | string"
+    )]
+    funding_cost: JsValue,
+) -> Result<f64, JsValue> {
     let value: metrics::MarginFundingCost = from_js_json(&funding_cost, "fundingCost")?;
     Ok(value.spread())
 }
 
 /// Funding cost over a period: `annual_cost * year_fraction`.
-/// @param funding_cost - `MarginFundingCost` (object or JSON).
-/// @param year_fraction - Length of the period in years.
+/// @param fundingCost - `MarginFundingCost` (object or JSON).
+/// @param yearFraction - Length of the period in years.
 /// @returns The cost in major units of the posted margin's currency.
 ///
 /// # Errors
@@ -205,7 +240,12 @@ pub fn margin_funding_cost_spread(funding_cost: JsValue) -> Result<f64, JsValue>
 /// the period cost is outside the Decimal range.
 #[wasm_bindgen(js_name = marginFundingCostCostForPeriod)]
 pub fn margin_funding_cost_cost_for_period(
+    #[wasm_bindgen(
+        js_name = "fundingCost",
+        unchecked_param_type = "MarginFundingCost | string"
+    )]
     funding_cost: JsValue,
+    #[wasm_bindgen(js_name = "yearFraction", unchecked_param_type = "number")]
     year_fraction: JsValue,
 ) -> Result<f64, JsValue> {
     let value: metrics::MarginFundingCost = from_js_json(&funding_cost, "fundingCost")?;
@@ -221,8 +261,8 @@ pub fn margin_funding_cost_cost_for_period(
 // ---------------------------------------------------------------------------
 
 /// Haircut01: PV change for a one basis point increase in the haircut.
-/// @param collateral_value - Collateral market value, in major units of `currency`.
-/// @param current_haircut - Current haircut as a decimal fraction (0.02 is 2%).
+/// @param collateralValue - Collateral market value, in major units of `currency`.
+/// @param currentHaircut - Current haircut as a decimal fraction (0.02 is 2%).
 /// @param currency - ISO-4217 currency of the collateral value.
 /// @returns The `Haircut01` (`collateral_value`, `current_haircut`, `pv_change`) as a plain object.
 ///
@@ -230,11 +270,12 @@ pub fn margin_funding_cost_cost_for_period(
 ///
 /// Throws for an unknown currency, a non-finite collateral value, or a
 /// one-basis-point PV change outside the monetary amount range.
-#[wasm_bindgen(js_name = haircut01)]
+#[wasm_bindgen(js_name = haircut01, unchecked_return_type = "Haircut01")]
 pub fn haircut01(
-    collateral_value: JsValue,
+    #[wasm_bindgen(js_name = "collateralValue", unchecked_param_type = "number")] collateral_value: JsValue,
+    #[wasm_bindgen(js_name = "currentHaircut", unchecked_param_type = "number")]
     current_haircut: JsValue,
-    currency: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
 ) -> Result<JsValue, JsValue> {
     let currency = js_currency(&currency, "currency")?;
     let collateral_value = js_money(&collateral_value, "collateralValue", currency)?;
@@ -252,7 +293,9 @@ pub fn haircut01(
 ///
 /// Throws if `haircut01` is malformed.
 #[wasm_bindgen(js_name = haircut01HaircutBp)]
-pub fn haircut01_haircut_bp(haircut01: JsValue) -> Result<f64, JsValue> {
+pub fn haircut01_haircut_bp(
+    #[wasm_bindgen(unchecked_param_type = "Haircut01 | string")] haircut01: JsValue,
+) -> Result<f64, JsValue> {
     let value: metrics::Haircut01 = from_js_json(&haircut01, "haircut01")?;
     Ok(value.haircut_bp())
 }

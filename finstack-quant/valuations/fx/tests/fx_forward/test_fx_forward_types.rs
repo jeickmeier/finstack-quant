@@ -72,19 +72,21 @@ fn test_fx_forward_from_trade_date() {
     let trade_date = Date::from_calendar_date(2024, Month::January, 15).expect("valid date");
 
     let forward = FxForward::from_trade_date(
-        "EURUSD-3M",
-        Currency::EUR,
-        Currency::USD,
-        trade_date,
-        Tenor::parse("3M").expect("valid tenor"),
-        Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
-        "USD-OIS",
-        "EUR-OIS",
-        None,
-        None,
-        Some(2), // T+2 spot
-        Some(BusinessDayConvention::ModifiedFollowing),
-        false,
+        finstack_quant_valuations_fx::fx_forward::FxForwardTradeDateParams {
+            id: "EURUSD-3M".into(),
+            base_currency: Currency::EUR,
+            quote_currency: Currency::USD,
+            trade_date,
+            tenor: Tenor::parse("3M").expect("valid tenor"),
+            notional: Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
+            domestic_discount_curve_id: "USD-OIS".into(),
+            foreign_discount_curve_id: "EUR-OIS".into(),
+            base_calendar_id: None,
+            quote_calendar_id: None,
+            settlement_days: Some(2),
+            business_day_convention: Some(BusinessDayConvention::ModifiedFollowing),
+            end_of_month: false,
+        },
     )
     .expect("should build");
 
@@ -96,19 +98,21 @@ fn test_fx_forward_from_trade_date() {
     // `None` selects the Rust-owned Modified Following default and the
     // pair's standard spot lag (T+2 for EUR/USD).
     let defaulted = FxForward::from_trade_date(
-        "EURUSD-3M",
-        Currency::EUR,
-        Currency::USD,
-        trade_date,
-        Tenor::parse("3M").expect("valid tenor"),
-        Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
-        "USD-OIS",
-        "EUR-OIS",
-        None,
-        None,
-        None,
-        None,
-        false,
+        finstack_quant_valuations_fx::fx_forward::FxForwardTradeDateParams {
+            id: "EURUSD-3M".into(),
+            base_currency: Currency::EUR,
+            quote_currency: Currency::USD,
+            trade_date,
+            tenor: Tenor::parse("3M").expect("valid tenor"),
+            notional: Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
+            domestic_discount_curve_id: "USD-OIS".into(),
+            foreign_discount_curve_id: "EUR-OIS".into(),
+            base_calendar_id: None,
+            quote_calendar_id: None,
+            settlement_days: None,
+            business_day_convention: None,
+            end_of_month: false,
+        },
     )
     .expect("should build");
     assert_eq!(defaulted.maturity, forward.maturity);
@@ -117,19 +121,21 @@ fn test_fx_forward_from_trade_date() {
 #[test]
 fn standard_forward_tenor_preserves_explicit_end_of_month_policy() {
     let forward = FxForward::from_trade_date(
-        "EURUSD-1M-EOM",
-        Currency::EUR,
-        Currency::USD,
-        Date::from_calendar_date(2024, Month::January, 29).expect("valid date"),
-        Tenor::parse("1M").expect("valid tenor"),
-        Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
-        "USD-OIS",
-        "EUR-OIS",
-        None,
-        None,
-        Some(2),
-        Some(BusinessDayConvention::Unadjusted),
-        true,
+        finstack_quant_valuations_fx::fx_forward::FxForwardTradeDateParams {
+            id: "EURUSD-1M-EOM".into(),
+            base_currency: Currency::EUR,
+            quote_currency: Currency::USD,
+            trade_date: Date::from_calendar_date(2024, Month::January, 29).expect("valid date"),
+            tenor: Tenor::parse("1M").expect("valid tenor"),
+            notional: Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
+            domestic_discount_curve_id: "USD-OIS".into(),
+            foreign_discount_curve_id: "EUR-OIS".into(),
+            base_calendar_id: None,
+            quote_calendar_id: None,
+            settlement_days: Some(2),
+            business_day_convention: Some(BusinessDayConvention::Unadjusted),
+            end_of_month: true,
+        },
     )
     .expect("should build");
 

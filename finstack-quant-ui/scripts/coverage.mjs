@@ -133,9 +133,11 @@ export function importsWasmValue(sourceFile) {
 
 /**
  * Facade units and class members the worker closure references, resolved by
- * the checker to their declarations in the facade `index.d.ts`.
+ * the checker to their declarations: namespaces and the members the facade adds
+ * in `index.d.ts`, every other class member in the package's generated
+ * `pkg/finstack_quant_wasm.d.ts`.
  */
-export function collectUsage(program, facade, files, surface) {
+export function collectUsage(program, facade, pkg, files, surface) {
   const checker = program.getTypeChecker();
   const namespaces = new Map(); // namespace interface -> facade path
   const classes = new Map(); // class or constructor interface -> class key
@@ -188,10 +190,13 @@ export function collectUsage(program, facade, files, surface) {
   const resolve = (node) => {
     const declaration = checker.getSymbolAtLocation(node.name)
       ?.declarations?.[0];
-    if (declaration?.getSourceFile() !== facade) return;
-    const owner = ts.isInterfaceDeclaration(declaration.parent)
-      ? declaration.parent.name.text
-      : null;
+    const file = declaration?.getSourceFile();
+    if (file !== facade && file !== pkg) return;
+    const owner =
+      ts.isInterfaceDeclaration(declaration.parent) ||
+      ts.isClassDeclaration(declaration.parent)
+        ? (declaration.parent.name?.text ?? null)
+        : null;
     const name = node.name.text;
     if (owner && namespaces.has(owner)) {
       const key = `${namespaces.get(owner)}.${name}`;
@@ -385,6 +390,17 @@ async function main() {
     .getSourceFiles()
     .find((file) => /finstack-quant-wasm\/index\.d\.ts$/.test(file.fileName));
   if (!facade) throw new Error("finstack-quant-wasm/index.d.ts is unresolved");
+  const pkg = program
+    .getSourceFiles()
+    .find((file) =>
+      /finstack-quant-wasm\/pkg\/finstack_quant_wasm\.d\.ts$/.test(
+        file.fileName,
+      ),
+    );
+  if (!pkg)
+    throw new Error(
+      "finstack-quant-wasm/pkg/finstack_quant_wasm.d.ts is unresolved; run `mise run wasm-build`",
+    );
   // The worker closure: every package source the worker entry reaches.
   const closure = program
     .getSourceFiles()
@@ -401,6 +417,7 @@ async function main() {
   const { units: used, members } = collectUsage(
     program,
     facade,
+    pkg,
     closure,
     surface,
   );

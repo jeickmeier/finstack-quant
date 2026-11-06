@@ -37,6 +37,7 @@ members = [
     "finstack-quant/arrow-interchange",
     "finstack-quant-py",
     "finstack-quant-wasm",
+    "finstack-quant-wasm/macros",
     "finstack-quant"
 ]
 resolver = "2"

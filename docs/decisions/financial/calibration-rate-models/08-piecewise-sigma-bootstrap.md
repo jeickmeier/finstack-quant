@@ -39,7 +39,7 @@ A global piecewise fit could combine repeated strikes and regularize term struct
 
 ## Implementation and evidence
 
-[cap_floor.rs](../../../../finstack-quant/calibration/src/hull_white/cap_floor.rs), [cap_schedule.rs](../../../../finstack-quant/calibration/src/hull_white/cap_schedule.rs) and [pricing.rs](../../../../finstack-quant/calibration/src/hull_white/pricing.rs). [tests.rs](../../../../finstack-quant/calibration/src/hull_white/tests.rs) creates a piecewise model with a 0.75-year breakpoint and recovers it from adjacent synthetic caps. [Contractual schedule tests](../../../../finstack-quant/calibration/src/hull_white/cap_schedule_tests.rs) reverse quote order and verify paired schedule sorting and repricing. These are same-kernel recovery/invariant tests, not external term-vol calibration evidence. No tests were run.
+[cap_floor.rs](../../../../finstack-quant/calibration/src/hull_white/cap_floor.rs), [cap_schedule.rs](../../../../finstack-quant/calibration/src/hull_white/cap_schedule.rs) and [pricing.rs](../../../../finstack-quant/calibration/src/hull_white/pricing.rs). [tests.rs](../../../../finstack-quant/calibration/src/hull_white/tests.rs) creates a piecewise model with a 0.75-year breakpoint and recovers it from adjacent synthetic caps. [Contractual schedule tests](../../../../finstack-quant/calibration/src/hull_white/cap_schedule/tests.rs) reverse quote order and verify paired schedule sorting and repricing. These are same-kernel recovery/invariant tests, not external term-vol calibration evidence. No tests were run.
 
 ## Follow-up tracking
 

@@ -15,8 +15,12 @@
 //!   per-1% move and `theta` is per day under ACT/365 (or 252 via
 //!   `theta_days_per_year`). Forward-option Greeks are undiscounted and their
 //!   `vega` is per unit volatility change.
+//! - `bs_greeks` and the barrier / Asian / lookback / quanto prices take the
+//!   serde form of the Rust `OptionMarketParams` as one `market` dict;
+//!   `heston_price` takes `HestonPricingParams` as `params`.
 
 use crate::bindings::macros::wire_methods;
+use crate::bindings::module_utils::spec_from_py;
 use crate::bindings::pandas_utils::{
     labeled_values_to_series, serde_object_to_single_row_dataframe,
 };
@@ -33,8 +37,15 @@ use finstack_quant_models::closed_form::{
     quanto_option_price, vanilla_expiry_payoff,
 };
 use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
-use finstack_quant_models::types::OptionType;
+use finstack_quant_models::types::{OptionMarketParams, OptionType};
 use pyo3::prelude::*;
+
+/// Parse a `market` argument (dict or JSON text) as an [`OptionMarketParams`].
+///
+/// Shared by the closed-form and Monte Carlo option bindings.
+pub(crate) fn option_market(market: &Bound<'_, PyAny>) -> PyResult<OptionMarketParams> {
+    spec_from_py(market.py(), market, "OptionMarketParams")
+}
 
 const BS_GREEK_LABELS: [&str; 6] = ["delta", "gamma", "vega", "theta", "rho_r", "rho_q"];
 
@@ -303,33 +314,14 @@ fn vanilla_expiry_payoff_wrapper(spot: f64, strike: f64, is_call: bool) -> PyRes
 #[doc = pydoc!("finstack_quant.models._closed_form", "bs_greeks")]
 #[pyfunction(name = "bs_greeks")]
 #[pyo3(
-    signature = (spot, strike, rate, div_yield, vol, expiry, is_call, theta_days_per_year=DEFAULT_THETA_DAYS_PER_YEAR),
-    text_signature = "(spot, strike, rate, div_yield, vol, expiry, is_call, theta_days_per_year=365.0)"
+    signature = (market, theta_days_per_year=DEFAULT_THETA_DAYS_PER_YEAR),
+    text_signature = "(market, theta_days_per_year=365.0)"
 )]
-#[allow(clippy::too_many_arguments)]
-fn bs_greeks_wrapper(
-    spot: f64,
-    strike: f64,
-    rate: f64,
-    div_yield: f64,
-    vol: f64,
-    expiry: f64,
-    is_call: bool,
-    theta_days_per_year: f64,
-) -> PyResult<PyBsGreeks> {
+fn bs_greeks_wrapper(market: &Bound<'_, PyAny>, theta_days_per_year: f64) -> PyResult<PyBsGreeks> {
     // theta_days_per_year validation (finite, > 0) lives in `bs_greeks`.
-    bs_greeks(
-        spot,
-        strike,
-        rate,
-        div_yield,
-        vol,
-        expiry,
-        OptionType::from(is_call),
-        theta_days_per_year,
-    )
-    .map(PyBsGreeks::from_inner)
-    .map_err(core_to_py)
+    bs_greeks(&option_market(market)?, theta_days_per_year)
+        .map(PyBsGreeks::from_inner)
+        .map_err(core_to_py)
 }
 
 // bs_implied_vol
@@ -497,151 +489,71 @@ fn black_shifted_vega_wrapper(
 
 #[doc = pydoc!("finstack_quant.models._closed_form", "barrier_option_price")]
 #[pyfunction(name = "barrier_option_price")]
-#[pyo3(signature = (spot, strike, barrier, rate, div_yield, vol, expiry, direction, knock, is_call=true))]
-#[allow(clippy::too_many_arguments)]
+#[pyo3(signature = (market, barrier, direction, knock))]
 fn barrier_option_price_wrapper(
-    spot: f64,
-    strike: f64,
+    market: &Bound<'_, PyAny>,
     barrier: f64,
-    rate: f64,
-    div_yield: f64,
-    vol: f64,
-    expiry: f64,
     direction: &str,
     knock: &str,
-    is_call: bool,
 ) -> PyResult<f64> {
-    barrier_option_price(
-        spot,
-        strike,
-        barrier,
-        rate,
-        div_yield,
-        vol,
-        expiry,
-        direction,
-        knock,
-        OptionType::from(is_call),
-    )
-    .map_err(core_to_py)
+    barrier_option_price(&option_market(market)?, barrier, direction, knock).map_err(core_to_py)
 }
 
 #[doc = pydoc!("finstack_quant.models._closed_form", "asian_option_price")]
 #[pyfunction(name = "asian_option_price")]
-#[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, num_fixings, averaging=None, is_call=true))]
-#[allow(clippy::too_many_arguments)]
+#[pyo3(signature = (market, num_fixings, averaging=None))]
 fn asian_option_wrapper(
-    spot: f64,
-    strike: f64,
-    rate: f64,
-    div_yield: f64,
-    vol: f64,
-    expiry: f64,
+    market: &Bound<'_, PyAny>,
     num_fixings: usize,
     averaging: Option<&str>,
-    is_call: bool,
 ) -> PyResult<f64> {
+    let market = option_market(market)?;
     let averaging = averaging
         .map(serde_parse::<AveragingMethod>)
         .transpose()
         .map_err(core_to_py)?
         .unwrap_or(DEFAULT_ASIAN_AVERAGING);
-    asian_option_price(
-        spot,
-        strike,
-        rate,
-        div_yield,
-        vol,
-        expiry,
-        num_fixings,
-        averaging,
-        OptionType::from(is_call),
-    )
-    .map_err(core_to_py)
+    asian_option_price(&market, num_fixings, averaging).map_err(core_to_py)
 }
 
 #[doc = pydoc!("finstack_quant.models._closed_form", "lookback_option_price")]
 #[pyfunction(name = "lookback_option_price")]
-#[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, extremum, strike_type=DEFAULT_LOOKBACK_STRIKE_TYPE, is_call=true))]
-#[allow(clippy::too_many_arguments)]
+#[pyo3(signature = (market, extremum, strike_type=DEFAULT_LOOKBACK_STRIKE_TYPE))]
 fn lookback_option_wrapper(
-    spot: f64,
-    strike: f64,
-    rate: f64,
-    div_yield: f64,
-    vol: f64,
-    expiry: f64,
+    market: &Bound<'_, PyAny>,
     extremum: f64,
     strike_type: &str,
-    is_call: bool,
 ) -> PyResult<f64> {
-    lookback_option_price(
-        spot,
-        strike,
-        rate,
-        div_yield,
-        vol,
-        expiry,
-        extremum,
-        strike_type,
-        OptionType::from(is_call),
-    )
-    .map_err(core_to_py)
+    lookback_option_price(&option_market(market)?, extremum, strike_type).map_err(core_to_py)
 }
 
 #[doc = pydoc!("finstack_quant.models._closed_form", "quanto_option_price")]
 #[pyfunction(name = "quanto_option_price")]
-#[pyo3(signature = (spot, strike, expiry, rate_domestic, rate_foreign, div_yield, vol_asset, vol_fx, correlation, is_call=true))]
-#[allow(clippy::too_many_arguments)]
+#[pyo3(signature = (market, rate_foreign, vol_fx, correlation))]
 fn quanto_option_wrapper(
-    spot: f64,
-    strike: f64,
-    expiry: f64,
-    rate_domestic: f64,
+    market: &Bound<'_, PyAny>,
     rate_foreign: f64,
-    div_yield: f64,
-    vol_asset: f64,
     vol_fx: f64,
     correlation: f64,
-    is_call: bool,
 ) -> PyResult<f64> {
-    quanto_option_price(
-        spot,
-        strike,
-        expiry,
-        rate_domestic,
-        rate_foreign,
-        div_yield,
-        vol_asset,
-        vol_fx,
-        correlation,
-        OptionType::from(is_call),
-    )
-    .map_err(core_to_py)
+    quanto_option_price(&option_market(market)?, rate_foreign, vol_fx, correlation)
+        .map_err(core_to_py)
 }
 
 // heston_price
 
 #[doc = pydoc!("finstack_quant.models._closed_form", "heston_price")]
 #[pyfunction(name = "heston_price")]
-#[pyo3(signature = (spot, strike, expiry, rate, div_yield, kappa, theta, sigma_v, rho, v0, is_call=true))]
-#[allow(clippy::too_many_arguments)]
+#[pyo3(signature = (spot, strike, expiry, params, is_call=true))]
 fn heston_price_wrapper(
     py: Python<'_>,
     spot: f64,
     strike: f64,
     expiry: f64,
-    rate: f64,
-    div_yield: f64,
-    kappa: f64,
-    theta: f64,
-    sigma_v: f64,
-    rho: f64,
-    v0: f64,
+    params: &Bound<'_, PyAny>,
     is_call: bool,
 ) -> PyResult<f64> {
-    let params = HestonPricingParams::new(rate, div_yield, kappa, theta, sigma_v, rho, v0)
-        .map_err(core_to_py)?;
+    let params: HestonPricingParams = spec_from_py(py, params, "HestonPricingParams")?;
     let option_type = OptionType::from(is_call);
     py.detach(move || heston_price(spot, strike, expiry, &params, option_type, None))
         .map_err(core_to_py)

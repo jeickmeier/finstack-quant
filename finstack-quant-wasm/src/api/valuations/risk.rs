@@ -21,22 +21,31 @@ use wasm_bindgen::prelude::*;
 /// distribution (R type-7 linear-interpolated quantile), so offsetting
 /// positions diversify. Quote-recalibrated shocks (credit spreads) use the
 /// same recalibration provider as `priceInstrument`.
-/// @param instruments_json - Array of plain `finstack_quant.instrument/1` envelope objects, or one JSON string holding that array; nested JSON strings are rejected. The whole inventory is capped at 16 MiB; an empty array returns zero VaR and ES.
-/// @param market_json - Unshocked base market (JSON string or plain object) every scenario perturbs.
-/// @param history_json - `MarketHistory` (JSON string or plain object); a non-empty portfolio needs at least one scenario.
-/// @param as_of - ISO-8601 valuation date for the base and every scenario revaluation.
+/// @param instrumentsJson - Array of plain `finstack_quant.instrument/1` envelope objects, or one JSON string holding that array; nested JSON strings are rejected. The whole inventory is capped at 16 MiB; an empty array returns zero VaR and ES.
+/// @param marketJson - Unshocked base market (JSON string or plain object) every scenario perturbs.
+/// @param historyJson - `MarketHistory` (JSON string or plain object); a non-empty portfolio needs at least one scenario.
+/// @param asOf - ISO-8601 valuation date for the base and every scenario revaluation.
 /// @param config - Optional `VarConfig` (JSON string or plain object): `confidence_level` (decimal in `(0, 1)`), `method` (`"full_revaluation"` or `"taylor_approximation"`) and `reporting_currency` (required for mixed-currency portfolios). Omit for the Rust default: 95%, full revaluation, natural currency.
 /// @param model - Optional model key applied to every instrument; omit or `"default"` for each instrument's canonical pricing path.
 /// @returns `VarResult` plain object: `var`, `expected_shortfall` (losses negative), the worst-first `pnl_distribution`, `num_scenarios` and `confidence_level`.
 /// @throws Error - Throws with kind `validation` if an envelope, the market, history, config, `asOf` or `model` is invalid, the confidence level is outside `(0, 1)`, a non-empty portfolio has no scenarios, or a mixed-currency portfolio has no reporting currency; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if a scenario revaluation fails.
-#[wasm_bindgen(js_name = calculateVar)]
+#[wasm_bindgen(js_name = calculateVar, unchecked_return_type = "generated.valuations.VarResult")]
 pub fn calculate_var(
+    #[wasm_bindgen(
+        js_name = "instrumentsJson",
+        unchecked_param_type = "generated.valuations.InstrumentEnvelope[] | string"
+    )]
     instruments_json: JsValue,
+    #[wasm_bindgen(js_name = "marketJson", unchecked_param_type = "JsonInput")]
     market_json: JsValue,
+    #[wasm_bindgen(js_name = "historyJson", unchecked_param_type = "JsonInput")]
     history_json: JsValue,
-    as_of: JsValue,
+    #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
+    #[wasm_bindgen(
+        unchecked_optional_param_type = "generated.valuations.VarConfig | string | null"
+    )]
     config: Option<JsValue>,
-    model: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "string | null")] model: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let parsed = finstack_quant_valuations::pricer::parse_boxed_instruments_from_json(&json_text(
         &instruments_json,

@@ -39,8 +39,11 @@ use wasm_bindgen::prelude::*;
 /// types, invalid formulas or dimensions, an invalid waterfall, or failure to
 /// serialize the normalized model.
 /// @param json - Canonical JSON string defining the object to deserialize or normalize.
+/// @returns Canonical financial-model JSON after semantic validation.
 #[wasm_bindgen(js_name = validateFinancialModelJson)]
-pub fn validate_financial_model_json(json: JsValue) -> Result<String, JsValue> {
+pub fn validate_financial_model_json(
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+) -> Result<String, JsValue> {
     let json: &str = &json_text(&json, "json")?;
     let model = FinancialModelSpec::from_json(json).map_err(to_js_err)?;
     serde_json::to_string(&model).map_err(to_js_err)
@@ -59,8 +62,11 @@ pub fn validate_financial_model_json(json: JsValue) -> Result<String, JsValue> {
 /// types, invalid formulas, or an invalid capital structure; or failure to
 /// serialize the node identifiers to JavaScript.
 /// @param json - Canonical JSON string defining the object to deserialize or normalize.
-#[wasm_bindgen(js_name = modelNodeIds)]
-pub fn model_node_ids(json: JsValue) -> Result<JsValue, JsValue> {
+/// @returns Node identifiers in model-declaration order.
+#[wasm_bindgen(js_name = modelNodeIds, unchecked_return_type = "string[]")]
+pub fn model_node_ids(
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+) -> Result<JsValue, JsValue> {
     let json: &str = &json_text(&json, "json")?;
     let model = FinancialModelSpec::from_json(json).map_err(to_js_err)?;
     let ids: Vec<&str> = model.nodes.keys().map(|k| k.as_str()).collect();
@@ -83,8 +89,12 @@ pub fn model_node_ids(json: JsValue) -> Result<JsValue, JsValue> {
 ///
 /// Rejects malformed or schema-incompatible `json`, negative or non-finite
 /// default configuration thresholds, or failure to serialize the decoded check-suite specification.
+/// @param json - Serialized `CheckSuiteSpec` with a suite name, optional checks, and optional configuration. Default tolerances and materiality thresholds must be finite and nonnegative; omitted configuration uses Rust defaults.
+/// @returns Canonical check-suite JSON after schema validation.
 #[wasm_bindgen(js_name = validateCheckSuiteSpecJson)]
-pub fn validate_check_suite_spec_json(json: JsValue) -> Result<String, JsValue> {
+pub fn validate_check_suite_spec_json(
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+) -> Result<String, JsValue> {
     validated_json(
         &json,
         |spec: &finstack_quant_statements::checks::CheckSuiteSpec| spec.config.validate(),
@@ -104,8 +114,11 @@ pub fn validate_check_suite_spec_json(json: JsValue) -> Result<String, JsValue> 
 /// prepayment rung; an interest-rate swap with side `Receive`; or failure to
 /// serialize the validated capital-structure specification.
 /// @param json - Canonical JSON string defining the object to deserialize or normalize.
+/// @returns Canonical capital-structure JSON after schema validation.
 #[wasm_bindgen(js_name = validateCapitalStructureSpecJson)]
-pub fn validate_capital_structure_spec_json(json: JsValue) -> Result<String, JsValue> {
+pub fn validate_capital_structure_spec_json(
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+) -> Result<String, JsValue> {
     validated_json(
         &json,
         finstack_quant_statements::types::CapitalStructureSpec::validate,
@@ -125,8 +138,11 @@ pub fn validate_capital_structure_spec_json(json: JsValue) -> Result<String, JsV
 /// payment-class, prepay-node, or ECF-sweep settings; or failure to serialize
 /// the validated waterfall.
 /// @param json - Canonical JSON string for a `WaterfallSpec`, including `priority_of_payments`, `available_cash_node`, optional `ecf_sweep`, `pik_toggle`, `payment_classes`, `mandatory_prepay_node`, and `voluntary_prepay_node`.
+/// @returns Canonical waterfall JSON after schema validation.
 #[wasm_bindgen(js_name = validateWaterfallSpecJson)]
-pub fn validate_waterfall_spec_json(json: JsValue) -> Result<String, JsValue> {
+pub fn validate_waterfall_spec_json(
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+) -> Result<String, JsValue> {
     validated_json(
         &json,
         finstack_quant_statements::capital_structure::WaterfallSpec::validate,
@@ -145,8 +161,11 @@ pub fn validate_waterfall_spec_json(json: JsValue) -> Result<String, JsValue> {
 /// outside `[0.0, 1.0]`, or failure to serialize the validated ECF-sweep
 /// specification.
 /// @param json - Canonical JSON string defining the object to deserialize or normalize.
+/// @returns Canonical ECF-sweep JSON after schema validation.
 #[wasm_bindgen(js_name = validateEcfSweepSpecJson)]
-pub fn validate_ecf_sweep_spec_json(json: JsValue) -> Result<String, JsValue> {
+pub fn validate_ecf_sweep_spec_json(
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+) -> Result<String, JsValue> {
     validated_json(
         &json,
         finstack_quant_statements::capital_structure::EcfSweepSpec::validate,
@@ -164,8 +183,11 @@ pub fn validate_ecf_sweep_spec_json(json: JsValue) -> Result<String, JsValue> {
 /// `target_instrument_ids` list, or failure to serialize the validated
 /// PIK-toggle specification.
 /// @param json - Canonical JSON string defining the object to deserialize or normalize.
+/// @returns Canonical PIK-toggle JSON after schema validation.
 #[wasm_bindgen(js_name = validatePikToggleSpecJson)]
-pub fn validate_pik_toggle_spec_json(json: JsValue) -> Result<String, JsValue> {
+pub fn validate_pik_toggle_spec_json(
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+) -> Result<String, JsValue> {
     validated_json(
         &json,
         finstack_quant_statements::capital_structure::PikToggleSpec::validate,
@@ -178,9 +200,9 @@ pub fn validate_pik_toggle_spec_json(json: JsValue) -> Result<String, JsValue> {
 /// `evaluator::node_to_dated_schedule`): periods are taken in model timeline
 /// order, periods without a value are skipped, and each period is dated by
 /// `convention`.
-/// @param model_json - The `FinancialModelSpec` that produced the result (its periods supply the dates).
-/// @param result_json - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
-/// @param node_id - Node identifier to export.
+/// @param modelJson - The `FinancialModelSpec` that produced the result (its periods supply the dates).
+/// @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
+/// @param nodeId - Node identifier to export.
 /// @param convention - Optional `"end"` (default: the period's last inclusive day, `end - 1 day`, since periods are half-open `[start, end)`) or `"start"`.
 /// @returns `[isoDate, value]` pairs in timeline order, in the node's own units.
 ///
@@ -189,12 +211,18 @@ pub fn validate_pik_toggle_spec_json(json: JsValue) -> Result<String, JsValue> {
 /// Throws with kind `not_found` if `nodeId` has no values in the result, and
 /// kind `validation` if an input is malformed or `convention` is not
 /// `"start"` / `"end"`.
-#[wasm_bindgen(js_name = nodeToDatedSchedule)]
+#[wasm_bindgen(js_name = nodeToDatedSchedule, unchecked_return_type = "[string, number][]")]
 pub fn node_to_dated_schedule(
-    model_json: JsValue,
+    #[wasm_bindgen(js_name = "modelJson", unchecked_param_type = "JsonInput")] model_json: JsValue,
+    #[wasm_bindgen(
+        js_name = "resultJson",
+        unchecked_param_type = "StatementResult | string"
+    )]
     result_json: JsValue,
-    node_id: JsValue,
-    convention: Option<JsValue>,
+    #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
+    #[wasm_bindgen(unchecked_optional_param_type = "'end' | 'start' | null")] convention: Option<
+        JsValue,
+    >,
 ) -> Result<JsValue, JsValue> {
     let model =
         FinancialModelSpec::from_json(&json_text(&model_json, "modelJson")?).map_err(to_js_err)?;
@@ -222,7 +250,7 @@ pub fn node_to_dated_schedule(
 /// (`value > threshold`); negate values and threshold for a downside test.
 /// Per-path values come from the result's `path_data` table, so the
 /// simulation must run with `include_path_data: true`.
-/// @param results_json - `MonteCarloResults` returned by `Evaluator.evaluateMonteCarlo` (object or JSON).
+/// @param resultsJson - `MonteCarloResults` returned by `Evaluator.evaluateMonteCarlo` (object or JSON).
 /// @param metric - Node identifier to test.
 /// @param threshold - Breach level in the metric's own units.
 /// @returns Fraction of paths that breach in at least one forecast period, or `undefined` when the metric has no path data (including results run without `include_path_data`), there are no forecast periods, or the simulation is incomplete.
@@ -233,9 +261,13 @@ pub fn node_to_dated_schedule(
 /// `invalid_type` if `threshold` is not a number.
 #[wasm_bindgen(js_name = monteCarloBreachProbability)]
 pub fn monte_carlo_breach_probability(
+    #[wasm_bindgen(
+        js_name = "resultsJson",
+        unchecked_param_type = "MonteCarloResults | string"
+    )]
     results_json: JsValue,
-    metric: JsValue,
-    threshold: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] metric: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] threshold: JsValue,
 ) -> Result<Option<f64>, JsValue> {
     let results: finstack_quant_statements::evaluator::MonteCarloResults =
         serde_json::from_str(&json_text(&results_json, "resultsJson")?).map_err(to_js_err)?;
@@ -250,7 +282,7 @@ pub fn monte_carlo_breach_probability(
 /// Free-function twin of Python `MonteCarloResults.percentile_by_period` (Rust
 /// `MonteCarloResults::percentile_by_period`): looks up a percentile that the
 /// simulation was configured to report.
-/// @param results_json - `MonteCarloResults` returned by `Evaluator.evaluateMonteCarlo` (object or JSON).
+/// @param resultsJson - `MonteCarloResults` returned by `Evaluator.evaluateMonteCarlo` (object or JSON).
 /// @param metric - Node identifier to read.
 /// @param percentile - Percentile as a fraction in `[0, 1]` (e.g. `0.95`); must be one of the configured percentiles.
 /// @returns Object mapping period id (e.g. `"2025Q1"`) to the percentile value in the metric's own units, or `undefined` when the metric or percentile is not in the results.
@@ -259,11 +291,15 @@ pub fn monte_carlo_breach_probability(
 ///
 /// Throws with kind `validation` if the results input is malformed, and kind
 /// `invalid_type` if `percentile` is not a number.
-#[wasm_bindgen(js_name = monteCarloPercentileByPeriod)]
+#[wasm_bindgen(js_name = monteCarloPercentileByPeriod, unchecked_return_type = "Record<string, number> | undefined")]
 pub fn monte_carlo_percentile_by_period(
+    #[wasm_bindgen(
+        js_name = "resultsJson",
+        unchecked_param_type = "MonteCarloResults | string"
+    )]
     results_json: JsValue,
-    metric: JsValue,
-    percentile: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] metric: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] percentile: JsValue,
 ) -> Result<JsValue, JsValue> {
     let results: finstack_quant_statements::evaluator::MonteCarloResults =
         serde_json::from_str(&json_text(&results_json, "resultsJson")?).map_err(to_js_err)?;
@@ -281,15 +317,21 @@ pub fn monte_carlo_percentile_by_period(
 /// Free-function twin of Python `StatementResult.to_arrow_long`
 /// (Rust `StatementResult::to_table_long`): one row per `(node, period)` in
 /// the result's node and period declaration order.
-/// @param result_json - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
+/// @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
 /// @returns `TableEnvelope` with columns `node_id`, `period_id`, `value`, `value_money`, `currency`, `value_type`, `source`; monetary nodes repeat their value in `value_money` and set `currency`, scalar nodes leave both null; `source` is the evaluation layer that produced the cell (`value`, `forecast`, `formula` or `where_masked`), null when the result records none.
 ///
 /// # Errors
 ///
 /// Throws with kind `validation` if the result input is malformed or table
 /// construction fails.
-#[wasm_bindgen(js_name = statementResultToTableLong)]
-pub fn statement_result_to_table_long(result_json: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = statementResultToTableLong, unchecked_return_type = "TableEnvelope")]
+pub fn statement_result_to_table_long(
+    #[wasm_bindgen(
+        js_name = "resultJson",
+        unchecked_param_type = "StatementResult | string"
+    )]
+    result_json: JsValue,
+) -> Result<JsValue, JsValue> {
     let result: finstack_quant_statements::evaluator::StatementResult =
         serde_json::from_str(&json_text(&result_json, "resultJson")?).map_err(to_js_err)?;
     crate::utils::to_js_value(&result.to_table_long().map_err(to_js_err)?)
@@ -300,15 +342,21 @@ pub fn statement_result_to_table_long(result_json: JsValue) -> Result<JsValue, J
 /// Free-function twin of Python `StatementResult.to_arrow_wide`
 /// (Rust `StatementResult::to_table_wide`): one row per period in
 /// chronological order and one column per node in declaration order.
-/// @param result_json - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
+/// @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
 /// @returns `TableEnvelope` with a `period_id` column followed by one value column per node; a node with no value in a period holds `NaN` (serialized as `null`), not zero.
 ///
 /// # Errors
 ///
 /// Throws with kind `validation` if the result input is malformed or table
 /// construction fails.
-#[wasm_bindgen(js_name = statementResultToTableWide)]
-pub fn statement_result_to_table_wide(result_json: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = statementResultToTableWide, unchecked_return_type = "TableEnvelope")]
+pub fn statement_result_to_table_wide(
+    #[wasm_bindgen(
+        js_name = "resultJson",
+        unchecked_param_type = "StatementResult | string"
+    )]
+    result_json: JsValue,
+) -> Result<JsValue, JsValue> {
     let result: finstack_quant_statements::evaluator::StatementResult =
         serde_json::from_str(&json_text(&result_json, "resultJson")?).map_err(to_js_err)?;
     crate::utils::to_js_value(&result.to_table_wide().map_err(to_js_err)?)
@@ -321,7 +369,7 @@ pub fn statement_result_to_table_wide(result_json: JsValue) -> Result<JsValue, J
 /// through `FinancialModelSpec::from_json`, then hashed over its canonical
 /// JSON, so the hash does not depend on key order or number spelling of the
 /// typed fields. Free-form `meta`/`params` maps keep their JSON spelling.
-/// @param model_json - `FinancialModelSpec` (object or JSON).
+/// @param modelJson - `FinancialModelSpec` (object or JSON).
 /// @returns `"sha256:<hex>"` content hash.
 ///
 /// # Errors
@@ -329,7 +377,9 @@ pub fn statement_result_to_table_wide(result_json: JsValue) -> Result<JsValue, J
 /// Throws with kind `validation` if the model is malformed or fails semantic
 /// validation, or contains a non-finite number.
 #[wasm_bindgen(js_name = financialModelContentHash)]
-pub fn financial_model_content_hash(model_json: JsValue) -> Result<String, JsValue> {
+pub fn financial_model_content_hash(
+    #[wasm_bindgen(js_name = "modelJson", unchecked_param_type = "JsonInput")] model_json: JsValue,
+) -> Result<String, JsValue> {
     FinancialModelSpec::from_json(&json_text(&model_json, "modelJson")?)
         .map_err(to_js_err)?
         .content_hash()
@@ -351,7 +401,9 @@ pub fn financial_model_content_hash(model_json: JsValue) -> Result<String, JsVal
 /// @param formula - Financial-model formula string to parse into its canonical expression representation.
 /// @returns Canonical formula text, e.g. `"(revenue - cogs) / revenue"`.
 #[wasm_bindgen(js_name = parseFormula)]
-pub fn parse_formula(formula: JsValue) -> Result<String, JsValue> {
+pub fn parse_formula(
+    #[wasm_bindgen(unchecked_param_type = "string")] formula: JsValue,
+) -> Result<String, JsValue> {
     let formula: &str = &js_string(&formula, "formula")?;
     let ast = finstack_quant_statements::dsl::parse_formula(formula).map_err(to_js_err)?;
     Ok(ast.to_string())
@@ -373,7 +425,9 @@ pub fn parse_formula(formula: JsValue) -> Result<String, JsValue> {
 /// operator form.
 /// @param formula - Financial-model formula string to parse and validate without evaluation.
 #[wasm_bindgen(js_name = parseAndCompile)]
-pub fn parse_and_compile(formula: JsValue) -> Result<(), JsValue> {
+pub fn parse_and_compile(
+    #[wasm_bindgen(unchecked_param_type = "string")] formula: JsValue,
+) -> Result<(), JsValue> {
     let formula: &str = &js_string(&formula, "formula")?;
     finstack_quant_statements::dsl::parse_and_compile(formula).map_err(to_js_err)?;
     Ok(())

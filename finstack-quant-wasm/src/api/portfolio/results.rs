@@ -29,7 +29,9 @@ use wasm_bindgen::prelude::*;
 /// string or plain object, and a `FinstackError` (kind `validation`) if it
 /// does not match the `PortfolioAttribution` schema.
 #[wasm_bindgen(js_name = portfolioAttributionExplainText)]
-pub fn portfolio_attribution_explain_text(attribution: JsValue) -> Result<String, JsValue> {
+pub fn portfolio_attribution_explain_text(
+    #[wasm_bindgen(unchecked_param_type = "PortfolioAttribution | string")] attribution: JsValue,
+) -> Result<String, JsValue> {
     let attribution: PortfolioAttribution = from_js_json(&attribution, "attribution")?;
     Ok(attribution.explain())
 }
@@ -49,9 +51,9 @@ pub fn portfolio_attribution_explain_text(attribution: JsValue) -> Result<String
 /// Throws a `TypeError` (kind `invalid_type`) if `attribution` is not a JSON
 /// string or plain object, and a `FinstackError` (kind `validation`) if it
 /// does not match the `PortfolioAttribution` schema.
-#[wasm_bindgen(js_name = portfolioAttributionPctOfTotalByBucket)]
+#[wasm_bindgen(js_name = portfolioAttributionPctOfTotalByBucket, unchecked_return_type = "PnlBucketShare[]")]
 pub fn portfolio_attribution_pct_of_total_by_bucket(
-    attribution: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "PortfolioAttribution | string")] attribution: JsValue,
 ) -> Result<JsValue, JsValue> {
     let attribution: PortfolioAttribution = from_js_json(&attribution, "attribution")?;
     to_js_value(&attribution.pct_of_total_by_bucket())
@@ -71,10 +73,10 @@ pub fn portfolio_attribution_pct_of_total_by_bucket(
 /// string or plain object or `tolerance` is not a number, and a
 /// `FinstackError` (kind `validation`) if `attribution` does not match the
 /// `PortfolioAttribution` schema.
-#[wasm_bindgen(js_name = portfolioAttributionReconciliationCheck)]
+#[wasm_bindgen(js_name = portfolioAttributionReconciliationCheck, unchecked_return_type = "ReconciliationReport")]
 pub fn portfolio_attribution_reconciliation_check(
-    attribution: JsValue,
-    tolerance: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "PortfolioAttribution | string")] attribution: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] tolerance: JsValue,
 ) -> Result<JsValue, JsValue> {
     let attribution: PortfolioAttribution = from_js_json(&attribution, "attribution")?;
     let tolerance = js_f64(&tolerance, "tolerance")?;
@@ -88,7 +90,7 @@ pub fn portfolio_attribution_reconciliation_check(
 /// `valuation_result` keeps 64-bit fields as `BigInt`, as `valuePortfolio`
 /// does.
 /// @param valuation - `PortfolioValuation` object or JSON from `valuePortfolio`.
-/// @param position_id - Position identifier to look up.
+/// @param positionId - Position identifier to look up.
 /// @returns The `PositionValue`, or `undefined` when the valuation has no such position.
 ///
 /// # Errors
@@ -97,10 +99,10 @@ pub fn portfolio_attribution_reconciliation_check(
 /// string or plain object or `positionId` is not a string, and a
 /// `FinstackError` (kind `validation`) if `valuation` does not match the
 /// `PortfolioValuation` schema.
-#[wasm_bindgen(js_name = portfolioValuationGetPositionValue)]
+#[wasm_bindgen(js_name = portfolioValuationGetPositionValue, unchecked_return_type = "PositionValue | undefined")]
 pub fn portfolio_valuation_get_position_value(
-    valuation: JsValue,
-    position_id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "PortfolioValuation | string")] valuation: JsValue,
+    #[wasm_bindgen(js_name = "positionId", unchecked_param_type = "string")] position_id: JsValue,
 ) -> Result<JsValue, JsValue> {
     let valuation: PortfolioValuation = from_js_json(&valuation, "valuation")?;
     let position_id = js_string(&position_id, "positionId")?;
@@ -115,7 +117,7 @@ pub fn portfolio_valuation_get_position_value(
 /// Twin of Python `PortfolioValuation.get_entity_value` (Rust
 /// `PortfolioValuation::get_entity_value`).
 /// @param valuation - `PortfolioValuation` object or JSON from `valuePortfolio`.
-/// @param entity_id - Entity identifier to look up.
+/// @param entityId - Entity identifier to look up.
 /// @returns The entity total as `Money`, or `undefined` when the valuation has no such entity.
 ///
 /// # Errors
@@ -124,10 +126,10 @@ pub fn portfolio_valuation_get_position_value(
 /// string or plain object or `entityId` is not a string, and a
 /// `FinstackError` (kind `validation`) if `valuation` does not match the
 /// `PortfolioValuation` schema.
-#[wasm_bindgen(js_name = portfolioValuationGetEntityValue)]
+#[wasm_bindgen(js_name = portfolioValuationGetEntityValue, unchecked_return_type = "MoneyValue | undefined")]
 pub fn portfolio_valuation_get_entity_value(
-    valuation: JsValue,
-    entity_id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "PortfolioValuation | string")] valuation: JsValue,
+    #[wasm_bindgen(js_name = "entityId", unchecked_param_type = "string")] entity_id: JsValue,
 ) -> Result<JsValue, JsValue> {
     let valuation: PortfolioValuation = from_js_json(&valuation, "valuation")?;
     let entity_id = js_string(&entity_id, "entityId")?;
@@ -142,7 +144,7 @@ pub fn portfolio_valuation_get_entity_value(
 /// Twin of Python `PortfolioMetrics.get_metric` (Rust
 /// `PortfolioMetrics::get_metric`).
 /// @param metrics - `PortfolioMetrics` object or JSON from `aggregateMetrics`.
-/// @param metric_id - Fully qualified metric key.
+/// @param metricId - Fully qualified metric key.
 /// @returns The `AggregatedMetric` (`total` plus `by_entity`), or `undefined` when the metric was not aggregated.
 ///
 /// # Errors
@@ -151,10 +153,10 @@ pub fn portfolio_valuation_get_entity_value(
 /// string or plain object or `metricId` is not a string, and a
 /// `FinstackError` (kind `validation`) if `metrics` does not match the
 /// `PortfolioMetrics` schema.
-#[wasm_bindgen(js_name = portfolioMetricsGetMetric)]
+#[wasm_bindgen(js_name = portfolioMetricsGetMetric, unchecked_return_type = "AggregatedMetric | undefined")]
 pub fn portfolio_metrics_get_metric(
-    metrics: JsValue,
-    metric_id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "PortfolioMetrics | string")] metrics: JsValue,
+    #[wasm_bindgen(js_name = "metricId", unchecked_param_type = "string")] metric_id: JsValue,
 ) -> Result<JsValue, JsValue> {
     let metrics: PortfolioMetrics = from_js_json(&metrics, "metrics")?;
     let metric_id = js_string(&metric_id, "metricId")?;
@@ -169,7 +171,7 @@ pub fn portfolio_metrics_get_metric(
 /// Twin of Python `PortfolioMetrics.get_position_metrics` (Rust
 /// `PortfolioMetrics::get_position_metrics`).
 /// @param metrics - `PortfolioMetrics` object or JSON from `aggregateMetrics`.
-/// @param position_id - Position identifier to look up.
+/// @param positionId - Position identifier to look up.
 /// @returns The position's `{ metricId: value }` map, or `undefined` when the position has no metrics.
 ///
 /// # Errors
@@ -178,10 +180,10 @@ pub fn portfolio_metrics_get_metric(
 /// string or plain object or `positionId` is not a string, and a
 /// `FinstackError` (kind `validation`) if `metrics` does not match the
 /// `PortfolioMetrics` schema.
-#[wasm_bindgen(js_name = portfolioMetricsGetPositionMetrics)]
+#[wasm_bindgen(js_name = portfolioMetricsGetPositionMetrics, unchecked_return_type = "PositionMetrics | undefined")]
 pub fn portfolio_metrics_get_position_metrics(
-    metrics: JsValue,
-    position_id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "PortfolioMetrics | string")] metrics: JsValue,
+    #[wasm_bindgen(js_name = "positionId", unchecked_param_type = "string")] position_id: JsValue,
 ) -> Result<JsValue, JsValue> {
     let metrics: PortfolioMetrics = from_js_json(&metrics, "metrics")?;
     let position_id = js_string(&position_id, "positionId")?;
@@ -196,7 +198,7 @@ pub fn portfolio_metrics_get_position_metrics(
 /// Twin of Python `PortfolioMetrics.get_total` (Rust
 /// `PortfolioMetrics::get_total`).
 /// @param metrics - `PortfolioMetrics` object or JSON from `aggregateMetrics`.
-/// @param metric_id - Fully qualified metric key.
+/// @param metricId - Fully qualified metric key.
 /// @returns The total, or `undefined` when the metric was not aggregated.
 ///
 /// # Errors
@@ -207,8 +209,8 @@ pub fn portfolio_metrics_get_position_metrics(
 /// `PortfolioMetrics` schema.
 #[wasm_bindgen(js_name = portfolioMetricsGetTotal)]
 pub fn portfolio_metrics_get_total(
-    metrics: JsValue,
-    metric_id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "PortfolioMetrics | string")] metrics: JsValue,
+    #[wasm_bindgen(js_name = "metricId", unchecked_param_type = "string")] metric_id: JsValue,
 ) -> Result<Option<f64>, JsValue> {
     let metrics: PortfolioMetrics = from_js_json(&metrics, "metrics")?;
     let metric_id = js_string(&metric_id, "metricId")?;
@@ -228,9 +230,9 @@ pub fn portfolio_metrics_get_total(
 /// Throws a `TypeError` (kind `invalid_type`) if `result` is not a JSON string
 /// or plain object, and a `FinstackError` (kind `validation`) if it does not
 /// match the optimization-result schema.
-#[wasm_bindgen(js_name = portfolioOptimizationResultNewPositionTrades)]
+#[wasm_bindgen(js_name = portfolioOptimizationResultNewPositionTrades, unchecked_return_type = "TradeSpec[]")]
 pub fn portfolio_optimization_result_new_position_trades(
-    result: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "PortfolioOptimizationResult | string")] result: JsValue,
 ) -> Result<JsValue, JsValue> {
     let result: PortfolioOptimizationResult = from_js_json(&result, "result")?;
     to_js_value(&result.new_position_trades())
@@ -249,9 +251,9 @@ pub fn portfolio_optimization_result_new_position_trades(
 /// Throws a `TypeError` (kind `invalid_type`) if `result` is not a JSON string
 /// or plain object, and a `FinstackError` (kind `validation`) if it does not
 /// match the optimization-result schema.
-#[wasm_bindgen(js_name = portfolioOptimizationResultBindingConstraints)]
+#[wasm_bindgen(js_name = portfolioOptimizationResultBindingConstraints, unchecked_return_type = "[string, number][]")]
 pub fn portfolio_optimization_result_binding_constraints(
-    result: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "PortfolioOptimizationResult | string")] result: JsValue,
 ) -> Result<JsValue, JsValue> {
     let result: PortfolioOptimizationResult = from_js_json(&result, "result")?;
     to_js_value(&result.binding_constraints())
@@ -263,7 +265,7 @@ pub fn portfolio_optimization_result_binding_constraints(
 /// `PortfolioMetrics::require_total`); WASM results are plain objects, so the
 /// method is a free function taking the object.
 /// @param metrics - `PortfolioMetrics` object or JSON from `aggregateMetrics`.
-/// @param metric_id - Fully qualified metric key (for example `dv01` or `bucketed_dv01::USD-OIS::10y`).
+/// @param metricId - Fully qualified metric key (for example `dv01` or `bucketed_dv01::USD-OIS::10y`).
 /// @returns The aggregated total in base-currency metric units.
 ///
 /// # Errors
@@ -275,8 +277,8 @@ pub fn portfolio_optimization_result_binding_constraints(
 /// was not aggregated.
 #[wasm_bindgen(js_name = portfolioMetricsRequireTotal)]
 pub fn portfolio_metrics_require_total(
-    metrics: JsValue,
-    metric_id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "PortfolioMetrics | string")] metrics: JsValue,
+    #[wasm_bindgen(js_name = "metricId", unchecked_param_type = "string")] metric_id: JsValue,
 ) -> Result<f64, JsValue> {
     let metrics: PortfolioMetrics = from_js_json(&metrics, "metrics")?;
     let metric_id = js_string(&metric_id, "metricId")?;
@@ -296,8 +298,10 @@ pub fn portfolio_metrics_require_total(
 /// Throws a `TypeError` (kind `invalid_type`) if `result` is not a JSON string
 /// or plain object, and a `FinstackError` (kind `validation`) if it does not
 /// match the optimization-result schema.
-#[wasm_bindgen(js_name = portfolioOptimizationResultToTradeList)]
-pub fn portfolio_optimization_result_to_trade_list(result: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = portfolioOptimizationResultToTradeList, unchecked_return_type = "TradeSpec[]")]
+pub fn portfolio_optimization_result_to_trade_list(
+    #[wasm_bindgen(unchecked_param_type = "PortfolioOptimizationResult | string")] result: JsValue,
+) -> Result<JsValue, JsValue> {
     let result: PortfolioOptimizationResult = from_js_json(&result, "result")?;
     to_js_value(&result.to_trade_list())
 }
@@ -316,7 +320,9 @@ pub fn portfolio_optimization_result_to_trade_list(result: JsValue) -> Result<Js
 /// or plain object, and a `FinstackError` (kind `validation`) if it does not
 /// match the optimization-result schema.
 #[wasm_bindgen(js_name = portfolioOptimizationResultIsFeasible)]
-pub fn portfolio_optimization_result_is_feasible(result: JsValue) -> Result<bool, JsValue> {
+pub fn portfolio_optimization_result_is_feasible(
+    #[wasm_bindgen(unchecked_param_type = "PortfolioOptimizationResult | string")] result: JsValue,
+) -> Result<bool, JsValue> {
     let result: PortfolioOptimizationResult = from_js_json(&result, "result")?;
     Ok(result.is_feasible())
 }
@@ -331,8 +337,8 @@ fn sensitivity_matrix(matrix: &JsValue) -> Result<SensitivityMatrix, JsValue> {
 ///
 /// Twin of Python `SensitivityMatrix.delta` (Rust `SensitivityMatrix::delta`).
 /// @param matrix - Sensitivity-matrix object or JSON `{ base_currency, position_ids, factor_ids, data }` from `computeFactorSensitivities`.
-/// @param position_idx - Zero-based row index into `position_ids`.
-/// @param factor_idx - Zero-based column index into `factor_ids`.
+/// @param positionIdx - Zero-based row index into `position_ids`.
+/// @param factorIdx - Zero-based column index into `factor_ids`.
 /// @returns The sensitivity in base-currency PV change per factor bump.
 ///
 /// # Errors
@@ -343,9 +349,9 @@ fn sensitivity_matrix(matrix: &JsValue) -> Result<SensitivityMatrix, JsValue> {
 /// its rows do not match its axes, or an index is out of bounds.
 #[wasm_bindgen(js_name = sensitivityMatrixDelta)]
 pub fn sensitivity_matrix_delta(
-    matrix: JsValue,
-    position_idx: JsValue,
-    factor_idx: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "SensitivityMatrixJson | string")] matrix: JsValue,
+    #[wasm_bindgen(js_name = "positionIdx", unchecked_param_type = "number")] position_idx: JsValue,
+    #[wasm_bindgen(js_name = "factorIdx", unchecked_param_type = "number")] factor_idx: JsValue,
 ) -> Result<f64, JsValue> {
     let position_idx: usize = js_uint(&position_idx, "positionIdx")?;
     let factor_idx: usize = js_uint(&factor_idx, "factorIdx")?;
@@ -359,7 +365,7 @@ pub fn sensitivity_matrix_delta(
 /// Twin of Python `SensitivityMatrix.position_deltas` (Rust
 /// `SensitivityMatrix::position_deltas`).
 /// @param matrix - Sensitivity-matrix object or JSON from `computeFactorSensitivities`.
-/// @param position_idx - Zero-based row index into `position_ids`.
+/// @param positionIdx - Zero-based row index into `position_ids`.
 /// @returns One value per factor, in `factor_ids` order.
 ///
 /// # Errors
@@ -370,8 +376,8 @@ pub fn sensitivity_matrix_delta(
 /// its rows do not match its axes, or `positionIdx` is out of bounds.
 #[wasm_bindgen(js_name = sensitivityMatrixPositionDeltas)]
 pub fn sensitivity_matrix_position_deltas(
-    matrix: JsValue,
-    position_idx: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "SensitivityMatrixJson | string")] matrix: JsValue,
+    #[wasm_bindgen(js_name = "positionIdx", unchecked_param_type = "number")] position_idx: JsValue,
 ) -> Result<Vec<f64>, JsValue> {
     let position_idx: usize = js_uint(&position_idx, "positionIdx")?;
     sensitivity_matrix(&matrix)?
@@ -385,7 +391,7 @@ pub fn sensitivity_matrix_position_deltas(
 /// Twin of Python `SensitivityMatrix.factor_deltas` (Rust
 /// `SensitivityMatrix::factor_deltas`).
 /// @param matrix - Sensitivity-matrix object or JSON from `computeFactorSensitivities`.
-/// @param factor_idx - Zero-based column index into `factor_ids`.
+/// @param factorIdx - Zero-based column index into `factor_ids`.
 /// @returns One value per position, in `position_ids` order.
 ///
 /// # Errors
@@ -396,8 +402,8 @@ pub fn sensitivity_matrix_position_deltas(
 /// its rows do not match its axes, or `factorIdx` is out of bounds.
 #[wasm_bindgen(js_name = sensitivityMatrixFactorDeltas)]
 pub fn sensitivity_matrix_factor_deltas(
-    matrix: JsValue,
-    factor_idx: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "SensitivityMatrixJson | string")] matrix: JsValue,
+    #[wasm_bindgen(js_name = "factorIdx", unchecked_param_type = "number")] factor_idx: JsValue,
 ) -> Result<Vec<f64>, JsValue> {
     let factor_idx: usize = js_uint(&factor_idx, "factorIdx")?;
     sensitivity_matrix(&matrix)?
@@ -422,7 +428,7 @@ fn constraint_value(
 /// Twin of Python `Constraint.exposure_limit` (Rust `Constraint::exposure_limit`).
 /// @param key - Position attribute key (for example `"rating"`).
 /// @param value - Text value the attribute must equal to count toward the exposure.
-/// @param max_share - Largest allowed share of portfolio weight as a decimal in `[0, 1]`.
+/// @param maxShare - Largest allowed share of portfolio weight as a decimal in `[0, 1]`.
 /// @param label - Optional label reported in constraint slacks.
 /// @returns The `metric_bound` `Constraint` object with operator `le`.
 ///
@@ -430,12 +436,12 @@ fn constraint_value(
 ///
 /// Throws a `TypeError` (kind `invalid_type`) for a wrong argument type, and a
 /// `FinstackError` (kind `validation`) if `maxShare` is outside `[0, 1]`.
-#[wasm_bindgen(js_name = constraintExposureLimit)]
+#[wasm_bindgen(js_name = constraintExposureLimit, unchecked_return_type = "generated.portfolio.Constraint")]
 pub fn constraint_exposure_limit(
-    key: JsValue,
-    value: JsValue,
-    max_share: JsValue,
-    label: Option<JsValue>,
+    #[wasm_bindgen(unchecked_param_type = "string")] key: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] value: JsValue,
+    #[wasm_bindgen(js_name = "maxShare", unchecked_param_type = "number")] max_share: JsValue,
+    #[wasm_bindgen(unchecked_optional_param_type = "string | null")] label: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let key = js_string(&key, "key")?;
     let value = js_string(&value, "value")?;
@@ -451,7 +457,7 @@ pub fn constraint_exposure_limit(
 /// Twin of Python `Constraint.exposure_minimum` (Rust `Constraint::exposure_minimum`).
 /// @param key - Position attribute key (for example `"sector"`).
 /// @param value - Text value the attribute must equal to count toward the exposure.
-/// @param min_share - Smallest required share of portfolio weight as a decimal in `[0, 1]`.
+/// @param minShare - Smallest required share of portfolio weight as a decimal in `[0, 1]`.
 /// @param label - Optional label reported in constraint slacks.
 /// @returns The `metric_bound` `Constraint` object with operator `ge`.
 ///
@@ -459,12 +465,12 @@ pub fn constraint_exposure_limit(
 ///
 /// Throws a `TypeError` (kind `invalid_type`) for a wrong argument type, and a
 /// `FinstackError` (kind `validation`) if `minShare` is outside `[0, 1]`.
-#[wasm_bindgen(js_name = constraintExposureMinimum)]
+#[wasm_bindgen(js_name = constraintExposureMinimum, unchecked_return_type = "generated.portfolio.Constraint")]
 pub fn constraint_exposure_minimum(
-    key: JsValue,
-    value: JsValue,
-    min_share: JsValue,
-    label: Option<JsValue>,
+    #[wasm_bindgen(unchecked_param_type = "string")] key: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] value: JsValue,
+    #[wasm_bindgen(js_name = "minShare", unchecked_param_type = "number")] min_share: JsValue,
+    #[wasm_bindgen(unchecked_optional_param_type = "string | null")] label: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let key = js_string(&key, "key")?;
     let value = js_string(&value, "value")?;

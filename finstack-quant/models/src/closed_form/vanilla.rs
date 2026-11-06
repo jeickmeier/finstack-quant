@@ -44,7 +44,7 @@
 //!
 
 use crate::closed_form::d1_d2;
-use crate::types::OptionType;
+use crate::types::{OptionMarketParams, OptionType};
 use finstack_quant_core::validation::require_with;
 use finstack_quant_core::{Error, Result};
 use std::fmt;
@@ -239,7 +239,6 @@ pub(crate) fn validate_spot_model_inputs(
 ///
 #[must_use]
 #[inline]
-#[allow(clippy::too_many_arguments)]
 pub fn bs_price_unchecked(
     spot: f64,
     strike: f64,
@@ -306,7 +305,6 @@ pub fn bs_price_unchecked(
 /// * `vol` - Annualized lognormal volatility as a decimal.
 /// * `expiry` - Remaining time to expiry in years.
 /// * `option_type` - Call or put payoff convention for the returned price.
-#[allow(clippy::too_many_arguments)]
 pub fn bs_price(
     spot: f64,
     strike: f64,
@@ -339,13 +337,10 @@ pub fn bs_price(
 ///
 /// # Arguments
 ///
-/// * `spot` - Current spot price S
-/// * `strike` - Exercise price K in the same units as the underlying spot.
-/// * `rate` - Domestic (risk-free) rate, continuously compounded decimal
-/// * `div_yield` - Dividend yield or foreign rate, continuously compounded decimal
-/// * `vol` - Volatility σ (annualized, decimal)
-/// * `expiry` - Time to expiration T (in years)
-/// * `option_type` - Call or put payoff convention for the reported Greeks.
+/// * `market` - Spot S, strike K (same units), continuously compounded
+///   domestic `rate` r and `dividend_yield` q (foreign rate for FX) as
+///   decimals, annualized decimal `volatility` σ, `time_to_expiry` T in years
+///   and the call/put `option_type` of the reported Greeks.
 /// * `theta_days_per_year` - Day-count basis for theta conversion (see below)
 ///
 /// # Returns
@@ -386,17 +381,16 @@ pub fn bs_price(
 ///
 #[must_use]
 #[inline]
-#[allow(clippy::too_many_arguments)]
-pub fn bs_greeks_unchecked(
-    spot: f64,
-    strike: f64,
-    rate: f64,
-    div_yield: f64,
-    vol: f64,
-    expiry: f64,
-    option_type: OptionType,
-    theta_days_per_year: f64,
-) -> BsGreeks {
+pub fn bs_greeks_unchecked(market: &OptionMarketParams, theta_days_per_year: f64) -> BsGreeks {
+    let &OptionMarketParams {
+        spot,
+        strike,
+        rate,
+        volatility: vol,
+        time_to_expiry: expiry,
+        dividend_yield: div_yield,
+        option_type,
+    } = market;
     if !theta_days_per_year.is_finite() || theta_days_per_year <= 0.0 {
         return BsGreeks {
             delta: f64::NAN,
@@ -505,27 +499,23 @@ pub const DEFAULT_THETA_DAYS_PER_YEAR: f64 = finstack_quant_core::dates::CALENDA
 ///
 /// # Arguments
 ///
-/// * `spot` - Current underlying spot price in the option's price units.
-/// * `strike` - Exercise price in the same units as `spot`.
-/// * `rate` - Continuously compounded domestic risk-free rate as a decimal.
-/// * `div_yield` - Continuously compounded dividend yield or foreign-rate carry as a
-///   decimal.
-/// * `vol` - Positive annualized lognormal volatility as a decimal.
-/// * `expiry` - Positive remaining time to expiry in years.
-/// * `option_type` - Call or put payoff convention for the reported Greeks.
+/// * `market` - Positive `spot` and `strike` in the same price units,
+///   continuously compounded domestic `rate` and `dividend_yield` (or
+///   foreign-rate carry) as decimals, positive annualized lognormal
+///   `volatility` as a decimal, positive `time_to_expiry` in years, and the
+///   call/put `option_type` of the reported Greeks.
 /// * `theta_days_per_year` - Positive calendar or trading-day basis used to
 ///   convert annual theta into the returned per-day amount.
-#[allow(clippy::too_many_arguments)]
-pub fn bs_greeks(
-    spot: f64,
-    strike: f64,
-    rate: f64,
-    div_yield: f64,
-    vol: f64,
-    expiry: f64,
-    option_type: OptionType,
-    theta_days_per_year: f64,
-) -> Result<BsGreeks> {
+pub fn bs_greeks(market: &OptionMarketParams, theta_days_per_year: f64) -> Result<BsGreeks> {
+    let &OptionMarketParams {
+        spot,
+        strike,
+        rate,
+        volatility: vol,
+        time_to_expiry: expiry,
+        dividend_yield: div_yield,
+        ..
+    } = market;
     for (name, value) in [
         ("spot", spot),
         ("strike", strike),
@@ -552,16 +542,7 @@ pub fn bs_greeks(
         )));
     }
 
-    let greeks = bs_greeks_unchecked(
-        spot,
-        strike,
-        rate,
-        div_yield,
-        vol,
-        expiry,
-        option_type,
-        theta_days_per_year,
-    );
+    let greeks = bs_greeks_unchecked(market, theta_days_per_year);
     for (name, value) in [
         ("delta", greeks.delta),
         ("gamma", greeks.gamma),
@@ -590,7 +571,19 @@ mod tests {
         let price = bs_price(100.0, 20.0, 0.0, 0.0, 0.2, 1.0, OptionType::Put).unwrap();
         let expected = 4.550_576_920_194_906e-16;
         assert!((price / expected - 1.0).abs() < 1e-6, "tail price={price}");
-        let greeks = bs_greeks(100.0, 10.0, 0.0, 0.0, 0.2, 1.0, OptionType::Put, 365.0).unwrap();
+        let greeks = bs_greeks(
+            &OptionMarketParams {
+                spot: 100.0,
+                strike: 10.0,
+                rate: 0.0,
+                volatility: 0.2,
+                time_to_expiry: 1.0,
+                dividend_yield: 0.0,
+                option_type: OptionType::Put,
+            },
+            365.0,
+        )
+        .unwrap();
         assert!(greeks.delta < 0.0);
         assert!(greeks.rho_r < 0.0);
         assert!(greeks.rho_q > 0.0);
@@ -684,8 +677,18 @@ mod tests {
 
     #[test]
     fn test_bs_greeks_call() {
-        let greeks =
-            bs_greeks_unchecked(100.0, 100.0, 0.05, 0.02, 0.20, 1.0, OptionType::Call, 365.0);
+        let greeks = bs_greeks_unchecked(
+            &OptionMarketParams {
+                spot: 100.0,
+                strike: 100.0,
+                rate: 0.05,
+                volatility: 0.20,
+                time_to_expiry: 1.0,
+                dividend_yield: 0.02,
+                option_type: OptionType::Call,
+            },
+            365.0,
+        );
         // ATM call delta should be around 0.5-0.6
         assert!(
             greeks.delta > 0.4 && greeks.delta < 0.7,
@@ -700,8 +703,18 @@ mod tests {
 
     #[test]
     fn test_bs_greeks_put() {
-        let greeks =
-            bs_greeks_unchecked(100.0, 100.0, 0.05, 0.02, 0.20, 1.0, OptionType::Put, 365.0);
+        let greeks = bs_greeks_unchecked(
+            &OptionMarketParams {
+                spot: 100.0,
+                strike: 100.0,
+                rate: 0.05,
+                volatility: 0.20,
+                time_to_expiry: 1.0,
+                dividend_yield: 0.02,
+                option_type: OptionType::Put,
+            },
+            365.0,
+        );
         // ATM put delta should be negative, around -0.4 to -0.5
         assert!(
             greeks.delta < 0.0 && greeks.delta > -0.7,
@@ -709,15 +722,35 @@ mod tests {
             greeks.delta
         );
         // Gamma same for calls and puts
-        let call_greeks =
-            bs_greeks_unchecked(100.0, 100.0, 0.05, 0.02, 0.20, 1.0, OptionType::Call, 365.0);
+        let call_greeks = bs_greeks_unchecked(
+            &OptionMarketParams {
+                spot: 100.0,
+                strike: 100.0,
+                rate: 0.05,
+                volatility: 0.20,
+                time_to_expiry: 1.0,
+                dividend_yield: 0.02,
+                option_type: OptionType::Call,
+            },
+            365.0,
+        );
         assert!((greeks.gamma - call_greeks.gamma).abs() < 1e-10);
     }
 
     #[test]
     fn test_bs_greeks_display() {
-        let greeks =
-            bs_greeks_unchecked(100.0, 100.0, 0.05, 0.02, 0.20, 1.0, OptionType::Call, 365.0);
+        let greeks = bs_greeks_unchecked(
+            &OptionMarketParams {
+                spot: 100.0,
+                strike: 100.0,
+                rate: 0.05,
+                volatility: 0.20,
+                time_to_expiry: 1.0,
+                dividend_yield: 0.02,
+                option_type: OptionType::Call,
+            },
+            365.0,
+        );
         let s = format!("{}", greeks);
         assert!(s.contains("Δ="));
         assert!(s.contains("Γ="));
@@ -727,31 +760,63 @@ mod tests {
     #[test]
     fn test_bs_greeks_is_valid() {
         // Normal ATM call should be valid
-        let greeks =
-            bs_greeks_unchecked(100.0, 100.0, 0.05, 0.02, 0.20, 1.0, OptionType::Call, 365.0);
+        let greeks = bs_greeks_unchecked(
+            &OptionMarketParams {
+                spot: 100.0,
+                strike: 100.0,
+                rate: 0.05,
+                volatility: 0.20,
+                time_to_expiry: 1.0,
+                dividend_yield: 0.02,
+                option_type: OptionType::Call,
+            },
+            365.0,
+        );
         assert!(greeks.is_valid(), "ATM call Greeks should be valid");
 
         // Normal ATM put should be valid
-        let put_greeks =
-            bs_greeks_unchecked(100.0, 100.0, 0.05, 0.02, 0.20, 1.0, OptionType::Put, 365.0);
+        let put_greeks = bs_greeks_unchecked(
+            &OptionMarketParams {
+                spot: 100.0,
+                strike: 100.0,
+                rate: 0.05,
+                volatility: 0.20,
+                time_to_expiry: 1.0,
+                dividend_yield: 0.02,
+                option_type: OptionType::Put,
+            },
+            365.0,
+        );
         assert!(put_greeks.is_valid(), "ATM put Greeks should be valid");
 
         // Deep ITM call should still be valid
         let deep_itm = bs_greeks_unchecked(
-            200.0,
-            100.0,
-            0.05,
-            0.02,
-            0.20,
-            0.01,
-            OptionType::Call,
+            &OptionMarketParams {
+                spot: 200.0,
+                strike: 100.0,
+                rate: 0.05,
+                volatility: 0.20,
+                time_to_expiry: 0.01,
+                dividend_yield: 0.02,
+                option_type: OptionType::Call,
+            },
             365.0,
         );
         assert!(deep_itm.is_valid(), "Deep ITM call Greeks should be valid");
 
         // Deep OTM put should still be valid
-        let deep_otm =
-            bs_greeks_unchecked(200.0, 100.0, 0.05, 0.02, 0.20, 0.01, OptionType::Put, 365.0);
+        let deep_otm = bs_greeks_unchecked(
+            &OptionMarketParams {
+                spot: 200.0,
+                strike: 100.0,
+                rate: 0.05,
+                volatility: 0.20,
+                time_to_expiry: 0.01,
+                dividend_yield: 0.02,
+                option_type: OptionType::Put,
+            },
+            365.0,
+        );
         assert!(deep_otm.is_valid(), "Deep OTM put Greeks should be valid");
     }
 
@@ -767,7 +832,18 @@ mod tests {
             let p = |s: f64, r: f64, q: f64, sigma: f64, t: f64| {
                 bs_price_unchecked(s, k, r, q, sigma, t, option_type)
             };
-            let g = bs_greeks_unchecked(s, k, r, q, sigma, t, option_type, 365.0);
+            let g = bs_greeks_unchecked(
+                &OptionMarketParams {
+                    spot: s,
+                    strike: k,
+                    rate: r,
+                    volatility: sigma,
+                    time_to_expiry: t,
+                    dividend_yield: q,
+                    option_type,
+                },
+                365.0,
+            );
 
             // Delta: ∂V/∂S
             let hs = 1e-4 * s;
@@ -837,7 +913,18 @@ mod tests {
     /// outside them.
     #[test]
     fn hull_chapter19_worked_example_anchor() {
-        let g = bs_greeks_unchecked(49.0, 50.0, 0.05, 0.0, 0.20, 0.3846, OptionType::Call, 365.0);
+        let g = bs_greeks_unchecked(
+            &OptionMarketParams {
+                spot: 49.0,
+                strike: 50.0,
+                rate: 0.05,
+                volatility: 0.20,
+                time_to_expiry: 0.3846,
+                dividend_yield: 0.0,
+                option_type: OptionType::Call,
+            },
+            365.0,
+        );
 
         assert!((g.delta - 0.522).abs() < 0.001, "delta {}", g.delta);
         assert!((g.gamma - 0.066).abs() < 0.001, "gamma {}", g.gamma);
@@ -868,7 +955,18 @@ mod tests {
             (110.0, OptionType::Put, 0.0),
             (100.0, OptionType::Put, 0.0),
         ] {
-            let g = bs_greeks_unchecked(spot, 100.0, 0.05, 0.02, 0.2, 0.0, option_type, 365.0);
+            let g = bs_greeks_unchecked(
+                &OptionMarketParams {
+                    spot,
+                    strike: 100.0,
+                    rate: 0.05,
+                    volatility: 0.2,
+                    time_to_expiry: 0.0,
+                    dividend_yield: 0.02,
+                    option_type,
+                },
+                365.0,
+            );
             assert!(
                 (g.delta - want_delta).abs() < 1e-12,
                 "{option_type:?} S={spot}: delta {} != {want_delta}",
@@ -897,13 +995,15 @@ mod tests {
     fn negative_carry_delta_above_one_is_not_invalid() {
         // Deep ITM call, q = −5%, T = 2y: delta = e^{0.1}·N(d1) ≈ 1.105·~1.
         let greeks = bs_greeks_unchecked(
-            200.0,
-            100.0,
-            0.03,
-            -0.05,
-            0.20,
-            2.0,
-            OptionType::Call,
+            &OptionMarketParams {
+                spot: 200.0,
+                strike: 100.0,
+                rate: 0.03,
+                volatility: 0.20,
+                time_to_expiry: 2.0,
+                dividend_yield: -0.05,
+                option_type: OptionType::Call,
+            },
             365.0,
         );
         assert!(
@@ -930,7 +1030,18 @@ mod tests {
         ];
 
         for (spot, strike, opt_type, expected_sign) in cases {
-            let greeks = bs_greeks_unchecked(spot, strike, 0.05, 0.02, 0.20, 1.0, opt_type, 365.0);
+            let greeks = bs_greeks_unchecked(
+                &OptionMarketParams {
+                    spot,
+                    strike,
+                    rate: 0.05,
+                    volatility: 0.20,
+                    time_to_expiry: 1.0,
+                    dividend_yield: 0.02,
+                    option_type: opt_type,
+                },
+                365.0,
+            );
             assert!(
                 greeks.is_valid(),
                 "Greeks should be valid for spot={}, strike={}, type={:?}",
@@ -950,12 +1061,52 @@ mod tests {
     fn bs_greeks_requires_positive_sigma() {
         for strike in [90.0, 100.0, 110.0] {
             for option in [OptionType::Call, OptionType::Put] {
-                assert!(bs_greeks(100.0, strike, 0.05, 0.02, 0.0, 1.0, option, 365.0).is_err());
-                assert!(bs_greeks(100.0, strike, 0.05, 0.02, -0.1, 1.0, option, 365.0).is_err());
+                assert!(
+                    bs_greeks(
+                        &OptionMarketParams {
+                            spot: 100.0,
+                            strike,
+                            rate: 0.05,
+                            volatility: 0.0,
+                            time_to_expiry: 1.0,
+                            dividend_yield: 0.02,
+                            option_type: option
+                        },
+                        365.0
+                    )
+                    .is_err()
+                );
+                assert!(
+                    bs_greeks(
+                        &OptionMarketParams {
+                            spot: 100.0,
+                            strike,
+                            rate: 0.05,
+                            volatility: -0.1,
+                            time_to_expiry: 1.0,
+                            dividend_yield: 0.02,
+                            option_type: option
+                        },
+                        365.0
+                    )
+                    .is_err()
+                );
             }
         }
         assert!(
-            bs_greeks_unchecked(100.0, 100.0, 0.05, 0.02, 0.2, 1.0, OptionType::Call, 365.0).vega
+            bs_greeks_unchecked(
+                &OptionMarketParams {
+                    spot: 100.0,
+                    strike: 100.0,
+                    rate: 0.05,
+                    volatility: 0.2,
+                    time_to_expiry: 1.0,
+                    dividend_yield: 0.02,
+                    option_type: OptionType::Call
+                },
+                365.0
+            )
+            .vega
                 > 0.0
         );
     }

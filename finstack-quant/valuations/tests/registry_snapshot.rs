@@ -3,9 +3,9 @@
 //! The snapshot lists, per instrument type, the registered model keys and the
 //! applicable metric identifiers. It guards the registry refactors of the
 //! valuations crate split: assembling the registries from per-family tables
-//! must leave both maps byte-identical. Regenerate deliberately with
-//! `UPDATE_REGISTRY_SNAPSHOT=1` after an intentional registration change and
-//! review the diff.
+//! must leave both maps byte-identical. It is the one pinned list of models
+//! and metrics per instrument type: regenerate it with `mise run gen-write`
+//! after an intentional registration change and review the diff.
 
 use finstack_quant_valuations::pricer::STANDARD;
 use std::collections::BTreeMap;
@@ -53,9 +53,38 @@ fn standard_registries_match_the_pinned_snapshot() {
         std::fs::write(path, &current).expect("write registry snapshot");
         return;
     }
+    // Compare per key first, so a mismatch names the instrument type (or the
+    // universal metric list) that moved; then the bytes, which pin formatting.
+    let parse = |text: &str| -> BTreeMap<String, serde_json::Value> {
+        serde_json::from_str(text).expect("registry snapshot is a JSON object")
+    };
+    let (current_doc, pinned_doc) = (parse(&current), parse(SNAPSHOT));
+    let entries =
+        |doc: &BTreeMap<String, serde_json::Value>| -> BTreeMap<String, serde_json::Value> {
+            let mut out = BTreeMap::new();
+            if let Some(serde_json::Value::Object(types)) = doc.get("instrument_types") {
+                for (key, value) in types {
+                    out.insert(key.clone(), value.clone());
+                }
+            }
+            out.insert(
+                "available_metrics".to_string(),
+                doc.get("available_metrics").cloned().unwrap_or_default(),
+            );
+            out
+        };
+    let (current_entries, pinned_entries) = (entries(&current_doc), entries(&pinned_doc));
+    for key in current_entries.keys().chain(pinned_entries.keys()) {
+        assert_eq!(
+            current_entries.get(key),
+            pinned_entries.get(key),
+            "registry entry `{key}` differs from tests/data/registry_snapshot.json; if the \
+             change is intentional, run `mise run gen-write` and review the diff"
+        );
+    }
     assert!(
         current == SNAPSHOT,
-        "standard registries differ from tests/data/registry_snapshot.json; \
-         if the change is intentional, rerun with UPDATE_REGISTRY_SNAPSHOT=1 and review the diff"
+        "registry snapshot formatting differs from tests/data/registry_snapshot.json; \
+         run `mise run gen-write`"
     );
 }

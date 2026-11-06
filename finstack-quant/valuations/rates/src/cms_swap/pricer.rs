@@ -610,26 +610,26 @@ mod tests {
         let as_of = date(2025, 5, 19);
         let start = date(2025, 5, 20);
         let end = date(2025, 8, 20);
-        let swap = CmsSwap::from_schedule(
-            "CMS-FUNDING-DATES",
-            start,
-            end,
-            Tenor::quarterly(),
-            Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y"),
-            Decimal::ZERO,
-            FundingLegSpec::Floating {
+        let swap = CmsSwap::from_schedule(crate::cms_swap::CmsSwapScheduleParams {
+            id: "CMS-FUNDING-DATES".into(),
+            start_date: start,
+            maturity: end,
+            cms_frequency: Tenor::quarterly(),
+            cms_tenor: Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y"),
+            cms_spread_bp: Decimal::ZERO,
+            funding_leg: FundingLegSpec::Floating {
                 spread_bp: Decimal::ZERO,
                 day_count: DayCount::Act360,
                 forward_curve_id: CurveId::new("USD-FUND"),
             },
-            Money::from((100_000_000_i64, Currency::USD)),
-            DayCount::Act360,
-            IndexId::new("USD-SOFR-OIS"),
-            PayReceive::Pay,
-            "USD-OIS",
-            "USD-FUND",
-            "USD-CMS10Y-VOL",
-        )
+            notional: Money::from((100_000_000_i64, Currency::USD)),
+            day_count: DayCount::Act360,
+            index_id: IndexId::new("USD-SOFR-OIS"),
+            side: PayReceive::Pay,
+            discount_curve_id: "USD-OIS".into(),
+            forward_curve_id: "USD-FUND".into(),
+            vol_surface_id: "USD-CMS10Y-VOL".into(),
+        })
         .expect("scheduled swap");
         assert!(swap.fixing_dates[0] < as_of);
         let FundingLeg::Floating { periods, .. } = &swap.funding_leg else {
@@ -682,26 +682,26 @@ mod tests {
         let as_of = date(2025, 5, 1);
         let start = date(2025, 5, 31);
         let end = date(2025, 11, 30);
-        let swap = CmsSwap::from_schedule(
-            "CMS-FUNDING-ROLL",
-            start,
-            end,
-            Tenor::quarterly(),
-            Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y"),
-            Decimal::ZERO,
-            FundingLegSpec::Floating {
+        let swap = CmsSwap::from_schedule(crate::cms_swap::CmsSwapScheduleParams {
+            id: "CMS-FUNDING-ROLL".into(),
+            start_date: start,
+            maturity: end,
+            cms_frequency: Tenor::quarterly(),
+            cms_tenor: Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y"),
+            cms_spread_bp: Decimal::ZERO,
+            funding_leg: FundingLegSpec::Floating {
                 spread_bp: Decimal::ZERO,
                 day_count: DayCount::Act360,
                 forward_curve_id: CurveId::new("USD-FUND"),
             },
-            Money::from((100_000_000_i64, Currency::USD)),
-            DayCount::Act360,
-            IndexId::new("USD-SOFR-OIS"),
-            PayReceive::Pay,
-            "USD-OIS",
-            "USD-FUND",
-            "USD-CMS10Y-VOL",
-        )
+            notional: Money::from((100_000_000_i64, Currency::USD)),
+            day_count: DayCount::Act360,
+            index_id: IndexId::new("USD-SOFR-OIS"),
+            side: PayReceive::Pay,
+            discount_curve_id: "USD-OIS".into(),
+            forward_curve_id: "USD-FUND".into(),
+            vol_surface_id: "USD-CMS10Y-VOL".into(),
+        })
         .expect("scheduled swap");
         let FundingLeg::Floating { periods, .. } = &swap.funding_leg else {
             panic!("floating")

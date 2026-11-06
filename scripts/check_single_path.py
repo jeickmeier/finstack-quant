@@ -29,12 +29,27 @@ now. Making a module private can leave a public item it holds unnameable with
 no compiler warning; the run exits 1 if any non-module item is lost.
 
 Path segments marked with a dagger are `#[doc(hidden)]` items.
+
+The run exits 1 on any violation of the one-public-path rule in
+`.agents/rules/rust/code-standards.md`: an item reachable at more than one
+path, a renamed re-export, or a re-export or glob outside `MOUNT_CRATES`
+(the umbrella crates, whose whole-module mounts are the documented exception)
+and `THIRD_PARTY_ALLOWED`. `mise run rust-doc` runs it.
 """
 
 from collections import defaultdict
 import json
 from pathlib import Path
 import sys
+
+# Umbrella crates: re-exporting other workspace crates' modules is their job.
+MOUNT_CRATES = {"finstack_quant", "finstack_quant_valuations"}
+# Third-party types core deliberately names as its own vocabulary.
+THIRD_PARTY_ALLOWED = {
+    "finstack_quant_core::FxHashMap",
+    "finstack_quant_core::FxHashSet",
+    "finstack_quant_core::dates::Date",
+}
 
 DOC = Path(sys.argv[1])
 OUT = Path(sys.argv[2])
@@ -189,6 +204,7 @@ def main():
     lines = []
     w = lines.append
     summary = []
+    violations = []
 
     # global identity -> {crate: [paths]} over the per-crate namespaces
     for name, c in sorted(crates.items()):
@@ -198,6 +214,18 @@ def main():
         hidden_dups = sum(1 for v in dups.values() if any("†" in p for p in v))
         ws_re = [r for r in c.reexports if r[2] and r[2].startswith(WS_PREFIX)]
         tp_re = [r for r in c.reexports if not (r[2] and r[2].startswith(WS_PREFIX))]
+        for ident, ps in dups.items():
+            violations.append(f"{name}: {ident} is reachable at {len(set(ps))} paths")
+        for path, ident in c.renames:
+            violations.append(f"{name}: renamed re-export {path} <- {ident}")
+        if name not in MOUNT_CRATES:
+            for path, ident, _src in ws_re:
+                violations.append(f"{name}: re-exports workspace item {path} <- {ident}")
+            for path, ident in c.globs:
+                violations.append(f"{name}: glob re-export {path}::* <- {ident}")
+        for path, ident, _src in tp_re:
+            if path not in THIRD_PARTY_ALLOWED:
+                violations.append(f"{name}: re-exports third-party item {path} <- {ident}")
         summary.append((
             name,
             len(c.reach),
@@ -298,7 +326,11 @@ def main():
                 lines.append(f"- [{kind}] {ident}  (was at {', '.join(ps)})")
     OUT.write_text("\n".join(head + lines) + "\n")
     print("\n".join(head))
-    if lost_items:
+    if umbrella_dups:
+        violations.append(f"umbrella view: {len(umbrella_dups)} items reachable at more than one path")
+    for violation in violations:
+        print(f"single-path violation: {violation}", file=sys.stderr)
+    if lost_items or violations:
         sys.exit(1)
 
 

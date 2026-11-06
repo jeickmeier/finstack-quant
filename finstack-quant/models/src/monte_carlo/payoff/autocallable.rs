@@ -36,6 +36,38 @@ pub enum FinalPayoffType {
     },
 }
 
+/// Contract terms of an [`AutocallablePayoff`], consumed by
+/// [`AutocallablePayoff::new`].
+///
+/// Every per-observation vector has one entry per `observation_dates` entry.
+#[derive(Debug, Clone)]
+pub struct AutocallableParams {
+    /// Observation times in years from valuation, strictly increasing.
+    pub observation_dates: Vec<f64>,
+    /// Autocall barrier levels at each observation date, in spot units.
+    pub autocall_barriers: Vec<f64>,
+    /// Independent coupon barrier levels at each observation date, in spot units.
+    pub coupon_barriers: Vec<f64>,
+    /// Coupon return amounts at each observation date, as decimal fractions
+    /// of notional.
+    pub coupons: Vec<f64>,
+    /// When `true`, coupons missing their coupon barrier accrue until a later
+    /// coupon barrier is met; when `false`, missed coupons lapse.
+    pub memory_coupons: bool,
+    /// Final barrier level for the knock-in/knock-out final payoff, in spot units.
+    pub final_barrier: f64,
+    /// Final payoff structure applied when the product is not autocalled.
+    pub final_payoff_type: FinalPayoffType,
+    /// Cap on the performance ratio `S_T / S_0` (e.g. `1.2` for a 20% cap).
+    pub cap_level: f64,
+    /// Notional amount in payoff currency units.
+    pub notional: f64,
+    /// Initial spot price `S_0`.
+    pub initial_spot: f64,
+    /// Ratios `DF(payment_date) / DF(expiry)` for each observation.
+    pub payment_df_ratios: Vec<f64>,
+}
+
 /// Autocallable structured product payoff.
 ///
 /// At each observation date, if spot >= autocall_barrier, the product
@@ -101,31 +133,29 @@ impl AutocallablePayoff {
     ///
     /// # Arguments
     ///
-    /// * `observation_dates` - Dates when autocall barriers are checked (must be sorted)
-    /// * `autocall_barriers` - Autocall barriers at each observation date
-    /// * `coupon_barriers` - Independent coupon barriers at each observation date
-    /// * `coupons` - Coupon return amounts at each observation date
-    /// * `memory_coupons` - Whether missed coupons accrue until a coupon barrier is met
-    /// * `final_barrier` - Barrier for final payoff (knock-in/knock-out)
-    /// * `final_payoff_type` - Type of final payoff
-    /// * `cap_level` - Maximum return cap
-    /// * `notional` - Notional amount
-    /// * `initial_spot` - Initial spot price S_0
-    /// * `payment_df_ratios` - Ratios `DF(payment_date)/DF(expiry)`
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        observation_dates: Vec<f64>,
-        autocall_barriers: Vec<f64>,
-        coupon_barriers: Vec<f64>,
-        coupons: Vec<f64>,
-        memory_coupons: bool,
-        final_barrier: f64,
-        final_payoff_type: FinalPayoffType,
-        cap_level: f64,
-        notional: f64,
-        initial_spot: f64,
-        payment_df_ratios: Vec<f64>,
-    ) -> finstack_quant_core::Result<Self> {
+    /// * `params` - Observation schedule, barriers, coupons, final payoff,
+    ///   cap, notional, initial spot and payment discount ratios; see
+    ///   [`AutocallableParams`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Validation`] when a per-observation vector length
+    /// differs from `observation_dates` or the dates are not strictly
+    /// increasing.
+    pub fn new(params: AutocallableParams) -> finstack_quant_core::Result<Self> {
+        let AutocallableParams {
+            observation_dates,
+            autocall_barriers,
+            coupon_barriers,
+            coupons,
+            memory_coupons,
+            final_barrier,
+            final_payoff_type,
+            cap_level,
+            notional,
+            initial_spot,
+            payment_df_ratios,
+        } = params;
         if observation_dates.len() != autocall_barriers.len() {
             return Err(Error::Validation(format!(
                 "AutocallablePayoff: observation_dates ({}) and autocall_barriers ({}) must have the same length",
@@ -375,22 +405,22 @@ mod tests {
         let barriers = vec![1.05, 1.05, 1.05, 1.05];
         let coupons = vec![0.08, 0.08, 0.08, 0.10];
 
-        let payoff = AutocallablePayoff::new(
+        let payoff = AutocallablePayoff::new(AutocallableParams {
             observation_dates,
-            barriers.clone(),
-            barriers,
+            autocall_barriers: barriers.clone(),
+            coupon_barriers: barriers,
             coupons,
-            false, // memory_coupons
-            0.75,  // Final barrier
-            FinalPayoffType::CapitalProtection {
+            memory_coupons: false,
+            final_barrier: 0.75,
+            final_payoff_type: FinalPayoffType::CapitalProtection {
                 floor: 0.9,
                 participation_rate: 1.0,
             },
-            1.2, // Cap level
-            100_000.0,
-            100.0,                    // Initial spot
-            vec![1.0, 1.0, 1.0, 1.0], // df_ratios))
-        )
+            cap_level: 1.2,
+            notional: 100_000.0,
+            initial_spot: 100.0,
+            payment_df_ratios: vec![1.0, 1.0, 1.0, 1.0],
+        })
         .expect("test fixture is well-formed");
 
         assert_eq!(payoff.observation_dates.len(), 4);
@@ -404,22 +434,11 @@ mod tests {
         let barriers = vec![1.05, 1.05];
         let coupons = vec![0.08, 0.10];
 
-        let mut payoff = AutocallablePayoff::new(
-            observation_dates,
-            barriers.clone(),
-            barriers,
-            coupons,
-            false, // memory_coupons
-            0.75,
-            FinalPayoffType::CapitalProtection {
+        let mut payoff = AutocallablePayoff::new(AutocallableParams { observation_dates, autocall_barriers: barriers.clone(), coupon_barriers: barriers, coupons, memory_coupons: false, final_barrier: // memory_coupons
+            0.75, final_payoff_type: FinalPayoffType::CapitalProtection {
                 floor: 0.9,
                 participation_rate: 1.0,
-            },
-            1.2,
-            100_000.0,
-            100.0,
-            vec![1.0, 1.0],
-        )
+            }, cap_level: 1.2, notional: 100_000.0, initial_spot: 100.0, payment_df_ratios: vec![1.0, 1.0] })
         .expect("test fixture is well-formed");
 
         // Simulate first observation date with spot above barrier
@@ -441,22 +460,11 @@ mod tests {
         let barriers = vec![1.20]; // Very high barrier, unlikely to hit
         let coupons = vec![0.0];
 
-        let mut payoff = AutocallablePayoff::new(
-            observation_dates,
-            barriers.clone(),
-            barriers,
-            coupons,
-            false, // memory_coupons
-            0.75,
-            FinalPayoffType::CapitalProtection {
+        let mut payoff = AutocallablePayoff::new(AutocallableParams { observation_dates, autocall_barriers: barriers.clone(), coupon_barriers: barriers, coupons, memory_coupons: false, final_barrier: // memory_coupons
+            0.75, final_payoff_type: FinalPayoffType::CapitalProtection {
                 floor: 0.9,
                 participation_rate: 1.0,
-            },
-            1.2,
-            100_000.0,
-            100.0,
-            vec![1.0],
-        )
+            }, cap_level: 1.2, notional: 100_000.0, initial_spot: 100.0, payment_df_ratios: vec![1.0] })
         .expect("test fixture is well-formed");
 
         // Not autocalled, final spot is below initial
@@ -482,21 +490,10 @@ mod tests {
 
     #[test]
     fn missing_spot_event_returns_error() {
-        let mut payoff = AutocallablePayoff::new(
-            vec![1.0],
-            vec![2.0],
-            vec![2.0],
-            vec![0.0],
-            false, // memory_coupons
-            0.75,
-            FinalPayoffType::Participation {
+        let mut payoff = AutocallablePayoff::new(AutocallableParams { observation_dates: vec![1.0], autocall_barriers: vec![2.0], coupon_barriers: vec![2.0], coupons: vec![0.0], memory_coupons: false, final_barrier: // memory_coupons
+            0.75, final_payoff_type: FinalPayoffType::Participation {
                 participation_rate: 1.0,
-            },
-            1.5,
-            100_000.0,
-            100.0,
-            vec![1.0],
-        )
+            }, cap_level: 1.5, notional: 100_000.0, initial_spot: 100.0, payment_df_ratios: vec![1.0] })
         .expect("test fixture is well-formed");
 
         let mut state = PathState::new(100, 1.0);
@@ -512,22 +509,11 @@ mod tests {
         let barriers = vec![1.05];
         let coupons = vec![0.08];
 
-        let mut payoff = AutocallablePayoff::new(
-            observation_dates,
-            barriers.clone(),
-            barriers,
-            coupons,
-            false, // memory_coupons
-            0.75,
-            FinalPayoffType::CapitalProtection {
+        let mut payoff = AutocallablePayoff::new(AutocallableParams { observation_dates, autocall_barriers: barriers.clone(), coupon_barriers: barriers, coupons, memory_coupons: false, final_barrier: // memory_coupons
+            0.75, final_payoff_type: FinalPayoffType::CapitalProtection {
                 floor: 0.9,
                 participation_rate: 1.0,
-            },
-            1.2,
-            100_000.0,
-            100.0,
-            vec![1.0],
-        )
+            }, cap_level: 1.2, notional: 100_000.0, initial_spot: 100.0, payment_df_ratios: vec![1.0] })
         .expect("test fixture is well-formed");
 
         let mut state = PathState::new(10, 0.25);
@@ -543,19 +529,8 @@ mod tests {
     #[test]
     fn test_final_knock_in_barrier_scales_from_initial_spot() {
         let notional = 100_000.0;
-        let mut payoff = AutocallablePayoff::new(
-            vec![1.0],
-            vec![2.0],
-            vec![2.0],
-            vec![0.0],
-            false, // memory_coupons
-            0.6,
-            FinalPayoffType::KnockInPut { strike_ratio: 1.0 },
-            1.2,
-            notional,
-            100.0,
-            vec![1.0],
-        )
+        let mut payoff = AutocallablePayoff::new(AutocallableParams { observation_dates: vec![1.0], autocall_barriers: vec![2.0], coupon_barriers: vec![2.0], coupons: vec![0.0], memory_coupons: false, final_barrier: // memory_coupons
+            0.6, final_payoff_type: FinalPayoffType::KnockInPut { strike_ratio: 1.0 }, cap_level: 1.2, notional, initial_spot: 100.0, payment_df_ratios: vec![1.0] })
         .expect("test fixture is well-formed");
 
         let mut state = PathState::new(100, 1.0);
@@ -582,19 +557,8 @@ mod tests {
     #[test]
     fn knock_in_put_strike_is_a_ratio_of_initial_spot() {
         let notional = 100_000.0;
-        let mut payoff = AutocallablePayoff::new(
-            vec![1.0],
-            vec![2.0],
-            vec![2.0],
-            vec![0.0],
-            false, // memory_coupons
-            0.6,
-            FinalPayoffType::KnockInPut { strike_ratio: 1.0 },
-            1.2,
-            notional,
-            200.0,
-            vec![1.0],
-        )
+        let mut payoff = AutocallablePayoff::new(AutocallableParams { observation_dates: vec![1.0], autocall_barriers: vec![2.0], coupon_barriers: vec![2.0], coupons: vec![0.0], memory_coupons: false, final_barrier: // memory_coupons
+            0.6, final_payoff_type: FinalPayoffType::KnockInPut { strike_ratio: 1.0 }, cap_level: 1.2, notional, initial_spot: 200.0, payment_df_ratios: vec![1.0] })
         .expect("test fixture is well-formed");
 
         let mut state = PathState::new(100, 1.0);
@@ -620,22 +584,11 @@ mod tests {
         let barriers = vec![2.0, 2.0, 1.05, 2.0];
         let coupons = vec![0.05, 0.06, 0.07, 0.08];
 
-        let mut payoff = AutocallablePayoff::new(
-            observation_dates,
-            barriers.clone(),
-            barriers,
-            coupons,
-            false, // memory_coupons
-            0.75,
-            FinalPayoffType::CapitalProtection {
+        let mut payoff = AutocallablePayoff::new(AutocallableParams { observation_dates, autocall_barriers: barriers.clone(), coupon_barriers: barriers, coupons, memory_coupons: false, final_barrier: // memory_coupons
+            0.75, final_payoff_type: FinalPayoffType::CapitalProtection {
                 floor: 0.9,
                 participation_rate: 1.0,
-            },
-            1.2,
-            100_000.0,
-            100.0,
-            vec![1.0, 1.0, 1.0, 1.0],
-        )
+            }, cap_level: 1.2, notional: 100_000.0, initial_spot: 100.0, payment_df_ratios: vec![1.0, 1.0, 1.0, 1.0] })
         .expect("test fixture is well-formed");
 
         // One coarse step lands at t = 0.75, past observation dates 0, 1 and 2.
@@ -662,22 +615,11 @@ mod tests {
         let barriers = vec![2.0, 2.0, 2.0, 2.0];
         let coupons = vec![0.05, 0.06, 0.07, 0.08];
 
-        let mut payoff = AutocallablePayoff::new(
-            observation_dates,
-            barriers.clone(),
-            barriers,
-            coupons,
-            false, // memory_coupons
-            0.75,
-            FinalPayoffType::CapitalProtection {
+        let mut payoff = AutocallablePayoff::new(AutocallableParams { observation_dates, autocall_barriers: barriers.clone(), coupon_barriers: barriers, coupons, memory_coupons: false, final_barrier: // memory_coupons
+            0.75, final_payoff_type: FinalPayoffType::CapitalProtection {
                 floor: 0.9,
                 participation_rate: 1.0,
-            },
-            1.2,
-            100_000.0,
-            100.0,
-            vec![1.0, 1.0, 1.0, 1.0],
-        )
+            }, cap_level: 1.2, notional: 100_000.0, initial_spot: 100.0, payment_df_ratios: vec![1.0, 1.0, 1.0, 1.0] })
         .expect("test fixture is well-formed");
 
         let mut state = PathState::new(1, 1.0);
@@ -693,21 +635,10 @@ mod tests {
 
     #[test]
     fn test_participation_payoff_respects_cap_level() {
-        let mut payoff = AutocallablePayoff::new(
-            vec![1.0],
-            vec![2.0],
-            vec![2.0],
-            vec![0.0],
-            false, // memory_coupons
-            0.6,
-            FinalPayoffType::Participation {
+        let mut payoff = AutocallablePayoff::new(AutocallableParams { observation_dates: vec![1.0], autocall_barriers: vec![2.0], coupon_barriers: vec![2.0], coupons: vec![0.0], memory_coupons: false, final_barrier: // memory_coupons
+            0.6, final_payoff_type: FinalPayoffType::Participation {
                 participation_rate: 1.0,
-            },
-            1.2,
-            100_000.0,
-            100.0,
-            vec![1.0],
-        )
+            }, cap_level: 1.2, notional: 100_000.0, initial_spot: 100.0, payment_df_ratios: vec![1.0] })
         .expect("test fixture is well-formed");
 
         let mut state = PathState::new(100, 1.0);
@@ -735,19 +666,8 @@ mod tests {
         let barriers = vec![2.0]; // unreachable autocall barrier
         let coupons = vec![0.0];
 
-        let mut payoff = AutocallablePayoff::new(
-            observation_dates,
-            barriers.clone(),
-            barriers,
-            coupons,
-            false,
-            0.6, // 60% knock-in barrier => barrier level = 60.0
-            FinalPayoffType::KnockInPut { strike_ratio: 1.0 },
-            1.5,
-            100_000.0,
-            100.0,
-            vec![1.0],
-        )
+        let mut payoff = AutocallablePayoff::new(AutocallableParams { observation_dates, autocall_barriers: barriers.clone(), coupon_barriers: barriers, coupons, memory_coupons: false, final_barrier: 0.6, final_payoff_type: // 60% knock-in barrier => barrier level = 60.0
+            FinalPayoffType::KnockInPut { strike_ratio: 1.0 }, cap_level: 1.5, notional: 100_000.0, initial_spot: 100.0, payment_df_ratios: vec![1.0] })
         .expect("test fixture is well-formed");
 
         // Intermediate (non-observation) time step at t = 0.5 with spot = 40,
@@ -793,21 +713,21 @@ mod tests {
         let barriers = vec![2.0, 2.0, 1.05];
         let coupons = vec![0.03, 0.04, 0.05];
 
-        let mut payoff = AutocallablePayoff::new(
+        let mut payoff = AutocallablePayoff::new(AutocallableParams {
             observation_dates,
-            barriers.clone(),
-            barriers,
+            autocall_barriers: barriers.clone(),
+            coupon_barriers: barriers,
             coupons,
-            true, // memory_coupons ENABLED
-            0.6,
-            FinalPayoffType::Participation {
+            memory_coupons: true,
+            final_barrier: 0.6,
+            final_payoff_type: FinalPayoffType::Participation {
                 participation_rate: 1.0,
             },
-            1.5,
-            100_000.0,
-            100.0,
-            vec![1.0, 1.0, 1.0], // df_ratios all 1.0 to isolate the coupon logic))
-        )
+            cap_level: 1.5,
+            notional: 100_000.0,
+            initial_spot: 100.0,
+            payment_df_ratios: vec![1.0, 1.0, 1.0],
+        })
         .expect("test fixture is well-formed");
 
         // One coarse step to t = 0.75 breaches only observation index 2.
@@ -838,21 +758,10 @@ mod tests {
         let barriers = vec![2.0, 2.0, 1.05];
         let coupons = vec![0.03, 0.04, 0.05];
 
-        let mut payoff = AutocallablePayoff::new(
-            observation_dates,
-            barriers.clone(),
-            barriers,
-            coupons,
-            false, // memory_coupons DISABLED
-            0.6,
-            FinalPayoffType::Participation {
+        let mut payoff = AutocallablePayoff::new(AutocallableParams { observation_dates, autocall_barriers: barriers.clone(), coupon_barriers: barriers, coupons, memory_coupons: false, final_barrier: // memory_coupons DISABLED
+            0.6, final_payoff_type: FinalPayoffType::Participation {
                 participation_rate: 1.0,
-            },
-            1.5,
-            100_000.0,
-            100.0,
-            vec![1.0, 1.0, 1.0],
-        )
+            }, cap_level: 1.5, notional: 100_000.0, initial_spot: 100.0, payment_df_ratios: vec![1.0, 1.0, 1.0] })
         .expect("test fixture is well-formed");
 
         let mut state = PathState::new(1, 0.75);
@@ -872,21 +781,21 @@ mod tests {
     }
     #[test]
     fn coupon_barrier_releases_memory_without_autocall() {
-        let mut payoff = AutocallablePayoff::new(
-            vec![0.5, 1.0],
-            vec![2.0, 2.0],
-            vec![0.95, 0.95],
-            vec![0.03, 0.04],
-            true,
-            0.6,
-            FinalPayoffType::Participation {
+        let mut payoff = AutocallablePayoff::new(AutocallableParams {
+            observation_dates: vec![0.5, 1.0],
+            autocall_barriers: vec![2.0, 2.0],
+            coupon_barriers: vec![0.95, 0.95],
+            coupons: vec![0.03, 0.04],
+            memory_coupons: true,
+            final_barrier: 0.6,
+            final_payoff_type: FinalPayoffType::Participation {
                 participation_rate: 1.0,
             },
-            1.5,
-            100_000.0,
-            100.0,
-            vec![1.0, 1.0],
-        )
+            cap_level: 1.5,
+            notional: 100_000.0,
+            initial_spot: 100.0,
+            payment_df_ratios: vec![1.0, 1.0],
+        })
         .expect("payoff");
 
         let mut first = PathState::new(1, 0.5);
@@ -906,21 +815,21 @@ mod tests {
 
     #[test]
     fn autocall_redemption_uses_contractual_payment_discount_ratio() {
-        let mut payoff = AutocallablePayoff::new(
-            vec![0.5],
-            vec![1.0],
-            vec![2.0],
-            vec![0.0],
-            false,
-            0.6,
-            FinalPayoffType::Participation {
+        let mut payoff = AutocallablePayoff::new(AutocallableParams {
+            observation_dates: vec![0.5],
+            autocall_barriers: vec![1.0],
+            coupon_barriers: vec![2.0],
+            coupons: vec![0.0],
+            memory_coupons: false,
+            final_barrier: 0.6,
+            final_payoff_type: FinalPayoffType::Participation {
                 participation_rate: 1.0,
             },
-            1.5,
-            100_000.0,
-            100.0,
-            vec![0.97],
-        )
+            cap_level: 1.5,
+            notional: 100_000.0,
+            initial_spot: 100.0,
+            payment_df_ratios: vec![0.97],
+        })
         .expect("payoff");
         let mut state = PathState::new(1, 0.5);
         state.set(state_keys::SPOT, 110.0);

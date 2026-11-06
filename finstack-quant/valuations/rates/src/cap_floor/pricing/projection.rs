@@ -254,19 +254,19 @@ mod tests {
     use time::macros::date;
 
     fn compounded_sofr_caplet() -> CapFloor {
-        let mut caplet = CapFloor::new(
-            "SOFR-CAPLET",
-            RateOptionType::Caplet,
-            Money::from((1_000_000_i64, Currency::USD)),
-            0.04,
-            date!(2025 - 01 - 02),
-            date!(2025 - 04 - 02),
-            None,
-            DayCount::Act360,
-            "USD-OIS",
-            "USD-SOFR-OIS",
-            "USD-CAP-VOL",
-        )
+        let mut caplet = CapFloor::new(crate::cap_floor::CapFloorParams {
+            id: "SOFR-CAPLET".into(),
+            rate_option_type: RateOptionType::Caplet,
+            notional: Money::from((1_000_000_i64, Currency::USD)),
+            strike: 0.04,
+            start_date: date!(2025 - 01 - 02),
+            maturity: date!(2025 - 04 - 02),
+            frequency: None,
+            day_count: DayCount::Act360,
+            discount_curve_id: "USD-OIS".into(),
+            forward_curve_id: "USD-SOFR-OIS".into(),
+            vol_surface_id: "USD-CAP-VOL".into(),
+        })
         .expect("caplet");
         caplet.vol_type = CapFloorVolType::Normal;
         caplet.overnight_coupon = Some(OvernightCouponConvention {

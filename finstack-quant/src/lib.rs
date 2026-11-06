@@ -87,3 +87,12 @@ pub use finstack_quant_valuations as valuations;
 
 #[cfg(all(feature = "json-schema", feature = "jsonschema-validate"))]
 pub mod schema;
+
+/// Compiles the repository `README.md` Rust samples as doctests.
+///
+/// The README is *not* included in the rendered crate documentation: this item
+/// exists only under `cfg(doctest)`, so every ` ```rust ` block in the root
+/// README is compiled and run by `mise run rust-test --doctest`.
+#[cfg(doctest)]
+#[doc = include_str!("../../README.md")]
+struct RootReadmeDoctests;

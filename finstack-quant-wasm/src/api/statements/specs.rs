@@ -26,9 +26,11 @@ use wasm_bindgen::prelude::*;
 ///
 /// Throws with kind `validation` if an input is malformed or the adjustment
 /// identifier already exists in the configuration.
-#[wasm_bindgen(js_name = normalizationConfigAddAdjustment)]
+#[wasm_bindgen(js_name = normalizationConfigAddAdjustment, unchecked_return_type = "generated.statements.NormalizationConfig")]
 pub fn normalization_config_add_adjustment(
+    #[wasm_bindgen(unchecked_param_type = "generated.statements.NormalizationConfig | string")]
     config: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.statements.Adjustment | string")]
     adjustment: JsValue,
 ) -> Result<JsValue, JsValue> {
     let config: NormalizationConfig = from_js_json(&config, "config")?;
@@ -48,7 +50,9 @@ pub fn normalization_config_add_adjustment(
 /// Throws with kind `validation` if `json` is malformed or holds duplicate
 /// adjustment identifiers.
 #[wasm_bindgen(js_name = validateNormalizationConfigJson)]
-pub fn validate_normalization_config_json(json: JsValue) -> Result<String, JsValue> {
+pub fn validate_normalization_config_json(
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+) -> Result<String, JsValue> {
     crate::utils::input::validated_json(&json, NormalizationConfig::validate)
 }
 
@@ -64,8 +68,12 @@ pub fn validate_normalization_config_json(json: JsValue) -> Result<String, JsVal
 /// Throws with kind `validation` if an input is malformed, the target node or
 /// a referenced node is absent from the results, the configuration is
 /// invalid, or the target and a reference node have incompatible units.
-#[wasm_bindgen(js_name = normalize)]
-pub fn normalize(results: JsValue, config: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = normalize, unchecked_return_type = "generated.statements.NormalizationResult[]")]
+pub fn normalize(
+    #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] results: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.statements.NormalizationConfig | string")]
+    config: JsValue,
+) -> Result<JsValue, JsValue> {
     let results: StatementResult = from_js_json(&results, "results")?;
     let config: NormalizationConfig = from_js_json(&config, "config")?;
     to_js_value(
@@ -82,8 +90,8 @@ pub fn normalize(results: JsValue, config: JsValue) -> Result<JsValue, JsValue> 
 /// attached check report is cleared because it describes the values before the
 /// merge. Rust updates its argument in place; here the merged copy is returned.
 /// @param results - Evaluated `StatementResult` to merge into (object or JSON); left unchanged.
-/// @param normalization_results - `NormalizationResult` array from `normalize`, all with the same unit and currency (object or JSON); an empty array returns an unchanged copy.
-/// @param output_node_id - Node to create or replace, e.g. `"adjusted_ebitda"`.
+/// @param normalizationResults - `NormalizationResult` array from `normalize`, all with the same unit and currency (object or JSON); an empty array returns an unchanged copy.
+/// @param outputNodeId - Node to create or replace, e.g. `"adjusted_ebitda"`.
 /// @returns The merged `StatementResult`.
 ///
 /// # Errors
@@ -91,10 +99,15 @@ pub fn normalize(results: JsValue, config: JsValue) -> Result<JsValue, JsValue> 
 /// Throws with kind `validation` if an input is malformed, and the kind of the
 /// Rust error if the results mix units or currencies, repeat a period or hold a
 /// non-finite value.
-#[wasm_bindgen(js_name = mergeIntoResults)]
+#[wasm_bindgen(js_name = mergeIntoResults, unchecked_return_type = "StatementResult")]
 pub fn merge_into_results(
-    results: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] results: JsValue,
+    #[wasm_bindgen(
+        js_name = "normalizationResults",
+        unchecked_param_type = "generated.statements.NormalizationResult[] | string"
+    )]
     normalization_results: JsValue,
+    #[wasm_bindgen(js_name = "outputNodeId", unchecked_param_type = "string")]
     output_node_id: JsValue,
 ) -> Result<JsValue, JsValue> {
     let mut results: StatementResult = from_js_json(&results, "results")?;
@@ -118,7 +131,7 @@ pub fn merge_into_results(
 /// # Errors
 ///
 /// Throws only if the list cannot be converted to a JavaScript array.
-#[wasm_bindgen(js_name = checkSuiteSpecBuiltinCheckNames)]
+#[wasm_bindgen(js_name = checkSuiteSpecBuiltinCheckNames, unchecked_return_type = "string[]")]
 pub fn check_suite_spec_builtin_check_names() -> Result<JsValue, JsValue> {
     to_js_value(&BuiltinCheckSpec::names())
 }
@@ -135,7 +148,10 @@ pub fn check_suite_spec_builtin_check_names() -> Result<JsValue, JsValue> {
 /// `validation` error when it does not match the `CheckConfig` contract or a
 /// tolerance or materiality threshold is negative or non-finite.
 #[wasm_bindgen(js_name = checkConfigValidate)]
-pub fn check_config_validate(config: JsValue) -> Result<(), JsValue> {
+pub fn check_config_validate(
+    #[wasm_bindgen(unchecked_param_type = "generated.statements.CheckConfig | string")]
+    config: JsValue,
+) -> Result<(), JsValue> {
     from_js_json::<CheckConfig>(&config, "config")?
         .validate()
         .map_err(to_js_err)

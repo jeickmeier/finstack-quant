@@ -228,7 +228,7 @@ This crate owns two checked-in JSON Schemas in
 
 ```bash
 cargo run -p finstack-quant-portfolio --bin gen_portfolio_schemas -- --write
-mise run rust-check-schemas
+mise run gen-check
 ```
 
 ## Verification

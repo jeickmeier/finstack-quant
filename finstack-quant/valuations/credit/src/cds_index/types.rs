@@ -233,45 +233,70 @@ impl CdsIndex {
         })
     }
 
-    /// Construct a `CdsIndex` from a preset descriptor + trade-specific args.
+    /// Construct a `CdsIndex` from a preset descriptor and the trade terms.
     ///
-    /// Replaces the previous `new_standard` constructor. Trade state that is
-    /// orthogonal to the preset (constituents, index factor) is attached
-    /// via the chained `with_*` methods on the returned instrument.
+    /// The preset supplies the index name, series, version, running coupon,
+    /// constituent count and regional ISDA convention (schedule terms and
+    /// settlement lag); `params` supplies the trade terms. Trade state that is
+    /// orthogonal to the preset (constituents, index factor) is attached via
+    /// the chained `with_*` methods on the returned instrument.
+    ///
+    /// # Arguments
+    ///
+    /// * `preset` - Standard index series descriptor, e.g.
+    ///   [`CdsIndexParams::cdx_na_ig`].
+    /// * `params` - Trade id, notional, side, start and end dates, recovery
+    ///   rate, discount curve and index hazard curve.
     ///
     /// # Example
     ///
-    /// ```text
+    /// ```
+    /// use finstack_quant_core::currency::Currency;
+    /// use finstack_quant_core::money::Money;
+    /// use finstack_quant_core::types::{CurveId, InstrumentId};
+    /// use finstack_quant_valuations_core::instruments::PayReceive;
+    /// use finstack_quant_valuations_credit::cds::CdsTradeParams;
+    /// use finstack_quant_valuations_credit::cds_index::{CdsIndex, CdsIndexParams};
+    /// use time::macros::date;
+    ///
+    /// # fn main() -> finstack_quant_core::Result<()> {
     /// let idx = CdsIndex::from_preset(
     ///     &CdsIndexParams::cdx_na_ig(42, 1, 100.0),
-    ///     "CDX-IG-42",
-    ///     Money::from((10_000_000_i64, Currency::USD)),
-    ///     PayReceive::Pay,
-    ///     start, end,
-    ///     0.40,
-    ///     "USD-OIS",
-    ///     "CDX.NA.IG.HAZARD",
+    ///     CdsTradeParams {
+    ///         id: InstrumentId::new("CDX-IG-42"),
+    ///         notional: Money::from((10_000_000_i64, Currency::USD)),
+    ///         side: PayReceive::Pay,
+    ///         start: date!(2024 - 03 - 20),
+    ///         end: date!(2029 - 06 - 20),
+    ///         recovery_rate: 0.40,
+    ///         discount_curve_id: CurveId::new("USD-OIS"),
+    ///         credit_curve_id: CurveId::new("CDX.NA.IG.HAZARD"),
+    ///     },
     /// )?
-    /// .with_index_factor(0.96)
-    /// .with_constituents(constituents);
+    /// .with_index_factor(0.96);
+    /// assert_eq!(idx.series, 42);
+    /// # Ok(())
+    /// # }
     /// ```
     ///
     /// # Errors
     ///
     /// Returns an error if `preset.coupon_bp` cannot be represented
     /// as `Decimal`.
-    #[allow(clippy::too_many_arguments)]
     pub fn from_preset(
         preset: &CdsIndexParams,
-        id: impl Into<InstrumentId>,
-        notional: Money,
-        side: PayReceive,
-        start: finstack_quant_core::dates::Date,
-        end: finstack_quant_core::dates::Date,
-        recovery_rate: f64,
-        discount_curve_id: impl Into<CurveId>,
-        credit_curve_id: impl Into<CurveId>,
+        params: crate::cds::CdsTradeParams,
     ) -> finstack_quant_core::Result<Self> {
+        let crate::cds::CdsTradeParams {
+            id,
+            notional,
+            side,
+            start,
+            end,
+            recovery_rate,
+            discount_curve_id,
+            credit_curve_id,
+        } = params;
         let convention = preset.convention;
         let day_count = convention.get_spec()?.day_count;
         let frequency = convention.get_spec()?.frequency;
@@ -281,7 +306,7 @@ impl CdsIndex {
         let coupon_bp = finstack_quant_core::decimal::f64_to_decimal(preset.coupon_bp)?;
 
         Ok(Self {
-            id: id.into(),
+            id,
             index_name: preset.index_name.clone(),
             series: preset.series,
             version: preset.version,
@@ -299,10 +324,10 @@ impl CdsIndex {
                 calendar_id: Some(convention.get_spec()?.calendar_id.as_str().into()),
                 day_count,
                 coupon_bp,
-                discount_curve_id: discount_curve_id.into(),
+                discount_curve_id,
             },
             protection_leg: ProtectionLegSpec {
-                credit_curve_id: credit_curve_id.into(),
+                credit_curve_id,
                 recovery_rate,
                 settlement_delay: convention.get_spec()?.settlement_days,
             },

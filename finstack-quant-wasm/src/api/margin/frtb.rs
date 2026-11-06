@@ -47,13 +47,16 @@ pub struct JsFrtbSensitivities {
 #[wasm_bindgen(js_class = FrtbSensitivities)]
 impl JsFrtbSensitivities {
     /// Create an empty FRTB sensitivity set in one reporting currency.
-    /// @param base_currency - ISO-4217 currency used for all SBA sensitivities and capital amounts.
+    /// @param baseCurrency - ISO-4217 currency used for all SBA sensitivities and capital amounts.
     ///
     /// # Errors
     ///
     /// Throws if `base_currency` is not a known ISO-4217 code.
     #[wasm_bindgen(constructor)]
-    pub fn new(base_currency: JsValue) -> Result<JsFrtbSensitivities, JsValue> {
+    pub fn new(
+        #[wasm_bindgen(js_name = "baseCurrency", unchecked_param_type = "string")]
+        base_currency: JsValue,
+    ) -> Result<JsFrtbSensitivities, JsValue> {
         Ok(Self {
             inner: FrtbSensitivities::new(js_currency(&base_currency, "baseCurrency")?),
         })
@@ -67,7 +70,9 @@ impl JsFrtbSensitivities {
     ///
     /// Throws if the JSON is malformed or has unknown fields.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsFrtbSensitivities, JsValue> {
+    pub fn from_json(
+        #[wasm_bindgen(unchecked_param_type = "FrtbSensitivitiesWire | string")] json: JsValue,
+    ) -> Result<JsFrtbSensitivities, JsValue> {
         Ok(Self {
             inner: from_js_json(&json, "json")?,
         })
@@ -109,9 +114,9 @@ impl JsFrtbSensitivities {
     #[wasm_bindgen(js_name = addGirrDelta)]
     pub fn add_girr_delta(
         &mut self,
-        currency: JsValue,
-        tenor: JsValue,
-        amount: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] tenor: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
     ) -> Result<(), JsValue> {
         let tenor = js_string(&tenor, "tenor")?;
         let amount = js_f64(&amount, "amount")?;
@@ -130,8 +135,8 @@ impl JsFrtbSensitivities {
     #[wasm_bindgen(js_name = addGirrInflationDelta)]
     pub fn add_girr_inflation_delta(
         &mut self,
-        currency: JsValue,
-        amount: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
     ) -> Result<(), JsValue> {
         let amount = js_f64(&amount, "amount")?;
         let currency = js_currency(&currency, "currency")?;
@@ -149,8 +154,8 @@ impl JsFrtbSensitivities {
     #[wasm_bindgen(js_name = addGirrXccyBasisDelta)]
     pub fn add_girr_xccy_basis_delta(
         &mut self,
-        currency: JsValue,
-        amount: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
     ) -> Result<(), JsValue> {
         let amount = js_f64(&amount, "amount")?;
         let currency = js_currency(&currency, "currency")?;
@@ -171,11 +176,11 @@ impl JsFrtbSensitivities {
     #[wasm_bindgen(js_name = addCsrNonsecDelta)]
     pub fn add_csr_nonsec_delta(
         &mut self,
-        issuer: JsValue,
-        bucket: JsValue,
-        tenor: JsValue,
-        basis: JsValue,
-        amount: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] issuer: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] tenor: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] basis: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
     ) -> Result<(), JsValue> {
         let issuer = js_string(&issuer, "issuer")?;
         let bucket: u8 = js_uint(&bucket, "bucket")?;
@@ -199,10 +204,10 @@ impl JsFrtbSensitivities {
     #[wasm_bindgen(js_name = addCsrNonsecVega)]
     pub fn add_csr_nonsec_vega(
         &mut self,
-        issuer: JsValue,
-        bucket: JsValue,
-        maturity: JsValue,
-        amount: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] issuer: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] maturity: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
     ) -> Result<(), JsValue> {
         let issuer = js_string(&issuer, "issuer")?;
         let bucket: u8 = js_uint(&bucket, "bucket")?;
@@ -216,8 +221,8 @@ impl JsFrtbSensitivities {
     /// Add a CSR non-securitisation curvature pair.
     /// @param issuer - Issuer or reference-entity identifier.
     /// @param bucket - 1-based CSR non-securitisation bucket (MAR21.51).
-    /// @param cvr_up - Curvature risk position under the upward spread shock, in the base currency.
-    /// @param cvr_down - Curvature risk position under the downward spread shock, in the base currency.
+    /// @param cvrUp - Curvature risk position under the upward spread shock, in the base currency.
+    /// @param cvrDown - Curvature risk position under the downward spread shock, in the base currency.
     ///
     /// # Errors
     ///
@@ -225,10 +230,10 @@ impl JsFrtbSensitivities {
     #[wasm_bindgen(js_name = addCsrNonsecCurvature)]
     pub fn add_csr_nonsec_curvature(
         &mut self,
-        issuer: JsValue,
-        bucket: JsValue,
-        cvr_up: JsValue,
-        cvr_down: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] issuer: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
+        #[wasm_bindgen(js_name = "cvrUp", unchecked_param_type = "number")] cvr_up: JsValue,
+        #[wasm_bindgen(js_name = "cvrDown", unchecked_param_type = "number")] cvr_down: JsValue,
     ) -> Result<(), JsValue> {
         let issuer = js_string(&issuer, "issuer")?;
         let bucket: u8 = js_uint(&bucket, "bucket")?;
@@ -252,11 +257,11 @@ impl JsFrtbSensitivities {
     #[wasm_bindgen(js_name = addCsrSecCtpDelta)]
     pub fn add_csr_sec_ctp_delta(
         &mut self,
-        tranche: JsValue,
-        bucket: JsValue,
-        tenor: JsValue,
-        basis: JsValue,
-        amount: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] tranche: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] tenor: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] basis: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
     ) -> Result<(), JsValue> {
         let tranche = js_string(&tranche, "tranche")?;
         let bucket: u8 = js_uint(&bucket, "bucket")?;
@@ -280,10 +285,10 @@ impl JsFrtbSensitivities {
     #[wasm_bindgen(js_name = addCsrSecCtpVega)]
     pub fn add_csr_sec_ctp_vega(
         &mut self,
-        tranche: JsValue,
-        bucket: JsValue,
-        maturity: JsValue,
-        amount: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] tranche: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] maturity: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
     ) -> Result<(), JsValue> {
         let tranche = js_string(&tranche, "tranche")?;
         let bucket: u8 = js_uint(&bucket, "bucket")?;
@@ -297,8 +302,8 @@ impl JsFrtbSensitivities {
     /// Add a CSR securitisation (correlation trading portfolio) curvature pair.
     /// @param tranche - Tranche or index identifier.
     /// @param bucket - 1-based CSR securitisation CTP bucket (MAR21.59).
-    /// @param cvr_up - Curvature risk position under the upward spread shock, in the base currency.
-    /// @param cvr_down - Curvature risk position under the downward spread shock, in the base currency.
+    /// @param cvrUp - Curvature risk position under the upward spread shock, in the base currency.
+    /// @param cvrDown - Curvature risk position under the downward spread shock, in the base currency.
     ///
     /// # Errors
     ///
@@ -306,10 +311,10 @@ impl JsFrtbSensitivities {
     #[wasm_bindgen(js_name = addCsrSecCtpCurvature)]
     pub fn add_csr_sec_ctp_curvature(
         &mut self,
-        tranche: JsValue,
-        bucket: JsValue,
-        cvr_up: JsValue,
-        cvr_down: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] tranche: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
+        #[wasm_bindgen(js_name = "cvrUp", unchecked_param_type = "number")] cvr_up: JsValue,
+        #[wasm_bindgen(js_name = "cvrDown", unchecked_param_type = "number")] cvr_down: JsValue,
     ) -> Result<(), JsValue> {
         let tranche = js_string(&tranche, "tranche")?;
         let bucket: u8 = js_uint(&bucket, "bucket")?;
@@ -333,11 +338,11 @@ impl JsFrtbSensitivities {
     #[wasm_bindgen(js_name = addCsrSecNonctpDelta)]
     pub fn add_csr_sec_nonctp_delta(
         &mut self,
-        tranche: JsValue,
-        bucket: JsValue,
-        tenor: JsValue,
-        basis: JsValue,
-        amount: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] tranche: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] tenor: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] basis: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
     ) -> Result<(), JsValue> {
         let tranche = js_string(&tranche, "tranche")?;
         let bucket: u8 = js_uint(&bucket, "bucket")?;
@@ -361,10 +366,10 @@ impl JsFrtbSensitivities {
     #[wasm_bindgen(js_name = addCsrSecNonctpVega)]
     pub fn add_csr_sec_nonctp_vega(
         &mut self,
-        tranche: JsValue,
-        bucket: JsValue,
-        maturity: JsValue,
-        amount: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] tranche: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] maturity: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
     ) -> Result<(), JsValue> {
         let tranche = js_string(&tranche, "tranche")?;
         let bucket: u8 = js_uint(&bucket, "bucket")?;
@@ -378,8 +383,8 @@ impl JsFrtbSensitivities {
     /// Add a CSR securitisation (non-CTP) curvature pair.
     /// @param tranche - Tranche identifier.
     /// @param bucket - 1-based CSR securitisation non-CTP bucket (MAR21.64).
-    /// @param cvr_up - Curvature risk position under the upward spread shock, in the base currency.
-    /// @param cvr_down - Curvature risk position under the downward spread shock, in the base currency.
+    /// @param cvrUp - Curvature risk position under the upward spread shock, in the base currency.
+    /// @param cvrDown - Curvature risk position under the downward spread shock, in the base currency.
     ///
     /// # Errors
     ///
@@ -387,10 +392,10 @@ impl JsFrtbSensitivities {
     #[wasm_bindgen(js_name = addCsrSecNonctpCurvature)]
     pub fn add_csr_sec_nonctp_curvature(
         &mut self,
-        tranche: JsValue,
-        bucket: JsValue,
-        cvr_up: JsValue,
-        cvr_down: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] tranche: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
+        #[wasm_bindgen(js_name = "cvrUp", unchecked_param_type = "number")] cvr_up: JsValue,
+        #[wasm_bindgen(js_name = "cvrDown", unchecked_param_type = "number")] cvr_down: JsValue,
     ) -> Result<(), JsValue> {
         let tranche = js_string(&tranche, "tranche")?;
         let bucket: u8 = js_uint(&bucket, "bucket")?;
@@ -412,9 +417,9 @@ impl JsFrtbSensitivities {
     #[wasm_bindgen(js_name = addEquityDelta)]
     pub fn add_equity_delta(
         &mut self,
-        underlier: JsValue,
-        bucket: JsValue,
-        amount: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] underlier: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
     ) -> Result<(), JsValue> {
         let underlier = js_string(&underlier, "underlier")?;
         let bucket: u8 = js_uint(&bucket, "bucket")?;
@@ -434,9 +439,9 @@ impl JsFrtbSensitivities {
     #[wasm_bindgen(js_name = addEquityRepoDelta)]
     pub fn add_equity_repo_delta(
         &mut self,
-        underlier: JsValue,
-        bucket: JsValue,
-        amount: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] underlier: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
     ) -> Result<(), JsValue> {
         let underlier = js_string(&underlier, "underlier")?;
         let bucket: u8 = js_uint(&bucket, "bucket")?;
@@ -456,9 +461,9 @@ impl JsFrtbSensitivities {
     #[wasm_bindgen(js_name = addFxDelta)]
     pub fn add_fx_delta(
         &mut self,
-        ccy1: JsValue,
-        ccy2: JsValue,
-        amount: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] ccy1: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] ccy2: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
     ) -> Result<(), JsValue> {
         let ccy1 = js_currency(&ccy1, "ccy1")?;
         let ccy2 = js_currency(&ccy2, "ccy2")?;
@@ -480,11 +485,11 @@ impl JsFrtbSensitivities {
     #[wasm_bindgen(js_name = addCommodityDelta)]
     pub fn add_commodity_delta(
         &mut self,
-        name: JsValue,
-        bucket: JsValue,
-        tenor: JsValue,
-        basis: JsValue,
-        amount: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] tenor: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] basis: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
     ) -> Result<(), JsValue> {
         let name = js_string(&name, "name")?;
         let bucket: u8 = js_uint(&bucket, "bucket")?;
@@ -508,10 +513,10 @@ impl JsFrtbSensitivities {
     #[wasm_bindgen(js_name = addCommodityVega)]
     pub fn add_commodity_vega(
         &mut self,
-        name: JsValue,
-        bucket: JsValue,
-        maturity: JsValue,
-        amount: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] maturity: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
     ) -> Result<(), JsValue> {
         let name = js_string(&name, "name")?;
         let bucket: u8 = js_uint(&bucket, "bucket")?;
@@ -525,8 +530,8 @@ impl JsFrtbSensitivities {
     /// Add a commodity curvature pair.
     /// @param name - Commodity identifier.
     /// @param bucket - 1-based commodity bucket (MAR21.82).
-    /// @param cvr_up - Curvature risk position under the upward price shock, in the base currency.
-    /// @param cvr_down - Curvature risk position under the downward price shock, in the base currency.
+    /// @param cvrUp - Curvature risk position under the upward price shock, in the base currency.
+    /// @param cvrDown - Curvature risk position under the downward price shock, in the base currency.
     ///
     /// # Errors
     ///
@@ -534,10 +539,10 @@ impl JsFrtbSensitivities {
     #[wasm_bindgen(js_name = addCommodityCurvature)]
     pub fn add_commodity_curvature(
         &mut self,
-        name: JsValue,
-        bucket: JsValue,
-        cvr_up: JsValue,
-        cvr_down: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
+        #[wasm_bindgen(js_name = "cvrUp", unchecked_param_type = "number")] cvr_up: JsValue,
+        #[wasm_bindgen(js_name = "cvrDown", unchecked_param_type = "number")] cvr_down: JsValue,
     ) -> Result<(), JsValue> {
         let name = js_string(&name, "name")?;
         let bucket: u8 = js_uint(&bucket, "bucket")?;
@@ -549,8 +554,8 @@ impl JsFrtbSensitivities {
     }
 
     /// Add a GIRR vega sensitivity.
-    /// @param option_maturity - Option maturity label such as `"1Y"`.
-    /// @param underlying_tenor - Underlying swap tenor label such as `"5Y"`.
+    /// @param optionMaturity - Option maturity label such as `"1Y"`.
+    /// @param underlyingTenor - Underlying swap tenor label such as `"5Y"`.
     /// @param amount - Volatility-scaled vega (sigma times dV/dsigma) in the base currency.
     /// @param currency - ISO-4217 currency of the curve of the shocked risk factor.
     ///
@@ -560,10 +565,12 @@ impl JsFrtbSensitivities {
     #[wasm_bindgen(js_name = addGirrVega)]
     pub fn add_girr_vega(
         &mut self,
-        currency: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+        #[wasm_bindgen(js_name = "optionMaturity", unchecked_param_type = "string")]
         option_maturity: JsValue,
+        #[wasm_bindgen(js_name = "underlyingTenor", unchecked_param_type = "string")]
         underlying_tenor: JsValue,
-        amount: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
     ) -> Result<(), JsValue> {
         let option_maturity = js_string(&option_maturity, "optionMaturity")?;
         let underlying_tenor = js_string(&underlying_tenor, "underlyingTenor")?;
@@ -586,10 +593,10 @@ impl JsFrtbSensitivities {
     #[wasm_bindgen(js_name = addEquityVega)]
     pub fn add_equity_vega(
         &mut self,
-        underlier: JsValue,
-        bucket: JsValue,
-        maturity: JsValue,
-        amount: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] underlier: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] maturity: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
     ) -> Result<(), JsValue> {
         let underlier = js_string(&underlier, "underlier")?;
         let bucket: u8 = js_uint(&bucket, "bucket")?;
@@ -612,10 +619,10 @@ impl JsFrtbSensitivities {
     #[wasm_bindgen(js_name = addFxVega)]
     pub fn add_fx_vega(
         &mut self,
-        ccy1: JsValue,
-        ccy2: JsValue,
-        maturity: JsValue,
-        amount: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] ccy1: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] ccy2: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] maturity: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
     ) -> Result<(), JsValue> {
         let ccy1 = js_currency(&ccy1, "ccy1")?;
         let ccy2 = js_currency(&ccy2, "ccy2")?;
@@ -626,8 +633,8 @@ impl JsFrtbSensitivities {
     }
 
     /// Add a GIRR curvature pair.
-    /// @param cvr_up - Curvature risk position under the upward rate shock, in the base currency.
-    /// @param cvr_down - Curvature risk position under the downward rate shock, in the base currency.
+    /// @param cvrUp - Curvature risk position under the upward rate shock, in the base currency.
+    /// @param cvrDown - Curvature risk position under the downward rate shock, in the base currency.
     /// @param currency - ISO-4217 currency of the curve of the shocked risk factor.
     ///
     /// # Errors
@@ -636,9 +643,9 @@ impl JsFrtbSensitivities {
     #[wasm_bindgen(js_name = addGirrCurvature)]
     pub fn add_girr_curvature(
         &mut self,
-        currency: JsValue,
-        cvr_up: JsValue,
-        cvr_down: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+        #[wasm_bindgen(js_name = "cvrUp", unchecked_param_type = "number")] cvr_up: JsValue,
+        #[wasm_bindgen(js_name = "cvrDown", unchecked_param_type = "number")] cvr_down: JsValue,
     ) -> Result<(), JsValue> {
         let cvr_up = js_f64(&cvr_up, "cvrUp")?;
         let cvr_down = js_f64(&cvr_down, "cvrDown")?;
@@ -650,8 +657,8 @@ impl JsFrtbSensitivities {
     /// Add an equity curvature pair.
     /// @param underlier - Equity underlier or index identifier.
     /// @param bucket - 1-based equity bucket (MAR21.72).
-    /// @param cvr_up - Curvature risk position under the upward price shock, in the base currency.
-    /// @param cvr_down - Curvature risk position under the downward price shock, in the base currency.
+    /// @param cvrUp - Curvature risk position under the upward price shock, in the base currency.
+    /// @param cvrDown - Curvature risk position under the downward price shock, in the base currency.
     ///
     /// # Errors
     ///
@@ -659,10 +666,10 @@ impl JsFrtbSensitivities {
     #[wasm_bindgen(js_name = addEquityCurvature)]
     pub fn add_equity_curvature(
         &mut self,
-        underlier: JsValue,
-        bucket: JsValue,
-        cvr_up: JsValue,
-        cvr_down: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] underlier: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] bucket: JsValue,
+        #[wasm_bindgen(js_name = "cvrUp", unchecked_param_type = "number")] cvr_up: JsValue,
+        #[wasm_bindgen(js_name = "cvrDown", unchecked_param_type = "number")] cvr_down: JsValue,
     ) -> Result<(), JsValue> {
         let underlier = js_string(&underlier, "underlier")?;
         let bucket: u8 = js_uint(&bucket, "bucket")?;
@@ -676,8 +683,8 @@ impl JsFrtbSensitivities {
     /// Add an FX curvature pair for a currency pair.
     /// @param ccy1 - First ISO-4217 currency of the FX pair.
     /// @param ccy2 - Second ISO-4217 currency of the FX pair.
-    /// @param cvr_up - Curvature risk position under the upward FX shock, in the base currency.
-    /// @param cvr_down - Curvature risk position under the downward FX shock, in the base currency.
+    /// @param cvrUp - Curvature risk position under the upward FX shock, in the base currency.
+    /// @param cvrDown - Curvature risk position under the downward FX shock, in the base currency.
     ///
     /// # Errors
     ///
@@ -685,10 +692,10 @@ impl JsFrtbSensitivities {
     #[wasm_bindgen(js_name = addFxCurvature)]
     pub fn add_fx_curvature(
         &mut self,
-        ccy1: JsValue,
-        ccy2: JsValue,
-        cvr_up: JsValue,
-        cvr_down: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] ccy1: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] ccy2: JsValue,
+        #[wasm_bindgen(js_name = "cvrUp", unchecked_param_type = "number")] cvr_up: JsValue,
+        #[wasm_bindgen(js_name = "cvrDown", unchecked_param_type = "number")] cvr_down: JsValue,
     ) -> Result<(), JsValue> {
         let ccy1 = js_currency(&ccy1, "ccy1")?;
         let ccy2 = js_currency(&ccy2, "ccy2")?;
@@ -702,7 +709,13 @@ impl JsFrtbSensitivities {
     /// @param position - DrcPosition object or JSON: issuer, signed jtd_amount in reporting currency before LGD, rating_bucket 1..9, sector, seniority, non-negative maturity_years and optional pnl_adjustment (default 0). Equity seniority requires corporate sector; securitisations are unsupported.
     /// @throws Error - If fields are unknown, malformed or fail Rust position validation.
     #[wasm_bindgen(js_name = addDrcPosition)]
-    pub fn add_drc_position(&mut self, position: JsValue) -> Result<(), JsValue> {
+    pub fn add_drc_position(
+        &mut self,
+        #[wasm_bindgen(
+            unchecked_param_type = "FrtbSensitivitiesWire['drc_positions'][number] | string"
+        )]
+        position: JsValue,
+    ) -> Result<(), JsValue> {
         let position: DrcPosition = from_js_json(&position, "position")?;
         position.validate().map_err(to_js_err)?;
         self.inner.add_drc_position(position);
@@ -710,9 +723,9 @@ impl JsFrtbSensitivities {
     }
 
     /// Add a Residual Risk Add-On position.
-    /// @param instrument_id - Instrument identifier.
+    /// @param instrumentId - Instrument identifier.
     /// @param notional - Gross notional in the base currency.
-    /// @param is_exotic - Required: `true` for an exotic underlying (1.0% weight); `false` for other residual risk such as gap, correlation or behavioural risk (0.1% weight).
+    /// @param isExotic - Required: `true` for an exotic underlying (1.0% weight); `false` for other residual risk such as gap, correlation or behavioural risk (0.1% weight).
     ///
     /// # Errors
     ///
@@ -720,9 +733,10 @@ impl JsFrtbSensitivities {
     #[wasm_bindgen(js_name = addRraoPosition)]
     pub fn add_rrao_position(
         &mut self,
+        #[wasm_bindgen(js_name = "instrumentId", unchecked_param_type = "string")]
         instrument_id: JsValue,
-        notional: JsValue,
-        is_exotic: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] notional: JsValue,
+        #[wasm_bindgen(js_name = "isExotic", unchecked_param_type = "boolean")] is_exotic: JsValue,
     ) -> Result<(), JsValue> {
         let instrument_id = js_string(&instrument_id, "instrumentId")?;
         let notional = js_f64(&notional, "notional")?;
@@ -767,14 +781,19 @@ pub struct JsFrtbSbaEngine {
 impl JsFrtbSbaEngine {
     /// Select the correlation scenarios and risk classes the engine evaluates.
     /// @param scenarios - Lower-case scenario labels (`"low"`, `"medium"`, `"high"`); the charge is the maximum across them. Omitted evaluates all three.
-    /// @param risk_classes - Lower-case risk-class labels to include (`"girr"`, `"csr_non_sec"`, `"csr_sec_ctp"`, `"csr_sec_non_ctp"`, `"equity"`, `"commodity"`, `"fx"`); omitted includes all seven.
+    /// @param riskClasses - Lower-case risk-class labels to include (`"girr"`, `"csr_non_sec"`, `"csr_sec_ctp"`, `"csr_sec_non_ctp"`, `"equity"`, `"commodity"`, `"fx"`); omitted includes all seven.
     ///
     /// # Errors
     ///
     /// Throws if a label is unknown or either list is empty.
     #[wasm_bindgen(constructor)]
     pub fn new(
+        #[wasm_bindgen(unchecked_optional_param_type = "readonly CorrelationScenario[] | null")]
         scenarios: Option<JsValue>,
+        #[wasm_bindgen(
+            js_name = "riskClasses",
+            unchecked_optional_param_type = "readonly FrtbRiskClass[] | null"
+        )]
         risk_classes: Option<JsValue>,
     ) -> Result<JsFrtbSbaEngine, JsValue> {
         let scenarios = js_opt_string_seq(scenarios.as_ref(), "scenarios")?
@@ -803,7 +822,7 @@ impl JsFrtbSbaEngine {
     /// # Errors
     ///
     /// Throws if the labels cannot be converted to a JavaScript value.
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, unchecked_return_type = "CorrelationScenario[]")]
     pub fn scenarios(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner.scenarios())
     }
@@ -813,7 +832,7 @@ impl JsFrtbSbaEngine {
     /// # Errors
     ///
     /// Throws if the labels cannot be converted to a JavaScript value.
-    #[wasm_bindgen(getter, js_name = riskClasses)]
+    #[wasm_bindgen(getter, js_name = riskClasses, unchecked_return_type = "FrtbRiskClass[]")]
     pub fn risk_classes(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner.risk_classes())
     }
@@ -826,6 +845,7 @@ impl JsFrtbSbaEngine {
     ///
     /// Throws if a sensitivity has an unsupported tenor or bucket, an empty
     /// required identifier, or a non-finite value.
+    #[wasm_bindgen(unchecked_return_type = "FrtbSbaResult")]
     pub fn calculate(&self, sensitivities: &JsFrtbSensitivities) -> Result<JsValue, JsValue> {
         to_js_value(
             &self
@@ -838,7 +858,7 @@ impl JsFrtbSbaEngine {
 
 /// FRTB SBA capital charge for one sensitivity portfolio.
 /// @param sensitivities - Portfolio of FRTB sensitivities (delta, vega, curvature, DRC, RRAO).
-/// @param correlation_scenario - `"low"`, `"medium"` or `"high"` to evaluate only that scenario; omitted runs all three and reports the binding (maximum) one per BCBS d457.
+/// @param correlationScenario - `"low"`, `"medium"` or `"high"` to evaluate only that scenario; omitted runs all three and reports the binding (maximum) one per BCBS d457.
 /// @returns The `FrtbSbaResult` as a plain object: `total`, the per-risk-class delta, vega and curvature breakdown, `drc`, `rrao`, and the per-scenario charges with the binding one named.
 ///
 /// # Errors
@@ -846,9 +866,13 @@ impl JsFrtbSbaEngine {
 /// Throws if `correlation_scenario` is unknown, or a sensitivity has an
 /// unsupported tenor or bucket, an empty required identifier, or a non-finite
 /// value.
-#[wasm_bindgen(js_name = frtbSbaCharge)]
+#[wasm_bindgen(js_name = frtbSbaCharge, unchecked_return_type = "FrtbSbaResult")]
 pub fn frtb_sba_charge(
     sensitivities: &JsFrtbSensitivities,
+    #[wasm_bindgen(
+        js_name = "correlationScenario",
+        unchecked_optional_param_type = "CorrelationScenario | null"
+    )]
     correlation_scenario: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let scenario = js_opt_string(correlation_scenario.as_ref(), "correlationScenario")?

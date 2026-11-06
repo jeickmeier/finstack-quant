@@ -10,7 +10,7 @@ use wasm_bindgen::prelude::*;
 /// Aggregate the full classified cashflow ladder using reusable portfolio and market handles.
 /// @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
 /// @param market - Constructed `core.MarketContext` handle supplying curves, quotes, and FX data.
-/// @param allow_partial - Optional; when omitted or `undefined`, uses the Rust
+/// @param allowPartial - Optional; when omitted or `undefined`, uses the Rust
 ///   `CashflowAggregationOptions` default, `false` (fail closed if any
 ///   position fails schedule construction). Pass `true` to keep a partial
 ///   ladder with issues on the result.
@@ -21,10 +21,12 @@ use wasm_bindgen::prelude::*;
 /// fails schedule construction while `allowPartial` is not `true`, monetary
 /// cash-flow aggregation overflows, or the aggregate cannot be converted to
 /// a JavaScript value.
-#[wasm_bindgen(js_name = aggregateFullCashflows)]
+/// @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
+#[wasm_bindgen(js_name = aggregateFullCashflows, unchecked_return_type = "PortfolioCashflows")]
 pub fn aggregate_full_cashflows(
     portfolio: &JsPortfolio,
     market: &JsMarketContext,
+    #[wasm_bindgen(js_name = "allowPartial", unchecked_optional_param_type = "boolean")]
     allow_partial: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let allow_partial = js_opt_bool(allow_partial.as_ref(), "allowPartial")?;
@@ -45,7 +47,7 @@ pub fn aggregate_full_cashflows(
 ///
 /// Mirrors Python `net_in_currency_by_date` (Rust
 /// `cashflows::net_in_currency_by_date_json`).
-/// @param cashflows_json - `PortfolioCashflows` from `aggregateFullCashflows` (object or JSON), or a bare `{date: {ccy: {kind: money}}}` map.
+/// @param cashflowsJson - `PortfolioCashflows` from `aggregateFullCashflows` (object or JSON), or a bare `{date: {ccy: {kind: money}}}` map.
 /// @param currency - ISO-4217 code selecting which per-date currency bucket to net.
 /// @returns `[isoDate, netAmount]` pairs sorted by date; dates with no flows in `currency` are omitted.
 ///
@@ -53,10 +55,14 @@ pub fn aggregate_full_cashflows(
 ///
 /// Throws with kind `validation` if the input is not JSON, `currency` is not
 /// a known ISO code, or `by_date` is not an object.
-#[wasm_bindgen(js_name = netInCurrencyByDate)]
+#[wasm_bindgen(js_name = netInCurrencyByDate, unchecked_return_type = "[string, number][]")]
 pub fn net_in_currency_by_date(
+    #[wasm_bindgen(
+        js_name = "cashflowsJson",
+        unchecked_param_type = "PortfolioCashflows | string"
+    )]
     cashflows_json: JsValue,
-    currency: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
 ) -> Result<JsValue, JsValue> {
     let rows = finstack_quant_portfolio::cashflows::net_in_currency_by_date_json(
         &json_text(&cashflows_json, "cashflowsJson")?,
@@ -72,23 +78,32 @@ pub fn net_in_currency_by_date(
 /// (Rust `PortfolioCashflows::collapse_to_base_by_date_kind`): each flow is
 /// converted at the CIP forward `F(T) = S × DF_from(T) / DF_base(T)` from the
 /// `asOf` spot.
-/// @param cashflows_json - `PortfolioCashflows` from `aggregateFullCashflows` (object or JSON).
+/// @param cashflowsJson - `PortfolioCashflows` from `aggregateFullCashflows` (object or JSON).
 /// @param market - `core.MarketContext` handle supplying the FX matrix and discount curves.
-/// @param base_currency - ISO-4217 reporting currency.
-/// @param as_of - ISO-8601 valuation date for spot FX and the start of each discount interval.
-/// @param discount_curves - Optional `{ currency: curveId }` map; a missing entry uses the ISO code as the curve id.
+/// @param baseCurrency - ISO-4217 reporting currency.
+/// @param asOf - ISO-8601 valuation date for spot FX and the start of each discount interval.
+/// @param discountCurves - Optional `{ currency: curveId }` map; a missing entry uses the ISO code as the curve id.
 /// @returns Nested `{ isoDate: { kind: Money } }` ladder in the base currency.
 ///
 /// # Errors
 ///
 /// Throws if an input is malformed, an FX rate or discount factor needed for a
 /// conversion is missing or invalid, or monetary aggregation fails.
-#[wasm_bindgen(js_name = collapseToBaseByDateKind)]
+#[wasm_bindgen(js_name = collapseToBaseByDateKind, unchecked_return_type = "Record<string, Record<string, MoneyValue>>")]
 pub fn collapse_to_base_by_date_kind(
+    #[wasm_bindgen(
+        js_name = "cashflowsJson",
+        unchecked_param_type = "PortfolioCashflows | string"
+    )]
     cashflows_json: JsValue,
     market: &JsMarketContext,
+    #[wasm_bindgen(js_name = "baseCurrency", unchecked_param_type = "string")]
     base_currency: JsValue,
-    as_of: JsValue,
+    #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
+    #[wasm_bindgen(
+        js_name = "discountCurves",
+        unchecked_optional_param_type = "Record<string, string> | null"
+    )]
     discount_curves: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let cashflows: finstack_quant_portfolio::cashflows::PortfolioCashflows =

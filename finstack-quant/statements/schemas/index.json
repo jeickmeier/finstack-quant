@@ -1,6 +1,15 @@
 {
   "artifacts": [
     {
+      "$id": "https://finstack_quant.dev/schemas/statements/1/bond_convention_params.schema.json",
+      "bytes": 25481,
+      "kind": "input",
+      "path": "schemas/statements/1/bond_convention_params.schema.json",
+      "summary": "Identity, notional, decimal coupon, dates, regional convention and discount curve of a capital-structure bond.",
+      "title": "BondConventionParams",
+      "type_name": "BondConventionParams"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json",
       "bytes": 22797,
       "kind": "input",
@@ -89,6 +98,24 @@
       "summary": "Evaluated node values per period, with policy stamps.",
       "title": "StatementResult",
       "type_name": "StatementResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements/1/swap_conventions.schema.json",
+      "bytes": 21689,
+      "kind": "input",
+      "path": "schemas/statements/1/swap_conventions.schema.json",
+      "summary": "Fixed and floating leg frequencies and day counts plus the business-day convention of a capital-structure swap.",
+      "title": "SwapConventions",
+      "type_name": "SwapConventions"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements/1/swap_params.schema.json",
+      "bytes": 22741,
+      "kind": "input",
+      "path": "schemas/statements/1/swap_params.schema.json",
+      "summary": "Identity, notional, decimal fixed rate, dates and curves of a capital-structure pay-fixed swap.",
+      "title": "SwapParams",
+      "type_name": "SwapParams"
     }
   ],
   "schema_index_version": 1

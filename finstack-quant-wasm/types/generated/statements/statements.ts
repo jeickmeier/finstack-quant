@@ -1166,6 +1166,28 @@ export type ProtectionWindow =
       };
     };
 /**
+ * Standard bond market conventions by region/issuer.
+ *
+ * Each variant provides market-standard defaults for day count, frequency,
+ * settlement days, and other conventions. Use [`BondConvention::settlement_days`]
+ * to get the standard settlement lag for each market.
+ *
+ * # Market Standards Reference
+ *
+ * | Convention | Day Count | Frequency | Settlement | Source |
+ * |------------|-----------|-----------|------------|--------|
+ * | US Treasury | ACT/ACT ICMA | Semi-annual | T+1 | Treasury Direct |
+ * | US Agency | 30/360 | Semi-annual | T+1 | SIFMA |
+ * | US Corporate | 30/360 | Semi-annual | T+1 | SIFMA (May 2024) |
+ * | EUR Corporate | ACT/ACT ICMA | Annual | T+2 | ICMA / TARGET2 |
+ * | German Bund | ACT/ACT ICMA | Annual | T+2 | Eurex |
+ * | UK Gilt | ACT/ACT ICMA | Semi-annual | T+1 | DMO |
+ * | French OAT | ACT/ACT ICMA | Annual | T+2 | AFT |
+ * | JGB | ACT/365F | Semi-annual | T+2 | JSCC (cross-border) |
+ */
+export type BondConvention =
+  "us_treasury" | "us_agency" | "german_bund" | "uk_gilt" | "french_oat" | "jgb" | "us_corporate" | "eur_corporate";
+/**
  * What a bootstrap resamples from its historical series.
  */
 export type ForecastBootstrapMode = "growth" | "diff";
@@ -4050,6 +4072,39 @@ export interface ScenarioPricingOverrides {
    * curve) bonds, shock the hazard curve instead (e.g. a par-CDS curve bump).
    */
   scenario_spread_shock_bp?: number | null;
+}
+/**
+ * Identity, notional, decimal coupon, dates, regional convention and discount curve of a capital-structure bond.
+ */
+export interface BondConventionParams {
+  /**
+   * Regional preset controlling coupon frequency, day count, and calendar.
+   */
+  convention: BondConvention;
+  /**
+   * Typed annual decimal coupon rate, such as 0.03 for 3%.
+   */
+  coupon_rate: number;
+  /**
+   * Discount-curve lookup identifier used during market-aware evaluation.
+   */
+  discount_curve_id: string;
+  /**
+   * Capital-structure identifier; market-aware evaluation rejects duplicates.
+   */
+  id: string;
+  /**
+   * Bond issue date (ISO `YYYY-MM-DD`), strictly before maturity.
+   */
+  issue_date: DateWire;
+  /**
+   * Final contractual bond maturity date (ISO `YYYY-MM-DD`).
+   */
+  maturity_date: DateWire;
+  /**
+   * Principal in the tagged currency's major units.
+   */
+  notional: Money;
 }
 /**
  * Parameters of [`ForecastParameters::Bootstrap`].
@@ -7639,4 +7694,64 @@ export interface StatementResult {
    * Required wire-format schema version. Only numeric `1` is accepted.
    */
   schema_version: SchemaVersion;
+}
+/**
+ * Fixed and floating leg frequencies and day counts plus the business-day convention of a capital-structure swap.
+ */
+export interface SwapConventions {
+  /**
+   * Schedule-date rolling rule on the currency's settlement calendar;
+   * omitted on the wire it takes the [`BusinessDayConvention`] default,
+   * Modified Following.
+   */
+  business_day_convention?: BusinessDayConvention;
+  /**
+   * Fixed-leg accrual year-fraction convention.
+   */
+  fixed_day_count: DayCount;
+  /**
+   * Contractual fixed-leg payment cadence.
+   */
+  fixed_frequency: Tenor;
+  /**
+   * Floating-leg accrual year-fraction convention.
+   */
+  float_day_count: DayCount;
+  /**
+   * Contractual floating-leg payment and fixing cadence.
+   */
+  float_frequency: Tenor;
+}
+/**
+ * Identity, notional, decimal fixed rate, dates and curves of a capital-structure pay-fixed swap.
+ */
+export interface SwapParams {
+  /**
+   * Discount-curve lookup identifier used at evaluation.
+   */
+  discount_curve_id: string;
+  /**
+   * Finite annual fixed-leg decimal rate, such as 0.04 for 4%.
+   */
+  fixed_rate: number;
+  /**
+   * Floating forward-curve identifier, coherent with simple term-index compounding.
+   */
+  forward_curve_id: string;
+  /**
+   * Capital-structure identifier; market-aware evaluation rejects duplicates.
+   */
+  id: string;
+  /**
+   * Final contractual swap maturity date (ISO `YYYY-MM-DD`).
+   */
+  maturity_date: DateWire;
+  /**
+   * Swap notional in the tagged currency's major units.
+   */
+  notional: Money;
+  /**
+   * Effective accrual start date (ISO `YYYY-MM-DD`), strictly before maturity.
+   */
+  start_date: DateWire;
 }

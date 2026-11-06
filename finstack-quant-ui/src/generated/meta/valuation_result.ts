@@ -3075,7 +3075,7 @@ export default [
   {
     "path": "#/$defs/d_ccd53ca701e8c5bb4008",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/FxValuationDetails",
-    "description": "Metadata for FX-bearing valuation paths (FX forwards, FX options, quanto).\n\nCaptures the FX policy applied at pricing time so downstream audit /\nreconciliation can trace whether a quoted rate came from a direct\nmarket quote or via triangulation through the matrix pivot currency.\nMirrors the cross-cutting invariant documented in\n`.claude/rules/project-description.md` (\"FX policy visibility: Applied\nconversion strategy recorded per layer (e.g., valuations, statements,\nportfolio)\")."
+    "description": "Metadata for FX-bearing valuation paths (FX forwards, FX options, quanto).\n\nCaptures the FX policy applied at pricing time so downstream audit /\nreconciliation can trace whether a quoted rate came from a direct\nmarket quote or via triangulation through the matrix pivot currency.\nMirrors the \"FX policy visibility\" invariant in `ARCHITECTURE.md`: the\napplied conversion strategy is recorded per layer (valuations, statements,\nportfolio)."
   },
   {
     "path": "#/$defs/d_ccd53ca701e8c5bb4008/properties/fx_triangulated",

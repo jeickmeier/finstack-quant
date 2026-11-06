@@ -153,7 +153,6 @@ fn hw1f_caplet_forward_rate_normal_vol(kappa: f64, sigma: f64, t_fix: f64, accru
 #[pyfunction]
 #[pyo3(signature = (kappa, sigma, periods, strike, is_cap, discount_curve, forward_curve))]
 #[pyo3(text_signature = "(kappa, sigma, periods, strike, is_cap, discount_curve, forward_curve)")]
-#[allow(clippy::too_many_arguments)]
 fn hw1f_cap_floor_price(
     kappa: f64,
     sigma: f64,

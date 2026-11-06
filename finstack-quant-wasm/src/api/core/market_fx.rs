@@ -17,6 +17,14 @@ use finstack_quant_core::money::fx::{
 use wasm_bindgen::prelude::*;
 
 /// Typed FX conversion policy wrapper for WASM callers.
+///
+/// @example
+/// ```typescript
+/// import init, { core } from "finstack-quant-wasm";
+/// await init();
+/// const policy = core.FxConversionPolicy.cashflowDate();
+/// console.log(policy.toString());
+/// ```
 #[wasm_bindgen(js_name = FxConversionPolicy)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct JsFxConversionPolicy {
@@ -35,6 +43,7 @@ impl JsFxConversionPolicy {
     }
 
     /// Use spot/forward on the cashflow date.
+    /// @returns An `FxConversionPolicy` handle.
     #[wasm_bindgen(js_name = cashflowDate)]
     pub fn cashflow_date() -> Self {
         Self {
@@ -43,6 +52,7 @@ impl JsFxConversionPolicy {
     }
 
     /// Use period end date.
+    /// @returns An `FxConversionPolicy` handle.
     #[wasm_bindgen(js_name = periodEnd)]
     pub fn period_end() -> Self {
         Self {
@@ -51,6 +61,7 @@ impl JsFxConversionPolicy {
     }
 
     /// Use an average over the period.
+    /// @returns An `FxConversionPolicy` handle.
     #[wasm_bindgen(js_name = periodAverage)]
     pub fn period_average() -> Self {
         Self {
@@ -65,8 +76,11 @@ impl JsFxConversionPolicy {
     ///
     /// Throws a JavaScript exception unless `name` is `cashflow_date`,
     /// `period_end`, or `period_average`.
+    /// @returns An `FxConversionPolicy` handle.
     #[wasm_bindgen(js_name = fromName)]
-    pub fn from_name(name: JsValue) -> Result<Self, JsValue> {
+    pub fn from_name(
+        #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
+    ) -> Result<Self, JsValue> {
         let name: &str = &js_string(&name, "name")?;
         Ok(Self {
             inner: name.parse().map_err(to_js_err)?,
@@ -74,6 +88,7 @@ impl JsFxConversionPolicy {
     }
 
     /// String form of the conversion policy.
+    /// @returns Human-readable string form of this value.
     #[wasm_bindgen(js_name = toString)]
     #[allow(clippy::inherent_to_string)]
     pub fn to_string(&self) -> String {
@@ -82,6 +97,21 @@ impl JsFxConversionPolicy {
 }
 
 /// Structured FX lookup result for WASM callers.
+///
+/// @example
+/// ```typescript
+/// import init, { core } from "finstack-quant-wasm";
+/// await init();
+/// const matrix = new core.FxMatrix();
+/// matrix.setQuotes([["EUR", "USD", 1.1]]);
+/// const result = matrix.rate(
+///   "EUR",
+///   "USD",
+///   "2026-01-02",
+///   core.FxConversionPolicy.cashflowDate()
+/// );
+/// console.log(result.rate, result.triangulated);
+/// ```
 #[wasm_bindgen(js_name = FxRateResult)]
 pub struct JsFxRateResult {
     pub(crate) inner: RustFxRateResult,
@@ -118,8 +148,11 @@ impl JsFxRateResult {
     ///
     /// @returns The parsed `FxRateResult`.
     /// @throws If `json` is malformed or has unknown or missing fields.
+    /// @param json - Canonical FxRateResult JSON text or plain object; unknown fields are rejected.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsFxRateResult, JsValue> {
+    pub fn from_json(
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+    ) -> Result<JsFxRateResult, JsValue> {
         from_js_json::<RustFxRateResult>(&json, "json").map(|inner| JsFxRateResult { inner })
     }
 }
@@ -146,6 +179,7 @@ pub struct JsFxQuoteConvention {
 #[wasm_bindgen(js_class = FxQuoteConvention)]
 impl JsFxQuoteConvention {
     /// USD is the quote currency (units of USD per one unit of CCY1).
+    /// @returns An `FxQuoteConvention` handle.
     pub fn direct() -> Self {
         Self {
             inner: RustFxQuoteConvention::Direct,
@@ -153,6 +187,7 @@ impl JsFxQuoteConvention {
     }
 
     /// USD is the base currency (units of CCY2 per one USD).
+    /// @returns An `FxQuoteConvention` handle.
     pub fn indirect() -> Self {
         Self {
             inner: RustFxQuoteConvention::Indirect,
@@ -165,8 +200,11 @@ impl JsFxQuoteConvention {
     /// # Errors
     ///
     /// Throws a JavaScript exception unless `name` is `direct` or `indirect`.
+    /// @returns An `FxQuoteConvention` handle.
     #[wasm_bindgen(js_name = fromName)]
-    pub fn from_name(name: JsValue) -> Result<Self, JsValue> {
+    pub fn from_name(
+        #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
+    ) -> Result<Self, JsValue> {
         let name: &str = &js_string(&name, "name")?;
         Ok(Self {
             inner: name.parse().map_err(to_js_err)?,
@@ -174,6 +212,7 @@ impl JsFxQuoteConvention {
     }
 
     /// String form of the USD quotation style (`"direct"` or `"indirect"`).
+    /// @returns Human-readable string form of this value.
     #[wasm_bindgen(js_name = toString)]
     #[allow(clippy::inherent_to_string)]
     pub fn to_string(&self) -> String {
@@ -254,7 +293,10 @@ impl JsFxPairConvention {
 /// Throws a JavaScript exception if either code is not a recognized ISO-4217
 /// alphabetic currency.
 #[wasm_bindgen(js_name = fxPairConvention)]
-pub fn fx_pair_convention(base: JsValue, quote: JsValue) -> Result<JsFxPairConvention, JsValue> {
+pub fn fx_pair_convention(
+    #[wasm_bindgen(unchecked_param_type = "string")] base: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] quote: JsValue,
+) -> Result<JsFxPairConvention, JsValue> {
     let base = js_currency(&base, "base")?;
     let quote = js_currency(&quote, "quote")?;
     Ok(JsFxPairConvention {
@@ -272,12 +314,23 @@ pub fn fx_pair_convention(base: JsValue, quote: JsValue) -> Result<JsFxPairConve
 /// Throws a `validation` error if `rate` is non-finite, zero or negative, or
 /// its reciprocal overflows.
 #[wasm_bindgen(js_name = invertFxRate)]
-pub fn invert_fx_rate(rate: JsValue) -> Result<f64, JsValue> {
+pub fn invert_fx_rate(
+    #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
+) -> Result<f64, JsValue> {
     let rate = js_f64(&rate, "rate")?;
     rust_invert_fx_rate(rate).map_err(to_js_err)
 }
 
 /// Foreign-exchange rate matrix for currency conversion.
+///
+/// @example
+/// ```typescript
+/// import init, { core } from "finstack-quant-wasm";
+/// await init();
+/// const matrix = new core.FxMatrix();
+/// matrix.setQuotes([["EUR", "USD", 1.1]]);
+/// console.log(matrix.rate("EUR", "USD", "2026-01-02").rate);
+/// ```
 #[wasm_bindgen(js_name = FxMatrix)]
 pub struct JsFxMatrix {
     pub(crate) inner: Arc<RustFxMatrix>,
@@ -312,8 +365,15 @@ impl JsFxMatrix {
     /// (or its JSON text); `FinstackError` (kind `validation`) for a triple of
     /// the wrong shape, an unknown currency code, or a non-positive or
     /// non-finite rate. On an error none of the batch is applied.
+    /// @param quotes - Array of `[base, quote, rate]` triples: two ISO-4217 currency codes and the finite, strictly positive number of quote units per one base unit.
     #[wasm_bindgen(js_name = setQuotes)]
-    pub fn set_quotes(&self, quotes: JsValue) -> Result<(), JsValue> {
+    pub fn set_quotes(
+        &self,
+        #[wasm_bindgen(
+            unchecked_param_type = "readonly (readonly [string, string, number])[] | string"
+        )]
+        quotes: JsValue,
+    ) -> Result<(), JsValue> {
         let quotes = from_js_json::<Vec<(String, String, f64)>>(&quotes, "quotes")?
             .into_iter()
             .map(|(base, quote, rate)| {
@@ -341,8 +401,11 @@ impl JsFxMatrix {
     /// @throws `TypeError` (kind `invalid_type`) if `quotes` is not a plain
     /// object or JSON text; `FinstackError` (kind `validation`) for a malformed
     /// pair key, an unknown currency code, or a non-positive or non-finite rate.
+    /// @param quotes - Plain object (or its JSON text) mapping a pair to its rate, such as `{ "EUR/USD": 1.1, "GBPUSD": 1.27 }`. A key is `"BASE/QUOTE"` or the six-letter compact form; the rate is the finite, strictly positive number of quote units per one base unit.
     #[wasm_bindgen(js_name = fromDict)]
-    pub fn from_dict(quotes: JsValue) -> Result<JsFxMatrix, JsValue> {
+    pub fn from_dict(
+        #[wasm_bindgen(unchecked_param_type = "Record<string, number> | string")] quotes: JsValue,
+    ) -> Result<JsFxMatrix, JsValue> {
         let quotes = from_js_json::<std::collections::BTreeMap<String, f64>>(&quotes, "quotes")?
             .into_iter()
             .map(|(pair, rate)| {
@@ -373,11 +436,11 @@ impl JsFxMatrix {
     #[wasm_bindgen(js_name = setQuoteOn)]
     pub fn set_quote_on(
         &self,
-        base: JsValue,
-        quote: JsValue,
-        date: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] base: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] quote: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] date: JsValue,
         policy: &JsFxConversionPolicy,
-        rate: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
     ) -> Result<(), JsValue> {
         let rate = js_f64(&rate, "rate")?;
         self.inner
@@ -410,11 +473,18 @@ impl JsFxMatrix {
     /// Throws a JavaScript exception if either currency code or `date` is invalid,
     /// no direct, inverse, or triangulated quote is available, or a resolved quote
     /// is non-finite or non-positive.
+    /// @param base - Base (from) currency ISO code.
+    /// @param quote - Quote (to) currency ISO code.
+    /// @param date - ISO date string.
+    /// @param policy - Reusable conversion policy handle; omitted means the Rust default (cashflow date).
+    /// @returns Resolved FX rate, including whether it was triangulated.
     pub fn rate(
         &self,
-        base: JsValue,
-        quote: JsValue,
-        date: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] base: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] quote: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] date: JsValue,
+        // The facade (exports/core.js) defaults an omitted policy.
+        #[wasm_bindgen(unchecked_optional_param_type = "FxConversionPolicy")]
         policy: &JsFxConversionPolicy,
     ) -> Result<JsFxRateResult, JsValue> {
         let query = FxQuery::new(

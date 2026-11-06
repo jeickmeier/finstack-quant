@@ -6,6 +6,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
+use finstack_quant_models::monte_carlo::payoff::barrier::BarrierOptionParams;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, expect_inst,
@@ -165,18 +166,18 @@ pub(crate) fn barrier_payoff(
     monitoring: finstack_quant_models::monte_carlo::payoff::barrier::BarrierMonitoring,
     r: f64,
 ) -> BarrierOptionPayoff {
-    let payoff = BarrierOptionPayoff::new(
-        inst.strike,
-        inst.barrier,
-        inst.barrier_type,
-        inst.option_type,
-        inst.rebate.map(|m| m.amount() / inst.quantity),
-        inst.quantity,
-        time_grid.num_steps(),
+    let payoff = BarrierOptionPayoff::new(BarrierOptionParams {
+        strike: inst.strike,
+        barrier: inst.barrier,
+        barrier_type: inst.barrier_type,
+        option_type: inst.option_type,
+        rebate: inst.rebate.map(|m| m.amount() / inst.quantity),
+        notional: inst.quantity,
+        maturity_step: time_grid.num_steps(),
         sigma,
         time_grid,
         monitoring,
-    );
+    });
     if wants_at_hit_rebate(inst) {
         payoff.with_rebate_at_hit(r)
     } else {
@@ -248,7 +249,7 @@ impl BarrierOptionMcPricer {
 
         // Price using path-dependent pricer (using vol surface time basis for simulation)
         let pricer = PathDependentPricer::new(config);
-        let result = pricer.price_with_grid(
+        let result = pricer.price(
             &process,
             spot,
             time_grid,

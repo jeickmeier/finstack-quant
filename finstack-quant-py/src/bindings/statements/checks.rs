@@ -270,7 +270,6 @@ impl PyFormulaCheckSpec {
         signature = (id, name, formula, message_template, category, severity, tolerance=None),
         text_signature = "(id, name, formula, message_template, category, severity, tolerance=None)"
     )]
-    #[allow(clippy::too_many_arguments)]
     fn new(
         id: String,
         name: String,

@@ -25,6 +25,9 @@ use wasm_bindgen::prelude::*;
 /// @returns A `RatingLevel` plain object with `name`, `score` and `min_score`.
 /// @throws `TypeError` (kind `invalid_type`) for a non-string name or non-number
 /// score; `FinstackError` (kind `validation`) for a blank name or invalid score.
+/// @param name - Nonblank rating label, retained verbatim (for example `"AAA"`).
+/// @param score - Finite representative score in the inclusive range `[0, 100]`.
+/// @param minScore - Finite minimum qualifying score in `[0, 100]`.
 /// @example
 /// ```typescript
 /// import init, { core } from "finstack-quant-wasm";
@@ -32,11 +35,11 @@ use wasm_bindgen::prelude::*;
 /// const level = core.ratingLevelTryNew("AAA", 95, 90);
 /// console.log(level.min_score); // 90
 /// ```
-#[wasm_bindgen(js_name = ratingLevelTryNew)]
+#[wasm_bindgen(js_name = ratingLevelTryNew, unchecked_return_type = "RatingLevel")]
 pub fn rating_level_try_new(
-    name: JsValue,
-    score: JsValue,
-    min_score: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] score: JsValue,
+    #[wasm_bindgen(js_name = "minScore", unchecked_param_type = "number")] min_score: JsValue,
 ) -> Result<JsValue, JsValue> {
     to_js_value(
         &RatingLevel::try_new(
@@ -61,6 +64,9 @@ pub fn rating_level_try_new(
 /// @throws `TypeError` (kind `invalid_type`) for mistyped string arguments;
 /// `FinstackError` (kind `validation`) for malformed, empty, duplicated, out-of-range
 /// or incorrectly ordered rating data. Description precedes ratings as in Rust.
+/// @param scaleName - Display name stored verbatim and used in validation messages.
+/// @param description - Optional description; pass `null` or `undefined` for none.
+/// @param ratings - Nonempty array (or its JSON text) of `RatingLevel` objects; names must be unique and both score and minimum score must strictly descend.
 /// @example
 /// ```typescript
 /// import init, { core } from "finstack-quant-wasm";
@@ -71,11 +77,11 @@ pub fn rating_level_try_new(
 /// ]);
 /// console.log(scale.ratings.length); // 2
 /// ```
-#[wasm_bindgen(js_name = scorecardScaleTryNew)]
+#[wasm_bindgen(js_name = scorecardScaleTryNew, unchecked_return_type = "ScorecardScale")]
 pub fn scorecard_scale_try_new(
-    scale_name: JsValue,
-    description: JsValue,
-    ratings: JsValue,
+    #[wasm_bindgen(js_name = "scaleName", unchecked_param_type = "string")] scale_name: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string | null | undefined")] description: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "ReadonlyArray<RatingLevel> | string")] ratings: JsValue,
 ) -> Result<JsValue, JsValue> {
     to_js_value(
         &ScorecardScale::try_new(
@@ -144,8 +150,11 @@ impl JsUnknownScalePolicy {
     /// @returns The matching `UnknownScalePolicy`.
     /// @throws `TypeError` (kind `invalid_type`) if `name` is not a string;
     /// `FinstackError` (kind `validation`) if no policy matches.
+    /// @param name - Policy name: `"error"`, `"fallback_to_default"` or `"warn_and_fallback"`, in any ASCII case.
     #[wasm_bindgen(js_name = fromName)]
-    pub fn from_name(name: JsValue) -> Result<JsUnknownScalePolicy, JsValue> {
+    pub fn from_name(
+        #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
+    ) -> Result<JsUnknownScalePolicy, JsValue> {
         js_string(&name, "name")?
             .parse()
             .map(Self::from_inner)
@@ -171,8 +180,11 @@ impl JsUnknownScalePolicy {
     /// @returns The parsed `UnknownScalePolicy`.
     /// @throws `TypeError` if `json` is not a string; `FinstackError` (kind
     /// `validation`) if it is not a quoted policy name.
+    /// @param json - JSON text holding the quoted policy name, such as `"\"warn_and_fallback\""`.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsUnknownScalePolicy, JsValue> {
+    pub fn from_json(
+        #[wasm_bindgen(unchecked_param_type = "string")] json: JsValue,
+    ) -> Result<JsUnknownScalePolicy, JsValue> {
         from_js_json::<UnknownScalePolicy>(&json, "json").map(Self::from_inner)
     }
 
@@ -252,8 +264,12 @@ impl JsRatingScaleRegistry {
     ///
     /// @returns `true` when the registry knows the name.
     /// @throws `TypeError` if `name` is not a string.
+    /// @param name - Canonical id (`sp` or `moodys`); surrounding whitespace and ASCII case are ignored.
     #[wasm_bindgen(js_name = isKnownRatingScale)]
-    pub fn is_known_rating_scale(&self, name: JsValue) -> Result<bool, JsValue> {
+    pub fn is_known_rating_scale(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
+    ) -> Result<bool, JsValue> {
         Ok(self.inner.is_known_rating_scale(&js_string(&name, "name")?))
     }
 
@@ -270,8 +286,12 @@ impl JsRatingScaleRegistry {
     /// `score` and `min_score` on the 0–100 scale.
     /// @throws `TypeError` if `name` is not a string; `FinstackError` if the
     /// name is unknown and the policy is `error`.
-    #[wasm_bindgen(js_name = ratingScale)]
-    pub fn rating_scale(&self, name: JsValue) -> Result<JsValue, JsValue> {
+    /// @param name - Canonical id, ignoring surrounding whitespace and ASCII case; an unknown name returns the default scale under a fallback policy.
+    #[wasm_bindgen(js_name = ratingScale, unchecked_return_type = "ScorecardScale")]
+    pub fn rating_scale(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let scale = self
             .inner
             .rating_scale(&js_string(&name, "name")?)
@@ -299,8 +319,11 @@ impl JsRatingScaleRegistry {
     /// @throws `TypeError` if `json` is not a JSON string or plain object;
     /// `FinstackError` (kind `validation`) if it is malformed or fails
     /// validation.
+    /// @param json - Registry JSON text or plain object, such as `toJson()` output. Validation enforces the schema version, unique normalized scale ids, an existing default scale and in-range scores.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsRatingScaleRegistry, JsValue> {
+    pub fn from_json(
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+    ) -> Result<JsRatingScaleRegistry, JsValue> {
         RatingScaleRegistry::from_json(&json_text(&json, "json")?)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
@@ -331,6 +354,7 @@ pub fn embedded_registry() -> Result<JsRatingScaleRegistry, JsValue> {
 /// @returns The validated `RatingScaleRegistry`.
 /// @throws `FinstackError` (kind `validation`) if the extension section is
 /// malformed or fails registry validation.
+/// @param config - Configuration to read; when its extensions hold the `ratingScalesExtensionKey()` section, that section replaces the embedded registry, otherwise the embedded registry is returned.
 #[wasm_bindgen(js_name = registryFromConfig)]
 pub fn registry_from_config(config: &JsFinstackConfig) -> Result<JsRatingScaleRegistry, JsValue> {
     rust_registry_from_config(&config.inner)

@@ -125,9 +125,7 @@ class CdsIndex:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
-        market_history: MarketHistory | dict[str, Any] | str | None = None,
-        explain: bool = False,
+        extras: dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this instrument and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -144,15 +142,19 @@ class CdsIndex:
             Model key (``"hazard_rate"`` is the native model).
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
-        metric_pricing_overrides : MetricPricingOverrides | dict[str, Any] | str, optional
-            Metric-time overrides merged into
-            ``instrument.spec.metric_pricing_overrides`` before pricing
-            (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
-        market_history : MarketHistory | dict[str, Any] | str, optional
-            ``MarketHistory`` scenarios required by ``hvar`` /
-            ``expected_shortfall``.
-        explain : bool, default False
-            When ``True``, attach a step trace as ``result.explanation``.
+        extras : dict[str, Any] or str, optional
+            The rarer pricing inputs, as a dict or JSON text in the shape of the
+            Rust ``PriceExtras``; every key is optional and an unknown key raises
+            ``ValueError``. ``metric_pricing_overrides`` (a ``MetricPricingOverrides``
+            or dict) is merged into ``instrument.spec.metric_pricing_overrides``
+            before pricing (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``):
+            only the keys present replace stored controls, ``bump_config`` keys
+            merge into the stored bump configuration and an explicit ``None``
+            clears a control; omitted keeps the instrument's overrides. ``market_history`` (a ``MarketHistory`` or dict)
+            holds the historical scenarios ``hvar`` and ``expected_shortfall``
+            require; omitted prices without history. ``explain`` (bool, default
+            ``False``) attaches a step trace as ``result.explanation`` when
+            ``True``. ``None`` (the default) means no extras.
 
         Returns
         -------
@@ -282,8 +284,8 @@ class CdsIndex:
         dict[str, object]
             Bump sizes, theta period and the other metric settings stored on
             the instrument; unset fields are ``None`` or omitted. A
-            ``metric_pricing_overrides`` argument to ``price`` is merged over it
-            per call.
+            ``price(..., extras={"metric_pricing_overrides": ...})`` patch is
+            merged over it per call.
 
         Notes
         -----
@@ -347,17 +349,7 @@ class CdsIndex:
         """
         ...
     @staticmethod
-    def from_preset(
-        preset: CdsIndexParams,
-        id: str,
-        notional: Money,
-        side: Literal["pay", "receive"],
-        start: datetime.date | datetime.datetime | pd.Timestamp | str,
-        end: datetime.date | datetime.datetime | pd.Timestamp | str,
-        recovery_rate: float,
-        discount_curve_id: str,
-        credit_curve_id: str,
-    ) -> CdsIndex:
+    def from_preset(preset: CdsIndexParams, params: dict[str, Any] | str) -> CdsIndex:
         """
         Build an index trade from a standardized preset (mirrors Rust
         ``CdsIndex::from_preset``): the premium leg takes the preset's fixed
@@ -369,22 +361,20 @@ class CdsIndex:
         ----------
         preset : CdsIndexParams
             Index identity, coupon and convention (e.g. :meth:`CdsIndexParams.cdx_na_ig`).
-        id : str
-            Unique instrument identifier for the trade.
-        notional : Money
-            Index notional.
-        side : {"pay", "receive"}
-            ``"pay"`` buys protection, ``"receive"`` sells protection.
-        start : datetime.date | datetime.datetime | pd.Timestamp | str
-            Premium accrual start (typically the last IMM roll).
-        end : datetime.date | datetime.datetime | pd.Timestamp | str
-            Scheduled maturity (an IMM date).
-        recovery_rate : float
-            Assumed recovery as a fraction (``0.4`` = 40%).
-        discount_curve_id : str
-            Discount curve identifier.
-        credit_curve_id : str
-            Index hazard curve identifier.
+        params : dict[str, Any] | str
+            ``CdsTradeParams`` trade terms as a dict or JSON text. Every key is
+            required:
+
+            - ``id`` (str): unique instrument identifier for the trade.
+            - ``notional`` (Money | dict): index notional, a ``Money`` or its wire dict ``{"amount": "1000000", "currency": "USD"}``.
+            - ``side`` (str): ``"pay"`` buys protection, ``"receive"`` sells it.
+            - ``start`` (datetime.date | str): ISO 8601 date: premium accrual start (typically the last
+              IMM roll).
+            - ``end`` (datetime.date | str): ISO 8601 date: scheduled maturity (an IMM date).
+            - ``recovery_rate`` (float): assumed recovery as a fraction
+              (``0.4`` = 40%).
+            - ``discount_curve_id`` (str): discount curve identifier.
+            - ``credit_curve_id`` (str): index hazard curve identifier.
 
         Returns
         -------
@@ -394,7 +384,7 @@ class CdsIndex:
         Raises
         ------
         ValueError
-            If ``side`` is unknown, a date cannot be interpreted, or the preset
+            If ``params`` has a missing, unknown or malformed key, or the preset
             coupon is not representable.
 
         Examples
@@ -404,14 +394,16 @@ class CdsIndex:
         >>> from finstack_quant.valuations.instruments import CdsIndex, CdsIndexParams
         >>> idx = CdsIndex.from_preset(
         ...     CdsIndexParams.cdx_na_ig(42, 1, 100.0),
-        ...     "CDX-42-5Y",
-        ...     Money(10_000_000.0, Currency("USD")),
-        ...     "pay",
-        ...     "2024-03-20",
-        ...     "2029-06-20",
-        ...     0.4,
-        ...     "USD-OIS",
-        ...     "CDX.NA.IG.HAZARD",
+        ...     {
+        ...         "id": "CDX-42-5Y",
+        ...         "notional": Money(10_000_000.0, Currency("USD")),
+        ...         "side": "pay",
+        ...         "start": "2024-03-20",
+        ...         "end": "2029-06-20",
+        ...         "recovery_rate": 0.4,
+        ...         "discount_curve_id": "USD-OIS",
+        ...         "credit_curve_id": "CDX.NA.IG.HAZARD",
+        ...     },
         ... )
         >>> (idx.convention, idx.num_constituents, idx.index_factor)
         ('isda_na', 125, 1.0)
@@ -788,12 +780,12 @@ class CdsIndexBuilder:
     ... )
     >>> from finstack_quant.cashflows.builder import RollRule
     >>> premium = PremiumLegSpec(
-    ...     datetime.date(2024, 3, 20),
-    ...     datetime.date(2029, 6, 20),
-    ...     Tenor.quarterly(),
-    ...     DayCount.ACT_360,
-    ...     100.0,
-    ...     "USD-OIS",
+    ...     start=datetime.date(2024, 3, 20),
+    ...     end=datetime.date(2029, 6, 20),
+    ...     frequency=Tenor.quarterly(),
+    ...     day_count=DayCount.ACT_360,
+    ...     coupon_bp="100",
+    ...     discount_curve_id="USD-OIS",
     ...     roll_rule=RollRule.CDS_IMM,
     ... )
     >>> index = (

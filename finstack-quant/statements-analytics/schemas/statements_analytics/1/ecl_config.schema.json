@@ -107,38 +107,44 @@
     },
     "StagingConfig": {
       "additionalProperties": false,
-      "description": "Configuration for IFRS 9 stage classification.\n\nControls the quantitative and qualitative thresholds used in the staging\nwaterfall, plus curing rules for step-down from higher stages.",
+      "description": "Configuration for IFRS 9 stage classification.\n\nControls the quantitative and qualitative thresholds used in the staging\nwaterfall, plus curing rules for step-down from higher stages.\n\nEvery field may be omitted from the serde document: an omitted field takes\nits value from [`StagingConfig::default`] (the embedded default IFRS 9\npolicy). An explicit `null` `pd_delta_relative` disables the relative\ntrigger. Unknown keys are rejected.",
       "properties": {
         "cure_periods_stage2_to_1": {
+          "default": 3,
           "description": "Curing configuration: minimum consecutive performing periods\nrequired to move from Stage 2 back to Stage 1. Default: 3.\n\nThe default is a pragmatic 3-period observation window; EBA\nGL on default uses a 3-month probation for Stage 2 → 1 (see\nEBA/GL/2016/07 §32).",
           "format": "uint32",
           "minimum": 0,
           "type": "integer"
         },
         "cure_periods_stage3_to_2": {
+          "default": 12,
           "description": "Curing configuration: minimum consecutive performing periods\nrequired to move from Stage 3 to Stage 2. Default: 12.\n\nThe default matches the EBA GL on default probation window of\n12 months for cure out of default (EBA/GL/2016/07 §71–§72). If\nyour internal policy uses a shorter probation, override this\nfield explicitly.",
           "format": "uint32",
           "minimum": 0,
           "type": "integer"
         },
         "dpd_stage2_threshold": {
+          "default": 30,
           "description": "DPD threshold for Stage 2 backstop (IFRS 9 B5.5.19 rebuttable\npresumption). Default: 30.",
           "format": "uint32",
           "minimum": 0,
           "type": "integer"
         },
         "dpd_stage3_threshold": {
+          "default": 90,
           "description": "DPD threshold for Stage 3 (absolute backstop). Default: 90.",
           "format": "uint32",
           "minimum": 0,
           "type": "integer"
         },
         "pd_delta_absolute": {
+          "default": 0.01,
           "description": "Absolute PD increase threshold for SICR (e.g., 0.01 = 1 pp).\nIf the lifetime PD has increased by more than this amount since\norigination, the exposure is classified as Stage 2.",
           "format": "double",
           "type": "number"
         },
         "pd_delta_relative": {
+          "default": 2.0,
           "description": "Relative PD increase threshold for SICR (e.g., 2.0 = PD doubled).\n`Some(threshold)` applies current_pd / origination_pd > threshold;\nthe threshold must be finite and non-negative. `None` disables this\ntrigger. Positive current PD against zero origination PD is undefined\nand errors when this trigger is enabled; both PDs zero mean no increase.\nDefault: `Some(2.0)`.",
           "format": "double",
           "type": [
@@ -147,10 +153,12 @@
           ]
         },
         "qualitative_triggers_enabled": {
+          "default": true,
           "description": "Whether any qualitative SICR flag triggers Stage 2.",
           "type": "boolean"
         },
         "rating_downgrade_notches": {
+          "default": 3,
           "description": "Rating downgrade notches that trigger Stage 2 (IFRS 9 B5.5.17(f):\nexternal credit rating downgrade as a SICR indicator).\n\n[`classify_stage_from_curves`] fires [`StagingTrigger::RatingDowngrade`] when\n`position(current) - position(origination) >= rating_downgrade_notches`\non the configured scale (see [`Self::rating_scale_labels`]). Example:\n3 means a 3-notch downgrade from origination triggers SICR. A `0`\nthreshold disables the trigger entirely.",
           "format": "uint32",
           "minimum": 0,
@@ -168,20 +176,11 @@
           ]
         },
         "stage3_qualitative_triggers_enabled": {
+          "default": true,
           "description": "Whether objective default-evidence flags (bankruptcy,\ndistressed modification, cross-default,\n`other_default_evidence`) trigger Stage 3 classification,\nindependently of the 90 DPD backstop. Defaults to `true`.\n\nDisable only when such triggers are controlled by an upstream\ncredit-event engine that already mapped them into DPD or\nprevious-stage state.",
           "type": "boolean"
         }
       },
-      "required": [
-        "pd_delta_absolute",
-        "rating_downgrade_notches",
-        "dpd_stage2_threshold",
-        "dpd_stage3_threshold",
-        "qualitative_triggers_enabled",
-        "stage3_qualitative_triggers_enabled",
-        "cure_periods_stage2_to_1",
-        "cure_periods_stage3_to_2"
-      ],
       "type": "object"
     }
   },

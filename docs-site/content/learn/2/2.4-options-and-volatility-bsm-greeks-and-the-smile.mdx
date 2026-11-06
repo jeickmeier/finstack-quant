@@ -138,7 +138,17 @@ r = market.get_discount('USD-OIS').zero_rate(expiry)
 spot, strike, q, vol = 5200.0, 5200.0, 0.015, 0.20
 analytical = bs_price(spot, strike, r, q, vol, expiry, True)
 spots = [5200.0, 5220.0, 5190.0, 5230.0, 5210.0, 5240.0]
-g = bs_greeks(spots[0], strike, r, q, vol, expiry, True)
+g = bs_greeks(
+    {
+        "spot": spots[0],
+        "strike": strike,
+        "rate": r,
+        "dividend_yield": q,
+        "volatility": vol,
+        "time_to_expiry": expiry,
+        "option_type": "call",
+    },
+)
 delta = g.delta
 cash = analytical - delta * spots[0]
 wealth, rows = 0.0, []
@@ -152,7 +162,17 @@ for day in range(1, len(spots)):
     before_rebalance = cash + delta * spots[day] - value
     ds = spots[day] - previous_spot
     approximate_pnl = financing + dividends - 0.5 * g.gamma * ds ** 2 - g.theta
-    g = bs_greeks(spots[day], strike, r, q, vol, time_left, True)
+    g = bs_greeks(
+        {
+            "spot": spots[day],
+            "strike": strike,
+            "rate": r,
+            "dividend_yield": q,
+            "volatility": vol,
+            "time_to_expiry": time_left,
+            "option_type": "call",
+        },
+    )
     cash -= (g.delta - delta) * spots[day]
     delta = g.delta
     after_rebalance = cash + delta * spots[day] - value
@@ -175,12 +195,32 @@ import math
 import matplotlib.pyplot as plt
 from finstack_quant.models import bs_price,bs_greeks
 spots=[4000+100*i for i in range(25)]
-greeks=[bs_greeks(s,5200,.04,.015,.20,1.,True) for s in spots]
+greeks=[bs_greeks(
+    {
+        "spot": s,
+        "strike": 5200,
+        "rate": .04,
+        "dividend_yield": .015,
+        "volatility": .20,
+        "time_to_expiry": 1.,
+        "option_type": "call",
+    },
+) for s in spots]
 fig,axes=plt.subplots(2,2,figsize=(9,6))
 for ax,name in zip(axes.flat,('delta','gamma','vega','theta')):
  ax.plot(spots,[getattr(g,name) for g in greeks]);ax.set(xlabel='Spot USD',ylabel=name);ax.grid(alpha=.25)
 fig.tight_layout()
-g=bs_greeks(5200,5200,.04,.015,.20,1.,True)
+g=bs_greeks(
+    {
+        "spot": 5200,
+        "strike": 5200,
+        "rate": .04,
+        "dividend_yield": .015,
+        "volatility": .20,
+        "time_to_expiry": 1.,
+        "option_type": "call",
+    },
+)
 rho_fd=(bs_price(5200,5200,.04001,.015,.20,1.,True)-bs_price(5200,5200,.03999,.015,.20,1.,True))/.00002*.01
 print({'ATM_delta':g.delta,'gamma_per_USD':g.gamma,'vega_per_vol_point':g.vega,'theta_per_day':g.theta,'rho_per_rate_point':g.rho_r})
 ```
@@ -313,7 +353,17 @@ r = market.get_discount('USD-OIS').zero_rate(expiry)
 spot, strike, q, vol = 5200.0, 5200.0, 0.015, 0.20
 analytical = bs_price(spot, strike, r, q, vol, expiry, True)
 spots = [5200.0, 5220.0, 5190.0, 5230.0, 5210.0, 5240.0]
-g = bs_greeks(spots[0], strike, r, q, vol, expiry, True)
+g = bs_greeks(
+    {
+        "spot": spots[0],
+        "strike": strike,
+        "rate": r,
+        "dividend_yield": q,
+        "volatility": vol,
+        "time_to_expiry": expiry,
+        "option_type": "call",
+    },
+)
 delta = g.delta
 cash = analytical - delta * spots[0]
 wealth, rows = 0.0, []
@@ -327,7 +377,17 @@ for day in range(1, len(spots)):
     before_rebalance = cash + delta * spots[day] - value
     ds = spots[day] - previous_spot
     approximate_pnl = financing + dividends - 0.5 * g.gamma * ds ** 2 - g.theta
-    g = bs_greeks(spots[day], strike, r, q, vol, time_left, True)
+    g = bs_greeks(
+        {
+            "spot": spots[day],
+            "strike": strike,
+            "rate": r,
+            "dividend_yield": q,
+            "volatility": vol,
+            "time_to_expiry": time_left,
+            "option_type": "call",
+        },
+    )
     cash -= (g.delta - delta) * spots[day]
     delta = g.delta
     after_rebalance = cash + delta * spots[day] - value
@@ -362,7 +422,7 @@ rf=-math.log(market.get_discount('EUR-OIS').df_between_dates(AS_OF,expiry))/t
 spot=1.08;strike=1.12;forward=spot*math.exp((rd-rf)*t)
 vol=get_fx_delta_vol(market.get_fx_delta_vol_surface('EURUSD-VOL'),t,strike,forward)
 option=(FxOption.builder().id('EURUSD-GK').base_currency(Currency('EUR')).quote_currency(Currency('USD'))
- .strike(strike).option_type('call').delta_convention('forward',Currency('USD'),'generic_interbank')
+ .strike(strike).option_type('call').delta_convention({'kind':'forward','premium_currency':'USD','venue':'generic_interbank'})
  .expiry(expiry).notional(Money(1_000_000,'EUR')).domestic_discount_curve_id('USD-OIS')
  .foreign_discount_curve_id('EUR-OIS').vol_surface_id('EURUSD-VOL').build())
 import json

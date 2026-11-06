@@ -27,17 +27,23 @@ fn build_swaption(as_of: Date) -> BermudanSwaption {
     let first_exercise = Date::from_calendar_date(2026, Month::January, 1).expect("Valid date");
 
     let mut swaption = BermudanSwaption::new(
-        "BERM-LSMC-BENCH",
-        OptionType::Call,
-        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
-        0.03,
-        swap_start,
-        swap_end,
-        BermudanSchedule::co_terminal(first_exercise, swap_end, Tenor::semi_annual())
+        finstack_quant_valuations::instruments::rates::swaption::BermudanSwaptionParams {
+            id: "BERM-LSMC-BENCH".into(),
+            option_type: OptionType::Call,
+            notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+            strike: 0.03,
+            underlying_start_date: swap_start,
+            underlying_maturity: swap_end,
+            exercise_schedule: BermudanSchedule::co_terminal(
+                first_exercise,
+                swap_end,
+                Tenor::semi_annual(),
+            )
             .expect("valid Bermudan schedule"),
-        "USD-OIS",
-        "USD-OIS",
-        "USD-VOL",
+            discount_curve_id: "USD-OIS".into(),
+            forward_curve_id: "USD-OIS".into(),
+            vol_surface_id: "USD-VOL".into(),
+        },
     )
     .expect("valid Bermudan swaption");
     swaption

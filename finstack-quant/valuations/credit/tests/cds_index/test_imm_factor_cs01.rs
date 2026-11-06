@@ -46,14 +46,16 @@ fn imm_20th_schedule_for_index_synthetic() {
 
     let idx = CdsIndex::from_preset(
         &CdsIndexParams::cdx_na_ig(42, 1, 100.0),
-        "CDX-IMM",
-        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-        PayReceive::Pay,
-        start,
-        end,
-        0.40,
-        "USD-OIS",
-        "HZ-IDX",
+        finstack_quant_valuations_credit::cds::CdsTradeParams {
+            id: finstack_quant_core::types::InstrumentId::new("CDX-IMM"),
+            notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            side: PayReceive::Pay,
+            start,
+            end,
+            recovery_rate: 0.40,
+            discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
+            credit_curve_id: finstack_quant_core::types::CurveId::new("HZ-IDX"),
+        },
     )
     .expect("valid test parameters");
     let cds = idx
@@ -106,28 +108,32 @@ fn index_factor_scales_pv() {
 
     let idx_base = CdsIndex::from_preset(
         &preset,
-        "CDX-BASE",
-        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
-        PayReceive::Pay,
-        start,
-        end,
-        rec,
-        "USD-OIS",
-        "HZ-IDX",
+        finstack_quant_valuations_credit::cds::CdsTradeParams {
+            id: finstack_quant_core::types::InstrumentId::new("CDX-BASE"),
+            notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+            side: PayReceive::Pay,
+            start,
+            end,
+            recovery_rate: rec,
+            discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
+            credit_curve_id: finstack_quant_core::types::CurveId::new("HZ-IDX"),
+        },
     )
     .expect("valid test parameters")
     .with_constituents(cons.clone());
 
     let idx_scaled = CdsIndex::from_preset(
         &preset,
-        "CDX-SCALED",
-        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
-        PayReceive::Pay,
-        start,
-        end,
-        rec,
-        "USD-OIS",
-        "HZ-IDX",
+        finstack_quant_valuations_credit::cds::CdsTradeParams {
+            id: finstack_quant_core::types::InstrumentId::new("CDX-SCALED"),
+            notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+            side: PayReceive::Pay,
+            start,
+            end,
+            recovery_rate: rec,
+            discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
+            credit_curve_id: finstack_quant_core::types::CurveId::new("HZ-IDX"),
+        },
     )
     .expect("valid test parameters")
     .with_index_factor(0.8)

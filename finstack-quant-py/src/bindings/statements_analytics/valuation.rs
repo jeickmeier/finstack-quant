@@ -18,14 +18,15 @@ use crate::bindings::pandas_utils::{
 use crate::bindings::statements::checks::PyCheckReport;
 use crate::bindings::statements::evaluator::PyStatementResult;
 use crate::bindings::statements_analytics::checks::{
-    PyCreditMapping, PyThreeStatementMapping, extract_check_suite_spec, extract_credit_mapping,
+    PyCreditMapping, PyThreeStatementMapping, extract_credit_mapping,
     extract_three_statement_mapping,
 };
 use crate::bindings::statements_analytics::typed::PyTornadoEntry;
 use crate::errors::{serde_json_to_py, statements_to_py};
 use finstack_quant_statements_analytics::analysis::{
-    CorporateAnalysis, CorporateValuationResult, DEFAULT_UFCF_NODE, DcfOptions,
-    DcfSensitivityResult, LboCheckMappings, LboConfig, LboResult, WaccInputs,
+    CorporateAnalysis, CorporateAnalysisOptions, CorporateValuationResult, DEFAULT_UFCF_NODE,
+    DcfInputs, DcfOptions, DcfSensitivityResult, LboCheckMappings, LboConfig, LboResult,
+    WaccInputs,
 };
 use finstack_quant_valuations::instruments::equity::dcf_equity::{
     EquityBridge, TerminalValueSpec, ValuationDiscounts,
@@ -657,8 +658,16 @@ impl_repr_html_via_dataframe!(PyDcfSensitivityResult);
 /// Examples
 /// --------
 /// >>> from finstack_quant.statements_analytics import CreditMapping, LboCheckMappings, ThreeStatementMapping
-/// >>> three = ThreeStatementMapping("cash", "re", "ni", ["assets"], ["liabilities"], ["equity"])
-/// >>> m = LboCheckMappings(three, CreditMapping("debt", "ebitda", "interest"))
+/// >>> three = ThreeStatementMapping(
+/// ...     cash_node="cash",
+/// ...     retained_earnings_node="re",
+/// ...     net_income_node="ni",
+/// ...     assets_nodes=["assets"],
+/// ...     liabilities_nodes=["liabilities"],
+/// ...     equity_nodes=["equity"],
+/// ... )
+/// >>> credit = CreditMapping(debt_node="debt", ebitda_node="ebitda", interest_expense_node="interest")
+/// >>> m = LboCheckMappings(three, credit)
 /// >>> m.credit.debt_node
 /// 'debt'
 #[pyclass(
@@ -971,102 +980,19 @@ impl PyCorporateAnalysis {
 
 wire_methods!(PyCorporateAnalysis, CorporateAnalysis, "CorporateAnalysis");
 
-/// Evaluate DCF valuation on a financial model.
-///
-/// Parameters
-/// ----------
-/// model : FinancialModelSpec | str
-///     A ``FinancialModelSpec`` object or a JSON string; metadata must contain
-///     a ``"currency"`` key.
-/// wacc : float
-///     Weighted average cost of capital in decimal form (``0.10`` = 10%).
-/// terminal_value : TerminalValueSpec | dict | str
-///     Terminal value method (typed, serde dict, or tagged JSON such as
-///     ``{"type": "gordon_growth", "stable_growth_rate": 0.02}``).
-/// ufcf_node : str
-///     Node id containing monetary unlevered free cash flow in model currency.
-///     Defaults to the Rust ``DEFAULT_UFCF_NODE`` (``"ufcf"``). Gordon Growth /
-///     H-Model terminal cash flow requires a complete contiguous calendar year
-///     at the end of the forecast.
-/// net_debt_override : float | None
-///     Flat net-debt amount used instead of the model-derived bridge.
-/// options : dict | str | None
-///     The Rust ``DcfOptions`` serde form; every key is optional and a missing
-///     one takes its Rust default: ``mid_year_convention`` (``False``),
-///     ``max_stable_growth_rate`` (``0.05``), ``shares_outstanding``,
-///     ``equity_bridge`` / ``valuation_discounts`` (serde dicts or the typed
-///     ``EquityBridge`` / ``ValuationDiscounts``), ``exit_multiple_metric_node``
-///     (statement monetary flow node whose complete trailing-year sum replaces
-///     ``terminal_metric`` on an exit-multiple terminal) and the sensitivity
-///     knobs. Unknown keys raise ``ValueError``. ``None``
-///     uses every default.
-/// market : MarketContext | str | None
-///     Market context used for statement evaluation (capital-structure curve
-///     lookups); DCF discounting stays WACC-only. Requires ``as_of``.
-/// as_of : datetime.date | str | None
-///     DCF valuation date and, with ``market``, the statement visibility and
-///     market-data date. Defaults to the first forecast boundary. As a
-///     visibility cutoff it hides each actual whose availability date (by
-///     default the period's exclusive end, the first day of the next period) is
-///     after it: a quarter-end ``"2025-03-31"`` hides 2025Q1's actuals, so pass
-///     ``"2025-04-01"`` or set the nodes' ``availability_dates``. Only forecast
-///     periods ending after ``as_of`` are discounted.
-///
-/// Returns
-/// -------
-/// CorporateValuationResult
-///     ``equity_value``, ``enterprise_value``, ``net_debt`` and
-///     ``terminal_value_pv`` as ``Money``; per-share values as floats; and
-///     the DCF working (``wacc``, ``periods``, ``pv_explicit``,
-///     ``terminal_value``, ``terminal_discount_years``, ``equity_bridge``).
-///
-/// Raises
-/// ------
-/// ValueError
-///     If ``market`` is set without ``as_of``, a payload or ``options`` is
-///     malformed, ``as_of`` hides an actual that a value node needs, no
-///     forecast cash flow ends after ``as_of``, or the model, cash-flow node,
-///     exit-multiple node or DCF inputs are invalid.
-/// KeyError
-///     If ``ufcf_node`` or ``exit_multiple_metric_node`` is missing from the model.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.core.money import Money
-/// >>> from finstack_quant.statements import ModelBuilder
-/// >>> from finstack_quant.statements_analytics import TerminalValueSpec, evaluate_dcf
-/// >>> b = ModelBuilder("dcf"); b.periods("2025..2026")
-/// >>> b.value_money("ufcf", [("2025", Money(100.0, "USD")), ("2026", Money(110.0, "USD"))])
-/// >>> b.with_meta("currency", '"USD"')
-/// >>> result = evaluate_dcf(b.build(), 0.10, TerminalValueSpec.gordon_growth(0.02), net_debt_override=0.0)
-/// >>> str(result.enterprise_value.currency)
-/// 'USD'
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "evaluate_dcf")]
 #[pyfunction]
-#[pyo3(signature = (
-    model,
-    wacc,
-    terminal_value,
-    ufcf_node=DEFAULT_UFCF_NODE,
-    net_debt_override=None,
-    options=None,
-    market=None,
-    as_of=None,
-))]
-#[allow(clippy::too_many_arguments)]
+#[pyo3(signature = (model, inputs, options=None, market=None, as_of=None))]
 fn evaluate_dcf<'py>(
     py: Python<'py>,
     model: &Bound<'py, PyAny>,
-    wacc: f64,
-    terminal_value: &Bound<'py, PyAny>,
-    ufcf_node: &str,
-    net_debt_override: Option<f64>,
+    inputs: &Bound<'py, PyAny>,
     options: Option<&Bound<'py, PyAny>>,
     market: Option<&Bound<'py, PyAny>>,
     as_of: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<PyCorporateValuationResult> {
     let model = extract_model_ref(model)?.into_owned();
-    let terminal_value = extract_terminal_value(py, terminal_value)?;
-    let ufcf_node = ufcf_node.to_owned();
+    let inputs: DcfInputs = crate::bindings::module_utils::spec_from_py(py, inputs, "DcfInputs")?;
     let options = extract_dcf_options(py, options)?;
     let market = extract_market_opt(py, market)?;
     let as_of = as_of
@@ -1077,10 +1003,7 @@ fn evaluate_dcf<'py>(
         .detach(move || {
             finstack_quant_statements_analytics::analysis::evaluate_dcf(
                 &model,
-                wacc,
-                terminal_value,
-                &ufcf_node,
-                net_debt_override,
+                &inputs,
                 &options,
                 market.as_ref(),
                 as_of,
@@ -1388,108 +1311,19 @@ fn wacc(inputs: PyWaccInputs) -> PyResult<f64> {
     finstack_quant_statements_analytics::analysis::wacc(&inputs.inner).map_err(statements_to_py)
 }
 
-/// Run the full corporate analysis pipeline.
-///
-/// Evaluates statements and optionally runs DCF equity valuation plus credit
-/// context through the Rust ``run_corporate_analysis`` (the same entry point
-/// WASM ``runCorporateAnalysis`` calls).
-///
-/// Parameters
-/// ----------
-/// model : FinancialModelSpec | str
-///     A ``FinancialModelSpec`` object or a JSON string.
-/// wacc : float | None
-///     Enables DCF valuation at this decimal discount rate when set.
-/// terminal_value : TerminalValueSpec | dict | str | None
-///     Terminal value method; required when ``wacc`` is set.
-/// net_debt_override : float | None
-///     Flat net debt for the equity bridge.
-/// cfads_node : str | None
-///     CFADS numerator required when the model has capital-structure credit
-///     analytics; no EBITDA fallback is applied.
-/// interest_coverage_node : str | None
-///     Earnings numerator used for interest coverage. ``None`` uses the Rust
-///     default, ``"ebitda"``.
-/// check_suite : CheckSuiteSpec | dict | str | None
-///     Check suite required for DCF or credit analysis; must include
-///     ``NonFiniteCheck``.
-/// market : MarketContext | str | None
-///     Market context for statement evaluation (not WACC discounting).
-/// as_of : datetime.date | str | None
-///     Valuation date; required when ``market`` is set.
-/// ltv_value_node : str | None
-///     Monetary statement node supplying a per-period LTV denominator in
-///     reporting currency; scalar, foreign-currency or non-finite values are
-///     rejected. Missing or non-positive values do not supply a denominator.
-///     When omitted, a positive DCF enterprise value is broadcast as a constant
-///     denominator.
-///
-/// Returns
-/// -------
-/// CorporateAnalysis
-///     ``statement`` (``StatementResult``), ``equity``
-///     (``CorporateValuationResult`` or ``None``), ``credit`` (per-instrument
-///     metrics) and ``ev_suppressed_non_positive``.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If ``terminal_value`` is missing while ``wacc`` is set, ``market`` is
-///     set without ``as_of``, a payload is malformed, or the pipeline fails.
-/// KeyError
-///     If a referenced node is missing from the model.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.statements import ModelBuilder
-/// >>> from finstack_quant.statements_analytics import run_corporate_analysis
-/// >>> b = ModelBuilder("m"); b.periods("2024Q1..Q2", None); b.value("revenue", [("2024Q1", 1.0), ("2024Q2", 2.0)])
-/// >>> run_corporate_analysis(b.build()).statement.node_count
-/// 1
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements_analytics._valuation", "run_corporate_analysis")]
 #[pyfunction]
-#[pyo3(signature = (
-    model,
-    wacc=None,
-    terminal_value=None,
-    net_debt_override=None,
-    cfads_node=None,
-    interest_coverage_node=None,
-    check_suite=None,
-    market=None,
-    as_of=None,
-    ltv_value_node=None,
-))]
-#[allow(clippy::too_many_arguments)]
+#[pyo3(signature = (model, options=None, market=None))]
 fn run_corporate_analysis<'py>(
     py: Python<'py>,
     model: &Bound<'py, PyAny>,
-    wacc: Option<f64>,
-    terminal_value: Option<&Bound<'py, PyAny>>,
-    net_debt_override: Option<f64>,
-    cfads_node: Option<&str>,
-    interest_coverage_node: Option<&str>,
-    check_suite: Option<&Bound<'py, PyAny>>,
+    options: Option<&Bound<'py, PyAny>>,
     market: Option<&Bound<'py, PyAny>>,
-    as_of: Option<&Bound<'py, PyAny>>,
-    ltv_value_node: Option<&str>,
 ) -> PyResult<PyCorporateAnalysis> {
     let model = extract_model_ref(model)?.into_owned();
-    let options = finstack_quant_statements_analytics::analysis::CorporateAnalysisOptions {
-        wacc,
-        terminal_value: terminal_value
-            .map(|spec| extract_terminal_value(py, spec))
-            .transpose()?,
-        net_debt_override,
-        cfads_node: cfads_node.map(str::to_owned),
-        interest_coverage_node: interest_coverage_node.map(str::to_owned),
-        check_suite: check_suite
-            .map(|spec| extract_check_suite_spec(py, spec))
-            .transpose()?,
-        as_of: as_of
-            .map(crate::bindings::date_utils::py_to_date)
-            .transpose()?,
-        ltv_value_node: ltv_value_node.map(str::to_owned),
-    };
+    let options: CorporateAnalysisOptions =
+        crate::bindings::module_utils::opt_spec_from_py(py, options, "CorporateAnalysisOptions")?
+            .unwrap_or_default();
     let market = extract_market_opt(py, market)?;
 
     let inner = py

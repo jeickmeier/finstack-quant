@@ -171,25 +171,42 @@ test('booleans are not coerced by truthiness', () => {
 });
 
 test('counts reject negatives, fractions and oversized values before Rust sizes anything', () => {
-  const args = [100, 100, 0.05, 0, 0.2, 1, true];
-  assert.ok(models.bsCosPrice(...args, 256) > 0);
-  assert.throws(() => models.bsCosPrice(...args, -1), invalidType('nTerms'));
-  assert.throws(() => models.bsCosPrice(...args, 2.5), invalidType('nTerms'));
-  assert.throws(() => models.bsCosPrice(...args, 1_000_000), /num_terms must be in 1\.\.=65536/);
-  const asian = [100, 100, 0.05, 0, 0.2, 1];
-  assert.throws(() => models.asianOptionPrice(...asian, -1), invalidType('numFixings'));
-  assert.throws(() => models.asianOptionPrice(...asian, 0), /num_fixings must be positive/);
-  assert.throws(() => models.asianOptionPrice(...asian, 2.5), invalidType('numFixings'));
-  assert.throws(() => models.asianOptionPrice(...asian, 2 ** 53), invalidType('numFixings'));
+  const cos = {
+    spot: 100,
+    strike: 100,
+    rate: 0.05,
+    dividend_yield: 0,
+    time_to_expiry: 1,
+    option_type: 'call',
+  };
+  // `n_terms` travels inside the `CosMarketParams` object, so the Rust
+  // deserializer rejects a non-count before any series is sized.
+  const badCount = (error) => error.kind === 'validation' && /market: /.test(error.message);
+  const bsCos = (nTerms) => models.bsCosPrice({ ...cos, n_terms: nTerms }, 0.2);
+  assert.ok(bsCos(256) > 0);
+  assert.throws(() => bsCos(-1), badCount);
+  assert.throws(() => bsCos(2.5), badCount);
+  assert.throws(() => bsCos(1_000_000), /num_terms must be in 1\.\.=65536/);
+  const asian = {
+    spot: 100,
+    strike: 100,
+    rate: 0.05,
+    dividend_yield: 0,
+    volatility: 0.2,
+    time_to_expiry: 1,
+    option_type: 'call',
+  };
+  assert.throws(() => models.asianOptionPrice(asian, -1), invalidType('numFixings'));
+  assert.throws(() => models.asianOptionPrice(asian, 0), /num_fixings must be positive/);
+  assert.throws(() => models.asianOptionPrice(asian, 2.5), invalidType('numFixings'));
+  assert.throws(() => models.asianOptionPrice(asian, 2 ** 53), invalidType('numFixings'));
   // The other COS kernels share the count check (audit finding F128).
-  const vg = [100, 100, 0.05, 0, 0.2, -0.14, 0.2, 1, true];
-  const mertonJump = [100, 100, 0.05, 0, 0.2, -0.1, 0.15, 0.5, 1, true];
   for (const price of [
-    (nTerms) => models.vgCosPrice(...vg, nTerms),
-    (nTerms) => models.mertonJumpCosPrice(...mertonJump, nTerms),
+    (nTerms) => models.vgCosPrice({ ...cos, n_terms: nTerms }, 0.2, -0.14, 0.2),
+    (nTerms) => models.mertonJumpCosPrice({ ...cos, n_terms: nTerms }, 0.2, -0.1, 0.15, 0.5),
   ]) {
     assert.ok(price(256) > 0);
-    for (const bad of [-1, 2.5, 2 ** 53]) assert.throws(() => price(bad), invalidType('nTerms'));
+    for (const bad of [-1, 2.5, 2 ** 53]) assert.throws(() => price(bad), badCount);
     assert.throws(() => price(1_000_000), /num_terms must be in 1\.\.=65536/);
   }
 });

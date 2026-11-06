@@ -1,0 +1,69 @@
+{
+  "$defs": {
+    "PeriodId": {
+      "description": "Identifier for a Gregorian period like `2025Q1` or a fiscal period like\n`FY2025W53`.",
+      "type": "string"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/goal_seek_spec.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Target node, period and value, driver node and period, model write-back flag and optional bracket of a `goal_seek` solve.",
+  "properties": {
+    "bounds": {
+      "default": null,
+      "description": "Optional `(lower, upper)` bracket, in the driver node's units, that\nconstrains the search; both ends must be finite and `lower < upper`.\n`None` (the default) searches outward from the driver's current value.",
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+        {
+          "format": "double",
+          "type": "number"
+        },
+        {
+          "format": "double",
+          "type": "number"
+        }
+      ],
+      "type": [
+        "array",
+        "null"
+      ]
+    },
+    "driver_node": {
+      "description": "Node identifier of the driver input the solve varies.",
+      "type": "string"
+    },
+    "driver_period": {
+      "$ref": "#/$defs/PeriodId",
+      "description": "Period whose driver value the solve varies."
+    },
+    "target_node": {
+      "description": "Node identifier of the target metric.",
+      "type": "string"
+    },
+    "target_period": {
+      "$ref": "#/$defs/PeriodId",
+      "description": "Period in which the target is evaluated."
+    },
+    "target_value": {
+      "description": "Desired value of the target metric, in the target node's units; must\nbe finite.",
+      "format": "double",
+      "type": "number"
+    },
+    "update_model": {
+      "description": "When `true`, [`GoalSeekResult::model`] holds a copy of the model with\nthe solved driver value written in; when `false` it is `None`.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "target_node",
+    "target_period",
+    "target_value",
+    "driver_node",
+    "driver_period",
+    "update_model"
+  ],
+  "title": "GoalSeekSpec",
+  "type": "object"
+}

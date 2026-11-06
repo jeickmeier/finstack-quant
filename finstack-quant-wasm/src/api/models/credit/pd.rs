@@ -29,14 +29,16 @@ pub fn basel_irb_pd_floor() -> f64 {
 ///
 /// Throws a `TypeError` if `pd` is not a number.
 #[wasm_bindgen(js_name = applyBaselIrbPdFloor)]
-pub fn apply_basel_irb_pd_floor(pd: JsValue) -> Result<f64, JsValue> {
+pub fn apply_basel_irb_pd_floor(
+    #[wasm_bindgen(unchecked_param_type = "number")] pd: JsValue,
+) -> Result<f64, JsValue> {
     Ok(pd::apply_basel_irb_pd_floor(js_f64(&pd, "pd")?))
 }
 
 /// Convert a point-in-time PD to through-the-cycle under the Vasicek single-factor model.
-/// @param pd_pit - Point-in-time default probability, strictly between 0 and 1.
-/// @param asset_correlation - Asset correlation with the systematic factor, strictly between 0 and 1.
-/// @param cycle_index - Standardized credit-cycle index; positive in benign conditions, negative in stress.
+/// @param pdPit - Point-in-time default probability, strictly between 0 and 1.
+/// @param assetCorrelation - Asset correlation with the systematic factor, strictly between 0 and 1.
+/// @param cycleIndex - Standardized credit-cycle index; positive in benign conditions, negative in stress.
 /// @returns The through-the-cycle default probability.
 ///
 /// # Errors
@@ -45,9 +47,10 @@ pub fn apply_basel_irb_pd_floor(pd: JsValue) -> Result<f64, JsValue> {
 /// or an input is non-finite.
 #[wasm_bindgen(js_name = pitToTtc)]
 pub fn pit_to_ttc(
-    pd_pit: JsValue,
+    #[wasm_bindgen(js_name = "pdPit", unchecked_param_type = "number")] pd_pit: JsValue,
+    #[wasm_bindgen(js_name = "assetCorrelation", unchecked_param_type = "number")]
     asset_correlation: JsValue,
-    cycle_index: JsValue,
+    #[wasm_bindgen(js_name = "cycleIndex", unchecked_param_type = "number")] cycle_index: JsValue,
 ) -> Result<f64, JsValue> {
     let pd_pit = js_f64(&pd_pit, "pdPit")?;
     let params = PdCycleParams {
@@ -58,9 +61,9 @@ pub fn pit_to_ttc(
 }
 
 /// Convert a through-the-cycle PD to point-in-time under the Vasicek single-factor model.
-/// @param pd_ttc - Through-the-cycle default probability, strictly between 0 and 1.
-/// @param asset_correlation - Asset correlation with the systematic factor, strictly between 0 and 1.
-/// @param cycle_index - Standardized credit-cycle index; positive in benign conditions, negative in stress.
+/// @param pdTtc - Through-the-cycle default probability, strictly between 0 and 1.
+/// @param assetCorrelation - Asset correlation with the systematic factor, strictly between 0 and 1.
+/// @param cycleIndex - Standardized credit-cycle index; positive in benign conditions, negative in stress.
 /// @returns The point-in-time default probability.
 ///
 /// # Errors
@@ -69,9 +72,10 @@ pub fn pit_to_ttc(
 /// or an input is non-finite.
 #[wasm_bindgen(js_name = ttcToPit)]
 pub fn ttc_to_pit(
-    pd_ttc: JsValue,
+    #[wasm_bindgen(js_name = "pdTtc", unchecked_param_type = "number")] pd_ttc: JsValue,
+    #[wasm_bindgen(js_name = "assetCorrelation", unchecked_param_type = "number")]
     asset_correlation: JsValue,
-    cycle_index: JsValue,
+    #[wasm_bindgen(js_name = "cycleIndex", unchecked_param_type = "number")] cycle_index: JsValue,
 ) -> Result<f64, JsValue> {
     let pd_ttc = js_f64(&pd_ttc, "pdTtc")?;
     let params = PdCycleParams {
@@ -82,7 +86,7 @@ pub fn ttc_to_pit(
 }
 
 /// Long-run central-tendency PD from a history of annual default rates.
-/// @param annual_default_rates - Annual default rates as decimals in `[0, 1]`, as a `number[]` or `Float64Array`; non-empty.
+/// @param annualDefaultRates - Annual default rates as decimals in `[0, 1]`, as a `number[]` or `Float64Array`; non-empty.
 /// @returns The central-tendency default probability.
 ///
 /// # Errors
@@ -90,12 +94,28 @@ pub fn ttc_to_pit(
 /// Throws a `validation` error if the series is empty or a rate is non-finite
 /// or outside `[0, 1]`.
 #[wasm_bindgen(js_name = centralTendency)]
-pub fn central_tendency(annual_default_rates: JsValue) -> Result<f64, JsValue> {
+pub fn central_tendency(
+    #[wasm_bindgen(js_name = "annualDefaultRates", unchecked_param_type = "NumericArray")]
+    annual_default_rates: JsValue,
+) -> Result<f64, JsValue> {
     let rates = js_f64_seq(&annual_default_rates, "annualDefaultRates")?;
     pd::central_tendency(&rates).map_err(to_js_err)
 }
 
 /// Rating master scale mapping default probabilities to grades.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const scale = new models.credit.pd.MasterScale([
+///   { label: "A", upper_pd: 0.01, central_pd: 0.005 },
+///   { label: "B", upper_pd: 0.1, central_pd: 0.04 },
+///   { label: "C", upper_pd: 1.0, central_pd: 0.3 },
+/// ]);
+/// console.log(scale.nGrades, scale.mapPd(0.02).grade);
+/// scale.free();
+/// ```
 #[wasm_bindgen(js_name = MasterScale)]
 pub struct JsMasterScale {
     pub(crate) inner: MasterScale,
@@ -113,7 +133,12 @@ impl JsMasterScale {
     /// Throws a `validation` error if the list is empty, a PD is out of range,
     /// or the grades are not sorted by `upper_pd`.
     #[wasm_bindgen(constructor)]
-    pub fn new(grades: JsValue) -> Result<JsMasterScale, JsValue> {
+    pub fn new(
+        #[wasm_bindgen(
+            unchecked_param_type = "readonly generated.models.MasterScaleGrade[] | string"
+        )]
+        grades: JsValue,
+    ) -> Result<JsMasterScale, JsValue> {
         let grades: Vec<MasterScaleGrade> = from_js_json(&grades, "grades")?;
         MasterScale::new(grades)
             .map(|inner| Self { inner })
@@ -134,14 +159,16 @@ impl JsMasterScale {
     }
 
     /// Master scale registered under an explicit registry identifier.
-    /// @param scale_id - Registry identifier of the master scale.
+    /// @param scaleId - Registry identifier of the master scale.
     /// @returns The registered master scale.
     ///
     /// # Errors
     ///
     /// Throws a `not_found` error if no scale is registered under `scaleId`.
     #[wasm_bindgen(js_name = fromRegistryId)]
-    pub fn from_registry_id(scale_id: JsValue) -> Result<JsMasterScale, JsValue> {
+    pub fn from_registry_id(
+        #[wasm_bindgen(js_name = "scaleId", unchecked_param_type = "string")] scale_id: JsValue,
+    ) -> Result<JsMasterScale, JsValue> {
         MasterScale::from_registry_id(&js_string(&scale_id, "scaleId")?)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
@@ -154,8 +181,11 @@ impl JsMasterScale {
     /// # Errors
     ///
     /// Throws a `validation` error if `pd` is non-finite or outside `[0, 1]`.
-    #[wasm_bindgen(js_name = mapPd)]
-    pub fn map_pd(&self, pd: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = mapPd, unchecked_return_type = "generated.models.MasterScaleResult")]
+    pub fn map_pd(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] pd: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let result = self.inner.map_pd(js_f64(&pd, "pd")?).map_err(to_js_err)?;
         to_js_value(&result)
     }
@@ -167,8 +197,11 @@ impl JsMasterScale {
     /// # Errors
     ///
     /// Throws a `validation` error if any PD is non-finite or outside `[0, 1]`.
-    #[wasm_bindgen(js_name = mapPds)]
-    pub fn map_pds(&self, pds: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = mapPds, unchecked_return_type = "generated.models.MasterScaleResult[]")]
+    pub fn map_pds(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray")] pds: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let pds = js_f64_seq(&pds, "pds")?;
         let rows = self.inner.map_pds(&pds).map_err(to_js_err)?;
         to_js_value(&rows)
@@ -182,8 +215,12 @@ impl JsMasterScale {
     ///
     /// Throws a `validation` error if the result is malformed, has no implied
     /// PD, or its PD is non-finite.
-    #[wasm_bindgen(js_name = mapScore)]
-    pub fn map_score(&self, result: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = mapScore, unchecked_return_type = "generated.models.MasterScaleResult")]
+    pub fn map_score(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "generated.models.ScoringResult | string")]
+        result: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let result: ScoringResult = from_js_json(&result, "result")?;
         let mapped = self.inner.map_score(&result).map_err(to_js_err)?;
         to_js_value(&mapped)
@@ -196,7 +233,7 @@ impl JsMasterScale {
     }
 
     /// Grades in ascending PD order, as `MasterScaleGrade` objects.
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, unchecked_return_type = "generated.models.MasterScaleGrade[]")]
     pub fn grades(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner.grades())
     }

@@ -1,0 +1,144 @@
+{
+  "$defs": {
+    "FxDeltaConvention": {
+      "additionalProperties": false,
+      "description": "Explicit venue and premium-currency convention for FX delta reporting.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/FxDeltaConventionKind",
+          "description": "Delta convention quoted by the venue."
+        },
+        "premium_currency": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+          "description": "Currency in which the option premium is paid."
+        },
+        "venue": {
+          "description": "Non-empty market venue or quoting-source identifier.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "premium_currency",
+        "venue"
+      ],
+      "type": "object"
+    },
+    "FxDeltaConventionKind": {
+      "description": "Pair/venue FX delta quoting convention selected by the contract.",
+      "oneOf": [
+        {
+          "const": "spot",
+          "description": "Unadjusted spot delta.",
+          "type": "string"
+        },
+        {
+          "const": "forward",
+          "description": "Unadjusted forward delta.",
+          "type": "string"
+        },
+        {
+          "const": "premium_adjusted_spot",
+          "description": "Premium-adjusted spot delta.",
+          "type": "string"
+        },
+        {
+          "const": "premium_adjusted_forward",
+          "description": "Premium-adjusted forward delta.",
+          "type": "string"
+        }
+      ]
+    },
+    "OptionType": {
+      "description": "Option payoff direction used by analytical and numerical model engines.",
+      "oneOf": [
+        {
+          "const": "call",
+          "description": "Call option.",
+          "type": "string"
+        },
+        {
+          "const": "put",
+          "description": "Put option.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/common/1/fx_option_params.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Pair, strike, expiry, notional, volatility surface, call/put and delta convention of a European FX option.",
+  "examples": [
+    {
+      "base_currency": "EUR",
+      "delta_convention": {
+        "kind": "forward",
+        "premium_currency": "USD",
+        "venue": "generic_interbank"
+      },
+      "expiry": "2025-07-15",
+      "id": "EURUSD-CALL-6M",
+      "notional": {
+        "amount": "1000000",
+        "currency": "EUR"
+      },
+      "option_type": "call",
+      "quote_currency": "USD",
+      "strike": 1.12,
+      "vol_surface_id": "EURUSD-VOL"
+    }
+  ],
+  "properties": {
+    "base_currency": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+      "description": "Base (foreign) currency: the notional currency."
+    },
+    "delta_convention": {
+      "$ref": "#/$defs/FxDeltaConvention",
+      "description": "Delta quoting convention: kind, premium currency (base or quote) and venue."
+    },
+    "expiry": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+      "description": "Expiry date; the cash payoff settles on this date."
+    },
+    "id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Unique instrument identifier."
+    },
+    "notional": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+      "description": "Notional in `base_currency`."
+    },
+    "option_type": {
+      "$ref": "#/$defs/OptionType",
+      "description": "`call` or `put` on the base currency."
+    },
+    "quote_currency": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+      "description": "Quote (domestic) currency: the strike and PV currency."
+    },
+    "strike": {
+      "description": "Strike exchange rate, quote currency per unit of base currency.",
+      "format": "double",
+      "type": "number"
+    },
+    "vol_surface_id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "FX volatility surface identifier."
+    }
+  },
+  "required": [
+    "id",
+    "base_currency",
+    "quote_currency",
+    "strike",
+    "expiry",
+    "notional",
+    "vol_surface_id",
+    "option_type",
+    "delta_convention"
+  ],
+  "title": "FxOptionParams",
+  "type": "object"
+}

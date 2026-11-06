@@ -7,6 +7,34 @@ import * as wasm from '../../pkg/finstack_quant_wasm.js';
  * a new state. Period return is `pnl / capital`; `return_index` starts at 100.
  * Close-effective rebalances report pre-trade P&L, then open the next interval
  * at the post-trade financed value. There is no `initializeFixed` export.
+ * @example
+ * ```typescript
+ * import init, { core, valuations } from "finstack-quant-wasm";
+ * await init();
+ * const equity = (id: string, price: number) => ({
+ *   type: "equity",
+ *   spec: {
+ *     id, ticker: id, currency: "USD", quantity: 1, quoted_spot: price, spot_id: null,
+ *     div_yield_id: null, discrete_dividends: [], discount_curve_id: "USD", attributes: {},
+ *   },
+ * });
+ * const spec = {
+ *   id: "A-B",
+ *   reporting_currency: "USD",
+ *   capital: { amount: "100", currency: "USD" },
+ *   legs: [
+ *     { instrument_id: "A", instrument: equity("A", 100), score: 1 },
+ *     { instrument_id: "B", instrument: equity("B", 90), score: -1 },
+ *   ],
+ *   weighting_method: { kind: "fixed_quantity" },
+ *   rebalance_rule: { kind: "manual" },
+ *   attributes: {},
+ * };
+ * // Both legs carry a quoted spot, so an empty market is enough.
+ * const market = new core.MarketContext().toJson();
+ * const result = valuations.composite.initialize(spec, market, "2025-01-01");
+ * console.log(result.trades.map((trade) => [trade.instrument_id, trade.quantity_delta])); // [["A", 1], ["B", -1]]
+ * ```
  */
 export const composite = {
   /**

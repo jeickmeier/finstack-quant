@@ -38,6 +38,17 @@ export type ValuationsNative = {
     >;
   };
 };
+/**
+ * The `extras` of a native price call: the request's market-history JSON
+ * text, parsed (its metric-pricing overrides already went to
+ * `validateInstrumentJson`).
+ */
+function historyExtras(marketHistory: string | null | undefined) {
+  return {
+    market_history:
+      marketHistory == null ? undefined : JSON.parse(marketHistory),
+  };
+}
 /** ValuationsApi over the valuations facade namespace and the shared market cache. */
 export function createValuationsService(
   native: ValuationsNative,
@@ -68,8 +79,7 @@ export function createValuationsService(
           // Omitted models resolve centrally; pricing.rs price_instrument uses "default".
           resolveModel(request.model),
           request.metrics == null ? request.metrics : [...request.metrics],
-          undefined,
-          request.marketHistory,
+          historyExtras(request.marketHistory),
         );
       });
     },
@@ -90,8 +100,7 @@ export function createValuationsService(
                 request.asOf,
                 resolveModel(request.model),
                 [metric],
-                undefined,
-                request.marketHistory,
+                historyExtras(request.marketHistory),
               ).measures[metric],
           ),
         }));

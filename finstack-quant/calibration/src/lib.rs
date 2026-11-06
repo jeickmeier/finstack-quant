@@ -138,8 +138,10 @@ pub mod recalibration;
 pub(crate) mod constants;
 
 #[cfg(test)]
+#[path = "tests/hazard_curve.rs"]
 mod hazard_curve_tests;
 #[cfg(test)]
+#[path = "tests/repricing.rs"]
 mod repricing_tests;
 #[cfg(test)]
 mod test_support;

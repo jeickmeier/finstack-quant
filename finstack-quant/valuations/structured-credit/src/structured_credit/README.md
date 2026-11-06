@@ -761,7 +761,7 @@ not move with the price. `cash_on_cash` is each distribution as an unannualized
 decimal share of `invested`. A class that receives nothing has `irr: None` and a true
 zero MOIC and NAV. With nothing invested `irr`, `moic` and each `cash_on_cash` share
 are `None`, as each divides by `invested`. A deal with no equity
-class is a validation error. `equity_metrics_field_units(currency)` (in `pricer`)
+class is a validation error. `equity_metrics_field_units(currency)` (in `results`)
 states these units for a host.
 
 `SimulationDiagnostics::to_table()` owns the nineteen-column period export used

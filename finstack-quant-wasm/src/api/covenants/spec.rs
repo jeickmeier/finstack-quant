@@ -20,8 +20,10 @@ use wasm_bindgen::prelude::*;
 /// @param threshold - Maximum allowed ratio in turns (`4.5` means 4.5x).
 /// @returns `CovenantType` wire value `{ max_debt_to_ebitda: { threshold } }`.
 /// @throws If `threshold` is not a number (kind `invalid_type`).
-#[wasm_bindgen(js_name = covenantTypeMaxDebtToEbitda)]
-pub fn covenant_type_max_debt_to_ebitda(threshold: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = covenantTypeMaxDebtToEbitda, unchecked_return_type = "generated.covenants.CovenantType")]
+pub fn covenant_type_max_debt_to_ebitda(
+    #[wasm_bindgen(unchecked_param_type = "number")] threshold: JsValue,
+) -> Result<JsValue, JsValue> {
     to_js_value(&CovenantType::MaxDebtToEbitda {
         threshold: js_f64(&threshold, "threshold")?,
     })
@@ -32,8 +34,10 @@ pub fn covenant_type_max_debt_to_ebitda(threshold: JsValue) -> Result<JsValue, J
 /// @param threshold - Minimum required ratio in turns.
 /// @returns `CovenantType` wire value `{ min_interest_coverage: { threshold } }`.
 /// @throws If `threshold` is not a number (kind `invalid_type`).
-#[wasm_bindgen(js_name = covenantTypeMinInterestCoverage)]
-pub fn covenant_type_min_interest_coverage(threshold: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = covenantTypeMinInterestCoverage, unchecked_return_type = "generated.covenants.CovenantType")]
+pub fn covenant_type_min_interest_coverage(
+    #[wasm_bindgen(unchecked_param_type = "number")] threshold: JsValue,
+) -> Result<JsValue, JsValue> {
     to_js_value(&CovenantType::MinInterestCoverage {
         threshold: js_f64(&threshold, "threshold")?,
     })
@@ -44,8 +48,10 @@ pub fn covenant_type_min_interest_coverage(threshold: JsValue) -> Result<JsValue
 /// @param threshold - Minimum required ratio in turns.
 /// @returns `CovenantType` wire value `{ min_fixed_charge_coverage: { threshold } }`.
 /// @throws If `threshold` is not a number (kind `invalid_type`).
-#[wasm_bindgen(js_name = covenantTypeMinFixedChargeCoverage)]
-pub fn covenant_type_min_fixed_charge_coverage(threshold: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = covenantTypeMinFixedChargeCoverage, unchecked_return_type = "generated.covenants.CovenantType")]
+pub fn covenant_type_min_fixed_charge_coverage(
+    #[wasm_bindgen(unchecked_param_type = "number")] threshold: JsValue,
+) -> Result<JsValue, JsValue> {
     to_js_value(&CovenantType::MinFixedChargeCoverage {
         threshold: js_f64(&threshold, "threshold")?,
     })
@@ -56,8 +62,10 @@ pub fn covenant_type_min_fixed_charge_coverage(threshold: JsValue) -> Result<JsV
 /// @param threshold - Maximum allowed total debt / EBITDA in turns.
 /// @returns `CovenantType` wire value `{ max_total_leverage: { threshold } }`.
 /// @throws If `threshold` is not a number (kind `invalid_type`).
-#[wasm_bindgen(js_name = covenantTypeMaxTotalLeverage)]
-pub fn covenant_type_max_total_leverage(threshold: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = covenantTypeMaxTotalLeverage, unchecked_return_type = "generated.covenants.CovenantType")]
+pub fn covenant_type_max_total_leverage(
+    #[wasm_bindgen(unchecked_param_type = "number")] threshold: JsValue,
+) -> Result<JsValue, JsValue> {
     to_js_value(&CovenantType::MaxTotalLeverage {
         threshold: js_f64(&threshold, "threshold")?,
     })
@@ -68,8 +76,10 @@ pub fn covenant_type_max_total_leverage(threshold: JsValue) -> Result<JsValue, J
 /// @param threshold - Maximum allowed senior debt / EBITDA in turns.
 /// @returns `CovenantType` wire value `{ max_senior_leverage: { threshold } }`.
 /// @throws If `threshold` is not a number (kind `invalid_type`).
-#[wasm_bindgen(js_name = covenantTypeMaxSeniorLeverage)]
-pub fn covenant_type_max_senior_leverage(threshold: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = covenantTypeMaxSeniorLeverage, unchecked_return_type = "generated.covenants.CovenantType")]
+pub fn covenant_type_max_senior_leverage(
+    #[wasm_bindgen(unchecked_param_type = "number")] threshold: JsValue,
+) -> Result<JsValue, JsValue> {
     to_js_value(&CovenantType::MaxSeniorLeverage {
         threshold: js_f64(&threshold, "threshold")?,
     })
@@ -80,8 +90,10 @@ pub fn covenant_type_max_senior_leverage(threshold: JsValue) -> Result<JsValue, 
 /// @param threshold - Minimum required asset coverage ratio in turns.
 /// @returns `CovenantType` wire value `{ min_asset_coverage: { threshold } }`.
 /// @throws If `threshold` is not a number (kind `invalid_type`).
-#[wasm_bindgen(js_name = covenantTypeMinAssetCoverage)]
-pub fn covenant_type_min_asset_coverage(threshold: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = covenantTypeMinAssetCoverage, unchecked_return_type = "generated.covenants.CovenantType")]
+pub fn covenant_type_min_asset_coverage(
+    #[wasm_bindgen(unchecked_param_type = "number")] threshold: JsValue,
+) -> Result<JsValue, JsValue> {
     to_js_value(&CovenantType::MinAssetCoverage {
         threshold: js_f64(&threshold, "threshold")?,
     })
@@ -92,8 +104,10 @@ pub fn covenant_type_min_asset_coverage(threshold: JsValue) -> Result<JsValue, J
 /// @param threshold - Minimum required DSCR in turns.
 /// @returns `CovenantType` wire value `{ min_dscr: { threshold } }`.
 /// @throws If `threshold` is not a number (kind `invalid_type`).
-#[wasm_bindgen(js_name = covenantTypeMinDscr)]
-pub fn covenant_type_min_dscr(threshold: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = covenantTypeMinDscr, unchecked_return_type = "generated.covenants.CovenantType")]
+pub fn covenant_type_min_dscr(
+    #[wasm_bindgen(unchecked_param_type = "number")] threshold: JsValue,
+) -> Result<JsValue, JsValue> {
     to_js_value(&CovenantType::MinDscr {
         threshold: js_f64(&threshold, "threshold")?,
     })
@@ -104,8 +118,10 @@ pub fn covenant_type_min_dscr(threshold: JsValue) -> Result<JsValue, JsValue> {
 /// @param threshold - Maximum allowed net debt / EBITDA in turns; the specification needs an earnings denominator metric.
 /// @returns `CovenantType` wire value `{ max_net_debt_to_ebitda: { threshold } }`.
 /// @throws If `threshold` is not a number (kind `invalid_type`).
-#[wasm_bindgen(js_name = covenantTypeMaxNetDebtToEbitda)]
-pub fn covenant_type_max_net_debt_to_ebitda(threshold: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = covenantTypeMaxNetDebtToEbitda, unchecked_return_type = "generated.covenants.CovenantType")]
+pub fn covenant_type_max_net_debt_to_ebitda(
+    #[wasm_bindgen(unchecked_param_type = "number")] threshold: JsValue,
+) -> Result<JsValue, JsValue> {
     to_js_value(&CovenantType::MaxNetDebtToEbitda {
         threshold: js_f64(&threshold, "threshold")?,
     })
@@ -116,8 +132,10 @@ pub fn covenant_type_max_net_debt_to_ebitda(threshold: JsValue) -> Result<JsValu
 /// @param threshold - Maximum allowed capex amount in the reporting currency.
 /// @returns `CovenantType` wire value `{ max_capex: { threshold } }`.
 /// @throws If `threshold` is not a number (kind `invalid_type`).
-#[wasm_bindgen(js_name = covenantTypeMaxCapex)]
-pub fn covenant_type_max_capex(threshold: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = covenantTypeMaxCapex, unchecked_return_type = "generated.covenants.CovenantType")]
+pub fn covenant_type_max_capex(
+    #[wasm_bindgen(unchecked_param_type = "number")] threshold: JsValue,
+) -> Result<JsValue, JsValue> {
     to_js_value(&CovenantType::MaxCapex {
         threshold: js_f64(&threshold, "threshold")?,
     })
@@ -128,8 +146,10 @@ pub fn covenant_type_max_capex(threshold: JsValue) -> Result<JsValue, JsValue> {
 /// @param threshold - Minimum required liquidity amount in the reporting currency.
 /// @returns `CovenantType` wire value `{ min_liquidity: { threshold } }`.
 /// @throws If `threshold` is not a number (kind `invalid_type`).
-#[wasm_bindgen(js_name = covenantTypeMinLiquidity)]
-pub fn covenant_type_min_liquidity(threshold: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = covenantTypeMinLiquidity, unchecked_return_type = "generated.covenants.CovenantType")]
+pub fn covenant_type_min_liquidity(
+    #[wasm_bindgen(unchecked_param_type = "number")] threshold: JsValue,
+) -> Result<JsValue, JsValue> {
     to_js_value(&CovenantType::MinLiquidity {
         threshold: js_f64(&threshold, "threshold")?,
     })
@@ -140,8 +160,10 @@ pub fn covenant_type_min_liquidity(threshold: JsValue) -> Result<JsValue, JsValu
 /// @param restriction - Description of the restricted action, for example `"no additional senior debt"`.
 /// @returns `CovenantType` wire value `{ negative: { restriction } }`; it has no numeric test.
 /// @throws If `restriction` is not a string (kind `invalid_type`).
-#[wasm_bindgen(js_name = covenantTypeNegative)]
-pub fn covenant_type_negative(restriction: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = covenantTypeNegative, unchecked_return_type = "generated.covenants.CovenantType")]
+pub fn covenant_type_negative(
+    #[wasm_bindgen(unchecked_param_type = "string")] restriction: JsValue,
+) -> Result<JsValue, JsValue> {
     to_js_value(&CovenantType::Negative {
         restriction: js_string(&restriction, "restriction")?,
     })
@@ -152,8 +174,10 @@ pub fn covenant_type_negative(restriction: JsValue) -> Result<JsValue, JsValue> 
 /// @param requirement - Description of the required action, for example `"deliver audited financials within 90 days"`.
 /// @returns `CovenantType` wire value `{ affirmative: { requirement } }`; it has no numeric test.
 /// @throws If `requirement` is not a string (kind `invalid_type`).
-#[wasm_bindgen(js_name = covenantTypeAffirmative)]
-pub fn covenant_type_affirmative(requirement: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = covenantTypeAffirmative, unchecked_return_type = "generated.covenants.CovenantType")]
+pub fn covenant_type_affirmative(
+    #[wasm_bindgen(unchecked_param_type = "string")] requirement: JsValue,
+) -> Result<JsValue, JsValue> {
     to_js_value(&CovenantType::Affirmative {
         requirement: js_string(&requirement, "requirement")?,
     })
@@ -171,11 +195,11 @@ fn threshold_test(test: &JsValue, value: &JsValue) -> Result<ThresholdTest, JsVa
 /// @param value - Finite threshold in the metric's own units.
 /// @returns `CovenantType` wire value `{ custom: { metric, test } }`.
 /// @throws If `metric` or `test` is not a string or `value` is not a number (kind `invalid_type`), or `test` is not one of the listed strings or `value` is non-finite (kind `validation`).
-#[wasm_bindgen(js_name = covenantTypeCustom)]
+#[wasm_bindgen(js_name = covenantTypeCustom, unchecked_return_type = "generated.covenants.CovenantType")]
 pub fn covenant_type_custom(
-    metric: JsValue,
-    test: JsValue,
-    value: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] metric: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "'maximum' | 'minimum'")] test: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] value: JsValue,
 ) -> Result<JsValue, JsValue> {
     to_js_value(&CovenantType::Custom {
         metric: js_string(&metric, "metric")?,
@@ -189,8 +213,11 @@ pub fn covenant_type_custom(
 /// @param limit - Maximum basket usage in the reporting currency.
 /// @returns `CovenantType` wire value `{ basket: { name, limit } }`.
 /// @throws If `name` is not a string or `limit` is not a number (kind `invalid_type`).
-#[wasm_bindgen(js_name = covenantTypeBasket)]
-pub fn covenant_type_basket(name: JsValue, limit: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = covenantTypeBasket, unchecked_return_type = "generated.covenants.CovenantType")]
+pub fn covenant_type_basket(
+    #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] limit: JsValue,
+) -> Result<JsValue, JsValue> {
     to_js_value(&CovenantType::Basket {
         name: js_string(&name, "name")?,
         limit: js_f64(&limit, "limit")?,
@@ -203,18 +230,20 @@ pub fn covenant_type_basket(name: JsValue, limit: JsValue) -> Result<JsValue, Js
 ///
 /// @returns `CovenantConsequence` wire value `"default"`.
 /// @throws If the value cannot be serialized.
-#[wasm_bindgen(js_name = covenantConsequenceDefault)]
+#[wasm_bindgen(js_name = covenantConsequenceDefault, unchecked_return_type = "generated.covenants.CovenantConsequence")]
 pub fn covenant_consequence_default() -> Result<JsValue, JsValue> {
     to_js_value(&CovenantConsequence::Default)
 }
 
 /// Breach consequence: the borrowing rate steps up.
 ///
-/// @param bp_increase - Rate increase in basis points per annum (`200` = +2.00%); must be finite and non-negative when the covenant is validated.
+/// @param bpIncrease - Rate increase in basis points per annum (`200` = +2.00%); must be finite and non-negative when the covenant is validated.
 /// @returns `CovenantConsequence` wire value `{ rate_increase: { bp_increase } }`.
 /// @throws If `bpIncrease` is not a number (kind `invalid_type`).
-#[wasm_bindgen(js_name = covenantConsequenceRateIncrease)]
-pub fn covenant_consequence_rate_increase(bp_increase: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = covenantConsequenceRateIncrease, unchecked_return_type = "generated.covenants.CovenantConsequence")]
+pub fn covenant_consequence_rate_increase(
+    #[wasm_bindgen(js_name = "bpIncrease", unchecked_param_type = "number")] bp_increase: JsValue,
+) -> Result<JsValue, JsValue> {
     to_js_value(&CovenantConsequence::RateIncrease {
         bp_increase: js_f64(&bp_increase, "bpIncrease")?,
     })
@@ -222,11 +251,13 @@ pub fn covenant_consequence_rate_increase(bp_increase: JsValue) -> Result<JsValu
 
 /// Breach consequence: excess cash is swept to repay debt.
 ///
-/// @param sweep_percentage - Share of excess cash swept, as a decimal in `[0, 1]` (`0.5` = 50%).
+/// @param sweepPercentage - Share of excess cash swept, as a decimal in `[0, 1]` (`0.5` = 50%).
 /// @returns `CovenantConsequence` wire value `{ cash_sweep: { sweep_percentage } }`.
 /// @throws If `sweepPercentage` is not a number (kind `invalid_type`).
-#[wasm_bindgen(js_name = covenantConsequenceCashSweep)]
-pub fn covenant_consequence_cash_sweep(sweep_percentage: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = covenantConsequenceCashSweep, unchecked_return_type = "generated.covenants.CovenantConsequence")]
+pub fn covenant_consequence_cash_sweep(
+    #[wasm_bindgen(js_name = "sweepPercentage", unchecked_param_type = "number")] sweep_percentage: JsValue,
+) -> Result<JsValue, JsValue> {
     to_js_value(&CovenantConsequence::CashSweep {
         sweep_percentage: js_f64(&sweep_percentage, "sweepPercentage")?,
     })
@@ -236,7 +267,7 @@ pub fn covenant_consequence_cash_sweep(sweep_percentage: JsValue) -> Result<JsVa
 ///
 /// @returns `CovenantConsequence` wire value `"block_distributions"`.
 /// @throws If the value cannot be serialized.
-#[wasm_bindgen(js_name = covenantConsequenceBlockDistributions)]
+#[wasm_bindgen(js_name = covenantConsequenceBlockDistributions, unchecked_return_type = "generated.covenants.CovenantConsequence")]
 pub fn covenant_consequence_block_distributions() -> Result<JsValue, JsValue> {
     to_js_value(&CovenantConsequence::BlockDistributions)
 }
@@ -246,8 +277,10 @@ pub fn covenant_consequence_block_distributions() -> Result<JsValue, JsValue> {
 /// @param description - Non-empty description of the required collateral.
 /// @returns `CovenantConsequence` wire value `{ require_collateral: { description } }`.
 /// @throws If `description` is not a string (kind `invalid_type`).
-#[wasm_bindgen(js_name = covenantConsequenceRequireCollateral)]
-pub fn covenant_consequence_require_collateral(description: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = covenantConsequenceRequireCollateral, unchecked_return_type = "generated.covenants.CovenantConsequence")]
+pub fn covenant_consequence_require_collateral(
+    #[wasm_bindgen(unchecked_param_type = "string")] description: JsValue,
+) -> Result<JsValue, JsValue> {
     to_js_value(&CovenantConsequence::RequireCollateral {
         description: js_string(&description, "description")?,
     })
@@ -255,11 +288,13 @@ pub fn covenant_consequence_require_collateral(description: JsValue) -> Result<J
 
 /// Breach consequence: the maturity is accelerated to a new date.
 ///
-/// @param new_maturity - ISO-8601 accelerated maturity date.
+/// @param newMaturity - ISO-8601 accelerated maturity date.
 /// @returns `CovenantConsequence` wire value `{ accelerate_maturity: { new_maturity } }`.
 /// @throws If `newMaturity` is not an ISO-8601 string (kind `invalid_type` or `validation`).
-#[wasm_bindgen(js_name = covenantConsequenceAccelerateMaturity)]
-pub fn covenant_consequence_accelerate_maturity(new_maturity: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = covenantConsequenceAccelerateMaturity, unchecked_return_type = "generated.covenants.CovenantConsequence")]
+pub fn covenant_consequence_accelerate_maturity(
+    #[wasm_bindgen(js_name = "newMaturity", unchecked_param_type = "string")] new_maturity: JsValue,
+) -> Result<JsValue, JsValue> {
     to_js_value(&CovenantConsequence::AccelerateMaturity {
         new_maturity: js_date(&new_maturity, "newMaturity")?,
     })
@@ -273,16 +308,24 @@ pub fn covenant_consequence_accelerate_maturity(new_maturity: JsValue) -> Result
 /// active maintenance covenant with no cure period, consequences or
 /// springing condition.
 ///
-/// @param covenant_type - `CovenantType` wire value, for example `{ max_debt_to_ebitda: { threshold: 4.5 } }`.
-/// @param test_frequency - `Tenor` wire object (`{ count, unit }`) recording how often the covenant is tested; it is metadata, the caller chooses each test date.
+/// @param covenantType - `CovenantType` wire value, for example `{ max_debt_to_ebitda: { threshold: 4.5 } }`.
+/// @param testFrequency - `Tenor` wire object (`{ count, unit }`) recording how often the covenant is tested; it is metadata, the caller chooses each test date.
 /// @param label - Instance label; it is the report key and must be unique within an engine on a test date.
 /// @returns `Covenant` wire object.
 /// @throws If an argument does not match its wire type (kind `invalid_type` or `validation`).
-#[wasm_bindgen(js_name = covenantNew)]
+#[wasm_bindgen(js_name = covenantNew, unchecked_return_type = "generated.covenants.Covenant")]
 pub fn covenant_new(
+    #[wasm_bindgen(
+        js_name = "covenantType",
+        unchecked_param_type = "generated.covenants.CovenantType"
+    )]
     covenant_type: JsValue,
+    #[wasm_bindgen(
+        js_name = "testFrequency",
+        unchecked_param_type = "generated.covenants.Tenor"
+    )]
     test_frequency: JsValue,
-    label: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] label: JsValue,
 ) -> Result<JsValue, JsValue> {
     to_js_value(&Covenant::new(
         js_wire::<CovenantType>(&covenant_type, "covenantType")?,
@@ -297,10 +340,10 @@ pub fn covenant_new(
 /// @param days - Calendar days the borrower has to cure a breach (integer); omitted or `null` means no cure period.
 /// @returns The updated `Covenant`.
 /// @throws If `covenant` is not a `Covenant` (kind `validation`) or `days` is not an integer (kind `invalid_type`).
-#[wasm_bindgen(js_name = covenantWithCurePeriod)]
+#[wasm_bindgen(js_name = covenantWithCurePeriod, unchecked_return_type = "generated.covenants.Covenant")]
 pub fn covenant_with_cure_period(
-    covenant: JsValue,
-    days: Option<JsValue>,
+    #[wasm_bindgen(unchecked_param_type = "generated.covenants.Covenant")] covenant: JsValue,
+    #[wasm_bindgen(unchecked_optional_param_type = "number | null")] days: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let covenant = js_wire::<Covenant>(&covenant, "covenant")?;
     to_js_value(&covenant.with_cure_period(js_opt_int(days.as_ref(), "days")?))
@@ -312,9 +355,10 @@ pub fn covenant_with_cure_period(
 /// @param consequence - `CovenantConsequence` wire value appended to the covenant's consequences.
 /// @returns The updated `Covenant`.
 /// @throws If either argument does not match its wire type (kind `validation`).
-#[wasm_bindgen(js_name = covenantWithConsequence)]
+#[wasm_bindgen(js_name = covenantWithConsequence, unchecked_return_type = "generated.covenants.Covenant")]
 pub fn covenant_with_consequence(
-    covenant: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.covenants.Covenant")] covenant: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.covenants.CovenantConsequence")]
     consequence: JsValue,
 ) -> Result<JsValue, JsValue> {
     let covenant = js_wire::<Covenant>(&covenant, "covenant")?;
@@ -329,8 +373,11 @@ pub fn covenant_with_consequence(
 /// @param scope - `"maintenance"` (tested on a schedule) or `"incurrence"` (tested only when an action is taken).
 /// @returns The updated `Covenant`.
 /// @throws If `covenant` is not a `Covenant` or `scope` is not one of the listed strings (kind `validation`).
-#[wasm_bindgen(js_name = covenantWithScope)]
-pub fn covenant_with_scope(covenant: JsValue, scope: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = covenantWithScope, unchecked_return_type = "generated.covenants.Covenant")]
+pub fn covenant_with_scope(
+    #[wasm_bindgen(unchecked_param_type = "generated.covenants.Covenant")] covenant: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.covenants.CovenantScope")] scope: JsValue,
+) -> Result<JsValue, JsValue> {
     let covenant = js_wire::<Covenant>(&covenant, "covenant")?;
     to_js_value(&covenant.with_scope(js_wire::<CovenantScope>(&scope, "scope")?))
 }
@@ -341,9 +388,10 @@ pub fn covenant_with_scope(covenant: JsValue, scope: JsValue) -> Result<JsValue,
 /// @param condition - `SpringingCondition` wire object (`{ metric_id, test }`), for example revolver utilization above a level; the covenant is inactive while the condition is unmet.
 /// @returns The updated `Covenant`.
 /// @throws If either argument does not match its wire type (kind `validation`).
-#[wasm_bindgen(js_name = covenantWithSpringingCondition)]
+#[wasm_bindgen(js_name = covenantWithSpringingCondition, unchecked_return_type = "generated.covenants.Covenant")]
 pub fn covenant_with_springing_condition(
-    covenant: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.covenants.Covenant")] covenant: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.covenants.SpringingCondition")]
     condition: JsValue,
 ) -> Result<JsValue, JsValue> {
     let covenant = js_wire::<Covenant>(&covenant, "covenant")?;
@@ -363,8 +411,10 @@ pub fn covenant_with_springing_condition(
 /// @param covenant - `Covenant` wire object.
 /// @returns `CovenantSpec` wire object with no `metric_id`; evaluation reads the covenant type's conventional metric (for example `"debt_to_ebitda"`) or the `metric` / `name` of a custom or basket covenant.
 /// @throws If `covenant` is not a `Covenant` (kind `validation`).
-#[wasm_bindgen(js_name = covenantSpecNew)]
-pub fn covenant_spec_new(covenant: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = covenantSpecNew, unchecked_return_type = "generated.covenants.CovenantSpec")]
+pub fn covenant_spec_new(
+    #[wasm_bindgen(unchecked_param_type = "generated.covenants.Covenant")] covenant: JsValue,
+) -> Result<JsValue, JsValue> {
     to_js_value(&CovenantSpec::new(js_wire::<Covenant>(
         &covenant, "covenant",
     )?))
@@ -377,13 +427,13 @@ pub fn covenant_spec_new(covenant: JsValue) -> Result<JsValue, JsValue> {
 /// default `"ebitda"` earnings denominator.
 ///
 /// @param covenant - `Covenant` wire object.
-/// @param metric_id - Identifier of the metric the covenant tests, as supplied in the metric map, for example `"debt_to_ebitda"`.
+/// @param metricId - Identifier of the metric the covenant tests, as supplied in the metric map, for example `"debt_to_ebitda"`.
 /// @returns `CovenantSpec` wire object.
 /// @throws If `covenant` is not a `Covenant` (kind `validation`) or `metricId` is not a string (kind `invalid_type`).
-#[wasm_bindgen(js_name = covenantSpecWithMetric)]
+#[wasm_bindgen(js_name = covenantSpecWithMetric, unchecked_return_type = "generated.covenants.CovenantSpec")]
 pub fn covenant_spec_with_metric(
-    covenant: JsValue,
-    metric_id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.covenants.Covenant")] covenant: JsValue,
+    #[wasm_bindgen(js_name = "metricId", unchecked_param_type = "string")] metric_id: JsValue,
 ) -> Result<JsValue, JsValue> {
     to_js_value(&CovenantSpec::with_metric(
         js_wire::<Covenant>(&covenant, "covenant")?,
@@ -394,13 +444,13 @@ pub fn covenant_spec_with_metric(
 /// Copy of a specification with an explicit earnings denominator metric.
 ///
 /// @param spec - `CovenantSpec` wire object of a built-in leverage covenant.
-/// @param metric_id - Identifier of the earnings metric the leverage ratio divides by, for example `"adjusted_ebitda"`.
+/// @param metricId - Identifier of the earnings metric the leverage ratio divides by, for example `"adjusted_ebitda"`.
 /// @returns The updated `CovenantSpec`.
 /// @throws If `spec` is not a `CovenantSpec` (kind `validation`) or `metricId` is not a string (kind `invalid_type`).
-#[wasm_bindgen(js_name = covenantSpecWithDenominatorMetric)]
+#[wasm_bindgen(js_name = covenantSpecWithDenominatorMetric, unchecked_return_type = "generated.covenants.CovenantSpec")]
 pub fn covenant_spec_with_denominator_metric(
-    spec: JsValue,
-    metric_id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.covenants.CovenantSpec")] spec: JsValue,
+    #[wasm_bindgen(js_name = "metricId", unchecked_param_type = "string")] metric_id: JsValue,
 ) -> Result<JsValue, JsValue> {
     let spec = js_wire::<CovenantSpec>(&spec, "spec")?;
     to_js_value(&spec.with_denominator_metric(js_string(&metric_id, "metricId")?))
@@ -412,9 +462,10 @@ pub fn covenant_spec_with_denominator_metric(
 /// @param schedule - `ThresholdSchedule` wire value: `[isoDate, threshold]` pairs; from each date that threshold replaces the covenant's static one.
 /// @returns The updated `CovenantSpec`.
 /// @throws If `spec` is not a `CovenantSpec`, or `schedule` has a non-finite threshold or repeats a date (kind `validation`).
-#[wasm_bindgen(js_name = covenantSpecWithThresholdSchedule)]
+#[wasm_bindgen(js_name = covenantSpecWithThresholdSchedule, unchecked_return_type = "generated.covenants.CovenantSpec")]
 pub fn covenant_spec_with_threshold_schedule(
-    spec: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.covenants.CovenantSpec")] spec: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.covenants.ThresholdSchedule")]
     schedule: JsValue,
 ) -> Result<JsValue, JsValue> {
     let spec = js_wire::<CovenantSpec>(&spec, "spec")?;
@@ -424,13 +475,14 @@ pub fn covenant_spec_with_threshold_schedule(
 /// Threshold in force on a test date.
 ///
 /// @param schedule - `ThresholdSchedule` wire value: `[isoDate, threshold]` pairs.
-/// @param test_date - ISO-8601 covenant test date.
+/// @param testDate - ISO-8601 covenant test date.
 /// @returns The threshold of the latest entry effective on or before `testDate`, or `undefined` when the schedule starts later.
 /// @throws If `schedule` has a non-finite threshold or repeats a date (kind `validation`), or `testDate` is not an ISO-8601 string (kind `invalid_type` or `validation`).
 #[wasm_bindgen(js_name = thresholdScheduleThresholdFor)]
 pub fn threshold_schedule_threshold_for(
+    #[wasm_bindgen(unchecked_param_type = "generated.covenants.ThresholdSchedule")]
     schedule: JsValue,
-    test_date: JsValue,
+    #[wasm_bindgen(js_name = "testDate", unchecked_param_type = "string")] test_date: JsValue,
 ) -> Result<Option<f64>, JsValue> {
     Ok(js_wire::<ThresholdSchedule>(&schedule, "schedule")?
         .threshold_for(js_date(&test_date, "testDate")?))

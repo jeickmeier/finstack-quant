@@ -78,7 +78,15 @@ def test_liquidity_tier_accepts_custom_thresholds() -> None:
 
 
 def test_impact_models_round_trip_and_trade() -> None:
-    profile = LiquidityProfile("ACME", 100.0, 99.95, 100.05, 1_000_000.0, 500.0, 0.0002)
+    profile = LiquidityProfile(
+        instrument_id="ACME",
+        mid=100.0,
+        bid=99.95,
+        ask=100.05,
+        avg_daily_volume=1_000_000.0,
+        avg_trade_size=500.0,
+        spread_volatility=0.0002,
+    )
     assert profile.spread == pytest.approx(0.1)
     assert profile.spread_volatility_kind == "relative"
     assert LiquidityProfile.from_json(profile.to_json()) == profile

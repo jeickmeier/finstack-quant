@@ -360,7 +360,7 @@ pub(crate) fn carry_credit_decomposition(
     )?;
 
     attribution.credit_carry_decomposition = Some(CreditCarryDecomposition {
-        model_id: credit_factor_model_id(model),
+        model_id: credit_factor_model_id(model)?,
         rates_carry_total,
         credit_carry_total: credit_total,
         credit_by_level: CreditCarryByLevel {

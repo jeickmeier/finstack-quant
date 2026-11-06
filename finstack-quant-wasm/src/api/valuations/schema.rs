@@ -19,7 +19,7 @@ use wasm_bindgen::prelude::*;
 /// large (about one megabyte); read it once and cache the parsed result.
 /// @returns JSON Schema document of the instrument envelope.
 /// @throws Error - Throws with kind `validation` if the embedded schema is malformed (does not occur for a released build).
-#[wasm_bindgen(js_name = instrumentEnvelopeSchema)]
+#[wasm_bindgen(js_name = instrumentEnvelopeSchema, unchecked_return_type = "Record<string, unknown>")]
 pub fn instrument_envelope_schema() -> Result<JsValue, JsValue> {
     to_js_value(schema::instrument_envelope_schema().map_err(to_js_err)?)
 }
@@ -35,11 +35,14 @@ pub fn instrument_types() -> Vec<String> {
 }
 
 /// JSON Schema of one instrument type.
-/// @param instrument_type - Canonical instrument type discriminator from `instrumentTypes()`, e.g. `"bond"`.
+/// @param instrumentType - Canonical instrument type discriminator from `instrumentTypes()`, e.g. `"bond"`.
 /// @returns JSON Schema document of that instrument type's envelope.
 /// @throws Error - Throws with kind `not_found` if `instrumentType` is not a registered instrument type, and kind `invalid_type` if it is not a string.
-#[wasm_bindgen(js_name = instrumentSchema)]
-pub fn instrument_schema(instrument_type: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = instrumentSchema, unchecked_return_type = "Record<string, unknown>")]
+pub fn instrument_schema(
+    #[wasm_bindgen(js_name = "instrumentType", unchecked_param_type = "string")]
+    instrument_type: JsValue,
+) -> Result<JsValue, JsValue> {
     let instrument_type = js_string(&instrument_type, "instrumentType")?;
     to_js_value(&schema::instrument_schema(&instrument_type).map_err(to_js_err)?)
 }
@@ -47,7 +50,7 @@ pub fn instrument_schema(instrument_type: JsValue) -> Result<JsValue, JsValue> {
 /// JSON Schema of the `ValuationResult` envelope returned by the pricing entry points.
 /// @returns JSON Schema document of the valuation result.
 /// @throws Error - Throws with kind `validation` if the embedded schema is malformed (does not occur for a released build).
-#[wasm_bindgen(js_name = valuationResultSchema)]
+#[wasm_bindgen(js_name = valuationResultSchema, unchecked_return_type = "Record<string, unknown>")]
 pub fn valuation_result_schema() -> Result<JsValue, JsValue> {
     to_js_value(schema::valuation_result_schema().map_err(to_js_err)?)
 }
@@ -61,24 +64,29 @@ fn canonical_json(instance: &serde_json::Value) -> Result<String, JsValue> {
 ///
 /// Both the envelope schema and the schema selected by `instrument.type` are
 /// applied, as the Rust loader does when it decodes tagged instrument JSON.
-/// @param instrument_json - A `finstack_quant.instrument/1` envelope, as JSON text or a plain object.
+/// @param instrumentJson - A `finstack_quant.instrument/1` envelope, as JSON text or a plain object.
 /// @returns Canonical compact JSON of the validated payload.
 /// @throws Error - Throws with kind `validation` if `instrumentJson` is JSON text that does not parse, or if it violates the envelope schema or its instrument type's schema (the message lists every violation); and kind `invalid_type` if it is neither JSON text nor a plain object.
 #[wasm_bindgen(js_name = validateInstrumentEnvelopeJson)]
-pub fn validate_instrument_envelope_json(instrument_json: JsValue) -> Result<String, JsValue> {
+pub fn validate_instrument_envelope_json(
+    #[wasm_bindgen(js_name = "instrumentJson", unchecked_param_type = "string | object")]
+    instrument_json: JsValue,
+) -> Result<String, JsValue> {
     let instance: serde_json::Value = from_js_json(&instrument_json, "instrumentJson")?;
     schema::validate_instrument_envelope_json(&instance).map_err(to_js_err)?;
     canonical_json(&instance)
 }
 
 /// Validate a payload against one instrument type's schema.
-/// @param instrument_type - Canonical instrument type discriminator from `instrumentTypes()`, e.g. `"bond"`.
-/// @param instrument_json - Payload to check against that type's schema, as JSON text or a plain object.
+/// @param instrumentType - Canonical instrument type discriminator from `instrumentTypes()`, e.g. `"bond"`.
+/// @param instrumentJson - Payload to check against that type's schema, as JSON text or a plain object.
 /// @returns Canonical compact JSON of the validated payload.
 /// @throws Error - Throws with kind `not_found` if `instrumentType` is not a registered instrument type; kind `validation` if `instrumentJson` is JSON text that does not parse or violates the type schema (the message lists every violation); and kind `invalid_type` if `instrumentType` is not a string or `instrumentJson` is neither JSON text nor a plain object.
 #[wasm_bindgen(js_name = validateInstrumentTypeJson)]
 pub fn validate_instrument_type_json(
+    #[wasm_bindgen(js_name = "instrumentType", unchecked_param_type = "string")]
     instrument_type: JsValue,
+    #[wasm_bindgen(js_name = "instrumentJson", unchecked_param_type = "string | object")]
     instrument_json: JsValue,
 ) -> Result<String, JsValue> {
     let instrument_type = js_string(&instrument_type, "instrumentType")?;

@@ -1,5 +1,15 @@
 import * as wasm from '../../pkg/finstack_quant_wasm.js';
 
+/**
+ * Namespaced TypeScript entry points for correlation calculations and types.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const [lower, upper] = models.correlation.correlationBounds(0.1, 0.2);
+ * console.log(lower, upper);
+ * ```
+ */
 export const correlation = {
   CopulaSpec: wasm.CopulaSpec,
   Copula: wasm.Copula,

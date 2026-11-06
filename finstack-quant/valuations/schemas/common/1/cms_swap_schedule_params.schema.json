@@ -1,0 +1,188 @@
+{
+  "$defs": {
+    "FundingLegSpec": {
+      "description": "Simplified funding leg specification for [`CmsSwap::from_schedule`].",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Fixed rate funding leg.",
+          "properties": {
+            "day_count": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+              "description": "Day count convention."
+            },
+            "rate": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+              "description": "Fixed coupon rate as a decimal annual rate (0.03 = 3%)."
+            },
+            "type": {
+              "const": "fixed",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "rate",
+            "day_count"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Floating rate funding leg.",
+          "properties": {
+            "day_count": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+              "description": "Day count convention."
+            },
+            "forward_curve_id": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+              "description": "Forward curve for floating rate projection."
+            },
+            "spread_bp": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+              "description": "Additive spread over the floating index in basis points (10 = 10bp)."
+            },
+            "type": {
+              "const": "floating",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "spread_bp",
+            "day_count",
+            "forward_curve_id"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "PayReceive": {
+      "description": "Direction for instrument legs (universal for IRS, CDS, variance swaps, etc.)\n\nFor interest rate swaps: Pay = pay fixed/receive floating, Receive = receive fixed/pay floating\nFor credit default swaps: Pay = buy protection (pay premium), Receive = sell protection (receive premium)\nFor variance swaps: Pay = short variance, Receive = long variance",
+      "oneOf": [
+        {
+          "const": "pay",
+          "description": "Pay the primary leg (fixed rate in IRS, protection premium in CDS, short variance)",
+          "type": "string"
+        },
+        {
+          "const": "receive",
+          "description": "Receive the primary leg (fixed rate in IRS, protection premium in CDS, long variance)",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/common/1/cms_swap_schedule_params.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Schedule, CMS terms, funding leg, notional and curves of a CMS swap built from its schedule.",
+  "examples": [
+    {
+      "cms_frequency": {
+        "count": 3,
+        "unit": "months"
+      },
+      "cms_spread_bp": "0",
+      "cms_tenor": {
+        "count": 10,
+        "unit": "years"
+      },
+      "day_count": "act_360",
+      "discount_curve_id": "USD-OIS",
+      "forward_curve_id": "USD-SOFR-OIS",
+      "funding_leg": {
+        "day_count": "30_360",
+        "rate": "0.03",
+        "type": "fixed"
+      },
+      "id": "CMS10Y-USD-5Y",
+      "index_id": "USD-SOFR-OIS",
+      "maturity": "2030-03-20",
+      "notional": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "side": "pay",
+      "start_date": "2025-03-20",
+      "vol_surface_id": "USD-SWPNVOL"
+    }
+  ],
+  "properties": {
+    "cms_frequency": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+      "description": "Payment and fixing frequency of both the CMS and funding schedules."
+    },
+    "cms_spread_bp": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+      "description": "Additive spread on the CMS rate in basis points (10 = 10bp)."
+    },
+    "cms_tenor": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+      "description": "Reference swap tenor of the CMS rate (e.g. 10Y); month- or year-based."
+    },
+    "day_count": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+      "description": "Day count of the CMS-leg accrual fractions."
+    },
+    "discount_curve_id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Discount curve for present values."
+    },
+    "forward_curve_id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Forward curve projecting the reference swap's floating rates."
+    },
+    "funding_leg": {
+      "$ref": "#/$defs/FundingLegSpec",
+      "description": "Fixed or floating funding leg; its schedule is generated from the same\nstart, maturity and CMS frequency."
+    },
+    "id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Unique instrument identifier."
+    },
+    "index_id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Rate-index convention-registry key (e.g. `USD-SOFR-OIS`) supplying the\ncalendar and reset lag; stored as the reference-swap index."
+    },
+    "maturity": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+      "description": "Final payment date."
+    },
+    "notional": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+      "description": "Notional; its currency is the payment currency."
+    },
+    "side": {
+      "$ref": "#/$defs/PayReceive",
+      "description": "`pay` or `receive` the CMS leg."
+    },
+    "start_date": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+      "description": "Inclusive schedule start date."
+    },
+    "vol_surface_id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Swaption volatility surface for the CMS convexity adjustment."
+    }
+  },
+  "required": [
+    "id",
+    "start_date",
+    "maturity",
+    "cms_frequency",
+    "cms_tenor",
+    "cms_spread_bp",
+    "funding_leg",
+    "notional",
+    "day_count",
+    "index_id",
+    "side",
+    "discount_curve_id",
+    "forward_curve_id",
+    "vol_surface_id"
+  ],
+  "title": "CmsSwapScheduleParams",
+  "type": "object"
+}

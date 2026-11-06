@@ -324,6 +324,48 @@ pub struct Ndf {
 
 finstack_quant_valuations_core::validate_on_deserialize!(Ndf);
 
+/// Inputs of [`Ndf::from_trade_date`].
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct NdfTradeDateParams {
+    /// Unique instrument identifier.
+    pub id: InstrumentId,
+    /// Restricted (non-deliverable) currency: the numerator and notional currency.
+    pub base_currency: Currency,
+    /// Convertible settlement currency (typically USD): the denominator.
+    pub settlement_currency: Currency,
+    /// Trade date from which the spot date is rolled.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub trade_date: Date,
+    /// Calendar tenor from spot to maturity, e.g. `3M`.
+    pub tenor: Tenor,
+    /// Notional in `base_currency`.
+    pub notional: Money,
+    /// Contract forward rate, base currency per unit of settlement currency.
+    pub contract_rate: f64,
+    /// Settlement-currency discount curve identifier.
+    pub domestic_discount_curve_id: CurveId,
+    /// Base-currency holiday calendar id; `None` uses weekends only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_calendar_id: Option<String>,
+    /// Settlement-currency holiday calendar id; `None` uses weekends only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settlement_calendar_id: Option<String>,
+    /// T+N spot lag in business days (typically 2).
+    pub settlement_days: u32,
+    /// Joint business days from fixing to maturity (typically 2); a negative
+    /// value places the fixing after maturity's unadjusted date.
+    pub fixing_offset_days: i64,
+    /// Business-day convention rolling the maturity on the joint calendar.
+    pub business_day_convention: finstack_quant_core::dates::BusinessDayConvention,
+    /// Preserve month-end: a month-end spot date gives a month-end maturity.
+    pub end_of_month: bool,
+}
+
 impl Ndf {
     const MIN_POSITIVE_RATE: f64 = 1.0e-12;
 
@@ -438,39 +480,38 @@ impl Ndf {
 
     /// Construct an NDF from trade date and tenor using standard fixing offset.
     ///
+    /// Spot is `trade_date` rolled by the T+N spot lag on the joint
+    /// base/settlement calendar; maturity is spot plus `tenor`; the fixing
+    /// date is `fixing_offset_days` joint business days before maturity,
+    /// adjusted Preceding.
+    ///
     /// # Arguments
     ///
-    /// * `id` - Instrument identifier
-    /// * `base_currency` - Restricted currency (numerator)
-    /// * `settlement_currency` - Convertible currency (denominator)
-    /// * `trade_date` - Trade date
-    /// * `tenor` - Calendar tenor from spot to maturity (for example, 3M).
-    /// * `notional` - Notional in base currency
-    /// * `contract_rate` - Contract forward rate
-    /// * `domestic_discount_curve_id` - Settlement/quote currency discount curve
-    /// * `base_calendar_id` - Optional base currency calendar
-    /// * `settlement_calendar_id` - Optional settlement currency calendar
-    /// * `settlement_days` - T+N spot lag in business days (typically 2)
-    /// * `fixing_offset_days` - Days before maturity for fixing (typically 2)
-    /// * `business_day_convention` - Business day convention
-    /// * `end_of_month` - Preserve month-end when the spot date is month-end.
-    #[allow(clippy::too_many_arguments)]
-    pub fn from_trade_date(
-        id: impl Into<InstrumentId>,
-        base_currency: Currency,
-        settlement_currency: Currency,
-        trade_date: Date,
-        tenor: Tenor,
-        notional: Money,
-        contract_rate: f64,
-        domestic_discount_curve_id: impl Into<CurveId>,
-        base_calendar_id: Option<String>,
-        settlement_calendar_id: Option<String>,
-        settlement_days: u32,
-        fixing_offset_days: i64,
-        business_day_convention: finstack_quant_core::dates::BusinessDayConvention,
-        end_of_month: bool,
-    ) -> finstack_quant_core::Result<Self> {
+    /// * `params` - Identifier, currencies, trade date, tenor, notional,
+    ///   contract rate, curve and spot/fixing conventions; see
+    ///   [`NdfTradeDateParams`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a calendar id is unknown, the dates cannot be
+    /// rolled, or the NDF fails validation.
+    pub fn from_trade_date(params: NdfTradeDateParams) -> finstack_quant_core::Result<Self> {
+        let NdfTradeDateParams {
+            id,
+            base_currency,
+            settlement_currency,
+            trade_date,
+            tenor,
+            notional,
+            contract_rate,
+            domestic_discount_curve_id,
+            base_calendar_id,
+            settlement_calendar_id,
+            settlement_days,
+            fixing_offset_days,
+            business_day_convention,
+            end_of_month,
+        } = params;
         use finstack_quant_core::dates::fx::{add_fx_standard_tenor, fx_spot_date};
         use finstack_quant_core::dates::{DateExt, adjust, resolve_joint_calendar};
 
@@ -525,14 +566,14 @@ impl Ndf {
         )?;
 
         Self::builder()
-            .id(id.into())
+            .id(id)
             .base_currency(base_currency)
             .settlement_currency(settlement_currency)
             .fixing_date(fixing_date)
             .maturity(maturity)
             .notional(notional)
             .contract_rate(contract_rate)
-            .domestic_discount_curve_id(domestic_discount_curve_id.into())
+            .domestic_discount_curve_id(domestic_discount_curve_id)
             .quote_convention(NdfQuoteConvention::BasePerSettlement)
             .base_calendar_id_opt(base_calendar_id.map(Into::into))
             .settlement_calendar_id_opt(settlement_calendar_id.map(Into::into))

@@ -20,21 +20,11 @@ contract for each envelope is in [`docs/CONTRACTS.md`](../../../docs/CONTRACTS.m
 ## Regenerating Schemas
 
 ```bash
-# Regenerate every registry-owned Rust schema
-mise run rust-gen-schemas
+# Regenerate every generated artifact: these schemas, the schema index, the
+# canonical instrument fixtures, and everything derived from them
+mise run gen-write
 
-# Regenerate only valuations-owned schemas, the schema index, and the
-# canonical instrument fixtures (all three come from one binary)
-cargo run -p finstack-quant-valuations --bin gen_schemas -- --write
-
-# Run the other owning generators directly when needed
-cargo run -p finstack-quant-cashflows --bin gen_cashflow_schemas -- --write
-cargo run -p finstack-quant-portfolio --bin gen_portfolio_schemas -- --write
-
-# Validate schema parity and the checked-in schema audit
-mise run rust-check-schemas
-
-# Regenerate all maintained schema/binding artifacts and check path/content drift
+# Fail on schema, fixture or binding drift (non-mutating)
 mise run gen-check
 ```
 
@@ -264,9 +254,7 @@ or the contract-specific strict loader listed in
 ## Verification
 
 ```bash
-# Fail if any checked-in schema, index entry, or canonical fixture has drifted
-cargo run -p finstack-quant-valuations --bin gen_schemas -- --check
-
-# Full schema gate: serde audit, every owning generator, and the parity tests
-mise run rust-check-schemas
+# Fail if any checked-in schema, index entry, or canonical fixture has drifted;
+# includes the serde audit and every owning generator
+mise run gen-check
 ```

@@ -48,12 +48,12 @@ class TrancheCashflows:
     >>> deal = StructuredCredit.new_standard(
     ...     "clo",
     ...     StandardDealParams(
-    ...         "CLO-1",
-    ...         pool,
-    ...         TrancheStructure([note]),
-    ...         as_of,
-    ...         maturity,
-    ...         "USD-SOFR-DISC",
+    ...         id="CLO-1",
+    ...         pool=pool,
+    ...         tranches=TrancheStructure([note]),
+    ...         closing_date=as_of,
+    ...         maturity=maturity,
+    ...         discount_curve_id="USD-SOFR-DISC",
     ...         calendar_id="nyse",
     ...     ),
     ... )

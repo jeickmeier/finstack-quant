@@ -7,7 +7,7 @@
 //! - Diversion rule processing
 //! - Stochastic pricing
 
-pub(crate) mod coverage_tests;
+pub(crate) mod coverage;
 pub(crate) mod resolve;
 pub(crate) mod simulation_engine;
 pub use simulation_engine::{

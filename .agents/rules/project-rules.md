@@ -8,9 +8,7 @@ globs:
   - Tests: `mise run rust-test-crate`, `rust-test-integration`, or `rust-test-filter` for the same package
   - Benchmarks: `mise run rust-bench-crate -- <package> <bench>` — never `rust-bench` unless validating performance broadly
   - See `.agents/rules/selective-test-running.mdc` for path → package mapping and examples
-- Run full-workspace gates only at the end of a plan or before commit/CI:
-  - `mise run rust-lint` (not after every edit — full-workspace clippy is still slow)
-  - `mise run rust-test`, `mise run all-lint`, `mise run all-test`
+- Run the gate, `mise run all` (exactly what CI runs), only at the end of a plan or before a commit/PR, not after every edit. Run `mise run gen-write` first when a generator, wire type, binding or the WASM facade changed.
 - For wasm code, run `mise run wasm-lint` after each set of changes (WASM surface is small enough to lint whole).
 - For python code changes, run `mise run python-lint` after each set of changes; run scoped pytest (`uv run pytest path -k filter`) rather than `python-test --all` while iterating.
 - Fix any errors that are present from lints and tests before moving on to next task.

@@ -36,7 +36,7 @@ test('every priced result records how it was produced', () => {
   assert.equal(result.provenance.sensitivity_bumps, undefined);
 
   const withRisk = priceInstrument(g.instrument, g.market.data, asOf, 'discounting', ['dv01'], {
-    bump_config: { rate_bump_bp: 5 },
+    metric_pricing_overrides: { bump_config: { rate_bump_bp: 5 } },
   });
   assert.equal(withRisk.provenance.sensitivity_bumps.rate_bump_bp, 5);
   assert.equal(withRisk.provenance.sensitivity_bumps.vol_bump_decimal, 0.01);
@@ -49,16 +49,9 @@ test('explain attaches a cashflow trace that sums to the price', () => {
   ]) {
     const g = golden(name);
     const asOf = g.metadata.valuation_date;
-    const result = priceInstrument(
-      g.instrument,
-      g.market.data,
-      asOf,
-      model,
-      null,
-      null,
-      null,
-      true
-    );
+    const result = priceInstrument(g.instrument, g.market.data, asOf, model, null, {
+      explain: true,
+    });
     const { type, entries } = result.explanation;
 
     assert.equal(type, 'pricing');
@@ -85,9 +78,7 @@ test('a model without a per-flow decomposition says so in the trace', () => {
     g.metadata.valuation_date,
     g.model,
     null,
-    null,
-    null,
-    true
+    { explain: true }
   );
   const { entries } = result.explanation;
 
@@ -96,8 +87,25 @@ test('a model without a per-flow decomposition says so in the trace', () => {
   assert.equal(entries[0].name, 'cashflow_trace_unavailable');
 });
 
-test('explain rejects a non-boolean', () => {
+test('extras rejects a non-boolean explain and an unknown key', () => {
   const g = golden('usd_fixed_10y_risk_free_quantlib');
+  for (const extras of [{ explain: 'yes' }, { explian: true }]) {
+    assert.throws(
+      () =>
+        priceInstrument(
+          g.instrument,
+          g.market.data,
+          g.metadata.valuation_date,
+          'discounting',
+          null,
+          extras
+        ),
+      (error) =>
+        error.name === 'FinstackError' &&
+        error.kind === 'validation' &&
+        error.message.includes('extras:')
+    );
+  }
   assert.throws(
     () =>
       priceInstrument(
@@ -106,9 +114,7 @@ test('explain rejects a non-boolean', () => {
         g.metadata.valuation_date,
         'discounting',
         null,
-        null,
-        null,
-        'yes'
+        true
       ),
     (error) => error instanceof TypeError && error.kind === 'invalid_type'
   );

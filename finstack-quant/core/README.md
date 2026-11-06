@@ -278,7 +278,7 @@ both copies by hand.
 
 JSON Schemas for the market-data contracts are checked in under `schemas/` and
 produced by the `gen_core_schemas` binary. Regenerate with
-`mise run rust-gen-schemas`; verify with `mise run rust-check-schemas`.
+`mise run gen-write`; verify with `mise run gen-check`.
 
 ## Cargo features
 
@@ -317,7 +317,7 @@ authority on what the namespaces must contain.
 mise run rust-test-crate -- finstack-quant-core
 mise run rust-lint-crate -- finstack-quant-core
 mise run rust-doc
-mise run rust-check-schemas
+mise run gen-check
 ```
 
 Workspace-wide equivalents: `mise run rust-test`, `mise run rust-lint`,

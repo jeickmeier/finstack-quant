@@ -968,7 +968,7 @@ mod tests {
                     .with_continuous_monitoring(sigma)
                     .unwrap();
                 let fixed = pricer
-                    .price_with_grid(
+                    .price(
                         &process,
                         100.0,
                         TimeGrid::uniform(1.0, steps).unwrap(),
@@ -978,7 +978,7 @@ mod tests {
                     )
                     .unwrap();
                 let floating = pricer
-                    .price_with_grid(
+                    .price(
                         &process,
                         100.0,
                         TimeGrid::uniform(1.0, steps).unwrap(),

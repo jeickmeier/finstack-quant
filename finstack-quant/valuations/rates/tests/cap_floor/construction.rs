@@ -20,19 +20,19 @@ fn test_cap_creation_basic() {
     let start = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let end = Date::from_calendar_date(2030, Month::January, 1).unwrap();
 
-    let cap = CapFloor::new(
-        "USD_CAP_3%",
-        RateOptionType::Cap,
+    let cap = CapFloor::new(finstack_quant_valuations_rates::cap_floor::CapFloorParams {
+        id: "USD_CAP_3%".into(),
+        rate_option_type: RateOptionType::Cap,
         notional,
-        0.03,
-        start,
-        end,
-        Some(Tenor::quarterly()),
-        DayCount::Act360,
-        "USD-OIS",
-        "USD-LIBOR-3M",
-        "USD-CAP-VOL",
-    )
+        strike: 0.03,
+        start_date: start,
+        maturity: end,
+        frequency: Some(Tenor::quarterly()),
+        day_count: DayCount::Act360,
+        discount_curve_id: "USD-OIS".into(),
+        forward_curve_id: "USD-LIBOR-3M".into(),
+        vol_surface_id: "USD-CAP-VOL".into(),
+    })
     .expect("valid strike");
 
     assert_eq!(cap.id, "USD_CAP_3%");
@@ -52,19 +52,19 @@ fn test_floor_creation_basic() {
     let start = Date::from_calendar_date(2025, Month::March, 15).unwrap();
     let end = Date::from_calendar_date(2028, Month::March, 15).unwrap();
 
-    let floor = CapFloor::new(
-        "EUR_FLOOR_1%",
-        RateOptionType::Floor,
+    let floor = CapFloor::new(finstack_quant_valuations_rates::cap_floor::CapFloorParams {
+        id: "EUR_FLOOR_1%".into(),
+        rate_option_type: RateOptionType::Floor,
         notional,
-        0.01,
-        start,
-        end,
-        Some(Tenor::semi_annual()),
-        DayCount::Thirty360,
-        "EUR-OIS",
-        "EUR-EURIBOR-6M",
-        "EUR-CAP-VOL",
-    )
+        strike: 0.01,
+        start_date: start,
+        maturity: end,
+        frequency: Some(Tenor::semi_annual()),
+        day_count: DayCount::Thirty360,
+        discount_curve_id: "EUR-OIS".into(),
+        forward_curve_id: "EUR-EURIBOR-6M".into(),
+        vol_surface_id: "EUR-CAP-VOL".into(),
+    })
     .expect("valid strike");
 
     assert_eq!(floor.id, "EUR_FLOOR_1%");
@@ -84,19 +84,19 @@ fn test_cap_new_cap_helper() {
     let start = Date::from_calendar_date(2025, Month::June, 1).unwrap();
     let end = Date::from_calendar_date(2027, Month::June, 1).unwrap();
 
-    let cap = CapFloor::new(
-        "GBP_CAP",
-        RateOptionType::Cap,
+    let cap = CapFloor::new(finstack_quant_valuations_rates::cap_floor::CapFloorParams {
+        id: "GBP_CAP".into(),
+        rate_option_type: RateOptionType::Cap,
         notional,
-        0.04,
-        start,
-        end,
-        Some(Tenor::quarterly()),
-        DayCount::Act365F,
-        "GBP-OIS",
-        "GBP-LIBOR-3M",
-        "GBP-CAP-VOL",
-    )
+        strike: 0.04,
+        start_date: start,
+        maturity: end,
+        frequency: Some(Tenor::quarterly()),
+        day_count: DayCount::Act365F,
+        discount_curve_id: "GBP-OIS".into(),
+        forward_curve_id: "GBP-LIBOR-3M".into(),
+        vol_surface_id: "GBP-CAP-VOL".into(),
+    })
     .expect("valid strike");
 
     assert_eq!(cap.rate_option_type, RateOptionType::Cap);
@@ -110,19 +110,19 @@ fn test_floor_new_floor_helper() {
     let start = Date::from_calendar_date(2026, Month::January, 1).unwrap();
     let end = Date::from_calendar_date(2031, Month::January, 1).unwrap();
 
-    let floor = CapFloor::new(
-        "JPY_FLOOR",
-        RateOptionType::Floor,
+    let floor = CapFloor::new(finstack_quant_valuations_rates::cap_floor::CapFloorParams {
+        id: "JPY_FLOOR".into(),
+        rate_option_type: RateOptionType::Floor,
         notional,
-        0.005,
-        start,
-        end,
-        Some(Tenor::quarterly()),
-        DayCount::Act360,
-        "JPY-OIS",
-        "JPY-LIBOR-3M",
-        "JPY-CAP-VOL",
-    )
+        strike: 0.005,
+        start_date: start,
+        maturity: end,
+        frequency: Some(Tenor::quarterly()),
+        day_count: DayCount::Act360,
+        discount_curve_id: "JPY-OIS".into(),
+        forward_curve_id: "JPY-LIBOR-3M".into(),
+        vol_surface_id: "JPY-CAP-VOL".into(),
+    })
     .expect("valid strike");
 
     assert_eq!(floor.rate_option_type, RateOptionType::Floor);
@@ -213,19 +213,19 @@ fn test_custom_calendar() {
     let start = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let end = Date::from_calendar_date(2030, Month::January, 1).unwrap();
 
-    let mut cap = CapFloor::new(
-        "CAP_WITH_CALENDAR",
-        RateOptionType::Cap,
+    let mut cap = CapFloor::new(finstack_quant_valuations_rates::cap_floor::CapFloorParams {
+        id: "CAP_WITH_CALENDAR".into(),
+        rate_option_type: RateOptionType::Cap,
         notional,
-        0.03,
-        start,
-        end,
-        Some(Tenor::quarterly()),
-        DayCount::Act360,
-        "USD-OIS",
-        "USD-LIBOR-3M",
-        "USD-CAP-VOL",
-    )
+        strike: 0.03,
+        start_date: start,
+        maturity: end,
+        frequency: Some(Tenor::quarterly()),
+        day_count: DayCount::Act360,
+        discount_curve_id: "USD-OIS".into(),
+        forward_curve_id: "USD-LIBOR-3M".into(),
+        vol_surface_id: "USD-CAP-VOL".into(),
+    })
     .expect("valid strike");
     cap.calendar_id = Some("US_NERC".into());
 
@@ -246,19 +246,19 @@ fn test_different_day_counts() {
     ];
 
     for day_count in day_counts {
-        let cap = CapFloor::new(
-            "CAP_DC_TEST",
-            RateOptionType::Cap,
+        let cap = CapFloor::new(finstack_quant_valuations_rates::cap_floor::CapFloorParams {
+            id: "CAP_DC_TEST".into(),
+            rate_option_type: RateOptionType::Cap,
             notional,
-            0.03,
-            start,
-            end,
-            Some(Tenor::quarterly()),
+            strike: 0.03,
+            start_date: start,
+            maturity: end,
+            frequency: Some(Tenor::quarterly()),
             day_count,
-            "USD-OIS",
-            "USD-LIBOR-3M",
-            "USD-CAP-VOL",
-        )
+            discount_curve_id: "USD-OIS".into(),
+            forward_curve_id: "USD-LIBOR-3M".into(),
+            vol_surface_id: "USD-CAP-VOL".into(),
+        })
         .expect("valid strike");
 
         assert_eq!(cap.day_count, day_count);
@@ -279,19 +279,19 @@ fn test_different_frequencies() {
     ];
 
     for frequency in frequencies {
-        let cap = CapFloor::new(
-            "CAP_FREQ_TEST",
-            RateOptionType::Cap,
+        let cap = CapFloor::new(finstack_quant_valuations_rates::cap_floor::CapFloorParams {
+            id: "CAP_FREQ_TEST".into(),
+            rate_option_type: RateOptionType::Cap,
             notional,
-            0.03,
-            start,
-            end,
-            Some(frequency),
-            DayCount::Act360,
-            "USD-OIS",
-            "USD-LIBOR-3M",
-            "USD-CAP-VOL",
-        )
+            strike: 0.03,
+            start_date: start,
+            maturity: end,
+            frequency: Some(frequency),
+            day_count: DayCount::Act360,
+            discount_curve_id: "USD-OIS".into(),
+            forward_curve_id: "USD-LIBOR-3M".into(),
+            vol_surface_id: "USD-CAP-VOL".into(),
+        })
         .expect("valid strike");
 
         assert_eq!(cap.frequency, frequency);
@@ -304,19 +304,19 @@ fn test_new_caplet_rejects_nan_strike() {
     let start = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let end = Date::from_calendar_date(2026, Month::January, 1).unwrap();
 
-    let result = CapFloor::new(
-        "CAPLET-NAN",
-        RateOptionType::Caplet,
+    let result = CapFloor::new(finstack_quant_valuations_rates::cap_floor::CapFloorParams {
+        id: "CAPLET-NAN".into(),
+        rate_option_type: RateOptionType::Caplet,
         notional,
-        f64::NAN,
-        start,
-        end,
-        None,
-        DayCount::Act360,
-        "USD-OIS",
-        "USD-SOFR-3M",
-        "USD_CAP_VOL",
-    );
+        strike: f64::NAN,
+        start_date: start,
+        maturity: end,
+        frequency: None,
+        day_count: DayCount::Act360,
+        discount_curve_id: "USD-OIS".into(),
+        forward_curve_id: "USD-SOFR-3M".into(),
+        vol_surface_id: "USD_CAP_VOL".into(),
+    });
     assert!(result.is_err(), "CapFloor::new should reject NaN strike");
 }
 
@@ -326,19 +326,19 @@ fn test_new_caplet_rejects_infinite_strike() {
     let start = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let end = Date::from_calendar_date(2026, Month::January, 1).unwrap();
 
-    let result = CapFloor::new(
-        "CAPLET-INF",
-        RateOptionType::Caplet,
+    let result = CapFloor::new(finstack_quant_valuations_rates::cap_floor::CapFloorParams {
+        id: "CAPLET-INF".into(),
+        rate_option_type: RateOptionType::Caplet,
         notional,
-        f64::INFINITY,
-        start,
-        end,
-        None,
-        DayCount::Act360,
-        "USD-OIS",
-        "USD-SOFR-3M",
-        "USD_CAP_VOL",
-    );
+        strike: f64::INFINITY,
+        start_date: start,
+        maturity: end,
+        frequency: None,
+        day_count: DayCount::Act360,
+        discount_curve_id: "USD-OIS".into(),
+        forward_curve_id: "USD-SOFR-3M".into(),
+        vol_surface_id: "USD_CAP_VOL".into(),
+    });
     assert!(
         result.is_err(),
         "CapFloor::new should reject infinite strike"
@@ -351,19 +351,19 @@ fn test_new_floorlet_rejects_nan_strike() {
     let start = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let end = Date::from_calendar_date(2026, Month::January, 1).unwrap();
 
-    let result = CapFloor::new(
-        "FLOORLET-NAN",
-        RateOptionType::Floorlet,
+    let result = CapFloor::new(finstack_quant_valuations_rates::cap_floor::CapFloorParams {
+        id: "FLOORLET-NAN".into(),
+        rate_option_type: RateOptionType::Floorlet,
         notional,
-        f64::NAN,
-        start,
-        end,
-        None,
-        DayCount::Act360,
-        "USD-OIS",
-        "USD-SOFR-3M",
-        "USD_CAP_VOL",
-    );
+        strike: f64::NAN,
+        start_date: start,
+        maturity: end,
+        frequency: None,
+        day_count: DayCount::Act360,
+        discount_curve_id: "USD-OIS".into(),
+        forward_curve_id: "USD-SOFR-3M".into(),
+        vol_surface_id: "USD_CAP_VOL".into(),
+    });
     assert!(result.is_err(), "CapFloor::new should reject NaN strike");
 }
 
@@ -373,19 +373,19 @@ fn test_new_caplet_accepts_valid_strike() {
     let start = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let end = Date::from_calendar_date(2026, Month::January, 1).unwrap();
 
-    let result = CapFloor::new(
-        "CAPLET-OK",
-        RateOptionType::Caplet,
+    let result = CapFloor::new(finstack_quant_valuations_rates::cap_floor::CapFloorParams {
+        id: "CAPLET-OK".into(),
+        rate_option_type: RateOptionType::Caplet,
         notional,
-        0.05,
-        start,
-        end,
-        None,
-        DayCount::Act360,
-        "USD-OIS",
-        "USD-SOFR-3M",
-        "USD_CAP_VOL",
-    );
+        strike: 0.05,
+        start_date: start,
+        maturity: end,
+        frequency: None,
+        day_count: DayCount::Act360,
+        discount_curve_id: "USD-OIS".into(),
+        forward_curve_id: "USD-SOFR-3M".into(),
+        vol_surface_id: "USD_CAP_VOL".into(),
+    });
     assert!(
         result.is_ok(),
         "CapFloor::new should accept a valid finite strike"
@@ -394,19 +394,19 @@ fn test_new_caplet_accepts_valid_strike() {
 
 #[test]
 fn term_index_rejects_overnight_coupon_settings() {
-    let mut caplet = CapFloor::new(
-        "TERM-WITH-OVERNIGHT-SETTINGS",
-        RateOptionType::Caplet,
-        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-        0.05,
-        Date::from_calendar_date(2025, Month::January, 2).unwrap(),
-        Date::from_calendar_date(2025, Month::April, 2).unwrap(),
-        None,
-        DayCount::Act360,
-        "USD-OIS",
-        "USD-LIBOR-3M",
-        "USD-CAP-VOL",
-    )
+    let mut caplet = CapFloor::new(finstack_quant_valuations_rates::cap_floor::CapFloorParams {
+        id: "TERM-WITH-OVERNIGHT-SETTINGS".into(),
+        rate_option_type: RateOptionType::Caplet,
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        strike: 0.05,
+        start_date: Date::from_calendar_date(2025, Month::January, 2).unwrap(),
+        maturity: Date::from_calendar_date(2025, Month::April, 2).unwrap(),
+        frequency: None,
+        day_count: DayCount::Act360,
+        discount_curve_id: "USD-OIS".into(),
+        forward_curve_id: "USD-LIBOR-3M".into(),
+        vol_surface_id: "USD-CAP-VOL".into(),
+    })
     .expect("valid caplet");
     caplet.overnight_coupon = Some(OvernightCouponConvention {
         compounding: FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 1 },
@@ -427,19 +427,19 @@ fn term_index_rejects_overnight_coupon_settings() {
 
 #[test]
 fn legacy_cap_json_defaults_overnight_coupon_to_none() {
-    let cap = CapFloor::new(
-        "LEGACY-CAP",
-        RateOptionType::Cap,
-        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-        0.05,
-        Date::from_calendar_date(2025, Month::January, 2).unwrap(),
-        Date::from_calendar_date(2026, Month::January, 2).unwrap(),
-        Some(Tenor::quarterly()),
-        DayCount::Act360,
-        "USD-OIS",
-        "USD-LIBOR-3M",
-        "USD-CAP-VOL",
-    )
+    let cap = CapFloor::new(finstack_quant_valuations_rates::cap_floor::CapFloorParams {
+        id: "LEGACY-CAP".into(),
+        rate_option_type: RateOptionType::Cap,
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        strike: 0.05,
+        start_date: Date::from_calendar_date(2025, Month::January, 2).unwrap(),
+        maturity: Date::from_calendar_date(2026, Month::January, 2).unwrap(),
+        frequency: Some(Tenor::quarterly()),
+        day_count: DayCount::Act360,
+        discount_curve_id: "USD-OIS".into(),
+        forward_curve_id: "USD-LIBOR-3M".into(),
+        vol_surface_id: "USD-CAP-VOL".into(),
+    })
     .expect("valid cap");
     let mut value = serde_json::to_value(cap).expect("serialize cap");
     assert!(

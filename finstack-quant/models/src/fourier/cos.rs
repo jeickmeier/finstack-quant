@@ -51,7 +51,12 @@ impl Default for CosConfig {
 }
 
 /// Option and market inputs shared by the COS entry points.
-#[derive(Debug, Clone, Copy)]
+///
+/// The serde form is the host-facing `market` object of `bs_cos_price`,
+/// `vg_cos_price` and `merton_jump_cos_price`; `n_terms` may be omitted.
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct CosMarketParams {
     /// Current spot price of the underlying.
     pub spot: f64,
@@ -60,13 +65,14 @@ pub struct CosMarketParams {
     /// Continuously-compounded risk-free rate.
     pub rate: f64,
     /// Continuous dividend yield (decimal, annualized).
-    pub div_yield: f64,
+    pub dividend_yield: f64,
     /// Time to expiry in years.
-    pub expiry: f64,
+    pub time_to_expiry: f64,
     /// Call or put payoff.
     pub option_type: OptionType,
     /// Optional COS term count in `1..=`[`CosConfig::MAX_TERMS`]; defaults to
     /// [`CosConfig::default`].
+    #[serde(default)]
     pub n_terms: Option<usize>,
 }
 
@@ -86,8 +92,10 @@ pub struct CosMarketParams {
 /// Returns an error for invalid market inputs, a zero term count, a degenerate
 /// truncation range, or non-finite model evaluations or prices.
 pub fn bs_cos_price(market: CosMarketParams, vol: f64) -> Result<f64> {
-    if !market.div_yield.is_finite() {
-        return Err(invalid_input("Black-Scholes COS div_yield must be finite"));
+    if !market.dividend_yield.is_finite() {
+        return Err(invalid_input(
+            "Black-Scholes COS dividend_yield must be finite",
+        ));
     }
     if !vol.is_finite() || vol <= 0.0 {
         return Err(invalid_input(format!(
@@ -96,7 +104,7 @@ pub fn bs_cos_price(market: CosMarketParams, vol: f64) -> Result<f64> {
     }
     let cf = BlackScholesCf {
         r: market.rate,
-        q: market.div_yield,
+        q: market.dividend_yield,
         sigma: vol,
     };
     price_from_cf(&cf, market)
@@ -121,7 +129,7 @@ pub fn bs_cos_price(market: CosMarketParams, vol: f64) -> Result<f64> {
 /// Returns an error for invalid market/process inputs, a zero term count, a
 /// degenerate truncation range, or non-finite model evaluations or prices.
 pub fn vg_cos_price(market: CosMarketParams, sigma: f64, theta: f64, nu: f64) -> Result<f64> {
-    let cf = VarianceGammaCf::new(market.rate, market.div_yield, sigma, nu, theta)?;
+    let cf = VarianceGammaCf::new(market.rate, market.dividend_yield, sigma, nu, theta)?;
     price_from_cf(&cf, market)
 }
 
@@ -155,7 +163,7 @@ pub fn merton_jump_cos_price(
 ) -> Result<f64> {
     let cf = MertonJumpCf {
         r: market.rate,
-        q: market.div_yield,
+        q: market.dividend_yield,
         sigma,
         lambda,
         mu_j: mu_jump,
@@ -178,7 +186,7 @@ fn price_from_cf(cf: &dyn CharacteristicFunction, market: CosMarketParams) -> Re
         market.spot,
         market.strike,
         market.rate,
-        market.expiry,
+        market.time_to_expiry,
         market.option_type,
     )
 }
@@ -402,10 +410,20 @@ impl<'a> CosPricer<'a> {
             0.0
         };
 
+        let strip = CosStrip {
+            r,
+            t,
+            spot,
+            a,
+            b,
+            bma,
+            df,
+            aks: &aks,
+        };
         strikes
             .iter()
             .map(|&strike| {
-                let put = self.put_price(strike, r, t, spot, a, b, bma, df, &aks)?;
+                let put = self.put_price(strike, &strip)?;
                 if !is_call {
                     return Ok(put);
                 }
@@ -421,19 +439,17 @@ impl<'a> CosPricer<'a> {
     /// coefficient `chi_k` stays bounded for arbitrarily wide truncation
     /// windows — this is the numerically stable building block from which the
     /// call is recovered by put-call parity.
-    #[allow(clippy::too_many_arguments)]
-    fn put_price(
-        &self,
-        strike: f64,
-        r: f64,
-        t: f64,
-        spot: f64,
-        a: f64,
-        b: f64,
-        bma: f64,
-        df: f64,
-        aks: &[f64],
-    ) -> Result<f64> {
+    fn put_price(&self, strike: f64, strip: &CosStrip<'_>) -> Result<f64> {
+        let &CosStrip {
+            r,
+            t,
+            spot,
+            a,
+            b,
+            bma,
+            df,
+            aks,
+        } = strip;
         // x0 = ln(S/K): shift from Y to X = Y + x0.
         // Integration window in X-space, following the moneyness shift.
         let x0 = spot.ln() - strike.ln();
@@ -483,6 +499,26 @@ impl<'a> CosPricer<'a> {
         }
         cos_finite_price(raw, "put")
     }
+}
+
+/// Strike-independent inputs shared by every strike of one COS price strip.
+struct CosStrip<'a> {
+    /// Continuously compounded risk-free rate (decimal); reported in warnings.
+    r: f64,
+    /// Time to expiry in years; reported in warnings.
+    t: f64,
+    /// Spot level `S_0`.
+    spot: f64,
+    /// Lower end of the `Y`-centred truncation window.
+    a: f64,
+    /// Upper end of the `Y`-centred truncation window.
+    b: f64,
+    /// Window width `b - a`.
+    bma: f64,
+    /// Discount factor `exp(-r t)`.
+    df: f64,
+    /// Strike-independent COS coefficients `Re[phi_Y(u_k) exp(-i u_k a)]`.
+    aks: &'a [f64],
 }
 
 /// Validate a raw COS price and clamp small negative noise to zero.
@@ -635,13 +671,13 @@ mod tests {
             spot: 100.0,
             strike: 100.0,
             rate: 0.05,
-            div_yield: 0.0,
-            expiry: 1.0,
+            dividend_yield: 0.0,
+            time_to_expiry: 1.0,
             option_type: OptionType::Call,
             n_terms: None,
         };
         let bad_carry = CosMarketParams {
-            div_yield: f64::NAN,
+            dividend_yield: f64::NAN,
             ..market
         };
         assert!(vg_cos_price(market, 0.2, -0.1, 0.2).is_ok());
@@ -931,8 +967,8 @@ mod tests {
             spot: 100.0,
             strike: 100.0,
             rate: 0.03,
-            div_yield: 0.0,
-            expiry: 1.0,
+            dividend_yield: 0.0,
+            time_to_expiry: 1.0,
             option_type: OptionType::Call,
             n_terms: Some(n_terms),
         };
@@ -1145,8 +1181,8 @@ mod tests {
                         spot,
                         strike,
                         rate,
-                        div_yield,
-                        expiry,
+                        dividend_yield: div_yield,
+                        time_to_expiry: expiry,
                         option_type,
                         n_terms,
                     };
@@ -1227,8 +1263,8 @@ mod tests {
                     spot: 100.0,
                     strike: 100.0,
                     rate: 0.05,
-                    div_yield: 0.0,
-                    expiry,
+                    dividend_yield: 0.0,
+                    time_to_expiry: expiry,
                     option_type: OptionType::Call,
                     n_terms,
                 },

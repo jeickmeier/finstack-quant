@@ -86,11 +86,7 @@ pub(in crate::builder) fn emit_fees_on(
                 let day_count_ctx = crate::builder::periods::period_day_count_context(
                     period,
                     pf.calendar,
-                    pf.schedule.frequency,
-                    pf.schedule.day_count,
-                    pf.schedule.stub,
-                    pf.schedule.end_of_month,
-                    pf.schedule.roll_rule,
+                    crate::builder::periods::AccrualConventions::from_schedule(&pf.schedule),
                     is_termination_date,
                 );
                 let coupon_period = day_count_ctx.coupon_period;

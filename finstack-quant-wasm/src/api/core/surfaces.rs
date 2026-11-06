@@ -29,6 +29,11 @@ use wasm_bindgen::prelude::*;
 /// @returns A `SabrParameterData` plain object; an absent shift is omitted.
 /// @throws `TypeError` (kind `invalid_type`) for a non-number argument;
 /// `FinstackError` (kind `validation`) for a non-finite or out-of-range parameter.
+/// @param alpha - Finite, strictly positive initial volatility scale.
+/// @param beta - Finite CEV elasticity in the inclusive range `[0, 1]`.
+/// @param nu - Finite, nonnegative volatility of volatility; zero is deterministic.
+/// @param rho - Finite forward-volatility correlation strictly between `-1` and `1`.
+/// @param shift - Optional finite displacement in forward/strike units; `null` or omission records an unshifted node, and finite negative shifts are allowed.
 /// @example
 /// ```typescript
 /// import init, { core } from "finstack-quant-wasm";
@@ -36,13 +41,13 @@ use wasm_bindgen::prelude::*;
 /// const node = core.sabrParameterDataNew(0.2, 1, 0, -0.5);
 /// console.log(node.nu); // 0
 /// ```
-#[wasm_bindgen(js_name = sabrParameterDataNew)]
+#[wasm_bindgen(js_name = sabrParameterDataNew, unchecked_return_type = "SabrParameterData")]
 pub fn sabr_parameter_data_new(
-    alpha: JsValue,
-    beta: JsValue,
-    nu: JsValue,
-    rho: JsValue,
-    shift: Option<JsValue>,
+    #[wasm_bindgen(unchecked_param_type = "number")] alpha: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] beta: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] nu: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] rho: JsValue,
+    #[wasm_bindgen(unchecked_optional_param_type = "number | null")] shift: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     to_js_value(
         &SabrParameterData::new(
@@ -61,6 +66,21 @@ pub fn sabr_parameter_data_new(
 /// Stores calibrated SABR parameters on an expiry × tenor grid and evaluates
 /// implied volatilities via bilinear parameter interpolation followed by the
 /// Hagan (2002) approximation.
+///
+/// @example
+/// ```typescript
+/// import init, { core } from "finstack-quant-wasm";
+/// await init();
+/// const cube = new core.VolCube(
+///   "USD-SWAPTION",
+///   [1],
+///   [5],
+///   [{ alpha: 0.02, beta: 0.5, rho: -0.2, nu: 0.4 }],
+///   [0.03]
+/// );
+/// console.log(cube.id, cube.interpolationMode);
+/// cube.free();
+/// ```
 #[wasm_bindgen(js_name = VolCube)]
 pub struct JsVolCube {
     pub(crate) inner: Arc<RustVolCube>,
@@ -80,7 +100,7 @@ impl JsVolCube {
     ///   or `null` `shift` means an unshifted node. The `nu` component is
     ///   nonnegative; zero gives deterministic volatility.
     /// * `forwards_row_major` - Row-major forward rates, one per grid node.
-    /// @param interpolation_mode - Interpolation across the expiry axis: `"vol"` or
+    /// @param interpolationMode - Interpolation across the expiry axis: `"vol"` or
     /// `"total_variance"`; omitted keeps the Rust `VolCube::from_grid` default (`"vol"`).
     ///
     /// # Errors
@@ -91,13 +111,27 @@ impl JsVolCube {
     /// non-finite; any SABR node has invalid
     /// alpha, beta, rho, nu, or shift; or `interpolationMode` is neither `vol`
     /// nor `total_variance`.
+    /// @param id - Curve identifier.
+    /// @param expiries - Option expiry axis in years (strictly increasing).
+    /// @param tenors - Swap tenor axis in years (strictly increasing).
+    /// @param paramsRowMajor - Row-major SABR nodes (expiry-major): an array of `{ alpha, beta, rho, nu, shift? }` objects (the `SabrParameterData` wire form) of length `expiries.length * tenors.length`; an omitted or `null` `shift` means an unshifted node. The `nu` component is nonnegative; zero gives deterministic volatility.
+    /// @param forwardsRowMajor - Row-major forward rates, one per grid node.
     #[wasm_bindgen(constructor)]
     pub fn new(
-        id: JsValue,
-        expiries: JsValue,
-        tenors: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray")] expiries: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray")] tenors: JsValue,
+        #[wasm_bindgen(
+            js_name = "paramsRowMajor",
+            unchecked_param_type = "SabrParameterData[] | string"
+        )]
         params_row_major: JsValue,
+        #[wasm_bindgen(js_name = "forwardsRowMajor", unchecked_param_type = "NumericArray")]
         forwards_row_major: JsValue,
+        #[wasm_bindgen(
+            js_name = "interpolationMode",
+            unchecked_optional_param_type = "string"
+        )]
         interpolation_mode: Option<JsValue>,
     ) -> Result<JsVolCube, JsValue> {
         let id = js_string(&id, "id")?;
@@ -126,8 +160,29 @@ impl JsVolCube {
     ///   Missing or null node shifts remain absent; unknown fields are rejected.
     /// @returns A validated VolCube handle owned by the caller; release it with free().
     /// @throws Error - Throws when JSON is malformed, fields are unknown, or native axis, parameter, or forward validation fails.
+    /// @param json - Canonical VolCube JSON containing id, expiry and tenor axes in years, row-major SABR nodes and decimal-rate forwards, and interpolation_mode. Missing or null node shifts remain absent; unknown fields are rejected.
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { core } from "finstack-quant-wasm";
+    /// await init();
+    /// const cube = core.VolCube.fromJson(
+    ///   JSON.stringify({
+    ///     id: "USD-SWAPTION",
+    ///     expiries: [1],
+    ///     tenors: [5],
+    ///     params: [{ alpha: 0.03, beta: 0.5, rho: -0.2, nu: 0.4, shift: null }],
+    ///     forwards: [0.03],
+    ///     interpolation_mode: "vol",
+    ///   })
+    /// );
+    /// console.log(cube.id);
+    /// cube.free();
+    /// ```
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsVolCube, JsValue> {
+    pub fn from_json(
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+    ) -> Result<JsVolCube, JsValue> {
         let inner = from_js_json::<RustVolCube>(&json, "json")?;
         Ok(Self {
             inner: Arc::new(inner),
@@ -184,7 +239,7 @@ impl JsVolCube {
     ///
     /// @returns One object per grid node in row-major (expiry, tenor) order.
     /// @throws If serialization fails (not expected for a valid cube).
-    #[wasm_bindgen(getter, js_name = params)]
+    #[wasm_bindgen(getter, js_name = params, unchecked_return_type = "SabrParameterData[]")]
     pub fn params(&self) -> Result<JsValue, JsValue> {
         crate::utils::to_js_value(&self.inner.params())
     }
@@ -199,8 +254,14 @@ impl JsVolCube {
     /// @returns The node's SABR parameters.
     /// @throws `TypeError` if an index is not a non-negative integer;
     /// `FinstackError` (kind `validation`) if it lies outside `gridShape`.
-    #[wasm_bindgen(js_name = paramsAt)]
-    pub fn params_at(&self, exp_idx: JsValue, tenor_idx: JsValue) -> Result<JsValue, JsValue> {
+    /// @param expIdx - Zero-based index into `expiries`.
+    /// @param tenorIdx - Zero-based index into `tenors`.
+    #[wasm_bindgen(js_name = paramsAt, unchecked_return_type = "SabrParameterData")]
+    pub fn params_at(
+        &self,
+        #[wasm_bindgen(js_name = "expIdx", unchecked_param_type = "number")] exp_idx: JsValue,
+        #[wasm_bindgen(js_name = "tenorIdx", unchecked_param_type = "number")] tenor_idx: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let exp_idx: usize = js_uint(&exp_idx, "expIdx")?;
         let tenor_idx: usize = js_uint(&tenor_idx, "tenorIdx")?;
         let params = self
@@ -220,8 +281,14 @@ impl JsVolCube {
     /// @returns The node's forward rate.
     /// @throws `TypeError` if an index is not a non-negative integer;
     /// `FinstackError` (kind `validation`) if it lies outside `gridShape`.
+    /// @param expIdx - Zero-based index into `expiries`.
+    /// @param tenorIdx - Zero-based index into `tenors`.
     #[wasm_bindgen(js_name = forwardAt)]
-    pub fn forward_at(&self, exp_idx: JsValue, tenor_idx: JsValue) -> Result<f64, JsValue> {
+    pub fn forward_at(
+        &self,
+        #[wasm_bindgen(js_name = "expIdx", unchecked_param_type = "number")] exp_idx: JsValue,
+        #[wasm_bindgen(js_name = "tenorIdx", unchecked_param_type = "number")] tenor_idx: JsValue,
+    ) -> Result<f64, JsValue> {
         let exp_idx: usize = js_uint(&exp_idx, "expIdx")?;
         let tenor_idx: usize = js_uint(&tenor_idx, "tenorIdx")?;
         self.inner.forward_at(exp_idx, tenor_idx).map_err(to_js_err)
@@ -235,6 +302,21 @@ impl JsVolCube {
 /// `models.volatility` (`getFxDeltaVol`, `getFxDeltaPillarVols`) for
 /// evaluation; this type does not convert quotes to strikes itself.
 /// The delta convention is **forward delta (premium-unadjusted)**.
+///
+/// @example
+/// ```typescript
+/// import init, { core } from "finstack-quant-wasm";
+/// await init();
+/// const surface = new core.FxDeltaVolSurface(
+///   "EURUSD-VOL",
+///   [1],
+///   [0.12],
+///   [0.01],
+///   [0.002]
+/// );
+/// console.log(surface.id, surface.expiries.length);
+/// surface.free();
+/// ```
 #[wasm_bindgen(js_name = FxDeltaVolSurface)]
 pub struct JsFxDeltaVolSurface {
     pub(crate) inner: Arc<RustFxDeltaVolSurface>,
@@ -263,15 +345,23 @@ impl JsFxDeltaVolSurface {
     /// or both absent; quote arrays are empty or have mismatched lengths;
     /// expiries are not finite, positive, and strictly increasing; ATM vols are
     /// not finite and positive; or any risk reversal or butterfly is non-finite.
+    /// @param id - Stable surface identifier.
+    /// @param expiries - Strictly increasing positive expiry times (years).
+    /// @param atmVols - ATM delta-neutral straddle vols per expiry.
+    /// @param rr25d - 25-delta risk reversal per expiry (call vol − put vol).
+    /// @param bf25d - 25-delta butterfly per expiry (wing avg − ATM).
+    /// @param rr10d - Optional 10-delta risk reversal per expiry.
+    /// @param bf10d - Optional 10-delta butterfly per expiry.
     #[wasm_bindgen(constructor)]
     pub fn new(
-        id: JsValue,
-        expiries: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray")] expiries: JsValue,
+        #[wasm_bindgen(js_name = "atmVols", unchecked_param_type = "NumericArray")]
         atm_vols: JsValue,
-        rr25d: JsValue,
-        bf25d: JsValue,
-        rr10d: Option<JsValue>,
-        bf10d: Option<JsValue>,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray")] rr25d: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray")] bf25d: JsValue,
+        #[wasm_bindgen(unchecked_optional_param_type = "NumericArray")] rr10d: Option<JsValue>,
+        #[wasm_bindgen(unchecked_optional_param_type = "NumericArray")] bf10d: Option<JsValue>,
     ) -> Result<JsFxDeltaVolSurface, JsValue> {
         let expiries = js_f64_seq(&expiries, "expiries")?;
         let atm_vols = js_f64_seq(&atm_vols, "atmVols")?;
@@ -297,8 +387,30 @@ impl JsFxDeltaVolSurface {
     ///   10-delta wings must occur together; unknown fields are rejected.
     /// @returns A validated FxDeltaVolSurface handle owned by the caller; release it with free().
     /// @throws Error - Throws when JSON is malformed, fields are unknown, or native expiry, quote, or wing validation fails.
+    /// @param json - Canonical FxDeltaVolSurface JSON with expiries in years and annualized decimal ATM, risk-reversal, and butterfly quotes. Optional 10-delta wings must occur together; unknown fields are rejected.
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { core } from "finstack-quant-wasm";
+    /// await init();
+    /// const surface = core.FxDeltaVolSurface.fromJson(
+    ///   JSON.stringify({
+    ///     id: "EURUSD",
+    ///     expiries: [1],
+    ///     atm_vols: [0.12],
+    ///     rr_25d: [0.01],
+    ///     bf_25d: [0.002],
+    ///     rr_10d: null,
+    ///     bf_10d: null,
+    ///   })
+    /// );
+    /// console.log(surface.id);
+    /// surface.free();
+    /// ```
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsFxDeltaVolSurface, JsValue> {
+    pub fn from_json(
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+    ) -> Result<JsFxDeltaVolSurface, JsValue> {
         let inner = from_js_json::<RustFxDeltaVolSurface>(&json, "json")?;
         Ok(Self {
             inner: Arc::new(inner),
@@ -424,13 +536,20 @@ impl JsVolSurface {
     /// grid of the wrong length, a negative or non-finite volatility, an
     /// unknown axis, mode or quote-type name, or displacements that do not
     /// match the quote convention and the expiry count.
+    /// @param id - Surface identifier, the `MarketContext` lookup key.
+    /// @param expiries - Option expiries in years, strictly increasing.
+    /// @param strikes - Secondary-axis coordinates (strikes, or swap tenors in years), strictly increasing.
+    /// @param vols - Decimal volatilities as a flat row-major (expiry-major) grid of `expiries.length * strikes.length` entries, finite and non-negative.
+    /// @param options - Optional `{ secondaryAxis, interpolationMode, quoteType, displacements }`: `secondaryAxis` is `"strike"` or `"tenor"`, `interpolationMode` is `"vol"` or `"total_variance"`, `quoteType` is `"black_lognormal"`, `"shifted_black_lognormal"` or `"normal"`, and `displacements` holds one shifted-Black displacement per expiry (required for `"shifted_black_lognormal"` quotes). Every omitted key takes the Rust default.
     #[wasm_bindgen(constructor)]
     pub fn new(
-        id: JsValue,
-        expiries: JsValue,
-        strikes: JsValue,
-        vols: JsValue,
-        options: Option<JsValue>,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray")] expiries: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray")] strikes: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray")] vols: JsValue,
+        #[wasm_bindgen(unchecked_optional_param_type = "VolSurfaceOptions | null")] options: Option<
+            JsValue,
+        >,
     ) -> Result<JsVolSurface, JsValue> {
         let id = js_string(&id, "id")?;
         let expiries = js_f64_seq(&expiries, "expiries")?;
@@ -477,8 +596,11 @@ impl JsVolSurface {
     /// @throws `TypeError` if `json` is not a JSON string or plain object;
     /// `FinstackError` (kind `validation`) if it does not match the schema or
     /// fails grid validation.
+    /// @param json - Canonical VolSurface JSON text or plain object; unknown fields are rejected and the grid is re-validated.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsVolSurface, JsValue> {
+    pub fn from_json(
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+    ) -> Result<JsVolSurface, JsValue> {
         from_js_json::<RustVolSurface>(&json, "json")
             .map(|surface| Self::from_inner(Arc::new(surface)))
     }
@@ -550,8 +672,12 @@ impl JsVolSurface {
     /// @throws `TypeError` (kind `invalid_type`) if `displacements` is not a
     /// numeric array; `FinstackError` (kind `validation`) if the count differs
     /// from the expiry count or a shift is non-finite.
+    /// @param displacements - Finite additive shifts in strike/rate units, one per expiry, in expiry-axis order.
     #[wasm_bindgen(js_name = withDisplacements)]
-    pub fn with_displacements(&self, displacements: JsValue) -> Result<JsVolSurface, JsValue> {
+    pub fn with_displacements(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray")] displacements: JsValue,
+    ) -> Result<JsVolSurface, JsValue> {
         self.inner
             .as_ref()
             .clone()
@@ -622,14 +748,23 @@ impl JsVolCubeExpirySlice {
     /// `FinstackError` (kind `validation`) for an invalid expiry or axis, a
     /// grid of the wrong length, an invalid volatility, an unknown quote type,
     /// or displacements that do not match the quote convention and tenor count.
+    /// @param id - Identifier of the materialized grid.
+    /// @param expiry - Fixed option expiry in years; finite and positive.
+    /// @param tenors - Underlying tenors in years, positive and strictly increasing.
+    /// @param strikes - Strike coordinates in forward-rate units, strictly increasing.
+    /// @param vols - Flat tenor-major grid, `tenors.length * strikes.length` entries: decimal Black volatilities or absolute normal volatilities.
+    /// @param quoteType - `"black_lognormal"`, `"shifted_black_lognormal"` or `"normal"`; omitted uses `"black_lognormal"`.
+    /// @param displacements - Shifted-Black displacements in rate units, one per tenor; required for shifted quotes and omitted otherwise.
     #[wasm_bindgen(constructor)]
     pub fn new(
-        id: JsValue,
-        expiry: JsValue,
-        tenors: JsValue,
-        strikes: JsValue,
-        vols: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray")] tenors: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray")] strikes: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray")] vols: JsValue,
+        #[wasm_bindgen(js_name = "quoteType", unchecked_optional_param_type = "string | null")]
         quote_type: Option<JsValue>,
+        #[wasm_bindgen(unchecked_optional_param_type = "NumericArray | null")]
         displacements: Option<JsValue>,
     ) -> Result<JsVolCubeExpirySlice, JsValue> {
         let quote_type = js_opt_string(quote_type.as_ref(), "quoteType")?
@@ -665,8 +800,11 @@ impl JsVolCubeExpirySlice {
     /// @throws `TypeError` if `json` is not a JSON string or plain object;
     /// `FinstackError` (kind `validation`) if it does not match the schema or
     /// fails grid validation.
+    /// @param json - Canonical VolCubeExpirySlice JSON text or plain object, such as `toJson()` output; unknown fields are rejected and the grid is re-validated.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsVolCubeExpirySlice, JsValue> {
+    pub fn from_json(
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+    ) -> Result<JsVolCubeExpirySlice, JsValue> {
         from_js_json::<RustVolCubeExpirySlice>(&json, "json").map(|slice| Self {
             inner: Arc::new(slice),
         })

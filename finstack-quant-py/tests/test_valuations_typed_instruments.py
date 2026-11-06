@@ -126,17 +126,17 @@ class TestBondTyped:
         assert json.loads(round_tripped) == json.loads(original)
 
     def test_floating_constructor(self) -> None:
-        frn = Bond.floating(
-            "FRN-1",
-            Money(1_000_000.0, Currency("USD")),
-            "USD-SOFR-3M",
-            Bps(200),
-            datetime.date(2024, 1, 1),
-            datetime.date(2030, 1, 1),
-            Tenor.quarterly(),
-            DayCount.ACT_360,
-            "USD-OIS",
-        )
+        frn = Bond.floating({
+            "id": "FRN-1",
+            "notional": Money(1_000_000.0, Currency("USD")),
+            "forward_curve_id": "USD-SOFR-3M",
+            "spread_bp": Bps(200),
+            "issue_date": datetime.date(2024, 1, 1),
+            "maturity": datetime.date(2030, 1, 1),
+            "frequency": Tenor.quarterly(),
+            "day_count": DayCount.ACT_360,
+            "discount_curve_id": "USD-OIS",
+        })
         payload = json.loads(frn.to_json())
         assert payload["instrument"]["type"] == "bond"
         assert frn.id == "FRN-1"

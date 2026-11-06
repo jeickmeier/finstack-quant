@@ -629,8 +629,7 @@ impl ReplayTemplate {
                             discount.as_ref(),
                             as_of,
                             times,
-                            accrual.start,
-                            accrual.end,
+                            (accrual.start, accrual.end),
                             spec,
                         )?;
                         if overnight
@@ -768,8 +767,7 @@ impl ReplayTemplate {
                     discount.as_ref(),
                     as_of,
                     times,
-                    start,
-                    end,
+                    (start, end),
                     spec,
                 )?;
                 (
@@ -1174,7 +1172,6 @@ impl ReplayTemplate {
         })
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub(super) fn decision_snapshot(
         &self,
         bond: &Bond,
@@ -1254,22 +1251,24 @@ impl ReplayTemplate {
         })
     }
 
-    #[allow(clippy::too_many_arguments)]
+    /// Replay decisions `low_decision..=high_decision` of one training path,
+    /// identified by its stream index and antithetic flag, from `checkpoint`.
     pub(super) fn replay_block(
         &self,
-        tree: &RatesCreditTree,
-        bond: &Bond,
-        config: &BondLsmcConfig,
-        seed: u64,
-        path_index: u64,
-        antithetic: bool,
+        run: TrainingRun<'_>,
+        (path_index, antithetic): (u64, bool),
         checkpoint: &TrainingCheckpoint,
-        low_decision: usize,
-        high_decision: usize,
+        (low_decision, high_decision): (usize, usize),
         make_whole_policies: Option<&[RegressionPolicy]>,
-        terms: &ReplayTerms,
         path: &mut Vec<RatesCreditPathState>,
     ) -> Result<BlockPathRecord> {
+        let TrainingRun {
+            tree,
+            bond,
+            config,
+            seed,
+            terms,
+        } = run;
         let low_step = self.decision_steps[low_decision];
         let high_step = self.decision_steps[high_decision];
         tree.sample_path_segment_into(

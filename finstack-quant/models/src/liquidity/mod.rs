@@ -106,7 +106,6 @@ pub use kyle::{KyleLambdaModel, kyle_lambda};
 ///
 /// Returns an error when the liquidity inputs are not finite and positive, or
 /// when the underlying model/profile validation fails.
-#[allow(clippy::too_many_arguments)]
 pub fn almgren_chriss_impact(
     position_size: f64,
     avg_daily_volume: f64,

@@ -34,23 +34,81 @@ def test_checked_black_scholes_raises_for_invalid_spot(spot: float) -> None:
 
 def test_cos_rejects_zero_terms() -> None:
     with pytest.raises(ValueError, match="num_terms"):
-        bs_cos_price(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, True, n_terms=0)
+        bs_cos_price(
+            {
+                "spot": 100.0,
+                "strike": 100.0,
+                "rate": 0.05,
+                "dividend_yield": 0.0,
+                "time_to_expiry": 1.0,
+                "option_type": "call",
+                "n_terms": 0,
+            },
+            0.2,
+        )
 
 
 @pytest.mark.parametrize("invalid", [math.nan, math.inf, -100.0, 0.0])
 @pytest.mark.parametrize("is_call", [True, False])
 def test_cos_invalid_prices_raise_value_error(invalid: float, is_call: bool) -> None:
-    with pytest.raises(ValueError, match="spot"):
-        bs_cos_price(invalid, 100.0, 0.05, 0.0, 0.2, 1.0, is_call)
-    with pytest.raises(ValueError, match="strike"):
-        bs_cos_price(100.0, invalid, 0.05, 0.0, 0.2, 1.0, is_call)
+    # A non-finite float has no JSON form, so the `market` object itself is rejected.
+    finite = math.isfinite(invalid)
+    with pytest.raises(ValueError, match="spot" if finite else "invalid CosMarketParams"):
+        bs_cos_price(
+            {
+                "spot": invalid,
+                "strike": 100.0,
+                "rate": 0.05,
+                "dividend_yield": 0.0,
+                "time_to_expiry": 1.0,
+                "option_type": ("call" if is_call else "put"),
+            },
+            0.2,
+        )
+    with pytest.raises(ValueError, match="strike" if finite else "invalid CosMarketParams"):
+        bs_cos_price(
+            {
+                "spot": 100.0,
+                "strike": invalid,
+                "rate": 0.05,
+                "dividend_yield": 0.0,
+                "time_to_expiry": 1.0,
+                "option_type": ("call" if is_call else "put"),
+            },
+            0.2,
+        )
 
 
 def test_cos_rejects_invalid_process_parameters() -> None:
     with pytest.raises(ValueError, match="sigma"):
-        vg_cos_price(100.0, 100.0, 0.05, 0.0, -0.2, -0.1, 0.2, 1.0, True)
+        vg_cos_price(
+            {
+                "spot": 100.0,
+                "strike": 100.0,
+                "rate": 0.05,
+                "dividend_yield": 0.0,
+                "time_to_expiry": 1.0,
+                "option_type": "call",
+            },
+            -0.2,
+            -0.1,
+            0.2,
+        )
     with pytest.raises(ValueError, match="lambda"):
-        merton_jump_cos_price(100.0, 100.0, 0.05, 0.0, 0.2, -0.1, 0.1, -0.1, 1.0, True)
+        merton_jump_cos_price(
+            {
+                "spot": 100.0,
+                "strike": 100.0,
+                "rate": 0.05,
+                "dividend_yield": 0.0,
+                "time_to_expiry": 1.0,
+                "option_type": "call",
+            },
+            0.2,
+            -0.1,
+            0.1,
+            -0.1,
+        )
 
 
 def test_sabr_diagnostics_accept_uneven_strike_spacing() -> None:

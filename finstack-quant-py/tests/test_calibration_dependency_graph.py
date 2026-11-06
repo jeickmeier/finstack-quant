@@ -10,8 +10,12 @@ def test_dependency_graph_matches_declared_structure() -> None:
     quote = RateQuote.deposit("Q", "USD-SOFR-OIS", "3M", 0.03)
     plan = CalibrationPlan(
         [
-            CalibrationStep.discount("D", "USD", "2026-05-08", quote_set="q"),
-            CalibrationStep.forward("F", "USD", "2026-05-08", 0.25, "D", quote_set="q"),
+            CalibrationStep.discount("D", {"currency": "USD", "base_date": "2026-05-08"}, quote_set="q"),
+            CalibrationStep.forward(
+                "F",
+                {"currency": "USD", "base_date": "2026-05-08", "tenor_years": 0.25, "discount_curve_id": "D"},
+                quote_set="q",
+            ),
         ],
         quote_sets={"q": ["Q"]},
     )

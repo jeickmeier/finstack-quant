@@ -131,17 +131,17 @@ mod tests {
         let as_of = date!(2025 - 01 - 01);
 
         // Valid FRN that references the "USD-SOFR-3M" projection curve.
-        let bond = crate::bond::Bond::floating(
-            "DM-UNIT-MISSING-FWD",
-            Money::from((1_000_000_i64, Currency::USD)),
-            "USD-SOFR-3M",
-            200,
-            as_of,
-            date!(2030 - 01 - 01),
-            finstack_quant_core::dates::Tenor::quarterly(),
-            finstack_quant_core::dates::DayCount::Act360,
-            "USD-OIS",
-        )
+        let bond = crate::bond::Bond::floating(crate::bond::FloatingBondParams {
+            id: "DM-UNIT-MISSING-FWD".into(),
+            notional: Money::from((1_000_000_i64, Currency::USD)),
+            forward_curve_id: "USD-SOFR-3M".into(),
+            spread_bp: 200.into(),
+            issue_date: as_of,
+            maturity: date!(2030 - 01 - 01),
+            frequency: finstack_quant_core::dates::Tenor::quarterly(),
+            day_count: finstack_quant_core::dates::DayCount::Act360,
+            discount_curve_id: "USD-OIS".into(),
+        })
         .expect("bond construction should succeed");
 
         // Market with only the discount curve — forward curve intentionally absent so

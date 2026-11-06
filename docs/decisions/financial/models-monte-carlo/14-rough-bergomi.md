@@ -20,7 +20,7 @@ The compensation assumes Var(Y_t)=t^(2H); finite-window fBM and discrete RL appr
 
 ## Evidence
 
-[Process](../../../../finstack-quant/models/src/monte_carlo/process/rough_bergomi.rs), [stepper](../../../../finstack-quant/models/src/monte_carlo/discretization/rough_bergomi.rs). Located tests include left-endpoint variance reconstruction, workspace reset, spot/forward-variance martingales and small-eta Black–Scholes convergence. [Non-Markov tests](../../../../finstack-quant/models/src/monte_carlo/simulate/non_markov_tests.rs) compare dedicated path loops and generator variants; loop equality is shared-kernel evidence. [Bayer–Friz–Gatheral](../../../REFERENCES.md#bayer-friz-gatheral-2016) and [McCrickerd–Pakkanen](../../../REFERENCES.md#mccrickerd-pakkanen-2018) are canonical background, with no recorded product adoption.
+[Process](../../../../finstack-quant/models/src/monte_carlo/process/rough_bergomi.rs), [stepper](../../../../finstack-quant/models/src/monte_carlo/discretization/rough_bergomi.rs). Located tests include left-endpoint variance reconstruction, workspace reset, spot/forward-variance martingales and small-eta Black–Scholes convergence. [Non-Markov tests](../../../../finstack-quant/models/src/monte_carlo/simulate/tests/non_markov.rs) compare dedicated path loops and generator variants; loop equality is shared-kernel evidence. [Bayer–Friz–Gatheral](../../../REFERENCES.md#bayer-friz-gatheral-2016) and [McCrickerd–Pakkanen](../../../REFERENCES.md#mccrickerd-pakkanen-2018) are canonical background, with no recorded product adoption.
 
 ## Follow-up tracking
 

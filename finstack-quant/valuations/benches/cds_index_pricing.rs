@@ -34,14 +34,16 @@ fn create_cds_index_single_curve(tenor_years: i32) -> CdsIndex {
 
     CdsIndex::from_preset(
         &preset,
-        format!("CDX-{}Y", tenor_years),
-        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
-        PayReceive::Pay,
-        start,
-        end,
-        0.40,
-        "USD-OIS",
-        "CDX-HAZARD",
+        finstack_quant_valuations::instruments::credit_derivatives::cds::CdsTradeParams {
+            id: format!("CDX-{}Y", tenor_years).into(),
+            notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+            side: PayReceive::Pay,
+            start,
+            end,
+            recovery_rate: 0.40,
+            discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
+            credit_curve_id: finstack_quant_core::types::CurveId::new("CDX-HAZARD"),
+        },
     )
     .expect("valid benchmark parameters")
 }
