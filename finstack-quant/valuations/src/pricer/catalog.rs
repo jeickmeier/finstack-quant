@@ -239,16 +239,16 @@ pub fn metric_metadata(keys: &[String]) -> finstack_quant_core::Result<Vec<Metri
 /// List every pricing model key that has a pricer in the standard registry.
 ///
 /// The list is **registry-derived**, not enum-derived: it reports real dispatch
-/// coverage. A [`ModelKey`] variant that exists in the enum but has no
+/// coverage. A [`ModelKey`](finstack_quant_valuations_core::pricer::ModelKey) variant that exists in the enum but has no
 /// registered pricer is omitted, whereas iterating `ModelKey` itself would
 /// advertise models that cannot price any instrument. Names are the canonical
 /// `ModelKey` display strings (`"discounting"`, `"black76"`, …) accepted by
-/// [`parse_model_key`] and by the `model` argument of the JSON pricing entry
+/// [`parse_model_key`](finstack_quant_valuations_core::pricer::parse_model_key) and by the `model` argument of the JSON pricing entry
 /// points.
 ///
 /// # Returns
 ///
-/// Deduplicated canonical model keys in ascending [`ModelKey`] order.
+/// Deduplicated canonical model keys in ascending [`ModelKey`](finstack_quant_valuations_core::pricer::ModelKey) order.
 pub fn list_models() -> Vec<String> {
     crate::pricer::STANDARD
         .pricers()
@@ -264,7 +264,7 @@ pub fn list_models() -> Vec<String> {
 /// registry-derived semantics: only instrument types with at least one
 /// registered pricer appear, and each entry lists only the models that can
 /// actually price that instrument. Keys are canonical [`crate::pricer::InstrumentType`]
-/// display strings; values are canonical [`ModelKey`] display strings.
+/// display strings; values are canonical [`ModelKey`](finstack_quant_valuations_core::pricer::ModelKey) display strings.
 ///
 /// # Returns
 ///
