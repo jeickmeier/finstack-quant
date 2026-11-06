@@ -7781,7 +7781,7 @@ export interface MarginNamespace {
   /**
    * Margined SA-CCR netting-set configuration.
    * @param nettingSetId - `NettingSetId` (object or JSON), bilateral or cleared.
-   * @param collateral - Net collateral held, in the reporting currency; positive means the bank holds collateral.
+   * @param collateral - Net variation margin held, excluding NICA, in the reporting currency; positive means the bank holds collateral.
    * @param threshold - CSA threshold (TH), non-negative.
    * @param mta - Minimum transfer amount, non-negative.
    * @param nica - Net independent collateral amount, signed.
@@ -7802,7 +7802,7 @@ export interface MarginNamespace {
    * Threshold, MTA and NICA are zero and `mpor_days` is the 10-business-day
    * bilateral default (used only for the reporting maturity factor).
    * @param nettingSetId - `NettingSetId` (object or JSON), bilateral or cleared.
-   * @param collateral - Net collateral held, in the reporting currency; positive means the bank holds collateral.
+   * @param collateral - Net variation margin held, excluding NICA, in the reporting currency; positive means the bank holds collateral.
    * @param asOf - ISO-8601 valuation date for forward-start and remaining-maturity calculations.
    * @returns The `SaCcrNettingSetConfig` as a plain object.
    *

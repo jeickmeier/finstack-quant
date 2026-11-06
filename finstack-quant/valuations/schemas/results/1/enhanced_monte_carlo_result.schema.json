@@ -1020,7 +1020,7 @@
       "type": "object"
     },
     "RunMetadata": {
-      "description": "Reproducibility metadata stamped on a Monte Carlo pricing run.\n\nRecords the execution policy that produced an estimate so results are\nauditable and replayable: the same `(seed, num_paths, num_steps,\nchunk_size)` reproduces the run bit-for-bit regardless of thread count or\nhost (see the determinism notes on [`crate::monte_carlo::engine::McEngine::price`]).",
+      "description": "Reproducibility metadata stamped on a Monte Carlo pricing run.\n\nRecords the execution policy that produced an estimate so results are\nauditable and replayable: the same `(seed, num_paths, num_steps,\nchunk_size)` reproduces the run bit-for-bit regardless of thread count on\nthe same build target; cross-target bit identity is not promised (see the\ndeterminism notes on [`crate::monte_carlo::engine::McEngine::price`]).",
       "properties": {
         "antithetic": {
           "default": false,

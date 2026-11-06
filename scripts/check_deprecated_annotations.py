@@ -1,4 +1,10 @@
-"""Enforce the INVARIANTS.md §7.2 deprecation-annotation contract.
+"""Check the annotation format of any ``#[deprecated(...)]`` in library source.
+
+Under ADR 0004 and INVARIANTS.md §7.2, approved development replacements remove
+the obsolete path instead of deprecating it, so this check does not implement
+that policy and does not enforce a notice window. It only validates the content
+of the deprecation attributes that remain, pending the final-release
+compatibility decision tracked in docs/decisions/FOLLOW_UPS.md.
 
 Every ``#[deprecated(...)]`` attribute in workspace Rust library source must
 state:
@@ -57,7 +63,10 @@ def check_file(path: Path) -> list[str]:
             if not REPLACEMENT_RE.search(note):
                 problems.append("note must point at the replacement API or state the retention rationale")
         if problems:
-            diagnostics.append(f"{location}: #[deprecated] violates INVARIANTS.md §7.2: " + "; ".join(problems))
+            diagnostics.append(
+                f"{location}: #[deprecated] has a malformed deprecation annotation (ADR 0004 / INVARIANTS.md §7.2): "
+                + "; ".join(problems)
+            )
     return diagnostics
 
 
@@ -72,7 +81,7 @@ def main() -> int:
     for diagnostic in diagnostics:
         print(diagnostic, file=sys.stderr)
     if diagnostics:
-        print(f"\n{len(diagnostics)} deprecation-annotation violation(s).", file=sys.stderr)
+        print(f"\n{len(diagnostics)} malformed deprecation annotation(s).", file=sys.stderr)
         return 1
     print("check_deprecated_annotations: all #[deprecated] annotations conform.")
     return 0

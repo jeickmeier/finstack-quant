@@ -1,11 +1,10 @@
 //! Tests for `CapFloorVolType::Auto` model selection.
 //!
-//! `Auto` treats the supplied surface as a **lognormal** surface: it prices with
-//! Black-76 where the model is well-defined (`forward > 0` and `strike > 0`) and
-//! otherwise converts the lognormal vol to an equivalent normal vol and uses
-//! Bachelier. This keeps a single, consistent interpretation of the surface
-//! across every caplet, so `Auto` behaves identically to `Lognormal` (which uses
-//! the same fallback) rather than feeding the raw surface number to Bachelier.
+//! `Auto` follows the volatility surface's own convention metadata: a lognormal
+//! surface prices with Black-76, a normal surface with Bachelier, and no quote is
+//! converted between conventions. A lognormal quote with a non-positive forward
+//! or strike is rejected (like explicit `Lognormal`), not repriced with a normal
+//! model.
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};

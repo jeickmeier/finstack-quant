@@ -10,10 +10,11 @@ use finstack_quant_valuations_core::instruments::pricing::hw1f_params::{
 
 /// Choice of short-rate model for the bond pricing tree.
 ///
-/// Controls which interest rate tree is used for backward induction. The default
-/// `HoLee` model is a simple parallel-shift tree appropriate for quick estimates.
-/// For production callable bond OAS, use `HullWhite` with parameters fitted
-/// before pricing.
+/// Controls which interest rate tree is used for backward induction. The
+/// private `Default` is `HoLee`, a simple parallel-shift tree appropriate for
+/// quick estimates. It does not describe public bond model selection: public
+/// bond trees follow `model_config.tree_model`, which defaults to Hull-White
+/// with 100 steps and requires fitted or market-resolved parameters.
 #[derive(Debug, Clone)]
 pub(crate) enum TreeModelChoice {
     /// Ho-Lee model with normal short-rate volatility.
@@ -65,15 +66,16 @@ impl Default for TreeModelChoice {
 ///
 /// | Model | Vol Type | Parameter | Typical Range |
 /// |-------|----------|-----------|---------------|
-/// | Ho-Lee (default) | Normal/Absolute | σ (rate units) | 50-150 bp (0.005-0.015) |
+/// | Ho-Lee (private default) | Normal/Absolute | σ (rate units) | 50-150 bp (0.005-0.015) |
 /// | BDT | Lognormal/Relative | σ (proportion) | 15-30% (0.15-0.30) |
 /// | Black-Karasinski | Lognormal/Relative | σ (proportion), κ | 15-30% (0.15-0.30) |
 ///
-/// The default configuration uses Ho-Lee with **normal volatility**.
+/// The private default configuration uses Ho-Lee with **normal volatility**
+/// and 200 steps; it is not the public bond selection default.
 ///
 /// ## Volatility Ranges by Model Type
 ///
-/// ### Ho-Lee (Normal Volatility - Default)
+/// ### Ho-Lee (Normal Volatility - Private Default)
 ///
 /// | Rate Environment | Typical Vol Range | Example |
 /// |------------------|-------------------|---------|
@@ -132,7 +134,7 @@ impl Default for TreeModelChoice {
 /// | Steps | Accuracy | Use Case |
 /// |-------|----------|----------|
 /// | 50 | ~2-5 bp | Quick screening |
-/// | 100 | ~1 bp | Default, most trading |
+/// | 100 | ~1 bp | Public bond default, most trading |
 /// | 200 | < 0.5 bp | Risk reports |
 /// | 500 | < 0.2 bp | Regulatory/audit |
 ///
@@ -165,7 +167,7 @@ pub(crate) struct TreePricerConfig {
 
     /// Short-rate model for the pricing tree.
     ///
-    /// - `HoLee` (default): Uses the existing `ShortRateTree` path.
+    /// - `HoLee` (private default): Uses the existing `ShortRateTree` path.
     /// - `HullWhite { kappa, sigma }`: Uses a calibrated HW trinomial tree.
     pub tree_model: TreeModelChoice,
 
@@ -178,7 +180,9 @@ pub(crate) struct TreePricerConfig {
 }
 
 impl Default for TreePricerConfig {
-    /// Default configuration using Ho-Lee model with 100 bp normal volatility.
+    /// Private default configuration: Ho-Lee with 100 bp normal volatility and
+    /// 200 steps. Public bond pricing resolves its own model (Hull-White by
+    /// default, 100 steps) and does not use this default.
     ///
     /// This is appropriate for normal rate environments (2-5% rates).
     /// For low/negative rate environments, consider lower volatility.

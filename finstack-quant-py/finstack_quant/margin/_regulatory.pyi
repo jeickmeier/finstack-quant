@@ -2344,7 +2344,8 @@ class SaCcrNettingSetConfig:
             Bilateral (``NettingSetId.bilateral``) or cleared
             (``NettingSetId.cleared``) netting-set key.
         collateral : float
-            Net collateral held (positive = bank holds collateral).
+            Net variation margin held, excluding NICA (positive = bank holds
+            collateral).
         as_of : datetime.date | str
             Valuation date for forward-start and remaining-maturity
             calculations (date-like or ISO ``YYYY-MM-DD``).
@@ -2389,7 +2390,8 @@ class SaCcrNettingSetConfig:
         netting_set_id : NettingSetId
             Bilateral or cleared netting-set key.
         collateral : float
-            Net collateral held (positive = bank holds collateral).
+            Net variation margin held, excluding NICA (positive = bank holds
+            collateral).
         threshold : float
             CSA threshold (TH), non-negative.
         mta : float
@@ -2500,7 +2502,7 @@ class SaCcrNettingSetConfig:
     @property
     def collateral(self) -> float:
         """
-        Net collateral currently held.
+        Net variation margin currently held, excluding NICA.
 
         Returns
         -------
@@ -2612,7 +2614,8 @@ class SaCcrNettingSetConfig:
     @property
     def nica(self) -> float:
         """
-        Net independent collateral amount in the reporting currency.
+        Net independent collateral amount in the reporting currency, held
+        separately from ``collateral`` and added to it when forming ``C``.
 
         Returns
         -------

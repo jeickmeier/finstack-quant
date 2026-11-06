@@ -1647,7 +1647,10 @@ export interface SaCcrNettingSetConfig {
    */
   as_of: valuations.DateWire;
   /**
-   * Net current collateral held (positive = bank holds collateral).
+   * Net variation margin held, excluding NICA (positive = bank holds
+   * collateral). Total recognized adjusted collateral `C` is
+   * `collateral + nica`, formed by the replacement-cost kernel, so NICA must
+   * not also be included here.
    */
   collateral: number;
   /**
@@ -1667,7 +1670,8 @@ export interface SaCcrNettingSetConfig {
    */
   netting_set_id: NettingSetId;
   /**
-   * Net independent collateral amount (NICA).
+   * Net independent collateral amount (NICA), held separately from
+   * `collateral` and added to it when forming `C`.
    */
   nica: number;
   /**

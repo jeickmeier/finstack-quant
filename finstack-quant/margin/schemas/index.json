@@ -182,7 +182,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/margin/1/sa_ccr_netting_set_config.schema.json",
-      "bytes": 3763,
+      "bytes": 3993,
       "kind": "input",
       "path": "schemas/margin/1/sa_ccr_netting_set_config.schema.json",
       "summary": "Netting set configuration for SA-CCR.",

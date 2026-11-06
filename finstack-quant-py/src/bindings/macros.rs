@@ -24,6 +24,9 @@
 /// - Append `rust_json` when the Rust type owns its wire form through inherent
 ///   `from_json(&str)` / `to_json()` methods (both returning
 ///   `finstack_quant_core::Result`), so both directions run the Rust checks.
+///   Unknown-field rejection follows each object's declared closure: closed
+///   objects reject unknown keys, while a declared open extension object (for
+///   example `CreditCalibrationDiagnostics`) accepts and discards them.
 macro_rules! wire_methods {
     ($py_type:ident, $rust_type:ty, $name:literal, module = $module:literal) => {
         $crate::bindings::macros::wire_methods!(@documented_json $py_type, $rust_type, $name, [], |inner| inner,
@@ -127,7 +130,7 @@ macro_rules! wire_methods {
                 "Deserialize a ", $name, " from its canonical JSON wire form.\n\n",
                 "Parameters\n----------\njson : str\n    JSON produced by ``to_json`` (strict field names).\n\n",
                 "Returns\n-------\n", $name, "\n    The reconstructed value.\n\n",
-                "Raises\n------\nValueError\n    If the JSON is malformed, carries unknown fields, or fails validation."
+                "Raises\n------\nValueError\n    If the JSON is malformed, carries a key its object's declared closure rejects, or fails validation."
             )]
             #[staticmethod]
             #[pyo3(text_signature = "(json)")]

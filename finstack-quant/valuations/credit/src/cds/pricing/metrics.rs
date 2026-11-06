@@ -226,24 +226,19 @@ impl CdsPricer {
 
     /// Calculate par spread (bp) that sets NPV to zero.
     ///
-    /// # ISDA Standard Par Spread Definition
-    ///
-    /// By default this implements the **ISDA standard definition**:
+    /// # Par spread definition
     ///
     /// ```text
-    /// Par Spread = Protection_PV / Risky_Annuity
+    /// Par Spread = Protection_PV / Denominator
     /// ```
     ///
-    /// where `Risky_Annuity` is the sum of `DF(t) * SP(t) * YearFrac` across
-    /// coupon periods, **excluding** accrual-on-default from the denominator.
-    ///
-    /// # Par Spread with Full Premium Leg
-    ///
-    /// When the instrument's valuation convention uses the full-premium
-    /// denominator, it includes the full premium leg PV (with
-    /// accrual-on-default) per unit spread. This matches
-    /// Bloomberg CDSW-style calculations and is appropriate for distressed credits
-    /// where accrual-on-default has material impact (typically 2-5 bp for hazard > 3%).
+    /// The denominator is selected by the instrument's `valuation_convention`
+    /// (see [`Self::par_spread_denominator`]). The default,
+    /// `BloombergCdswClean`, uses the premium-leg annuity **including**
+    /// accrual-on-default minus the accrued fraction. Only `IsdaDirty` uses the
+    /// scheduled risky annuity `Σ DF(t) * SP(t) * YearFrac`, which excludes
+    /// accrual-on-default. Accrual-on-default matters most for distressed
+    /// credits (typically 2-5 bp for hazard > 3%).
     ///
     /// # Returns
     ///
@@ -254,11 +249,12 @@ impl CdsPricer {
     ///
     /// * full-premium denominator (`BloombergCdswCleanFullPremium`,
     ///   `QuantLibIsdaParity`) → full premium leg PV per unit
-    ///   spread including accrual-on-default (Bloomberg CDSW
-    ///   `BloombergCdswCleanFullPremium` and QuantLib parity behaviour).
+    ///   spread including accrual-on-default, with no accrued subtraction.
     /// * `cds.uses_clean_price()` → clean-price denominator (premium leg per unit
-    ///   spread minus accrued fraction; Bloomberg CDSW default).
-    /// * Otherwise → ISDA standard risky annuity (`Σ DF·SP·τ`).
+    ///   spread including accrual-on-default, minus the accrued fraction;
+    ///   `BloombergCdswClean`, the default).
+    /// * Otherwise (`IsdaDirty`) → scheduled risky annuity (`Σ DF·SP·τ`), which
+    ///   excludes accrual-on-default.
     ///
     /// All branches return values in the same units (per unit notional, per
     /// unit spread), so callers can reuse the result for index aggregation

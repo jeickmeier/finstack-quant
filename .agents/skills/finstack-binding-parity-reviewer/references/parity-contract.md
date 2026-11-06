@@ -19,7 +19,7 @@ Use this reference when a Rust public API is intended to appear in Python or WAS
 
 - Rust names are canonical. Python should preserve `snake_case`; WASM should expose `camelCase` via `js_name`.
 - Bindings use `pub(crate) inner: RustType` plus `from_inner()` for wrapper construction.
-- Error mapping stays centralized: Python uses crate error mappers; WASM returns `JsValue` or the established JS error shape.
+- Error mapping stays centralized: Python uses the `finstack-quant-py/src/errors.rs` adapters (e.g. `core_to_py`); WASM throws through `crate::utils::to_js_err`, never a bare string `JsValue`.
 - Binding code does not implement pricing, risk, validation, scenario math, or portfolio aggregation.
 - `.pyi`, `__all__`, module registration, JS facade exports, and parity contract entries move with public API changes.
 

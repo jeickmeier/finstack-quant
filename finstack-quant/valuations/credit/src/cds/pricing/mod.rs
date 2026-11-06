@@ -14,10 +14,19 @@
 //! protection leg PV equals premium leg PV). It is calculated as:
 //!
 //! ```text
-//! Par Spread = Protection_PV / RPV01
+//! Par Spread = Protection_PV / Denominator
 //! ```
 //!
-//! where RPV01 (Risky PV01 or Risky Duration) is defined as:
+//! The denominator is selected by the instrument's `valuation_convention`:
+//!
+//! | Convention | Denominator |
+//! |------------|-------------|
+//! | `BloombergCdswClean` (default) | Premium-leg annuity including accrual-on-default, minus the accrued fraction |
+//! | `BloombergCdswCleanFullPremium` | Premium-leg annuity including accrual-on-default, no accrued subtraction |
+//! | `QuantLibIsdaParity` | Premium-leg annuity including accrual-on-default, no accrued subtraction |
+//! | `IsdaDirty` | Risky annuity `RPV01` excluding accrual-on-default |
+//!
+//! where, for `IsdaDirty`:
 //!
 //! ```text
 //! RPV01 = Σᵢ DF(tᵢ) × SP(tᵢ) × Δt(tᵢ₋₁, tᵢ)
@@ -27,23 +36,9 @@
 //! - **SP(t)**: Survival probability to time t (from hazard curve)
 //! - **Δt**: Day count fraction for the accrual period
 //!
-//! This is the **Risky Annuity** excluding accrual-on-default, which matches
-//! the ISDA CDS Standard Model convention.
-//!
-//! ## ISDA vs Bloomberg CDSW Methodology
-//!
-//! | Methodology | Denominator | Use Case |
-//! |-------------|-------------|----------|
-//! | ISDA Standard Model | Risky Annuity only | Default, curve building |
-//! | Bloomberg CDSW | Includes accrual-on-default | Trading desk analytics |
-//!
-//! The difference is typically:
+//! The difference from including accrual-on-default is typically:
 //! - **< 1bp** for investment grade credits (hazard rate < 1%)
 //! - **2-5 bp** for high yield/distressed credits (hazard rate > 3%)
-//!
-//! To include accrual-on-default in the par-spread denominator, set the
-//! instrument's `valuation_convention` to `bloomberg_cdsw_clean_full_premium`
-//! (or `quant_lib_isda_parity`).
 //!
 //! # Day Count Convention Handling
 //!

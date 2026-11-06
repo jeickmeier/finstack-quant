@@ -11,8 +11,9 @@
 //! moneyness with geometric-mean-based moneyness, reducing errors from O(ε²) to O(ε³)
 //! for intermediate β values (0 < β < 1).
 //!
-//! Residual accuracy limitations (after Obloj correction):
-//! - **T > 10Y**: Very long maturities may still show ~5-10bp error
+//! Residual accuracy limitations (after Obloj correction; no error size is
+//! published because no reproducible benchmark defines one):
+//! - **T > 10Y**: Very long maturities may still show material error
 //! - **ν (vol-of-vol) > 1.0**: Extreme vol-of-vol
 //! - **Very far OTM strikes**: 3+ standard deviations from ATM
 //!

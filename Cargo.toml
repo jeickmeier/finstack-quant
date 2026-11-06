@@ -164,7 +164,7 @@ missing_docs = "deny"           # all public API must be documented (rustc lint,
 
 # ---- ERROR HANDLING ----
 "result_large_err" = "deny"     # catches heavy error types
-"match_wild_err_arm" = "deny"   # no wildcard catching errors
+"match_wild_err_arm" = "deny"   # no `Err(_)` arm that panics or aborts (not enum-classification exhaustiveness)
 "needless_borrow" = "deny"
 
 # ---- API DESIGN / READABILITY ----

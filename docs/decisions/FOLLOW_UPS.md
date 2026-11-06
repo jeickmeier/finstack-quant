@@ -24,14 +24,14 @@ resolve the stated scope question explicitly.
    [ADR 0004](project/0004-development-compatibility.md): approved development
    replacements remove obsolete paths. The
    [annotation checker](../../scripts/check_deprecated_annotations.py) still
-   runs in `rust-doc` and cites section 7.2 while requiring `since = "X.Y.Z"`,
-   a replacement pointer or retention rationale, and an earliest removal
-   release in each deprecation note. It checks annotation content, not the
-   former notice window. Reconcile that check, its diagnostic wording, and
-   remaining guidance with the accepted policy without silently disabling a
-   protected gate. The former rule retaining APIs through `0.(y+1)` after
-   deprecation in `0.y`, with removal in `0.(y+2)`, is superseded; it is not the
-   final-release strategy. That strategy remains a separate lifecycle task.
+   runs in `rust-doc`; its docstring and diagnostics now describe it as an
+   annotation-format check rather than the replacement policy, and no library
+   `#[deprecated]` attribute currently exists. Still open: decide whether its
+   `since = "X.Y.Z"`, replacement-or-rationale and earliest-removal-release
+   requirements remain, without silently disabling a protected gate. The former
+   rule retaining APIs through `0.(y+1)` after deprecation in `0.y`, with
+   removal in `0.(y+2)`, is superseded; it is not the final-release strategy.
+   That strategy remains a separate lifecycle task.
 2. **Python/WASM parity guidance and coverage.**
    [INVARIANTS.md section 7.1](../../INVARIANTS.md#71-host-surface-parity) follows
    [ADR 0005](standards/0005-python-wasm-parity.md). Audit remaining guidance,
@@ -40,39 +40,29 @@ resolve the stated scope question explicitly.
    and the protected zero-backlog requirement. Preserve the distinction from
    exposing every internal Rust function. Surface checks alone do not prove
    semantic parity or independent protection of their own ceilings.
-3. **WASM error instructions.**
-   [AGENTS.md](../../AGENTS.md) and the simplify skill references
-   ([refactor-tactics.md](../../.agents/skills/finstack-simplify/references/refactor-tactics.md),
-   [slop-patterns.md](../../.agents/skills/finstack-simplify/references/slop-patterns.md))
-   now specify `crate::utils::to_js_err`, matching the
-   [boundary checker](../../scripts/check_wasm_boundary.py) and
-   [ADR 0006](standards/0006-structured-errors.md). Audit remaining contributor
-   and binding docs for any stale bare-string error examples.
-4. **Cross-target reproducibility claims.**
-   The [models README](../../finstack-quant/models/README.md), under
-   "Determinism and parallelism", claims native/WASM bit identity.
-   The [Monte Carlo run-metadata documentation](../../finstack-quant/models/src/monte_carlo/results.rs)
+3. **Cross-target reproducibility claims.**
+   [ADR 0021](standards/0021-reproducibility-guarantees.md) and
+   [INVARIANTS.md](../../INVARIANTS.md) section 2.1 limit bit-identity promises
+   to demonstrated target and execution conditions and verify numerical parity
+   with justified tolerances otherwise. The
+   [models README](../../finstack-quant/models/README.md),
+   [run-metadata documentation](../../finstack-quant/models/src/monte_carlo/results.rs)
    and [engine pricing documentation](../../finstack-quant/models/src/monte_carlo/engine/pricing.rs)
-   also promise host-independent bit reproduction; include them in the same
-   reconciliation. The inspected serial/parallel and thread-count tests
-   establish evidence for same-target conditions, not every host or machine.
-   [INVARIANTS.md](../../INVARIANTS.md), section 2.1, limits reproducibility
-   tiers per target and requires justified tolerances across hosts unless
-   stronger guarantees are tested.
-   [ADR 0021](standards/0021-reproducibility-guarantees.md) now defines the accepted
-   policy: limit bit-identity promises to demonstrated target and execution
-   conditions, and verify numerical parity with justified tolerances otherwise.
-   Correct the guidance and reconcile its evidence; that work remains pending.
-   This conflict is not proof of a numerical defect, and ADR 0005 does not
-   imply blanket bit-identical floating-point results.
-5. **Option-bearing bond CS01 scope.**
+   now scope their promise to thread-count independence on one build target and
+   state that native-versus-WASM results agree only within tolerances. Still
+   open: no native-versus-WASM comparison or justified tolerance backs that
+   statement, and the same-target tests do not cover every machine; add that
+   evidence under the reproducibility coverage follow-up. This conflict was
+   never proof of a numerical defect, and ADR 0005 does not imply blanket
+   bit-identical floating-point results.
+4. **Option-bearing bond CS01 scope.**
    The [bond CS01 implementation](../../finstack-quant/valuations/fixed-income/src/bond/metrics/cs01.rs)
    has a model-specific OAS branch when the active option-bearing model does
    not consume a credit curve. Clarify its relationship to the supported-bond
    z-spread rule in [ADR 0011](financial/valuations-bonds/0011-bond-cs01-without-hazard-curve.md).
    The existing branch is neither silently approved as an exception nor
    classified as a defect by this record.
-6. **Code-standard guidance and configuration.**
+5. **Code-standard guidance and configuration.**
    Align contributor and agent guidance with the accepted policy and shared
    executable definitions under
    [ADR 0034](standards/0034-code-standards-authority.md). The
@@ -89,8 +79,8 @@ resolve the stated scope question explicitly.
    [ADR 0021](standards/0021-reproducibility-guarantees.md) and
    [ADR 0042](standards/0042-numerical-accumulation-and-comparisons.md)
    (determinism and summation), and ADR 0034 (lint definitions live in the
-   workspace manifest). The error guide's crate inventory is now a snapshot
-   to re-check, and the
+   workspace manifest). The error guide's crate inventory was re-checked against each
+   crate's error module on 2026-11-05 and is accurate, and the
    [testing guidance](../../.agents/rules/rust/testing-standards.md) now
    follows [ADR 0048](project/0048-reference-provenance-and-version-pinning.md)
    for fixture location and provenance and names the actual `ResultsMeta`
@@ -101,7 +91,7 @@ resolve the stated scope question explicitly.
 
 <a id="credit-factor-guidance"></a>
 
-7. **Credit factor schema guidance and extension scope.**
+6. **Credit factor schema guidance and extension scope.**
    [ADR 0047](architecture/0047-credit-factor-wire-and-validation-contract.md)
    is accepted on 2026-11-05: require typed `schema` with
    `CreditFactorModelSchema::CURRENT`, reject missing, malformed or unsupported
@@ -110,19 +100,19 @@ resolve the stated scope question explicitly.
    The former representation/failure-timing discrepancy is settled; enforcement
    and guidance corrections remain open under
    [INVARIANTS.md section 8](../../INVARIANTS.md#8-credit-factor-model-schema-versioning).
-   Reconcile the [Serde policy's](../SERDE_STABILITY.md#object-strictness)
-   extension-map wording with the narrow, explicitly open
-   `CreditCalibrationDiagnostics` object. Unknown diagnostic keys are accepted
-   and discarded; known fields retain their requiredness and meaning, including
-   computational `fold_ups`. Additions affecting computation require a
-   coordinated semantic contract change. Qualify the Python
+   The [Serde policy](../SERDE_STABILITY.md#object-strictness), the Python
    [`rust_json` macro documentation](../../finstack-quant-py/src/bindings/macros.rs)
-   so unknown-field rejection applies according to each object's declared
-   closure. The [hierarchy's](../../finstack-quant/factor/src/credit/hierarchy.rs)
-   unknown-root-field test still says an additive root field requires a new
-   schema version; align that wording with authorized development v1
-   replacement while retaining rejection of unrecognized fields. Preserve the
-   stable schema path/URI and the separate final-release compatibility decision.
+   and the [hierarchy's](../../finstack-quant/factor/src/credit/hierarchy.rs)
+   unknown-root-field test message now state the narrow, explicitly open
+   `CreditCalibrationDiagnostics` object (unknown diagnostic keys accepted and
+   discarded; known fields keep their requiredness and meaning, including
+   computational `fold_ups`), unknown-field rejection by each object's declared
+   closure, and root additions as a coordinated v1 contract change. Still open:
+   enforcement, tracked in the
+   [credit artifact validation entry](#credit-artifact-validation), and any
+   remaining guidance that still describes `schema_version` or a new schema
+   version for root additions. Preserve the stable schema path/URI and the
+   separate final-release compatibility decision.
 
 ## Implementation and lifecycle follow-up
 
@@ -234,8 +224,8 @@ resolve the stated scope question explicitly.
   same-target baselines also record the relevant build/runtime/execution
   conditions; the target alone does not establish reproducibility.
   Address missing repeatability, thread-count, or cross-host coverage for the
-  guarantees actually promised. Reconciliation item 4 tracks the conflicting
-  native/WASM bit-identity wording separately. The former catalogue reported
+  guarantees actually promised. Reconciliation item 3 tracks the remaining
+  native/WASM evidence separately. The former catalogue reported
   approximately `1e-8` relative Monte Carlo PV differences and `2e-4` relative
   carry/bucketed-DV01 differences without a pinned reproducible setup. Recover
   the inputs, target builds, and provenance or retire those unverified
@@ -310,15 +300,16 @@ resolve the stated scope question explicitly.
   [retained-earnings check](../../finstack-quant/statements/src/checks/builtins/retained_earnings.rs);
   resolve enforcement and test the public boundary without treating those
   warnings as strict rejection.
-  Reconcile the SA-CCR [public field's](../../finstack-quant/margin/src/regulatory/sa_ccr/types.rs)
-  net-collateral description with the [kernel's](../../finstack-quant/margin/src/regulatory/sa_ccr/replacement_cost.rs)
-  VM-only interpretation of `config.collateral` and addition of NICA.
-  Total recognized adjusted collateral `C` already includes NICA; define
-  non-overlapping inputs and verify NICA is never counted twice. The
+  The SA-CCR [public field](../../finstack-quant/margin/src/regulatory/sa_ccr/types.rs)
+  documentation (Rust, Python and WASM) now matches the
+  [kernel's](../../finstack-quant/margin/src/regulatory/sa_ccr/replacement_cost.rs)
+  VM-only interpretation of `config.collateral` and addition of NICA. Still
+  open: the kernel does not prevent a caller passing total collateral, so
+  verify or enforce that NICA is never counted twice. The
   [SA-CCR qualification entry](financial/FOLLOW_UPS.md#saccr-collateral-qualification)
   owns regulatory qualification of the margined and unmargined methodologies.
-  Acceptance of the sign policy does not settle the exact public-field
-  reconciliation or certify either calculation.
+  Acceptance of the sign policy does not settle non-overlap enforcement or
+  certify either calculation.
 
 <a id="clock-metadata-defaults"></a>
 
@@ -515,7 +506,7 @@ resolve the stated scope question explicitly.
   not imply the bounded loading contract. Verify missing/malformed/unsupported
   markers, closed roots, discarded unknown diagnostic keys, known-field
   preservation, deterministic schema generation and coordinated host behavior.
-  Carry guidance corrections in reconciliation item 7 above.
+  Carry the remaining guidance work in reconciliation item 6 above.
 
 <a id="reference-provenance"></a>
 
@@ -524,14 +515,15 @@ resolve the stated scope question explicitly.
   case-attributable metadata, inherited suite/header/README values, explicit
   case overrides and reasons for genuinely inapplicable fields. Preserve
   methodology, inputs, output units and tolerance rationale, including when
-  fixtures are shared between hosts. Reconcile the
-  [core golden guide](../../finstack-quant/core/tests/golden/README.md), which
-  promotes fixtures to `certified` after unspecified review and permits a skip
-  with an explanation, with ADR 0014's independent evidence and authorization
-  requirements. The [realized-variance fixture](../../finstack-quant/core/tests/golden/data/realized_variance.json)
-  names the implementation as its generator while expected-value notes claim
-  hand calculation. Trace the independent derivation before counting it as
-  financial correctness evidence; this review establishes no numerical defect.
+  fixtures are shared between hosts. The
+  [core golden guide](../../finstack-quant/core/tests/golden/README.md) now
+  ties `certified` promotion and skips to ADR 0014's independent evidence and
+  authorization requirements, and records that an independent recomputation
+  from the cited formulas reproduced all four realized-variance values. Still
+  open: the [realized-variance fixture](../../finstack-quant/core/tests/golden/data/realized_variance.json)
+  still names the implementation as its generator and carries approximate
+  hand-calculation notes, so store the derivation per case; this review
+  establishes no numerical defect.
   The [metadata test](../../finstack-quant/core/tests/golden/variance_tests.rs)
   checks nonempty labels and `certified` status, not independent derivation,
   tolerance rationale or review. Shared host runs do not create additional
@@ -549,15 +541,12 @@ resolve the stated scope question explicitly.
   reports only the methodology enum. Record effective overlay/parameter
   provenance after [registry overlays](../../finstack-quant/margin/src/registry/mod.rs);
   the registry's wire-format version is a separate identity.
-  Historical [v2.6 table tests](../../finstack-quant/margin/tests/simm_schedule_parity.rs)
-  still select `SimmVersion::default()` in several cases; pin `V2_6` explicitly.
-  Reconcile the [margin data guide](../../finstack-quant/margin/data/margin/README.md),
-  including its six-file count versus five embedded files, stale v2.5 listing,
-  removed `SimmV26GoldenValues` reference and
-  procedure description, with the actual tests and
-  [v2.6 provenance record](../../finstack-quant/margin/tests/fixtures/simm_v26_provenance.md).
-  Distinguish the implemented historical pin from the catalogue's v2.8+2512
-  bibliography entry and the unversioned [central reference](../REFERENCES.md#isda-simm).
+  The historical v2.6 table tests now pin `SimmVersion::V2_6`, the
+  [margin data guide](../../finstack-quant/margin/data/margin/README.md) matches
+  the five embedded files, tests and
+  [v2.6 provenance record](../../finstack-quant/margin/tests/fixtures/simm_v26_provenance.md),
+  and INVARIANTS and the [central reference](../REFERENCES.md#isda-simm)
+  distinguish the implemented v2.6 pin from the v2.8+2512 bibliography entry.
   These documentation corrections do not authorize a methodology upgrade or
   certify regulatory applicability.
 
@@ -568,13 +557,13 @@ resolve the stated scope question explicitly.
   build/runtime/execution conditions, including seeds where applicable. Apply
   ADR 0043's reproducibility conditions and retain the distinction between
   measured error, sampling uncertainty, test tolerance and a broader bound.
-  The [SABR documentation](../../finstack-quant/models/src/volatility/README.md)
-  claims approximately 5–10 bp error for expiries above ten years without a
-  linked reproducible setup, comparator or clearly specified error scale.
-  Supply that evidence or remove the numerical claim while retaining justified
-  qualitative limitations. Audit other published accuracy claims for the same
-  evidence requirements; locating a test or source citation does not establish
-  an executed result or complete coverage.
+  The SABR documentation no longer publishes an error size without evidence.
+  Still open: audit other published accuracy claims for the same evidence
+  requirements, including the CMS convexity "5–10 bp" statements in the
+  [rates README](../../finstack-quant/valuations/rates/README.md) and the CMS
+  swap pricer and module documentation, and the tree-step accuracy table in the
+  bond tree configuration. Locating a test or source citation does not
+  establish an executed result or complete coverage.
 - **Detailed invariant enforcement and evidence:** the
   [clause map](INVARIANT_MAP.md) provides an accepted decision for every
   normative catalogue clause. Review of decisions 0042–0049 is complete under
@@ -609,7 +598,7 @@ is accepted on 2026-11-05 for the named perspectives and explicit conversions,
 including the dividend magnitude default with an explicitly selected signed
 alternative. Its retained margined replacement-cost formula uses total
 recognized adjusted collateral `C`, already including NICA. Dividend
-enforcement, SA-CCR public-field reconciliation, full margined/unmargined
+enforcement, SA-CCR non-overlap enforcement, full margined/unmargined
 methodology qualification, and cross-boundary checks remain in the sign
 follow-up above.
 
@@ -638,18 +627,18 @@ deserialization without first-error priority, stable closed-root schema identity
 explicit open diagnostics and current-state semantic validation. Unknown
 diagnostic keys are discarded; computational `fold_ups` retains its meaning.
 Ordinary and resource-limited loaders retain distinct contracts. Consumer and
-post-mutation validation, fold-up coverage, and Serde/Python/test guidance
-corrections remain in the credit-artifact follow-up and reconciliation item 7
-above. Acceptance does not certify complete validation coverage.
+post-mutation validation and fold-up coverage remain in the credit-artifact
+follow-up; remaining guidance work is in reconciliation item 6 above.
+Acceptance does not certify complete validation coverage.
 
 [ADR 0048](project/0048-reference-provenance-and-version-pinning.md)
 is accepted on 2026-11-05 for case-attributable applicable metadata, shared
 fixture locations, exact methodology/effective-parameter pins, and recorded
 execution evidence for measured accuracy. Inherited metadata permits explicit
 case overrides; genuinely inapplicable fields require an explanation. Policy,
-implementation and validation statuses remain distinct. Golden derivation and
-guidance, SIMM version/override provenance and historical test selection, and
-the SABR accuracy claim remain in the reference follow-ups above. Acceptance
+implementation and validation statuses remain distinct. Golden fixture
+derivation metadata, SIMM effective overlay provenance, and the audit of other
+published accuracy claims remain in the reference follow-ups above. Acceptance
 does not approve a methodology upgrade, certify existing references or change
 protected expectations and tolerances.
 
@@ -770,18 +759,6 @@ requiring reproduction, adoption choices and missing validation are distinct.
   still conflict with those directions. Reconcile the affected Rust and host
   contracts, documentation, and protected expectations together. The existing
   CAGR item above remains a separate discrepancy under ADR 0008.
-- **Selection wording:** clarify the private Ho-Lee/200-step tree configuration
-  versus the public bond HW/100-step resolver documented in 0028; a private
-  default does not describe public selection. Reconcile the negative-rate
-  conversion promised by `CapFloorVolType::Auto` and test-module prose with
-  the executable rejection behavior linked in 0029. Correct the
-  [credit-family README](../../finstack-quant/valuations/credit/README.md)
-  Black option wording against the live `BloombergCdso` dispatch recorded in
-  the inventory. Reconcile Bloomberg CDS par-denominator source descriptions
-  with the [leg calculation](financial/models-and-valuations-credit/12-cds-legs.md#selection-and-controls):
-  both clean and full-premium variants include accrual-on-default; clean
-  subtracts accrued and full-premium does not. These findings do not authorize
-  silently changing models.
 - **Related scope:** retain the option-bearing CS01/OAS reconciliation above.
   The inventory's statement DCF path uses ACT/365.25; the dated-CAGR decision
   does not establish a DCF time-basis change. Different fixing/overnight paths

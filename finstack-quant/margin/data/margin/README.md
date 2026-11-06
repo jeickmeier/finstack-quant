@@ -1,6 +1,6 @@
 # `data/margin` — regulatory and market-convention reference data
 
-Six JSON files, embedded into the `finstack-quant-margin` binary at build time
+Five JSON files, embedded into the `finstack-quant-margin` binary at build time
 by `src/registry/embedded.rs` (`include_str!`), parsed by `src/registry/mod.rs`,
 and overlayable at runtime through the Finstack config extension key
 `margin.registry.v1`.
@@ -18,7 +18,7 @@ computed margin. Every edit needs a source citation and a reviewer.
 
 | File | Source | Version / as-of | Test-pinned? |
 |------|--------|-----------------|--------------|
-| `simm.v1.json` | ISDA SIMM Methodology | v2.6 (Dec 2023) and v2.5 (Dec 2022) | **Yes** — partial, `tests/simm_schedule_parity.rs` |
+| `simm.v1.json` | ISDA SIMM Methodology | v2.6 (Dec 2023) only | **Yes** — partial, `tests/simm_schedule_parity.rs` |
 | `schedule_im.v1.json` | BCBS-IOSCO standardised IM schedule | BCBS 261 / d499 Appendix A | Partial — 6 of 18 rate cells |
 | `collateral_schedules.v1.json` | BCBS-IOSCO standardised haircut schedule + market convention | BCBS 261 / d499 Appendix B | Partial |
 | `defaults.v1.json` | Market convention (ISDA CSA practice), **not** a published schedule | Convention, as-of 2026-08-20 | Partial |
@@ -44,18 +44,28 @@ inputs and output must be normalized to USD. The implementation is explicitly
 approximate because some required factor and product-class dimensions are
 not represented. Parameter provenance is not model certification.
 
-**Pinned by.** `tests/simm_schedule_parity.rs`. That file is the authoritative
-provenance record for this JSON: it carries the ISDA section/table reference
-for each golden value and the full re-verification procedure for adopting a
-new ISDA release. It pins a **subset** — enough to catch accidental edits and
-loader drift, not every number in the file.
+**Pinned by.** `tests/simm_schedule_parity.rs`, which transcribes published
+v2.6 tables and selects `SimmVersion::V2_6` explicitly, with the page-level
+source mapping in [`tests/fixtures/simm_v26_provenance.md`](../../tests/fixtures/simm_v26_provenance.md)
+(official PDF and SHA256). Formula checks live in
+`tests/production_simm_csa_audit.rs`. The parity file pins a **subset** —
+enough to catch accidental edits and loader drift, not every number in the file.
 
-**Not pinned.** Any risk weight, correlation or threshold absent from
-`SimmV26GoldenValues`.
+**Not pinned.** Any risk weight, correlation or threshold that the transcribed
+tests in `tests/simm_schedule_parity.rs` do not assert.
 
-**Regeneration.** Follow the numbered procedure in the module doc of
-`tests/simm_schedule_parity.rs`. ISDA publishes annually; the embedded copy
-must be re-verified against the ISDA PDF on every schedule update.
+**Effective parameters.** `SimmCalculator::version()` reports only the
+methodology enum. The embedded registry can be overlaid at runtime through
+`margin.registry.v1`, and the effective overlay or parameter set is not
+recorded by the calculator, so a result's version label does not identify an
+overridden calibration. The registry's own wire-format version is a separate
+identity from the SIMM methodology edition.
+
+**Adopting a new ISDA release.** No procedure is codified in the test module.
+Adopting a different edition is a methodology decision, not a data refresh:
+re-transcribe the published tables from the official PDF, record its identity
+and SHA256 in a new provenance record, and pin the new version explicitly.
+This README's citation of v2.6 does not adopt or certify any later edition.
 
 ---
 

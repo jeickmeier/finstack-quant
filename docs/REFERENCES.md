@@ -585,6 +585,10 @@ and implementation and validation evidence.
 - International Swaps and Derivatives Association. *Standard Initial Margin
   Model (SIMM) Methodology*. Canonical reference for SIMM risk classes, buckets,
   risk weights, correlations, concentration thresholds, and margin aggregation.
+  This entry names the family only. The implementation embeds and tests the
+  historical v2.6 edition (December 2023); see the
+  [margin data guide](../finstack-quant/margin/data/margin/README.md#simmv1json)
+  and the [v2.6 provenance record](../finstack-quant/margin/tests/fixtures/simm_v26_provenance.md).
 
 <a id="bcbs-iosco-uncleared-margin"></a>
 

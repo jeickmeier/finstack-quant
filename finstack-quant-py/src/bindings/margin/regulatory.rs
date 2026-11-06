@@ -949,7 +949,8 @@ impl PySaCcrNettingSetConfig {
     ///     Bilateral (``NettingSetId.bilateral``) or cleared
     ///     (``NettingSetId.cleared``) netting-set key.
     /// collateral : float
-    ///     Net collateral held (positive = bank holds collateral).
+    ///     Net variation margin held, excluding NICA (positive = bank holds
+    ///     collateral).
     /// as_of : datetime.date | str
     ///     Valuation date for forward-start and remaining-maturity
     ///     calculations.
@@ -979,7 +980,8 @@ impl PySaCcrNettingSetConfig {
     /// netting_set_id : NettingSetId
     ///     Bilateral or cleared netting-set key.
     /// collateral : float
-    ///     Net collateral held (positive = bank holds collateral).
+    ///     Net variation margin held, excluding NICA (positive = bank holds
+    ///     collateral).
     /// threshold : float
     ///     CSA threshold (TH), non-negative.
     /// mta : float
@@ -1069,7 +1071,7 @@ impl PySaCcrNettingSetConfig {
         self.inner.is_margined
     }
 
-    /// Net collateral held against the netting set, in its reporting currency.
+    /// Net variation margin held against the netting set, excluding NICA, in its reporting currency.
     #[getter]
     fn collateral(&self) -> f64 {
         self.inner.collateral

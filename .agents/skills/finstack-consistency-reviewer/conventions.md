@@ -77,7 +77,7 @@ Reference of patterns observed across the finstack-quant codebase. When reviewin
 | Wrapper naming | `Py{Type}` | `PyCurrency`, `PyMoney`, `PyDiscountCurve` |
 | Module registration | `pub(crate) fn register()` | Every submodule has one |
 | Argument parsing | Centralized `*Arg` types | `CurrencyArg` in `common/args.rs` |
-| Error mapping | `map_error()` function | `finstack-quant-py/src/errors.rs` |
+| Error mapping | `core_to_py()` and sibling adapters | `finstack-quant-py/src/errors.rs` |
 | Inner field | `pub(crate) inner: RustType` | Consistent across all wrappers |
 
 ## WASM Binding Conventions

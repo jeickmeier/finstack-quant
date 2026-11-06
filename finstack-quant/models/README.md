@@ -366,10 +366,15 @@ The determinism guarantee is stronger than "reproducible across runs":
   The chunk partition fixes the `OnlineStats::merge` reduction tree, and
   floating-point merges are order-sensitive.
 - Consequently, with a splittable RNG and auto-stopping disabled, serial and
-  parallel runs are **bit-identical**, and so are runs across machines,
-  `RAYON_NUM_THREADS` settings, and native-vs-wasm hosts.
-  `src/monte_carlo/engine/tests.rs` pins this with `to_bits()` comparisons across 1-thread
-  and 8-thread rayon pools.
+  parallel runs are **bit-identical** within one build target, independent of
+  `RAYON_NUM_THREADS`. `src/monte_carlo/engine/tests.rs` pins this with
+  `to_bits()` comparisons across 1-thread and 8-thread rayon pools on the
+  target under test.
+- Bit identity is not promised across targets or machines. Native and wasm32
+  builds use different platform implementations of transcendental functions, so
+  native-vs-wasm results agree only within justified, operation-specific
+  tolerances ([ADR 0021](../../docs/decisions/standards/0021-reproducibility-guarantees.md),
+  [INVARIANTS.md](../../INVARIANTS.md) section 2.1).
 - Captured paths are sorted by `path_id` before being returned, so dataset
   ordering is stable across serial and parallel runs.
 

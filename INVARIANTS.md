@@ -399,8 +399,9 @@ governs metric meaning.
   `max(V - C, TH + MTA - NICA, 0)`, where `C` is total recognized net collateral
   after applicable adjustments and already includes NICA. Component inputs
   MUST be explicitly defined and non-overlapping; NICA MUST NOT be added to
-  total `C` a second time. Exact public-field reconciliation and full
-  margined/unmargined methodology qualification remain open.
+  total `C` a second time. The public `collateral` field is variation margin
+  excluding NICA, and the kernel adds `nica` to form `C`. Full
+  margined/unmargined methodology qualification remains open.
 - CDS option Call means payer protection; Put means receiver protection.
 - Portfolio quantity greater than zero means long. P&L attribution is
   positive for a gain to the long holder. Sensitivity signs follow the
@@ -417,11 +418,12 @@ and [SA-CCR replacement cost](finstack-quant/margin/src/regulatory/sa_ccr/replac
 provide operation-specific implementation evidence. Retained earnings supports
 the accepted explicit dividend selector, but negative magnitude inputs currently
 produce warnings rather than rejection; enforcement remains a follow-up. The
-SA-CCR public field describes net collateral held, while the kernel treats
-`config.collateral` as VM and adds `config.nica`. That ambiguity can double count
-NICA when the caller supplies total collateral. The kernel also implements
+SA-CCR public `collateral` field is documented as variation margin excluding
+NICA, matching the kernel, which adds `config.nica`; a caller who supplies total
+collateral in `collateral` would still double count NICA, so the kernel does
+not enforce non-overlap. The kernel also implements
 unmargined `max(V - C, 0)`; accepting the sign policy does not qualify either
-branch's complete methodology. Public-field reconciliation, named conversion
+branch's complete methodology. Non-overlap verification, named conversion
 helpers or typed wrappers where needed, and cross-boundary verification remain
 tracked in
 [FOLLOW_UPS.md](docs/decisions/FOLLOW_UPS.md#implementation-and-lifecycle-follow-up).
@@ -793,7 +795,8 @@ of computational `fold_ups` fields, and guidance reconciliation. The inspected
 validator does not check `diagnostics.fold_ups`; decomposition checks an
 out-of-range level later. Located validation calls and tests do not prove
 complete enforcement. The Serde open-object guidance, Python macro wording
-and root-field test wording still need alignment, as recorded in
+and root-field test wording now follow ADR 0047; the remaining enforcement
+work is recorded in
 [FOLLOW_UPS.md](docs/decisions/FOLLOW_UPS.md#reconciliation-items).
 
 ---
@@ -868,6 +871,8 @@ authorize upgrading the implementation to that edition.
   methodology and effective parameter set, including any overrides, rather
   than relying on “current”. Use a published calibration tag where available;
   otherwise identify the exact edition and immutable source/parameter set.
+  The implemented and test-pinned edition is historical v2.6; citing v2.8+2512
+  here does not adopt it or authorize a methodology upgrade.
 - [AFMA, *Interest Rate Options Conventions* (June 2025)](https://www.afma.com.au/getattachment/Standards/Market-Conventions/Sections/Content/Interest-Rate-Options-Conventions-2025-06.pdf?lang=en-AU)
   — market-specific Actual/365 quotation practice; not a universal global
   volatility-time rule.

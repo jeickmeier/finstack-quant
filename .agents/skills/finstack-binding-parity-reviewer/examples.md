@@ -374,7 +374,7 @@ When reviewing, verify Python implementations can be trivially replicated in WAS
 #[pymethods]
 impl PyBond {
     fn clean_price(&self, market_data: &PyMarketData) -> PyResult<f64> {
-        self.inner.clean_price(&market_data.inner).map_err(map_error)
+        self.inner.clean_price(&market_data.inner).map_err(core_to_py)
     }
 }
 
@@ -382,7 +382,7 @@ impl PyBond {
 #[wasm_bindgen]
 impl JsBond {
     pub fn clean_price(&self, market_data: &JsMarketData) -> Result<f64, JsValue> {
-        self.inner.clean_price(&market_data.inner).map_err(core_to_js)
+        self.inner.clean_price(&market_data.inner).map_err(to_js_err)
     }
 }
 ```
