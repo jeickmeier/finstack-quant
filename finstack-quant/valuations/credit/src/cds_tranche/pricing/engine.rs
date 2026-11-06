@@ -485,26 +485,15 @@ impl CdsTranchePricer {
         let detach = tranche.detach_pct / 100.0;
 
         // Debug assertions for invariants
-        debug_assert!(
-            (0.0..=1.0).contains(&l),
-            "realized_loss {} must be in [0, 1]",
-            l
-        );
-        debug_assert!(
-            attach <= detach,
-            "attach {} must be <= detach {}",
-            attach,
-            detach
-        );
+        debug_assert!((0.0..=1.0).contains(&l), "realized_loss must be in [0, 1]");
+        debug_assert!(attach <= detach, "attachment must not exceed detachment");
         debug_assert!(
             (0.0..=1.0).contains(&attach),
-            "attach {} must be in [0, 1]",
-            attach
+            "attachment must be in [0, 1]"
         );
         debug_assert!(
             (0.0..=1.0).contains(&detach),
-            "detach {} must be in [0, 1]",
-            detach
+            "detachment must be in [0, 1]"
         );
 
         let (defaulted, recovered) = self.realized_default_state(tranche, recovery_rate);

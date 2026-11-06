@@ -148,7 +148,7 @@ export function scanSource(text, file) {
     const match = /(?:\/\/|\/\*)\s*finstack-arith:(.*)$/.exec(content);
     if (!match) return;
     const line = index + 1;
-    if (!match[1].replace("*/", "").replace("}", "").trim()) {
+    if (!match[1].replaceAll("*/", "").replaceAll("}", "").trim()) {
       errors.push(
         `${file}:${line}: finstack-arith comment has no reason; write \`// finstack-arith: <reason>\``,
       );

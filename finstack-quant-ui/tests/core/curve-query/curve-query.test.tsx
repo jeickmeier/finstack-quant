@@ -225,7 +225,7 @@ it.each([
   const name = kind === "surface" ? "Surface values" : "Curve values";
   expect(
     table(name).getByRole("columnheader", {
-      name: new RegExp(header.replace(/[()]/g, "\\$&")),
+      name: (name) => name.includes(header),
     }),
   ).toBeTruthy();
   expect(table(name).getAllByRole("row")).toHaveLength(

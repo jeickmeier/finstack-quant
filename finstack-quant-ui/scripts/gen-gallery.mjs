@@ -184,14 +184,20 @@ if (workbenchTypes.size)
   throw new Error(`Missing workbench pricing cases: ${[...workbenchTypes]}`);
 const imports = nonvisual.map((item) => {
   const targets = (item.files ?? [])
-    .map((file) => file.target.replace(/^~\//, ""))
+    .map(({ target }) => (target.startsWith("~/") ? target.slice(2) : target))
     .filter(
       (target) =>
         /\.(?:[cm]?js|tsx?|json)$/.test(target) &&
         !target.endsWith(".d.ts") &&
         !target.endsWith(".worker.ts"),
-    );
-  return `${JSON.stringify(item.name)}:()=>Promise.all([${targets.map((target) => `import(${JSON.stringify("@/" + target.replace(/\.tsx?$/, ""))})`).join(",")}]).then(modules=>({name:${JSON.stringify(item.name)},modules:modules.length}))`;
+    )
+    .map((target) => {
+      const extension = path.extname(target);
+      return extension === ".ts" || extension === ".tsx"
+        ? target.slice(0, -extension.length)
+        : target;
+    });
+  return `${JSON.stringify(item.name)}:()=>Promise.all([${targets.map((target) => `import(${JSON.stringify("@/" + target)})`).join(",")}]).then(modules=>({name:${JSON.stringify(item.name)},modules:modules.length}))`;
 });
 const exampleId = (name) =>
   name.replace(/(?:^|-)(\w)/g, (_, letter) => letter.toUpperCase());
