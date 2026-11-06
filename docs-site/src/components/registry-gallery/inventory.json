@@ -1696,7 +1696,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/core/market-browser/cases.json",
-      "sha256": "87b45db4b2e5180dcdbd7b4ca1f92e767ed56ffd9a108c9b1b8dd40ded0d89aa"
+      "sha256": "25012a1c71e60570dea931b00c42a8e84c110219894928a4e0a6469e320b480f"
     },
     {
       "path": "finstack-quant-ui/tests/core/curve-query/cases.json",
@@ -1708,7 +1708,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/calibration/cases.json",
-      "sha256": "5aa64ee899633c86d41a377c7a5b71d8c4e12f8c8ad3cd7078ca00353e3fefe4"
+      "sha256": "cb1778d18db30a66f272293025fdab3ff491f950f05bb57bbc7978d7a6dff8b0"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/cases.json",

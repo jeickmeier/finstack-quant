@@ -2762,6 +2762,47 @@ fn credit_performance_numerical_baseline() {
         let width = (detach - attach) / 100.0;
         records.push(serde_json::json!({"name": name, "raw": raw, "curve": curve.iter().map(|p| [p.el_fraction, p.wd_fraction]).collect::<Vec<_>>(), "pv": pv, "delta": delta, "fraction_bound": 4e-10 / width, "pv_bound": tranche.notional.amount() * 4e-10 / width * (2.0 * periods.len() as f64 + 0.05 * (years as f64 + 1.0))}));
     }
+    // Same-build preparation checks use bit strings: JSON float parsing itself
+    // must not introduce a one-ULP difference into the comparison.
+    fn bit_record(value: &serde_json::Value) -> serde_json::Value {
+        match value {
+            serde_json::Value::Number(number) => serde_json::Value::String(format!(
+                "{:016x}",
+                number.as_f64().expect("numeric record").to_bits()
+            )),
+            serde_json::Value::Array(values) => {
+                serde_json::Value::Array(values.iter().map(bit_record).collect())
+            }
+            serde_json::Value::Object(values) => serde_json::Value::Object(
+                values
+                    .iter()
+                    .map(|(key, value)| (key.clone(), bit_record(value)))
+                    .collect(),
+            ),
+            _ => value.clone(),
+        }
+    }
+    let bit_snapshot = bit_record(&serde_json::json!(records));
+    if let Ok(path) = std::env::var("FQ_CREDIT_SNAPSHOT") {
+        std::fs::write(
+            path,
+            serde_json::to_vec_pretty(
+                &serde_json::json!({"values": records, "bits": bit_snapshot}),
+            )
+            .expect("snapshot JSON"),
+        )
+        .expect("save numerical snapshot");
+    }
+    if let Ok(path) = std::env::var("FQ_CREDIT_BITWISE_REFERENCE") {
+        let reference: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(path).expect("read same-build reference"))
+                .expect("reference JSON");
+        assert_eq!(
+            bit_snapshot, reference["bits"],
+            "preparation must preserve same-build arithmetic bit for bit"
+        );
+    }
+
     let baseline: Vec<serde_json::Value> = serde_json::from_str(include_str!(
         "../../../tests/fixtures/credit_performance_baseline.json"
     ))
@@ -2795,6 +2836,11 @@ fn credit_performance_numerical_baseline() {
             }
         }
         let pv_bound = expected["pv_bound"].as_f64().expect("PV bound");
+        eprintln!(
+            "{}: PV delta={:.12e}, bound={pv_bound:.12e}",
+            actual["name"],
+            actual["pv"].as_f64().expect("PV") - expected["pv"].as_f64().expect("PV")
+        );
         assert!(
             (actual["pv"].as_f64().expect("PV") - expected["pv"].as_f64().expect("PV")).abs()
                 <= pv_bound,

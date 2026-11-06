@@ -1,11 +1,14 @@
 //! Expected tranche loss and the expected loss/write-down curve, with the
 //! equity-tranche capped expectations they are built from.
 
-use super::pricer::{CdsTranchePricer, ElWdPoint, INTEGRATION_TOLERANCE, PoolExposure};
+use super::pricer::{
+    CdsTranchePricer, ElWdPoint, INTEGRATION_TOLERANCE, PROBABILITY_CLIP, PoolExposure,
+};
 use crate::cds_tranche::CdsTranche;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::term_structures::CreditIndexData;
 use finstack_quant_core::{Error, Result};
+use finstack_quant_models::correlation::CopulaSpec;
 
 /// Pre-computed invariants for EL fraction evaluation (hoisted out of the date loop).
 struct ElInvariants {
@@ -424,6 +427,37 @@ impl CdsTranchePricer {
         }
     }
 
+    /// Gaussian marginal identity, applicable only to valid finite pools.
+    /// Invalid inputs still reach the checked conditional/integration path, so
+    /// eliminating an integral cannot conceal its validation failures.
+    fn gaussian_cap_identity(
+        &self,
+        cap: f64,
+        count: usize,
+        default_prob: f64,
+        exposure: f64,
+        correlation: f64,
+    ) -> Option<f64> {
+        if self.copula_spec != CopulaSpec::Gaussian
+            || count == 0
+            || !default_prob.is_finite()
+            || !cap.is_finite()
+            || !(0.0..=1.0).contains(&exposure)
+            || !(0.0..=1.0).contains(&correlation)
+        {
+            return None;
+        }
+        if cap == 0.0 {
+            Some(0.0)
+        } else if cap >= exposure {
+            // The same clipping used to construct the Gaussian threshold.
+            // E[Binomial(N, P(default|Z))/N] = effective marginal PD.
+            Some(exposure * default_prob.clamp(PROBABILITY_CLIP, 1.0 - PROBABILITY_CLIP))
+        } else {
+            None
+        }
+    }
+
     /// Shared uniform-pool engine with a constant recovery rate.
     pub(super) fn homogeneous_capped_expectation(
         &self,
@@ -438,6 +472,11 @@ impl CdsTranchePricer {
             PoolExposure::Loss => 1.0 - base_recovery,
             PoolExposure::Recovery => base_recovery,
         };
+        if let Some(expected) =
+            self.gaussian_cap_identity(cap, count, default_prob, exposure, correlation)
+        {
+            return Ok(expected);
+        }
         let conditional_p = self.conditional_pd(default_prob, correlation);
         self.integrate_factors(&|factors| {
             self.conditional_equity_tranche_capped(count, cap, conditional_p(factors), exposure)
@@ -495,7 +534,51 @@ impl CdsTranchePricer {
         base_recovery: f64,
         correlation: f64,
     ) -> Result<(f64, f64)> {
+        let loss = self.gaussian_cap_identity(
+            loss_cap,
+            count,
+            default_prob,
+            1.0 - base_recovery,
+            correlation,
+        );
+        let recovery = self.gaussian_cap_identity(
+            recovery_cap,
+            count,
+            default_prob,
+            base_recovery,
+            correlation,
+        );
         let conditional_p = self.conditional_pd(default_prob, correlation);
+        match (loss, recovery) {
+            (Some(loss), Some(recovery)) => return Ok((loss, recovery)),
+            (Some(loss), None) => {
+                return Ok((
+                    loss,
+                    self.integrate_factors(&|factors| {
+                        self.conditional_equity_tranche_capped(
+                            count,
+                            recovery_cap,
+                            conditional_p(factors),
+                            base_recovery,
+                        )
+                    })?,
+                ));
+            }
+            (None, Some(recovery)) => {
+                return Ok((
+                    self.integrate_factors(&|factors| {
+                        self.conditional_equity_tranche_capped(
+                            count,
+                            loss_cap,
+                            conditional_p(factors),
+                            1.0 - base_recovery,
+                        )
+                    })?,
+                    recovery,
+                ));
+            }
+            (None, None) => {}
+        }
         self.integrate_factors_pair(&|factors| {
             self.conditional_equity_tranche_pair(
                 count,
@@ -528,5 +611,122 @@ mod production_credit_audit {
             .resolve_tranchelet_difference(0.01 - 4.0 * tolerance, 0.01, 3.0, 7.0, date)
             .expect_err("materially negative loss");
         assert!(error.to_string().contains("integration budget"));
+    }
+
+    #[test]
+    fn gaussian_nonbinding_caps_use_clipped_marginal_probability() {
+        let pricer = CdsTranchePricer::new();
+        for count in [1, 125, 10_000] {
+            for pd in [0.0_f64, 1e-8, 0.05, 0.9, 1.0] {
+                for recovery in [0.0_f64, 0.4, 1.0] {
+                    for rho in [0.01, 0.3, 0.99] {
+                        for exposure in [PoolExposure::Loss, PoolExposure::Recovery] {
+                            let amount = match exposure {
+                                PoolExposure::Loss => 1.0 - recovery,
+                                PoolExposure::Recovery => recovery,
+                            };
+                            let expected =
+                                amount * pd.clamp(PROBABILITY_CLIP, 1.0 - PROBABILITY_CLIP);
+                            for cap in [amount, amount.next_up(), 1.0] {
+                                let actual = pricer
+                                    .homogeneous_capped_expectation(
+                                        cap, count, pd, recovery, rho, exposure,
+                                    )
+                                    .expect("nonbinding cap");
+                                assert_eq!(actual.to_bits(), expected.to_bits());
+                            }
+                            assert_eq!(
+                                pricer
+                                    .homogeneous_capped_expectation(
+                                        0.0, count, pd, recovery, rho, exposure
+                                    )
+                                    .expect("zero cap"),
+                                0.0
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn gaussian_cap_seam_preserves_finite_pool_value() {
+        let pricer = CdsTranchePricer::new();
+        for recovery in [0.0_f64, 0.4, 1.0] {
+            for exposure in [PoolExposure::Loss, PoolExposure::Recovery] {
+                let amount = match exposure {
+                    PoolExposure::Loss => 1.0 - recovery,
+                    PoolExposure::Recovery => recovery,
+                };
+                if amount > 0.0 {
+                    let below = pricer
+                        .homogeneous_capped_expectation(
+                            amount.next_down(),
+                            125,
+                            0.12,
+                            recovery,
+                            0.8,
+                            exposure,
+                        )
+                        .expect("binding cap at seam");
+                    assert!((below - amount * 0.12).abs() < INTEGRATION_TOLERANCE);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn cap_identity_never_bypasses_invalid_correlation_or_non_gaussian_model() {
+        let pricer = CdsTranchePricer::new();
+        for cap in [0.0, 1.0] {
+            assert!(
+                pricer
+                    .homogeneous_capped_expectation(
+                        cap,
+                        125,
+                        0.1,
+                        0.4,
+                        f64::NAN,
+                        PoolExposure::Loss
+                    )
+                    .is_err()
+            );
+            assert_eq!(pricer.gaussian_cap_identity(cap, 0, 0.1, 0.6, 0.3), None);
+            assert_eq!(
+                pricer.gaussian_cap_identity(cap, 125, 0.1, f64::NAN, 0.3),
+                None
+            );
+            let student = CdsTranchePricer::with_copula(CopulaSpec::StudentT {
+                degrees_of_freedom: 6.0,
+            })
+            .expect("copula");
+            assert_eq!(student.gaussian_cap_identity(cap, 125, 0.1, 0.6, 0.3), None);
+        }
+    }
+
+    #[test]
+    fn paired_caps_resolve_each_component_independently() {
+        let pricer = CdsTranchePricer::new();
+        for (loss_cap, recovery_cap) in [(0.0, 1.0), (0.03, 1.0), (1.0, 0.03), (0.03, 0.03)] {
+            let pair = pricer
+                .homogeneous_capped_pair(loss_cap, recovery_cap, 125, 0.12, 0.4, 0.3)
+                .expect("pair");
+            let loss = pricer
+                .homogeneous_capped_expectation(loss_cap, 125, 0.12, 0.4, 0.3, PoolExposure::Loss)
+                .expect("loss");
+            let recovery = pricer
+                .homogeneous_capped_expectation(
+                    recovery_cap,
+                    125,
+                    0.12,
+                    0.4,
+                    0.3,
+                    PoolExposure::Recovery,
+                )
+                .expect("recovery");
+            assert_eq!(pair.0.to_bits(), loss.to_bits());
+            assert_eq!(pair.1.to_bits(), recovery.to_bits());
+        }
     }
 }

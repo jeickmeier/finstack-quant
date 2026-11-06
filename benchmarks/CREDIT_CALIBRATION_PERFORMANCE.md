@@ -52,3 +52,43 @@ Test-only PMF counters report actual node work without instrumentation in releas
 pricing. Existing heterogeneous, Student-t, arbitrage/error, settlement and
 independent-reference tests remain acceptance controls. New algorithmic results
 are never used to regenerate the original-engine snapshot.
+
+## BC1: exact Gaussian cap expectations
+
+S0 was repeated after unrelated validation workers finished. Use `s0-quiet` for
+comparisons; the initial `s0` timings had wider intervals and slower unchanged
+controls. An interrupted BC1 run under CPU contention is excluded.
+
+The table reports Criterion mean time in milliseconds, including preparation.
+Confidence intervals and individual samples are retained beside each run.
+
+| Workload | S0 quiet (ms) | BC1 (ms) | Change |
+| --- | ---: | ---: | ---: |
+| Base correlation: isolated | 8239.613 | 4028.962 | -51.1% |
+| Base correlation: full plan | 8315.811 | 4114.187 | -50.5% |
+| Equity PV | 35.562 | 11.402 | -67.9% |
+| Mezzanine PV | 46.740 | 23.804 | -49.1% |
+| Thin-tranche PV | 47.451 | 24.475 | -48.4% |
+| High-detachment PV | 36.994 | 0.007 | -99.98% |
+| Student-t control | 11.921 | 11.946 | 0.2% |
+| Heterogeneous control | 437.723 | 429.526 | -1.9% |
+
+BC1 retains no additional per-quote memory and adds no production counters.
+PMF calls per price fell from 52,416 to 17,204 for equity, 70,716 to 37,604 for
+the thin tranche, and 184,420 to zero for the high-detachment snapshot. Solver
+calls changed from 177 to 180, plus ten commit/final repricings in each case;
+the improvement is cheaper residual evaluations, not fewer solver iterations.
+
+The largest knot movement was 1.32002e-10. Maximum final quote residual was
+6.27884e-13 (S0: 7.89039e-13). Six fixed-correlation snapshot PVs were unchanged;
+the ten-year high-detachment PV changed by 0.0000581751 on 10 million notional,
+inside the bounds fixed in S0. All 86 scoped tranche tests and 15 calibration
+tests passed. All 91 umbrella tranche tests and `mise run gen-write` also passed.
+Generated calibration, market-browser and gallery fixtures were refreshed. A transient nextest leaky-process report cleared on a focused rerun.
+
+For subsequent pure preparation slices, the test also supports same-build bit
+comparisons: capture `FQ_CREDIT_SNAPSHOT=/tmp/prior.json` with the existing
+`credit_performance_numerical_baseline` test, then rerun with
+`FQ_CREDIT_BITWISE_REFERENCE=/tmp/prior.json`. Snapshots encode floating-point
+bits as strings so JSON parsing does not alter the comparison. These are local
+same-build checks, not cross-platform bit-identity promises.
