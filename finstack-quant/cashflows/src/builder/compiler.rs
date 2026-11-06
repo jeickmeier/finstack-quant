@@ -34,6 +34,7 @@ use super::date_generation::{
     CompiledPeriod, build_schedule_period, compile_periods, effective_frequency, effective_stub,
     generate_periods_with_adjustment, validate_accrual_grid, validate_unique_payment_dates,
 };
+use super::periods::BuildPeriodsParams;
 use super::rate_helpers::FloatingRateParams;
 use super::specs::{
     CouponType, FeeAccrualBasis, FeeBase, FeeSpec, FixedCouponSpec, FloatingCouponSpec,
@@ -131,18 +132,12 @@ fn build_compiled_periods(
         params.day_count,
         params.roll_rule,
     )?;
-    let mut periods = generate_periods_with_adjustment(
+    let mut periods = generate_periods_with_adjustment(&BuildPeriodsParams::from_schedule(
+        params,
         window.start,
         window.end,
-        params.frequency,
-        params.stub,
-        params.business_day_convention,
-        params.end_of_month,
-        params.payment_lag_days,
-        &params.calendar_id,
-        params.adjust_accrual_dates,
-        params.roll_rule,
-    )?;
+        None,
+    ))?;
     // CDS front accrual belongs to the instrument's initial window only.
     // Reapplying it after a coupon or settlement-type change would charge the
     // portion before the change twice. Keep the next roll and clip the start.

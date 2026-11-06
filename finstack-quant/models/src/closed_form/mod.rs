@@ -92,19 +92,20 @@
 //! ## Black-Scholes Greeks
 //!
 //! ```rust
-//! use finstack_quant_models::types::OptionType;
+//! use finstack_quant_models::types::{OptionMarketParams, OptionType};
 //! use finstack_quant_models::closed_form::bs_greeks;
 //!
-//! let spot = 100.0;
-//! let strike = 100.0;
-//! let time = 1.0;
-//! let rate = 0.05;
-//! let div_yield = 0.02;
-//! let vol = 0.20;
+//! let market = OptionMarketParams {
+//!     spot: 100.0,
+//!     strike: 100.0,
+//!     rate: 0.05,
+//!     volatility: 0.20,
+//!     time_to_expiry: 1.0,
+//!     dividend_yield: 0.02,
+//!     option_type: OptionType::Call,
+//! };
 //!
-//! let greeks = bs_greeks(
-//!     spot, strike, rate, div_yield, vol, time, OptionType::Call, 365.0,
-//! )?;
+//! let greeks = bs_greeks(&market, 365.0)?;
 //!
 //! assert!((greeks.delta - 0.5).abs() < 0.1);
 //! assert!(greeks.gamma > 0.0);
@@ -159,8 +160,8 @@ mod quanto;
 mod vanilla;
 
 pub use asian::{
-    arithmetic_asian_tw_price, arithmetic_asian_tw_price_times, geometric_asian_price,
-    geometric_asian_price_times,
+    AsianFixingSchedule, arithmetic_asian_tw_price, arithmetic_asian_tw_price_times,
+    geometric_asian_price, geometric_asian_price_times,
 };
 pub use bachelier::{
     bachelier_call, bachelier_delta_call, bachelier_delta_put, bachelier_gamma,

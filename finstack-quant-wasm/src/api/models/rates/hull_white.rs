@@ -13,6 +13,15 @@ use wasm_bindgen::prelude::*;
 
 /// Hull-White one-factor parameters: constant mean reversion and a
 /// piecewise-constant volatility schedule.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const params = models.rates.hullWhite.HullWhiteParams.piecewise(0.05, [0, 2.5], [0.01, 0.012]);
+/// console.log(params.getSigma(3), params.stateVariance(2), params.bondVol(0, 1, 5));
+/// params.free();
+/// ```
 #[wasm_bindgen(js_name = HullWhiteParams)]
 pub struct JsHullWhiteParams {
     pub(crate) inner: HullWhiteParams,
@@ -31,7 +40,10 @@ impl JsHullWhiteParams {
     /// Throws a `validation` error if `kappa` is not positive or `sigma` is
     /// negative or non-finite.
     #[wasm_bindgen(constructor)]
-    pub fn new(kappa: JsValue, sigma: JsValue) -> Result<JsHullWhiteParams, JsValue> {
+    pub fn new(
+        #[wasm_bindgen(unchecked_param_type = "number")] kappa: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] sigma: JsValue,
+    ) -> Result<JsHullWhiteParams, JsValue> {
         HullWhiteParams::constant(js_f64(&kappa, "kappa")?, js_f64(&sigma, "sigma")?)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
@@ -49,9 +61,9 @@ impl JsHullWhiteParams {
     /// differ, the first time is not 0, the times are not increasing, or a
     /// value is out of range.
     pub fn piecewise(
-        kappa: JsValue,
-        times: JsValue,
-        values: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] kappa: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray")] times: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray")] values: JsValue,
     ) -> Result<JsHullWhiteParams, JsValue> {
         HullWhiteParams::piecewise(
             js_f64(&kappa, "kappa")?,
@@ -92,7 +104,10 @@ impl JsHullWhiteParams {
     ///
     /// Throws a `TypeError` if `t` is not a number.
     #[wasm_bindgen(js_name = getSigma)]
-    pub fn get_sigma(&self, t: JsValue) -> Result<f64, JsValue> {
+    pub fn get_sigma(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] t: JsValue,
+    ) -> Result<f64, JsValue> {
         Ok(self.inner.get_sigma(js_f64(&t, "t")?))
     }
 
@@ -104,15 +119,18 @@ impl JsHullWhiteParams {
     ///
     /// Throws a `validation` error if `t` is negative or non-finite.
     #[wasm_bindgen(js_name = stateVariance)]
-    pub fn state_variance(&self, t: JsValue) -> Result<f64, JsValue> {
+    pub fn state_variance(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] t: JsValue,
+    ) -> Result<f64, JsValue> {
         self.inner
             .state_variance(js_f64(&t, "t")?)
             .map_err(to_js_err)
     }
 
     /// Covariance of the short-rate state variable at two times.
-    /// @param left_time - First time in years; non-negative.
-    /// @param right_time - Second time in years; non-negative.
+    /// @param leftTime - First time in years; non-negative.
+    /// @param rightTime - Second time in years; non-negative.
     /// @returns `Cov[x(leftTime), x(rightTime)]`.
     ///
     /// # Errors
@@ -121,8 +139,8 @@ impl JsHullWhiteParams {
     #[wasm_bindgen(js_name = stateCovariance)]
     pub fn state_covariance(
         &self,
-        left_time: JsValue,
-        right_time: JsValue,
+        #[wasm_bindgen(js_name = "leftTime", unchecked_param_type = "number")] left_time: JsValue,
+        #[wasm_bindgen(js_name = "rightTime", unchecked_param_type = "number")] right_time: JsValue,
     ) -> Result<f64, JsValue> {
         self.inner
             .state_covariance(
@@ -142,7 +160,12 @@ impl JsHullWhiteParams {
     ///
     /// Throws a `validation` error if the times are out of order or non-finite.
     #[wasm_bindgen(js_name = bondVol)]
-    pub fn bond_vol(&self, t: JsValue, expiry: JsValue, maturity: JsValue) -> Result<f64, JsValue> {
+    pub fn bond_vol(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] t: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] maturity: JsValue,
+    ) -> Result<f64, JsValue> {
         self.inner
             .bond_vol(
                 js_f64(&t, "t")?,
@@ -156,8 +179,8 @@ impl JsHullWhiteParams {
 /// Futures-forward convexity adjustment under Hull-White one-factor.
 /// @param kappa - Mean-reversion speed per year.
 /// @param sigma - Short-rate volatility per square-root year, as a decimal.
-/// @param t_settle - Futures settlement time in years.
-/// @param t_end - End of the underlying rate period in years.
+/// @param tSettle - Futures settlement time in years.
+/// @param tEnd - End of the underlying rate period in years.
 /// @returns The futures rate minus the forward rate, as a decimal.
 ///
 /// # Errors
@@ -165,10 +188,10 @@ impl JsHullWhiteParams {
 /// Throws a `TypeError` if an argument is not a number.
 #[wasm_bindgen(js_name = hw1fConvexityAdjustment)]
 pub fn hw1f_convexity_adjustment(
-    kappa: JsValue,
-    sigma: JsValue,
-    t_settle: JsValue,
-    t_end: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] kappa: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] sigma: JsValue,
+    #[wasm_bindgen(js_name = "tSettle", unchecked_param_type = "number")] t_settle: JsValue,
+    #[wasm_bindgen(js_name = "tEnd", unchecked_param_type = "number")] t_end: JsValue,
 ) -> Result<f64, JsValue> {
     Ok(hull_white::hw1f_convexity_adjustment(
         js_f64(&kappa, "kappa")?,
@@ -191,11 +214,11 @@ pub fn hw1f_convexity_adjustment(
 /// Throws a `TypeError` if an argument is not a number.
 #[wasm_bindgen(js_name = hwBondVol)]
 pub fn hw_bond_vol(
-    kappa: JsValue,
-    sigma: JsValue,
-    t: JsValue,
-    expiry: JsValue,
-    maturity: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] kappa: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] sigma: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] t: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] maturity: JsValue,
 ) -> Result<f64, JsValue> {
     Ok(hull_white::hw_bond_vol(
         js_f64(&kappa, "kappa")?,
@@ -207,11 +230,11 @@ pub fn hw_bond_vol(
 }
 
 /// Price of a European option on a zero-coupon bond (Jamshidian 1989).
-/// @param p0_expiry - Discount factor to the option expiry.
-/// @param p0_maturity - Discount factor to the bond maturity.
+/// @param p0Expiry - Discount factor to the option expiry.
+/// @param p0Maturity - Discount factor to the bond maturity.
 /// @param strike - Strike price of the bond, per unit of face value.
-/// @param bond_vol - Integrated bond-price volatility, as returned by `hwBondVol`.
-/// @param is_call - `true` for a call on the bond, `false` for a put.
+/// @param bondVol - Integrated bond-price volatility, as returned by `hwBondVol`.
+/// @param isCall - `true` for a call on the bond, `false` for a put.
 /// @returns The option price per unit of face value.
 ///
 /// # Errors
@@ -219,11 +242,11 @@ pub fn hw_bond_vol(
 /// Throws a `TypeError` if an argument has the wrong JavaScript type.
 #[wasm_bindgen(js_name = hw1fZcbOptionPrice)]
 pub fn hw1f_zcb_option_price(
-    p0_expiry: JsValue,
-    p0_maturity: JsValue,
-    strike: JsValue,
-    bond_vol: JsValue,
-    is_call: JsValue,
+    #[wasm_bindgen(js_name = "p0Expiry", unchecked_param_type = "number")] p0_expiry: JsValue,
+    #[wasm_bindgen(js_name = "p0Maturity", unchecked_param_type = "number")] p0_maturity: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(js_name = "bondVol", unchecked_param_type = "number")] bond_vol: JsValue,
+    #[wasm_bindgen(js_name = "isCall", unchecked_param_type = "boolean")] is_call: JsValue,
 ) -> Result<f64, JsValue> {
     Ok(hull_white::hw1f_zcb_option_price(
         js_f64(&p0_expiry, "p0Expiry")?,
@@ -237,7 +260,7 @@ pub fn hw1f_zcb_option_price(
 /// Normal volatility of a caplet's forward rate implied by Hull-White one-factor.
 /// @param kappa - Mean-reversion speed per year.
 /// @param sigma - Short-rate volatility per square-root year, as a decimal.
-/// @param t_fix - Fixing time of the forward rate in years.
+/// @param tFix - Fixing time of the forward rate in years.
 /// @param accrual - Accrual year fraction of the forward-rate period.
 /// @returns The annualized normal (Bachelier) volatility of the forward rate, as a decimal.
 ///
@@ -246,10 +269,10 @@ pub fn hw1f_zcb_option_price(
 /// Throws a `TypeError` if an argument is not a number.
 #[wasm_bindgen(js_name = hw1fCapletForwardRateNormalVol)]
 pub fn hw1f_caplet_forward_rate_normal_vol(
-    kappa: JsValue,
-    sigma: JsValue,
-    t_fix: JsValue,
-    accrual: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] kappa: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] sigma: JsValue,
+    #[wasm_bindgen(js_name = "tFix", unchecked_param_type = "number")] t_fix: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] accrual: JsValue,
 ) -> Result<f64, JsValue> {
     Ok(hull_white::hw1f_caplet_forward_rate_normal_vol(
         js_f64(&kappa, "kappa")?,
@@ -265,9 +288,9 @@ pub fn hw1f_caplet_forward_rate_normal_vol(
 /// @param sigma - Short-rate volatility per square-root year, as a decimal; positive.
 /// @param periods - Array of `[tFix, tPay, accrual]` triples in years, one per caplet or floorlet.
 /// @param strike - Cap or floor strike rate, as a decimal.
-/// @param is_cap - `true` for a cap, `false` for a floor.
-/// @param discount_curve - `core.DiscountCurve` handle used to discount the payoffs.
-/// @param forward_curve - `core.DiscountCurve` handle projecting forward rates; pass the discount curve explicitly for single-curve pricing.
+/// @param isCap - `true` for a cap, `false` for a floor.
+/// @param discountCurve - `core.DiscountCurve` handle used to discount the payoffs.
+/// @param forwardCurve - `core.DiscountCurve` handle projecting forward rates; pass the discount curve explicitly for single-curve pricing.
 /// @returns The cap or floor price per unit notional.
 ///
 /// # Errors
@@ -275,16 +298,18 @@ pub fn hw1f_caplet_forward_rate_normal_vol(
 /// Throws an error if either required curve handle is missing or has the wrong type.
 /// Throws a `validation` error if `kappa` or `sigma` is out of range or
 /// `periods` is malformed.
-#[allow(clippy::too_many_arguments)]
 #[wasm_bindgen(js_name = hw1fCapFloorPrice)]
 pub fn hw1f_cap_floor_price(
-    kappa: JsValue,
-    sigma: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] kappa: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] sigma: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "readonly (readonly [number, number, number])[] | string"
+    )]
     periods: JsValue,
-    strike: JsValue,
-    is_cap: JsValue,
-    discount_curve: &JsDiscountCurve,
-    forward_curve: &JsDiscountCurve,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(js_name = "isCap", unchecked_param_type = "boolean")] is_cap: JsValue,
+    #[wasm_bindgen(js_name = "discountCurve")] discount_curve: &JsDiscountCurve,
+    #[wasm_bindgen(js_name = "forwardCurve")] forward_curve: &JsDiscountCurve,
 ) -> Result<f64, JsValue> {
     let params =
         HullWhiteCalibrationParams::new(js_f64(&kappa, "kappa")?, js_f64(&sigma, "sigma")?)

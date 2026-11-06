@@ -98,8 +98,7 @@ def test_explained_price_carries_trace_and_provenance() -> None:
         "2025-01-15",
         model="discounting",
         metrics=["dv01"],
-        metric_pricing_overrides={"bump_config": {"rate_bump_bp": 5.0}},
-        explain=True,
+        extras={"metric_pricing_overrides": {"bump_config": {"rate_bump_bp": 5.0}}, "explain": True},
     )
     bumps = explained.provenance["sensitivity_bumps"]
     assert bumps["rate_bump_bp"] == 5.0

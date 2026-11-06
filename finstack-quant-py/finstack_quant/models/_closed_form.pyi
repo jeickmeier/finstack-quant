@@ -14,7 +14,16 @@ class BsGreeks:
     Examples
     --------
     >>> from finstack_quant.models import bs_greeks
-    >>> g = bs_greeks(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, True)
+    >>> market = {
+    ...     "spot": 100.0,
+    ...     "strike": 100.0,
+    ...     "rate": 0.05,
+    ...     "dividend_yield": 0.0,
+    ...     "volatility": 0.2,
+    ...     "time_to_expiry": 1.0,
+    ...     "option_type": "call",
+    ... }
+    >>> g = bs_greeks(market)
     >>> round(g.delta, 4)
     0.6368
     >>> g.to_series().index.tolist()
@@ -184,7 +193,15 @@ class BsGreeks:
         Examples
         --------
         >>> from finstack_quant.models import BsGreeks, bs_greeks
-        >>> g = bs_greeks(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, True)
+        >>> g = bs_greeks({
+        ...     "spot": 100.0,
+        ...     "strike": 100.0,
+        ...     "rate": 0.05,
+        ...     "dividend_yield": 0.0,
+        ...     "volatility": 0.2,
+        ...     "time_to_expiry": 1.0,
+        ...     "option_type": "call",
+        ... })
         >>> BsGreeks.from_json(g.to_json()) == g
         True
         """
@@ -636,13 +653,7 @@ def vanilla_expiry_payoff(spot: float, strike: float, is_call: bool) -> float:
     ...
 
 def bs_greeks(
-    spot: float,
-    strike: float,
-    rate: float,
-    div_yield: float,
-    vol: float,
-    expiry: float,
-    is_call: bool,
+    market: dict[str, Any] | str,
     theta_days_per_year: float = 365.0,
 ) -> BsGreeks:
     """
@@ -653,20 +664,14 @@ def bs_greeks(
 
     Parameters
     ----------
-    spot : float
-        Spot price of the underlying.
-    strike : float
-        Option strike.
-    rate : float
-        Continuously compounded risk-free rate (decimal).
-    div_yield : float
-        Continuous dividend/borrow yield (decimal).
-    vol : float
-        Annualized volatility (decimal); must be positive.
-    expiry : float
-        Time to expiry in years; must be positive.
-    is_call : bool
-        ``True`` for a call, ``False`` for a put.
+    market : dict or str
+        Serde form of the Rust ``OptionMarketParams``, as a dict or JSON text.
+        Every key is required: ``spot`` and ``strike`` (float, the same price
+        units); ``rate`` (continuously compounded risk-free rate, decimal);
+        ``dividend_yield`` (continuous dividend, borrow or foreign yield,
+        decimal); ``volatility`` (annualized lognormal volatility, decimal);
+        ``time_to_expiry`` (years); ``option_type`` (``"call"`` or ``"put"``).
+        ``volatility`` and ``time_to_expiry`` must be positive.
     theta_days_per_year : float, default 365.0
         Day-count denominator for theta scaling.
 
@@ -678,14 +683,24 @@ def bs_greeks(
     Raises
     ------
     ValueError
-        If any numeric input is non-finite; ``spot`` or ``strike`` is
-        non-positive; ``vol``, ``expiry``, or ``theta_days_per_year`` is non-positive;
-        or a computed Greek is non-finite.
+        If ``market`` has an unknown or missing key or a wrongly typed value; any numeric input is non-finite; ``spot`` or
+        ``strike`` is non-positive; ``volatility``, ``time_to_expiry``, or
+        ``theta_days_per_year`` is non-positive; or a computed Greek is
+        non-finite.
 
     Examples
     --------
     >>> from finstack_quant.models import bs_greeks
-    >>> greeks = bs_greeks(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, True)
+    >>> market = {
+    ...     "spot": 100.0,
+    ...     "strike": 100.0,
+    ...     "rate": 0.05,
+    ...     "dividend_yield": 0.0,
+    ...     "volatility": 0.2,
+    ...     "time_to_expiry": 1.0,
+    ...     "option_type": "call",
+    ... }
+    >>> greeks = bs_greeks(market)
     >>> (round(greeks.delta, 4), round(greeks.rho_r, 4))
     (0.6368, 0.5323)
 
@@ -1103,13 +1118,7 @@ def heston_price(
     spot: float,
     strike: float,
     expiry: float,
-    rate: float,
-    div_yield: float,
-    kappa: float,
-    theta: float,
-    sigma_v: float,
-    rho: float,
-    v0: float,
+    params: dict[str, Any] | str,
     is_call: bool = True,
 ) -> float:
     """
@@ -1126,20 +1135,15 @@ def heston_price(
         Option strike.
     expiry : float
         Time to expiry in years; ``expiry <= 0`` returns intrinsic value.
-    rate : float
-        Continuously compounded risk-free rate (decimal).
-    div_yield : float
-        Continuous dividend / foreign yield (decimal).
-    kappa : float
-        Mean-reversion speed of the variance process (per year, positive).
-    theta : float
-        Long-run variance level (variance units, positive).
-    sigma_v : float
-        Volatility of variance (vol-of-vol, positive).
-    rho : float
-        Spot/variance correlation in ``(-1, 1)``.
-    v0 : float
-        Initial instantaneous variance (variance, not volatility; positive).
+    params : dict or str
+        Serde form of the Rust ``HestonPricingParams``, as a dict or JSON text.
+        Every key is required: ``r`` (continuously compounded risk-free rate,
+        decimal); ``q`` (continuous dividend / foreign yield, decimal);
+        ``v0`` (initial instantaneous variance, not volatility; positive);
+        ``kappa`` (variance mean-reversion speed per year, positive);
+        ``theta`` (long-run variance, positive); ``sigma_v`` (volatility of
+        variance, positive); ``rho`` (spot/variance correlation in
+        ``[-1, 1]``).
     is_call : bool, default True
         ``True`` for a call, ``False`` for a put.
 
@@ -1151,14 +1155,16 @@ def heston_price(
     Raises
     ------
     ValueError
-        If a Heston parameter or rate is non-finite or outside its domain.
+        If ``params`` has an unknown or missing key or a wrongly typed value,
+        or a Heston parameter or rate is non-finite or outside its domain.
     RuntimeError
         If the Fourier integration fails to produce a finite price.
 
     Examples
     --------
     >>> from finstack_quant.models import heston_price
-    >>> p = heston_price(100.0, 100.0, 1.0, 0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04)
+    >>> params = {"r": 0.05, "q": 0.02, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "sigma_v": 0.3, "rho": -0.7}
+    >>> p = heston_price(100.0, 100.0, 1.0, params)
     >>> 5.0 < p < 15.0
     True
 
@@ -1172,16 +1178,10 @@ def heston_price(
 # Closed-form exotics
 
 def barrier_option_price(
-    spot: float,
-    strike: float,
+    market: dict[str, Any] | str,
     barrier: float,
-    rate: float,
-    div_yield: float,
-    vol: float,
-    expiry: float,
     direction: str,
     knock: str,
-    is_call: bool = True,
 ) -> float:
     """
     Reiner-Rubinstein continuous-monitoring barrier option price.
@@ -1190,26 +1190,19 @@ def barrier_option_price(
 
     Parameters
     ----------
-    spot : float
-        Spot price of the underlying.
-    strike : float
-        Option strike.
+    market : dict or str
+        Serde form of the Rust ``OptionMarketParams``, as a dict or JSON text.
+        Every key is required: ``spot`` and ``strike`` (float, the same price
+        units); ``rate`` (continuously compounded risk-free rate, decimal);
+        ``dividend_yield`` (continuous dividend, borrow or foreign yield,
+        decimal); ``volatility`` (annualized lognormal volatility, decimal);
+        ``time_to_expiry`` (years); ``option_type`` (``"call"`` or ``"put"``).
     barrier : float
-        Barrier level.
-    rate : float
-        Continuously compounded risk-free rate (decimal).
-    div_yield : float
-        Continuous dividend/borrow yield (decimal).
-    vol : float
-        Annualized volatility (decimal).
-    expiry : float
-        Time to expiry in years.
+        Continuously monitored barrier level, in the units of ``spot``.
     direction : str
         ``"up"`` or ``"down"``.
     knock : str
         ``"in"`` or ``"out"``.
-    is_call : bool, optional
-        ``True`` for a call (default), ``False`` for a put.
 
     Returns
     -------
@@ -1219,15 +1212,25 @@ def barrier_option_price(
     Raises
     ------
     ValueError
-        If ``direction`` is not ``"up"`` or ``"down"``, ``knock`` is not
-        ``"in"`` or ``"out"``, or the formula produces a non-finite price.
+        If ``market`` has an unknown or missing key or a wrongly typed value, ``direction`` is not ``"up"`` or ``"down"``,
+        ``knock`` is not ``"in"`` or ``"out"``, or the formula produces a
+        non-finite price.
 
     Examples
     --------
     >>> from finstack_quant.models import barrier_option_price
-    >>> round(barrier_option_price(100.0, 100.0, 120.0, 0.05, 0.0, 0.2, 1.0, "up", "out"), 4)
+    >>> call = {
+    ...     "spot": 100.0,
+    ...     "strike": 100.0,
+    ...     "rate": 0.05,
+    ...     "dividend_yield": 0.0,
+    ...     "volatility": 0.2,
+    ...     "time_to_expiry": 1.0,
+    ...     "option_type": "call",
+    ... }
+    >>> round(barrier_option_price(call, 120.0, "up", "out"), 4)
     1.1761
-    >>> barrier_option_price(100.0, 100.0, 80.0, 0.05, 0.0, 0.2, 1.0, "down", "out", is_call=False) > 0
+    >>> barrier_option_price({**call, "option_type": "put"}, 80.0, "down", "out") > 0
     True
 
     Sources
@@ -1238,40 +1241,27 @@ def barrier_option_price(
     ...
 
 def asian_option_price(
-    spot: float,
-    strike: float,
-    rate: float,
-    div_yield: float,
-    vol: float,
-    expiry: float,
+    market: dict[str, Any] | str,
     num_fixings: int,
     averaging: str | None = None,
-    is_call: bool = True,
 ) -> float:
     """
     Arithmetic (Turnbull-Wakeman) or geometric (Kemna-Vorst) Asian option price.
 
     Parameters
     ----------
-    spot : float
-        Spot price of the underlying.
-    strike : float
-        Option strike.
-    rate : float
-        Continuously compounded risk-free rate (decimal).
-    div_yield : float
-        Continuous dividend/borrow yield (decimal).
-    vol : float
-        Annualized volatility (decimal).
-    expiry : float
-        Time to expiry in years.
+    market : dict or str
+        Serde form of the Rust ``OptionMarketParams``, as a dict or JSON text.
+        Every key is required: ``spot`` and ``strike`` (float, the same price
+        units); ``rate`` (continuously compounded risk-free rate, decimal);
+        ``dividend_yield`` (continuous dividend, borrow or foreign yield,
+        decimal); ``volatility`` (annualized lognormal volatility, decimal);
+        ``time_to_expiry`` (years); ``option_type`` (``"call"`` or ``"put"``).
     num_fixings : int
         Positive number of equally spaced averaging fixings.
     averaging : str or None, default None
         ``"arithmetic"`` (Turnbull-Wakeman) or ``"geometric"`` (Kemna-Vorst);
         ``None`` selects arithmetic.
-    is_call : bool, default True
-        ``True`` for a call, ``False`` for a put.
 
     Returns
     -------
@@ -1281,13 +1271,23 @@ def asian_option_price(
     Raises
     ------
     ValueError
-        If ``num_fixings`` is zero, ``averaging`` is not ``"arithmetic"`` or
-        ``"geometric"``, or the formula produces a non-finite price.
+        If ``market`` has an unknown or missing key or a wrongly typed value, ``num_fixings`` is zero, ``averaging`` is not
+        ``"arithmetic"`` or ``"geometric"``, or the formula produces a
+        non-finite price.
 
     Examples
     --------
     >>> from finstack_quant.models import asian_option_price
-    >>> round(asian_option_price(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, 12), 4)
+    >>> market = {
+    ...     "spot": 100.0,
+    ...     "strike": 100.0,
+    ...     "rate": 0.05,
+    ...     "dividend_yield": 0.0,
+    ...     "volatility": 0.2,
+    ...     "time_to_expiry": 1.0,
+    ...     "option_type": "call",
+    ... }
+    >>> round(asian_option_price(market, 12), 4)
     6.1742
 
     Sources
@@ -1299,42 +1299,30 @@ def asian_option_price(
     ...
 
 def lookback_option_price(
-    spot: float,
-    strike: float,
-    rate: float,
-    div_yield: float,
-    vol: float,
-    expiry: float,
+    market: dict[str, Any] | str,
     extremum: float,
     strike_type: str = "fixed",
-    is_call: bool = True,
 ) -> float:
     """
     Conze-Viswanathan lookback option price.
 
-    For ``strike_type="floating"``, ``strike`` is ignored and ``extremum``
-    is the observed min (call) / max (put) to date.
+    For ``strike_type="floating"``, ``market["strike"]`` is ignored (but must
+    be finite) and ``extremum`` is the observed min (call) / max (put) to date.
 
     Parameters
     ----------
-    spot : float
-        Spot price of the underlying.
-    strike : float
-        Option strike (ignored for floating strike).
-    rate : float
-        Continuously compounded risk-free rate (decimal).
-    div_yield : float
-        Continuous dividend/borrow yield (decimal).
-    vol : float
-        Annualized volatility (decimal).
-    expiry : float
-        Time to expiry in years.
+    market : dict or str
+        Serde form of the Rust ``OptionMarketParams``, as a dict or JSON text.
+        Every key is required: ``spot`` and ``strike`` (float, the same price
+        units); ``rate`` (continuously compounded risk-free rate, decimal);
+        ``dividend_yield`` (continuous dividend, borrow or foreign yield,
+        decimal); ``volatility`` (annualized lognormal volatility, decimal);
+        ``time_to_expiry`` (years); ``option_type`` (``"call"`` or ``"put"``).
     extremum : float
-        Observed extremum (min for call, max for put) to date.
+        Observed extremum (min for call, max for put) to date, in the units
+        of ``spot``.
     strike_type : str, default "fixed"
         ``"fixed"`` or ``"floating"``.
-    is_call : bool, default True
-        ``True`` for a call, ``False`` for a put.
 
     Returns
     -------
@@ -1344,13 +1332,22 @@ def lookback_option_price(
     Raises
     ------
     ValueError
-        If ``strike_type`` is not ``"fixed"`` or ``"floating"``, or the
-        formula produces a non-finite price.
+        If ``market`` has an unknown or missing key or a wrongly typed value, ``strike_type`` is not ``"fixed"`` or
+        ``"floating"``, or the formula produces a non-finite price.
 
     Examples
     --------
     >>> from finstack_quant.models import lookback_option_price
-    >>> round(lookback_option_price(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, 100.0), 4)
+    >>> market = {
+    ...     "spot": 100.0,
+    ...     "strike": 100.0,
+    ...     "rate": 0.05,
+    ...     "dividend_yield": 0.0,
+    ...     "volatility": 0.2,
+    ...     "time_to_expiry": 1.0,
+    ...     "option_type": "call",
+    ... }
+    >>> round(lookback_option_price(market, 100.0), 4)
     19.1676
 
     Sources
@@ -1361,42 +1358,30 @@ def lookback_option_price(
     ...
 
 def quanto_option_price(
-    spot: float,
-    strike: float,
-    expiry: float,
-    rate_domestic: float,
+    market: dict[str, Any] | str,
     rate_foreign: float,
-    div_yield: float,
-    vol_asset: float,
     vol_fx: float,
     correlation: float,
-    is_call: bool = True,
 ) -> float:
     """
     Quanto option (FX-adjusted cross-currency) price in domestic currency.
 
     Parameters
     ----------
-    spot : float
-        Spot price of the underlying in foreign currency.
-    strike : float
-        Option strike in foreign currency.
-    expiry : float
-        Time to expiry in years.
-    rate_domestic : float
-        Domestic risk-free rate (decimal, continuously compounded).
+    market : dict or str
+        Serde form of the Rust ``OptionMarketParams`` for the foreign asset,
+        as a dict or JSON text. Every key is required: ``spot`` and
+        ``strike`` (float, foreign currency); ``rate`` (the **domestic**
+        continuously compounded risk-free rate, decimal); ``dividend_yield``
+        (the asset's continuous dividend yield, decimal); ``volatility`` (the
+        annualized asset volatility, decimal); ``time_to_expiry`` (years);
+        ``option_type`` (``"call"`` or ``"put"``).
     rate_foreign : float
         Foreign risk-free rate (decimal, continuously compounded).
-    div_yield : float
-        Dividend yield on the underlying (decimal).
-    vol_asset : float
-        Volatility of the underlying asset (decimal).
     vol_fx : float
         Volatility of the FX rate (decimal).
     correlation : float
-        Correlation between asset and FX returns.
-    is_call : bool, default True
-        ``True`` for a call, ``False`` for a put.
+        Correlation between asset and FX returns, in ``[-1, 1]``.
 
     Returns
     -------
@@ -1406,12 +1391,22 @@ def quanto_option_price(
     Raises
     ------
     ValueError
-        If the supplied inputs produce a non-finite quanto price.
+        If ``market`` has an unknown or missing key or a wrongly typed value, or the supplied inputs produce a non-finite quanto
+        price.
 
     Examples
     --------
     >>> from finstack_quant.models import quanto_option_price
-    >>> round(quanto_option_price(100.0, 100.0, 1.0, 0.05, 0.02, 0.01, 0.2, 0.1, 0.3), 4)
+    >>> market = {
+    ...     "spot": 100.0,
+    ...     "strike": 100.0,
+    ...     "rate": 0.05,
+    ...     "dividend_yield": 0.01,
+    ...     "volatility": 0.2,
+    ...     "time_to_expiry": 1.0,
+    ...     "option_type": "call",
+    ... }
+    >>> round(quanto_option_price(market, 0.02, 0.1, 0.3), 4)
     7.7844
 
     Sources

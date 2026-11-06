@@ -9,7 +9,7 @@ use crate::bindings::valuations::typed_revolving_credit::PyRevolvingCredit;
 use crate::errors::serde_json_to_py;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, CallExercisePolicy, DealType, InstrumentCollateral, InstrumentExerciseOverride,
-    PutExercisePolicy, ReinvestmentPeriod,
+    PoolAccounts, PutExercisePolicy, ReinvestmentPeriod,
 };
 
 use super::super::convert::enum_from_str;
@@ -85,11 +85,8 @@ impl PyAssetPool {
     #[pyo3(
         text_signature = "($self, bonds=None, term_loans=None, revolvers=None, call_exercise=None, put_exercise=None, overrides=None)"
     )]
-    // PyO3 binding: the argument list mirrors the Python keyword-argument API.
-    #[allow(clippy::too_many_arguments)]
     fn with_instruments(
-        &self,
-        py: Python<'_>,
+        slf: PyRef<'_, Self>,
         bonds: Option<Vec<PyRef<'_, PyBond>>>,
         term_loans: Option<Vec<PyRef<'_, PyTermLoan>>>,
         revolvers: Option<Vec<PyRef<'_, PyRevolvingCredit>>>,
@@ -97,6 +94,7 @@ impl PyAssetPool {
         put_exercise: Option<&Bound<'_, PyAny>>,
         overrides: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
+        let py = slf.py();
         let call_exercise: CallExercisePolicy = match call_exercise {
             Some(value) => tagged_enum_from_py(py, value, "policy", "call_exercise")?,
             None => CallExercisePolicy::default(),
@@ -129,15 +127,15 @@ impl PyAssetPool {
             put_exercise,
             overrides,
         };
-        let mut inner = self.inner.clone();
+        let mut inner = slf.inner.clone();
         inner.instruments = Some(collateral);
         Ok(Self { inner })
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.with_reserve")]
-    #[pyo3(signature = (reserve_account, reserve_account_rate=0.0, reserve_target=None, reserve_interest_destination=None, currency=None))]
+    #[pyo3(signature = (reserve_account, reserve_account_rate=0.0, reserve_target=None, reserve_interest_destination=None))]
     #[pyo3(
-        text_signature = "($self, reserve_account, reserve_account_rate=0.0, reserve_target=None, reserve_interest_destination=None, currency=None)"
+        text_signature = "($self, reserve_account, reserve_account_rate=0.0, reserve_target=None, reserve_interest_destination=None)"
     )]
     fn with_reserve(
         &self,
@@ -146,13 +144,12 @@ impl PyAssetPool {
         reserve_account_rate: f64,
         reserve_target: Option<&Bound<'_, PyAny>>,
         reserve_interest_destination: Option<&Bound<'_, PyAny>>,
-        currency: Option<&str>,
     ) -> PyResult<Self> {
         let inner = self.inner.clone().with_reserve(
-            money_from_py(reserve_account, currency, "reserve_account")?,
+            money_from_py(reserve_account, "reserve_account")?,
             reserve_account_rate,
             reserve_target
-                .map(|value| money_from_py(value, currency, "reserve_target"))
+                .map(|value| money_from_py(value, "reserve_target"))
                 .transpose()?,
             reserve_interest_destination
                 .map(|value| tagged_enum_from_py(py, value, "kind", "reserve_interest_destination"))
@@ -175,45 +172,20 @@ impl PyAssetPool {
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.with_accounts")]
-    #[pyo3(signature = (*, cumulative_defaults=None, cumulative_recoveries=None, cumulative_prepayments=None, cumulative_scheduled_amortization=None, collection_account=None, excess_spread_account=None, original_balance=None))]
     #[pyo3(
+        signature = (**accounts),
         text_signature = "($self, *, cumulative_defaults=None, cumulative_recoveries=None, cumulative_prepayments=None, cumulative_scheduled_amortization=None, collection_account=None, excess_spread_account=None, original_balance=None)"
     )]
-    // PyO3 binding: one keyword per pool account field.
-    #[allow(clippy::too_many_arguments)]
     fn with_accounts(
         &self,
-        cumulative_defaults: Option<PyRef<'_, PyMoney>>,
-        cumulative_recoveries: Option<PyRef<'_, PyMoney>>,
-        cumulative_prepayments: Option<PyRef<'_, PyMoney>>,
-        cumulative_scheduled_amortization: Option<PyRef<'_, PyMoney>>,
-        collection_account: Option<PyRef<'_, PyMoney>>,
-        excess_spread_account: Option<PyRef<'_, PyMoney>>,
-        original_balance: Option<PyRef<'_, PyMoney>>,
-    ) -> Self {
-        let mut inner = self.inner.clone();
-        if let Some(value) = original_balance {
-            inner.original_balance = Some(value.inner);
-        }
-        if let Some(value) = cumulative_defaults {
-            inner.cumulative_defaults = value.inner;
-        }
-        if let Some(value) = cumulative_recoveries {
-            inner.cumulative_recoveries = value.inner;
-        }
-        if let Some(value) = cumulative_prepayments {
-            inner.cumulative_prepayments = value.inner;
-        }
-        if let Some(value) = cumulative_scheduled_amortization {
-            inner.cumulative_scheduled_amortization = value.inner;
-        }
-        if let Some(value) = collection_account {
-            inner.collection_account = value.inner;
-        }
-        if let Some(value) = excess_spread_account {
-            inner.excess_spread_account = value.inner;
-        }
-        Self { inner }
+        py: Python<'_>,
+        accounts: Option<&Bound<'_, pyo3::types::PyDict>>,
+    ) -> PyResult<Self> {
+        let accounts: PoolAccounts =
+            crate::bindings::module_utils::fields_from_py(py, accounts, "PoolAccounts")?;
+        Ok(Self {
+            inner: self.inner.clone().with_accounts(accounts),
+        })
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.asset_pool", "AssetPool.from_json")]

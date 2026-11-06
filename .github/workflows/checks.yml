@@ -1,12 +1,14 @@
 name: Checks
 
-# The fast tier: lint, generated-artifact drift, the uninstrumented fast tests
-# on all three surfaces, the component-registry check, and the supply-chain
-# audit, all in parallel after prime-cache. Budget: under 15 minutes wall clock on a warm master cache. No
-# coverage, doctests or slow tests; full-checks.yml runs those. Every job runs a
-# canonical mise task, so a failure reproduces locally with the same command
-# (`mise run all-ci` runs the set); the per-test time cap is CI-only and
-# reproduces with `NEXTEST_PROFILE=ci mise run rust-test`. pr.yml runs it for every pull request,
+# The fast tier, and `mise run all` split across runners: each job runs one
+# stage of `mise run all`, so change both together
+# (scripts/tests/test_gate_parity.py fails when they differ). Lint,
+# generated-artifact drift, the uninstrumented fast tests on all three
+# surfaces, the component-registry check, and the supply-chain audit, all in
+# parallel after prime-cache. Budget: under 15 minutes wall clock on a warm
+# master cache. No coverage, doctests or slow tests; full-checks.yml runs those.
+# The per-test time cap is CI-only and reproduces with
+# `NEXTEST_PROFILE=ci mise run rust-test`. pr.yml runs it for every pull request,
 # nightly.yml every night on master (saving the caches pull requests restore),
 # and release.yml as a gate for a tagged release.
 #
@@ -163,10 +165,7 @@ jobs:
 
       # mise pre-commit-run uses `uv run --no-sync`. Plain `uv run` here used to
       # build the PyO3 extension (~20–25m) even though lint never needs it.
-      # Skip cargo-deny and osv-scanner here: the supply-chain job already owns them.
       - name: Run pre-commit checks
-        env:
-          SKIP: cargo-deny,osv-scanner
         run: mise run pre-commit-run
 
   # ============================================
@@ -219,10 +218,6 @@ jobs:
       - name: Install WASM dependencies
         run: npm ci --ignore-scripts
         working-directory: finstack-quant-wasm
-
-      # gen-check runs the registry generator in --check mode.
-      - name: Install component registry dependencies
-        run: mise run ui-sync
 
       - name: Set up Python environment
         run: |

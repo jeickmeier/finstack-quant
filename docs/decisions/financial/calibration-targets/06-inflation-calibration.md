@@ -27,7 +27,7 @@ Observed CPI versus projected level, month anchoring, seasonality and publicatio
 ## Evidence
 
 - Owning [inflation.rs](../../../../finstack-quant/calibration/src/targets/inflation.rs); inspected [preflight](../../../../finstack-quant/calibration/src/validation/preflight.rs) establishes that differing observed lag/base is rejected publicly.
-- [Inflation integration tests](../../../../finstack-quant/calibration/tests/calibration/inflation.rs) locate reference-origin, lagged-fixing, observed-base consistency, no-override repricing, leap-day and day-lag rejection evidence. The selected ZC case in [repricing_tests.rs](../../../../finstack-quant/calibration/src/repricing_tests.rs) builds the same convention-based trade after calibration.
+- [Inflation integration tests](../../../../finstack-quant/calibration/tests/calibration/inflation.rs) locate reference-origin, lagged-fixing, observed-base consistency, no-override repricing, leap-day and day-lag rejection evidence. The selected ZC case in [tests/repricing.rs](../../../../finstack-quant/calibration/src/tests/repricing.rs) builds the same convention-based trade after calibration.
 
 No numerical tests were executed.
 

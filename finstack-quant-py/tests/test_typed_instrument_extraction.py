@@ -101,17 +101,17 @@ def _fixed_bond() -> Bond:
 
 
 def _frn() -> Bond:
-    return Bond.floating(
-        "FRN1",
-        Money(1_000_000.0, Currency("USD")),
-        "USD-SOFR-3M",
-        Bps(150),
-        datetime.date(2024, 3, 15),
-        datetime.date(2029, 1, 15),
-        Tenor.quarterly(),
-        DayCount.ACT_360,
-        "USD-OIS",
-    )
+    return Bond.floating({
+        "id": "FRN1",
+        "notional": Money(1_000_000.0, Currency("USD")),
+        "forward_curve_id": "USD-SOFR-3M",
+        "spread_bp": Bps(150),
+        "issue_date": datetime.date(2024, 3, 15),
+        "maturity": datetime.date(2029, 1, 15),
+        "frequency": Tenor.quarterly(),
+        "day_count": DayCount.ACT_360,
+        "discount_curve_id": "USD-OIS",
+    })
 
 
 def _snapshot(value: object) -> object:
@@ -181,15 +181,17 @@ def test_metric_pricing_overrides_merge_identically() -> None:
     overrides = {"bump_config": {"rate_bump_bp": 2.5}, "theta_period": {"count": 1, "unit": "weeks"}}
     bond = _fixed_bond()
     kind, _ = _assert_same(
-        lambda: price_instrument(bond, _market(), AS_OF, metrics=["dv01", "theta"], metric_pricing_overrides=overrides),
         lambda: price_instrument(
-            bond.to_json(), _market(), AS_OF, metrics=["dv01", "theta"], metric_pricing_overrides=overrides
+            bond, _market(), AS_OF, metrics=["dv01", "theta"], extras={"metric_pricing_overrides": overrides}
+        ),
+        lambda: price_instrument(
+            bond.to_json(), _market(), AS_OF, metrics=["dv01", "theta"], extras={"metric_pricing_overrides": overrides}
         ),
     )
     assert kind == "ok"
     kind, _ = _assert_same(
-        lambda: price_instrument(bond, _market(), AS_OF, metric_pricing_overrides='{"bogus": 1}'),
-        lambda: price_instrument(bond.to_json(), _market(), AS_OF, metric_pricing_overrides='{"bogus": 1}'),
+        lambda: price_instrument(bond, _market(), AS_OF, extras='{"metric_pricing_overrides": {"bogus": 1}}'),
+        lambda: price_instrument(bond.to_json(), _market(), AS_OF, extras={"metric_pricing_overrides": {"bogus": 1}}),
     )
     assert kind == "ValueError"
 
@@ -291,8 +293,26 @@ def test_attribution_typed_equal_envelope(cls: type) -> None:
     t1 = datetime.date(2024, 1, 22)
     market_t1 = _market(t1, df_5y=0.81)
     _assert_same(
-        lambda: attribute_pnl(instrument, _market(), market_t1, AS_OF, t1, "parallel"),
-        lambda: attribute_pnl(envelope, _market(), market_t1, AS_OF, t1, "parallel"),
+        lambda: attribute_pnl(
+            instrument,
+            {
+                "market_t0": _market(),
+                "market_t1": market_t1,
+                "as_of_t0": AS_OF,
+                "as_of_t1": t1,
+                "method": "parallel",
+            },
+        ),
+        lambda: attribute_pnl(
+            envelope,
+            {
+                "market_t0": _market(),
+                "market_t1": market_t1,
+                "as_of_t0": AS_OF,
+                "as_of_t1": t1,
+                "method": "parallel",
+            },
+        ),
     )
 
 
@@ -300,8 +320,26 @@ def test_attribution_many_typed_equal_envelope() -> None:
     instruments = [_fixed_bond(), _frn()]
     t1 = datetime.date(2024, 1, 22)
     market_t1 = _market(t1, df_5y=0.81)
-    typed = attribute_pnl_many(instruments, _market(), market_t1, AS_OF, t1, "parallel")
-    via_json = attribute_pnl_many([i.to_json() for i in instruments], _market(), market_t1, AS_OF, t1, "parallel")
+    typed = attribute_pnl_many(
+        {
+            "market_t0": _market(),
+            "market_t1": market_t1,
+            "as_of_t0": AS_OF,
+            "as_of_t1": t1,
+            "method": "parallel",
+        },
+        instruments,
+    )
+    via_json = attribute_pnl_many(
+        {
+            "market_t0": _market(),
+            "market_t1": market_t1,
+            "as_of_t0": AS_OF,
+            "as_of_t1": t1,
+            "method": "parallel",
+        },
+        [i.to_json() for i in instruments],
+    )
     assert typed.equals(via_json)
 
 
@@ -324,8 +362,26 @@ def test_priced_scenario_horizon_attribution_typed_equal_envelope(make: Callable
             lambda: compute_horizon_return(envelope, _market(), AS_OF, shock),
         ),
         (
-            lambda: attribute_pnl(bond, _market(), market_t1, AS_OF, t1, "parallel"),
-            lambda: attribute_pnl(envelope, _market(), market_t1, AS_OF, t1, "parallel"),
+            lambda: attribute_pnl(
+                bond,
+                {
+                    "market_t0": _market(),
+                    "market_t1": market_t1,
+                    "as_of_t0": AS_OF,
+                    "as_of_t1": t1,
+                    "method": "parallel",
+                },
+            ),
+            lambda: attribute_pnl(
+                envelope,
+                {
+                    "market_t0": _market(),
+                    "market_t1": market_t1,
+                    "as_of_t0": AS_OF,
+                    "as_of_t1": t1,
+                    "method": "parallel",
+                },
+            ),
         ),
     ]:
         kind, _ = _assert_same(typed, via_json)

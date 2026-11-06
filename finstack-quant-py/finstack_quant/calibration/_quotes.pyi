@@ -330,38 +330,30 @@ class CdsQuote:
         """
 
     @staticmethod
-    def upfront(
-        id: str,
-        entity: str,
-        currency: str | Currency,
-        doc_clause: str,
-        pillar: str,
-        coupon_bp: float,
-        upfront_pct: float,
-        recovery_rate: float,
-    ) -> CdsQuote:
+    def upfront(params: dict[str, Any] | str) -> CdsQuote:
         """Build a standard-coupon CDS quote with an upfront payment.
 
         Parameters
         ----------
-        id : str
-            Unique quote identifier.
-        entity : str
-            Reference entity identifier.
-        currency : str | Currency
-            ISO 4217 code of the contract currency.
-        doc_clause : str
-            ISDA documentation clause, for example ``"xr14"``.
-        pillar : str
-            Contract tenor code, for example ``"5Y"``.
-        coupon_bp : float
-            Fixed running coupon in basis points per annum (``100.0`` or ``500.0``
-            for the standard North American coupons).
-        upfront_pct : float
-            Upfront payment as a decimal fraction of notional, positive when the
-            protection buyer pays (``0.023`` for 2.3 points).
-        recovery_rate : float
-            Assumed recovery as a decimal fraction of notional.
+        params : dict[str, Any] | str
+            Wire fields of the Rust ``CdsQuote::CdsUpfront`` variant as a dict, or the
+            same object as JSON text (the ``"type"`` tag is set to ``"cds_upfront"``).
+            Every key is required:
+
+            - ``id`` (str): Unique quote identifier, the residual label.
+            - ``entity`` (str): Reference entity identifier.
+            - ``convention`` (dict): CDS convention key ``{"currency": ..., "doc_clause": ...}``;
+              ``currency`` is an upper-case ISO 4217 code (or a ``Currency``) and ``doc_clause``
+              one of ``"cr14"``, ``"mr14"``, ``"mm14"``, ``"xr14"``, ``"isda_na"``, ``"isda_eu"``, ``"isda_as"``, ``"isda_au"``, ``"isda_nz"`` or ``"custom"``.
+            - ``pillar`` (dict): Maturity pillar in its serde form, a tenor
+              ``{"tenor": {"count": 5, "unit": "years"}}`` (units ``"days"``, ``"weeks"``,
+              ``"months"``, ``"years"``) or a date ``{"date": "2029-06-20"}``.
+            - ``coupon_bp`` (float): Fixed running coupon in basis points per annum (``100.0``
+              or ``500.0`` for the standard North American coupons).
+            - ``upfront_pct`` (float): Upfront payment as a decimal fraction of notional,
+              positive when the protection buyer pays (``0.023`` for 2.3 points).
+            - ``recovery_rate`` (float): Assumed recovery as a decimal fraction of notional in
+              ``[0, 1)``.
 
         Returns
         -------
@@ -371,15 +363,24 @@ class CdsQuote:
         Raises
         ------
         ValueError
-            If a field is empty, ``currency`` is invalid, or ``recovery_rate``
-            lies outside [0, 1).
+            If a key is missing or unknown, a value has the wrong shape (an unknown currency or
+            doc clause, a malformed pillar), or the quote fails validation (for example
+            ``recovery_rate`` outside [0, 1)).
         TypeError
-            If ``currency`` is neither a currency-code string nor a ``Currency`` instance.
+            If a ``params`` value is not JSON-serializable.
 
         Examples:
         --------
         >>> from finstack_quant.calibration import CdsQuote
-        >>> CdsQuote.upfront("u5y", "ACME", "USD", "xr14", "5Y", 100.0, 0.023, 0.4).type
+        >>> CdsQuote.upfront({
+        ...     "id": "u5y",
+        ...     "entity": "ACME",
+        ...     "convention": {"currency": "USD", "doc_clause": "xr14"},
+        ...     "pillar": {"tenor": {"count": 5, "unit": "years"}},
+        ...     "coupon_bp": 100.0,
+        ...     "upfront_pct": 0.023,
+        ...     "recovery_rate": 0.4,
+        ... }).type
         'cds_upfront'
 
         """
@@ -1147,57 +1148,52 @@ class CdsTrancheQuote:
     Examples:
     --------
     >>> from finstack_quant.calibration import CdsTrancheQuote
-    >>> CdsTrancheQuote("ig-3-7", "CDX.NA.IG", 42, 0.03, 0.07, "2031-06-20", 0.01, 100.0, "USD", "isda_na").detachment
+    >>> CdsTrancheQuote({
+    ...     "id": "ig-3-7",
+    ...     "index": "CDX.NA.IG",
+    ...     "series": 42,
+    ...     "attachment": 0.03,
+    ...     "detachment": 0.07,
+    ...     "maturity": "2031-06-20",
+    ...     "upfront_pct": 0.01,
+    ...     "coupon_bp": 100.0,
+    ...     "convention": {"currency": "USD", "doc_clause": "isda_na"},
+    ... }).detachment
     0.07
 
     """
 
-    def __init__(
-        self,
-        id: str,
-        index: str,
-        series: int,
-        attachment: float,
-        detachment: float,
-        maturity: str,
-        upfront_pct: float,
-        coupon_bp: float,
-        currency: str | Currency,
-        doc_clause: str,
-    ) -> None:
+    def __init__(self, params: dict[str, Any] | str) -> None:
         """Build a CDS index tranche quote.
 
         Parameters
         ----------
-        id : str
-            Unique quote identifier.
-        index : str
-            Credit index name, for example ``"CDX.NA.IG"``.
-        series : int
-            Index series number.
-        attachment : float
-            Attachment point as a decimal loss fraction in [0, 1].
-        detachment : float
-            Detachment point as a decimal loss fraction in [0, 1], above
-            ``attachment``.
-        maturity : str | datetime.date
-            Tranche maturity date.
-        upfront_pct : float
-            Upfront payment as a decimal fraction of notional, ``|upfront_pct| <= 1``.
-        coupon_bp : float
-            Running coupon in basis points per annum (positive).
-        currency : str | Currency
-            ISO 4217 code of the contract currency.
-        doc_clause : str
-            ISDA documentation clause, for example ``"isda_na"``.
+        params : dict[str, Any] | str
+            Wire fields of the Rust ``CdsTrancheQuote`` as a dict, or the same object as JSON
+            text. Every key is required:
+
+            - ``id`` (str): Unique quote identifier.
+            - ``index`` (str): Credit index name, for example ``"CDX.NA.IG"``.
+            - ``series`` (int): Index series number.
+            - ``attachment`` (float): Attachment point as a decimal loss fraction in [0, 1].
+            - ``detachment`` (float): Detachment point as a decimal loss fraction in [0, 1],
+              above ``attachment``.
+            - ``maturity`` (str): Tranche maturity as an ISO-8601 date string.
+            - ``upfront_pct`` (float): Upfront payment as a decimal fraction of tranche
+              notional, ``|upfront_pct| <= 1``.
+            - ``coupon_bp`` (float): Running coupon in basis points per annum (positive).
+            - ``convention`` (dict): CDS convention key ``{"currency": ..., "doc_clause": ...}``;
+              ``currency`` is an upper-case ISO 4217 code (or a ``Currency``) and ``doc_clause``
+              one of ``"cr14"``, ``"mr14"``, ``"mm14"``, ``"xr14"``, ``"isda_na"``, ``"isda_eu"``, ``"isda_as"``, ``"isda_au"``, ``"isda_nz"`` or ``"custom"``.
 
         Raises
         ------
         ValueError
-            If a date, convention or numeric input is invalid, or
+            If a key is missing or unknown, a date, convention or numeric value is invalid, or
             ``attachment >= detachment``.
         TypeError
-            If ``currency`` is neither a currency-code string nor a ``Currency`` instance.
+            If a ``params`` value is not JSON-serializable (pass ``maturity`` as an ISO string,
+            not ``datetime.date``).
 
         """
 

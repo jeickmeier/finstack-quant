@@ -37,5 +37,4 @@ export interface RecoveryClaimWire {
    * Caller-defined seniority label used for reporting.
    */
   seniority: string;
-  [k: string]: unknown;
 }

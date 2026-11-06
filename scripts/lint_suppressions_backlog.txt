@@ -1,0 +1,18 @@
+# Forbidden lint suppressions not yet removed; read by check_lint_suppressions.py.
+#
+# Each entry is `path: lint: reason`. The checker fails on a suppression that
+# is not listed and on an entry that no longer matches one, so this list can
+# only shrink. Do not add to it: remove the suppression instead.
+#
+# Every entry below is the one panicking accessor of an embedded, test-validated
+# data asset (or of the per-family registry built from code), used by `Default`
+# impls and infallible `&'static` accessors. Removing them means either a
+# fallible replacement for each `Default` or generating the assets as Rust
+# constants (the `core/build/generate_reference_data.py` pattern).
+finstack-quant/margin/src/registry/mod.rs: clippy::expect_used: embedded margin registry, read by Default impls
+finstack-quant/models/src/monte_carlo/registry.rs: clippy::expect_used: embedded Monte Carlo defaults, read by pricer-config Default impls
+finstack-quant/statements-analytics/src/analysis/ecl/policy.rs: clippy::expect_used: embedded ECL policy registry, read by EclConfig/StagingConfig/CeclConfig Default
+finstack-quant/valuations/core/src/contract_specs.rs: clippy::expect_used: embedded contract specs, read by BondFutureSpecs Default
+finstack-quant/valuations/core/src/pricer/defaults.rs: clippy::expect_used: embedded product Monte Carlo defaults, read by pricer configs
+finstack-quant/valuations/core/src/pricer/family.rs: clippy::expect_used: per-family registries built from code on first use; &'static accessors
+finstack-quant/valuations/structured-credit/src/structured_credit/assumptions.rs: clippy::expect_used: embedded structured-credit assumptions, read by Default impls and constructors

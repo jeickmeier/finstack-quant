@@ -102,7 +102,7 @@ from finstack_quant.statements_analytics import (AccountType, CorkscrewAccount, 
 b=borrower_builder()
 for node,formula in {"cfi":"-capex","cff":"-amortization","debt_change":"-amortization","ppe_change":"capex-depreciation"}.items(): b.compute(node,formula)
 checked_model=b.build(); checked_result=Evaluator().evaluate(checked_model)
-check_mapping=ThreeStatementMapping("cash_end","equity_end","net_income",assets_nodes=["assets"],liabilities_nodes=["debt_end"],equity_nodes=["equity_end"],ppe_node="ppe_end",depreciation_node="depreciation",tax_expense_node="cash_taxes",pretax_income_node="pretax_income",cfo_node="cash_from_operations",cfi_node="cfi",cff_node="cff",total_cf_node="change_cash",capex_node="capex")
+check_mapping=ThreeStatementMapping(cash_node="cash_end",retained_earnings_node="equity_end",net_income_node="net_income",assets_nodes=["assets"],liabilities_nodes=["debt_end"],equity_nodes=["equity_end"],ppe_node="ppe_end",depreciation_node="depreciation",tax_expense_node="cash_taxes",pretax_income_node="pretax_income",cfo_node="cash_from_operations",cfi_node="cfi",cff_node="cff",total_cf_node="change_cash",capex_node="capex")
 checks=json.loads(run_three_statement_checks(checked_model,check_mapping,checked_result).to_json())
 print("Native accounting checks and disclosed warnings:",checks)
 accounts=[CorkscrewAccount(node,kind,[change]) for node,kind,change in [("cash_end",AccountType.Asset,"change_cash"),("nwc_end",AccountType.Asset,"change_nwc"),("ppe_end",AccountType.Asset,"ppe_change"),("debt_end",AccountType.Liability,"debt_change"),("equity_end",AccountType.Equity,"net_income")]]

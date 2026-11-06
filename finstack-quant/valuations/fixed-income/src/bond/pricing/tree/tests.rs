@@ -672,17 +672,17 @@ fn bond_bdt_tree_reads_bdt_sigma() {
 fn risk_free_callable_frn(maturity: Date) -> Bond {
     let issue = Date::from_calendar_date(2025, Month::January, 15).expect("Valid test date");
     let call_date = Date::from_calendar_date(2027, Month::January, 15).expect("Valid test date");
-    let mut bond = Bond::floating(
-        "RISK_FREE_CALLABLE_FRN",
-        Money::from((1000_i64, finstack_quant_core::currency::Currency::USD)),
-        "USD-SOFR-3M",
-        200,
-        issue,
+    let mut bond = Bond::floating(crate::bond::FloatingBondParams {
+        id: "RISK_FREE_CALLABLE_FRN".into(),
+        notional: Money::from((1000_i64, finstack_quant_core::currency::Currency::USD)),
+        forward_curve_id: "USD-SOFR-3M".into(),
+        spread_bp: 200.into(),
+        issue_date: issue,
         maturity,
-        finstack_quant_core::dates::Tenor::quarterly(),
-        finstack_quant_core::dates::DayCount::Act360,
-        "USD-OIS",
-    )
+        frequency: finstack_quant_core::dates::Tenor::quarterly(),
+        day_count: finstack_quant_core::dates::DayCount::Act360,
+        discount_curve_id: "USD-OIS".into(),
+    })
     .expect("floating bond builds");
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {

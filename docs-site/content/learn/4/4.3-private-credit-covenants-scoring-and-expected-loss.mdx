@@ -286,10 +286,10 @@ physical_schedules = {name:[(float(t),1-(1-credit_data["credit"][name]["pd"])**f
                       for name in ["base","downside","severe"]}
 base_lifetime_pd = physical_schedules["base"][-1][1]
 staging_policy = StagingConfig(pd_delta_absolute=0.05,pd_delta_relative=None)
-performing_comparator = Exposure("performing-comparator",ead43,lgd43,eir43,maturity43,base_lifetime_pd,base_lifetime_pd)
+performing_comparator = Exposure(id="performing-comparator",ead=ead43,lgd=lgd43,eir=eir43,remaining_maturity_years=maturity43,current_pd=base_lifetime_pd,origination_pd=base_lifetime_pd)
 # Explicit analyst policy for this case: the observed covenant weakness warrants a watchlist review/SICR flag.
-watched_borrower = Exposure("BORROWER-TL",ead43,lgd43,eir43,maturity43,base_lifetime_pd,base_lifetime_pd,qualitative_flags=QualitativeFlags(watchlist=True))
-defaulted_comparator = Exposure("defaulted-comparator",ead43,lgd43,eir43,maturity43,1.0,base_lifetime_pd,dpd=120)
+watched_borrower = Exposure(id="BORROWER-TL",ead=ead43,lgd=lgd43,eir=eir43,remaining_maturity_years=maturity43,current_pd=base_lifetime_pd,origination_pd=base_lifetime_pd,qualitative_flags=QualitativeFlags(watchlist=True))
+defaulted_comparator = Exposure(id="defaulted-comparator",ead=ead43,lgd=lgd43,eir=eir43,remaining_maturity_years=maturity43,current_pd=1.0,origination_pd=base_lifetime_pd,days_past_due=120)
 for exposure in [performing_comparator,watched_borrower,defaulted_comparator]:
     stage = classify_stage(exposure,staging_policy)
     print(exposure.id,stage.stage.value,stage.triggers)
@@ -301,7 +301,7 @@ weighted_native = compute_ecl_weighted(watched_borrower,[(scenario_weights[name]
 manual_weighted = sum(weight*compute_ecl(watched_borrower,physical_schedules[name],stage="stage2",bucket_width_years=0.25).ecl for name,weight in scenario_weights.items())
 joint_pd_lgd_ecl = 0.0
 for name,weight in scenario_weights.items():
-    exposure = Exposure(name,ead43,credit_data["credit"][name]["lgd"],eir43,maturity43,physical_schedules[name][-1][1],base_lifetime_pd)
+    exposure = Exposure(id=name,ead=ead43,lgd=credit_data["credit"][name]["lgd"],eir=eir43,remaining_maturity_years=maturity43,current_pd=physical_schedules[name][-1][1],origination_pd=base_lifetime_pd)
     joint_pd_lgd_ecl += weight*compute_ecl(exposure,physical_schedules[name],stage="stage2",bucket_width_years=0.25).ecl
 stage3_ecl = compute_ecl(defaulted_comparator,physical_schedules["base"],stage="stage3",stage3_time_to_recovery_years=1.0)
 print("Stage1 / lifetime / fixed-LGD weighted lifetime / joint PD-LGD weighted lifetime / Stage3 ECL USD:",base_ecl.ecl,lifetime_ecl.ecl,weighted_native.ecl,joint_pd_lgd_ecl,stage3_ecl.ecl)
@@ -323,7 +323,7 @@ quarterly_amortization = ead43*credit_data["loan"]["amortization_per_quarter_of_
 midpoint_ead = [(float((quarterly_times[i]+quarterly_times[i+1])/2),ead43-i*quarterly_amortization) for i in range(20)]
 # Exposure interpolates linearly, so pin every integration midpoint to its contractual pre-payment balance.
 ead_knots = [(0.0,ead43),*midpoint_ead,(5.0,0.0)]
-amortizing_exposure = Exposure("BORROWER-TL-amortizing",ead43,lgd43,eir43,maturity43,base_lifetime_pd,base_lifetime_pd,
+amortizing_exposure = Exposure(id="BORROWER-TL-amortizing",ead=ead43,lgd=lgd43,eir=eir43,remaining_maturity_years=maturity43,current_pd=base_lifetime_pd,origination_pd=base_lifetime_pd,
     qualitative_flags=QualitativeFlags(watchlist=True),ead_schedule=ead_knots)
 amortizing_loss = compute_ecl(amortizing_exposure,physical_schedules["base"],stage="stage2",bucket_width_years=0.25)
 manual_amortizing_loss = sum((physical_schedules["base"][i+1][1]-physical_schedules["base"][i][1])*balance*lgd43/(1+eir43)**t for i,(t,balance) in enumerate(midpoint_ead))

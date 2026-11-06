@@ -67,7 +67,9 @@ macro_rules! json_round_trip {
             /// a string nor a plain object, and a `validation` error if it is
             /// malformed or fails the type's validation.
             #[wasm_bindgen(js_name = fromJson)]
-            pub fn from_json(json: wasm_bindgen::JsValue) -> Result<$js, wasm_bindgen::JsValue> {
+            pub fn from_json(
+                #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: wasm_bindgen::JsValue,
+            ) -> Result<$js, wasm_bindgen::JsValue> {
                 let $json = json;
                 Ok(Self { inner: $load })
             }

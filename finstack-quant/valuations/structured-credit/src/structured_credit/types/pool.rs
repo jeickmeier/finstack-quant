@@ -719,6 +719,58 @@ impl RepLine {
     }
 }
 
+/// Account balances and performance tallies of a seasoned pool, set together
+/// by [`AssetPool::with_accounts`].
+///
+/// Every field is optional: an omitted field keeps the pool's current value.
+/// All amounts are in the pool currency.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_core::currency::Currency;
+/// use finstack_quant_core::money::Money;
+/// use finstack_quant_valuations_structured_credit::structured_credit::{
+///     AssetPool, DealType, PoolAccounts,
+/// };
+///
+/// let collected = Money::new(250_000.0, Currency::USD)?;
+/// let pool = AssetPool::new("POOL", DealType::Abs, Currency::USD).with_accounts(PoolAccounts {
+///     collection_account: Some(collected),
+///     ..PoolAccounts::default()
+/// });
+/// assert_eq!(pool.collection_account, collected);
+/// # Ok::<(), finstack_quant_core::Error>(())
+/// ```
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct PoolAccounts {
+    /// Cumulative defaults to date ([`AssetPool::cumulative_defaults`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cumulative_defaults: Option<Money>,
+    /// Cumulative recoveries on defaulted assets
+    /// ([`AssetPool::cumulative_recoveries`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cumulative_recoveries: Option<Money>,
+    /// Cumulative voluntary prepayments ([`AssetPool::cumulative_prepayments`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cumulative_prepayments: Option<Money>,
+    /// Cumulative scheduled amortization
+    /// ([`AssetPool::cumulative_scheduled_amortization`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cumulative_scheduled_amortization: Option<Money>,
+    /// Collection account balance ([`AssetPool::collection_account`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub collection_account: Option<Money>,
+    /// Excess spread account balance ([`AssetPool::excess_spread_account`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub excess_spread_account: Option<Money>,
+    /// Original (cut-off) pool balance ([`AssetPool::original_balance`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub original_balance: Option<Money>,
+}
+
 impl AssetPool {
     /// Create new asset pool
     pub fn new(id: impl Into<InstrumentId>, deal_type: DealType, currency: Currency) -> Self {
@@ -743,6 +795,46 @@ impl AssetPool {
             reserve_target: None,
             reserve_interest_destination: ReserveInterestDestination::Waterfall,
         }
+    }
+
+    /// Set the pool's account balances and performance tallies, returning the
+    /// updated pool.
+    ///
+    /// # Arguments
+    ///
+    /// * `accounts` - New values, in the pool currency; a `None` field keeps
+    ///   the pool's current value.
+    #[must_use]
+    pub fn with_accounts(mut self, accounts: PoolAccounts) -> Self {
+        if let Some(value) = accounts.original_balance {
+            self.original_balance = Some(value);
+        }
+        let tallies = [
+            (accounts.cumulative_defaults, &mut self.cumulative_defaults),
+            (
+                accounts.cumulative_recoveries,
+                &mut self.cumulative_recoveries,
+            ),
+            (
+                accounts.cumulative_prepayments,
+                &mut self.cumulative_prepayments,
+            ),
+            (
+                accounts.cumulative_scheduled_amortization,
+                &mut self.cumulative_scheduled_amortization,
+            ),
+            (accounts.collection_account, &mut self.collection_account),
+            (
+                accounts.excess_spread_account,
+                &mut self.excess_spread_account,
+            ),
+        ];
+        for (value, slot) in tallies {
+            if let Some(value) = value {
+                *slot = value;
+            }
+        }
+        self
     }
 
     /// Configure the pool's reserve account, returning the updated pool.

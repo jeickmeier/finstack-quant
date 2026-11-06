@@ -41,21 +41,21 @@ pub use types::{
     EarlyAmortizationSpec, EligibilityRule, EquityHistory, ExcessSpreadSpec, FundingSource,
     HedgeSwap, IncentiveFeeSpec, InstrumentCollateral, InstrumentExerciseOverride, LiquidationSpec,
     LiveCollateral, LossAllocationPolicy, LossRecognition, ManagementFeeType, Metadata,
-    ModificationSpec, PaymentCalculation, PaymentRecord, PaymentType, PenaltyStep, PoolAsset,
-    PoolConcentrationEntry, PoolReport, PoolStats, PrepaymentPenalty, PutExercisePolicy, Recipient,
-    RecipientType, ReinvestmentAssumptions, ReinvestmentCriteria, ReinvestmentPeriod, RepLine,
-    ReserveAccountSpec, ReserveInterestDestination, ReserveTarget, RoundingConvention, ShiftMode,
-    ShiftingInterestSpec, ShiftingInterestStep, SpecialServicingSpec, StandardDealFamily,
-    StandardDealParams, StepDownSpec, StepDownTrigger, StructuredCredit, StructuredCreditBuilder,
-    SwapNotional, SwapPriority, TargetOcSpec, TemplateFees, Tranche, TrancheAccrualPeriod,
-    TrancheBuilder, TrancheCashflows, TrancheDraw, TrancheReadvance, TrancheStructure,
-    TriggerConsequence, Waterfall, WaterfallBuilder, WaterfallDistribution, WaterfallRules,
-    WaterfallTier, calculate_pool_stats, pool_report, standard_deal_families,
+    ModificationSpec, PaymentCalculation, PaymentRecord, PaymentType, PenaltyStep, PoolAccounts,
+    PoolAsset, PoolConcentrationEntry, PoolReport, PoolStats, PrepaymentPenalty, PutExercisePolicy,
+    Recipient, RecipientType, ReinvestmentAssumptions, ReinvestmentCriteria, ReinvestmentPeriod,
+    RepLine, ReserveAccountSpec, ReserveInterestDestination, ReserveTarget, RoundingConvention,
+    ShiftMode, ShiftingInterestSpec, ShiftingInterestStep, SpecialServicingSpec,
+    StandardDealFamily, StandardDealParams, StepDownSpec, StepDownTrigger, StructuredCredit,
+    StructuredCreditBuilder, SwapNotional, SwapPriority, TargetOcSpec, TemplateFees, Tranche,
+    TrancheAccrualPeriod, TrancheBuilder, TrancheCashflows, TrancheDraw, TrancheReadvance,
+    TrancheStructure, TriggerConsequence, Waterfall, WaterfallBuilder, WaterfallDistribution,
+    WaterfallRules, WaterfallTier, calculate_pool_stats, pool_report, standard_deal_families,
 };
 
 pub use pricing::execute_waterfall;
 
-pub use pricing::coverage_tests::{TestContext, TestResult};
+pub use pricing::coverage::{TestContext, TestResult};
 pub use pricing::waterfall::WaterfallContext;
 pub use pricing::{
     CoverageTestBreach, CoverageTestDiagnostic, NonWaterfallPayment, NonWaterfallSource,

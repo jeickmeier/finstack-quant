@@ -29,7 +29,7 @@ Alternative models include log projection DFs, piecewise forwards per reset inte
 ## Evidence
 
 - Owning [forward.rs](../../../../finstack-quant/calibration/src/targets/forward.rs) fully inspected, including grid/collision dispatch and residual construction.
-- The inspected `deposit_residual_uses_index_day_count_for_accrual` establishes the explicit `365/360` rate conversion. Multiple-deposit control, configured bounds/weights, futures curve-clock, explicit day-count and quote-replay tests are located in the same file. FRA/futures/swaps are repriced through the public flow in [repricing_tests.rs](../../../../finstack-quant/calibration/src/repricing_tests.rs); these share production pricing kernels.
+- The inspected `deposit_residual_uses_index_day_count_for_accrual` establishes the explicit `365/360` rate conversion. Multiple-deposit control, configured bounds/weights, futures curve-clock, explicit day-count and quote-replay tests are located in the same file. FRA/futures/swaps are repriced through the public flow in [tests/repricing.rs](../../../../finstack-quant/calibration/src/tests/repricing.rs); these share production pricing kernels.
 
 No test execution or independent vendor reconciliation was performed.
 

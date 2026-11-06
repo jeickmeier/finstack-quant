@@ -179,8 +179,17 @@ def _declared_model() -> object:
     ]:
         values = None
         if formula is None:
-            values = list(zip(QUARTERS, [10.0, 20.0, 30.0, 40.0], strict=True))
-        builder.insert_node(NodeSpec(node_id, node_type, values=values, formula_text=formula, tags=tags, rollup=rollup))
+            values = dict(zip(QUARTERS, [10.0, 20.0, 30.0, 40.0], strict=True))
+        builder.insert_node(
+            NodeSpec(
+                node_id=node_id,
+                node_type=node_type,
+                values=values,
+                formula_text=formula,
+                tags=tags,
+                rollup=rollup,
+            )
+        )
     return builder.build()
 
 
@@ -241,9 +250,9 @@ def test_rollup_rejects_a_declared_formula_without_a_formula() -> None:
     builder.periods("2025Q1..Q4", None)
     builder.insert_node(
         NodeSpec(
-            "revenue",
-            NodeType.value(),
-            values=list(zip(QUARTERS, [1.0, 2.0, 3.0, 4.0], strict=True)),
+            node_id="revenue",
+            node_type=NodeType.value(),
+            values=dict(zip(QUARTERS, [1.0, 2.0, 3.0, 4.0], strict=True)),
             rollup="formula",
         )
     )
@@ -251,4 +260,4 @@ def test_rollup_rejects_a_declared_formula_without_a_formula() -> None:
     with pytest.raises(ValueError, match="'revenue'"):
         Evaluator().evaluate(model).rollup(model, RollupSpec("annual"))
     with pytest.raises(ValueError, match="closing"):
-        NodeSpec("revenue", NodeType.value(), rollup="closing")
+        NodeSpec(node_id="revenue", node_type=NodeType.value(), rollup="closing")

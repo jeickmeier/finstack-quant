@@ -34,7 +34,7 @@ A typed dependency graph could distinguish a scalar from a curve with the same I
 - Implementation: [validation/preflight.rs](../../../../finstack-quant/calibration/src/validation/preflight.rs) — type-specific financial preconditions.
 - Implementation: [step_runtime.rs](../../../../finstack-quant/calibration/src/step_runtime.rs) — target dispatch, output installation and replay entry point.
 - Implementation: [api/errors.rs](../../../../finstack-quant/calibration/src/api/errors.rs) — structured error wire mapping.
-- Test evidence: [src/api/dependency_review_tests.rs](../../../../finstack-quant/calibration/src/api/dependency_review_tests.rs) — same-kernel serial/parallel equivalence, stale prior writer, XCCY and equity carry reads; inspected or located, not executed.
+- Test evidence: [src/api/tests/engine_dependency_review.rs](../../../../finstack-quant/calibration/src/api/tests/engine_dependency_review.rs) — same-kernel serial/parallel equivalence, stale prior writer, XCCY and equity carry reads; inspected or located, not executed.
 - Test evidence: [src/step_runtime.rs](../../../../finstack-quant/calibration/src/step_runtime.rs) — passing runtime validation preserves a target validation failure; inspected or located, not executed.
 - Reference gap: no method-specific independent source or external benchmark is established by this record; source and regression evidence describe implementation behavior.
 

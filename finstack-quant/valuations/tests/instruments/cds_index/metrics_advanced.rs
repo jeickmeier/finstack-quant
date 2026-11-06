@@ -49,14 +49,16 @@ fn test_jump_to_default_negative_for_protection_seller() {
 
     let idx = CdsIndex::from_preset(
         &standard_cdx_params(),
-        "CDX-JTD-SELL",
-        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
-        PayReceive::Receive, // Sell protection
-        start,
-        end,
-        STANDARD_RECOVERY_SENIOR,
-        "USD-OIS",
-        "HZ-INDEX",
+        finstack_quant_valuations::instruments::credit_derivatives::cds::CdsTradeParams {
+            id: finstack_quant_core::types::InstrumentId::new("CDX-JTD-SELL"),
+            notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+            side: PayReceive::Receive,
+            start,
+            end,
+            recovery_rate: STANDARD_RECOVERY_SENIOR,
+            discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
+            credit_curve_id: finstack_quant_core::types::CurveId::new("HZ-INDEX"),
+        },
     )
     .expect("valid test parameters");
 

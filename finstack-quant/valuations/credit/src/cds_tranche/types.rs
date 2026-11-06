@@ -314,7 +314,6 @@ impl CdsTranche {
     /// # Errors
     ///
     /// Returns the same validation errors as [`Self::new`].
-    #[allow(clippy::too_many_arguments)]
     pub fn standard(
         id: impl Into<InstrumentId>,
         tranche_params: &CdsTrancheParams,

@@ -137,15 +137,18 @@ impl JsDiscountCurve {
     /// misplaced or missing `forwardFloor`, a `"bus_252"` curve without
     /// `calendarId`, or discount factors the curve validation rejects;
     /// `FinstackError` (kind `not_found`) for an unknown `calendarId`.
+    /// @param options - DiscountCurveOptions object (or its JSON text) with: `id` (curve identifier, the `MarketContext` lookup key); `baseDate` (ISO-8601 `"YYYY-MM-DD"`; knot times are year fractions from it under `dayCount`); `knots` (flat `[t0, df0, t1, df1, …]` array or typed array, `t` in years, `df` strictly positive, even length); and the optional `interp` (`"linear"`, `"log_linear"`, `"monotone_convex"`, `"cubic_hermite"`, `"piecewise_quadratic_forward"`), `extrapolation` (`"flat_zero"`, `"flat_forward"`, or `"none"`, which returns NaN outside the pillar range), `dayCount` (used to convert dates to curve time; not inferred from the ID), `calendarId` (registered holiday calendar of the curve's time axis, e.g. `"brbd"`; required with `"bus_252"`), `validationMode` (`"market_standard"` or `"negative_rate_friendly"`) and `forwardFloor` (decimal minimum implied forward, required with `"negative_rate_friendly"` and rejected otherwise). Omitted options use the Rust builder defaults: `monotone_convex`, `flat_forward`, `act_365f` and `market_standard`. Unknown keys are rejected.
     #[wasm_bindgen(constructor)]
-    pub fn new(options: JsValue) -> Result<JsDiscountCurve, JsValue> {
+    pub fn new(
+        #[wasm_bindgen(unchecked_param_type = "DiscountCurveOptions | string")] options: JsValue,
+    ) -> Result<JsDiscountCurve, JsValue> {
         Self::build(from_js_json(&options, "options")?)
     }
 
     /// Construct a flat continuously-compounded discount curve.
     /// @param id - Curve identifier stored on the constructed discount curve.
-    /// @param base_date - ISO-8601 curve base date from which time coordinates are measured.
-    /// @param continuous_rate - Flat continuously compounded zero rate expressed as a decimal.
+    /// @param baseDate - ISO-8601 curve base date from which time coordinates are measured.
+    /// @param continuousRate - Flat continuously compounded zero rate expressed as a decimal.
     ///
     /// # Errors
     ///
@@ -153,10 +156,12 @@ impl JsDiscountCurve {
     /// `continuousRate` is non-finite or `|continuousRate| > 1` (rates are
     /// decimals: `0.05` is 5%), or the implied discount factors are not finite
     /// and strictly positive.
+    /// @returns A `DiscountCurve` handle.
     #[wasm_bindgen(js_name = flat)]
     pub fn flat(
-        id: JsValue,
-        base_date: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+        #[wasm_bindgen(js_name = "baseDate", unchecked_param_type = "string")] base_date: JsValue,
+        #[wasm_bindgen(js_name = "continuousRate", unchecked_param_type = "number")]
         continuous_rate: JsValue,
     ) -> Result<JsDiscountCurve, JsValue> {
         let continuous_rate = js_f64(&continuous_rate, "continuousRate")?;
@@ -177,7 +182,11 @@ impl JsDiscountCurve {
     /// @throws `TypeError` if `t` is neither a number nor a string;
     /// `FinstackError` (kind `validation`) for a malformed date or a year
     /// fraction that cannot be computed.
-    pub fn df(&self, t: JsValue) -> Result<f64, JsValue> {
+    /// @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
+    pub fn df(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number | string")] t: JsValue,
+    ) -> Result<f64, JsValue> {
         match js_time_point(&t, "t")? {
             TimePoint::Years(t) => Ok(self.inner.df(t)),
             TimePoint::Date(d) => self.inner.df_on_date(d).map_err(to_js_err),
@@ -193,8 +202,13 @@ impl JsDiscountCurve {
     /// Throws a JavaScript exception if either time is non-finite, `t2` is not
     /// later than `t1`, the interval is shorter than the curve's minimum forward
     /// tenor, or either endpoint discount factor is non-finite or non-positive.
+    /// @returns Continuously compounded forward rate as a decimal over `(t1, t2)`.
     #[wasm_bindgen(js_name = forward)]
-    pub fn forward(&self, t1: JsValue, t2: JsValue) -> Result<f64, JsValue> {
+    pub fn forward(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] t1: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] t2: JsValue,
+    ) -> Result<f64, JsValue> {
         let t1 = js_f64(&t1, "t1")?;
         let t2 = js_f64(&t2, "t2")?;
         self.inner.forward(t1, t2).map_err(to_js_err)
@@ -216,12 +230,18 @@ impl JsDiscountCurve {
     /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
     /// `validation`) for an empty or odd-length `points`, a malformed date, an
     /// unknown compounding, or discount factors the curve validation rejects.
+    /// @param id - Curve identifier stored on the curve.
+    /// @param baseDate - ISO-8601 valuation date anchoring `t = 0`.
+    /// @param points - Flat `[t0, z0, t1, z1, …]` array: times in years and zero rates as decimals (`0.05` is 5%), with strictly increasing times.
+    /// @param compounding - Compounding of the zero rates: `"continuous"`, `"simple"`, `"periodic(1)"`, `"semi_annual"`, `"quarterly"` or `"monthly"`; omitted means `"continuous"`.
     #[wasm_bindgen(js_name = fromZeroRates)]
     pub fn from_zero_rates(
-        id: JsValue,
-        base_date: JsValue,
-        points: JsValue,
-        compounding: Option<JsValue>,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+        #[wasm_bindgen(js_name = "baseDate", unchecked_param_type = "string")] base_date: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray")] points: JsValue,
+        #[wasm_bindgen(unchecked_optional_param_type = "string | null")] compounding: Option<
+            JsValue,
+        >,
     ) -> Result<JsDiscountCurve, JsValue> {
         let id = js_string(&id, "id")?;
         let base_date = js_date(&base_date, "baseDate")?;
@@ -248,11 +268,17 @@ impl JsDiscountCurve {
     /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
     /// `validation`) for empty `points`, a malformed date, an unknown day
     /// count, or discount factors the curve validation rejects.
+    /// @param id - Curve identifier stored on the curve.
+    /// @param baseDate - ISO-8601 valuation date anchoring `t = 0`.
+    /// @param points - Array of `[isoDate, discountFactor]` pairs with strictly increasing dates on or after `baseDate` and strictly positive discount factors.
+    /// @param dayCount - Day count that converts each date to curve time; omitted uses the Rust default (`"act_365f"`).
     #[wasm_bindgen(js_name = fromDates)]
     pub fn from_dates(
-        id: JsValue,
-        base_date: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+        #[wasm_bindgen(js_name = "baseDate", unchecked_param_type = "string")] base_date: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "readonly (readonly [string, number])[] | string")]
         points: JsValue,
+        #[wasm_bindgen(js_name = "dayCount", unchecked_optional_param_type = "string | null")]
         day_count: Option<JsValue>,
     ) -> Result<JsDiscountCurve, JsValue> {
         let id = js_string(&id, "id")?;
@@ -281,8 +307,11 @@ impl JsDiscountCurve {
     /// @throws `TypeError` if `json` is not a JSON string or plain object;
     /// `FinstackError` (kind `validation`) if it does not match the schema or
     /// fails curve validation.
+    /// @param json - Canonical DiscountCurve JSON text or plain object; unknown fields are rejected and the curve is re-validated.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsDiscountCurve, JsValue> {
+    pub fn from_json(
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+    ) -> Result<JsDiscountCurve, JsValue> {
         from_js_json::<RustDiscountCurve>(&json, "json").map(Self::from_inner)
     }
 
@@ -310,8 +339,16 @@ impl JsDiscountCurve {
     /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
     /// `validation`) for a malformed date, an unknown compounding, or a year
     /// fraction that cannot be computed.
+    /// @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
+    /// @param compounding - `"continuous"`, `"simple"`, `"periodic(1)"`, `"semi_annual"`, `"quarterly"` or `"monthly"`; omitted means `"continuous"`.
     #[wasm_bindgen(js_name = zeroRate)]
-    pub fn zero_rate(&self, t: JsValue, compounding: Option<JsValue>) -> Result<f64, JsValue> {
+    pub fn zero_rate(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number | string")] t: JsValue,
+        #[wasm_bindgen(unchecked_optional_param_type = "string | null")] compounding: Option<
+            JsValue,
+        >,
+    ) -> Result<f64, JsValue> {
         let comp = compounding_arg(compounding.as_ref())?;
         match js_time_point(&t, "t")? {
             TimePoint::Years(t) => Ok(self.inner.zero_rate(t, comp)),
@@ -332,8 +369,14 @@ impl JsDiscountCurve {
     /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
     /// `validation`) for a malformed date, a year fraction that cannot be
     /// computed, or a non-finite or non-positive discount factor.
+    /// @param fromDate - ISO-8601 start date of the discounting interval.
+    /// @param toDate - ISO-8601 end date of the discounting interval.
     #[wasm_bindgen(js_name = dfBetweenDates)]
-    pub fn df_between_dates(&self, from_date: JsValue, to_date: JsValue) -> Result<f64, JsValue> {
+    pub fn df_between_dates(
+        &self,
+        #[wasm_bindgen(js_name = "fromDate", unchecked_param_type = "string")] from_date: JsValue,
+        #[wasm_bindgen(js_name = "toDate", unchecked_param_type = "string")] to_date: JsValue,
+    ) -> Result<f64, JsValue> {
         let from_date = js_date(&from_date, "fromDate")?;
         let to_date = js_date(&to_date, "toDate")?;
         self.inner
@@ -356,12 +399,15 @@ impl JsDiscountCurve {
     /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
     /// `validation`) for a non-positive tenor, an unknown interpolation style,
     /// or forwards the forward-curve builder rejects.
+    /// @param forwardId - Identifier of the new forward curve.
+    /// @param tenor - Index tenor in years (for example `0.25` for 3M); finite and strictly positive.
+    /// @param interp - Interpolation style of the forward curve (for example `"linear"`); omitted uses the Rust default.
     #[wasm_bindgen(js_name = toForwardCurve)]
     pub fn to_forward_curve(
         &self,
-        forward_id: JsValue,
-        tenor: JsValue,
-        interp: Option<JsValue>,
+        #[wasm_bindgen(js_name = "forwardId", unchecked_param_type = "string")] forward_id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] tenor: JsValue,
+        #[wasm_bindgen(unchecked_optional_param_type = "string | null")] interp: Option<JsValue>,
     ) -> Result<JsForwardCurve, JsValue> {
         let forward_id = js_string(&forward_id, "forwardId")?;
         let tenor = js_f64(&tenor, "tenor")?;
@@ -432,7 +478,7 @@ impl JsDiscountCurve {
     ///
     /// @returns The `RateCalibrationRecipe` object, or `undefined` for a curve that was built directly rather than produced by a calibration step.
     /// @throws FinstackError - If the recipe cannot be converted to a JavaScript object.
-    #[wasm_bindgen(getter, js_name = rateCalibration)]
+    #[wasm_bindgen(getter, js_name = rateCalibration, unchecked_return_type = "RateCalibrationRecipe | undefined")]
     pub fn rate_calibration(&self) -> Result<JsValue, JsValue> {
         match self.inner.rate_calibration() {
             Some(recipe) => crate::utils::to_js_value(recipe),

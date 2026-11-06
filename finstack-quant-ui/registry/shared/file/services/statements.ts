@@ -223,10 +223,12 @@ export function createStatementsService(
       return context.result(() =>
         native.statements_analytics.evaluateDcf(
           request.modelJson,
-          request.wacc,
-          request.terminalValue,
-          request.ufcfNode,
-          request.netDebtOverride,
+          {
+            wacc: request.wacc,
+            terminal_value: request.terminalValue,
+            ufcf_node: request.ufcfNode,
+            net_debt_override: request.netDebtOverride,
+          },
           request.optionsJson,
           request.marketJson,
           request.asOf,
@@ -287,18 +289,18 @@ export function createStatementsService(
     },
     goalSeek(request) {
       return context.result(() =>
-        native.statements_analytics.goalSeek(
-          request.modelJson,
-          request.targetNode,
-          request.targetPeriod,
-          request.targetValue,
-          request.driverNode,
-          request.driverPeriod,
-          request.updateModel,
-          request.bounds === undefined
-            ? undefined
-            : [request.bounds[0], request.bounds[1]],
-        ),
+        native.statements_analytics.goalSeek(request.modelJson, {
+          target_node: request.targetNode,
+          target_period: request.targetPeriod,
+          target_value: request.targetValue,
+          driver_node: request.driverNode,
+          driver_period: request.driverPeriod,
+          update_model: request.updateModel,
+          bounds:
+            request.bounds === undefined
+              ? undefined
+              : [request.bounds[0], request.bounds[1]],
+        }),
       );
     },
     runVariance(request) {

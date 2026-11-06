@@ -116,8 +116,11 @@ impl JsInflationCurve {
     /// unknown, missing or mistyped key, an odd-length `knots`, a malformed
     /// date, an unknown day-count/interpolation/extrapolation name, or CPI
     /// levels the curve builder rejects.
+    /// @param options - InflationCurveOptions object (or its JSON text) with: `id` (curve identifier, the `MarketContext` lookup key); `baseDate` (ISO-8601; knot times are year fractions from it under `dayCount`); `baseCpi` (strictly positive index level at the base date); `knots` (flat `[t0, cpi0, t1, cpi1, …]` array, `t` in years, `cpi` the projected index level); and the optional `dayCount`, `indexationLagMonths` (publication lag in whole months), `interp` and `extrapolation`. Omitted options use the Rust builder defaults. Unknown keys are rejected.
     #[wasm_bindgen(constructor)]
-    pub fn new(options: JsValue) -> Result<JsInflationCurve, JsValue> {
+    pub fn new(
+        #[wasm_bindgen(unchecked_param_type = "InflationCurveOptions | string")] options: JsValue,
+    ) -> Result<JsInflationCurve, JsValue> {
         Self::build(from_js_json(&options, "options")?)
     }
 
@@ -132,8 +135,11 @@ impl JsInflationCurve {
     /// @throws `TypeError` if `json` is not a JSON string or plain object;
     /// `FinstackError` (kind `validation`) if it does not match the schema or
     /// fails curve validation.
+    /// @param json - Canonical InflationCurve JSON text or plain object; unknown fields are rejected and the curve is re-validated.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsInflationCurve, JsValue> {
+    pub fn from_json(
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+    ) -> Result<JsInflationCurve, JsValue> {
         from_js_json::<RustInflationCurve>(&json, "json")
             .map(|curve| Self::from_inner(Arc::new(curve)))
     }
@@ -159,8 +165,12 @@ impl JsInflationCurve {
     /// @throws `TypeError` if `t` is neither a number nor a string;
     /// `FinstackError` (kind `validation`) for a malformed date or a year
     /// fraction that cannot be computed.
+    /// @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
     #[wasm_bindgen(js_name = cpi)]
-    pub fn cpi(&self, t: JsValue) -> Result<f64, JsValue> {
+    pub fn cpi(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number | string")] t: JsValue,
+    ) -> Result<f64, JsValue> {
         match js_time_point(&t, "t")? {
             TimePoint::Years(t) => Ok(self.inner.cpi(t)),
             TimePoint::Date(d) => self.inner.cpi_on_date(d).map_err(to_js_err),
@@ -178,8 +188,12 @@ impl JsInflationCurve {
     /// @returns The lagged index level (a continuous shift, with no
     /// seasonality adjustment).
     /// @throws `TypeError` if `t` is not a number.
+    /// @param t - Settlement time from the curve base date in years; the curve is evaluated at `t - indexationLagMonths / 12`.
     #[wasm_bindgen(js_name = cpiWithLag)]
-    pub fn cpi_with_lag(&self, t: JsValue) -> Result<f64, JsValue> {
+    pub fn cpi_with_lag(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] t: JsValue,
+    ) -> Result<f64, JsValue> {
         Ok(self.inner.cpi_with_lag(js_f64(&t, "t")?))
     }
 
@@ -194,8 +208,12 @@ impl JsInflationCurve {
     /// 108% of face; no deflation floor is applied.
     /// @throws `TypeError` if `t` is not a number; `FinstackError` (kind
     /// `validation`) if the ratio is not finite and positive.
+    /// @param t - Settlement time from the curve base date in years.
     #[wasm_bindgen(js_name = indexRatio)]
-    pub fn index_ratio(&self, t: JsValue) -> Result<f64, JsValue> {
+    pub fn index_ratio(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] t: JsValue,
+    ) -> Result<f64, JsValue> {
         self.inner.index_ratio(js_f64(&t, "t")?).map_err(to_js_err)
     }
 
@@ -210,8 +228,14 @@ impl JsInflationCurve {
     /// @returns The annualised inflation rate as a decimal.
     /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
     /// `validation`) for an invalid interval or non-positive CPI levels.
+    /// @param t1 - Start time in years from the curve base date.
+    /// @param t2 - End time in years, strictly greater than `t1`.
     #[wasm_bindgen(js_name = inflationRate)]
-    pub fn inflation_rate(&self, t1: JsValue, t2: JsValue) -> Result<f64, JsValue> {
+    pub fn inflation_rate(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] t1: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] t2: JsValue,
+    ) -> Result<f64, JsValue> {
         self.inner
             .inflation_rate(js_f64(&t1, "t1")?, js_f64(&t2, "t2")?)
             .map_err(to_js_err)
@@ -372,8 +396,11 @@ impl JsPriceCurve {
     /// unknown, missing or mistyped key, an odd-length `knots`, a malformed
     /// date, an unknown kind/day-count/interpolation/extrapolation name, or
     /// levels the curve builder rejects.
+    /// @param options - PriceCurveOptions object (or its JSON text) with: `id` (curve identifier, the `MarketContext` lookup key); `baseDate` (ISO-8601; knot times are year fractions from it under `dayCount`); `knots` (flat `[t0, p0, t1, p1, …]` array, `t` in years, `p` the forward price or index level); and the optional `kind` (`"price"`, the default, accepts any finite level; `"vol_index"` requires non-negative levels), `spotPrice` (level at `t = 0`), `extrapolation`, `interp` and `dayCount`. Omitted options use the Rust builder defaults. Unknown keys are rejected.
     #[wasm_bindgen(constructor)]
-    pub fn new(options: JsValue) -> Result<JsPriceCurve, JsValue> {
+    pub fn new(
+        #[wasm_bindgen(unchecked_param_type = "PriceCurveOptions | string")] options: JsValue,
+    ) -> Result<JsPriceCurve, JsValue> {
         Self::build(from_js_json(&options, "options")?)
     }
 
@@ -388,8 +415,11 @@ impl JsPriceCurve {
     /// @throws `TypeError` if `json` is not a JSON string or plain object;
     /// `FinstackError` (kind `validation`) if it does not match the schema or
     /// fails curve validation.
+    /// @param json - Canonical PriceCurve JSON text or plain object; unknown fields are rejected and the curve is re-validated.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsPriceCurve, JsValue> {
+    pub fn from_json(
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+    ) -> Result<JsPriceCurve, JsValue> {
         from_js_json::<RustPriceCurve>(&json, "json").map(|curve| Self::from_inner(Arc::new(curve)))
     }
 
@@ -414,8 +444,12 @@ impl JsPriceCurve {
     /// @throws `TypeError` if `t` is neither a number nor a string;
     /// `FinstackError` (kind `validation`) for a malformed date or a year
     /// fraction that cannot be computed.
+    /// @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
     #[wasm_bindgen(js_name = price)]
-    pub fn price(&self, t: JsValue) -> Result<f64, JsValue> {
+    pub fn price(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number | string")] t: JsValue,
+    ) -> Result<f64, JsValue> {
         match js_time_point(&t, "t")? {
             TimePoint::Years(t) => Ok(self.inner.price(t)),
             TimePoint::Date(d) => self.inner.price_on_date(d).map_err(to_js_err),
@@ -513,8 +547,13 @@ impl JsBaseCorrelationCurve {
     /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
     /// `validation`) for an odd-length or too-short `knots`, unsorted
     /// detachment points, or correlations the builder rejects.
+    /// @param id - Curve identifier, the `MarketContext` lookup key.
+    /// @param knots - Flat `[d0, rho0, d1, rho1, …]` array: detachment points in percent (`3.0` is 3%), strictly increasing, and base correlations as decimals in `[0, 1]`.
     #[wasm_bindgen(constructor)]
-    pub fn new(id: JsValue, knots: JsValue) -> Result<JsBaseCorrelationCurve, JsValue> {
+    pub fn new(
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray")] knots: JsValue,
+    ) -> Result<JsBaseCorrelationCurve, JsValue> {
         let id = js_string(&id, "id")?;
         let knots = flat_pairs(&js_f64_seq(&knots, "knots")?, "knots")?;
         RustBaseCorrelationCurve::builder(id)
@@ -536,8 +575,11 @@ impl JsBaseCorrelationCurve {
     /// @throws `TypeError` if `json` is not a JSON string or plain object;
     /// `FinstackError` (kind `validation`) if it does not match the schema or
     /// fails curve validation.
+    /// @param json - Canonical BaseCorrelationCurve JSON text or plain object; unknown fields are rejected and the curve is re-validated.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsBaseCorrelationCurve, JsValue> {
+    pub fn from_json(
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+    ) -> Result<JsBaseCorrelationCurve, JsValue> {
         from_js_json::<RustBaseCorrelationCurve>(&json, "json")
             .map(|curve| Self::from_inner(Arc::new(curve)))
     }
@@ -560,8 +602,12 @@ impl JsBaseCorrelationCurve {
     /// @returns The interpolated correlation as a decimal; flat beyond the
     /// first and last pillar.
     /// @throws `TypeError` if `detachmentPct` is not a number.
+    /// @param detachmentPct - Tranche detachment point in percent (`7.0` is 7%).
     #[wasm_bindgen(js_name = correlation)]
-    pub fn correlation(&self, detachment_pct: JsValue) -> Result<f64, JsValue> {
+    pub fn correlation(
+        &self,
+        #[wasm_bindgen(js_name = "detachmentPct", unchecked_param_type = "number")] detachment_pct: JsValue,
+    ) -> Result<f64, JsValue> {
         Ok(self
             .inner
             .correlation(js_f64(&detachment_pct, "detachmentPct")?))
@@ -641,11 +687,18 @@ impl JsCreditIndexData {
     /// @returns The validated `CreditIndexData`; the curves are shared, not copied.
     /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
     /// `validation`) for a zero constituent count or a recovery outside `[0, 1]`.
+    /// @param numConstituents - Number of names in the index (for example `125` for CDX IG), an integer in `1..=65535`.
+    /// @param recoveryRate - Index-level recovery on default as a decimal in `[0, 1]`.
+    /// @param indexCreditCurve - Hazard curve of the index as a whole.
+    /// @param baseCorrelationCurve - Base-correlation curve used for tranches.
     #[wasm_bindgen(constructor)]
     pub fn new(
+        #[wasm_bindgen(js_name = "numConstituents", unchecked_param_type = "number")]
         num_constituents: JsValue,
+        #[wasm_bindgen(js_name = "recoveryRate", unchecked_param_type = "number")]
         recovery_rate: JsValue,
-        index_credit_curve: &JsHazardCurve,
+        #[wasm_bindgen(js_name = "indexCreditCurve")] index_credit_curve: &JsHazardCurve,
+        #[wasm_bindgen(js_name = "baseCorrelationCurve")]
         base_correlation_curve: &JsBaseCorrelationCurve,
     ) -> Result<JsCreditIndexData, JsValue> {
         RustCreditIndexData::builder()
@@ -694,8 +747,12 @@ impl JsCreditIndexData {
     /// @returns The issuer's `HazardCurve`, or `indexCreditCurve` when the
     /// data has no curve for `issuerId` (homogeneous assumption).
     /// @throws `TypeError` if `issuerId` is not a string.
+    /// @param issuerId - Issuer identifier as stored in the index data (ticker, CUSIP, ...).
     #[wasm_bindgen(js_name = getIssuerCurve)]
-    pub fn get_issuer_curve(&self, issuer_id: JsValue) -> Result<JsHazardCurve, JsValue> {
+    pub fn get_issuer_curve(
+        &self,
+        #[wasm_bindgen(js_name = "issuerId", unchecked_param_type = "string")] issuer_id: JsValue,
+    ) -> Result<JsHazardCurve, JsValue> {
         let issuer_id = js_string(&issuer_id, "issuerId")?;
         Ok(JsHazardCurve {
             inner: Arc::new(self.inner.get_issuer_curve(&issuer_id).clone()),
@@ -727,8 +784,12 @@ impl JsCreditIndexData {
     /// @returns The issuer's recovery as a decimal, or `recoveryRate` when
     /// none was supplied for `issuerId`.
     /// @throws `TypeError` if `issuerId` is not a string.
+    /// @param issuerId - Issuer identifier as stored in the index data.
     #[wasm_bindgen(js_name = getIssuerRecovery)]
-    pub fn get_issuer_recovery(&self, issuer_id: JsValue) -> Result<f64, JsValue> {
+    pub fn get_issuer_recovery(
+        &self,
+        #[wasm_bindgen(js_name = "issuerId", unchecked_param_type = "string")] issuer_id: JsValue,
+    ) -> Result<f64, JsValue> {
         let issuer_id = js_string(&issuer_id, "issuerId")?;
         Ok(self.inner.get_issuer_recovery(&issuer_id))
     }
@@ -742,8 +803,12 @@ impl JsCreditIndexData {
     /// @returns The issuer's weight as a decimal fraction, or
     /// `1 / numConstituents` when none was supplied for `issuerId`.
     /// @throws `TypeError` if `issuerId` is not a string.
+    /// @param issuerId - Issuer identifier as stored in the index data.
     #[wasm_bindgen(js_name = getIssuerWeight)]
-    pub fn get_issuer_weight(&self, issuer_id: JsValue) -> Result<f64, JsValue> {
+    pub fn get_issuer_weight(
+        &self,
+        #[wasm_bindgen(js_name = "issuerId", unchecked_param_type = "string")] issuer_id: JsValue,
+    ) -> Result<f64, JsValue> {
         let issuer_id = js_string(&issuer_id, "issuerId")?;
         Ok(self.inner.get_issuer_weight(&issuer_id))
     }

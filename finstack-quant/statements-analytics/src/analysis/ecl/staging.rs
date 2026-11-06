@@ -167,9 +167,14 @@ pub struct StageResult {
 ///
 /// Controls the quantitative and qualitative thresholds used in the staging
 /// waterfall, plus curing rules for step-down from higher stages.
+///
+/// Every field may be omitted from the serde document: an omitted field takes
+/// its value from [`StagingConfig::default`] (the embedded default IFRS 9
+/// policy). An explicit `null` `pd_delta_relative` disables the relative
+/// trigger. Unknown keys are rejected.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct StagingConfig {
     /// Absolute PD increase threshold for SICR (e.g., 0.01 = 1 pp).
     /// If the lifetime PD has increased by more than this amount since
@@ -198,7 +203,6 @@ pub struct StagingConfig {
     /// notches for the `rating_downgrade_notches` trigger. When `None`, the
     /// core 10-state S&P/Fitch scale (AAA, AA, A, BBB, BB, B, CCC, CC, C, D)
     /// is used. Ratings not present on the scale never fire the trigger.
-    #[serde(default)]
     pub rating_scale_labels: Option<Vec<String>>,
 
     /// DPD threshold for Stage 2 backstop (IFRS 9 B5.5.19 rebuttable

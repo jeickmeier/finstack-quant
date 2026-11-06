@@ -112,36 +112,109 @@ pub(crate) fn attach_submodule(
     Ok(())
 }
 
-/// Build the `json.dumps` ``default`` hook that encodes typed wrappers.
+/// Encode one object `json.dumps` cannot serialize; the ``default`` hook.
 ///
 /// Typed wrappers serialize through their canonical form, standalone or
-/// nested inside lists and dicts: ``to_dict`` when they carry one, otherwise
-/// the ``to_json`` every result and spec wrapper exposes. NumPy arrays and
-/// scalars serialize through ``tolist``. Objects with none of these keep the
-/// standard ``TypeError: Object of type ... is not JSON serializable``.
-fn typed_wrapper_json_hook<'py>(
-    py: Python<'py>,
-    json_mod: &Bound<'py, PyModule>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let globals = pyo3::types::PyDict::new(py);
-    globals.set_item("json", json_mod)?;
-    py.eval(
-        c"lambda o: o.to_dict() if hasattr(o, 'to_dict') \
-           else json.loads(o.to_json()) if hasattr(o, 'to_json') \
-           else o.tolist() if hasattr(o, 'tolist') \
-           else json.JSONEncoder().default(o)",
-        Some(&globals),
-        None,
-    )
+/// nested inside lists and dicts:
+///
+/// - `Tenor`, `DayCount` and the schedule enums (`BusinessDayConvention`,
+///   `StubKind`, `RollRule`, `FloatingLegCompounding`,
+///   `OvernightIndexConstraintApplication`, `FloatingRateFallback`,
+///   `FeeAccrualBasis`) give their serde wire form (`{"count": 6, "unit":
+///   "months"}`, `"act_360"`, `"short_front"`), the form those fields take;
+///   none carries a ``to_json`` of its own. The statements enums
+///   `NodeType`, `Stage` and `LeaseGrowthConvention` do the same (`"value"`,
+///   `"stage2"`, `"per_period"`).
+/// - Wrappers with ``to_dict`` use it; the others use the ``to_json`` every
+///   result and spec wrapper (and `Money`, `Currency`) exposes.
+/// - A ``decimal.Decimal`` gives its ``str``, the wire form of every exact
+///   decimal field (``"0.04"``, ``"200"``).
+/// - A ``datetime.date`` gives its ISO-8601 string, the wire form of every
+///   date field (a ``datetime.datetime`` gives a timestamp string, which date
+///   fields reject).
+/// - NumPy arrays and scalars serialize through ``tolist``.
+///
+/// Anything else raises the standard ``TypeError: Object of type ... is not
+/// JSON serializable``.
+#[pyfunction]
+fn json_default<'py>(py: Python<'py>, obj: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+    use crate::bindings::cashflows::builder::specs::{
+        PyFeeAccrualBasis, PyFloatingLegCompounding, PyFloatingRateFallback,
+        PyOvernightIndexConstraintApplication, PyRollRule,
+    };
+    use crate::bindings::core::dates::calendar::PyBusinessDayConvention;
+    use crate::bindings::core::dates::daycount::PyDayCount;
+    use crate::bindings::core::dates::schedule::PyStubKind;
+    use crate::bindings::core::dates::tenor::PyTenor;
+    use crate::bindings::pandas_utils::serde_to_py;
+    use crate::bindings::statements::types::PyNodeType;
+    use crate::bindings::statements_analytics::ecl::PyStage;
+    use crate::bindings::statements_analytics::templates_real_estate::PyLeaseGrowthConvention;
+
+    /// Return the serde wire form of the first matching frozen wrapper.
+    macro_rules! wire_of_wrapper {
+        ($($wrapper:ty),+ $(,)?) => {
+            $(
+                if let Ok(value) = obj.cast::<$wrapper>() {
+                    return serde_to_py(py, &value.get().inner);
+                }
+            )+
+        };
+    }
+    wire_of_wrapper!(
+        PyTenor,
+        PyDayCount,
+        PyBusinessDayConvention,
+        PyStubKind,
+        PyRollRule,
+        PyFloatingLegCompounding,
+        PyOvernightIndexConstraintApplication,
+        PyFloatingRateFallback,
+        PyFeeAccrualBasis,
+        PyNodeType,
+    );
+    // Simple-enum pyclasses that are their own serde type.
+    if let Ok(value) = obj.cast::<PyStage>() {
+        return serde_to_py(py, value.get());
+    }
+    if let Ok(value) = obj.cast::<PyLeaseGrowthConvention>() {
+        return serde_to_py(py, value.get());
+    }
+    if obj.is_instance(&py.import("decimal")?.getattr("Decimal")?)? {
+        return Ok(obj.str()?.into_any());
+    }
+    if obj.hasattr("to_dict")? {
+        return obj.call_method0("to_dict");
+    }
+    let json_mod = py.import("json")?;
+    if obj.hasattr("to_json")? {
+        return json_mod.call_method1("loads", (obj.call_method0("to_json")?,));
+    }
+    if obj.is_instance(&py.import("datetime")?.getattr("date")?)? {
+        return obj.call_method0("isoformat");
+    }
+    if obj.hasattr("tolist")? {
+        return obj.call_method0("tolist");
+    }
+    json_mod
+        .getattr("JSONEncoder")?
+        .call0()?
+        .call_method1("default", (obj,))
+}
+
+/// The `json.dumps` ``default`` hook that encodes typed wrappers
+/// ([`json_default`]).
+fn typed_wrapper_json_hook<'py>(py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    Ok(wrap_pyfunction!(json_default, py)?.into_any())
 }
 
 /// Convert a Python object (e.g. dict or string) to a `serde_json::Value`.
 ///
 /// A Python `str` is first parsed as JSON; when that fails it is treated as
 /// a **bare string value** (`serde_json::Value::String`). This is what
-/// externally-tagged serde enums expect for unit variants — e.g. the
-/// documented `attribute_pnl(..., method="parallel")` form, which previously
-/// raised `ValueError: invalid method JSON` (quant review M11).
+/// externally-tagged serde enums expect for unit variants — e.g. a bare
+/// `"parallel"` for a unit-variant method, which would otherwise raise
+/// `ValueError: invalid method JSON` (quant review M11).
 pub(crate) fn py_to_json_value<'py>(
     py: Python<'py>,
     obj: &Bound<'py, PyAny>,
@@ -153,7 +226,7 @@ pub(crate) fn py_to_json_value<'py>(
 
     let json_mod = py.import("json")?;
     let kwargs = pyo3::types::PyDict::new(py);
-    kwargs.set_item("default", typed_wrapper_json_hook(py, &json_mod)?)?;
+    kwargs.set_item("default", typed_wrapper_json_hook(py)?)?;
     let json: String = json_mod
         .call_method("dumps", (obj,), Some(&kwargs))
         .and_then(|value| value.extract())
@@ -180,7 +253,9 @@ pub(crate) fn py_to_json_string<'py>(
 ///
 /// Releases the GIL for the serde step. Prefer this over re-declaring a local
 /// copy per binding module: the conversion and its error shape are the same
-/// everywhere, and duplicates drift.
+/// everywhere, and duplicates drift. JSON carries only finite floats, so a
+/// ``nan`` or ``inf`` anywhere in `obj` raises ``ValueError`` "invalid
+/// {label}: ... non-finite float" before Rust sees it.
 pub(crate) fn py_to_serde<'py, T: serde::de::DeserializeOwned + Send>(
     py: Python<'py>,
     obj: &Bound<'py, PyAny>,
@@ -188,9 +263,19 @@ pub(crate) fn py_to_serde<'py, T: serde::de::DeserializeOwned + Send>(
 ) -> PyResult<T> {
     let json_mod = py.import("json")?;
     let kwargs = pyo3::types::PyDict::new(py);
-    kwargs.set_item("default", typed_wrapper_json_hook(py, &json_mod)?)?;
+    kwargs.set_item("default", typed_wrapper_json_hook(py)?)?;
+    kwargs.set_item("allow_nan", false)?;
     let json_str: String = json_mod
-        .call_method("dumps", (obj,), Some(&kwargs))?
+        .call_method("dumps", (obj,), Some(&kwargs))
+        .map_err(|err| {
+            if err.to_string().contains("Out of range float") {
+                crate::errors::value_error(format!(
+                    "invalid {label}: non-finite float ({err}); float fields must be finite"
+                ))
+            } else {
+                err
+            }
+        })?
         .extract()?;
     py.detach(move || serde_json::from_str(&json_str))
         .map_err(|e| crate::errors::serde_json_to_py(e, &format!("invalid {label}")))
@@ -211,6 +296,25 @@ pub(crate) fn spec_from_py<T: serde::de::DeserializeOwned + Send>(
             .map_err(|err| crate::errors::serde_json_to_py(err, &format!("invalid {label} JSON")));
     }
     py_to_serde(py, obj, label)
+}
+
+/// Read the keyword-only fields of a data-class constructor into its serde
+/// struct.
+///
+/// The constructor takes ``**fields``; the mapping (an empty one when no
+/// keyword was given) goes through [`py_to_serde`], so every field takes its
+/// wire form or a typed wrapper the [`json_default`] hook encodes, the Rust
+/// struct supplies the defaults, and its `deny_unknown_fields` rejects an
+/// unknown keyword (`ValueError` "invalid {label}: …").
+pub(crate) fn fields_from_py<T: serde::de::DeserializeOwned + Send>(
+    py: Python<'_>,
+    fields: Option<&Bound<'_, pyo3::types::PyDict>>,
+    label: &str,
+) -> PyResult<T> {
+    match fields {
+        Some(fields) => py_to_serde(py, fields.as_any(), label),
+        None => py_to_serde(py, pyo3::types::PyDict::new(py).as_any(), label),
+    }
 }
 
 /// [`spec_from_py`] for an optional argument: an omitted argument or `None`

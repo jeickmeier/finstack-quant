@@ -192,12 +192,11 @@ The contract gate requires:
 Run:
 
 ```text
-mise run rust-gen-schemas
-mise run rust-check-schemas   # includes the serde audit
+mise run gen-write
+mise run gen-check
 mise run gen-check
 ```
 
-The full release-facing gate is `mise run all-fmt`, `mise run all-lint`,
-`mise run all-test`, `mise run rust-doc`, `mise run python-doc`,
-`mise run wasm-doc`, and the `--doctest` runs of `rust-test`, `python-test`
-and `wasm-test`.
+The full release-facing gate is `mise run all --release`: the pull-request
+gate plus `rust-doc`, `wasm-doc` and the `--doctest` runs of `rust-test`,
+`python-test` and `wasm-test`.

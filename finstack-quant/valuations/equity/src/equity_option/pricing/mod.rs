@@ -131,7 +131,7 @@ mod tests {
     use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
     use finstack_quant_models::closed_form::bs_greeks_unchecked;
-    use finstack_quant_models::types::{ExerciseStyle, OptionType};
+    use finstack_quant_models::types::{ExerciseStyle, OptionMarketParams, OptionType};
     use finstack_quant_valuations_core::instruments::SettlementType;
     use finstack_quant_valuations_core::instruments::pricing_overrides::ThetaDayBasis;
     use finstack_quant_valuations_core::pricer::{ModelKey, Pricer};
@@ -415,13 +415,15 @@ mod tests {
         let inputs = collect_inputs(&opt, &market(as_of, 100.0, 0.20, base_rate, 0.0), as_of)
             .expect("inputs");
         let naive = bs_greeks_unchecked(
-            inputs.spot,
-            opt.strike,
-            inputs.r,
-            inputs.q,
-            inputs.sigma,
-            inputs.t_vol,
-            opt.option_type,
+            &OptionMarketParams {
+                spot: inputs.spot,
+                strike: opt.strike,
+                rate: inputs.r,
+                volatility: inputs.sigma,
+                time_to_expiry: inputs.t_vol,
+                dividend_yield: inputs.q,
+                option_type: opt.option_type,
+            },
             opt.metric_pricing_overrides.theta_days_per_year(),
         )
         .rho_r
@@ -493,13 +495,15 @@ mod tests {
         // Analytic European gamma with the same inputs.
         let inputs = collect_inputs(&american, &curves, as_of).expect("inputs");
         let analytic = bs_greeks_unchecked(
-            inputs.spot,
-            american.strike,
-            inputs.r,
-            inputs.q,
-            inputs.sigma,
-            inputs.t_vol,
-            american.option_type,
+            &OptionMarketParams {
+                spot: inputs.spot,
+                strike: american.strike,
+                rate: inputs.r,
+                volatility: inputs.sigma,
+                time_to_expiry: inputs.t_vol,
+                dividend_yield: inputs.q,
+                option_type: american.option_type,
+            },
             american.metric_pricing_overrides.theta_days_per_year(),
         )
         .gamma
@@ -618,13 +622,15 @@ mod tests {
             .expect("supported");
         let inputs = collect_inputs(&option, &curves, as_of).expect("inputs");
         let expected = bs_greeks_unchecked(
-            inputs.spot,
-            option.strike,
-            inputs.r,
-            inputs.q,
-            inputs.sigma,
-            inputs.t_vol,
-            option.option_type,
+            &OptionMarketParams {
+                spot: inputs.spot,
+                strike: option.strike,
+                rate: inputs.r,
+                volatility: inputs.sigma,
+                time_to_expiry: inputs.t_vol,
+                dividend_yield: inputs.q,
+                option_type: option.option_type,
+            },
             365.0,
         )
         .theta

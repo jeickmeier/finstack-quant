@@ -17,6 +17,7 @@ pub mod swap_rate_utils;
 pub(crate) mod tree_valuator;
 
 #[cfg(test)]
+#[path = "tests/numeraire.rs"]
 mod numeraire_tests;
 
 pub use tree_valuator::BermudanSwaptionTreeValuator;

@@ -16,7 +16,9 @@ use wasm_bindgen::prelude::*;
 /// Throws a `TypeError` if `returns` is not an array of numbers. Invalid
 /// estimator samples return `undefined`.
 #[wasm_bindgen(js_name = rollEffectiveSpread)]
-pub fn roll_effective_spread(returns: JsValue) -> Result<Option<f64>, JsValue> {
+pub fn roll_effective_spread(
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] returns: JsValue,
+) -> Result<Option<f64>, JsValue> {
     let returns = js_f64_seq(&returns, "returns")?;
     Ok(liquidity::roll_effective_spread(&returns))
 }
@@ -31,7 +33,10 @@ pub fn roll_effective_spread(returns: JsValue) -> Result<Option<f64>, JsValue> {
 /// Throws a `TypeError` if either argument is not an array of numbers.
 /// Invalid estimator samples return `undefined`.
 #[wasm_bindgen(js_name = amihudIlliquidity)]
-pub fn amihud_illiquidity(returns: JsValue, volumes: JsValue) -> Result<Option<f64>, JsValue> {
+pub fn amihud_illiquidity(
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] returns: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] volumes: JsValue,
+) -> Result<Option<f64>, JsValue> {
     let returns = js_f64_seq(&returns, "returns")?;
     let volumes = js_f64_seq(&volumes, "volumes")?;
     Ok(liquidity::amihud_illiquidity(&returns, &volumes))
@@ -44,8 +49,10 @@ pub fn amihud_illiquidity(returns: JsValue, volumes: JsValue) -> Result<Option<f
 /// @returns Liquidation horizon in trading days, or infinity for non-positive capacity.
 #[wasm_bindgen(js_name = daysToLiquidate)]
 pub fn days_to_liquidate(
+    #[wasm_bindgen(js_name = "positionQuantity", unchecked_param_type = "number")]
     position_quantity: JsValue,
-    adv: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] adv: JsValue,
+    #[wasm_bindgen(js_name = "participationRate", unchecked_param_type = "number")]
     participation_rate: JsValue,
 ) -> Result<f64, JsValue> {
     let position_quantity = js_f64(&position_quantity, "positionQuantity")?;
@@ -70,8 +77,10 @@ pub fn days_to_liquidate(
 /// thresholds are not strictly ascending.
 #[wasm_bindgen(js_name = liquidityTier)]
 pub fn liquidity_tier(
-    days_to_liquidate: JsValue,
-    thresholds: Option<JsValue>,
+    #[wasm_bindgen(js_name = "daysToLiquidate", unchecked_param_type = "number")] days_to_liquidate: JsValue,
+    #[wasm_bindgen(unchecked_optional_param_type = "NumericArray | null")] thresholds: Option<
+        JsValue,
+    >,
 ) -> Result<String, JsValue> {
     let days_to_liquidate = js_f64(&days_to_liquidate, "daysToLiquidate")?;
     let thresholds = match thresholds {
@@ -93,7 +102,7 @@ pub fn liquidity_tier(
 }
 
 /// Compute Bangia liquidity-adjusted VaR under the loss-sign convention.
-/// @param var - Finite non-positive base VaR; a negative value denotes a loss.
+/// @param varValue - Finite non-positive base VaR; a negative value denotes a loss.
 /// @param spreadMean - Finite non-negative mean relative bid-ask spread as a decimal.
 /// @param spreadVol - Finite non-negative volatility of the relative spread.
 /// @param confidence - Confidence level strictly between 0.5 and 1.
@@ -104,12 +113,13 @@ pub fn liquidity_tier(
 ///
 /// Throws a JavaScript exception if an input violates the stated finiteness,
 /// sign, or range contract, or if the result cannot be converted.
-#[wasm_bindgen(js_name = lvarBangia)]
+#[wasm_bindgen(js_name = lvarBangia, unchecked_return_type = "LvarBangiaScalar")]
 pub fn lvar_bangia(
-    var: JsValue,
-    spread_mean: JsValue,
-    spread_vol: JsValue,
-    confidence: JsValue,
+    #[wasm_bindgen(js_name = "varValue", unchecked_param_type = "number")] var: JsValue,
+    #[wasm_bindgen(js_name = "spreadMean", unchecked_param_type = "number")] spread_mean: JsValue,
+    #[wasm_bindgen(js_name = "spreadVol", unchecked_param_type = "number")] spread_vol: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] confidence: JsValue,
+    #[wasm_bindgen(js_name = "positionValue", unchecked_param_type = "number")]
     position_value: JsValue,
 ) -> Result<JsValue, JsValue> {
     let var = js_f64(&var, "varValue")?;
@@ -136,15 +146,23 @@ pub fn lvar_bangia(
 ///
 /// Throws a JavaScript exception if an input violates the stated finiteness,
 /// sign, or range contract, calculation fails, or conversion fails.
-#[wasm_bindgen(js_name = almgrenChrissImpact)]
-#[allow(clippy::too_many_arguments)]
+#[wasm_bindgen(js_name = almgrenChrissImpact, unchecked_return_type = "ImpactEstimate")]
 pub fn almgren_chriss_impact(
+    #[wasm_bindgen(js_name = "positionSize", unchecked_param_type = "number")]
     position_size: JsValue,
+    #[wasm_bindgen(js_name = "avgDailyVolume", unchecked_param_type = "number")]
     avg_daily_volume: JsValue,
-    volatility: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] volatility: JsValue,
+    #[wasm_bindgen(js_name = "executionHorizonDays", unchecked_param_type = "number")]
     execution_horizon_days: JsValue,
+    #[wasm_bindgen(js_name = "permanentImpactCoef", unchecked_param_type = "number")]
     permanent_impact_coef: JsValue,
+    #[wasm_bindgen(js_name = "temporaryImpactCoef", unchecked_param_type = "number")]
     temporary_impact_coef: JsValue,
+    #[wasm_bindgen(
+        js_name = "referencePrice",
+        unchecked_optional_param_type = "number | null"
+    )]
     reference_price: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let position_size = js_f64(&position_size, "positionSize")?;
@@ -181,8 +199,9 @@ pub fn almgren_chriss_impact(
 /// Invalid estimator samples return `undefined`.
 #[wasm_bindgen(js_name = kyleLambda)]
 pub fn kyle_lambda(
-    returns: JsValue,
-    volumes: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] returns: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] volumes: JsValue,
+    #[wasm_bindgen(js_name = "referencePrice", unchecked_param_type = "number")]
     reference_price: JsValue,
 ) -> Result<Option<f64>, JsValue> {
     let reference_price = js_f64(&reference_price, "referencePrice")?;
@@ -222,7 +241,10 @@ pub fn kyle_lambda(
 /// and a `validation` error if it is malformed or fails the profile's
 /// quote and volume checks.
 #[wasm_bindgen(js_name = liquidityProfileSpread)]
-pub fn liquidity_profile_spread(profile: JsValue) -> Result<f64, JsValue> {
+pub fn liquidity_profile_spread(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.LiquidityProfile | string")]
+    profile: JsValue,
+) -> Result<f64, JsValue> {
     let profile: LiquidityProfile = from_js_json(&profile, "profile")?;
     Ok(profile.spread())
 }
@@ -258,7 +280,10 @@ pub fn liquidity_profile_spread(profile: JsValue) -> Result<f64, JsValue> {
 /// and a `validation` error if it is malformed or fails the profile's
 /// quote and volume checks.
 #[wasm_bindgen(js_name = liquidityProfileRelativeSpread)]
-pub fn liquidity_profile_relative_spread(profile: JsValue) -> Result<f64, JsValue> {
+pub fn liquidity_profile_relative_spread(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.LiquidityProfile | string")]
+    profile: JsValue,
+) -> Result<f64, JsValue> {
     let profile: LiquidityProfile = from_js_json(&profile, "profile")?;
     Ok(profile.relative_spread())
 }
@@ -295,7 +320,10 @@ pub fn liquidity_profile_relative_spread(profile: JsValue) -> Result<f64, JsValu
 /// and a `validation` error if it is malformed or fails the profile's
 /// quote and volume checks.
 #[wasm_bindgen(js_name = liquidityProfileHalfSpread)]
-pub fn liquidity_profile_half_spread(profile: JsValue) -> Result<f64, JsValue> {
+pub fn liquidity_profile_half_spread(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.LiquidityProfile | string")]
+    profile: JsValue,
+) -> Result<f64, JsValue> {
     let profile: LiquidityProfile = from_js_json(&profile, "profile")?;
     Ok(profile.half_spread())
 }
@@ -334,7 +362,10 @@ pub fn liquidity_profile_half_spread(profile: JsValue) -> Result<f64, JsValue> {
 /// and a `validation` error if it is malformed or fails the profile's
 /// quote and volume checks.
 #[wasm_bindgen(js_name = liquidityProfileRelativeSpreadVolatility)]
-pub fn liquidity_profile_relative_spread_volatility(profile: JsValue) -> Result<f64, JsValue> {
+pub fn liquidity_profile_relative_spread_volatility(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.LiquidityProfile | string")]
+    profile: JsValue,
+) -> Result<f64, JsValue> {
     let profile: LiquidityProfile = from_js_json(&profile, "profile")?;
     Ok(profile.relative_spread_volatility())
 }
@@ -374,13 +405,29 @@ pub fn liquidity_profile_relative_spread_volatility(profile: JsValue) -> Result<
 /// Throws a `TypeError` if `params` is neither a string nor a plain object,
 /// and a `validation` error if it is malformed.
 #[wasm_bindgen(js_name = tradeParamsEffectiveReferencePrice)]
-pub fn trade_params_effective_reference_price(params: JsValue) -> Result<f64, JsValue> {
+pub fn trade_params_effective_reference_price(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.TradeParams | string")] params: JsValue,
+) -> Result<f64, JsValue> {
     let params: TradeParams = from_js_json(&params, "params")?;
     Ok(params.effective_reference_price())
 }
 
 /// Almgren-Chriss market-impact model with linear permanent impact and
 /// power-law temporary impact.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const profile = {
+///   instrument_id: "ACME", mid: 100, bid: 99.95, ask: 100.05, avg_daily_volume: 1000000,
+///   avg_trade_size: 500, spread_volatility: 0.0002, spread_volatility_kind: "relative" as const, observation_days: 20,
+/// };
+/// const model = new models.liquidity.AlmgrenChrissModel(1e-7, 1e-6, 1.0);
+/// const params = { quantity: 50000, horizon_days: 5, daily_volatility: 0.02, profile, risk_aversion: 1e-6, reference_price: null };
+/// console.log(model.estimateCost(params).total_cost, model.optimalTrajectory(params, 5).quantities);
+/// model.free();
+/// ```
 #[wasm_bindgen(js_name = AlmgrenChrissModel)]
 pub struct JsAlmgrenChrissModel {
     pub(crate) inner: AlmgrenChrissModel,
@@ -401,9 +448,9 @@ impl JsAlmgrenChrissModel {
     /// `delta` is outside `(0, 1]`.
     #[wasm_bindgen(constructor)]
     pub fn new(
-        gamma: JsValue,
-        eta: JsValue,
-        delta: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] gamma: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] eta: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] delta: JsValue,
     ) -> Result<JsAlmgrenChrissModel, JsValue> {
         AlmgrenChrissModel::new(
             js_f64(&gamma, "gamma")?,
@@ -416,7 +463,7 @@ impl JsAlmgrenChrissModel {
 
     /// Calibrate the impact coefficients from a liquidity profile.
     /// @param profile - `LiquidityProfile` object or JSON (`instrument_id`, `mid`, `bid`, `ask`, `avg_daily_volume`, `avg_trade_size`, `spread_volatility`, `spread_volatility_kind`, `observation_days`).
-    /// @param daily_volatility - Daily return volatility as a decimal; positive.
+    /// @param dailyVolatility - Daily return volatility as a decimal; positive.
     /// @returns The calibrated model.
     ///
     /// # Errors
@@ -425,7 +472,9 @@ impl JsAlmgrenChrissModel {
     /// volatility or volume is not positive.
     #[wasm_bindgen(js_name = fromProfile)]
     pub fn from_profile(
+        #[wasm_bindgen(unchecked_param_type = "generated.models.LiquidityProfile | string")]
         profile: JsValue,
+        #[wasm_bindgen(js_name = "dailyVolatility", unchecked_param_type = "number")]
         daily_volatility: JsValue,
     ) -> Result<JsAlmgrenChrissModel, JsValue> {
         let profile: LiquidityProfile = from_js_json(&profile, "profile")?;
@@ -459,25 +508,31 @@ impl JsAlmgrenChrissModel {
     /// # Errors
     ///
     /// Throws a `validation` error if the parameters are malformed or out of range.
-    #[wasm_bindgen(js_name = estimateCost)]
-    pub fn estimate_cost(&self, params: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = estimateCost, unchecked_return_type = "ImpactEstimate")]
+    pub fn estimate_cost(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "generated.models.TradeParams | string")]
+        params: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let params: TradeParams = from_js_json(&params, "params")?;
         to_js_value(&self.inner.estimate_cost(&params).map_err(to_js_err)?)
     }
 
     /// Risk-averse optimal execution schedule (Almgren-Chriss 2000).
     /// @param params - `TradeParams` object or JSON; `risk_aversion` selects the urgency of the schedule.
-    /// @param num_buckets - Number of equal time buckets over the horizon; a positive safe integer.
+    /// @param numBuckets - Number of equal time buckets over the horizon; a positive safe integer.
     /// @returns The `ExecutionTrajectory` object (`quantities`, `remaining`, `time_points`, `expected_cost`, `cost_variance`).
     ///
     /// # Errors
     ///
     /// Throws a `validation` error if the parameters are malformed or
     /// `numBuckets` is zero.
-    #[wasm_bindgen(js_name = optimalTrajectory)]
+    #[wasm_bindgen(js_name = optimalTrajectory, unchecked_return_type = "generated.models.ExecutionTrajectory")]
     pub fn optimal_trajectory(
         &self,
+        #[wasm_bindgen(unchecked_param_type = "generated.models.TradeParams | string")]
         params: JsValue,
+        #[wasm_bindgen(js_name = "numBuckets", unchecked_param_type = "number")]
         num_buckets: JsValue,
     ) -> Result<JsValue, JsValue> {
         let params: TradeParams = from_js_json(&params, "params")?;
@@ -490,6 +545,15 @@ impl JsAlmgrenChrissModel {
 }
 
 /// Kyle (1985) linear price-impact model.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const model = models.liquidity.KyleLambdaModel.fromAmihud(1e-9, 100);
+/// console.log(model.lambda);
+/// model.free();
+/// ```
 #[wasm_bindgen(js_name = KyleLambdaModel)]
 pub struct JsKyleLambdaModel {
     pub(crate) inner: KyleLambdaModel,
@@ -506,15 +570,17 @@ impl JsKyleLambdaModel {
     ///
     /// Throws a `validation` error if `lambda` is negative or non-finite.
     #[wasm_bindgen(constructor)]
-    pub fn new(lambda: JsValue) -> Result<JsKyleLambdaModel, JsValue> {
+    pub fn new(
+        #[wasm_bindgen(unchecked_param_type = "number")] lambda: JsValue,
+    ) -> Result<JsKyleLambdaModel, JsValue> {
         KyleLambdaModel::new(js_f64(&lambda, "lambda")?)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
     }
 
     /// Model whose lambda is implied by an Amihud illiquidity ratio.
-    /// @param amihud_ratio - Amihud ratio: average absolute return per unit of traded value; non-negative.
-    /// @param reference_price - Reference price used to turn the return impact into a price impact; positive.
+    /// @param amihudRatio - Amihud ratio: average absolute return per unit of traded value; non-negative.
+    /// @param referencePrice - Reference price used to turn the return impact into a price impact; positive.
     /// @returns The Kyle model with `lambda = amihudRatio * referencePrice`.
     ///
     /// # Errors
@@ -522,7 +588,9 @@ impl JsKyleLambdaModel {
     /// Throws a `validation` error if an input is negative or non-finite.
     #[wasm_bindgen(js_name = fromAmihud)]
     pub fn from_amihud(
+        #[wasm_bindgen(js_name = "amihudRatio", unchecked_param_type = "number")]
         amihud_ratio: JsValue,
+        #[wasm_bindgen(js_name = "referencePrice", unchecked_param_type = "number")]
         reference_price: JsValue,
     ) -> Result<JsKyleLambdaModel, JsValue> {
         KyleLambdaModel::from_amihud(
@@ -546,25 +614,31 @@ impl JsKyleLambdaModel {
     /// # Errors
     ///
     /// Throws a `validation` error if the parameters are malformed or out of range.
-    #[wasm_bindgen(js_name = estimateCost)]
-    pub fn estimate_cost(&self, params: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = estimateCost, unchecked_return_type = "ImpactEstimate")]
+    pub fn estimate_cost(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "generated.models.TradeParams | string")]
+        params: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let params: TradeParams = from_js_json(&params, "params")?;
         to_js_value(&self.inner.estimate_cost(&params).map_err(to_js_err)?)
     }
 
     /// Execution schedule under linear impact.
     /// @param params - `TradeParams` object or JSON describing the trade.
-    /// @param num_buckets - Number of equal time buckets over the horizon; a positive safe integer.
+    /// @param numBuckets - Number of equal time buckets over the horizon; a positive safe integer.
     /// @returns The `ExecutionTrajectory` object (`quantities`, `remaining`, `time_points`, `expected_cost`, `cost_variance`).
     ///
     /// # Errors
     ///
     /// Throws a `validation` error if the parameters are malformed or
     /// `numBuckets` is zero.
-    #[wasm_bindgen(js_name = optimalTrajectory)]
+    #[wasm_bindgen(js_name = optimalTrajectory, unchecked_return_type = "generated.models.ExecutionTrajectory")]
     pub fn optimal_trajectory(
         &self,
+        #[wasm_bindgen(unchecked_param_type = "generated.models.TradeParams | string")]
         params: JsValue,
+        #[wasm_bindgen(js_name = "numBuckets", unchecked_param_type = "number")]
         num_buckets: JsValue,
     ) -> Result<JsValue, JsValue> {
         let params: TradeParams = from_js_json(&params, "params")?;

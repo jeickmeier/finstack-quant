@@ -140,7 +140,7 @@ for kind in ["clo","abs","cmbs","rmbs"]:
     pool_payload=deepcopy(spec["pool"]);pool_payload["deal_type"]=kind
     p=AssetPool.from_json(json.dumps(pool_payload))
     tr=TrancheStructure.from_json(json.dumps(spec["tranches"]))
-    native_deal=StructuredCredit.new_standard(kind,StandardDealParams("C3-"+kind,p,tr,AS_OF,date(2030,1,15),"USD-OIS",calendar_id="weekends_only"))
+    native_deal=StructuredCredit.new_standard(kind,StandardDealParams(id="C3-"+kind, pool=p, tranches=tr, closing_date=AS_OF, maturity=date(2030,1,15), discount_curve_id="USD-OIS", calendar_id="weekends_only"))
     payload=json.loads(native_deal.to_json());s=payload["instrument"]["spec"]
     s.update(calendar_id="weekends_only",business_day_convention="following")
     s["pool"]["deal_type"]=kind

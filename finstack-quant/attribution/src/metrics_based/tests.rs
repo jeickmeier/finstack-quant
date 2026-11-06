@@ -1149,17 +1149,19 @@ fn hw1f_cap_surface_shock_does_not_affect_explicit_parameter_pricing() {
     let as_of_t0 = date!(2024 - 01 - 01);
     let as_of_t1 = date!(2024 - 01 - 02);
     let mut cap = CapFloor::new(
-        "HW-SURFACE-CAP",
-        RateOptionType::Cap,
-        Money::from((1000000_i64, Currency::USD)),
-        0.05,
-        date!(2024 - 04 - 01),
-        date!(2029 - 04 - 01),
-        Some(Tenor::quarterly()),
-        DayCount::Act365F,
-        "USD-OIS",
-        "USD-LIBOR-3M",
-        "USD-CAP-VOL",
+        finstack_quant_valuations::instruments::rates::cap_floor::CapFloorParams {
+            id: "HW-SURFACE-CAP".into(),
+            rate_option_type: RateOptionType::Cap,
+            notional: Money::from((1000000_i64, Currency::USD)),
+            strike: 0.05,
+            start_date: date!(2024 - 04 - 01),
+            maturity: date!(2029 - 04 - 01),
+            frequency: Some(Tenor::quarterly()),
+            day_count: DayCount::Act365F,
+            discount_curve_id: "USD-OIS".into(),
+            forward_curve_id: "USD-LIBOR-3M".into(),
+            vol_surface_id: "USD-CAP-VOL".into(),
+        },
     )
     .expect("cap");
     cap.vol_type = CapFloorVolType::Normal;

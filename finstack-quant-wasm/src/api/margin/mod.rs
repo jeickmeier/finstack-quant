@@ -80,14 +80,34 @@ fn base_money(csa: &finstack_quant_margin::types::CsaSpec, amount: f64) -> Resul
 /// );
 /// result.total_xva; // CVA - DVA + FVA + MVA
 /// ```
-#[wasm_bindgen(js_name = computeBilateralXva)]
+///
+/// @example
+/// ```typescript
+/// import init, { core, margin } from "finstack-quant-wasm";
+/// await init();
+/// const df = core.DiscountCurve.flat("USD-OIS", "2025-01-01", 0.03);
+/// const hz = core.HazardCurve.flat("CPTY", "2025-01-01", 0.02, 0.4);
+/// const result = margin.computeBilateralXva(
+///   JSON.stringify({ times: [1, 2], mtm_values: [1e6, 1e6], epe: [1e6, 1e6], ene: [0, 0] }),
+///   hz, hz, df, 0.4, 0.4,
+///   JSON.stringify({ funding_spread_bp: 50.0 }),
+/// );
+/// result.total_xva; // CVA - DVA + FVA + MVA
+/// ```
+#[wasm_bindgen(js_name = computeBilateralXva, unchecked_return_type = "XvaResult")]
 pub fn compute_bilateral_xva(
+    #[wasm_bindgen(js_name = "exposureProfileJson", unchecked_param_type = "JsonInput")]
     exposure_profile_json: JsValue,
-    counterparty_hazard_curve: &JsHazardCurve,
-    own_hazard_curve: &JsHazardCurve,
-    discount_curve: &JsDiscountCurve,
+    #[wasm_bindgen(js_name = "counterpartyHazardCurve")] counterparty_hazard_curve: &JsHazardCurve,
+    #[wasm_bindgen(js_name = "ownHazardCurve")] own_hazard_curve: &JsHazardCurve,
+    #[wasm_bindgen(js_name = "discountCurve")] discount_curve: &JsDiscountCurve,
+    #[wasm_bindgen(js_name = "counterpartyRecoveryRate", unchecked_param_type = "number")]
     counterparty_recovery_rate: JsValue,
-    own_recovery_rate: JsValue,
+    #[wasm_bindgen(js_name = "ownRecoveryRate", unchecked_param_type = "number")] own_recovery_rate: JsValue,
+    #[wasm_bindgen(
+        js_name = "fundingJson",
+        unchecked_optional_param_type = "JsonInput | null"
+    )]
     funding_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let counterparty_recovery_rate =

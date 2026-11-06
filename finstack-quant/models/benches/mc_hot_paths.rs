@@ -58,7 +58,15 @@ fn bench_european_pricer(c: &mut Criterion) {
                 .with_parallel(false);
             b.iter(|| {
                 pricer
-                    .price(&process, 100.0, 1.0, 252, &payoff, Currency::USD, df)
+                    .price(
+                        &process,
+                        100.0,
+                        finstack_quant_core::math::time_grid::TimeGrid::uniform(1.0, 252)
+                            .expect("valid time grid"),
+                        &payoff,
+                        Currency::USD,
+                        df,
+                    )
                     .expect("pricing should succeed")
             });
         });
@@ -91,14 +99,16 @@ fn bench_lsmc_pricer(c: &mut Criterion) {
             b.iter(|| {
                 pricer
                     .price(
-                        &process,
-                        100.0,
-                        1.0,
-                        num_steps,
-                        &exercise,
-                        &basis,
+                        &finstack_quant_models::monte_carlo::pricer::lsmc::LsmcInputs {
+                            process: &process,
+                            initial_spot: 100.0,
+                            time_to_maturity: 1.0,
+                            num_steps,
+                            exercise: &exercise,
+                            basis: &basis,
+                            discount_rate: 0.05,
+                        },
                         Currency::USD,
-                        0.05,
                     )
                     .expect("pricing should succeed")
             });
@@ -158,13 +168,15 @@ fn bench_heston_qe_pricer(c: &mut Criterion) {
         b.iter(|| {
             engine
                 .price(
-                    &rng,
-                    &process,
-                    &disc,
-                    &[100.0, 0.04],
-                    &payoff,
-                    Currency::USD,
-                    df,
+                    finstack_quant_models::monte_carlo::engine::McPricingInputs {
+                        rng: &rng,
+                        process: &process,
+                        disc: &disc,
+                        initial_state: &[100.0, 0.04],
+                        payoff: &payoff,
+                        currency: Currency::USD,
+                        discount_factor: df,
+                    },
                 )
                 .expect("pricing should succeed")
         });
@@ -242,7 +254,17 @@ fn bench_hw1f_pricer(c: &mut Criterion) {
         );
         b.iter(|| {
             engine
-                .price(&rng, &process, &disc, &[0.03], &payoff, Currency::USD, df)
+                .price(
+                    finstack_quant_models::monte_carlo::engine::McPricingInputs {
+                        rng: &rng,
+                        process: &process,
+                        disc: &disc,
+                        initial_state: &[0.03],
+                        payoff: &payoff,
+                        currency: Currency::USD,
+                        discount_factor: df,
+                    },
+                )
                 .expect("pricing should succeed")
         });
     });

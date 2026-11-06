@@ -1,0 +1,146 @@
+{
+  "$defs": {
+    "BermudanSchedule": {
+      "additionalProperties": false,
+      "description": "Bermudan exercise schedule specification.\n\nDefines the exercise dates and constraints for a Bermudan swaption.\nExercise dates are typically aligned with swap coupon dates.\n\nEach exercise date is the notification (decision) date on which the holder\nelects to exercise, as in QuantLib's `BermudanExercise`; any contractual\nnotice period is already reflected in where the dates sit, so the schedule\ncarries no separate notice lag.",
+      "properties": {
+        "exercise_dates": {
+          "description": "Exercise notification (decision) dates, sorted; typically one notice\nperiod before the swap coupon dates they enter on.",
+          "items": {
+            "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+          },
+          "type": "array"
+        },
+        "lockout_end": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Lockout period end (no exercise before this date)"
+        }
+      },
+      "required": [
+        "exercise_dates"
+      ],
+      "type": "object"
+    },
+    "OptionType": {
+      "description": "Option payoff direction used by analytical and numerical model engines.",
+      "oneOf": [
+        {
+          "const": "call",
+          "description": "Call option.",
+          "type": "string"
+        },
+        {
+          "const": "put",
+          "description": "Put option.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/common/1/bermudan_swaption_params.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Option type, notional, strike, underlying swap dates, exercise schedule and curves of a co-terminal Bermudan swaption.",
+  "examples": [
+    {
+      "discount_curve_id": "USD-OIS",
+      "exercise_schedule": {
+        "exercise_dates": [
+          "2029-01-17",
+          "2029-07-17",
+          "2030-01-17",
+          "2030-07-17",
+          "2031-01-17",
+          "2031-07-17",
+          "2032-01-19",
+          "2032-07-19",
+          "2033-01-17",
+          "2033-07-18",
+          "2034-01-17",
+          "2034-07-17",
+          "2035-01-17",
+          "2035-07-17",
+          "2036-01-17",
+          "2036-07-17"
+        ],
+        "lockout_end": null
+      },
+      "forward_curve_id": "USD-OIS",
+      "id": "BERM-10NC2-USD",
+      "notional": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "option_type": "call",
+      "strike": 0.03,
+      "underlying_maturity": "2037-01-17",
+      "underlying_start_date": "2027-01-17",
+      "vol_surface_id": "USD-SWPNVOL"
+    }
+  ],
+  "properties": {
+    "discount_curve_id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Discount curve for both legs."
+    },
+    "exercise_schedule": {
+      "$ref": "#/$defs/BermudanSchedule",
+      "description": "Exercise dates."
+    },
+    "forward_curve_id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Projection curve of the floating leg."
+    },
+    "id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Unique instrument identifier."
+    },
+    "notional": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+      "description": "Swap notional; its currency is the payment currency."
+    },
+    "option_type": {
+      "$ref": "#/$defs/OptionType",
+      "description": "`call` for a payer (right to pay fixed), `put` for a receiver (right\nto receive fixed)."
+    },
+    "strike": {
+      "description": "Fixed rate of the underlying swap as a decimal (0.03 = 3%).",
+      "format": "double",
+      "type": "number"
+    },
+    "underlying_maturity": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+      "description": "Maturity of the underlying swap (co-terminal for every exercise)."
+    },
+    "underlying_start_date": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+      "description": "Effective date of the underlying swap."
+    },
+    "vol_surface_id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Swaption volatility cube."
+    }
+  },
+  "required": [
+    "id",
+    "option_type",
+    "notional",
+    "strike",
+    "underlying_start_date",
+    "underlying_maturity",
+    "exercise_schedule",
+    "discount_curve_id",
+    "forward_curve_id",
+    "vol_surface_id"
+  ],
+  "title": "BermudanSwaptionParams",
+  "type": "object"
+}

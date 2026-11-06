@@ -114,11 +114,16 @@ def test_validate_rejects_a_non_json_payload() -> None:
 
 def test_instrument_catalogue_is_cheap_to_list() -> None:
     # The point of the index: choosing an instrument must not require loading
-    # the umbrella union, which is two orders of magnitude larger.
-    index = valuations_schema.index()
+    # the umbrella union. Each row is a summary (id, path, title, one-line
+    # summary, byte count), never a schema body, so its size does not depend on
+    # the schema it describes; the index as a whole grows only by one such row
+    # per registered artifact.
+    rows = json.loads(valuations_schema.index())["artifacts"]
     umbrella = valuations_schema.get("instruments/1/instrument.schema.json")
 
-    assert len(index) * 20 < len(umbrella)
+    for row in rows:
+        assert len(json.dumps(row)) <= 512, row["path"]
+    assert len(json.dumps(rows)) * 10 < len(umbrella)
 
 
 def test_every_registry_crate_publishes_the_same_surface() -> None:

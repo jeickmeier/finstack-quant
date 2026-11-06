@@ -1,0 +1,74 @@
+{
+  "$defs": {
+    "OptionType": {
+      "description": "Option payoff direction used by analytical and numerical model engines.",
+      "oneOf": [
+        {
+          "const": "call",
+          "description": "Call option.",
+          "type": "string"
+        },
+        {
+          "const": "put",
+          "description": "Put option.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/cos_market_params.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Option and market inputs of the COS Fourier pricers.",
+  "properties": {
+    "dividend_yield": {
+      "description": "Continuous dividend yield (decimal, annualized).",
+      "format": "double",
+      "type": "number"
+    },
+    "n_terms": {
+      "default": null,
+      "description": "Optional COS term count in `1..=`[`CosConfig::MAX_TERMS`]; defaults to\n[`CosConfig::default`].",
+      "format": "uint",
+      "minimum": 0,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "option_type": {
+      "$ref": "#/$defs/OptionType",
+      "description": "Call or put payoff."
+    },
+    "rate": {
+      "description": "Continuously-compounded risk-free rate.",
+      "format": "double",
+      "type": "number"
+    },
+    "spot": {
+      "description": "Current spot price of the underlying.",
+      "format": "double",
+      "type": "number"
+    },
+    "strike": {
+      "description": "Option strike.",
+      "format": "double",
+      "type": "number"
+    },
+    "time_to_expiry": {
+      "description": "Time to expiry in years.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "spot",
+    "strike",
+    "rate",
+    "dividend_yield",
+    "time_to_expiry",
+    "option_type"
+  ],
+  "title": "CosMarketParams",
+  "type": "object"
+}

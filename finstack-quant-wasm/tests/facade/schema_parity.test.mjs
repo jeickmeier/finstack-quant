@@ -4,8 +4,9 @@
  * `schema` namespace, the cashflow resources and the instrument validators.
  *
  * Expected values come from `schema_parity.golden.json`, which
- * `finstack-quant-py/tests/test_schema_wasm_parity.py` generates and asserts
- * through the Python binding, so each case is a cross-host golden. Python
+ * `finstack-quant-py/tests/test_schema_wasm_parity.py` generates (in
+ * `mise run gen-write`) and asserts through the Python binding, so each case is
+ * a cross-host golden. Python
  * returns JSON text where WASM returns plain objects.
  *
  * Requires the wasm-pack web build: npm run build (mise run wasm-build).

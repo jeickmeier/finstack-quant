@@ -65,7 +65,12 @@ class TestStructuredCreditTyped:
         deal = StructuredCredit.new_standard(
             "abs",
             StandardDealParams(
-                "ABS-1", _pool(), _tranches(), datetime.date(2024, 1, 15), datetime.date(2031, 1, 15), "USD-SOFR-DISC"
+                id="ABS-1",
+                pool=_pool(),
+                tranches=_tranches(),
+                closing_date=datetime.date(2024, 1, 15),
+                maturity=datetime.date(2031, 1, 15),
+                discount_curve_id="USD-SOFR-DISC",
             ),
         )
         payload = json.loads(deal.to_json())
@@ -105,7 +110,12 @@ class TestStructuredCreditTyped:
         deal = StructuredCredit.new_standard(
             "abs",
             StandardDealParams(
-                "ABS-1", _pool(), _tranches(), datetime.date(2024, 1, 15), datetime.date(2031, 1, 15), "USD-SOFR-DISC"
+                id="ABS-1",
+                pool=_pool(),
+                tranches=_tranches(),
+                closing_date=datetime.date(2024, 1, 15),
+                maturity=datetime.date(2031, 1, 15),
+                discount_curve_id="USD-SOFR-DISC",
             ),
         )
         payload = json.loads(deal.to_json())

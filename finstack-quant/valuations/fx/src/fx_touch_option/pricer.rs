@@ -71,19 +71,7 @@ pub(crate) fn compute_pv(
         return Money::new(pv, inst.quote_currency);
     }
 
-    let price = price_touch(
-        inst,
-        spot,
-        inst.barrier,
-        r_d,
-        r_f,
-        sigma,
-        t,
-        inst.touch_type,
-        inst.barrier_direction,
-        inst.payout_timing,
-        inst.payout_amount.amount(),
-    )?;
+    let price = price_touch(inst, spot, r_d, r_f, sigma, t)?;
 
     Money::new(price, inst.quote_currency)
 }
@@ -115,20 +103,24 @@ fn input_request<'a>(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+/// Closed-form (Rubinstein-Reiner) touch value per unit of `inst`'s payout,
+/// in quote currency. Barrier, touch type, direction, payout timing and the
+/// payout amount come from `inst`; `r_d`/`r_f` are the continuously
+/// compounded domestic/foreign rates, `sigma` the volatility and `t` the time
+/// to expiry in years.
 fn price_touch(
     inst: &FxTouchOption,
     spot: f64,
-    barrier: f64,
     r_d: f64,
     r_f: f64,
     sigma: f64,
     t: f64,
-    touch_type: TouchType,
-    barrier_direction: BarrierDirection,
-    payout_timing: PayoutTiming,
-    payout: f64,
 ) -> Result<f64> {
+    let barrier = inst.barrier;
+    let touch_type = inst.touch_type;
+    let barrier_direction = inst.barrier_direction;
+    let payout_timing = inst.payout_timing;
+    let payout = inst.payout_amount.amount();
     let already_breached = match barrier_direction {
         BarrierDirection::Down => spot <= barrier,
         BarrierDirection::Up => spot >= barrier,

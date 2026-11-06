@@ -151,7 +151,7 @@ impl LookbackOptionMcPricer {
                 } else {
                     payoff
                 };
-                pricer.price_with_grid(
+                pricer.price(
                     &process,
                     spot,
                     time_grid,
@@ -183,7 +183,7 @@ impl LookbackOptionMcPricer {
                 } else {
                     payoff
                 };
-                pricer.price_with_grid(
+                pricer.price(
                     &process,
                     spot,
                     time_grid,

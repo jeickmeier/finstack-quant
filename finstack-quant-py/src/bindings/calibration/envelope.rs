@@ -6,10 +6,8 @@
 
 use super::config::extract_config;
 use super::quotes::extract_market_datum;
-use crate::bindings::core::currency::extract_currency;
-use crate::bindings::date_utils::extract_date_iso;
 use crate::bindings::macros::wire_methods;
-use crate::bindings::module_utils::py_to_json_value;
+use crate::bindings::module_utils::{py_to_json_value, spec_from_py};
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::pickle_support::reduce_via_json;
 use crate::bindings::pydoc::pydoc;
@@ -27,27 +25,6 @@ use serde_json::{Map, Value};
 /// Deserialize a JSON object into `T` with a labelled error.
 pub(crate) fn from_value<T: serde::de::DeserializeOwned>(value: Value, label: &str) -> PyResult<T> {
     serde_json::from_value(value).map_err(|e| serde_json_to_py(e, &format!("invalid {label}")))
-}
-
-/// Merge ``**params`` keyword overrides into a wire object.
-fn merge_kwargs(
-    py: Python<'_>,
-    target: &mut Map<String, Value>,
-    params: Option<&Bound<'_, PyDict>>,
-    label: &str,
-) -> PyResult<()> {
-    if let Some(params) = params {
-        for (key, value) in params.iter() {
-            let key: String = key.extract()?;
-            let value = if value.is_none() {
-                Value::Null
-            } else {
-                py_to_json_value(py, &value, &format!("{label} field '{key}'"))?
-            };
-            target.insert(key, value);
-        }
-    }
-    Ok(())
 }
 
 fn extract_market_data(
@@ -85,17 +62,16 @@ fn extract_prior_market(
 
 /// One calibration step: the object to build, its quote set, and kind-specific parameters.
 ///
-/// Every constructor takes the step ``id`` and the kind's required fields;
-/// remaining optional fields are keyword overrides named exactly as in the
-/// Rust ``StepParams`` wire schema (see ``schema.get("calibration.schema.json")``).
-/// Quote payloads live in ``CalibrationEnvelope.market_data``. The plan
-/// names their IDs in ``quote_sets``; a step references the set by name.
+/// Every constructor takes the step ``id``, a ``params`` dict (or JSON text)
+/// holding the kind's wire fields named exactly as in the Rust ``StepParams``
+/// schema (see ``schema.get("calibration.schema.json")``), and an optional
+/// ``quote_set``. Quote payloads live in ``CalibrationEnvelope.market_data``.
+/// The plan names their IDs in ``quote_sets``; a step references the set by name.
 ///
 /// Examples
 /// --------
-/// >>> from finstack_quant.calibration import CalibrationStep, RateQuote
-/// >>> quotes = [RateQuote.deposit("D3M", "USD-SOFR-OIS", "3M", 0.052)]
-/// >>> step = CalibrationStep.discount("USD-OIS", "USD", "2026-05-08")
+/// >>> from finstack_quant.calibration import CalibrationStep
+/// >>> step = CalibrationStep.discount("USD-OIS", {"currency": "USD", "base_date": "2026-05-08"})
 /// >>> step.kind, step.quote_set
 /// ('discount', 'USD-OIS')
 #[pyclass(
@@ -114,496 +90,161 @@ impl PyCalibrationStep {
         Self { inner }
     }
 
-    /// Shared constructor: `kind` + `id` + explicit fields + `**params`.
+    /// Shared constructor: `kind` + `id` + the kind's wire-field object.
     ///
-    /// Rust `CalibrationStep::from_wire_fields` owns the omitted-argument
-    /// defaults (quote set and produced-object identifiers fall back to `id`).
+    /// Rust `CalibrationStep::from_wire_fields` owns the omitted-field
+    /// defaults (quote set and produced-object identifiers fall back to `id`)
+    /// and the strict deserialization.
     fn build(
-        py: Python<'_>,
         kind: &str,
         id: &str,
+        params: &Bound<'_, PyAny>,
         quote_set: Option<String>,
-        mut fields: Map<String, Value>,
-        params: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
-        merge_kwargs(py, &mut fields, params, kind)?;
+        let fields: Map<String, Value> =
+            spec_from_py(params.py(), params, &format!("{kind} step params"))?;
         let step = CalibrationStep::from_wire_fields(kind, id, quote_set.as_deref(), fields)
             .map_err(core_to_py)?;
         Ok(Self::from_inner(step))
     }
 }
 
-/// Insert `key: value` pairs into a wire map.
-fn fields(pairs: Vec<(&str, Value)>) -> Map<String, Value> {
-    pairs.into_iter().map(|(k, v)| (k.to_string(), v)).collect()
-}
-
 #[pymethods]
 impl PyCalibrationStep {
     #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationStep.discount")]
     #[staticmethod]
-    #[pyo3(signature = (id, currency, base_date, quote_set = None, curve_id = None, **params))]
-    #[pyo3(text_signature = "(id, currency, base_date, quote_set=None, curve_id=None, **params)")]
-    #[allow(clippy::too_many_arguments)]
-    fn discount(
-        py: Python<'_>,
-        id: &str,
-        currency: &Bound<'_, PyAny>,
-        base_date: &Bound<'_, PyAny>,
-        quote_set: Option<String>,
-        curve_id: Option<String>,
-        params: Option<&Bound<'_, PyDict>>,
-    ) -> PyResult<Self> {
-        let f = fields(vec![
-            ("curve_id", curve_id.map_or(Value::Null, Value::String)),
-            (
-                "currency",
-                Value::String(extract_currency(currency)?.to_string()),
-            ),
-            ("base_date", Value::String(extract_date_iso(base_date)?)),
-        ]);
-        Self::build(py, "discount", id, quote_set, f, params)
+    #[pyo3(signature = (id, params, quote_set = None))]
+    #[pyo3(text_signature = "(id, params, quote_set=None)")]
+    fn discount(id: &str, params: &Bound<'_, PyAny>, quote_set: Option<String>) -> PyResult<Self> {
+        Self::build("discount", id, params, quote_set)
     }
 
     #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationStep.forward")]
     #[staticmethod]
-    #[pyo3(signature = (id, currency, base_date, tenor_years, discount_curve_id, quote_set = None, curve_id = None, **params))]
-    #[pyo3(
-        text_signature = "(id, currency, base_date, tenor_years, discount_curve_id, quote_set=None, curve_id=None, **params)"
-    )]
-    #[allow(clippy::too_many_arguments)]
-    fn forward(
-        py: Python<'_>,
-        id: &str,
-        currency: &Bound<'_, PyAny>,
-        base_date: &Bound<'_, PyAny>,
-        tenor_years: f64,
-        discount_curve_id: &str,
-        quote_set: Option<String>,
-        curve_id: Option<String>,
-        params: Option<&Bound<'_, PyDict>>,
-    ) -> PyResult<Self> {
-        let f = fields(vec![
-            ("curve_id", curve_id.map_or(Value::Null, Value::String)),
-            (
-                "currency",
-                Value::String(extract_currency(currency)?.to_string()),
-            ),
-            ("base_date", Value::String(extract_date_iso(base_date)?)),
-            ("tenor_years", Value::from(tenor_years)),
-            ("discount_curve_id", Value::String(discount_curve_id.into())),
-        ]);
-        Self::build(py, "forward", id, quote_set, f, params)
+    #[pyo3(signature = (id, params, quote_set = None))]
+    #[pyo3(text_signature = "(id, params, quote_set=None)")]
+    fn forward(id: &str, params: &Bound<'_, PyAny>, quote_set: Option<String>) -> PyResult<Self> {
+        Self::build("forward", id, params, quote_set)
     }
 
     #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationStep.hazard")]
     #[staticmethod]
-    #[pyo3(signature = (id, entity, currency, base_date, discount_curve_id, recovery_rate, seniority = None, quote_set = None, curve_id = None, **params))]
-    #[pyo3(
-        text_signature = "(id, entity, currency, base_date, discount_curve_id, recovery_rate, seniority=None, quote_set=None, curve_id=None, **params)"
-    )]
-    #[allow(clippy::too_many_arguments)]
-    fn hazard(
-        py: Python<'_>,
-        id: &str,
-        entity: &str,
-        currency: &Bound<'_, PyAny>,
-        base_date: &Bound<'_, PyAny>,
-        discount_curve_id: &str,
-        recovery_rate: f64,
-        seniority: Option<&str>,
-        quote_set: Option<String>,
-        curve_id: Option<String>,
-        params: Option<&Bound<'_, PyDict>>,
-    ) -> PyResult<Self> {
-        let f = fields(vec![
-            ("curve_id", curve_id.map_or(Value::Null, Value::String)),
-            ("entity", Value::String(entity.into())),
-            ("seniority", seniority.map_or(Value::Null, Value::from)),
-            (
-                "currency",
-                Value::String(extract_currency(currency)?.to_string()),
-            ),
-            ("base_date", Value::String(extract_date_iso(base_date)?)),
-            ("discount_curve_id", Value::String(discount_curve_id.into())),
-            ("recovery_rate", Value::from(recovery_rate)),
-        ]);
-        Self::build(py, "hazard", id, quote_set, f, params)
+    #[pyo3(signature = (id, params, quote_set = None))]
+    #[pyo3(text_signature = "(id, params, quote_set=None)")]
+    fn hazard(id: &str, params: &Bound<'_, PyAny>, quote_set: Option<String>) -> PyResult<Self> {
+        Self::build("hazard", id, params, quote_set)
     }
 
     #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationStep.inflation")]
     #[staticmethod]
-    #[pyo3(signature = (id, currency, base_date, discount_curve_id, index, observation_lag, base_cpi, quote_set = None, curve_id = None, **params))]
-    #[pyo3(
-        text_signature = "(id, currency, base_date, discount_curve_id, index, observation_lag, base_cpi, quote_set=None, curve_id=None, **params)"
-    )]
-    #[allow(clippy::too_many_arguments)]
-    fn inflation(
-        py: Python<'_>,
-        id: &str,
-        currency: &Bound<'_, PyAny>,
-        base_date: &Bound<'_, PyAny>,
-        discount_curve_id: &str,
-        index: &str,
-        observation_lag: &str,
-        base_cpi: f64,
-        quote_set: Option<String>,
-        curve_id: Option<String>,
-        params: Option<&Bound<'_, PyDict>>,
-    ) -> PyResult<Self> {
-        let f = fields(vec![
-            ("curve_id", curve_id.map_or(Value::Null, Value::String)),
-            (
-                "currency",
-                Value::String(extract_currency(currency)?.to_string()),
-            ),
-            ("base_date", Value::String(extract_date_iso(base_date)?)),
-            ("discount_curve_id", Value::String(discount_curve_id.into())),
-            ("index", Value::String(index.into())),
-            ("observation_lag", Value::String(observation_lag.into())),
-            ("base_cpi", Value::from(base_cpi)),
-        ]);
-        Self::build(py, "inflation", id, quote_set, f, params)
+    #[pyo3(signature = (id, params, quote_set = None))]
+    #[pyo3(text_signature = "(id, params, quote_set=None)")]
+    fn inflation(id: &str, params: &Bound<'_, PyAny>, quote_set: Option<String>) -> PyResult<Self> {
+        Self::build("inflation", id, params, quote_set)
     }
 
-    /// Equity/FX volatility-surface (SABR) step from option vol quotes.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Step identifier (default quote-set name and surface id).
-    /// base_date : datetime.date | str
-    ///     Surface base date.
-    /// underlying_ticker : str
-    ///     Underlying identifier the quotes reference.
-    /// quote_set
-    ///     As in ``discount``.
-    /// vol_surface_id : str | None, default None
-    ///     Identifier of the produced surface; defaults to ``id``.
-    /// **params
-    ///     Optional wire fields: ``discount_curve_id``, ``beta``,
-    ///     ``target_expiries``, ``target_strikes``, ``spot_override``,
-    ///     ``dividend_yield_override``, ``expiry_extrapolation``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a field is unknown or has the wrong shape.
+    #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationStep.vol_surface")]
     #[staticmethod]
-    #[pyo3(signature = (id, base_date, underlying_ticker, quote_set = None, vol_surface_id = None, **params))]
-    #[pyo3(
-        text_signature = "(id, base_date, underlying_ticker,  quote_set=None, vol_surface_id=None, **params)"
-    )]
-    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (id, params, quote_set = None))]
+    #[pyo3(text_signature = "(id, params, quote_set=None)")]
     fn vol_surface(
-        py: Python<'_>,
         id: &str,
-        base_date: &Bound<'_, PyAny>,
-        underlying_ticker: &str,
+        params: &Bound<'_, PyAny>,
         quote_set: Option<String>,
-        vol_surface_id: Option<String>,
-        params: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
-        let f = fields(vec![
-            (
-                "vol_surface_id",
-                vol_surface_id.map_or(Value::Null, Value::String),
-            ),
-            ("base_date", Value::String(extract_date_iso(base_date)?)),
-            ("underlying_ticker", Value::String(underlying_ticker.into())),
-        ]);
-        Self::build(py, "vol_surface", id, quote_set, f, params)
+        Self::build("vol_surface", id, params, quote_set)
     }
 
     #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationStep.swaption_vol")]
     #[staticmethod]
-    #[pyo3(signature = (id, base_date, discount_curve_id, currency, quote_set = None, vol_surface_id = None, **params))]
-    #[pyo3(
-        text_signature = "(id, base_date, discount_curve_id, currency, quote_set=None, vol_surface_id=None, **params)"
-    )]
-    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (id, params, quote_set = None))]
+    #[pyo3(text_signature = "(id, params, quote_set=None)")]
     fn swaption_vol(
-        py: Python<'_>,
         id: &str,
-        base_date: &Bound<'_, PyAny>,
-        discount_curve_id: &str,
-        currency: &Bound<'_, PyAny>,
+        params: &Bound<'_, PyAny>,
         quote_set: Option<String>,
-        vol_surface_id: Option<String>,
-        params: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
-        let f = fields(vec![
-            (
-                "vol_surface_id",
-                vol_surface_id.map_or(Value::Null, Value::String),
-            ),
-            ("base_date", Value::String(extract_date_iso(base_date)?)),
-            ("discount_curve_id", Value::String(discount_curve_id.into())),
-            (
-                "currency",
-                Value::String(extract_currency(currency)?.to_string()),
-            ),
-        ]);
-        Self::build(py, "swaption_vol", id, quote_set, f, params)
+        Self::build("swaption_vol", id, params, quote_set)
     }
 
     #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationStep.base_correlation")]
     #[staticmethod]
-    #[pyo3(signature = (id, index_id, series, maturity_years, base_date, discount_curve_id, currency, quote_set = None, **params))]
-    #[pyo3(
-        text_signature = "(id, index_id, series, maturity_years, base_date, discount_curve_id, currency, quote_set=None, **params)"
-    )]
-    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (id, params, quote_set = None))]
+    #[pyo3(text_signature = "(id, params, quote_set=None)")]
     fn base_correlation(
-        py: Python<'_>,
         id: &str,
-        index_id: &str,
-        series: u16,
-        maturity_years: f64,
-        base_date: &Bound<'_, PyAny>,
-        discount_curve_id: &str,
-        currency: &Bound<'_, PyAny>,
+        params: &Bound<'_, PyAny>,
         quote_set: Option<String>,
-        params: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
-        let f = fields(vec![
-            ("index_id", Value::String(index_id.into())),
-            ("series", Value::from(series)),
-            ("maturity_years", Value::from(maturity_years)),
-            ("base_date", Value::String(extract_date_iso(base_date)?)),
-            ("discount_curve_id", Value::String(discount_curve_id.into())),
-            (
-                "currency",
-                Value::String(extract_currency(currency)?.to_string()),
-            ),
-        ]);
-        Self::build(py, "base_correlation", id, quote_set, f, params)
+        Self::build("base_correlation", id, params, quote_set)
     }
 
-    /// Student-t copula degrees-of-freedom step for one tranche.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Step identifier (default quote-set name).
-    /// tranche_instrument_id : str
-    ///     Tranche instrument whose ``"{id}_STUDENT_T_DF"`` scalar is written.
-    /// base_correlation_curve_id : str
-    ///     Base-correlation curve the tranche is priced on.
-    /// quote_set
-    ///     As in ``discount``.
-    /// **params
-    ///     Optional wire fields: ``discount_curve_id``, ``initial_df``,
-    ///     ``df_bounds``, ``correlation``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a field is unknown or has the wrong shape.
+    #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationStep.student_t")]
     #[staticmethod]
-    #[pyo3(signature = (id, tranche_instrument_id, base_correlation_curve_id, quote_set = None, **params))]
-    #[pyo3(
-        text_signature = "(id, tranche_instrument_id, base_correlation_curve_id, quote_set=None, **params)"
-    )]
-    fn student_t(
-        py: Python<'_>,
-        id: &str,
-        tranche_instrument_id: &str,
-        base_correlation_curve_id: &str,
-        quote_set: Option<String>,
-        params: Option<&Bound<'_, PyDict>>,
-    ) -> PyResult<Self> {
-        let f = fields(vec![
-            (
-                "tranche_instrument_id",
-                Value::String(tranche_instrument_id.into()),
-            ),
-            (
-                "base_correlation_curve_id",
-                Value::String(base_correlation_curve_id.into()),
-            ),
-        ]);
-        Self::build(py, "student_t", id, quote_set, f, params)
+    #[pyo3(signature = (id, params, quote_set = None))]
+    #[pyo3(text_signature = "(id, params, quote_set=None)")]
+    fn student_t(id: &str, params: &Bound<'_, PyAny>, quote_set: Option<String>) -> PyResult<Self> {
+        Self::build("student_t", id, params, quote_set)
     }
 
     #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationStep.hull_white")]
     #[staticmethod]
-    #[pyo3(signature = (id, curve_id, currency, base_date, quote_set = None, **params))]
-    #[pyo3(text_signature = "(id, curve_id, currency, base_date, quote_set=None, **params)")]
-    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (id, params, quote_set = None))]
+    #[pyo3(text_signature = "(id, params, quote_set=None)")]
     fn hull_white(
-        py: Python<'_>,
         id: &str,
-        curve_id: &str,
-        currency: &Bound<'_, PyAny>,
-        base_date: &Bound<'_, PyAny>,
+        params: &Bound<'_, PyAny>,
         quote_set: Option<String>,
-        params: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
-        let f = fields(vec![
-            ("curve_id", Value::String(curve_id.into())),
-            (
-                "currency",
-                Value::String(extract_currency(currency)?.to_string()),
-            ),
-            ("base_date", Value::String(extract_date_iso(base_date)?)),
-        ]);
-        Self::build(py, "hull_white", id, quote_set, f, params)
+        Self::build("hull_white", id, params, quote_set)
     }
 
     #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationStep.cap_floor_hull_white")]
     #[staticmethod]
-    #[pyo3(signature = (id, discount_curve_id, forward_curve_id, index_id, currency, base_date, quote_set = None, **params))]
-    #[pyo3(
-        text_signature = "(id, discount_curve_id, forward_curve_id, index_id, currency, base_date, quote_set=None, **params)"
-    )]
-    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (id, params, quote_set = None))]
+    #[pyo3(text_signature = "(id, params, quote_set=None)")]
     fn cap_floor_hull_white(
-        py: Python<'_>,
         id: &str,
-        discount_curve_id: &str,
-        forward_curve_id: &str,
-        index_id: &str,
-        currency: &Bound<'_, PyAny>,
-        base_date: &Bound<'_, PyAny>,
+        params: &Bound<'_, PyAny>,
         quote_set: Option<String>,
-        params: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
-        let f = fields(vec![
-            ("discount_curve_id", Value::String(discount_curve_id.into())),
-            ("forward_curve_id", Value::String(forward_curve_id.into())),
-            ("index_id", Value::String(index_id.into())),
-            (
-                "currency",
-                Value::String(extract_currency(currency)?.to_string()),
-            ),
-            ("base_date", Value::String(extract_date_iso(base_date)?)),
-        ]);
-        Self::build(py, "cap_floor_hull_white", id, quote_set, f, params)
+        Self::build("cap_floor_hull_white", id, params, quote_set)
     }
 
-    /// SVI volatility-surface step from option vol quotes.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Step identifier (default quote-set name and surface id).
-    /// base_date : datetime.date | str
-    ///     Surface base date.
-    /// underlying_ticker : str
-    ///     Underlying identifier the quotes reference.
-    /// quote_set, vol_surface_id
-    ///     As in ``vol_surface``.
-    /// **params
-    ///     Optional wire fields: ``discount_curve_id``, ``target_expiries``,
-    ///     ``target_strikes``, ``spot_override``, ``dividend_yield_override``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a field is unknown or has the wrong shape.
+    #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationStep.svi_surface")]
     #[staticmethod]
-    #[pyo3(signature = (id, base_date, underlying_ticker, quote_set = None, vol_surface_id = None, **params))]
-    #[pyo3(
-        text_signature = "(id, base_date, underlying_ticker, quote_set=None, vol_surface_id=None, **params)"
-    )]
-    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (id, params, quote_set = None))]
+    #[pyo3(text_signature = "(id, params, quote_set=None)")]
     fn svi_surface(
-        py: Python<'_>,
         id: &str,
-        base_date: &Bound<'_, PyAny>,
-        underlying_ticker: &str,
+        params: &Bound<'_, PyAny>,
         quote_set: Option<String>,
-        vol_surface_id: Option<String>,
-        params: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
-        let f = fields(vec![
-            (
-                "vol_surface_id",
-                vol_surface_id.map_or(Value::Null, Value::String),
-            ),
-            ("base_date", Value::String(extract_date_iso(base_date)?)),
-            ("underlying_ticker", Value::String(underlying_ticker.into())),
-        ]);
-        Self::build(py, "svi_surface", id, quote_set, f, params)
+        Self::build("svi_surface", id, params, quote_set)
     }
 
     #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationStep.xccy_basis")]
     #[staticmethod]
-    #[pyo3(signature = (id, currency, base_date, fx_spot, domestic_discount_id, quote_set = None, curve_id = None, **params))]
-    #[pyo3(
-        text_signature = "(id, currency, base_date, fx_spot, domestic_discount_id, quote_set=None, curve_id=None, **params)"
-    )]
-    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (id, params, quote_set = None))]
+    #[pyo3(text_signature = "(id, params, quote_set=None)")]
     fn xccy_basis(
-        py: Python<'_>,
         id: &str,
-        currency: &Bound<'_, PyAny>,
-        base_date: &Bound<'_, PyAny>,
-        fx_spot: f64,
-        domestic_discount_id: &str,
+        params: &Bound<'_, PyAny>,
         quote_set: Option<String>,
-        curve_id: Option<String>,
-        params: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
-        let f = fields(vec![
-            ("curve_id", curve_id.map_or(Value::Null, Value::String)),
-            (
-                "currency",
-                Value::String(extract_currency(currency)?.to_string()),
-            ),
-            ("base_date", Value::String(extract_date_iso(base_date)?)),
-            ("fx_spot", Value::from(fx_spot)),
-            (
-                "domestic_discount_id",
-                Value::String(domestic_discount_id.into()),
-            ),
-        ]);
-        Self::build(py, "xccy_basis", id, quote_set, f, params)
+        Self::build("xccy_basis", id, params, quote_set)
     }
 
-    /// Parametric (Nelson-Siegel / Svensson) curve fit step.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Step identifier (default quote-set name and curve id).
-    /// base_date : datetime.date | str
-    ///     Curve base date.
-    /// model : str, optional
-    ///     Parametric family (``"ns"`` Nelson-Siegel or ``"nss"`` Svensson).
-    ///     ``None`` uses the Rust authoring default
-    ///     ``CalibrationStep::DEFAULT_PARAMETRIC_MODEL`` (``"ns"``).
-    /// quote_set, curve_id
-    ///     As in ``discount``.
-    /// **params
-    ///     Optional wire field: ``initial_params``. Only single-curve discount
-    ///     fitting is supported. Acceptance uses the configured
-    ///     discount-curve validation tolerance without a least-squares floor.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a field is unknown or has the wrong shape.
+    #[doc = pydoc!("finstack_quant.calibration._envelope", "CalibrationStep.parametric")]
     #[staticmethod]
-    #[pyo3(signature = (id, base_date, model = None, quote_set = None, curve_id = None, **params))]
-    #[pyo3(text_signature = "(id, base_date, model=None, quote_set=None, curve_id=None, **params)")]
-    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (id, params, quote_set = None))]
+    #[pyo3(text_signature = "(id, params, quote_set=None)")]
     fn parametric(
-        py: Python<'_>,
         id: &str,
-        base_date: &Bound<'_, PyAny>,
-        model: Option<&str>,
+        params: &Bound<'_, PyAny>,
         quote_set: Option<String>,
-        curve_id: Option<String>,
-        params: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
-        let f = fields(vec![
-            ("curve_id", curve_id.map_or(Value::Null, Value::String)),
-            ("base_date", Value::String(extract_date_iso(base_date)?)),
-            ("model", model.map_or(Value::Null, Value::from)),
-        ]);
-        Self::build(py, "parametric", id, quote_set, f, params)
+        Self::build("parametric", id, params, quote_set)
     }
 
     /// Step identifier.
@@ -654,7 +295,7 @@ wire_methods!(PyCalibrationStep, CalibrationStep, "CalibrationStep");
 /// ...     RateQuote.deposit("USD-DEP-3M", "USD-SOFR-OIS", "3M", 0.052),
 /// ...     RateQuote.swap("USD-SWAP-2Y", "USD-SOFR-OIS", "2Y", 0.049),
 /// ... ]
-/// >>> plan = CalibrationPlan([CalibrationStep.discount("USD-OIS", "USD", "2026-05-08")], quote_sets={"USD-OIS": [q.id for q in quotes]})
+/// >>> plan = CalibrationPlan([CalibrationStep.discount("USD-OIS", {"currency": "USD", "base_date": "2026-05-08"})], quote_sets={"USD-OIS": [q.id for q in quotes]})
 /// >>> plan.quote_sets
 /// {'USD-OIS': ['USD-DEP-3M', 'USD-SWAP-2Y']}
 /// >>> calibrate(CalibrationEnvelope(plan, market_data=quotes)).success

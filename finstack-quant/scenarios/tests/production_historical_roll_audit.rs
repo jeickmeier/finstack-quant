@@ -223,15 +223,17 @@ fn production_time_roll_materializes_raw_index_fixings_before_curve_roll() {
     let origin = date!(2025 - 01 - 02);
     let reset = date!(2025 - 01 - 03);
     let mut bond = Bond::floating(
-        "ROLL-FRN",
-        Money::from((1_000_000_i64, Currency::USD)),
-        "USD-SOFR-3M",
-        150,
-        reset,
-        date!(2026 - 01 - 03),
-        Tenor::quarterly(),
-        DayCount::Act360,
-        "USD-OIS",
+        finstack_quant_valuations::instruments::fixed_income::bond::FloatingBondParams {
+            id: "ROLL-FRN".into(),
+            notional: Money::from((1_000_000_i64, Currency::USD)),
+            forward_curve_id: "USD-SOFR-3M".into(),
+            spread_bp: 150.into(),
+            issue_date: reset,
+            maturity: date!(2026 - 01 - 03),
+            frequency: Tenor::quarterly(),
+            day_count: DayCount::Act360,
+            discount_curve_id: "USD-OIS".into(),
+        },
     )
     .expect("floating bond");
     if let CashflowSpec::Floating(spec) = &mut bond.cashflow_spec {

@@ -162,9 +162,7 @@ class RevolvingCredit:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
-        market_history: MarketHistory | dict[str, Any] | str | None = None,
-        explain: bool = False,
+        extras: dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this facility and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -184,14 +182,19 @@ class RevolvingCredit:
         metrics : list[str], optional
             Metric identifiers to compute (for example ``"dv01"`` or
             ``"draw_option_cost"``).
-        metric_pricing_overrides : MetricPricingOverrides | dict[str, Any] | str, optional
-            Metric-time overrides merged into
-            ``instrument.spec.metric_pricing_overrides`` before pricing.
-        market_history : MarketHistory | dict[str, Any] | str, optional
-            ``MarketHistory`` scenarios required by ``hvar`` /
-            ``expected_shortfall``.
-        explain : bool, default False
-            When ``True``, attach a step trace as ``result.explanation``.
+        extras : dict[str, Any] or str, optional
+            The rarer pricing inputs, as a dict or JSON text in the shape of the
+            Rust ``PriceExtras``; every key is optional and an unknown key raises
+            ``ValueError``. ``metric_pricing_overrides`` (a ``MetricPricingOverrides``
+            or dict) is merged into ``instrument.spec.metric_pricing_overrides``
+            before pricing (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``):
+            only the keys present replace stored controls, ``bump_config`` keys
+            merge into the stored bump configuration and an explicit ``None``
+            clears a control; omitted keeps the instrument's overrides. ``market_history`` (a ``MarketHistory`` or dict)
+            holds the historical scenarios ``hvar`` and ``expected_shortfall``
+            require; omitted prices without history. ``explain`` (bool, default
+            ``False``) attaches a step trace as ``result.explanation`` when
+            ``True``. ``None`` (the default) means no extras.
 
         Returns
         -------
@@ -734,8 +737,8 @@ class RevolvingCredit:
         dict[str, object]
             Bump sizes, theta period and the other metric settings stored on
             the instrument; unset fields are ``None`` or omitted. A
-            ``metric_pricing_overrides`` argument to ``price`` is merged over it
-            per call.
+            ``price(..., extras={"metric_pricing_overrides": ...})`` patch is
+            merged over it per call.
 
         Notes
         -----
@@ -867,16 +870,14 @@ class RevolvingCreditBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def commitment(self, value: Money | float, currency: str | None = None) -> RevolvingCreditBuilder:
+    def commitment(self, value: Money) -> RevolvingCreditBuilder:
         """
         Set the total commitment.
 
         Parameters
         ----------
-        value : Money | float
-            Commitment; a bare number needs ``currency``.
-        currency : str, optional
-            ISO-4217 code applied when ``value`` is a bare number.
+        value : Money
+            Total commitment, in the facility currency.
 
         Returns
         -------
@@ -886,22 +887,19 @@ class RevolvingCreditBuilder:
         Raises
         ------
         ValueError
-            If the amount is not finite, a bare number has no currency, or the
-            builder was already consumed.
+            If the builder was already consumed.
         TypeError
-            If ``value`` is neither ``Money`` nor a number.
+            If ``value`` is not a ``finstack_quant.core.money.Money``.
         """
         ...
-    def drawn(self, value: Money | float, currency: str | None = None) -> RevolvingCreditBuilder:
+    def drawn(self, value: Money) -> RevolvingCreditBuilder:
         """
         Set the drawn balance at the simulation anchor, the later of the commitment date and the valuation date, in both modes. Deterministic draw/repay events must be dated after that anchor.
 
         Parameters
         ----------
-        value : Money | float
-            Drawn balance; a bare number needs ``currency``.
-        currency : str, optional
-            ISO-4217 code applied when ``value`` is a bare number.
+        value : Money
+            Drawn balance, in the facility currency.
 
         Returns
         -------
@@ -911,10 +909,9 @@ class RevolvingCreditBuilder:
         Raises
         ------
         ValueError
-            If the amount is not finite, a bare number has no currency, or the
-            builder was already consumed.
+            If the builder was already consumed.
         TypeError
-            If ``value`` is neither ``Money`` nor a number.
+            If ``value`` is not a ``finstack_quant.core.money.Money``.
         """
         ...
     def issue_date(self, value: datetime.date | datetime.datetime | pd.Timestamp | str) -> RevolvingCreditBuilder:

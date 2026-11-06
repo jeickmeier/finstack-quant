@@ -221,24 +221,28 @@ pub(crate) fn price_bond_lsmc(
     };
     let terms = ReplayTerms::new(&template, tree, bond, config)?;
     let make_whole_policies = fit_make_whole_policies(
-        tree,
+        TrainingRun {
+            tree,
+            bond,
+            config,
+            seed: make_whole_seed,
+            terms: &terms,
+        },
         &template,
-        bond,
-        config,
-        make_whole_seed,
         make_whole_training_simulated_paths,
-        &terms,
     )?;
     let policies = if needs_training {
         fit_policies(
-            tree,
+            TrainingRun {
+                tree,
+                bond,
+                config,
+                seed: train_seed,
+                terms: &terms,
+            },
             &template,
-            bond,
-            config,
-            train_seed,
             training_simulated_paths,
             &make_whole_policies,
-            &terms,
         )?
     } else {
         vec![None; template.decision_steps.len()]
@@ -381,17 +385,31 @@ fn training_boundaries(template: &ReplayTemplate, simulated_paths: usize) -> Res
     Ok(boundaries)
 }
 
-#[allow(clippy::too_many_arguments)]
-fn build_training_checkpoints(
-    tree: &RatesCreditTree,
-    template: &ReplayTemplate,
-    bond: &Bond,
-    config: &BondLsmcConfig,
+/// Inputs shared by every training replay of one regression fit: the factor
+/// tree, the bond and its LSMC config, the fit's path-stream seed and the
+/// replay terms.
+#[derive(Clone, Copy)]
+struct TrainingRun<'a> {
+    tree: &'a RatesCreditTree,
+    bond: &'a Bond,
+    config: &'a BondLsmcConfig,
     seed: u64,
+    terms: &'a ReplayTerms,
+}
+
+fn build_training_checkpoints(
+    run: TrainingRun<'_>,
+    template: &ReplayTemplate,
     simulated_paths: usize,
     boundaries: &[usize],
-    terms: &ReplayTerms,
 ) -> Result<Vec<Vec<TrainingCheckpoint>>> {
+    let TrainingRun {
+        tree,
+        bond,
+        config,
+        seed,
+        terms,
+    } = run;
     let origin = || -> Result<TrainingCheckpoint> {
         Ok(TrainingCheckpoint {
             factor: RatesCreditPathCheckpoint {

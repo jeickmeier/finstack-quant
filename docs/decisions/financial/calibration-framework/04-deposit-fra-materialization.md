@@ -27,8 +27,8 @@ Convention data, builders and pricing kernels are external dependencies of this 
 - Implementation: [build/helpers.rs](../../../../finstack-quant/calibration/src/build/helpers.rs) — business-day spot calculation.
 - Implementation: [build/rates.rs](../../../../finstack-quant/calibration/src/build/rates.rs) — deposit/FRA dates and instrument orientation.
 - Implementation: [build/prepared.rs](../../../../finstack-quant/calibration/src/build/prepared.rs) — cached pillar year fraction and deposit raw NPV override.
-- Test evidence: [src/build/tests_rates.rs](../../../../finstack-quant/calibration/src/build/tests_rates.rs) — deposit/FRA fields and EUR/USD construction assertions; inspected or located, not executed.
-- Test evidence: [src/build/tests_quote_construction.rs](../../../../finstack-quant/calibration/src/build/tests_quote_construction.rs) — quote-family construction smoke evidence; inspected or located, not executed.
+- Test evidence: [src/build/tests/rates.rs](../../../../finstack-quant/calibration/src/build/tests/rates.rs) — deposit/FRA fields and EUR/USD construction assertions; inspected or located, not executed.
+- Test evidence: [src/build/tests/quote_construction.rs](../../../../finstack-quant/calibration/src/build/tests/quote_construction.rs) — quote-family construction smoke evidence; inspected or located, not executed.
 - Test evidence: [src/build/prepared.rs](../../../../finstack-quant/calibration/src/build/prepared.rs) — deposit calibration-value convention regression; inspected or located, not executed.
 - Reference context: [ISDA 2021 definitions](../../../REFERENCES.md#isda-2021-definitions) — convention context; no mapping of every registry entry to a versioned source is established; a catalogue entry is not proof of implementation equivalence.
 

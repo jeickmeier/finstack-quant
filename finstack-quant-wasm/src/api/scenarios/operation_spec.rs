@@ -42,20 +42,21 @@ fn operation(value: &JsValue) -> Result<OperationSpec, JsValue> {
 }
 
 /// Expand a parallel shift into one operation per curve identifier.
-/// @param curve_kind - Canonical discount, forward, par_cds, inflation or commodity family label.
-/// @param curve_ids - Ordered array of curve identifiers; empty input returns an empty array.
+/// @param curveKind - Canonical discount, forward, par_cds, inflation or commodity family label.
+/// @param curveIds - Ordered array of curve identifiers; empty input returns an empty array.
 /// @param bp - Additive basis points; percent of forward for commodity curves.
-/// @param discount_curve_id - Optional ParCDS discount curve copied onto every operation.
+/// @param discountCurveId - Optional ParCDS discount curve copied onto every operation.
 /// @returns An array of operations preserving identifier order.
 ///
 /// # Errors
 ///
 /// Throws TypeError for malformed identifiers or non-numeric bp, and a validation error for an unknown curve family.
-#[wasm_bindgen(js_name = parallelBpMany)]
+#[wasm_bindgen(js_name = parallelBpMany, unchecked_return_type = "OperationSpec[]")]
 pub fn parallel_bp_many(
-    curve_kind: JsValue,
-    curve_ids: JsValue,
-    bp: JsValue,
+    #[wasm_bindgen(js_name = "curveKind", unchecked_param_type = "CurveKind")] curve_kind: JsValue,
+    #[wasm_bindgen(js_name = "curveIds", unchecked_param_type = "string[]")] curve_ids: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] bp: JsValue,
+    #[wasm_bindgen(js_name = "discountCurveId", unchecked_optional_param_type = "string")]
     discount_curve_id: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let ids = js_string_seq(&curve_ids, "curveIds")?;
@@ -72,19 +73,20 @@ pub fn parallel_bp_many(
 /// Free-function twin of Python `OperationSpec.time_roll_forward` (Rust
 /// `OperationSpec::time_roll_forward`).
 /// @param period - Tenor-style roll period such as `"1D"`, `"1W"`, `"1M"` or `"1Y"`; parsed when the operation is validated.
-/// @param apply_shocks - Whether the remaining operations run after the roll; omit for the Rust default, `true`.
-/// @param roll_mode - Optional roll semantics label: `"business_days"`, `"calendar_days"` or `"approximate"`; omit for the Rust default, `"business_days"`.
+/// @param applyShocks - Whether the remaining operations run after the roll; omit for the Rust default, `true`.
+/// @param rollMode - Optional roll semantics label: `"business_days"`, `"calendar_days"` or `"approximate"`; omit for the Rust default, `"business_days"`.
 /// @returns The `time_roll_forward` operation object.
 ///
 /// # Errors
 ///
 /// Throws a `TypeError` for wrongly typed arguments and a `validation` error
 /// for an unknown `rollMode` label.
-#[wasm_bindgen(js_name = operationSpecTimeRollForward)]
+#[wasm_bindgen(js_name = operationSpecTimeRollForward, unchecked_return_type = "OperationSpec")]
 pub fn operation_spec_time_roll_forward(
-    period: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] period: JsValue,
+    #[wasm_bindgen(js_name = "applyShocks", unchecked_optional_param_type = "boolean")]
     apply_shocks: Option<JsValue>,
-    roll_mode: Option<JsValue>,
+    #[wasm_bindgen(js_name = "rollMode", unchecked_optional_param_type = "TimeRollMode")] roll_mode: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let period = js_string(&period, "period")?;
     let apply_shocks = js_opt_bool(apply_shocks.as_ref(), "applyShocks")?;
@@ -110,7 +112,9 @@ pub fn operation_spec_time_roll_forward(
 /// the variant's rules (blank identifier, non-finite number, FX `pct <= -100`,
 /// unparseable tenor).
 #[wasm_bindgen(js_name = operationSpecValidate)]
-pub fn operation_spec_validate(operation: JsValue) -> Result<(), JsValue> {
+pub fn operation_spec_validate(
+    #[wasm_bindgen(unchecked_param_type = "OperationSpec | string")] operation: JsValue,
+) -> Result<(), JsValue> {
     self::operation(&operation)?.validate().map_err(to_js_err)
 }
 
@@ -126,7 +130,9 @@ pub fn operation_spec_validate(operation: JsValue) -> Result<(), JsValue> {
 /// Throws a `TypeError` when `operation` is not an object or JSON string, and
 /// a `validation` error when it matches no `OperationSpec` variant.
 #[wasm_bindgen(js_name = operationSpecRequiresInstruments)]
-pub fn operation_spec_requires_instruments(operation: JsValue) -> Result<bool, JsValue> {
+pub fn operation_spec_requires_instruments(
+    #[wasm_bindgen(unchecked_param_type = "OperationSpec | string")] operation: JsValue,
+) -> Result<bool, JsValue> {
     Ok(self::operation(&operation)?.requires_instruments())
 }
 
@@ -142,6 +148,8 @@ pub fn operation_spec_requires_instruments(operation: JsValue) -> Result<bool, J
 /// Throws a `TypeError` when `operation` is not an object or JSON string, and
 /// a `validation` error when it matches no `OperationSpec` variant.
 #[wasm_bindgen(js_name = operationSpecMutatesInstruments)]
-pub fn operation_spec_mutates_instruments(operation: JsValue) -> Result<bool, JsValue> {
+pub fn operation_spec_mutates_instruments(
+    #[wasm_bindgen(unchecked_param_type = "OperationSpec | string")] operation: JsValue,
+) -> Result<bool, JsValue> {
     Ok(self::operation(&operation)?.mutates_instruments())
 }

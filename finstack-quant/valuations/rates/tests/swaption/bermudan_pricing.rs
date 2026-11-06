@@ -48,17 +48,23 @@ fn test_bermudan_swaption(
     option_type: OptionType,
 ) -> BermudanSwaption {
     let mut swaption = BermudanSwaption::new(
-        "TEST-BERM",
-        OptionType::Call,
-        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
-        strike,
-        swap_start,
-        swap_end,
-        BermudanSchedule::co_terminal(first_exercise, swap_end, Tenor::semi_annual())
+        finstack_quant_valuations_rates::swaption::BermudanSwaptionParams {
+            id: "TEST-BERM".into(),
+            option_type: OptionType::Call,
+            notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+            strike,
+            underlying_start_date: swap_start,
+            underlying_maturity: swap_end,
+            exercise_schedule: BermudanSchedule::co_terminal(
+                first_exercise,
+                swap_end,
+                Tenor::semi_annual(),
+            )
             .expect("valid Bermudan schedule"),
-        "USD-OIS",
-        "USD-OIS",
-        "USD-VOL",
+            discount_curve_id: "USD-OIS".into(),
+            forward_curve_id: "USD-OIS".into(),
+            vol_surface_id: "USD-VOL".into(),
+        },
     )
     .expect("valid Bermudan swaption");
     swaption.option_type = option_type;

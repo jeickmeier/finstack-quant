@@ -1,21 +1,11 @@
 """Stub declarations mirroring ``finstack-quant-py/src/bindings/models/monte_carlo/greeks.rs``."""
 
 from __future__ import annotations
+from typing import Any
 from finstack_quant.models.monte_carlo._results import Estimate
 
 def finite_diff_delta(
-    spot: float,
-    strike: float,
-    rate: float,
-    div_yield: float,
-    vol: float,
-    expiry: float,
-    is_call: bool,
-    num_paths: int | None = None,
-    seed: int | None = None,
-    num_steps: int | None = None,
-    bump_size: float | None = None,
-    currency: str | None = None,
+    spec: dict[str, Any] | str,
 ) -> Estimate:
     """
     Finite-difference delta for a vanilla European option under GBM.
@@ -27,34 +17,21 @@ def finite_diff_delta(
 
     Parameters
     ----------
-    spot : float
-        Finite positive spot price. The down-bumped state must remain at least
-        ``1e-12``.
-    strike : float
-        Strike price.
-    rate : float
-        Risk-free rate (continuously compounded decimal).
-    div_yield : float
-        Dividend yield (continuously compounded decimal).
-    vol : float
-        Volatility (decimal); must be strictly positive.
-    expiry : float
-        Maturity in years.
-    is_call : bool
-        ``True`` for a call, ``False`` for a put.
-    num_paths : int, optional
-        Paths per evaluation (default ``10_000``).
-    seed : int, optional
-        RNG seed (default ``42``).
-    num_steps : int, optional
-        Time-grid steps (default ``50``).
-    bump_size : float, optional
-        Relative Monte Carlo spot shock (default ``0.01`` = 1% of spot), not
-        a closed-form local Greek step. The absolute bump is
-        ``max(abs(spot) * bump_size, 1e-8)`` and must leave a symmetric
-        central stencil above the spot floor.
-    currency : str, optional
-        ISO currency code. Defaults to USD.
+    spec : dict or str
+        Serde form of the Rust ``GbmEuropeanFdSpec``, as a dict or JSON text.
+        Required keys: ``spot`` (finite positive spot price; the down-bumped
+        state must remain at least ``1e-12``); ``strike`` (same units as
+        ``spot``); ``rate`` and ``dividend_yield`` (continuously compounded
+        decimals); ``volatility`` (annualized volatility, decimal, strictly
+        positive); ``time_to_expiry`` (years); ``option_type`` (``"call"`` or
+        ``"put"``). Optional keys, each defaulting to the registry value when
+        omitted or ``None``: ``num_paths`` (paths per evaluation, default
+        ``10_000``); ``seed`` (RNG seed, default ``42``); ``num_steps``
+        (time-grid steps, default ``50``); ``bump_size`` (relative Monte Carlo
+        spot shock, default ``0.01`` = 1% of spot, not a closed-form local
+        Greek step: the absolute bump is ``max(abs(spot) * bump_size, 1e-8)``
+        and must leave a symmetric central stencil above the spot floor);
+        ``currency`` (ISO currency code, default USD).
 
     Returns
     -------
@@ -65,32 +42,32 @@ def finite_diff_delta(
     Raises
     ------
     ValueError
-        If ``vol`` is not strictly positive, ``spot`` or ``bump_size`` is
+        If ``spec`` has an unknown or missing key or a wrongly typed value, or ``volatility`` is not strictly positive, ``spot`` or ``bump_size`` is
         non-finite or non-positive, the symmetric down-bump falls below
         ``1e-12``, or another pricing input is invalid.
 
     Examples
     --------
     >>> from finstack_quant.models.monte_carlo import finite_diff_delta
-    >>> est = finite_diff_delta(100, 100, 0.05, 0.0, 0.2, 1.0, True, num_paths=200, seed=7, num_steps=10)
+    >>> est = finite_diff_delta({
+    ...     "spot": 100,
+    ...     "strike": 100,
+    ...     "rate": 0.05,
+    ...     "dividend_yield": 0.0,
+    ...     "volatility": 0.2,
+    ...     "time_to_expiry": 1.0,
+    ...     "option_type": "call",
+    ...     "num_paths": 200,
+    ...     "seed": 7,
+    ...     "num_steps": 10,
+    ... })
     >>> 0 < est.mean < 1 and est.stderr >= 0
     True
     """
     ...
 
 def finite_diff_gamma(
-    spot: float,
-    strike: float,
-    rate: float,
-    div_yield: float,
-    vol: float,
-    expiry: float,
-    is_call: bool,
-    num_paths: int | None = None,
-    seed: int | None = None,
-    num_steps: int | None = None,
-    bump_size: float | None = None,
-    currency: str | None = None,
+    spec: dict[str, Any] | str,
 ) -> Estimate:
     """
     Finite-difference gamma for a vanilla European option under GBM.
@@ -101,34 +78,21 @@ def finite_diff_gamma(
 
     Parameters
     ----------
-    spot : float
-        Finite positive spot price. The down-bumped state must remain at least
-        ``1e-12``.
-    strike : float
-        Strike price.
-    rate : float
-        Risk-free rate (continuously compounded decimal).
-    div_yield : float
-        Dividend yield (continuously compounded decimal).
-    vol : float
-        Volatility (decimal); must be strictly positive.
-    expiry : float
-        Maturity in years.
-    is_call : bool
-        ``True`` for a call, ``False`` for a put.
-    num_paths : int, optional
-        Paths per evaluation (default ``10_000``).
-    seed : int, optional
-        RNG seed (default ``42``).
-    num_steps : int, optional
-        Time-grid steps (default ``50``).
-    bump_size : float, optional
-        Relative Monte Carlo spot shock (default ``0.01`` = 1% of spot), not
-        a closed-form local Greek step. The absolute bump is
-        ``max(abs(spot) * bump_size, 1e-8)`` and must leave a symmetric
-        central stencil above the spot floor.
-    currency : str, optional
-        ISO currency code. Defaults to USD.
+    spec : dict or str
+        Serde form of the Rust ``GbmEuropeanFdSpec``, as a dict or JSON text.
+        Required keys: ``spot`` (finite positive spot price; the down-bumped
+        state must remain at least ``1e-12``); ``strike`` (same units as
+        ``spot``); ``rate`` and ``dividend_yield`` (continuously compounded
+        decimals); ``volatility`` (annualized volatility, decimal, strictly
+        positive); ``time_to_expiry`` (years); ``option_type`` (``"call"`` or
+        ``"put"``). Optional keys, each defaulting to the registry value when
+        omitted or ``None``: ``num_paths`` (paths per evaluation, default
+        ``10_000``); ``seed`` (RNG seed, default ``42``); ``num_steps``
+        (time-grid steps, default ``50``); ``bump_size`` (relative Monte Carlo
+        spot shock, default ``0.01`` = 1% of spot, not a closed-form local
+        Greek step: the absolute bump is ``max(abs(spot) * bump_size, 1e-8)``
+        and must leave a symmetric central stencil above the spot floor);
+        ``currency`` (ISO currency code, default USD).
 
     Returns
     -------
@@ -139,14 +103,25 @@ def finite_diff_gamma(
     Raises
     ------
     ValueError
-        If ``vol`` is not strictly positive, ``spot`` or ``bump_size`` is
+        If ``spec`` has an unknown or missing key or a wrongly typed value, or ``volatility`` is not strictly positive, ``spot`` or ``bump_size`` is
         non-finite or non-positive, the symmetric down-bump falls below
         ``1e-12``, or another pricing input is invalid.
 
     Examples
     --------
     >>> from finstack_quant.models.monte_carlo import finite_diff_gamma
-    >>> est = finite_diff_gamma(100, 100, 0.05, 0.0, 0.2, 1.0, True, num_paths=200, seed=7, num_steps=10)
+    >>> est = finite_diff_gamma({
+    ...     "spot": 100,
+    ...     "strike": 100,
+    ...     "rate": 0.05,
+    ...     "dividend_yield": 0.0,
+    ...     "volatility": 0.2,
+    ...     "time_to_expiry": 1.0,
+    ...     "option_type": "call",
+    ...     "num_paths": 200,
+    ...     "seed": 7,
+    ...     "num_steps": 10,
+    ... })
     >>> est.mean > 0 and est.stderr >= 0
     True
     """

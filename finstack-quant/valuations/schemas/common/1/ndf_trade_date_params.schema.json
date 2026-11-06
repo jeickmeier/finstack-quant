@@ -1,0 +1,113 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/common/1/ndf_trade_date_params.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Trade-date, tenor, contract rate and fixing inputs of an NDF built from its trade date.",
+  "examples": [
+    {
+      "base_currency": "CNY",
+      "business_day_convention": "modified_following",
+      "contract_rate": 7.25,
+      "domestic_discount_curve_id": "USD-OIS",
+      "end_of_month": false,
+      "fixing_offset_days": 2,
+      "id": "USDCNY-NDF-3M",
+      "notional": {
+        "amount": "10000000",
+        "currency": "CNY"
+      },
+      "settlement_calendar_id": "usny",
+      "settlement_currency": "USD",
+      "settlement_days": 2,
+      "tenor": {
+        "count": 3,
+        "unit": "months"
+      },
+      "trade_date": "2025-01-15"
+    }
+  ],
+  "properties": {
+    "base_calendar_id": {
+      "description": "Base-currency holiday calendar id; `None` uses weekends only.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "base_currency": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+      "description": "Restricted (non-deliverable) currency: the numerator and notional currency."
+    },
+    "business_day_convention": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
+      "description": "Business-day convention rolling the maturity on the joint calendar."
+    },
+    "contract_rate": {
+      "description": "Contract forward rate, base currency per unit of settlement currency.",
+      "format": "double",
+      "type": "number"
+    },
+    "domestic_discount_curve_id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Settlement-currency discount curve identifier."
+    },
+    "end_of_month": {
+      "description": "Preserve month-end: a month-end spot date gives a month-end maturity.",
+      "type": "boolean"
+    },
+    "fixing_offset_days": {
+      "description": "Joint business days from fixing to maturity (typically 2); a negative\nvalue places the fixing after maturity's unadjusted date.",
+      "format": "int64",
+      "type": "integer"
+    },
+    "id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Unique instrument identifier."
+    },
+    "notional": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+      "description": "Notional in `base_currency`."
+    },
+    "settlement_calendar_id": {
+      "description": "Settlement-currency holiday calendar id; `None` uses weekends only.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "settlement_currency": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+      "description": "Convertible settlement currency (typically USD): the denominator."
+    },
+    "settlement_days": {
+      "description": "T+N spot lag in business days (typically 2).",
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "tenor": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+      "description": "Calendar tenor from spot to maturity, e.g. `3M`."
+    },
+    "trade_date": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+      "description": "Trade date from which the spot date is rolled."
+    }
+  },
+  "required": [
+    "id",
+    "base_currency",
+    "settlement_currency",
+    "trade_date",
+    "tenor",
+    "notional",
+    "contract_rate",
+    "domestic_discount_curve_id",
+    "settlement_days",
+    "fixing_offset_days",
+    "business_day_convention",
+    "end_of_month"
+  ],
+  "title": "NdfTradeDateParams",
+  "type": "object"
+}

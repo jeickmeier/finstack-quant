@@ -335,8 +335,8 @@ structure is rejected in Monte Carlo mode; run instrument-level Monte Carlo in
 Checked-in JSON Schema artifacts live under `schemas/statements/1/`:
 `financial_model_spec.schema.json`, `statement_result.schema.json`,
 `normalization_config.schema.json`. Access them from Rust via the `schema`
-module. Regenerate and verify with `mise run rust-gen-schemas` and
-`mise run rust-check-schemas` (the `gen_statement_schemas` binary backs both).
+module. Regenerate and verify with `mise run gen-write` and
+`mise run gen-check` (the `gen_statement_schemas` binary backs both).
 
 See [docs/SERDE_STABILITY.md](../../docs/SERDE_STABILITY.md) for the wire-format
 policy.

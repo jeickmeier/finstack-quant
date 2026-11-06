@@ -29,16 +29,16 @@ class Bond:
 
     Examples
     --------
+    >>> from finstack_quant.core.money import Money
     >>> from finstack_quant.valuations.instruments import Bond
     >>> bond = Bond.fixed(
     ...     "BOND-1",
-    ...     1_000_000.0,
+    ...     Money(1_000_000.0, "USD"),
     ...     0.05,
     ...     "2024-01-01",
     ...     "2034-01-01",
     ...     "none",
     ...     "USD-OIS",
-    ...     currency="USD",
     ... )
     >>> bond.id
     'BOND-1'
@@ -71,14 +71,12 @@ class Bond:
     @staticmethod
     def fixed(
         id: str,
-        notional: Money | float,
+        notional: Money,
         coupon_rate: float | Rate,
         issue_date: datetime.date | datetime.datetime | pd.Timestamp | str,
         maturity: datetime.date | datetime.datetime | pd.Timestamp | str,
         stub: StubKind | Literal["none", "short_front", "long_front", "short_back", "long_back"],
         discount_curve_id: str,
-        *,
-        currency: str | None = None,
     ) -> Bond:
         """
         Create a US corporate fixed-rate bond (semi-annual, 30/360, T+1).
@@ -91,8 +89,8 @@ class Bond:
         ----------
         id : str
             Unique instrument identifier.
-        notional : Money | float
-            Principal amount; a bare number is tagged with ``currency``.
+        notional : Money
+            Principal amount; its currency is the coupon and redemption currency.
         coupon_rate : float | Rate
             Annual coupon as a decimal (``0.05`` = 5%) or a ``Rate``.
         issue_date : datetime.date | datetime.datetime | pd.Timestamp | str
@@ -104,8 +102,6 @@ class Bond:
             ``StubKind`` or its serde name (``"none"``, ``"short_front"``, ...).
         discount_curve_id : str
             Discount curve identifier used for pricing.
-        currency : str, optional
-            ISO-4217 code applied when ``notional`` is a bare number.
 
         Returns
         -------
@@ -115,19 +111,17 @@ class Bond:
         Raises
         ------
         ValueError
-            If ``stub`` is not a recognized name, a bare ``notional`` has no
-            ``currency``, or validation fails (e.g. maturity not after
-            issue_date).
+            If ``stub`` is not a recognized name or validation fails (e.g.
+            maturity not after issue_date).
         TypeError
-            If ``coupon_rate`` or ``notional`` has an unsupported type or a date
-            cannot be interpreted.
+            If ``notional`` is not a ``Money``, ``coupon_rate`` has an
+            unsupported type or a date cannot be interpreted.
 
         Examples
         --------
+        >>> from finstack_quant.core.money import Money
         >>> from finstack_quant.valuations.instruments import Bond
-        >>> bond = Bond.fixed(
-        ...     "BOND-1", 1_000_000.0, 0.05, "2024-01-01", "2034-01-01", "none", "USD-OIS", currency="USD"
-        ... )
+        >>> bond = Bond.fixed("BOND-1", Money(1_000_000.0, "USD"), 0.05, "2024-01-01", "2034-01-01", "none", "USD-OIS")
         >>> bond.settlement_days
         1
         """
@@ -158,9 +152,10 @@ class Bond:
 
         Examples
         --------
+        >>> from finstack_quant.core.money import Money
         >>> from finstack_quant.valuations.instruments import Bond
         >>> bund = Bond.with_convention(
-        ...     "BUND", 1_000_000.0, 0.025, "2024-01-15", "2034-01-15", "german_bund", "EUR-OIS", currency="EUR"
+        ...     "BUND", Money(1_000_000.0, "EUR"), 0.025, "2024-01-15", "2034-01-15", "german_bund", "EUR-OIS"
         ... ).with_stub("long_back")
         >>> bund.to_dict()["cashflow_spec"]["fixed"]["stub"]
         'long_back'
@@ -169,7 +164,7 @@ class Bond:
     @staticmethod
     def with_convention(
         id: str,
-        notional: Money | float,
+        notional: Money,
         coupon_rate: float | Rate,
         issue_date: datetime.date | datetime.datetime | pd.Timestamp | str,
         maturity: datetime.date | datetime.datetime | pd.Timestamp | str,
@@ -177,8 +172,6 @@ class Bond:
             "us_treasury", "us_agency", "german_bund", "uk_gilt", "french_oat", "jgb", "us_corporate", "eur_corporate"
         ],
         discount_curve_id: str,
-        *,
-        currency: str | None = None,
     ) -> Bond:
         """
         Create a fixed-rate bond from a named market convention.
@@ -190,8 +183,8 @@ class Bond:
         ----------
         id : str
             Unique instrument identifier.
-        notional : Money | float
-            Principal amount; a bare number is tagged with ``currency``.
+        notional : Money
+            Principal amount; its currency is the coupon and redemption currency.
         coupon_rate : float | Rate
             Annual coupon as a decimal (``0.05`` = 5%) or a ``Rate``.
         issue_date : datetime.date | datetime.datetime | pd.Timestamp | str
@@ -204,8 +197,6 @@ class Bond:
             ``"us_corporate"``, ``"eur_corporate"``).
         discount_curve_id : str
             Discount curve identifier used for pricing.
-        currency : str, optional
-            ISO-4217 code applied when ``notional`` is a bare number.
 
         Returns
         -------
@@ -215,43 +206,30 @@ class Bond:
         Raises
         ------
         ValueError
-            If ``convention`` is unknown, a bare ``notional`` has no ``currency``,
-            or validation fails.
+            If ``convention`` is unknown or validation fails.
         TypeError
-            If ``coupon_rate``/``notional`` has an unsupported type or a date
-            cannot be interpreted.
+            If ``notional`` is not a ``Money``, ``coupon_rate`` has an
+            unsupported type or a date cannot be interpreted.
 
         Examples
         --------
+        >>> from finstack_quant.core.money import Money
         >>> from finstack_quant.valuations.instruments import Bond
         >>> gilt = Bond.with_convention(
         ...     "GILT",
-        ...     1_000_000.0,
+        ...     Money(1_000_000.0, "GBP"),
         ...     0.04,
         ...     "2024-01-01",
         ...     "2034-01-01",
         ...     "uk_gilt",
         ...     "GBP-OIS",
-        ...     currency="GBP",
         ... )
         >>> gilt.settlement_days
         1
         """
         ...
     @staticmethod
-    def floating(
-        id: str,
-        notional: Money | float,
-        forward_curve_id: str,
-        spread_bp: float | Bps,
-        issue_date: datetime.date | datetime.datetime | pd.Timestamp | str,
-        maturity: datetime.date | datetime.datetime | pd.Timestamp | str,
-        frequency: Tenor,
-        day_count: DayCount,
-        discount_curve_id: str,
-        *,
-        currency: str | None = None,
-    ) -> Bond:
+    def floating(params: dict[str, Any] | str) -> Bond:
         """
         Create a floating-rate bond (FRN) linked to a forward index.
 
@@ -263,27 +241,27 @@ class Bond:
 
         Parameters
         ----------
-        id : str
-            Unique instrument identifier.
-        notional : Money | float
-            Principal amount; a bare number is tagged with ``currency``.
-        forward_curve_id : str
-            Forward curve identifier (e.g. ``"USD-SOFR-3M"``).
-        spread_bp : float | Bps
-            Spread over the index in whole basis points; fractional values raise
-            ``ValueError`` (use :meth:`Bond.from_json` for sub-bp margins).
-        issue_date : datetime.date | datetime.datetime | pd.Timestamp | str
-            Issue date.
-        maturity : datetime.date | datetime.datetime | pd.Timestamp | str
-            Maturity date.
-        frequency : Tenor
-            Payment frequency (e.g. ``Tenor.quarterly()``).
-        day_count : DayCount
-            Day count convention (e.g. ``DayCount.ACT_360``).
-        discount_curve_id : str
-            Discount curve identifier used for pricing.
-        currency : str, optional
-            ISO-4217 code applied when ``notional`` is a bare number.
+        params : dict[str, Any] | str
+            ``FloatingBondParams`` as a dict or JSON text. Every key is
+            required:
+
+            - ``id`` (str): unique instrument identifier.
+            - ``notional`` (Money | dict): principal amount, a ``Money`` or its
+              wire dict ``{"amount": "1000000", "currency": "USD"}``; its
+              currency is the coupon and redemption currency.
+            - ``forward_curve_id`` (str): forward curve of the coupon index
+              (e.g. ``"USD-SOFR-3M"``).
+            - ``spread_bp`` (int): spread over the index in whole basis points
+              (``125`` = 1.25%); a fractional value raises ``ValueError`` (use
+              :meth:`Bond.from_json` for sub-bp margins).
+            - ``issue_date`` / ``maturity`` (datetime.date | str): start of the
+              first coupon period and redemption date (ISO 8601 strings).
+            - ``frequency`` (Tenor | dict): coupon frequency, a ``Tenor``
+              (``Tenor.quarterly()``) or its wire dict
+              ``{"count": 3, "unit": "months"}``.
+            - ``day_count`` (DayCount | str): coupon accrual day count
+              (``DayCount.ACT_360`` or its label ``"act_360"``).
+            - ``discount_curve_id`` (str): discount curve used for pricing.
 
         Returns
         -------
@@ -293,81 +271,69 @@ class Bond:
         Raises
         ------
         ValueError
-            If the notional currency has no mapped settlement convention,
-            ``notional`` is not finite and positive, ``spread_bp`` is not a finite
-            whole number of basis points, or ``issue_date`` is not strictly before
+            If ``params`` has a missing, unknown or malformed key, the notional
+            currency has no mapped settlement convention, ``notional`` is not
+            finite and positive, or ``issue_date`` is not strictly before
             ``maturity``.
-        TypeError
-            If ``spread_bp``/``notional`` has an unsupported type or a date cannot
-            be interpreted.
 
         Examples
         --------
         >>> from finstack_quant.core.dates import DayCount, Tenor
+        >>> from finstack_quant.core.money import Money
         >>> from finstack_quant.valuations.instruments import Bond
-        >>> frn = Bond.floating(
-        ...     "FRN",
-        ...     1000.0,
-        ...     "USD-SOFR-3M",
-        ...     125.0,
-        ...     "2024-01-01",
-        ...     "2029-01-01",
-        ...     Tenor.quarterly(),
-        ...     DayCount.ACT_360,
-        ...     "USD-OIS",
-        ...     currency="USD",
-        ... )
+        >>> frn = Bond.floating({
+        ...     "id": "FRN",
+        ...     "notional": Money(1000.0, "USD"),
+        ...     "forward_curve_id": "USD-SOFR-3M",
+        ...     "spread_bp": 125,
+        ...     "issue_date": "2024-01-01",
+        ...     "maturity": "2029-01-01",
+        ...     "frequency": Tenor.quarterly(),
+        ...     "day_count": DayCount.ACT_360,
+        ...     "discount_curve_id": "USD-OIS",
+        ... })
         >>> frn.has_floating_coupons
         True
         """
         ...
     @staticmethod
     def floating_with_convention(
-        id: str,
-        notional: Money | float,
-        forward_curve_id: str,
-        spread_bp: float | Bps,
-        issue_date: datetime.date | datetime.datetime | pd.Timestamp | str,
-        maturity: datetime.date | datetime.datetime | pd.Timestamp | str,
-        frequency: Tenor,
-        day_count: DayCount,
+        params: dict[str, Any] | str,
         convention: Literal[
             "us_treasury", "us_agency", "german_bund", "uk_gilt", "french_oat", "jgb", "us_corporate", "eur_corporate"
         ],
-        discount_curve_id: str,
-        *,
-        currency: str | None = None,
     ) -> Bond:
         """
         Create a floating-rate bond with an explicit convention preset.
 
-        Mirrors Rust ``Bond::floating_with_convention``.
+        Mirrors Rust ``Bond::floating_with_convention``: the preset supplies
+        settlement lag, business-day convention and calendar.
 
         Parameters
         ----------
-        id : str
-            Unique instrument identifier.
-        notional : Money | float
-            Principal amount; a bare number is tagged with ``currency``.
-        forward_curve_id : str
-            Forward curve identifier (e.g. ``"EUR-EURIBOR-3M"``).
-        spread_bp : float | Bps
-            Spread over the index in whole basis points; fractional values raise
-            ``ValueError`` (use :meth:`Bond.from_json` for sub-bp margins).
-        issue_date : datetime.date | datetime.datetime | pd.Timestamp | str
-            Issue date.
-        maturity : datetime.date | datetime.datetime | pd.Timestamp | str
-            Maturity date.
-        frequency : Tenor
-            Payment frequency.
-        day_count : DayCount
-            Day count convention.
+        params : dict[str, Any] | str
+            ``FloatingBondParams`` as a dict or JSON text. Every key is
+            required:
+
+            - ``id`` (str): unique instrument identifier.
+            - ``notional`` (Money | dict): principal amount, a ``Money`` or its
+              wire dict ``{"amount": "1000000", "currency": "USD"}``; its
+              currency is the coupon and redemption currency.
+            - ``forward_curve_id`` (str): forward curve of the coupon index
+              (e.g. ``"USD-SOFR-3M"``).
+            - ``spread_bp`` (int): spread over the index in whole basis points
+              (``125`` = 1.25%); a fractional value raises ``ValueError`` (use
+              :meth:`Bond.from_json` for sub-bp margins).
+            - ``issue_date`` / ``maturity`` (datetime.date | str): start of the
+              first coupon period and redemption date (ISO 8601 strings).
+            - ``frequency`` (Tenor | dict): coupon frequency, a ``Tenor``
+              (``Tenor.quarterly()``) or its wire dict
+              ``{"count": 3, "unit": "months"}``.
+            - ``day_count`` (DayCount | str): coupon accrual day count
+              (``DayCount.ACT_360`` or its label ``"act_360"``).
+            - ``discount_curve_id`` (str): discount curve used for pricing.
         convention : str
             Bond convention preset (see :meth:`Bond.with_convention`).
-        discount_curve_id : str
-            Discount curve identifier used for pricing.
-        currency : str, optional
-            ISO-4217 code applied when ``notional`` is a bare number.
 
         Returns
         -------
@@ -377,29 +343,27 @@ class Bond:
         Raises
         ------
         ValueError
-            If ``convention`` is unknown, a bare ``notional`` has no ``currency``,
-            ``spread_bp`` is not a finite whole number of basis points, or
-            validation fails.
-        TypeError
-            If ``spread_bp``/``notional`` has an unsupported type or a date cannot
-            be interpreted.
+            If ``params`` has a missing, unknown or malformed key,
+            ``convention`` is unknown, or validation fails.
 
         Examples
         --------
         >>> from finstack_quant.core.dates import DayCount, Tenor
+        >>> from finstack_quant.core.money import Money
         >>> from finstack_quant.valuations.instruments import Bond
         >>> frn = Bond.floating_with_convention(
-        ...     "FRN-EUR",
-        ...     1000.0,
-        ...     "EUR-EURIBOR-3M",
-        ...     80.0,
-        ...     "2024-01-01",
-        ...     "2029-01-01",
-        ...     Tenor.quarterly(),
-        ...     DayCount.ACT_360,
+        ...     {
+        ...         "id": "FRN-EUR",
+        ...         "notional": Money(1000.0, "EUR"),
+        ...         "forward_curve_id": "EUR-EURIBOR-3M",
+        ...         "spread_bp": 80,
+        ...         "issue_date": "2024-01-01",
+        ...         "maturity": "2029-01-01",
+        ...         "frequency": Tenor.quarterly(),
+        ...         "day_count": DayCount.ACT_360,
+        ...         "discount_curve_id": "EUR-OIS",
+        ...     },
         ...     "eur_corporate",
-        ...     "EUR-OIS",
-        ...     currency="EUR",
         ... )
         >>> frn.settlement_days
         2
@@ -408,12 +372,10 @@ class Bond:
     @staticmethod
     def zero_coupon(
         id: str,
-        notional: Money | float,
+        notional: Money,
         issue_date: datetime.date | datetime.datetime | pd.Timestamp | str,
         maturity: datetime.date | datetime.datetime | pd.Timestamp | str,
         discount_curve_id: str,
-        *,
-        currency: str | None = None,
     ) -> Bond:
         """
         Create a zero-coupon bond (single principal redemption at maturity).
@@ -424,16 +386,14 @@ class Bond:
         ----------
         id : str
             Unique instrument identifier.
-        notional : Money | float
-            Redemption amount; a bare number is tagged with ``currency``.
+        notional : Money
+            Redemption amount; its currency is the bond currency.
         issue_date : datetime.date | datetime.datetime | pd.Timestamp | str
             Issue date.
         maturity : datetime.date | datetime.datetime | pd.Timestamp | str
             Maturity (redemption) date.
         discount_curve_id : str
             Discount curve identifier used for pricing.
-        currency : str, optional
-            ISO-4217 code applied when ``notional`` is a bare number.
 
         Returns
         -------
@@ -443,16 +403,15 @@ class Bond:
         Raises
         ------
         ValueError
-            If a bare ``notional`` has no ``currency`` or ``maturity`` is not after
-            ``issue_date``.
+            If ``maturity`` is not after ``issue_date``.
         TypeError
-            If ``notional`` has an unsupported type or a date cannot be
-            interpreted.
+            If ``notional`` is not a ``Money`` or a date cannot be interpreted.
 
         Examples
         --------
+        >>> from finstack_quant.core.money import Money
         >>> from finstack_quant.valuations.instruments import Bond
-        >>> zc = Bond.zero_coupon("ZC", 1_000_000.0, "2024-01-01", "2029-01-01", "USD-OIS", currency="USD")
+        >>> zc = Bond.zero_coupon("ZC", Money(1_000_000.0, "USD"), "2024-01-01", "2029-01-01", "USD-OIS")
         >>> zc.has_floating_coupons
         False
         """
@@ -613,9 +572,7 @@ class Bond:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
-        market_history: MarketHistory | dict[str, Any] | str | None = None,
-        explain: bool = False,
+        extras: dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this bond and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -637,15 +594,19 @@ class Bond:
             call, put, and return-floor rights jointly with credit risk.
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
-        metric_pricing_overrides : MetricPricingOverrides | dict[str, Any] | str, optional
-            Metric-time overrides merged into
-            ``instrument.spec.metric_pricing_overrides`` before pricing
-            (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
-        market_history : MarketHistory | dict[str, Any] | str, optional
-            ``MarketHistory`` scenarios required by ``hvar`` /
-            ``expected_shortfall``.
-        explain : bool, default False
-            When ``True``, attach a step trace as ``result.explanation``.
+        extras : dict[str, Any] or str, optional
+            The rarer pricing inputs, as a dict or JSON text in the shape of the
+            Rust ``PriceExtras``; every key is optional and an unknown key raises
+            ``ValueError``. ``metric_pricing_overrides`` (a ``MetricPricingOverrides``
+            or dict) is merged into ``instrument.spec.metric_pricing_overrides``
+            before pricing (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``):
+            only the keys present replace stored controls, ``bump_config`` keys
+            merge into the stored bump configuration and an explicit ``None``
+            clears a control; omitted keeps the instrument's overrides. ``market_history`` (a ``MarketHistory`` or dict)
+            holds the historical scenarios ``hvar`` and ``expected_shortfall``
+            require; omitted prices without history. ``explain`` (bool, default
+            ``False``) attaches a step trace as ``result.explanation`` when
+            ``True``. ``None`` (the default) means no extras.
 
         Returns
         -------
@@ -1048,8 +1009,8 @@ class Bond:
         dict[str, object]
             Bump sizes, theta period and the other metric settings stored on
             the instrument; unset fields are ``None`` or omitted. A
-            ``metric_pricing_overrides`` argument to ``price`` is merged over it
-            per call.
+            ``price(..., extras={"metric_pricing_overrides": ...})`` patch is
+            merged over it per call.
 
         Notes
         -----
@@ -1145,16 +1106,16 @@ class Bond:
         Examples
         --------
         >>> from finstack_quant.valuations.instruments import Bond, MertonMcConfig, PikMode, PikSchedule
+        >>> from finstack_quant.core.money import Money
         >>> from finstack_quant.models.credit import MertonModel
         >>> bond = Bond.fixed(
         ...     "BOND-MC",
-        ...     1_000_000.0,
+        ...     Money(1_000_000.0, "USD"),
         ...     0.08,
         ...     "2024-01-01",
         ...     "2029-01-01",
         ...     "none",
         ...     "USD-OIS",
-        ...     currency="USD",
         ... )
         >>> merton = MertonModel(100.0, 0.25, 80.0, 0.04)
         >>> config = MertonMcConfig(merton, 0.40).pik_schedule(PikSchedule.uniform(PikMode.pik()))
@@ -1191,13 +1152,14 @@ class BondBuilder:
 
     Examples
     --------
+    >>> from finstack_quant.core.money import Money
     >>> from finstack_quant.valuations.instruments import Bond
     >>> base = Bond.example().to_dict()
     >>> callable_bond = (
     ...     Bond
     ...     .builder()
     ...     .id("CALLABLE")
-    ...     .notional(1_000_000.0, currency="USD")
+    ...     .notional(Money(1_000_000.0, "USD"))
     ...     .issue_date("2024-01-15")
     ...     .maturity("2034-01-15")
     ...     .cashflow_spec(base["cashflow_spec"])
@@ -1233,16 +1195,14 @@ class BondBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def notional(self, value: Money | float, currency: str | None = None) -> BondBuilder:
+    def notional(self, value: Money) -> BondBuilder:
         """
         Set the principal amount.
 
         Parameters
         ----------
-        value : Money | float
-            Principal amount; a bare number is tagged with ``currency``.
-        currency : str, optional
-            ISO-4217 code applied when ``value`` is a bare number.
+        value : Money
+            Principal amount; its currency is the bond currency.
 
         Returns
         -------
@@ -1252,7 +1212,9 @@ class BondBuilder:
         Raises
         ------
         ValueError
-            If the builder was already consumed by ``build()`` or a bare number is given without ``currency``.
+            If the builder was already consumed by ``build()``.
+        TypeError
+            If ``value`` is not a ``finstack_quant.core.money.Money``.
         """
         ...
     def issue_date(self, value: datetime.date | datetime.datetime | pd.Timestamp | str) -> BondBuilder:
@@ -1779,9 +1741,7 @@ class TermLoan:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
-        market_history: MarketHistory | dict[str, Any] | str | None = None,
-        explain: bool = False,
+        extras: dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this term loan and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -1798,15 +1758,19 @@ class TermLoan:
             Model key (``"discounting"``, ``"hazard_rate"``, ``"tree"``).
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
-        metric_pricing_overrides : MetricPricingOverrides | dict[str, Any] | str, optional
-            Metric-time overrides merged into
-            ``instrument.spec.metric_pricing_overrides`` before pricing
-            (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
-        market_history : MarketHistory | dict[str, Any] | str, optional
-            ``MarketHistory`` scenarios required by ``hvar`` /
-            ``expected_shortfall``.
-        explain : bool, default False
-            When ``True``, attach a step trace as ``result.explanation``.
+        extras : dict[str, Any] or str, optional
+            The rarer pricing inputs, as a dict or JSON text in the shape of the
+            Rust ``PriceExtras``; every key is optional and an unknown key raises
+            ``ValueError``. ``metric_pricing_overrides`` (a ``MetricPricingOverrides``
+            or dict) is merged into ``instrument.spec.metric_pricing_overrides``
+            before pricing (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``):
+            only the keys present replace stored controls, ``bump_config`` keys
+            merge into the stored bump configuration and an explicit ``None``
+            clears a control; omitted keeps the instrument's overrides. ``market_history`` (a ``MarketHistory`` or dict)
+            holds the historical scenarios ``hvar`` and ``expected_shortfall``
+            require; omitted prices without history. ``explain`` (bool, default
+            ``False``) attaches a step trace as ``result.explanation`` when
+            ``True``. ``None`` (the default) means no extras.
 
         Returns
         -------
@@ -2238,8 +2202,8 @@ class TermLoan:
         dict[str, object]
             Bump sizes, theta period and the other metric settings stored on
             the instrument; unset fields are ``None`` or omitted. A
-            ``metric_pricing_overrides`` argument to ``price`` is merged over it
-            per call.
+            ``price(..., extras={"metric_pricing_overrides": ...})`` patch is
+            merged over it per call.
 
         Notes
         -----
@@ -2322,13 +2286,14 @@ class TermLoanBuilder:
     Examples
     --------
     >>> from finstack_quant.core.dates import DayCount, Tenor
+    >>> from finstack_quant.core.money import Money
     >>> from finstack_quant.valuations.instruments import TermLoan
     >>> loan = (
     ...     TermLoan
     ...     .builder()
     ...     .id("TL-1")
     ...     .currency("USD")
-    ...     .notional_limit(10_000_000.0, currency="USD")
+    ...     .notional_limit(Money(10_000_000.0, "USD"))
     ...     .issue_date("2024-01-01")
     ...     .maturity("2029-01-01")
     ...     .rate(0.06)
@@ -2382,16 +2347,14 @@ class TermLoanBuilder:
             If the builder was already consumed by ``build()`` or ``value`` is not a recognized currency code.
         """
         ...
-    def notional_limit(self, value: Money | float, currency: str | None = None) -> TermLoanBuilder:
+    def notional_limit(self, value: Money) -> TermLoanBuilder:
         """
         Set the committed notional (facility limit).
 
         Parameters
         ----------
-        value : Money | float
-            Committed notional (facility limit); a bare number is tagged with ``currency``.
-        currency : str, optional
-            ISO-4217 code applied when ``value`` is a bare number.
+        value : Money
+            Committed notional (facility limit), in the loan currency.
 
         Returns
         -------
@@ -2401,7 +2364,9 @@ class TermLoanBuilder:
         Raises
         ------
         ValueError
-            If the builder was already consumed by ``build()`` or a bare number is given without ``currency``.
+            If the builder was already consumed by ``build()``.
+        TypeError
+            If ``value`` is not a ``finstack_quant.core.money.Money``.
         """
         ...
     def issue_date(self, value: datetime.date | datetime.datetime | pd.Timestamp | str) -> TermLoanBuilder:
@@ -2652,21 +2617,19 @@ class TermLoanBuilder:
             If the builder was already consumed by ``build()`` or ``value`` is not a recognized name.
         """
         ...
-    def upfront_fee(
-        self, value: Money | float | dict[str, object] | str, currency: str | None = None
-    ) -> TermLoanBuilder:
+    def upfront_fee(self, value: dict[str, object] | str) -> TermLoanBuilder:
         """
         Set the upfront (arrangement or OID) fee paid on the issue date.
 
         Parameters
         ----------
-        value : Money | float | dict[str, object] | str
-            A ``Money`` or bare number (tagged with ``currency``) is an absolute
-            amount; a ``dict`` or JSON string is the ``UpfrontFee`` serde form
-            (``{"amount": Money-dict}`` or ``{"fraction_of_commitment": 0.02}``,
-            a decimal fraction of the DDTL commitment, else ``notional_limit``).
-        currency : str, optional
-            ISO-4217 code applied when ``value`` is a bare number.
+        value : dict[str, object] | str
+            The ``UpfrontFee`` serde form, as a ``dict`` or JSON string:
+            ``{"amount": Money}`` for an absolute fee (a ``Money`` or its
+            ``{"amount": "20000", "currency": "USD"}`` dict) or
+            ``{"fraction_of_commitment": 0.02}`` for a decimal fraction of the
+            DDTL commitment, else ``notional_limit``. The ``upfront_fee``
+            getter returns this shape.
 
         Returns
         -------
@@ -2676,7 +2639,7 @@ class TermLoanBuilder:
         Raises
         ------
         ValueError
-            If the builder was already consumed by ``build()``, a bare number is given without ``currency``, or a ``dict``/string does not match the ``UpfrontFee`` shape.
+            If the builder was already consumed by ``build()`` or ``value`` does not match the ``UpfrontFee`` shape.
         """
         ...
     def ddtl(self, value: dict[str, object] | str) -> TermLoanBuilder:

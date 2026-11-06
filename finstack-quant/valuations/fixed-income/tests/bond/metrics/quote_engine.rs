@@ -131,15 +131,17 @@ fn test_quote_engine_roundtrip_dm_for_frn() {
 
     // Simple FRN: 3M SOFR + 150bp
     let frn = Bond::floating(
-        "QE-FRN",
-        notional,
-        "USD-SOFR-3M",
-        150,
-        as_of,
-        maturity,
-        Tenor::quarterly(),
-        DayCount::Act360,
-        "USD-OIS",
+        finstack_quant_valuations_fixed_income::bond::FloatingBondParams {
+            id: "QE-FRN".into(),
+            notional,
+            forward_curve_id: "USD-SOFR-3M".into(),
+            spread_bp: 150.into(),
+            issue_date: as_of,
+            maturity,
+            frequency: Tenor::quarterly(),
+            day_count: DayCount::Act360,
+            discount_curve_id: "USD-OIS".into(),
+        },
     )
     .unwrap();
 

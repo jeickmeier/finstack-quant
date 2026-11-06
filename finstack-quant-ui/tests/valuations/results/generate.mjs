@@ -1,6 +1,7 @@
 import { pricingCases } from "../../browser/cases.mjs";
 import { checking, emit } from "../../../scripts/fixture-output.mjs";
 import { native } from "../../../scripts/fixture-inputs.mjs";
+import { priceExtras } from "../../shared/price-extras.mjs";
 const request = (await pricingCases()).bond;
 request.metrics = ["ytm", "dv01", "duration_mod", "bucketed_dv01"];
 const result = native.priceInstrument(
@@ -9,8 +10,7 @@ const result = native.priceInstrument(
   request.asOf,
   request.model,
   request.metrics,
-  request.metricPricingOverrides,
-  request.marketHistory,
+  priceExtras(request),
 );
 const fixture = {
   request,

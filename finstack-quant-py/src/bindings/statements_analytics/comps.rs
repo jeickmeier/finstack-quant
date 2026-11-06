@@ -214,7 +214,9 @@ pub(super) fn extract_company_metrics(
 
 /// Screening criteria for building a peer set from a universe.
 ///
-/// All non-empty criteria are AND-ed; list criteria are OR-ed within.
+/// All non-empty criteria are AND-ed; list criteria are OR-ed within. Every
+/// parameter is keyword-only and optional; Rust reads them as the serde
+/// struct, so an unknown keyword raises ``ValueError``.
 ///
 /// Parameters
 /// ----------
@@ -255,42 +257,14 @@ pub struct PyPeerFilter {
 #[pymethods]
 impl PyPeerFilter {
     #[new]
-    #[pyo3(signature = (
-        gics_sectors=Vec::new(),
-        gics_industries=Vec::new(),
-        countries=Vec::new(),
-        market_cap_min=None,
-        market_cap_max=None,
-        ratings=Vec::new(),
-        required_tags=Vec::new(),
-        excluded_tags=Vec::new(),
-        selectors=Vec::new(),
-    ))]
-    #[allow(clippy::too_many_arguments)]
-    fn new(
-        gics_sectors: Vec<String>,
-        gics_industries: Vec<String>,
-        countries: Vec<String>,
-        market_cap_min: Option<f64>,
-        market_cap_max: Option<f64>,
-        ratings: Vec<String>,
-        required_tags: Vec<String>,
-        excluded_tags: Vec<String>,
-        selectors: Vec<String>,
-    ) -> Self {
-        Self {
-            inner: PeerFilter {
-                gics_sectors,
-                gics_industries,
-                countries,
-                market_cap_min,
-                market_cap_max,
-                ratings,
-                required_tags,
-                excluded_tags,
-                selectors,
-            },
-        }
+    #[pyo3(
+        signature = (**fields),
+        text_signature = "(*, gics_sectors=[], gics_industries=[], countries=[], market_cap_min=None, market_cap_max=None, ratings=[], required_tags=[], excluded_tags=[], selectors=[])"
+    )]
+    fn new(py: Python<'_>, fields: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
+        let inner: PeerFilter =
+            crate::bindings::module_utils::fields_from_py(py, fields, "PeerFilter")?;
+        Ok(Self { inner })
     }
 
     /// GICS sector codes to include.

@@ -266,19 +266,19 @@ fn test_short_maturity_higher_theta() {
 #[test]
 fn same_day_unpublished_fixing_caps_theta_without_historical_series() {
     let as_of = date!(2024 - 03 - 01);
-    let caplet = CapFloor::new(
-        "SAME-DAY-THETA",
-        RateOptionType::Caplet,
-        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-        0.05,
-        as_of,
-        date!(2024 - 06 - 01),
-        None,
-        DayCount::Act360,
-        "USD_OIS",
-        "USD_LIBOR_3M",
-        "USD_CAP_VOL",
-    )
+    let caplet = CapFloor::new(finstack_quant_valuations_rates::cap_floor::CapFloorParams {
+        id: "SAME-DAY-THETA".into(),
+        rate_option_type: RateOptionType::Caplet,
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        strike: 0.05,
+        start_date: as_of,
+        maturity: date!(2024 - 06 - 01),
+        frequency: None,
+        day_count: DayCount::Act360,
+        discount_curve_id: "USD_OIS".into(),
+        forward_curve_id: "USD_LIBOR_3M".into(),
+        vol_surface_id: "USD_CAP_VOL".into(),
+    })
     .expect("caplet");
     let market = MarketContext::new()
         .insert(build_flat_discount_curve(0.03, as_of, "USD_OIS"))

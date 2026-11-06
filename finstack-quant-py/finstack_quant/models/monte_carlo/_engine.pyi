@@ -201,27 +201,19 @@ def heston_satisfies_feller(kappa: float, theta: float, vol_of_vol: float) -> bo
 def price_heston(
     spot: float,
     strike: float,
-    rate: float,
-    div_yield: float,
-    kappa: float,
-    theta: float,
-    vol_of_vol: float,
-    rho: float,
-    v0: float,
     expiry: float,
+    params: dict[str, Any] | str,
     is_call: bool,
-    num_paths: int | None = None,
-    seed: int | None = None,
-    num_steps: int | None = None,
-    currency: str | None = None,
+    settings: dict[str, Any] | str | None = None,
 ) -> MoneyEstimate:
     """
     Monte Carlo European option under Heston stochastic volatility.
 
     Simulates spot and variance with Andersen's quadratic-exponential (QE)
     discretization, which stays stable when the Feller condition is violated.
-    Rates and dividend yield are continuously compounded decimals; Heston
-    parameters follow the standard square-root variance specification.
+    Mirrors the Fourier :func:`finstack_quant.models.heston_price`: the same
+    market and model inputs, with Monte Carlo settings in place of the
+    Fourier settings.
 
     Parameters
     ----------
@@ -229,34 +221,28 @@ def price_heston(
         Initial spot price.
     strike : float
         Strike price.
-    rate : float
-        Risk-free rate as a decimal.
-    div_yield : float
-        Dividend yield as a decimal.
-    kappa : float
-        Mean-reversion speed of variance.
-    theta : float
-        Long-run variance level.
-    vol_of_vol : float
-        Volatility of variance (``sigma`` in Heston notation).
-    rho : float
-        Correlation between spot and variance Brownian motions in ``[-1, 1]``.
-    v0 : float
-        Initial variance (not volatility).
     expiry : float
         Time to maturity in years.
+    params : dict or str
+        Serde form of the Rust ``HestonPricingParams``, as a dict or JSON text.
+        Every key is required: ``r`` (continuously compounded risk-free rate,
+        decimal); ``q`` (continuous dividend yield, decimal); ``v0`` (initial
+        variance, not volatility); ``kappa`` (mean-reversion speed of
+        variance); ``theta`` (long-run variance level); ``sigma_v``
+        (volatility of variance, ``sigma`` in Heston notation); ``rho``
+        (correlation between spot and variance Brownian motions in
+        ``[-1, 1]``).
     is_call : bool
         ``True`` for a call paying ``max(S_T - K, 0)``, ``False`` for a put
         paying ``max(K - S_T, 0)``.
-    num_paths : int, optional
-        Independent path estimators in ``[2, 10_000_000]``; each antithetic
-        pair counts once. The registry default is ``100_000``.
-    seed : int, optional
-        RNG seed (registry default ``42``).
-    num_steps : int, optional
-        Time steps per path (registry default ``252``).
-    currency : str, optional
-        ISO currency code; ``None`` uses the registry binding default.
+    settings : dict or str, optional
+        Serde form of the Rust ``HestonMcSettings``, as a dict or JSON text.
+        Every key is optional and an omitted key (or ``settings=None``) takes
+        the registry binding default: ``num_paths`` (independent path
+        estimators in ``[2, 10_000_000]``, each antithetic pair counts once;
+        default ``100_000``); ``seed`` (RNG seed, default ``42``);
+        ``num_steps`` (time steps per path, default ``252``); ``currency``
+        (ISO currency code stamped on the result).
 
     Returns
     -------
@@ -266,9 +252,11 @@ def price_heston(
     Raises
     ------
     ValueError
-        If Heston parameters, expiry, path count, step count, or the discount
-        factor fail validation, or a simulated discounted payoff is
-        non-finite. Violating the Feller condition does not raise.
+        If ``params`` or ``settings`` has an unknown key or a wrongly typed
+        value, ``params`` misses a key, the Heston parameters, expiry, path
+        count, step count, or the discount factor fail validation, or a
+        simulated discounted payoff is non-finite. Violating the Feller
+        condition does not raise.
 
     Sources
     -------
@@ -278,10 +266,11 @@ def price_heston(
     Examples
     --------
     >>> from finstack_quant.models.monte_carlo import price_heston
-    >>> r = price_heston(100, 100, 0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04, 1.0, True, num_paths=5000)
+    >>> params = {"r": 0.05, "q": 0.0, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "sigma_v": 0.3, "rho": -0.7}
+    >>> r = price_heston(100, 100, 1.0, params, True, {"num_paths": 5000})
     >>> r.num_paths
     5000
-    >>> put = price_heston(100, 100, 0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04, 1.0, False, num_paths=5000)
+    >>> put = price_heston(100, 100, 1.0, params, False, {"num_paths": 5000})
     >>> put.mean.amount > 0
     True
     """

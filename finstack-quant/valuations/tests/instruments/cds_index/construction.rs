@@ -50,14 +50,16 @@ fn test_construction_with_index_factor() {
 
     let idx = CdsIndex::from_preset(
         &CdsIndexParams::cdx_na_ig(42, 1, 100.0),
-        "CDX-FACTOR",
-        Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
-        PayReceive::Pay,
-        start,
-        end,
-        TEST_RECOVERY,
-        "USD-OIS",
-        "HZ-INDEX",
+        finstack_quant_valuations::instruments::credit_derivatives::cds::CdsTradeParams {
+            id: finstack_quant_core::types::InstrumentId::new("CDX-FACTOR"),
+            notional: Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
+            side: PayReceive::Pay,
+            start,
+            end,
+            recovery_rate: TEST_RECOVERY,
+            discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
+            credit_curve_id: finstack_quant_core::types::CurveId::new("HZ-INDEX"),
+        },
     )
     .expect("valid test parameters")
     .with_index_factor(factor);
@@ -149,14 +151,16 @@ fn test_weight_sum_validation() {
 
     let idx = CdsIndex::from_preset(
         &CdsIndexParams::cdx_na_ig(42, 1, 100.0),
-        "CDX-WEIGHTS",
-        Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
-        PayReceive::Pay,
-        start,
-        end,
-        TEST_RECOVERY,
-        "USD-OIS",
-        "HZ-INDEX",
+        finstack_quant_valuations::instruments::credit_derivatives::cds::CdsTradeParams {
+            id: finstack_quant_core::types::InstrumentId::new("CDX-WEIGHTS"),
+            notional: Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
+            side: PayReceive::Pay,
+            start,
+            end,
+            recovery_rate: TEST_RECOVERY,
+            discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
+            credit_curve_id: finstack_quant_core::types::CurveId::new("HZ-INDEX"),
+        },
     )
     .expect("valid test parameters")
     .with_constituents(constituents);
@@ -286,14 +290,16 @@ fn test_multiple_index_types_construction() {
     for (name, params) in indices {
         let idx = CdsIndex::from_preset(
             &params,
-            format!("{}-TEST", name),
-            Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
-            PayReceive::Pay,
-            start,
-            end,
-            TEST_RECOVERY,
-            "USD-OIS",
-            "HZ-INDEX",
+            finstack_quant_valuations::instruments::credit_derivatives::cds::CdsTradeParams {
+                id: format!("{}-TEST", name).into(),
+                notional: Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
+                side: PayReceive::Pay,
+                start,
+                end,
+                recovery_rate: TEST_RECOVERY,
+                discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
+                credit_curve_id: finstack_quant_core::types::CurveId::new("HZ-INDEX"),
+            },
         )
         .expect("valid test parameters");
 

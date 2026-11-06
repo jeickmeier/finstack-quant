@@ -46,6 +46,18 @@ pub(crate) fn dated_flows_arg(value: &JsValue, label: &str) -> Result<Vec<(Date,
 /// Obtain one from `CashFlowSchedule.builder()`, `buildCashflowSchedule`,
 /// `CashFlowSchedule.fromJson` or `CashFlowSchedule.fromFlows`. Methods that
 /// return a schedule return a new handle and leave this one unchanged.
+///
+/// @example
+/// ```typescript
+/// import init, { cashflows } from "finstack-quant-wasm";
+/// await init();
+/// const schedule = cashflows.CashFlowSchedule.builder()
+///   .principal({ amount: "1000000", currency: "USD" }, "2025-01-15", "2027-01-15")
+///   .fixedCf({ rate: "0.05", coupon_type: "cash", ...cashflows.scheduleParamsSemiannual30360() })
+///   .build();
+/// console.log(schedule.wal("2025-01-15"), schedule.getFlows().length);
+/// schedule.free();
+/// ```
 #[wasm_bindgen(js_name = CashFlowSchedule)]
 #[derive(Clone, Debug)]
 pub struct JsCashFlowSchedule {
@@ -80,15 +92,18 @@ impl JsCashFlowSchedule {
     ///
     /// @param flows - `CashFlow` wire objects.
     /// @param notional - `Notional` wire object: initial balance and amortization rule.
-    /// @param day_count - `DayCount` wire string used for accrual and year fractions.
+    /// @param dayCount - `DayCount` wire string used for accrual and year fractions.
     /// @param meta - Optional `CashFlowMeta` wire object; omitted means the default metadata (contractual representation, no issue date).
     /// @returns The assembled `CashFlowSchedule`.
     /// @throws If an argument does not match its wire type or a flow fails validation (kind `validation`).
     #[wasm_bindgen(js_name = fromFlows)]
     pub fn from_flows(
+        #[wasm_bindgen(unchecked_param_type = "readonly generated.cashflows.CashFlow[]")]
         flows: JsValue,
-        notional: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "generated.cashflows.Notional")] notional: JsValue,
+        #[wasm_bindgen(js_name = "dayCount", unchecked_param_type = "generated.core.DayCount")]
         day_count: JsValue,
+        #[wasm_bindgen(unchecked_optional_param_type = "generated.cashflows.CashFlowMeta | null")]
         meta: Option<JsValue>,
     ) -> Result<JsCashFlowSchedule, JsValue> {
         CashFlowSchedule::from_flows(
@@ -107,7 +122,9 @@ impl JsCashFlowSchedule {
     /// @returns The parsed `CashFlowSchedule`; it is not validated until `validate()` or an analytic runs.
     /// @throws If `json` is neither a string nor a plain object (kind `invalid_type`) or does not match the schedule schema (kind `validation`).
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsCashFlowSchedule, JsValue> {
+    pub fn from_json(
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+    ) -> Result<JsCashFlowSchedule, JsValue> {
         crate::utils::input::from_js_json::<CashFlowSchedule>(&json, "json").map(Self::from_inner)
     }
 
@@ -128,6 +145,7 @@ impl JsCashFlowSchedule {
     #[wasm_bindgen(js_name = withRepresentation)]
     pub fn with_representation(
         &self,
+        #[wasm_bindgen(unchecked_param_type = "generated.cashflows.CashflowRepresentation")]
         representation: JsValue,
     ) -> Result<JsCashFlowSchedule, JsValue> {
         Ok(Self::from_inner(self.inner.clone().with_representation(
@@ -141,7 +159,10 @@ impl JsCashFlowSchedule {
     /// @returns A new `CashFlowSchedule`; flows are unchanged.
     /// @throws If `notional` is not a `Notional` (kind `validation`).
     #[wasm_bindgen(js_name = withNotional)]
-    pub fn with_notional(&self, notional: JsValue) -> Result<JsCashFlowSchedule, JsValue> {
+    pub fn with_notional(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "generated.cashflows.Notional")] notional: JsValue,
+    ) -> Result<JsCashFlowSchedule, JsValue> {
         Ok(Self::from_inner(self.inner.clone().with_notional(
             js_wire::<Notional>(&notional, "notional")?,
         )))
@@ -151,7 +172,7 @@ impl JsCashFlowSchedule {
     ///
     /// @returns `CashFlow` wire objects: coupons, fees, principal and state rows.
     /// @throws If the flows cannot be serialized.
-    #[wasm_bindgen(js_name = getFlows)]
+    #[wasm_bindgen(js_name = getFlows, unchecked_return_type = "generated.cashflows.CashFlow[]")]
     pub fn get_flows(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner.get_flows())
     }
@@ -160,7 +181,7 @@ impl JsCashFlowSchedule {
     ///
     /// @returns `CashFlow` wire objects of interest-like kinds, in schedule order.
     /// @throws If the flows cannot be serialized.
-    #[wasm_bindgen]
+    #[wasm_bindgen(unchecked_return_type = "generated.cashflows.CashFlow[]")]
     pub fn coupons(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner.coupons().collect::<Vec<_>>())
     }
@@ -169,7 +190,7 @@ impl JsCashFlowSchedule {
     ///
     /// @returns ISO-8601 flow dates aligned with `getFlows()`: a date repeats when several flows fall on it.
     /// @throws If the dates cannot be serialized.
-    #[wasm_bindgen]
+    #[wasm_bindgen(unchecked_return_type = "generated.core.DateWire[]")]
     pub fn dates(&self) -> Result<JsValue, JsValue> {
         to_js_value(
             &self
@@ -185,7 +206,7 @@ impl JsCashFlowSchedule {
     ///
     /// @returns `Notional` wire object: initial balance and amortization rule.
     /// @throws If the notional cannot be serialized.
-    #[wasm_bindgen(js_name = getNotional)]
+    #[wasm_bindgen(js_name = getNotional, unchecked_return_type = "generated.cashflows.Notional")]
     pub fn get_notional(&self) -> Result<JsValue, JsValue> {
         to_js_value(self.inner.get_notional())
     }
@@ -194,7 +215,7 @@ impl JsCashFlowSchedule {
     ///
     /// @returns `DayCount` wire string such as `"act_360"`.
     /// @throws If the day count cannot be serialized.
-    #[wasm_bindgen(js_name = getDayCount)]
+    #[wasm_bindgen(js_name = getDayCount, unchecked_return_type = "generated.core.DayCount")]
     pub fn get_day_count(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner.get_day_count())
     }
@@ -203,7 +224,7 @@ impl JsCashFlowSchedule {
     ///
     /// @returns `CashFlowMeta` wire object: representation, calendar ids, commitment, issue date, maturity and projected fixings.
     /// @throws If the metadata cannot be serialized.
-    #[wasm_bindgen(js_name = getMeta)]
+    #[wasm_bindgen(js_name = getMeta, unchecked_return_type = "generated.cashflows.CashFlowMeta")]
     pub fn get_meta(&self) -> Result<JsValue, JsValue> {
         to_js_value(self.inner.get_meta())
     }
@@ -225,7 +246,10 @@ impl JsCashFlowSchedule {
     /// @returns A new, scaled `CashFlowSchedule`.
     /// @throws If `scale` is not a number (kind `invalid_type`) or is NaN or infinite (kind `validation`).
     #[wasm_bindgen(js_name = scaleAmounts)]
-    pub fn scale_amounts(&self, scale: JsValue) -> Result<JsCashFlowSchedule, JsValue> {
+    pub fn scale_amounts(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] scale: JsValue,
+    ) -> Result<JsCashFlowSchedule, JsValue> {
         self.inner
             .clone()
             .scale_amounts(js_f64(&scale, "scale")?)
@@ -243,11 +267,14 @@ impl JsCashFlowSchedule {
     /// else the cash amount), so a payment lag or a premium/OID cash amount
     /// does not move WAL.
     ///
-    /// @param as_of - ISO-8601 measurement date; only repayments whose balance-effective date is strictly after it count.
+    /// @param asOf - ISO-8601 measurement date; only repayments whose balance-effective date is strictly after it count.
     /// @returns WAL in years; `0` when no repayment falls after `asOf`.
     /// @throws If `asOf` is not an ISO-8601 string (kind `invalid_type` or `validation`), contributing repayments mix currencies, or a year fraction cannot be computed.
     #[wasm_bindgen]
-    pub fn wal(&self, as_of: JsValue) -> Result<f64, JsValue> {
+    pub fn wal(
+        &self,
+        #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
+    ) -> Result<f64, JsValue> {
         self.inner.wal(js_date(&as_of, "asOf")?).map_err(to_js_err)
     }
 
@@ -258,7 +285,7 @@ impl JsCashFlowSchedule {
     ///
     /// @returns `{ date, amount }` entries in date order; `amount` is the outstanding balance after that date's flows.
     /// @throws If `meta.issue_date` is unset or principal flows mix currencies (kind `validation`).
-    #[wasm_bindgen(js_name = outstandingByDate)]
+    #[wasm_bindgen(js_name = outstandingByDate, unchecked_return_type = "DatedFlowJson[]")]
     pub fn outstanding_by_date(&self) -> Result<JsValue, JsValue> {
         dated_flows_wire(self.inner.outstanding_by_date().map_err(to_js_err)?)
     }
@@ -270,18 +297,23 @@ impl JsCashFlowSchedule {
     ///
     /// @param periods - `Period` wire objects (`{ id, start, end, is_actual }`) defining the reporting buckets.
     /// @param market - `MarketContext` handle holding the discount (and credit) curve.
-    /// @param disc_curve_id - Identifier of the discount curve in `market`, for example `"USD-OIS"`.
+    /// @param discCurveId - Identifier of the discount curve in `market`, for example `"USD-OIS"`.
     /// @param base - ISO-8601 valuation date that discounting starts from.
-    /// @param credit_curve_id - Optional identifier of a hazard curve in `market`; omitted means no credit adjustment.
+    /// @param creditCurveId - Optional identifier of a hazard curve in `market`; omitted means no credit adjustment.
     /// @returns `PeriodAggregation`: `{ periodId: { currency: Money } }` of PV per period and currency.
     /// @throws If a curve is missing from `market` (kind `not_found`), or an argument is malformed or a discount factor cannot be computed (kind `invalid_type` or `validation`).
-    #[wasm_bindgen(js_name = pvByPeriod)]
+    #[wasm_bindgen(js_name = pvByPeriod, unchecked_return_type = "generated.cashflows.PeriodAggregation")]
     pub fn pv_by_period(
         &self,
-        periods: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "readonly generated.core.Period[]")] periods: JsValue,
         market: &JsMarketContext,
+        #[wasm_bindgen(js_name = "discCurveId", unchecked_param_type = "string")]
         disc_curve_id: JsValue,
-        base: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] base: JsValue,
+        #[wasm_bindgen(
+            js_name = "creditCurveId",
+            unchecked_optional_param_type = "string | null"
+        )]
         credit_curve_id: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
         let periods = js_wire::<Vec<Period>>(&periods, "periods")?;
@@ -307,8 +339,11 @@ impl JsCashFlowSchedule {
     /// @param pvs - Present value of each flow, one per flow in schedule order, in flow-amount units.
     /// @returns `{ year, non_principal, principal, pv }` rows in ascending year order. (Python returns the same rows as a DataFrame.)
     /// @throws If `pvs` is not an array of numbers (kind `invalid_type`), does not have one entry per flow, or holds a non-finite value (kind `validation`).
-    #[wasm_bindgen(js_name = calendarYearLadder)]
-    pub fn calendar_year_ladder(&self, pvs: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = calendarYearLadder, unchecked_return_type = "CalendarYearLadderRow[]")]
+    pub fn calendar_year_ladder(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number[] | Float64Array")] pvs: JsValue,
+    ) -> Result<JsValue, JsValue> {
         to_js_value(
             &self
                 .inner
@@ -333,6 +368,20 @@ impl JsCashFlowSchedule {
 /// rather than from issue; with no stub such a boundary is rejected.
 /// `stepUpCf` keeps one full-horizon grid instead. Snap off-cycle dates onto
 /// the accrual grid first when coupon dates must not move.
+///
+/// @example
+/// ```typescript
+/// import init, { cashflows } from "finstack-quant-wasm";
+/// await init();
+/// const builder = cashflows.CashFlowSchedule.builder()
+///   .principal({ amount: "1000000", currency: "USD" }, "2025-01-15", "2027-01-15")
+///   .amortization({ linear_to: { final_notional: { amount: "500000", currency: "USD" } } })
+///   .fixedCf({ rate: "0.05", coupon_type: "cash", ...cashflows.scheduleParamsSemiannual30360() });
+/// const schedule = builder.build();
+/// console.log(schedule.outstandingByDate());
+/// schedule.free();
+/// builder.free();
+/// ```
 #[wasm_bindgen(js_name = CashFlowBuilder)]
 #[derive(Clone, Debug)]
 pub struct JsCashFlowBuilder {
@@ -344,16 +393,16 @@ impl JsCashFlowBuilder {
     /// Set the initial principal and the issue and maturity dates.
     ///
     /// @param initial - `Money` wire object: initial outstanding balance; its currency is the schedule currency.
-    /// @param issue_date - ISO-8601 issue date; accrual starts here.
+    /// @param issueDate - ISO-8601 issue date; accrual starts here.
     /// @param maturity - ISO-8601 maturity date; the final principal is repaid here.
     /// @returns The builder, for chaining.
     /// @throws If an argument does not match its wire type (kind `invalid_type` or `validation`).
     #[wasm_bindgen]
     pub fn principal(
         &mut self,
-        initial: JsValue,
-        issue_date: JsValue,
-        maturity: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "MoneyValue")] initial: JsValue,
+        #[wasm_bindgen(js_name = "issueDate", unchecked_param_type = "string")] issue_date: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] maturity: JsValue,
     ) -> Result<(), JsValue> {
         let _ = self.inner.principal(
             js_wire::<Money>(&initial, "initial")?,
@@ -369,7 +418,11 @@ impl JsCashFlowBuilder {
     /// @returns The builder, for chaining.
     /// @throws If `exchange` is not one of the listed strings (kind `validation`).
     #[wasm_bindgen(js_name = principalExchange)]
-    pub fn principal_exchange(&mut self, exchange: JsValue) -> Result<(), JsValue> {
+    pub fn principal_exchange(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "generated.cashflows.PrincipalExchange")]
+        exchange: JsValue,
+    ) -> Result<(), JsValue> {
         let _ = self
             .inner
             .principal_exchange(js_wire(&exchange, "exchange")?);
@@ -382,7 +435,11 @@ impl JsCashFlowBuilder {
     /// @returns The builder, for chaining.
     /// @throws If `spec` is not an `AmortizationSpec` (kind `validation`).
     #[wasm_bindgen]
-    pub fn amortization(&mut self, spec: JsValue) -> Result<(), JsValue> {
+    pub fn amortization(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "generated.cashflows.AmortizationSpec")]
+        spec: JsValue,
+    ) -> Result<(), JsValue> {
         let _ = self.inner.amortization(js_wire(&spec, "spec")?);
         Ok(())
     }
@@ -390,7 +447,7 @@ impl JsCashFlowBuilder {
     /// Add a dated principal event (draw, repayment or other balance change).
     ///
     /// @param date - ISO-8601 economic date on which the outstanding balance changes.
-    /// @param payment_date - ISO-8601 cash settlement date of the event.
+    /// @param paymentDate - ISO-8601 cash settlement date of the event.
     /// @param delta - `Money` wire object: change in outstanding balance (positive increases it, negative repays).
     /// @param kind - `CFKind` wire string of the emitted flow, for example `"amortization"` or `"revolving_draw"`.
     /// @param cash - Optional `Money` wire object: cash paid or received when it differs from `delta` (OID, fees); omitted means equal to `delta`.
@@ -399,11 +456,12 @@ impl JsCashFlowBuilder {
     #[wasm_bindgen(js_name = addPrincipalEvent)]
     pub fn add_principal_event(
         &mut self,
-        date: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] date: JsValue,
+        #[wasm_bindgen(js_name = "paymentDate", unchecked_param_type = "string")]
         payment_date: JsValue,
-        delta: JsValue,
-        kind: JsValue,
-        cash: Option<JsValue>,
+        #[wasm_bindgen(unchecked_param_type = "MoneyValue")] delta: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "generated.cashflows.CFKind")] kind: JsValue,
+        #[wasm_bindgen(unchecked_optional_param_type = "MoneyValue | null")] cash: Option<JsValue>,
     ) -> Result<(), JsValue> {
         let _ = self.inner.add_principal_event(
             js_date(&date, "date")?,
@@ -421,7 +479,10 @@ impl JsCashFlowBuilder {
     /// @returns The builder, for chaining.
     /// @throws If `spec` is not a `FixedCouponSpec` (kind `validation`).
     #[wasm_bindgen(js_name = fixedCf)]
-    pub fn fixed_cf(&mut self, spec: JsValue) -> Result<(), JsValue> {
+    pub fn fixed_cf(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "generated.cashflows.FixedCouponSpec")] spec: JsValue,
+    ) -> Result<(), JsValue> {
         let _ = self.inner.fixed_cf(js_wire(&spec, "spec")?);
         Ok(())
     }
@@ -432,7 +493,11 @@ impl JsCashFlowBuilder {
     /// @returns The builder, for chaining.
     /// @throws If `spec` is not a `FloatingCouponSpec` (kind `validation`).
     #[wasm_bindgen(js_name = floatingCf)]
-    pub fn floating_cf(&mut self, spec: JsValue) -> Result<(), JsValue> {
+    pub fn floating_cf(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "generated.cashflows.FloatingCouponSpec")]
+        spec: JsValue,
+    ) -> Result<(), JsValue> {
         let _ = self.inner.floating_cf(js_wire(&spec, "spec")?);
         Ok(())
     }
@@ -443,7 +508,11 @@ impl JsCashFlowBuilder {
     /// @returns The builder, for chaining.
     /// @throws If `spec` is not a `StepUpCouponSpec` (kind `validation`).
     #[wasm_bindgen(js_name = stepUpCf)]
-    pub fn step_up_cf(&mut self, spec: JsValue) -> Result<(), JsValue> {
+    pub fn step_up_cf(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "generated.cashflows.StepUpCouponSpec")]
+        spec: JsValue,
+    ) -> Result<(), JsValue> {
         let _ = self.inner.step_up_cf(js_wire(&spec, "spec")?);
         Ok(())
     }
@@ -454,7 +523,10 @@ impl JsCashFlowBuilder {
     /// @returns The builder, for chaining.
     /// @throws If `spec` is not a `FeeSpec` (kind `validation`).
     #[wasm_bindgen]
-    pub fn fee(&mut self, spec: JsValue) -> Result<(), JsValue> {
+    pub fn fee(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "generated.cashflows.FeeSpec")] spec: JsValue,
+    ) -> Result<(), JsValue> {
         let _ = self.inner.fee(js_wire(&spec, "spec")?);
         Ok(())
     }
@@ -472,9 +544,9 @@ impl JsCashFlowBuilder {
     #[wasm_bindgen(js_name = addFixedWindow)]
     pub fn add_fixed_window(
         &mut self,
-        start: JsValue,
-        end: JsValue,
-        spec: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] start: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] end: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "generated.cashflows.FixedCouponSpec")] spec: JsValue,
     ) -> Result<(), JsValue> {
         let _ = self.inner.add_fixed_window(
             js_date(&start, "start")?,
@@ -497,8 +569,9 @@ impl JsCashFlowBuilder {
     #[wasm_bindgen(js_name = addFloatingWindow)]
     pub fn add_floating_window(
         &mut self,
-        start: JsValue,
-        end: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] start: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] end: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "generated.cashflows.FloatingCouponSpec")]
         spec: JsValue,
     ) -> Result<(), JsValue> {
         let _ = self.inner.add_floating_window(
@@ -523,9 +596,9 @@ impl JsCashFlowBuilder {
     #[wasm_bindgen(js_name = addPaymentWindow)]
     pub fn add_payment_window(
         &mut self,
-        start: JsValue,
-        end: JsValue,
-        split: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] start: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] end: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "generated.cashflows.CouponType")] split: JsValue,
     ) -> Result<(), JsValue> {
         let _ = self.inner.add_payment_window(
             js_date(&start, "start")?,
@@ -544,7 +617,13 @@ impl JsCashFlowBuilder {
     /// @returns The builder, for chaining.
     /// @throws If `steps` is not an array of `[isoDate, CouponType]` pairs (kind `validation`).
     #[wasm_bindgen(js_name = paymentSplitProgram)]
-    pub fn payment_split_program(&mut self, steps: JsValue) -> Result<(), JsValue> {
+    pub fn payment_split_program(
+        &mut self,
+        #[wasm_bindgen(
+            unchecked_param_type = "readonly (readonly [string, generated.cashflows.CouponType])[]"
+        )]
+        steps: JsValue,
+    ) -> Result<(), JsValue> {
         let steps = js_wire::<Vec<(Date, CouponType)>>(&steps, "steps")?;
         let _ = self.inner.payment_split_program(&steps);
         Ok(())
@@ -555,7 +634,7 @@ impl JsCashFlowBuilder {
     /// The switch date cuts the coupon horizon, so each leg gets its own
     /// schedule; see the window-boundary rule on `CashFlowBuilder`.
     ///
-    /// @param switch_date - ISO-8601 date on which the leg switches from fixed to floating (Rust and Python name it `switch`, a reserved word in JavaScript).
+    /// @param switchDate - ISO-8601 date on which the leg switches from fixed to floating (Rust and Python name it `switch`, a reserved word in JavaScript).
     /// @param fixed - `FixedCouponSpec` wire object used before the switch.
     /// @param floating - `FloatingCouponSpec` wire object used from the switch.
     /// @returns The builder, for chaining.
@@ -563,8 +642,11 @@ impl JsCashFlowBuilder {
     #[wasm_bindgen(js_name = fixedToFloat)]
     pub fn fixed_to_float(
         &mut self,
+        #[wasm_bindgen(js_name = "switchDate", unchecked_param_type = "string")]
         switch_date: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "generated.cashflows.FixedCouponSpec")]
         fixed: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "generated.cashflows.FloatingCouponSpec")]
         floating: JsValue,
     ) -> Result<(), JsValue> {
         let _ = self.inner.fixed_to_float(
@@ -582,13 +664,18 @@ impl JsCashFlowBuilder {
     /// window-boundary rule on `CashFlowBuilder`.
     ///
     /// @param steps - `[isoDate, decimalString]` pairs with strictly increasing dates: the spread in basis points in force from each date.
-    /// @param base_spec - `FloatingCouponSpec` wire object supplying index, schedule and conventions; its own spread applies before the first step.
+    /// @param baseSpec - `FloatingCouponSpec` wire object supplying index, schedule and conventions; its own spread applies before the first step.
     /// @returns The builder, for chaining.
     /// @throws If an argument does not match its wire type (kind `validation`).
     #[wasm_bindgen(js_name = floatMarginSteps)]
     pub fn float_margin_steps(
         &mut self,
+        #[wasm_bindgen(unchecked_param_type = "readonly (readonly [string, string])[]")]
         steps: JsValue,
+        #[wasm_bindgen(
+            js_name = "baseSpec",
+            unchecked_param_type = "generated.cashflows.FloatingCouponSpec"
+        )]
         base_spec: JsValue,
     ) -> Result<(), JsValue> {
         let steps: Vec<_> = js_wire::<Vec<(Date, DecimalWire)>>(&steps, "steps")?
@@ -621,14 +708,14 @@ impl JsCashFlowBuilder {
     /// Build cashflows with an explicit historical-observation cutoff.
     ///
     /// @param market - MarketContext with projection curves and exact historical index fixings.
-    /// @param as_of - ISO-8601 valuation date: earlier resets require historical fixings; an available same-day fixing takes precedence over projection.
+    /// @param asOf - ISO-8601 valuation date: earlier resets require historical fixings; an available same-day fixing takes precedence over projection.
     /// @returns A CashFlowSchedule with realized and projected coupons; release it with free().
     /// @throws If a date or schedule is invalid, a required fixing is unavailable, or market data is missing.
     #[wasm_bindgen(js_name = buildAsOf)]
     pub fn build_as_of(
         &self,
         market: &JsMarketContext,
-        as_of: JsValue,
+        #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
     ) -> Result<JsCashFlowSchedule, JsValue> {
         self.inner
             .build_as_of(market.inner(), js_date(&as_of, "asOf")?)
@@ -641,7 +728,7 @@ impl JsCashFlowBuilder {
     /// @param market - `MarketContext` handle holding the forward curves and fixings the floating legs reference.
     /// @returns The built `CashFlowSchedule` handle; release it with free().
     /// @throws If a setter recorded an error, the principal is unset, a referenced curve or fixing is missing (kind `not_found`), or schedule generation fails (kind `validation`).
-    #[wasm_bindgen(js_name = buildWithMarket)]
+    #[wasm_bindgen(skip_typescript, js_name = buildWithMarket)]
     pub fn build_with_market(
         &self,
         market: &JsMarketContext,
@@ -665,7 +752,12 @@ impl JsCashFlowBuilder {
 /// @returns The built `CashFlowSchedule` handle; release it with free().
 /// @throws If `spec` does not match the build-spec schema (kind `invalid_type` or `validation`), a referenced curve or fixing is missing (kind `not_found`), or schedule construction fails (kind `validation`).
 #[wasm_bindgen(js_name = buildCashflowSchedule)]
-pub fn build_cashflow_schedule(spec: JsValue) -> Result<JsCashFlowSchedule, JsValue> {
+pub fn build_cashflow_schedule(
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.cashflows.CashflowScheduleBuildSpec | string"
+    )]
+    spec: JsValue,
+) -> Result<JsCashFlowSchedule, JsValue> {
     crate::utils::input::from_js_json::<CashflowScheduleBuildSpec>(&spec, "spec")?
         .build(None)
         .map(JsCashFlowSchedule::from_inner)
@@ -681,6 +773,9 @@ pub fn build_cashflow_schedule(spec: JsValue) -> Result<JsCashFlowSchedule, JsVa
 /// @throws If `spec` does not match the build-spec schema, a referenced curve or fixing is missing (kind `not_found`), or schedule construction fails (kind `validation`).
 #[wasm_bindgen(js_name = buildCashflowScheduleWithMarket)]
 pub fn build_cashflow_schedule_with_market(
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.cashflows.CashflowScheduleBuildSpec | string"
+    )]
     spec: JsValue,
     market: &JsMarketContext,
 ) -> Result<JsCashFlowSchedule, JsValue> {
@@ -699,7 +794,7 @@ pub fn build_cashflow_schedule_with_market(
 /// @param schedule - `CashFlowSchedule` handle.
 /// @returns `{ date, amount }` entries in schedule order. (Python returns `(date, Money)` tuples.)
 /// @throws If the schedule fails validation (kind `validation`).
-#[wasm_bindgen(js_name = datedFlows)]
+#[wasm_bindgen(js_name = datedFlows, unchecked_return_type = "DatedFlowJson[]")]
 pub fn dated_flows(schedule: &JsCashFlowSchedule) -> Result<JsValue, JsValue> {
     dated_flows_wire(schedule.inner.dated_flows().map_err(to_js_err)?)
 }
@@ -708,15 +803,17 @@ pub fn dated_flows(schedule: &JsCashFlowSchedule) -> Result<JsValue, JsValue> {
 ///
 /// @param flows - `{ date, amount }` entries: ISO-8601 date and `Money` amount of each flow.
 /// @param kind - `CFKind` wire string stamped on every flow, for example `"fixed"`.
-/// @param day_count - `DayCount` wire string attached to the schedule for downstream accrual and yield calculations.
+/// @param dayCount - `DayCount` wire string attached to the schedule for downstream accrual and yield calculations.
 /// @param opts - Optional `ScheduleBuildOpts` wire object (`{ notional_hint?, meta? }`); omitted means a zero notional in the first flow's currency and default metadata.
 /// @returns The `CashFlowSchedule` handle, flows in canonical order.
 /// @throws If an argument does not match its wire type, or a flow is invalid (kind `validation`).
 #[wasm_bindgen(js_name = scheduleFromDatedFlows)]
 pub fn schedule_from_dated_flows(
-    flows: JsValue,
-    kind: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "readonly DatedFlowJson[]")] flows: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.cashflows.CFKind")] kind: JsValue,
+    #[wasm_bindgen(js_name = "dayCount", unchecked_param_type = "generated.core.DayCount")]
     day_count: JsValue,
+    #[wasm_bindgen(unchecked_optional_param_type = "generated.cashflows.ScheduleBuildOpts | null")]
     opts: Option<JsValue>,
 ) -> Result<JsCashFlowSchedule, JsValue> {
     Ok(JsCashFlowSchedule::from_inner(
@@ -733,14 +830,17 @@ pub fn schedule_from_dated_flows(
 /// Build a schedule from flows that already carry their cashflow kind.
 ///
 /// @param flows - `CashFlow` wire objects; each flow's kind is kept as is.
-/// @param day_count - `DayCount` wire string attached to the schedule for downstream accrual and yield calculations.
+/// @param dayCount - `DayCount` wire string attached to the schedule for downstream accrual and yield calculations.
 /// @param opts - Optional `ScheduleBuildOpts` wire object (`{ notional_hint?, meta? }`); omitted means a zero notional in the first flow's currency and default metadata.
 /// @returns The `CashFlowSchedule` handle, flows in canonical order.
 /// @throws If an argument does not match its wire type, or a flow is invalid (kind `validation`).
 #[wasm_bindgen(js_name = scheduleFromClassifiedFlows)]
 pub fn schedule_from_classified_flows(
+    #[wasm_bindgen(unchecked_param_type = "readonly generated.cashflows.CashFlow[]")]
     flows: JsValue,
+    #[wasm_bindgen(js_name = "dayCount", unchecked_param_type = "generated.core.DayCount")]
     day_count: JsValue,
+    #[wasm_bindgen(unchecked_optional_param_type = "generated.cashflows.ScheduleBuildOpts | null")]
     opts: Option<JsValue>,
 ) -> Result<JsCashFlowSchedule, JsValue> {
     Ok(JsCashFlowSchedule::from_inner(
@@ -780,13 +880,14 @@ pub(crate) fn schedules_arg(
 ///
 /// @param schedules - Schedules to merge: `CashFlowSchedule` handles (the facade passes them as JSON), canonical JSON strings or plain objects.
 /// @param notional - `Notional` wire object of the merged schedule.
-/// @param day_count - `DayCount` wire string of the merged schedule.
+/// @param dayCount - `DayCount` wire string of the merged schedule.
 /// @returns The merged `CashFlowSchedule` handle.
 /// @throws If `schedules` is not an array (kind `invalid_type`) or an argument does not match its wire type (kind `validation`).
 #[wasm_bindgen(js_name = mergeCashflowSchedules)]
 pub fn merge_cashflow_schedules(
-    schedules: JsValue,
-    notional: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "readonly JsonInput[]")] schedules: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.cashflows.Notional")] notional: JsValue,
+    #[wasm_bindgen(js_name = "dayCount", unchecked_param_type = "generated.core.DayCount")]
     day_count: JsValue,
 ) -> Result<JsCashFlowSchedule, JsValue> {
     Ok(JsCashFlowSchedule::from_inner(

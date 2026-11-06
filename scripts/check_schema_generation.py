@@ -7,8 +7,8 @@ generations are byte-identical to each other and to the checked-in files. With
 
 The generators are executed from ``--bin-dir`` (default: ``target/debug`` of the
 cargo target directory) instead of through ``cargo run``, which re-resolves
-features and rebuilds per package. ``mise run rust-check-schemas`` and
-``mise run rust-gen-schemas`` build them first.
+features and rebuilds per package. ``mise run gen-check`` and
+``mise run gen-write`` build them first.
 """
 
 from __future__ import annotations
@@ -85,7 +85,7 @@ def command(generator: Generator, bin_dir: Path, *arguments: str) -> list[str]:
     binary = bin_dir / generator.binary
     if not binary.is_file():
         raise FileNotFoundError(
-            f"schema generator {binary} is not built; run `mise run rust-check-schemas` or `mise run rust-gen-schemas`"
+            f"schema generator {binary} is not built; run `mise run gen-check` or `mise run gen-write`"
         )
     return [str(binary), *arguments]
 

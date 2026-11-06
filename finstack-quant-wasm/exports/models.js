@@ -7,6 +7,16 @@ import { monteCarlo } from './models/monteCarlo.js';
 import { rates } from './models/rates.js';
 import { volatility } from './models/volatility.js';
 
+/**
+ * Namespaced TypeScript entry points for reusable quantitative models.
+ *
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * console.log(models.bsPrice(100, 100, 0.03, 0, 0.2, 1, true));
+ * ```
+ */
 export const models = {
   correlation,
   credit,

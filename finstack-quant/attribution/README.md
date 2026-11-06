@@ -156,7 +156,7 @@ Two schema artifacts are checked in under
 [`schemas/attribution/1/`](schemas/attribution/1) — `attribution.schema.json`
 (input) and `attribution_result.schema.json` (output) — indexed by
 [`schemas/index.json`](schemas/index.json). Regenerate with
-`mise run rust-gen-schemas`; verify with `mise run rust-check-schemas`.
+`mise run gen-write`; verify with `mise run gen-check`.
 
 ## Public API
 

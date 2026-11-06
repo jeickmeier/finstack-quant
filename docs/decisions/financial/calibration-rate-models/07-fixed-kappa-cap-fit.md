@@ -36,7 +36,7 @@ A common vega-scaled objective would align this branch more closely with the two
 
 ## Implementation and evidence
 
-[cap_floor.rs](../../../../finstack-quant/calibration/src/hull_white/cap_floor.rs) owns objective, intervals, golden search and diagnostics. [tests.rs](../../../../finstack-quant/calibration/src/hull_white/tests.rs) contrasts the SSE fit with a signed-sum root, checks neighboring σ values and validates fixed-κ range/quote count. That is a local regression using the same HW kernel, not a global minimization proof. Fixed-κ parameter recovery and [contractual cap tests](../../../../finstack-quant/calibration/src/hull_white/cap_schedule_tests.rs) are primarily same-kernel repricing. Evidence was inspected, not executed.
+[cap_floor.rs](../../../../finstack-quant/calibration/src/hull_white/cap_floor.rs) owns objective, intervals, golden search and diagnostics. [tests.rs](../../../../finstack-quant/calibration/src/hull_white/tests.rs) contrasts the SSE fit with a signed-sum root, checks neighboring σ values and validates fixed-κ range/quote count. That is a local regression using the same HW kernel, not a global minimization proof. Fixed-κ parameter recovery and [contractual cap tests](../../../../finstack-quant/calibration/src/hull_white/cap_schedule/tests.rs) are primarily same-kernel repricing. Evidence was inspected, not executed.
 
 ## Follow-up tracking
 

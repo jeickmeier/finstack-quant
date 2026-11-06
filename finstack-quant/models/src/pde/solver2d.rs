@@ -101,10 +101,8 @@ impl Solver2D {
             self.stepper.step(
                 problem,
                 &self.grid,
-                &mut u_full,
-                &mut u_int,
-                levels[step],
-                levels[step + 1],
+                (&mut u_full, &mut u_int),
+                (levels[step], levels[step + 1]),
                 step,
                 &mut buffers,
             )?;

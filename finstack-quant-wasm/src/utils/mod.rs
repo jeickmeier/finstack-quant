@@ -213,7 +213,7 @@ fn named_js_error(name: &str, e: &impl IntoJsError) -> JsValue {
 /// Unlike `serde_wasm_bindgen::to_value`, which serializes Rust maps (and
 /// `serde_json::Value::Object`) as ES2015 `Map`s, this helper uses
 /// [`serde_wasm_bindgen::Serializer::json_compatible`] so maps become plain
-/// JS objects — matching the shapes declared in `index.d.ts` and the dict
+/// JS objects — matching the declared TypeScript shapes and the dict
 /// shapes returned by the Python bindings.
 ///
 /// Key order: JavaScript enumerates map keys that are canonical array indices

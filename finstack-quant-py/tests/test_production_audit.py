@@ -22,12 +22,12 @@ def test_structured_credit_constructor_derives_first_payment() -> None:
     deal = StructuredCredit.new_standard(
         "abs",
         StandardDealParams(
-            "NEW-ABS",
-            structured_credit_pool(),
-            structured_credit_tranches(),
-            date(2026, 9, 9),
-            date(2031, 1, 15),
-            "USD-OIS",
+            id="NEW-ABS",
+            pool=structured_credit_pool(),
+            tranches=structured_credit_tranches(),
+            closing_date=date(2026, 9, 9),
+            maturity=date(2031, 1, 15),
+            discount_curve_id="USD-OIS",
         ),
     )
     assert deal.first_payment_date == date(2026, 10, 9)

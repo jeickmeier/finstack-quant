@@ -36,12 +36,12 @@ class StochasticPricingResult:
     >>> as_of, maturity = datetime.date(2024, 1, 15), datetime.date(2031, 1, 15)
     >>> pool = AssetPool("POOL-1", "abs", Currency("USD")).with_rep_lines([
     ...     RepLine(
-    ...         "LINE-1",
-    ...         Money(80_000_000.0, Currency("USD")),
-    ...         0.07,
-    ...         maturity,
-    ...         12,
-    ...         DayCount.ACT_360,
+    ...         id="LINE-1",
+    ...         balance=Money(80_000_000.0, Currency("USD")),
+    ...         rate=0.07,
+    ...         maturity=maturity,
+    ...         seasoning_months=12,
+    ...         day_count=DayCount.ACT_360,
     ...         asset_type={"type": "first_lien_loan"},
     ...     )
     ... ])
@@ -58,7 +58,15 @@ class StochasticPricingResult:
     ...     .build()
     ... )
     >>> deal = StructuredCredit.new_standard(
-    ...     "abs", StandardDealParams("ABS-1", pool, TrancheStructure([note]), as_of, maturity, "USD-SOFR-DISC")
+    ...     "abs",
+    ...     StandardDealParams(
+    ...         id="ABS-1",
+    ...         pool=pool,
+    ...         tranches=TrancheStructure([note]),
+    ...         closing_date=as_of,
+    ...         maturity=maturity,
+    ...         discount_curve_id="USD-SOFR-DISC",
+    ...     ),
     ... )
     >>> envelope = json.loads(deal.to_json())
     >>> envelope["instrument"]["spec"]["calendar_id"] = "nyse"

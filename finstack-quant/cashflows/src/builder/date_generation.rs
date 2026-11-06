@@ -9,7 +9,7 @@
 //! - Classify compiler periods using contractual stub metadata
 //! - Apply business day adjustments using calendars
 
-use super::periods::SchedulePeriod;
+use super::periods::{BuildPeriodsParams, SchedulePeriod};
 use super::specs::RollRule;
 use finstack_quant_core::dates::calendar_by_id_strict;
 use finstack_quant_core::dates::{
@@ -353,24 +353,29 @@ pub(crate) fn generate_periods(
     payment_lag_days: i32,
     calendar_id: &str,
 ) -> finstack_quant_core::Result<Vec<SchedulePeriod>> {
-    generate_periods_with_adjustment(
+    generate_periods_with_adjustment(&BuildPeriodsParams {
         start,
         end,
         frequency,
         stub,
         business_day_convention,
-        end_of_month,
-        payment_lag_days,
         calendar_id,
-        false,
-        RollRule::None,
-    )
+        end_of_month,
+        day_count: DayCount::Act360,
+        payment_lag_days,
+        reset_lag_days: None,
+        adjust_accrual_dates: false,
+        roll_rule: RollRule::None,
+    })
 }
 
 /// Generate skeletal periods and apply the optional accrual-boundary policy.
 ///
-/// Enrichment (day counts and reset dates) remains the caller's job because the
-/// compiler needs raw periods for coupon-specific metadata.
+/// Reads the window, frequency, stub, business-day convention, end-of-month
+/// flag, payment lag, calendar, accrual-adjustment flag and roll rule from
+/// `params`; `day_count` and `reset_lag_days` are ignored here. Enrichment (day
+/// counts and reset dates) remains the caller's job because the compiler needs
+/// raw periods for coupon-specific metadata.
 ///
 /// `roll_rule` selects the core `ScheduleBuilder` anchor mode.
 /// `RollRule::Imm` rolls the regular periods on IMM dates at `frequency` with
@@ -379,19 +384,22 @@ pub(crate) fn generate_periods(
 /// short-back final stub whatever `frequency`/`stub` say, anchored at the CDS
 /// roll date preceding `start` (post-Big-Bang front accrual), so the first
 /// accrual start may lie before `start`.
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn generate_periods_with_adjustment(
-    start: Date,
-    end: Date,
-    frequency: Tenor,
-    stub: StubKind,
-    business_day_convention: BusinessDayConvention,
-    end_of_month: bool,
-    payment_lag_days: i32,
-    calendar_id: &str,
-    adjust_accrual_dates: bool,
-    roll_rule: RollRule,
+    params: &BuildPeriodsParams<'_>,
 ) -> finstack_quant_core::Result<Vec<SchedulePeriod>> {
+    let &BuildPeriodsParams {
+        start,
+        end,
+        frequency,
+        stub,
+        business_day_convention,
+        calendar_id,
+        end_of_month,
+        payment_lag_days,
+        adjust_accrual_dates,
+        roll_rule,
+        ..
+    } = params;
     if payment_lag_days < 0 {
         return Err(finstack_quant_core::Error::Validation(format!(
             "payment_lag_days must be non-negative; got {payment_lag_days}"
@@ -448,6 +456,25 @@ mod tests {
             .expect("Valid test date")
     }
 
+    /// Quarterly, unstubbed, Modified Following on `usny` with adjusted
+    /// accruals and no lag; tests override the conventions they vary.
+    fn window(start: Date, end: Date) -> BuildPeriodsParams<'static> {
+        BuildPeriodsParams {
+            start,
+            end,
+            frequency: Tenor::quarterly(),
+            stub: StubKind::None,
+            business_day_convention: BusinessDayConvention::ModifiedFollowing,
+            calendar_id: "usny",
+            end_of_month: false,
+            day_count: DayCount::Act360,
+            payment_lag_days: 0,
+            reset_lag_days: None,
+            adjust_accrual_dates: true,
+            roll_rule: RollRule::None,
+        }
+    }
+
     #[test]
     fn adjust_is_idempotent_for_every_convention() {
         let cal = calendar_by_id_strict("usny").expect("usny calendar");
@@ -483,18 +510,11 @@ mod tests {
             (StubKind::ShortFront, d(2025, 2, 14), d(2027, 1, 31)),
             (StubKind::ShortBack, d(2025, 1, 31), d(2026, 11, 15)),
         ] {
-            let periods = generate_periods_with_adjustment(
-                start,
-                end,
-                Tenor::quarterly(),
+            let periods = generate_periods_with_adjustment(&BuildPeriodsParams {
                 stub,
-                BusinessDayConvention::ModifiedFollowing,
-                true,
-                0,
-                "usny",
-                true,
-                RollRule::None,
-            )
+                end_of_month: true,
+                ..window(start, end)
+            })
             .expect("schedule builds");
 
             assert!(periods.len() >= 2, "need multiple periods for {stub:?}");
@@ -509,18 +529,10 @@ mod tests {
 
     #[test]
     fn payment_date_equals_adjusted_accrual_end_without_lag() {
-        let periods = generate_periods_with_adjustment(
-            d(2025, 1, 31),
-            d(2027, 1, 31),
-            Tenor::quarterly(),
-            StubKind::None,
-            BusinessDayConvention::ModifiedFollowing,
-            true,
-            0,
-            "usny",
-            true,
-            RollRule::None,
-        )
+        let periods = generate_periods_with_adjustment(&BuildPeriodsParams {
+            end_of_month: true,
+            ..window(d(2025, 1, 31), d(2027, 1, 31))
+        })
         .expect("schedule builds");
 
         assert!(!periods.is_empty());
@@ -573,18 +585,12 @@ mod tests {
     #[test]
     fn adjusted_accrual_regular_periods_are_not_stubs() {
         // Regularity uses unadjusted dates (ISDA 2006 §4.16(c)).
-        let periods = generate_periods_with_adjustment(
-            d(2025, 1, 4), // Saturday anchor
-            d(2026, 1, 4), // Sunday anchor
-            Tenor::semi_annual(),
-            StubKind::None,
-            BusinessDayConvention::ModifiedFollowing,
-            false,
-            0,
-            "weekends_only",
-            true,
-            RollRule::None,
-        )
+        let periods = generate_periods_with_adjustment(&BuildPeriodsParams {
+            frequency: Tenor::semi_annual(),
+            calendar_id: "weekends_only",
+            // Saturday and Sunday anchors.
+            ..window(d(2025, 1, 4), d(2026, 1, 4))
+        })
         .expect("schedule builds");
 
         assert_eq!(periods.len(), 2);
@@ -638,18 +644,15 @@ mod tests {
             ] {
                 for adjust_accrual in [false, true] {
                     for lag in [0, 2] {
-                        let periods = generate_periods_with_adjustment(
-                            d(2025, 1, 31),
-                            d(2025, 12, 31),
-                            Tenor::monthly(),
-                            StubKind::None,
-                            convention,
-                            true,
-                            lag,
+                        let periods = generate_periods_with_adjustment(&BuildPeriodsParams {
+                            frequency: Tenor::monthly(),
+                            business_day_convention: convention,
                             calendar_id,
-                            adjust_accrual,
-                            RollRule::None,
-                        )
+                            end_of_month: true,
+                            payment_lag_days: lag,
+                            adjust_accrual_dates: adjust_accrual,
+                            ..window(d(2025, 1, 31), d(2025, 12, 31))
+                        })
                         .expect("generated monthly periods");
                         for period in periods {
                             let explicit = build_schedule_period(
@@ -692,18 +695,13 @@ mod tests {
             true,
         )
         .expect_err("weekend accrual boundaries both adjust to Monday");
-        let generated = generate_periods_with_adjustment(
-            start,
-            end,
-            Tenor::daily(),
-            StubKind::None,
-            BusinessDayConvention::Following,
-            false,
-            2,
-            "weekends_only",
-            true,
-            RollRule::None,
-        )
+        let generated = generate_periods_with_adjustment(&BuildPeriodsParams {
+            frequency: Tenor::daily(),
+            business_day_convention: BusinessDayConvention::Following,
+            calendar_id: "weekends_only",
+            payment_lag_days: 2,
+            ..window(start, end)
+        })
         .expect_err("generated boundaries also collapse");
         assert_eq!(explicit.to_string(), generated.to_string());
         assert!(explicit.to_string().contains("collapsed period"));

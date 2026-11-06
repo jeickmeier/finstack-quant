@@ -1,174 +1,89 @@
-"""Report source files whose effective line count exceeds a limit.
+"""Enforce the Rust source-file size limit.
 
-Rust files are counted after removing inline test blocks such as ``#[test]``
-functions, ``#[tokio::test]`` functions, and ``#[cfg(test)]`` modules.
+Counts the non-test lines of every hand-written Rust source file under a
+crate's ``src/`` directory and fails when one exceeds the hard limit (2000 by
+default). Files over the soft limit (1000) are summarised on one line;
+``--full`` lists them.
+
+Excluded from the count, because the rule in
+``.agents/rules/rust/code-standards.md`` measures source, not tests:
+
+- items under ``#[test]``-style attributes and ``#[cfg(test)]`` (also
+  ``#[cfg(all(test, ...))]``), but not ``#[cfg(not(test))]`` or
+  ``#[cfg(any(test, ...))]``, which also compile outside tests;
+- a module's sibling test file (``tests.rs``) and anything under a ``tests/``
+  directory;
+- generated sources (any path segment named ``generated``).
 """
 
 from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
-import os
 from pathlib import Path
-import re
 import sys
 
-DEFAULT_LIMIT = 1000
-EXCLUDED_DIRS = {
-    ".git",
-    ".venv",
-    "__pycache__",
-    "build",
-    "dist",
-    "node_modules",
-    "pkg",
-    "pkg-node",
-    "target",
-    "target-codex",
-    "vendor",
-}
-SOURCE_EXTENSIONS = {".js", ".jsx", ".py", ".rs", ".sh", ".ts", ".tsx"}
-# Hand-maintained WASM declaration/API facade; size tracks the exhaustive surface/docs.
-EXCLUDED_RELATIVE_PATHS: frozenset[str] = frozenset({"finstack-quant-wasm/index.d.ts"})
-TEST_ATTRIBUTE_RE = re.compile(r"^\s*#\[\s*(?:[A-Za-z_]\w*::)*test\b[^\]]*\]\s*$")
-CFG_TEST_RE = re.compile(r"^\s*#\[\s*cfg\s*\([^\]]*\btest\b[^\]]*\)\s*\]\s*$")
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from rust_source import iter_rust_sources, production_lines
+
+HARD_LIMIT = 2000
+SOFT_LIMIT = 1000
 
 
 @dataclass(frozen=True, slots=True)
 class Args:
-    """Parsed command-line arguments for the line-count check."""
+    """Parsed command-line arguments."""
 
     limit: int
+    report_at: int
     ci: bool
+    full: bool
 
 
-def parse_args() -> Args:
-    """Parse command-line options for the line-count check."""
-    parser = argparse.ArgumentParser(
-        description=(
-            "List source files whose effective line count exceeds the limit. "
-            "Rust inline test blocks are excluded from the count."
-        )
-    )
-    parser.add_argument("limit", nargs="?", type=int, default=DEFAULT_LIMIT)
-    parser.add_argument("--ci", action="store_true", help="exit with status 1 when violations are found")
-    ns = parser.parse_args()
-    return Args(limit=ns.limit, ci=ns.ci)
-
-
-def should_skip_dir(dirname: str) -> bool:
-    """Return whether a directory should be excluded from the scan."""
-    return dirname in EXCLUDED_DIRS or dirname.startswith(".")
-
-
-def is_excluded_relative_path(relative_path: str) -> bool:
-    """Return whether an exact repo-relative path is excluded from line counts."""
-    return relative_path in EXCLUDED_RELATIVE_PATHS
-
-
-def iter_source_files(root: Path) -> list[Path]:
-    """Collect source files under ``root`` that count toward the limit."""
-    files: list[Path] = []
-    for current_root, dirnames, filenames in os.walk(root):
-        dirnames[:] = sorted(name for name in dirnames if not should_skip_dir(name))
-        base = Path(current_root)
-        for filename in sorted(filenames):
-            path = base / filename
-            if path.suffix in SOURCE_EXTENSIONS:
-                files.append(path)
-    return files
-
-
-def count_braces(line: str) -> int:
-    """Return the net change in brace depth for a Rust source line."""
-    return line.count("{") - line.count("}")
-
-
-def is_rust_test_attribute(line: str) -> bool:
-    """Return whether a line starts a Rust test-only item."""
-    return bool(TEST_ATTRIBUTE_RE.match(line) or CFG_TEST_RE.match(line))
+def parse_args(argv: list[str] | None = None) -> Args:
+    """Parse the command line."""
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("limit", nargs="?", type=int, default=HARD_LIMIT, help="hard limit (fail above it)")
+    parser.add_argument("--report-at", type=int, default=SOFT_LIMIT, help="soft limit (summarised above it)")
+    parser.add_argument("--ci", action="store_true", help="exit 1 when a file exceeds the hard limit")
+    parser.add_argument("--full", action="store_true", help="list every file above the soft limit")
+    ns = parser.parse_args(argv)
+    return Args(limit=ns.limit, report_at=ns.report_at, ci=ns.ci, full=ns.full)
 
 
 def count_rust_lines(path: Path) -> int:
-    """Count Rust lines while excluding inline test-only items."""
-    effective_lines = 0
-    skipping_item = False
-    item_started = False
-    brace_depth = 0
-
-    with path.open("r", encoding="utf-8", errors="ignore") as handle:
-        for line in handle:
-            if skipping_item:
-                if not item_started:
-                    if "{" in line:
-                        item_started = True
-                        brace_depth = count_braces(line)
-                        if brace_depth <= 0:
-                            skipping_item = False
-                            item_started = False
-                            brace_depth = 0
-                    elif ";" in line:
-                        skipping_item = False
-                else:
-                    brace_depth += count_braces(line)
-                    if brace_depth <= 0:
-                        skipping_item = False
-                        item_started = False
-                        brace_depth = 0
-                continue
-
-            if is_rust_test_attribute(line):
-                skipping_item = True
-                item_started = False
-                brace_depth = 0
-                continue
-
-            effective_lines += 1
-
-    return effective_lines
+    """Count a Rust file's lines, excluding items under test-only attributes."""
+    return sum(1 for _ in production_lines(path))
 
 
-def count_lines(path: Path) -> int:
-    """Count effective lines for a supported source file."""
-    if path.suffix == ".rs":
-        return count_rust_lines(path)
-
-    with path.open("r", encoding="utf-8", errors="ignore") as handle:
-        return sum(1 for _ in handle)
+def measure(root: Path) -> list[tuple[str, int]]:
+    """Return every Rust source file with its effective line count, largest first."""
+    counts = [(p.relative_to(root).as_posix(), count_rust_lines(p)) for p in iter_rust_sources(root)]
+    counts.sort(key=lambda item: (-item[1], item[0]))
+    return counts
 
 
-def collect_violations(root: Path, limit: int) -> list[tuple[str, int]]:
-    """Return files whose effective line count exceeds ``limit``."""
-    violations: list[tuple[str, int]] = []
-    for path in iter_source_files(root):
-        relative_path = path.relative_to(root).as_posix()
-        if is_excluded_relative_path(relative_path):
-            continue
-        line_count = count_lines(path)
-        if line_count > limit:
-            violations.append((relative_path, line_count))
-    violations.sort(key=lambda item: (-item[1], item[0]))
-    return violations
-
-
-def main() -> int:
-    """Run the line-count check and print a report."""
-    args = parse_args()
+def main(argv: list[str] | None = None) -> int:
+    """Run the check and print a report."""
+    args = parse_args(argv)
     root = Path(__file__).resolve().parent.parent
-    violations = collect_violations(root, args.limit)
-
-    if not violations:
-        print(f"All source files are within the {args.limit}-line limit.")
-        return 0
-
-    print(f"Found {len(violations)} file(s) exceeding {args.limit} lines:")
-    print()
-    print(f"{'LINES':>6}  FILE")
-    print(f"{'-----':>6}  ----")
-    for relative_path, line_count in violations:
-        print(f"{line_count:6d}  {relative_path}")
-
-    return 1 if args.ci else 0
+    counts = measure(root)
+    hard = [(p, n) for p, n in counts if n > args.limit]
+    soft = [(p, n) for p, n in counts if args.report_at < n <= args.limit]
+    for path, lines in hard:
+        print(f"{lines:6d}  {path}  (over the {args.limit}-line limit)")
+    if args.full:
+        for path, lines in soft:
+            print(f"{lines:6d}  {path}")
+    if soft:
+        hint = "" if args.full else "; --full lists them"
+        print(f"{len(soft)} Rust source file(s) between {args.report_at} and {args.limit} lines{hint}.")
+    if hard:
+        print(f"{len(hard)} Rust source file(s) exceed the {args.limit}-line limit; split them.")
+        return 1 if args.ci else 0
+    print(f"All {len(counts)} Rust source files are within the {args.limit}-line limit.")
+    return 0
 
 
 if __name__ == "__main__":

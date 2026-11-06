@@ -331,7 +331,6 @@ impl PyMertonModel {
 
     #[doc = pydoc!("finstack_quant.models.credit", "MertonModel.new_with_dynamics")]
     #[staticmethod]
-    #[allow(clippy::too_many_arguments)]
     fn new_with_dynamics(
         asset_value: f64,
         asset_vol: f64,

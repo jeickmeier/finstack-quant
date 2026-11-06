@@ -64,8 +64,16 @@ def test_forward_greeks_is_typed_with_pandas_exits() -> None:
 
 
 def test_heston_price_dispatches_put_through_rust() -> None:
-    call = heston_price(100.0, 100.0, 1.0, 0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04)
-    put = heston_price(100.0, 100.0, 1.0, 0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04, is_call=False)
+    call = heston_price(
+        100.0, 100.0, 1.0, {"r": 0.05, "q": 0.02, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "sigma_v": 0.3, "rho": -0.7}
+    )
+    put = heston_price(
+        100.0,
+        100.0,
+        1.0,
+        {"r": 0.05, "q": 0.02, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "sigma_v": 0.3, "rho": -0.7},
+        is_call=False,
+    )
     parity = call - put - (100.0 * math.exp(-0.02) - 100.0 * math.exp(-0.05))
     assert abs(parity) < 1e-8
 
@@ -104,7 +112,15 @@ def test_option_calculation_price_solve_matches_the_kernels() -> None:
     assert result.price == bs_price(100.0, 105.0, 0.03, 0.01, 0.25, 0.75, False)
     assert result.implied_vol == 0.25
     assert isinstance(result.greeks, BsGreeks)
-    assert result.greeks == bs_greeks(100.0, 105.0, 0.03, 0.01, 0.25, 0.75, False)
+    assert result.greeks == bs_greeks({
+        "spot": 100.0,
+        "strike": 105.0,
+        "rate": 0.03,
+        "dividend_yield": 0.01,
+        "volatility": 0.25,
+        "time_to_expiry": 0.75,
+        "option_type": "put",
+    })
 
 
 @pytest.mark.parametrize(

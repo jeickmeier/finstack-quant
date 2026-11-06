@@ -19,13 +19,14 @@
 //! rng.fill_std_normals(&mut fbm_normals);
 //! fbm_gen.generate(&fbm_normals, &mut fbm_increments);
 //!
-//! let pv = simulate_path_fractional(
-//!     &mut path_rng, time_grid, process, disc, initial_state,
-//!     &mut payoff, currency, &fbm_increments, fbm_z_index, None,
-//!     &mut state, &mut z, &mut work,
-//! )?;
+//! let path = FractionalPath {
+//!     time_grid, process, disc, initial_state, currency,
+//!     fbm_increments: &fbm_increments, fbm_z_index, aux: None,
+//! };
+//! let pv = simulate_path_fractional(&mut path_rng, &path, &mut payoff, &mut state, &mut z, &mut work)?;
 //! ```
 
+use crate::monte_carlo::engine::simulation::{PathBuffers, PathLoop};
 use crate::monte_carlo::engine::{McEngine, NoiseHook, run_path_loop};
 #[cfg(test)]
 use crate::monte_carlo::traits::PathState;
@@ -34,27 +35,44 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::{Error, Result};
 
+/// Model, grid and pre-generated fractional noise of one
+/// [`simulate_path_fractional`] path.
+pub struct FractionalPath<'a, P, D> {
+    /// Simulation time grid.
+    pub time_grid: &'a TimeGrid,
+    /// Stochastic process driving the state.
+    pub process: &'a P,
+    /// Discretization scheme compatible with `process`.
+    pub disc: &'a D,
+    /// Initial state vector; its length must equal `process.dim()`.
+    pub initial_state: &'a [f64],
+    /// Currency tag assigned to the resulting payoff amount.
+    pub currency: Currency,
+    /// Pre-generated fractional increments, at least `time_grid.num_steps()`
+    /// long; `fbm_increments[step]` is injected at every step.
+    pub fbm_increments: &'a [f64],
+    /// Index in `z` where the fractional increment is injected.
+    pub fbm_z_index: usize,
+    /// Optional second injection `(z_index, values)`; rBergomi uses it to
+    /// inject the unit-variance driving Brownian normal for the exact
+    /// spot–vol correlation. `None` for schemes that need only the single
+    /// increment.
+    pub aux: Option<(usize, &'a [f64])>,
+}
+
 /// Simulate a single Monte Carlo path with fractional noise injection.
 ///
 /// Thin wrapper over the shared per-path loop with a noise injection hook
-/// that overwrites `z[fbm_z_index]` with `fbm_increments[step]` after
-/// drawing i.i.d. shocks. Correlation is not applied; rough-volatility schemes
-/// encode their factor structure inside `disc.step`.
+/// that overwrites `z[path.fbm_z_index]` with `path.fbm_increments[step]`
+/// after drawing i.i.d. shocks. Correlation is not applied; rough-volatility
+/// schemes encode their factor structure inside `disc.step`.
 ///
 /// # Arguments
 ///
 /// * `rng` — random stream for standard normals and uniform draws
-/// * `time_grid` — simulation time grid
-/// * `process` — stochastic process
-/// * `disc` — discretization scheme
-/// * `initial_state` — initial state vector (length = `process.dim()`)
+/// * `path` — grid, process, scheme, initial state, currency and the
+///   fractional noise to inject; see [`FractionalPath`]
 /// * `payoff` — payoff accumulator (must be pre-reset by caller)
-/// * `currency` — Currency tag assigned to the resulting discounted payoff.
-/// * `fbm_increments` — pre-generated fractional increments (length = `num_steps`)
-/// * `fbm_z_index` — index in `z` where the fractional increment is injected
-/// * `aux` — optional second injection `(z_index, values)`; rBergomi uses it to
-///   inject the unit-variance driving Brownian normal for the exact spot–vol
-///   correlation. Pass `None` for schemes that need only the single increment.
 /// * `state` — reusable state buffer (length = `process.dim()`)
 /// * `z` — reusable noise buffer (length = `process.num_factors()`)
 /// * `work` — reusable work buffer (length = `disc.work_size(process)`); the
@@ -65,18 +83,10 @@ use finstack_quant_core::{Error, Result};
 ///
 /// Returns an error if the scheme pairing, grid step count, buffer dimensions,
 /// or payoff value computation fails.
-#[allow(clippy::too_many_arguments)]
 pub fn simulate_path_fractional<R, P, D, F>(
     rng: &mut R,
-    time_grid: &TimeGrid,
-    process: &P,
-    disc: &D,
-    initial_state: &[f64],
+    path: &FractionalPath<'_, P, D>,
     payoff: &mut F,
-    currency: Currency,
-    fbm_increments: &[f64],
-    fbm_z_index: usize,
-    aux: Option<(usize, &[f64])>,
     state: &mut [f64],
     z: &mut [f64],
     work: &mut [f64],
@@ -87,6 +97,16 @@ where
     D: Discretization<P>,
     F: Payoff,
 {
+    let &FractionalPath {
+        time_grid,
+        process,
+        disc,
+        initial_state,
+        currency,
+        fbm_increments,
+        fbm_z_index,
+        aux,
+    } = path;
     McEngine::validate_scheme_pairing(process, disc)?;
     let num_steps = time_grid.num_steps();
     if let Some(expected) = disc.expected_num_steps()
@@ -138,24 +158,25 @@ where
     // No engine-side correlation: rough-vol schemes apply factor structure inside `disc.step`.
     // `z_raw` is unused in the InjectFbm path, so a zero-length slice suffices.
     let mut z_raw: [f64; 0] = [];
-    run_path_loop(
-        rng,
+    let path_loop = PathLoop {
         time_grid,
         process,
         disc,
         initial_state,
-        payoff,
-        state,
-        z,
-        &mut z_raw,
-        work,
-        NoiseHook::InjectFbm {
+        hook: NoiseHook::InjectFbm {
             z_index: fbm_z_index,
             increments: fbm_increments,
             aux,
         },
         currency,
-    )
+    };
+    let buffers = PathBuffers {
+        state,
+        z,
+        z_raw: &mut z_raw,
+        work,
+    };
+    run_path_loop(rng, &path_loop, payoff, buffers)
 }
 
 #[cfg(test)]
@@ -251,22 +272,19 @@ mod tests {
         let mut z = vec![0.0, 0.0];
         let mut work = vec![];
 
-        let pv = simulate_path_fractional(
-            &mut rng,
-            &time_grid,
-            &process,
-            &disc,
-            &[0.0],
-            &mut payoff,
-            Currency::USD,
-            &fbm_increments,
-            1,
-            None,
-            &mut state,
-            &mut z,
-            &mut work,
-        )
-        .expect("simulation should succeed");
+        let path = FractionalPath {
+            time_grid: &time_grid,
+            process: &process,
+            disc: &disc,
+            initial_state: &[0.0],
+            currency: Currency::USD,
+            fbm_increments: &fbm_increments,
+            fbm_z_index: 1,
+            aux: None,
+        };
+        let pv =
+            simulate_path_fractional(&mut rng, &path, &mut payoff, &mut state, &mut z, &mut work)
+                .expect("simulation should succeed");
 
         // The disc accumulates z[1] into x[0], so final = sum of fBM increments
         let expected: f64 = fbm_increments.iter().sum();
@@ -299,22 +317,19 @@ mod tests {
         rng.fill_std_normals(&mut fbm_normals);
         fbm_gen.generate(&fbm_normals, &mut fbm_increments);
 
-        let pv = simulate_path_fractional(
-            &mut rng,
-            &time_grid,
-            &process,
-            &disc,
-            &[0.0],
-            &mut payoff,
-            Currency::USD,
-            &fbm_increments,
-            1,
-            None,
-            &mut state,
-            &mut z,
-            &mut work,
-        )
-        .expect("simulation should succeed");
+        let path = FractionalPath {
+            time_grid: &time_grid,
+            process: &process,
+            disc: &disc,
+            initial_state: &[0.0],
+            currency: Currency::USD,
+            fbm_increments: &fbm_increments,
+            fbm_z_index: 1,
+            aux: None,
+        };
+        let pv =
+            simulate_path_fractional(&mut rng, &path, &mut payoff, &mut state, &mut z, &mut work)
+                .expect("simulation should succeed");
 
         // pv should be the sum of correlated fBM increments (finite, non-NaN)
         assert!(pv.is_finite(), "payoff must be finite, got {pv}");

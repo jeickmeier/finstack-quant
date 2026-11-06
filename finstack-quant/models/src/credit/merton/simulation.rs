@@ -266,8 +266,7 @@ impl MertonModel {
                 &normals,
                 jump_data.as_deref(),
                 jump_params,
-                drift_per_step,
-                diffusion,
+                (drift_per_step, diffusion),
                 false,
             );
             if gen_antithetic && all_paths.len() / values_per_path < num_paths {
@@ -277,8 +276,7 @@ impl MertonModel {
                     &normals,
                     jump_data.as_deref(),
                     jump_params,
-                    drift_per_step,
-                    diffusion,
+                    (drift_per_step, diffusion),
                     true,
                 );
             }
@@ -300,16 +298,15 @@ impl MertonModel {
 ///
 /// The antithetic leg negates the diffusion and jump-size normals and uses the
 /// antithetic Poisson counts; every random draw happened beforehand, so both
-/// legs read the same numbers.
-#[allow(clippy::too_many_arguments)]
+/// legs read the same numbers. `(drift_per_step, diffusion)` are the per-step
+/// log drift and the diffusion multiplier of each normal.
 fn push_path(
     all_paths: &mut Vec<f64>,
     v0: f64,
     normals: &[f64],
     jump_data: Option<&[StepJumpData]>,
     jump_params: Option<(f64, f64, f64)>,
-    drift_per_step: f64,
-    diffusion: f64,
+    (drift_per_step, diffusion): (f64, f64),
     anti: bool,
 ) {
     let sign = |x: f64| if anti { -x } else { x };

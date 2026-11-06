@@ -389,8 +389,7 @@ test('calculateVar matches the hvar metric and aggregates positions', () => {
     '2024-01-15',
     'default',
     ['hvar'],
-    null,
-    RATE_HISTORY
+    { market_history: RATE_HISTORY }
   );
   assert.equal(result.num_scenarios, 3);
   assert.equal(result.confidence_level, 0.95);

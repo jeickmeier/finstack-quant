@@ -30,10 +30,13 @@ use wasm_bindgen::prelude::*;
 /// @param config - `CapitalStructureSummaryConfig` (object or JSON): `period` (the reporting period, such as `"2025Q4"`), `ebitda_node` (required; the node holding EBITDA for each single period, never inferred from a conventional name) and `cash_node` (optional; the node holding the period-end cash balance, omitted means null cash, net debt and net leverage).
 /// @returns `CapitalStructureSummary` plain object: `as_of`, `currency`, `total_debt`, `cash`, `net_debt` and `ltm_ebitda` as money, `ltm_periods_required`, `ltm_periods_found`, `total_leverage`, `net_leverage` and `total_coverage` in turns, `tranches` by rank then declaration order (`id`, `kind`, `rank`, `payment_class`, `balance` with a revolver at its drawn balance, `share_of_debt` as a decimal, `maturity`, `cumulative_debt`, `leverage` and `interest_coverage` through the class, `ltm_interest`) and `maturity_wall` by calendar year of final maturity, ascending (`year`, `amount`, `share_of_debt`), using the balance at the period and ignoring any scheduled amortization after it.
 /// @throws If an argument is malformed, the model has no capital structure or no debt instruments once hedges are excluded, `cs_cashflows` is absent, the period is not in the model, a configured node is not in the results or the cash node has no value at the period, an instrument has no cashflows at the period or is in no class while payment classes are declared, a consumed value or ratio is non-finite, tranches are in more than one currency (no FX is applied), or the EBITDA or cash node is monetary in another currency (kind `validation`).
-#[wasm_bindgen(js_name = capitalStructureSummary)]
+#[wasm_bindgen(js_name = capitalStructureSummary, unchecked_return_type = "generated.statements_analytics.CapitalStructureSummary")]
 pub fn capital_structure_summary(
-    results: JsValue,
-    model: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] results: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.CapitalStructureSummaryConfig | string"
+    )]
     config: JsValue,
 ) -> Result<JsValue, JsValue> {
     let results: StatementResult = from_js_json(&results, "results")?;
@@ -53,8 +56,13 @@ pub fn capital_structure_summary(
 /// @param summary - `CapitalStructureSummary` plain object or JSON string, as `capitalStructureSummary` returns it.
 /// @returns `TableEnvelope` in tranche order (rank, then model declaration order) with columns `id`, `kind` (`bond`, `convertible_bond`, `term_loan` or `revolving_credit`), `rank` (integer), `payment_class` (nullable string), `balance`, `share_of_debt` (nullable decimal), `maturity` (ISO date string), `cumulative_debt`, `leverage` and `interest_coverage` (nullable, in turns) and `ltm_interest` (nullable); amounts are floats in the summary's `currency`, which the table does not state. The columns remain when there are no tranches.
 /// @throws Error - Throws with kind `validation` if `summary` does not match the `CapitalStructureSummary` schema.
-#[wasm_bindgen(js_name = capitalStructureSummaryTable)]
-pub fn capital_structure_summary_table(summary: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = capitalStructureSummaryTable, unchecked_return_type = "TableEnvelope")]
+pub fn capital_structure_summary_table(
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.CapitalStructureSummary | string"
+    )]
+    summary: JsValue,
+) -> Result<JsValue, JsValue> {
     let summary: CapitalStructureSummary = from_js_json(&summary, "summary")?;
     to_js_value(&summary.to_table())
 }

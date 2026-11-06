@@ -87,13 +87,11 @@ test('statements_analytics matches the cross-host golden', () => {
     2026: { amount: '110', currency: 'USD' },
   });
   dcfBuilder.withMeta('currency', 'USD');
-  const dcf = sa.evaluateDcf(
-    dcfBuilder.build(),
-    0.1,
-    { type: 'gordon_growth', stable_growth_rate: 0.02 },
-    undefined,
-    0.0
-  );
+  const dcf = sa.evaluateDcf(dcfBuilder.build(), {
+    wacc: 0.1,
+    terminal_value: { type: 'gordon_growth', stable_growth_rate: 0.02 },
+    net_debt_override: 0.0,
+  });
 
   assert.throws(
     () => sa.runCorporateAnalysis(MODEL, { wacc: 0.1 }),

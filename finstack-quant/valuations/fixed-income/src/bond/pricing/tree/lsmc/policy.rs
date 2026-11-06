@@ -55,30 +55,17 @@ pub(super) struct PathRecord {
 
 pub(super) type RegressionPolicy = StandardizedPolynomialPolicy<FEATURE_COUNT>;
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn fit_make_whole_policies(
-    tree: &RatesCreditTree,
+    run: TrainingRun<'_>,
     template: &ReplayTemplate,
-    bond: &Bond,
-    config: &BondLsmcConfig,
-    seed: u64,
     simulated_paths: usize,
-    terms: &ReplayTerms,
 ) -> Result<Vec<RegressionPolicy>> {
     if template.make_whole_claims.is_empty() {
         return Ok(Vec::new());
     }
+    let (config, terms) = (run.config, run.terms);
     let boundaries = training_boundaries(template, simulated_paths)?;
-    let checkpoints = build_training_checkpoints(
-        tree,
-        template,
-        bond,
-        config,
-        seed,
-        simulated_paths,
-        &boundaries,
-        terms,
-    )?;
+    let checkpoints = build_training_checkpoints(run, template, simulated_paths, &boundaries)?;
     let mut policies = vec![None; template.make_whole_claims.len()];
     let mut carried_reference_values =
         vec![vec![0.0; simulated_paths]; template.make_whole_bases.len()];
@@ -121,17 +108,11 @@ pub(super) fn fit_make_whole_policies(
         let paths = map_paths(simulated_paths, Vec::new, |sampled, physical| {
             let (path_index, antithetic) = physical_path_identity(physical, config.antithetic);
             let record = template.replay_block(
-                tree,
-                bond,
-                config,
-                seed,
-                path_index,
-                antithetic,
+                run,
+                (path_index, antithetic),
                 &block_checkpoints[physical],
-                low,
-                high,
+                (low, high),
                 None,
-                terms,
                 sampled,
             )?;
             let mut values = Vec::with_capacity(template.make_whole_bases.len());
@@ -194,32 +175,19 @@ pub(super) fn fit_make_whole_policies(
         .collect()
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn fit_policies(
-    tree: &RatesCreditTree,
+    run: TrainingRun<'_>,
     template: &ReplayTemplate,
-    bond: &Bond,
-    config: &BondLsmcConfig,
-    seed: u64,
     simulated_paths: usize,
     make_whole_policies: &[RegressionPolicy],
-    terms: &ReplayTerms,
 ) -> Result<Vec<Option<RegressionPolicy>>> {
+    let config = run.config;
     let decisions = template.decision_steps.len();
     let last = decisions.checked_sub(1).ok_or_else(|| {
         Error::Internal("bond hazard LSMC replay produced no decision snapshots".into())
     })?;
     let boundaries = training_boundaries(template, simulated_paths)?;
-    let checkpoints = build_training_checkpoints(
-        tree,
-        template,
-        bond,
-        config,
-        seed,
-        simulated_paths,
-        &boundaries,
-        terms,
-    )?;
+    let checkpoints = build_training_checkpoints(run, template, simulated_paths, &boundaries)?;
     let mut policies = vec![None; decisions];
     let mut values = vec![0.0; simulated_paths];
     for block_index in (0..boundaries.len() - 1).rev() {
@@ -241,17 +209,11 @@ pub(super) fn fit_policies(
         let records = map_paths(simulated_paths, Vec::new, |sampled, physical| {
             let (path_index, antithetic) = physical_path_identity(physical, config.antithetic);
             template.replay_block(
-                tree,
-                bond,
-                config,
-                seed,
-                path_index,
-                antithetic,
+                run,
+                (path_index, antithetic),
                 &block_checkpoints[physical],
-                low,
-                high,
+                (low, high),
                 Some(make_whole_policies),
-                terms,
                 sampled,
             )
         })?;

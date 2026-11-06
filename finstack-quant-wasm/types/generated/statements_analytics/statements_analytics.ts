@@ -2191,6 +2191,30 @@ export interface CreditMapping {
   leverage_warn?: [number, number] | null;
 }
 /**
+ * Headline DCF assumptions: decimal WACC, terminal value, unlevered free cash flow node and optional net-debt override.
+ */
+export interface DcfInputs {
+  /**
+   * Flat net-debt amount in model currency used instead of the
+   * model-derived equity bridge; `None` (the default) derives net debt
+   * from the model's debt and cash.
+   */
+  net_debt_override?: number | null;
+  /**
+   * Terminal-value convention applied after the explicit forecast period.
+   */
+  terminal_value: TerminalValueSpec;
+  /**
+   * Node id containing monetary unlevered free cash flow for forecast
+   * periods (default [`DEFAULT_UFCF_NODE`], `"ufcf"`).
+   */
+  ufcf_node?: string;
+  /**
+   * Weighted average cost of capital as a decimal (`0.10` means `10%`).
+   */
+  wacc: number;
+}
+/**
  * Optional configuration for DCF valuation beyond the core WACC/terminal parameters.
  */
 export interface DcfOptions {
@@ -2545,6 +2569,11 @@ export interface EclConfig {
  *
  * Controls the quantitative and qualitative thresholds used in the staging
  * waterfall, plus curing rules for step-down from higher stages.
+ *
+ * Every field may be omitted from the serde document: an omitted field takes
+ * its value from [`StagingConfig::default`] (the embedded default IFRS 9
+ * policy). An explicit `null` `pd_delta_relative` disables the relative
+ * trigger. Unknown keys are rejected.
  */
 export interface StagingConfig {
   /**
@@ -2555,7 +2584,7 @@ export interface StagingConfig {
    * GL on default uses a 3-month probation for Stage 2 → 1 (see
    * EBA/GL/2016/07 §32).
    */
-  cure_periods_stage2_to_1: number;
+  cure_periods_stage2_to_1?: number;
   /**
    * Curing configuration: minimum consecutive performing periods
    * required to move from Stage 3 to Stage 2. Default: 12.
@@ -2565,22 +2594,22 @@ export interface StagingConfig {
    * your internal policy uses a shorter probation, override this
    * field explicitly.
    */
-  cure_periods_stage3_to_2: number;
+  cure_periods_stage3_to_2?: number;
   /**
    * DPD threshold for Stage 2 backstop (IFRS 9 B5.5.19 rebuttable
    * presumption). Default: 30.
    */
-  dpd_stage2_threshold: number;
+  dpd_stage2_threshold?: number;
   /**
    * DPD threshold for Stage 3 (absolute backstop). Default: 90.
    */
-  dpd_stage3_threshold: number;
+  dpd_stage3_threshold?: number;
   /**
    * Absolute PD increase threshold for SICR (e.g., 0.01 = 1 pp).
    * If the lifetime PD has increased by more than this amount since
    * origination, the exposure is classified as Stage 2.
    */
-  pd_delta_absolute: number;
+  pd_delta_absolute?: number;
   /**
    * Relative PD increase threshold for SICR (e.g., 2.0 = PD doubled).
    * `Some(threshold)` applies current_pd / origination_pd > threshold;
@@ -2593,7 +2622,7 @@ export interface StagingConfig {
   /**
    * Whether any qualitative SICR flag triggers Stage 2.
    */
-  qualitative_triggers_enabled: boolean;
+  qualitative_triggers_enabled?: boolean;
   /**
    * Rating downgrade notches that trigger Stage 2 (IFRS 9 B5.5.17(f):
    * external credit rating downgrade as a SICR indicator).
@@ -2604,7 +2633,7 @@ export interface StagingConfig {
    * 3 means a 3-notch downgrade from origination triggers SICR. A `0`
    * threshold disables the trigger entirely.
    */
-  rating_downgrade_notches: number;
+  rating_downgrade_notches?: number;
   /**
    * Ordered rating-scale labels (best -> worst) used to count downgrade
    * notches for the `rating_downgrade_notches` trigger. When `None`, the
@@ -2622,7 +2651,7 @@ export interface StagingConfig {
    * credit-event engine that already mapped them into DPD or
    * previous-stage state.
    */
-  stage3_qualitative_triggers_enabled: boolean;
+  stage3_qualitative_triggers_enabled?: boolean;
 }
 /**
  * ECL result for a single exposure under a single scenario.
@@ -2929,8 +2958,9 @@ export interface Exposure {
   previous_stage?: Stage | null;
   /**
    * Qualitative flags that can trigger Stage 2 classification.
+   * Default: no flags ([`QualitativeFlags::default`]).
    */
-  qualitative_flags: QualitativeFlags;
+  qualitative_flags?: QualitativeFlags;
   /**
    * Remaining maturity in years from reporting date. For revolving
    * facilities, use behavioural maturity.
@@ -2938,9 +2968,9 @@ export interface Exposure {
   remaining_maturity_years: number;
   /**
    * Segment keys for portfolio aggregation (product type, geography, rating
-   * bucket, etc.). Empty vec means "unclassified".
+   * bucket, etc.). Empty vec means "unclassified". Default empty.
    */
-  segments: string[];
+  segments?: string[];
   /**
    * Undrawn commitment at the reporting date, in the same currency as
    * [`Self::ead`]. Constant across the horizon (no undrawn schedule).
@@ -2959,31 +2989,36 @@ export interface Exposure {
  * (`bankruptcy`, `distressed_modification`, `cross_default`,
  * `other_default_evidence`) represent objective evidence of default
  * and should trigger Stage 3 independently of the 90-DPD backstop.
+ *
+ * Every field may be omitted from the serde document: an omitted flag is
+ * off and an omitted list is empty, so `{}` (the [`Default`]) carries no
+ * flags. Unknown keys are rejected, so a misspelt flag is an error rather
+ * than a silently dropped trigger.
  */
 export interface QualitativeFlags {
   /**
    * Significant adverse change in business or financial conditions.
    */
-  adverse_conditions: boolean;
+  adverse_conditions?: boolean;
   /**
    * Obligor has filed or is subject to bankruptcy / insolvency
    * proceedings. Non-rebuttable Stage 3 trigger.
    */
-  bankruptcy: boolean;
+  bankruptcy?: boolean;
   /**
    * Cross-default has been triggered on another obligation of the
    * same obligor.
    */
-  cross_default: boolean;
+  cross_default?: boolean;
   /**
    * Custom user-defined SICR flags (e.g., sector-specific triggers).
    */
-  custom: string[];
+  custom?: string[];
   /**
    * Distressed restructuring / modification with material NPV loss
    * to the lender. IFRS 9 B5.5.37(e) / EBA GL on default.
    */
-  distressed_modification: boolean;
+  distressed_modification?: boolean;
   /**
    * Forbearance or concession granted. Under IFRS 9 forbearance is
    * at minimum a SICR trigger; distressed modifications (deep
@@ -2991,16 +3026,15 @@ export interface QualitativeFlags {
    * are tracked separately under `distressed_modification` and
    * trigger Stage 3.
    */
-  forbearance: boolean;
+  forbearance?: boolean;
   /**
    * Custom user-defined Stage 3 default-evidence flags.
    */
-  other_default_evidence: string[];
+  other_default_evidence?: string[];
   /**
    * On internal watchlist.
    */
-  watchlist: boolean;
-  [k: string]: unknown;
+  watchlist?: boolean;
 }
 /**
  * Tracks consecutive periods of negative free cash flow and flags at configurable thresholds.
@@ -3134,6 +3168,46 @@ export interface GoalSeekResult {
    * units: `1e-9 * max(|target_value|, 1)`.
    */
   tolerance?: number;
+}
+/**
+ * Target node, period and value, driver node and period, model write-back flag and optional bracket of a `goal_seek` solve.
+ */
+export interface GoalSeekSpec {
+  /**
+   * Optional `(lower, upper)` bracket, in the driver node's units, that
+   * constrains the search; both ends must be finite and `lower < upper`.
+   * `None` (the default) searches outward from the driver's current value.
+   *
+   * @minItems 2
+   * @maxItems 2
+   */
+  bounds?: [number, number] | null;
+  /**
+   * Node identifier of the driver input the solve varies.
+   */
+  driver_node: string;
+  /**
+   * Period whose driver value the solve varies.
+   */
+  driver_period: PeriodId;
+  /**
+   * Node identifier of the target metric.
+   */
+  target_node: string;
+  /**
+   * Period in which the target is evaluated.
+   */
+  target_period: PeriodId;
+  /**
+   * Desired value of the target metric, in the target node's units; must
+   * be finite.
+   */
+  target_value: number;
+  /**
+   * When `true`, [`GoalSeekResult::model`] holds a copy of the model with
+   * the solved driver value written in; when `false` it is `None`.
+   */
+  update_model: boolean;
 }
 /**
  * Flags line items whose period-over-period growth exceeds configurable upper / lower bounds.

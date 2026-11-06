@@ -188,14 +188,16 @@ fn test_constituents_unequal_weights() {
 
     let idx = CdsIndex::from_preset(
         &standard_cdx_params(),
-        "CDX-UNEQUAL",
-        Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
-        PayReceive::Pay,
-        start,
-        end,
-        STANDARD_RECOVERY_SENIOR,
-        "USD-OIS",
-        "HZ-INDEX",
+        finstack_quant_valuations::instruments::credit_derivatives::cds::CdsTradeParams {
+            id: finstack_quant_core::types::InstrumentId::new("CDX-UNEQUAL"),
+            notional: Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
+            side: PayReceive::Pay,
+            start,
+            end,
+            recovery_rate: STANDARD_RECOVERY_SENIOR,
+            discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
+            credit_curve_id: finstack_quant_core::types::CurveId::new("HZ-INDEX"),
+        },
     )
     .expect("valid test parameters")
     .with_constituents(constituents);
@@ -218,14 +220,16 @@ fn test_constituents_index_factor_application() {
 
     let idx = CdsIndex::from_preset(
         &standard_cdx_params(),
-        "CDX-FACTOR",
-        Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
-        PayReceive::Pay,
-        start,
-        end,
-        STANDARD_RECOVERY_SENIOR,
-        "USD-OIS",
-        "HZ-INDEX",
+        finstack_quant_valuations::instruments::credit_derivatives::cds::CdsTradeParams {
+            id: finstack_quant_core::types::InstrumentId::new("CDX-FACTOR"),
+            notional: Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
+            side: PayReceive::Pay,
+            start,
+            end,
+            recovery_rate: STANDARD_RECOVERY_SENIOR,
+            discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
+            credit_curve_id: finstack_quant_core::types::CurveId::new("HZ-INDEX"),
+        },
     )
     .expect("valid test parameters")
     .with_index_factor(factor)

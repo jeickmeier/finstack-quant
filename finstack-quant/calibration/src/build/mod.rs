@@ -22,8 +22,11 @@ pub(crate) mod xccy;
 pub(crate) use context::BuildCtx;
 
 #[cfg(test)]
+#[path = "tests/credit.rs"]
 mod tests_credit;
 #[cfg(test)]
+#[path = "tests/quote_construction.rs"]
 mod tests_quote_construction;
 #[cfg(test)]
+#[path = "tests/rates.rs"]
 mod tests_rates;

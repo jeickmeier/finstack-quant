@@ -18,8 +18,10 @@ use wasm_bindgen::prelude::*;
 /// @param name - Kind label such as `"fixed"`, `"float_reset"` or `"pre_payment"`.
 /// @returns The `CFKind` wire string, as used by the `kind` field of a `CashFlow`.
 /// @throws If `name` is not a string (kind `invalid_type`) or names no cashflow kind (kind `validation`).
-#[wasm_bindgen(js_name = cfKindParse)]
-pub fn cf_kind_parse(name: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = cfKindParse, unchecked_return_type = "generated.cashflows.CFKind")]
+pub fn cf_kind_parse(
+    #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
+) -> Result<JsValue, JsValue> {
     let kind = js_string(&name, "name")?
         .parse::<CFKind>()
         .map_err(to_js_err)?;
@@ -32,7 +34,9 @@ pub fn cf_kind_parse(name: JsValue) -> Result<JsValue, JsValue> {
 /// @returns `true` for coupon-type kinds; fees, principal and margin kinds are `false`.
 /// @throws If `kind` is not a `CFKind` wire string (kind `validation`).
 #[wasm_bindgen(js_name = cfKindIsInterestLike)]
-pub fn cf_kind_is_interest_like(kind: JsValue) -> Result<bool, JsValue> {
+pub fn cf_kind_is_interest_like(
+    #[wasm_bindgen(unchecked_param_type = "generated.cashflows.CFKind")] kind: JsValue,
+) -> Result<bool, JsValue> {
     Ok(js_wire::<CFKind>(&kind, "kind")?.is_interest_like())
 }
 
@@ -42,7 +46,9 @@ pub fn cf_kind_is_interest_like(kind: JsValue) -> Result<bool, JsValue> {
 /// @returns `true` for notional, PIK, amortization, prepayment, revolving draw/repayment and defaulted-notional kinds.
 /// @throws If `kind` is not a `CFKind` wire string (kind `validation`).
 #[wasm_bindgen(js_name = cfKindIsPrincipalLike)]
-pub fn cf_kind_is_principal_like(kind: JsValue) -> Result<bool, JsValue> {
+pub fn cf_kind_is_principal_like(
+    #[wasm_bindgen(unchecked_param_type = "generated.cashflows.CFKind")] kind: JsValue,
+) -> Result<bool, JsValue> {
     Ok(js_wire::<CFKind>(&kind, "kind")?.is_principal_like())
 }
 
@@ -55,7 +61,9 @@ pub fn cf_kind_is_principal_like(kind: JsValue) -> Result<bool, JsValue> {
 /// @returns `true` when flows of this kind are paid or received in cash.
 /// @throws If `kind` is not a `CFKind` wire string (kind `validation`).
 #[wasm_bindgen(js_name = cfKindIsCashSettlement)]
-pub fn cf_kind_is_cash_settlement(kind: JsValue) -> Result<bool, JsValue> {
+pub fn cf_kind_is_cash_settlement(
+    #[wasm_bindgen(unchecked_param_type = "generated.cashflows.CFKind")] kind: JsValue,
+) -> Result<bool, JsValue> {
     Ok(js_wire::<CFKind>(&kind, "kind")?.is_cash_settlement())
 }
 
@@ -67,8 +75,10 @@ pub fn cf_kind_is_cash_settlement(kind: JsValue) -> Result<bool, JsValue> {
 /// @param flow - `CashFlow` wire object.
 /// @returns ISO-8601 balance date.
 /// @throws If `flow` is not a `CashFlow` (kind `validation`).
-#[wasm_bindgen(js_name = cashFlowGetBalanceDate)]
-pub fn cash_flow_get_balance_date(flow: JsValue) -> Result<String, JsValue> {
+#[wasm_bindgen(js_name = cashFlowGetBalanceDate, unchecked_return_type = "generated.core.DateWire")]
+pub fn cash_flow_get_balance_date(
+    #[wasm_bindgen(unchecked_param_type = "generated.cashflows.CashFlow")] flow: JsValue,
+) -> Result<String, JsValue> {
     Ok(date_to_iso(
         js_wire::<CashFlow>(&flow, "flow")?.get_balance_date(),
     ))
@@ -79,7 +89,9 @@ pub fn cash_flow_get_balance_date(flow: JsValue) -> Result<String, JsValue> {
 /// @param flow - `CashFlow` wire object.
 /// @throws If `flow` is not a `CashFlow`, its accrual factor or rate is non-finite, its accrual factor is negative, its reset date is after its payment date, or its principal delta is in another currency (kind `validation`).
 #[wasm_bindgen(js_name = cashFlowValidate)]
-pub fn cash_flow_validate(flow: JsValue) -> Result<(), JsValue> {
+pub fn cash_flow_validate(
+    #[wasm_bindgen(unchecked_param_type = "generated.cashflows.CashFlow")] flow: JsValue,
+) -> Result<(), JsValue> {
     js_wire::<CashFlow>(&flow, "flow")?
         .validate()
         .map_err(to_js_err)

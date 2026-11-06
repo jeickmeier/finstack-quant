@@ -19,6 +19,7 @@ from finstack_quant.attribution import default_waterfall_order
 from finstack_quant.core.config import FinstackConfig
 from finstack_quant.core.dates import DayCount, Tenor
 from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, MarketContext
+from finstack_quant.core.money import Money
 from finstack_quant.scenarios import (
     ApplicationReport,
     ApplicationResult,
@@ -316,7 +317,7 @@ HORIZON_METHODS = [
 @pytest.mark.parametrize("instrument_kind", ["deposit", "bond"])
 def test_horizon_methods_support_standard_fixed_income_instruments(method: str, instrument_kind: str) -> None:
     instrument = (
-        Bond.fixed("HORIZON-BOND", 100.0, 0.05, "2024-01-01", "2034-01-01", "none", "USD-OIS", currency="USD")
+        Bond.fixed("HORIZON-BOND", Money(100.0, "USD"), 0.05, "2024-01-01", "2034-01-01", "none", "USD-OIS")
         if instrument_kind == "bond"
         else _deposit_json()
     )
@@ -349,18 +350,17 @@ def test_floating_horizons_preserve_opening_and_crossed_fixings(method: str, iss
             reset_lag=0,
         )
     )
-    bond = Bond.floating(
-        "HORIZON-FRN",
-        1_000_000.0,
-        "USD-SOFR-3M",
-        150.0,
-        issue_date,
-        "2026-01-03",
-        Tenor.quarterly(),
-        DayCount.ACT_360,
-        "USD-OIS",
-        currency="USD",
-    )
+    bond = Bond.floating({
+        "id": "HORIZON-FRN",
+        "notional": Money(1_000_000.0, "USD"),
+        "forward_curve_id": "USD-SOFR-3M",
+        "spread_bp": 150,
+        "issue_date": issue_date,
+        "maturity": "2026-01-03",
+        "frequency": Tenor.quarterly(),
+        "day_count": DayCount.ACT_360,
+        "discount_curve_id": "USD-OIS",
+    })
     original = bond.to_json()
     envelope = json.loads(original)
     envelope["instrument"]["spec"]["cashflow_spec"]["floating"]["rate_spec"]["reset_lag_days"] = 0

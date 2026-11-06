@@ -15,14 +15,12 @@ use crate::bindings::extract::extract_market;
 use crate::errors::core_to_py;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::fx::fx_option::{
-    FxDeltaConvention, FxDeltaConventionKind,
-};
+use finstack_quant_valuations::instruments::fx::fx_option::FxDeltaConvention;
 
 use super::convert::enum_from_str;
 use super::convert::{
-    attributes_from_py, bdc_from_py, date_repr, day_count_from_py, enum_to_py_string, float_repr,
-    money_repr, money_to_py, opt_repr,
+    attributes_from_py, date_repr, day_count_from_py, enum_to_py_string, float_repr, money_repr,
+    money_to_py, opt_repr,
 };
 use super::pricing::typed_option_greeks;
 use super::typed_macros::{builder_set, instrument_envelope_methods, instrument_pricing_methods};
@@ -71,57 +69,14 @@ impl PyFxForward {
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForward.from_trade_date")]
     #[staticmethod]
-    #[pyo3(signature = (id, base_currency, quote_currency, trade_date, tenor, notional,
-                        domestic_discount_curve_id, foreign_discount_curve_id, *,
-                        base_calendar_id=None, quote_calendar_id=None, settlement_days=None,
-                        business_day_convention=None, end_of_month=false))]
-    #[pyo3(
-        text_signature = "(id, base_currency, quote_currency, trade_date, tenor, notional, \
-domestic_discount_curve_id, foreign_discount_curve_id, *, base_calendar_id=None, \
-quote_calendar_id=None, settlement_days=None, business_day_convention=None, \
-end_of_month=False)"
-    )]
-    // PyO3 binding: the argument list mirrors the Python keyword-argument API.
-    #[allow(clippy::too_many_arguments)]
-    fn from_trade_date(
-        id: &str,
-        base_currency: &Bound<'_, PyAny>,
-        quote_currency: &Bound<'_, PyAny>,
-        trade_date: &Bound<'_, PyAny>,
-        tenor: &Bound<'_, PyAny>,
-        notional: &Bound<'_, PyAny>,
-        domestic_discount_curve_id: &str,
-        foreign_discount_curve_id: &str,
-        base_calendar_id: Option<String>,
-        quote_calendar_id: Option<String>,
-        settlement_days: Option<u32>,
-        business_day_convention: Option<&Bound<'_, PyAny>>,
-        end_of_month: bool,
-    ) -> PyResult<Self> {
-        let base = crate::bindings::core::currency::extract_currency(base_currency)?;
-        let quote = crate::bindings::core::currency::extract_currency(quote_currency)?;
-        let convention = business_day_convention
-            .filter(|value| !value.is_none())
-            .map(|value| bdc_from_py(value, "business_day_convention"))
-            .transpose()?;
-        let inner =
-            finstack_quant_valuations::instruments::fx::fx_forward::FxForward::from_trade_date(
-                InstrumentId::new(id.to_string()),
-                base,
-                quote,
-                py_to_date(trade_date)?,
-                crate::bindings::core::dates::tenor::extract_tenor(tenor)?,
-                super::convert::money_from_py(notional, Some(base.as_ref()), "notional")?,
-                CurveId::new(domestic_discount_curve_id.to_string()),
-                CurveId::new(foreign_discount_curve_id.to_string()),
-                base_calendar_id,
-                quote_calendar_id,
-                settlement_days,
-                convention,
-                end_of_month,
-            )
-            .map_err(core_to_py)?;
-        Ok(Self { inner })
+    #[pyo3(text_signature = "(params)")]
+    fn from_trade_date(params: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let params = crate::bindings::module_utils::spec_from_py::<
+            finstack_quant_valuations::instruments::fx::fx_forward::FxForwardTradeDateParams,
+        >(params.py(), params, "FxForwardTradeDateParams")?;
+        finstack_quant_valuations::instruments::fx::fx_forward::FxForward::from_trade_date(params)
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForward.with_forward_points")]
@@ -411,21 +366,6 @@ instrument_pricing_methods!(
     module = "finstack_quant.valuations.instruments._typed_fx"
 );
 
-/// Build an `FxDeltaConvention` from the loose Python inputs.
-fn delta_convention_from_parts(
-    kind: &str,
-    premium_currency: &Bound<'_, PyAny>,
-    venue: &str,
-) -> PyResult<FxDeltaConvention> {
-    let kind: FxDeltaConventionKind = enum_from_str(kind, "delta convention kind")?;
-    FxDeltaConvention::new(
-        kind,
-        crate::bindings::core::currency::extract_currency(premium_currency)?,
-        venue,
-    )
-    .map_err(core_to_py)
-}
-
 #[pymethods]
 impl PyFxOption {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOption.example")]
@@ -439,42 +379,14 @@ impl PyFxOption {
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOption.european")]
     #[staticmethod]
-    #[pyo3(signature = (id, base_currency, quote_currency, strike, expiry, notional, vol_surface_id,
-                        option_type, delta_convention_kind, premium_currency, venue))]
-    #[pyo3(
-        text_signature = "(id, base_currency, quote_currency, strike, expiry, notional, \
-vol_surface_id, option_type, delta_convention_kind, premium_currency, venue)"
-    )]
-    // PyO3 binding: the argument list mirrors the Python keyword-argument API.
-    #[allow(clippy::too_many_arguments)]
-    fn european(
-        id: &str,
-        base_currency: &Bound<'_, PyAny>,
-        quote_currency: &Bound<'_, PyAny>,
-        strike: f64,
-        expiry: &Bound<'_, PyAny>,
-        notional: &Bound<'_, PyAny>,
-        vol_surface_id: &str,
-        option_type: &str,
-        delta_convention_kind: &str,
-        premium_currency: &Bound<'_, PyAny>,
-        venue: &str,
-    ) -> PyResult<Self> {
-        let base = crate::bindings::core::currency::extract_currency(base_currency)?;
-        let quote = crate::bindings::core::currency::extract_currency(quote_currency)?;
-        let inner = finstack_quant_valuations::instruments::fx::fx_option::FxOption::european(
-            InstrumentId::new(id.to_string()),
-            base,
-            quote,
-            strike,
-            py_to_date(expiry)?,
-            super::convert::money_from_py(notional, Some(base.as_ref()), "notional")?,
-            CurveId::new(vol_surface_id.to_string()),
-            enum_from_str(option_type, "option_type")?,
-            delta_convention_from_parts(delta_convention_kind, premium_currency, venue)?,
-        )
-        .map_err(core_to_py)?;
-        Ok(Self { inner })
+    #[pyo3(text_signature = "(params)")]
+    fn european(params: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let params = crate::bindings::module_utils::spec_from_py::<
+            finstack_quant_valuations::instruments::fx::fx_option::FxOptionParams,
+        >(params.py(), params, "FxOptionParams")?;
+        finstack_quant_valuations::instruments::fx::fx_option::FxOption::european(params)
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOption.implied_vol")]
@@ -642,17 +554,17 @@ impl PyFxOptionBuilder {
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxOptionBuilder.delta_convention")]
-    #[pyo3(text_signature = "($self, kind, premium_currency, venue)")]
+    #[pyo3(text_signature = "($self, value)")]
     fn delta_convention<'py>(
         mut slf: PyRefMut<'py, Self>,
-        kind: &str,
-        premium_currency: &Bound<'_, PyAny>,
-        venue: &str,
+        value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let convention = delta_convention_from_parts(kind, premium_currency, venue)?;
+        let convention: FxDeltaConvention =
+            crate::bindings::module_utils::spec_from_py(value.py(), value, "FxDeltaConvention")?;
+        convention.validate().map_err(core_to_py)?;
         let shown = format!(
-            "({kind:?}, Currency('{}'), {venue:?})",
-            convention.premium_currency
+            "{{'kind': '{}', 'premium_currency': '{}', 'venue': '{}'}}",
+            convention.kind, convention.premium_currency, convention.venue
         );
         builder_set!(slf, delta_convention, shown, |b: FxOptionBuilder| b
             .delta_convention(convention))

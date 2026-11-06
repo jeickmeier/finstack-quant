@@ -238,9 +238,33 @@ _ALLOCATION_COLUMNS = [
 def _claims() -> list[recovery_waterfall.RecoveryClaim]:
     """Three claims of different size, supplied out of priority order."""
     return [
-        recovery_waterfall.RecoveryClaim("SUB", "subordinated", 3, 100.0, 0.0, 0.0, 0.0),
-        recovery_waterfall.RecoveryClaim("SEN", "senior_secured", 1, 100.0, 0.0, 0.0, 0.0),
-        recovery_waterfall.RecoveryClaim("MEZZ", "senior_unsecured", 2, 50.0, 0.0, 0.0, 0.0),
+        recovery_waterfall.RecoveryClaim(
+            id="SUB",
+            seniority="subordinated",
+            priority=3,
+            principal=100.0,
+            accrued=0.0,
+            penalties=0.0,
+            collateral_haircut=0.0,
+        ),
+        recovery_waterfall.RecoveryClaim(
+            id="SEN",
+            seniority="senior_secured",
+            priority=1,
+            principal=100.0,
+            accrued=0.0,
+            penalties=0.0,
+            collateral_haircut=0.0,
+        ),
+        recovery_waterfall.RecoveryClaim(
+            id="MEZZ",
+            seniority="senior_unsecured",
+            priority=2,
+            principal=50.0,
+            accrued=0.0,
+            penalties=0.0,
+            collateral_haircut=0.0,
+        ),
     ]
 
 

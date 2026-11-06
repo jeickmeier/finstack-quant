@@ -79,5 +79,5 @@ Use `mise run rust-lint-crate -- finstack-quant-core` and
 [benchmark guide](../benches/README.md) describes benchmark registration.
 Run `mise run rust-doc` for documentation, `mise run rust-test --doctest` for
 doctests, and
-`mise run rust-check-schemas` for the persisted schema contract. The crate
+`mise run gen-check` for the persisted schema contract. The crate
 README's Rust examples are included in doctests by `lib.rs`.

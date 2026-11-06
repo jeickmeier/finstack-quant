@@ -11,7 +11,7 @@ use finstack_quant_statements::checks::CheckSuite;
 use finstack_quant_statements::checks::builtins::NonFiniteCheck;
 use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::AmountOrScalar;
-use finstack_quant_statements_analytics::analysis::{DcfOptions, evaluate_dcf};
+use finstack_quant_statements_analytics::analysis::{DcfInputs, DcfOptions, evaluate_dcf};
 use finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec;
 use time::Month;
 
@@ -55,12 +55,14 @@ fn test_dcf_evaluation_gordon_growth() {
 
     let result = evaluate_dcf(
         &model,
-        0.10,
-        TerminalValueSpec::GordonGrowth {
-            stable_growth_rate: 0.02,
+        &DcfInputs {
+            wacc: 0.10,
+            terminal_value: TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: 0.02,
+            },
+            ufcf_node: "ufcf".to_string(),
+            net_debt_override: Some(50_000.0),
         },
-        "ufcf",
-        Some(50_000.0),
         &DcfOptions::default(),
         None,
         None,
@@ -89,12 +91,14 @@ fn test_dcf_rejects_scalar_ufcf_node() {
 
     let error = evaluate_dcf(
         &model,
-        0.10,
-        TerminalValueSpec::GordonGrowth {
-            stable_growth_rate: 0.02,
+        &DcfInputs {
+            wacc: 0.10,
+            terminal_value: TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: 0.02,
+            },
+            ufcf_node: "ufcf".to_string(),
+            net_debt_override: Some(0.0),
         },
-        "ufcf",
-        Some(0.0),
         &DcfOptions::default(),
         None,
         None,
@@ -221,12 +225,14 @@ fn test_dcf_with_market_context() {
     // Test with None market context
     let result_no_market = evaluate_dcf(
         &model,
-        0.10,
-        TerminalValueSpec::GordonGrowth {
-            stable_growth_rate: 0.02,
+        &DcfInputs {
+            wacc: 0.10,
+            terminal_value: TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: 0.02,
+            },
+            ufcf_node: "ufcf".to_string(),
+            net_debt_override: Some(0.0),
         },
-        "ufcf",
-        Some(0.0),
         &options,
         None,
         None,
@@ -240,12 +246,14 @@ fn test_dcf_with_market_context() {
     let market = MarketContext::new();
     let missing_as_of = evaluate_dcf(
         &model,
-        0.10,
-        TerminalValueSpec::GordonGrowth {
-            stable_growth_rate: 0.02,
+        &DcfInputs {
+            wacc: 0.10,
+            terminal_value: TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: 0.02,
+            },
+            ufcf_node: "ufcf".to_string(),
+            net_debt_override: Some(0.0),
         },
-        "ufcf",
-        Some(0.0),
         &options,
         Some(&market),
         None,
@@ -257,12 +265,14 @@ fn test_dcf_with_market_context() {
 
     let result_with_market = evaluate_dcf(
         &model,
-        0.10,
-        TerminalValueSpec::GordonGrowth {
-            stable_growth_rate: 0.02,
+        &DcfInputs {
+            wacc: 0.10,
+            terminal_value: TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: 0.02,
+            },
+            ufcf_node: "ufcf".to_string(),
+            net_debt_override: Some(0.0),
         },
-        "ufcf",
-        Some(0.0),
         &options,
         Some(&market),
         Some(as_of),
@@ -312,12 +322,14 @@ fn test_dcf_excludes_historical_periods_from_explicit_flows() {
 
     let result = evaluate_dcf(
         &model,
-        0.10,
-        TerminalValueSpec::GordonGrowth {
-            stable_growth_rate: 0.02,
+        &DcfInputs {
+            wacc: 0.10,
+            terminal_value: TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: 0.02,
+            },
+            ufcf_node: "ufcf".to_string(),
+            net_debt_override: Some(0.0),
         },
-        "ufcf",
-        Some(0.0),
         &DcfOptions::default(),
         None,
         None,
@@ -413,12 +425,14 @@ fn test_dcf_uses_as_of_for_valuation_date_and_auto_net_debt() {
     let as_of = Date::from_calendar_date(2025, Month::August, 15).expect("valid date");
     let result = evaluate_dcf(
         &model,
-        0.10,
-        TerminalValueSpec::GordonGrowth {
-            stable_growth_rate: 0.02,
+        &DcfInputs {
+            wacc: 0.10,
+            terminal_value: TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: 0.02,
+            },
+            ufcf_node: "ufcf".to_string(),
+            net_debt_override: None,
         },
-        "ufcf",
-        None,
         &DcfOptions::default(),
         None,
         Some(as_of),
@@ -526,12 +540,14 @@ fn test_dcf_forecast_only_requires_opening_balance_or_override() {
 
     let result = evaluate_dcf(
         &model,
-        0.10,
-        TerminalValueSpec::GordonGrowth {
-            stable_growth_rate: 0.02,
+        &DcfInputs {
+            wacc: 0.10,
+            terminal_value: TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: 0.02,
+            },
+            ufcf_node: "ufcf".to_string(),
+            net_debt_override: None,
         },
-        "ufcf",
-        None,
         &DcfOptions::default(),
         None,
         None,
@@ -584,10 +600,12 @@ fn parity_orchestrator_dcf_matches_standalone() {
 
     let standalone = evaluate_dcf(
         &model,
-        0.10,
-        tv.clone(),
-        "ufcf",
-        Some(50_000.0),
+        &DcfInputs {
+            wacc: 0.10,
+            terminal_value: tv.clone(),
+            ufcf_node: "ufcf".to_string(),
+            net_debt_override: Some(50_000.0),
+        },
         &DcfOptions::default(),
         None,
         None,
@@ -622,12 +640,14 @@ fn quarterly_gordon_terminal_value_uses_annualized_flow() {
 
     let result = evaluate_dcf(
         &model,
-        0.10,
-        TerminalValueSpec::GordonGrowth {
-            stable_growth_rate: 0.02,
+        &DcfInputs {
+            wacc: 0.10,
+            terminal_value: TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: 0.02,
+            },
+            ufcf_node: "ufcf".to_string(),
+            net_debt_override: Some(0.0),
         },
-        "ufcf",
-        Some(0.0),
         &DcfOptions::default(),
         None,
         None,
@@ -677,12 +697,14 @@ fn annual_gordon_terminal_value_unchanged() {
 
     let result = evaluate_dcf(
         &model,
-        0.10,
-        TerminalValueSpec::GordonGrowth {
-            stable_growth_rate: 0.02,
+        &DcfInputs {
+            wacc: 0.10,
+            terminal_value: TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: 0.02,
+            },
+            ufcf_node: "ufcf".to_string(),
+            net_debt_override: Some(0.0),
         },
-        "ufcf",
-        Some(0.0),
         &DcfOptions::default(),
         None,
         None,
@@ -714,12 +736,14 @@ fn usd_discount_curve_does_not_mix_discounting_bases() {
     let net_debt = 50_000.0;
     let with_market = evaluate_dcf(
         &model,
-        0.10,
-        TerminalValueSpec::GordonGrowth {
-            stable_growth_rate: 0.02,
+        &DcfInputs {
+            wacc: 0.10,
+            terminal_value: TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: 0.02,
+            },
+            ufcf_node: "ufcf".to_string(),
+            net_debt_override: Some(net_debt),
         },
-        "ufcf",
-        Some(net_debt),
         &DcfOptions::default(),
         Some(&market),
         Some(base_date),
@@ -728,12 +752,14 @@ fn usd_discount_curve_does_not_mix_discounting_bases() {
 
     let without_market = evaluate_dcf(
         &model,
-        0.10,
-        TerminalValueSpec::GordonGrowth {
-            stable_growth_rate: 0.02,
+        &DcfInputs {
+            wacc: 0.10,
+            terminal_value: TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: 0.02,
+            },
+            ufcf_node: "ufcf".to_string(),
+            net_debt_override: Some(net_debt),
         },
-        "ufcf",
-        Some(net_debt),
         &DcfOptions::default(),
         None,
         None,
@@ -767,12 +793,14 @@ fn nan_terminal_value_parameters_error() {
 
     let result = evaluate_dcf(
         &model,
-        0.10,
-        TerminalValueSpec::GordonGrowth {
-            stable_growth_rate: f64::NAN,
+        &DcfInputs {
+            wacc: 0.10,
+            terminal_value: TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: f64::NAN,
+            },
+            ufcf_node: "ufcf".to_string(),
+            net_debt_override: Some(0.0),
         },
-        "ufcf",
-        Some(0.0),
         &DcfOptions::default(),
         None,
         None,
@@ -789,12 +817,14 @@ fn stable_growth_above_policy_ceiling_is_rejected() {
     };
     let error = evaluate_dcf(
         &model,
-        0.10,
-        TerminalValueSpec::GordonGrowth {
-            stable_growth_rate: 0.04,
+        &DcfInputs {
+            wacc: 0.10,
+            terminal_value: TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: 0.04,
+            },
+            ufcf_node: "ufcf".to_string(),
+            net_debt_override: Some(0.0),
         },
-        "ufcf",
-        Some(0.0),
         &options,
         None,
         None,
@@ -869,12 +899,14 @@ fn evaluate_dcf_uses_curve_for_cs_interest() {
 
     let no_market = evaluate_dcf(
         &model,
-        0.10,
-        TerminalValueSpec::GordonGrowth {
-            stable_growth_rate: 0.02,
+        &DcfInputs {
+            wacc: 0.10,
+            terminal_value: TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: 0.02,
+            },
+            ufcf_node: "ufcf".to_string(),
+            net_debt_override: Some(0.0),
         },
-        "ufcf",
-        Some(0.0),
         &DcfOptions::default(),
         None,
         None,
@@ -883,12 +915,14 @@ fn evaluate_dcf_uses_curve_for_cs_interest() {
 
     let missing_as_of = evaluate_dcf(
         &model,
-        0.10,
-        TerminalValueSpec::GordonGrowth {
-            stable_growth_rate: 0.02,
+        &DcfInputs {
+            wacc: 0.10,
+            terminal_value: TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: 0.02,
+            },
+            ufcf_node: "ufcf".to_string(),
+            net_debt_override: Some(0.0),
         },
-        "ufcf",
-        Some(0.0),
         &DcfOptions::default(),
         Some(&market),
         None,
@@ -900,12 +934,14 @@ fn evaluate_dcf_uses_curve_for_cs_interest() {
 
     let result = evaluate_dcf(
         &model,
-        0.10,
-        TerminalValueSpec::GordonGrowth {
-            stable_growth_rate: 0.02,
+        &DcfInputs {
+            wacc: 0.10,
+            terminal_value: TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: 0.02,
+            },
+            ufcf_node: "ufcf".to_string(),
+            net_debt_override: Some(0.0),
         },
-        "ufcf",
-        Some(0.0),
         &DcfOptions::default(),
         Some(&market),
         Some(as_of),
@@ -952,12 +988,14 @@ fn quarter_end_dcf_model() -> finstack_quant_statements::types::FinancialModelSp
 fn dcf_with_market_as_of(as_of: Date) -> finstack_quant_statements::Result<()> {
     evaluate_dcf(
         &quarter_end_dcf_model(),
-        0.10,
-        TerminalValueSpec::GordonGrowth {
-            stable_growth_rate: 0.02,
+        &DcfInputs {
+            wacc: 0.10,
+            terminal_value: TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: 0.02,
+            },
+            ufcf_node: "ufcf".to_string(),
+            net_debt_override: Some(0.0),
         },
-        "ufcf",
-        Some(0.0),
         &DcfOptions::default(),
         Some(&MarketContext::new()),
         Some(as_of),

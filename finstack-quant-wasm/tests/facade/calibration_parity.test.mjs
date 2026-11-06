@@ -114,7 +114,15 @@ test('cdsQuoteParSpread builds the Python CdsQuote.par_spread object', () => {
 test('cdsQuoteUpfront builds the Python CdsQuote.upfront object', () => {
   assert.deepEqual(
     plain(
-      calibration.cdsQuoteUpfront('ACME-5Y-U', 'ACME', 'USD', 'isda_na', '5Y', 100.0, 0.01, 0.4)
+      calibration.cdsQuoteUpfront({
+        id: 'ACME-5Y-U',
+        entity: 'ACME',
+        convention: { currency: 'USD', doc_clause: 'isda_na' },
+        pillar: { tenor: { count: 5, unit: 'years' } },
+        coupon_bp: 100.0,
+        upfront_pct: 0.01,
+        recovery_rate: 0.4,
+      })
     ),
     GOLDEN.quotes.upfront
   );
@@ -167,55 +175,83 @@ test('rateBoundsForCurrency and rateBoundsEmergingMarkets return the Rust bounds
   assert.throws(() => calibration.rateBoundsForCurrency('not-a-currency'), validation);
 });
 
+const RATES = { currency: 'USD', base_date: BASE };
 const STEPS = {
-  discount: () => calibration.calibrationStepDiscount('USD-OIS', 'USD', BASE),
+  discount: () => calibration.calibrationStepDiscount('USD-OIS', RATES),
   discount_named: () =>
-    calibration.calibrationStepDiscount('d2', 'USD', BASE, 'qs', 'USD-OIS', {
-      interpolation: 'linear',
+    calibration.calibrationStepDiscount(
+      'd2',
+      { ...RATES, curve_id: 'USD-OIS', interpolation: 'linear' },
+      'qs'
+    ),
+  forward: () =>
+    calibration.calibrationStepForward('USD-SOFR-3M', {
+      ...RATES,
+      tenor_years: 0.25,
+      discount_curve_id: 'USD-OIS',
     }),
-  forward: () => calibration.calibrationStepForward('USD-SOFR-3M', 'USD', BASE, 0.25, 'USD-OIS'),
-  hazard: () => calibration.calibrationStepHazard('ACME', 'ACME', 'USD', BASE, 'USD-OIS', 0.4),
+  hazard: () =>
+    calibration.calibrationStepHazard('ACME', {
+      ...RATES,
+      entity: 'ACME',
+      discount_curve_id: 'USD-OIS',
+      recovery_rate: 0.4,
+    }),
   inflation: () =>
-    calibration.calibrationStepInflation(
-      'USA-CPI',
-      'USD',
-      BASE,
-      'USD-OIS',
-      'USA-CPI-U',
-      '3M',
-      310.0
-    ),
-  vol_surface: () => calibration.calibrationStepVolSurface('AAPL-VOL', BASE, 'AAPL'),
-  swaption_vol: () => calibration.calibrationStepSwaptionVol('USD-SWPT', BASE, 'USD-OIS', 'USD'),
+    calibration.calibrationStepInflation('USA-CPI', {
+      ...RATES,
+      discount_curve_id: 'USD-OIS',
+      index: 'USA-CPI-U',
+      observation_lag: '3M',
+      base_cpi: 310.0,
+    }),
+  vol_surface: () =>
+    calibration.calibrationStepVolSurface('AAPL-VOL', {
+      base_date: BASE,
+      underlying_ticker: 'AAPL',
+    }),
+  swaption_vol: () =>
+    calibration.calibrationStepSwaptionVol('USD-SWPT', { ...RATES, discount_curve_id: 'USD-OIS' }),
   base_correlation: () =>
-    calibration.calibrationStepBaseCorrelation(
-      'CDX-CORR',
-      'CDX.NA.IG',
-      42,
-      5.0,
-      BASE,
-      'USD-OIS',
-      'USD'
-    ),
-  student_t: () => calibration.calibrationStepStudentT('T', 'TRANCHE-1', 'CDX.NA.IG_CORR'),
+    calibration.calibrationStepBaseCorrelation('CDX-CORR', {
+      ...RATES,
+      index_id: 'CDX.NA.IG',
+      series: 42,
+      maturity_years: 5.0,
+      discount_curve_id: 'USD-OIS',
+    }),
+  student_t: () =>
+    calibration.calibrationStepStudentT('T', {
+      tranche_instrument_id: 'TRANCHE-1',
+      base_correlation_curve_id: 'CDX.NA.IG_CORR',
+    }),
   hull_white: () =>
-    calibration.calibrationStepHullWhite('HW', 'USD-OIS', 'USD', BASE, undefined, {
+    calibration.calibrationStepHullWhite('HW', {
+      ...RATES,
+      curve_id: 'USD-OIS',
       fit_tolerance: 1e-4,
     }),
   cap_floor_hull_white: () =>
-    calibration.calibrationStepCapFloorHullWhite(
-      'HWCF',
-      'USD-OIS',
-      'USD-SOFR-3M',
-      'USD-SOFR-3M',
-      'USD',
-      BASE,
-      undefined,
-      { fit_tolerance: 1e-4 }
-    ),
-  svi_surface: () => calibration.calibrationStepSviSurface('AAPL-SVI', BASE, 'AAPL'),
-  xccy_basis: () => calibration.calibrationStepXccyBasis('EUR-XCCY', 'EUR', BASE, 1.1, 'USD-OIS'),
-  parametric: () => calibration.calibrationStepParametric('USD-NS', BASE),
+    calibration.calibrationStepCapFloorHullWhite('HWCF', {
+      ...RATES,
+      discount_curve_id: 'USD-OIS',
+      forward_curve_id: 'USD-SOFR-3M',
+      index_id: 'USD-SOFR-3M',
+      fit_tolerance: 1e-4,
+    }),
+  svi_surface: () =>
+    calibration.calibrationStepSviSurface('AAPL-SVI', {
+      base_date: BASE,
+      underlying_ticker: 'AAPL',
+    }),
+  xccy_basis: () =>
+    calibration.calibrationStepXccyBasis('EUR-XCCY', {
+      currency: 'EUR',
+      base_date: BASE,
+      fx_spot: 1.1,
+      domestic_discount_id: 'USD-OIS',
+    }),
+  parametric: () => calibration.calibrationStepParametric('USD-NS', { base_date: BASE }),
 };
 
 for (const [name, build] of Object.entries(STEPS)) {
@@ -224,16 +260,17 @@ for (const [name, build] of Object.entries(STEPS)) {
   });
 }
 
-test('calibrationStep twins reject unknown fields and bad dates', () => {
+test('calibrationStep twins reject unknown fields, missing fields and bad dates', () => {
   assert.throws(
-    () =>
-      calibration.calibrationStepDiscount('USD-OIS', 'USD', BASE, undefined, undefined, {
-        bogus: 1,
-      }),
+    () => calibration.calibrationStepDiscount('USD-OIS', { ...RATES, bogus: 1 }),
     (error) => validation(error) && /invalid discount step/.test(error.message)
   );
   assert.throws(
-    () => calibration.calibrationStepDiscount('USD-OIS', 'USD', '08/05/2026'),
+    () => calibration.calibrationStepDiscount('USD-OIS', { currency: 'USD' }),
+    (error) => validation(error) && /base_date/.test(error.message)
+  );
+  assert.throws(
+    () => calibration.calibrationStepDiscount('USD-OIS', { ...RATES, base_date: '08/05/2026' }),
     validation
   );
 });
@@ -248,7 +285,7 @@ test('a plan built from the step and quote twins calibrates', () => {
     plan: {
       id: 'parity',
       quote_sets: { 'USD-OIS': quotes.map((quote) => quote.id) },
-      steps: [calibration.calibrationStepDiscount('USD-OIS', 'USD', BASE)],
+      steps: [calibration.calibrationStepDiscount('USD-OIS', RATES)],
     },
     market_data: quotes.map((quote) => ({ kind: 'rate_quote', ...quote })),
   };

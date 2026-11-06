@@ -332,7 +332,7 @@ pub(super) fn bilinear(q00: f64, q10: f64, q01: f64, q11: f64, t: f64, u: f64) -
 pub fn get_surface_vol(surface: &VolSurface, expiry: f64, strike: f64) -> Result<f64> {
     let (e0, e1, t) = segment(surface.expiries(), expiry)?;
     let (s0, s1, u) = segment(surface.strikes(), strike)?;
-    interpolate_surface(surface, expiry, e0, e1, s0, s1, t, u)
+    interpolate_surface(surface, expiry, (e0, e1, t), (s0, s1, u))
 }
 
 /// Evaluate a core surface after clamping finite coordinates to its axes.
@@ -407,16 +407,15 @@ pub fn measure_vol_surface_shift(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+/// Bilinear (vol or total-variance) interpolation inside one grid cell.
+///
+/// `(e0, e1, t)` and `(s0, s1, u)` are the bracketing expiry and strike
+/// indices with their interpolation weights, as returned by `segment`.
 fn interpolate_surface(
     surface: &VolSurface,
     expiry: f64,
-    e0: usize,
-    e1: usize,
-    s0: usize,
-    s1: usize,
-    t: f64,
-    u: f64,
+    (e0, e1, t): (usize, usize, f64),
+    (s0, s1, u): (usize, usize, f64),
 ) -> Result<f64> {
     let columns = surface.strikes().len();
     let values = surface.vols();

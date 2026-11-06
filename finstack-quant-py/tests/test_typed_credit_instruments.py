@@ -275,12 +275,12 @@ class TestPremiumLegSpecTyped:
     def test_every_stub_literal_value_accepted(self, stub: str) -> None:
         """Every value in the `stub` Literal (including `"none"`) must be a real accepted wire value."""
         leg = PremiumLegSpec(
-            datetime.date(2024, 3, 20),
-            datetime.date(2029, 6, 20),
-            Tenor.quarterly(),
-            DayCount.ACT_360,
-            100.0,
-            "USD-OIS",
+            start=datetime.date(2024, 3, 20),
+            end=datetime.date(2029, 6, 20),
+            frequency=Tenor.quarterly(),
+            day_count=DayCount.ACT_360,
+            coupon_bp="100",
+            discount_curve_id="USD-OIS",
             stub=stub,
             roll_rule=RollRule.NONE,
         )

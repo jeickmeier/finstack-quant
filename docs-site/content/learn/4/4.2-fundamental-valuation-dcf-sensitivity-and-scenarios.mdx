@@ -103,7 +103,15 @@ valuation_results = Evaluator().evaluate(valuation_model)
 cost_of_capital = wacc(WaccInputs(equity_weight=0.65,cost_of_equity=0.12,debt_weight=0.35,cost_of_debt=0.075,tax_rate=0.25))
 terminal_growth = 0.025
 terminal = TerminalValueSpec.gordon_growth(terminal_growth)
-base_dcf = evaluate_dcf(valuation_model,cost_of_capital,terminal,ufcf_node="ufcf_usd",as_of="2025-01-01")
+base_dcf = evaluate_dcf(
+    valuation_model,
+    {
+        "wacc": cost_of_capital,
+        "terminal_value": terminal,
+        "ufcf_node": "ufcf_usd",
+    },
+    as_of="2025-01-01",
+)
 terminal_annual_ufcf = sum(valuation_results.get("ufcf",p) for p in PERIODS[4:])
 terminal_undiscounted = terminal_annual_ufcf*(1+terminal_growth)/(cost_of_capital-terminal_growth)
 terminal_discount_factor = base_dcf.terminal_value_pv.amount/terminal_undiscounted
@@ -134,7 +142,14 @@ from IPython.display import SVG, display
 rows = []
 for discount_rate in (0.0876875,0.0976875,0.1076875):
     for growth in (0.015,0.025,0.035):
-        value = evaluate_dcf(valuation_model,discount_rate,TerminalValueSpec.gordon_growth(growth),ufcf_node="ufcf_usd")
+        value = evaluate_dcf(
+            valuation_model,
+            {
+                "wacc": discount_rate,
+                "terminal_value": TerminalValueSpec.gordon_growth(growth),
+                "ufcf_node": "ufcf_usd",
+            },
+        )
         rows.append({"WACC":discount_rate,"terminal_growth":growth,"equity_usd":value.equity_value.amount})
 grid = pd.DataFrame(rows).pivot(index="WACC",columns="terminal_growth",values="equity_usd")
 print(grid.to_string())
@@ -174,7 +189,14 @@ def price_ufcf_path(forecast_values):
     """Carry one native quarterly UFCF path into the native DCF without mixing marginal percentiles."""
     money_values = [(p,Money(valuation_results.get("ufcf",p) if p in PERIODS[:4] else float(forecast_values[p]),"USD")) for p in PERIODS]
     priced_model = ModelBuilder.from_spec(valuation_model).value_money("ufcf_usd",money_values).build()
-    return evaluate_dcf(priced_model,cost_of_capital,terminal,ufcf_node="ufcf_usd")
+    return evaluate_dcf(
+        priced_model,
+        {
+            "wacc": cost_of_capital,
+            "terminal_value": terminal,
+            "ufcf_node": "ufcf_usd",
+        },
+    )
 
 scenario_rows = []
 for name in scenario_results.names:
@@ -205,9 +227,26 @@ goal_model = goal_builder.build()
 market_equity = 130_000_000.0
 market_enterprise = market_equity + base_dcf.net_debt.amount
 required_terminal = (market_enterprise-explicit_pv)/terminal_discount_factor
-implied = goal_seek(goal_model,"terminal_ev_hook","2025Q4",required_terminal,
-                    "terminal_growth_assumption","2025Q4",True,(-0.02,0.045))
-repriced = evaluate_dcf(valuation_model,cost_of_capital,TerminalValueSpec.gordon_growth(implied.solved_value),ufcf_node="ufcf_usd")
+implied = goal_seek(
+    goal_model,
+    {
+        "target_node": "terminal_ev_hook",
+        "target_period": "2025Q4",
+        "target_value": required_terminal,
+        "driver_node": "terminal_growth_assumption",
+        "driver_period": "2025Q4",
+        "update_model": True,
+        "bounds": (-0.02,0.045),
+    },
+)
+repriced = evaluate_dcf(
+    valuation_model,
+    {
+        "wacc": cost_of_capital,
+        "terminal_value": TerminalValueSpec.gordon_growth(implied.solved_value),
+        "ufcf_node": "ufcf_usd",
+    },
+)
 print(f"Target equity={market_equity:,.2f}; implied perpetual growth={implied.solved_value:.6%}; native reprice={repriced.equity_value.amount:,.2f}")
 ```
 {/* /notebook-block */}
@@ -282,8 +321,15 @@ Divide the undiscounted Gordon terminal value by the final annualized EBITDA met
 ```python exec id=equivalent-terminal-multiple role=exercise
 exit_ebitda = sum(valuation_results.get("ebitda", p) for p in PERIODS[4:])
 equivalent_multiple = terminal_undiscounted / exit_ebitda
-exit_value = evaluate_dcf(valuation_model,cost_of_capital,TerminalValueSpec.exit_multiple(equivalent_multiple, 0.0),
-                         ufcf_node="ufcf_usd",options={"exit_multiple_metric_node":"ebitda_usd"})
+exit_value = evaluate_dcf(
+    valuation_model,
+    {
+        "wacc": cost_of_capital,
+        "terminal_value": TerminalValueSpec.exit_multiple(equivalent_multiple, 0.0),
+        "ufcf_node": "ufcf_usd",
+    },
+    options={"exit_multiple_metric_node":"ebitda_usd"},
+)
 print(f"Equivalent exit EV / trailing-year EBITDA={equivalent_multiple:.6f}x")
 print(f"Gordon EV={base_dcf.enterprise_value.amount:,.2f}; exit-multiple EV={exit_value.enterprise_value.amount:,.2f}")
 print("The multiple is implied by this cash-conversion ratio, discount rate and growth; it is not an independent market comparable.")

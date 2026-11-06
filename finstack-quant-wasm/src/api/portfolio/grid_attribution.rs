@@ -25,9 +25,12 @@ use wasm_bindgen::prelude::*;
 /// return is non-finite, either side's weights do not sum to one, a cell or
 /// cell-sector bucket has a zero or near-zero net weight relative to gross
 /// weight, or the result cannot be converted to a JavaScript value.
-#[wasm_bindgen(js_name = gridAttribution)]
+/// @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
+#[wasm_bindgen(js_name = gridAttribution, unchecked_return_type = "GridAttributionResult")]
 pub fn grid_attribution(
+    #[wasm_bindgen(js_name = "portfolioJson", unchecked_param_type = "JsonInput")]
     portfolio_json: JsValue,
+    #[wasm_bindgen(js_name = "benchmarkJson", unchecked_param_type = "JsonInput")]
     benchmark_json: JsValue,
 ) -> Result<JsValue, JsValue> {
     let portfolio: Vec<finstack_quant_portfolio::grid_attribution::GridPosition> =
@@ -56,8 +59,12 @@ pub fn grid_attribution(
 /// Throws a JavaScript exception if `periodsJson` is malformed, the sequence is
 /// empty, a consumed value is non-finite or inconsistent, a return is at most
 /// `-1`, or the linked result cannot be converted to a JavaScript value.
-#[wasm_bindgen(js_name = gridCarinoLink)]
-pub fn grid_carino_link(periods_json: JsValue) -> Result<JsValue, JsValue> {
+/// @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
+#[wasm_bindgen(js_name = gridCarinoLink, unchecked_return_type = "GridCarinoLinkedResult")]
+pub fn grid_carino_link(
+    #[wasm_bindgen(js_name = "periodsJson", unchecked_param_type = "JsonInput")]
+    periods_json: JsValue,
+) -> Result<JsValue, JsValue> {
     let periods: Vec<finstack_quant_portfolio::grid_attribution::GridAttributionResult> =
         from_js_json(&periods_json, "periodsJson")?;
     let result = finstack_quant_portfolio::grid_attribution::grid_carino_link(&periods)

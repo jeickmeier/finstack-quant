@@ -17,6 +17,7 @@ use finstack_quant_valuations_core::pricer::{
 use finstack_quant_valuations_core::results::ValuationResult;
 
 use finstack_quant_models::closed_form::quanto_price;
+use finstack_quant_models::types::OptionMarketParams;
 
 /// Helper to collect inputs for quanto option pricing.
 fn collect_quanto_inputs(
@@ -177,16 +178,18 @@ impl Pricer for QuantoOptionAnalyticalPricer {
         }
 
         let price = quanto_price(
-            spot,
-            quanto.strike,
-            t,
-            r_dom,
+            &OptionMarketParams {
+                spot,
+                strike: quanto.strike,
+                rate: r_dom,
+                volatility: sigma_equity,
+                time_to_expiry: t,
+                dividend_yield: q,
+                option_type: quanto.option_type,
+            },
             r_for,
-            q,
-            sigma_equity,
             sigma_fx,
             quanto.correlation,
-            quanto.option_type,
         );
 
         let scale = payoff_scale(quanto)?;

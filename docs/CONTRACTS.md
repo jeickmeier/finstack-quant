@@ -154,16 +154,15 @@ file digest.
 
 ## Generation and verification
 
-`mise run rust-gen-schemas` is the sole schema write path. Every generator
-supports `--write`, `--check`, `--list`, and `--output-root`. Both schema tasks
-build the generators first (locally the `rust-test` build, so it is a no-op after
-tests) and run the binaries from `target/debug` through
-`scripts/check_schema_generation.py`. `mise run gen-write` is the local umbrella
-that runs that write path plus the core reference tables and the WASM and UI
-TypeScript bindings. `mise run all-ci` always regenerates through `gen-write`
-before tests and the rest of the verification suite.
+`mise run gen-write` is the one write path for every generated artifact: the
+schemas, the core reference tables, the WASM contract types, the facade
+declaration and surface, the UI's generated files and fixtures, and the pinned
+registry snapshot. Every schema generator supports `--write`, `--check`,
+`--list`, and `--output-root`; the tasks build the generators first (locally
+the `rust-test` build) and run the binaries from `target/debug` through
+`scripts/check_schema_generation.py`.
 
-`mise run rust-check-schemas` is non-mutating. It verifies registry inventory,
+`mise run gen-check` is non-mutating. For the schemas it verifies registry inventory,
 checked-in bytes, unique `$id` values, resolvable references, and v1-only
 paths, and fails on generator-owned files that no registry lists.
 `scripts/check_schema_generation.py` generates into two independent temporary

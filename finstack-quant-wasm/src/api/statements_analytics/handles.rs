@@ -51,7 +51,9 @@ impl JsDependencyTracer {
     /// @returns A tracer bound to the model.
     /// @throws Error with kind `validation` if the model is malformed, fails semantic validation, or a formula's dependencies cannot be parsed; kind `not_found` if a formula references an unknown node; kind `computation` for a dependency cycle.
     #[wasm_bindgen(constructor)]
-    pub fn new(model: JsValue) -> Result<JsDependencyTracer, JsValue> {
+    pub fn new(
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
+    ) -> Result<JsDependencyTracer, JsValue> {
         let model = parse_model(&model)?;
         let graph = DependencyGraph::from_model(&model).map_err(to_js_err)?;
         Ok(JsDependencyTracer { model, graph })
@@ -63,11 +65,14 @@ impl JsDependencyTracer {
     /// `DependencyTracer::dependency_tree`). A dependency already on the
     /// current path appears once more as a leaf named `"<id> (cycle)"`.
     ///
-    /// @param node_id - Root node whose dependencies are traced.
+    /// @param nodeId - Root node whose dependencies are traced.
     /// @returns `DependencyTree` plain object: `node_id`, `formula` (`null` for a value node) and `children`, one tree per direct dependency.
     /// @throws Error with kind `not_found` if `nodeId` or a reachable dependency is not in the model.
-    #[wasm_bindgen(js_name = dependencyTree)]
-    pub fn dependency_tree(&self, node_id: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = dependencyTree, unchecked_return_type = "DependencyTree")]
+    pub fn dependency_tree(
+        &self,
+        #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let tree = self
             .tracer()
             .dependency_tree(&js_string(&node_id, "nodeId")?)
@@ -80,11 +85,14 @@ impl JsDependencyTracer {
     /// Twin of Python `DependencyTracer.dependency_tree_text` (Rust
     /// `DependencyTracer::dependency_tree_text`).
     ///
-    /// @param node_id - Root node whose dependencies are traced.
+    /// @param nodeId - Root node whose dependencies are traced.
     /// @returns Multi-line tree, one node per line.
     /// @throws Error with kind `not_found` if `nodeId` or a reachable dependency is not in the model.
     #[wasm_bindgen(js_name = dependencyTreeText)]
-    pub fn dependency_tree_text(&self, node_id: JsValue) -> Result<String, JsValue> {
+    pub fn dependency_tree_text(
+        &self,
+        #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
+    ) -> Result<String, JsValue> {
         self.tracer()
             .dependency_tree_text(&js_string(&node_id, "nodeId")?)
             .map_err(to_js_err)
@@ -96,16 +104,16 @@ impl JsDependencyTracer {
     /// `render_tree_detailed` over `DependencyTracer::dependency_tree`).
     ///
     /// @param results - Evaluated `StatementResult` supplying the values (object or JSON).
-    /// @param node_id - Root node whose dependencies are traced.
+    /// @param nodeId - Root node whose dependencies are traced.
     /// @param period - Period whose values annotate each node, e.g. `"2025Q1"`.
     /// @returns Multi-line tree with `node = value` (two decimals) on each line that has a value.
     /// @throws Error with kind `not_found` if `nodeId` or a reachable dependency is not in the model, and kind `validation` if `results` is malformed or `period` is not a valid period identifier.
     #[wasm_bindgen(js_name = dependencyTreeDetailedText)]
     pub fn dependency_tree_detailed_text(
         &self,
-        results: JsValue,
-        node_id: JsValue,
-        period: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] results: JsValue,
+        #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] period: JsValue,
     ) -> Result<String, JsValue> {
         let results: StatementResult = from_js_json(&results, "results")?;
         let period: finstack_quant_core::dates::PeriodId =
@@ -122,11 +130,14 @@ impl JsDependencyTracer {
     /// Twin of Python `DependencyTracer.direct_dependencies` (Rust
     /// `DependencyTracer::direct_dependencies`).
     ///
-    /// @param node_id - Node to inspect.
+    /// @param nodeId - Node to inspect.
     /// @returns Identifiers of the direct dependencies; empty for a value node.
     /// @throws Error with kind `not_found` if `nodeId` is not in the model.
-    #[wasm_bindgen(js_name = directDependencies)]
-    pub fn direct_dependencies(&self, node_id: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = directDependencies, unchecked_return_type = "string[]")]
+    pub fn direct_dependencies(
+        &self,
+        #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let tracer = self.tracer();
         let dependencies = tracer
             .direct_dependencies(&js_string(&node_id, "nodeId")?)
@@ -139,11 +150,14 @@ impl JsDependencyTracer {
     /// Twin of Python `DependencyTracer.all_dependencies` (Rust
     /// `DependencyTracer::all_dependencies`).
     ///
-    /// @param node_id - Node to inspect.
+    /// @param nodeId - Node to inspect.
     /// @returns Identifiers of all upstream nodes in dependency order (inputs before the nodes that use them).
     /// @throws Error with kind `not_found` if `nodeId` is not in the model.
-    #[wasm_bindgen(js_name = allDependencies)]
-    pub fn all_dependencies(&self, node_id: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = allDependencies, unchecked_return_type = "string[]")]
+    pub fn all_dependencies(
+        &self,
+        #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let dependencies = self
             .tracer()
             .all_dependencies(&js_string(&node_id, "nodeId")?)
@@ -156,10 +170,14 @@ impl JsDependencyTracer {
     /// Twin of Python `DependencyTracer.dependents` (Rust
     /// `DependencyTracer::dependents`).
     ///
-    /// @param node_id - Node to inspect.
+    /// @param nodeId - Node to inspect.
     /// @returns Identifiers of the nodes that read `nodeId`.
     /// @throws Error with kind `not_found` if `nodeId` is not in the model.
-    pub fn dependents(&self, node_id: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(unchecked_return_type = "string[]")]
+    pub fn dependents(
+        &self,
+        #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let tracer = self.tracer();
         let dependents = tracer
             .dependents(&js_string(&node_id, "nodeId")?)
@@ -204,7 +222,12 @@ impl JsCorkscrewExtension {
     /// @returns The configured extension.
     /// @throws Error with kind `validation` if `config` is malformed.
     #[wasm_bindgen(constructor)]
-    pub fn new(config: JsValue) -> Result<JsCorkscrewExtension, JsValue> {
+    pub fn new(
+        #[wasm_bindgen(
+            unchecked_param_type = "generated.statements_analytics.CorkscrewConfig | string"
+        )]
+        config: JsValue,
+    ) -> Result<JsCorkscrewExtension, JsValue> {
         let config: CorkscrewConfig = from_js_json(&config, "config")?;
         Ok(JsCorkscrewExtension {
             inner: CorkscrewExtension::new(config),
@@ -218,6 +241,7 @@ impl JsCorkscrewExtension {
     ///
     /// @returns `CorkscrewConfig` plain object.
     /// @throws Error only if the configuration cannot be converted to a JavaScript object.
+    #[wasm_bindgen(unchecked_return_type = "generated.statements_analytics.CorkscrewConfig")]
     pub fn config(&self) -> Result<JsValue, JsValue> {
         to_js_value(self.inner.config())
     }
@@ -231,7 +255,12 @@ impl JsCorkscrewExtension {
     /// @param results - Evaluated `StatementResult` (object or JSON).
     /// @returns `CorkscrewReport`: `status`, `message`, per-account `data`, `warnings` and `errors`.
     /// @throws Error with kind `validation` if an input is malformed, or strict mode (`fail_on_error`) meets a missing or invalid account, change node or period value.
-    pub fn execute(&self, model: JsValue, results: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(unchecked_return_type = "generated.statements_analytics.CorkscrewReport")]
+    pub fn execute(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] results: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let model = parse_model(&model)?;
         let results: StatementResult = from_js_json(&results, "results")?;
         to_js_value(&self.inner.execute(&model, &results).map_err(to_js_err)?)
@@ -274,7 +303,12 @@ impl JsCreditScorecardExtension {
     /// @returns The configured extension.
     /// @throws Error with kind `validation` if `config` is malformed.
     #[wasm_bindgen(constructor)]
-    pub fn new(config: JsValue) -> Result<JsCreditScorecardExtension, JsValue> {
+    pub fn new(
+        #[wasm_bindgen(
+            unchecked_param_type = "generated.statements_analytics.ScorecardConfig | string"
+        )]
+        config: JsValue,
+    ) -> Result<JsCreditScorecardExtension, JsValue> {
         let config: ScorecardConfig = from_js_json(&config, "config")?;
         Ok(JsCreditScorecardExtension {
             inner: CreditScorecardExtension::new(config),
@@ -288,6 +322,7 @@ impl JsCreditScorecardExtension {
     ///
     /// @returns `ScorecardConfig` plain object.
     /// @throws Error only if the configuration cannot be converted to a JavaScript object.
+    #[wasm_bindgen(unchecked_return_type = "generated.statements_analytics.ScorecardConfig")]
     pub fn config(&self) -> Result<JsValue, JsValue> {
         to_js_value(self.inner.config())
     }
@@ -301,7 +336,12 @@ impl JsCreditScorecardExtension {
     /// @param results - Evaluated `StatementResult` (object or JSON).
     /// @returns `ScorecardReport`: `status`, `message`, the rating and per-metric scores in `data`, `warnings` and `errors` (per-metric evaluation failures are reported there, not thrown).
     /// @throws Error with kind `validation` if an input is malformed, the configuration is invalid, or the target period is missing.
-    pub fn execute(&self, model: JsValue, results: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(unchecked_return_type = "generated.statements_analytics.ScorecardReport")]
+    pub fn execute(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] results: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let model = parse_model(&model)?;
         let results: StatementResult = from_js_json(&results, "results")?;
         to_js_value(&self.inner.execute(&model, &results).map_err(to_js_err)?)
@@ -322,7 +362,12 @@ impl JsCreditScorecardExtension {
 /// implausible, a threshold range is invalid, or the explicit period is not a
 /// valid period identifier.
 #[wasm_bindgen(js_name = validateScorecardConfig)]
-pub fn validate_scorecard_config(config: JsValue) -> Result<(), JsValue> {
+pub fn validate_scorecard_config(
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.ScorecardConfig | string"
+    )]
+    config: JsValue,
+) -> Result<(), JsValue> {
     let config: ScorecardConfig = from_js_json(&config, "config")?;
     CreditScorecardExtension::validate_config(&config).map_err(to_js_err)
 }

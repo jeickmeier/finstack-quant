@@ -410,9 +410,7 @@ impl PyPortfolioAttribution {
 /// (``datetime.date``, ``pandas.Timestamp``) or an ISO 8601 string.
 #[pyfunction]
 #[pyo3(signature = (portfolio, market_t0, market_t1, as_of_t0, as_of_t1, method, config=None))]
-#[allow(clippy::too_many_arguments)]
 fn attribute_portfolio_pnl(
-    py: Python<'_>,
     portfolio: &Bound<'_, PyAny>,
     market_t0: &Bound<'_, PyAny>,
     market_t1: &Bound<'_, PyAny>,
@@ -421,6 +419,7 @@ fn attribute_portfolio_pnl(
     method: &Bound<'_, PyAny>,
     config: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyPortfolioAttribution> {
+    let py = portfolio.py();
     let portfolio = extract_portfolio_ref(py, portfolio)?;
     let market_t0 = extract_market_ref(py, market_t0)?;
     let market_t1 = extract_market_ref(py, market_t1)?;

@@ -14,6 +14,15 @@ use finstack_quant_models::credit::lgd::{
 use wasm_bindgen::prelude::*;
 
 /// Beta-distributed recovery rate, parameterized by its mean and standard deviation.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const recovery = new models.credit.lgd.BetaRecovery(0.4, 0.2);
+/// console.log(recovery.alpha, recovery.quantile(0.05), recovery.sampleSeeded(3, 42));
+/// recovery.free();
+/// ```
 #[wasm_bindgen(js_name = BetaRecovery)]
 pub struct JsBetaRecovery {
     pub(crate) inner: BetaRecovery,
@@ -25,14 +34,17 @@ json_round_trip!(JsBetaRecovery, BetaRecovery);
 impl JsBetaRecovery {
     /// Beta recovery distribution matched to a mean and standard deviation.
     /// @param mean - Mean recovery rate as a fraction strictly between 0 and 1.
-    /// @param std_dev - Recovery standard deviation as a fraction; positive and below `sqrt(mean * (1 - mean))`.
+    /// @param stdDev - Recovery standard deviation as a fraction; positive and below `sqrt(mean * (1 - mean))`.
     ///
     /// # Errors
     ///
     /// Throws a `validation` error if the moments are non-finite or do not
     /// define a Beta distribution.
     #[wasm_bindgen(constructor)]
-    pub fn new(mean: JsValue, std_dev: JsValue) -> Result<JsBetaRecovery, JsValue> {
+    pub fn new(
+        #[wasm_bindgen(unchecked_param_type = "number")] mean: JsValue,
+        #[wasm_bindgen(js_name = "stdDev", unchecked_param_type = "number")] std_dev: JsValue,
+    ) -> Result<JsBetaRecovery, JsValue> {
         BetaRecovery::new(js_f64(&mean, "mean")?, js_f64(&std_dev, "stdDev")?)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
@@ -87,12 +99,15 @@ impl JsBetaRecovery {
     /// # Errors
     ///
     /// Throws a `validation` error if `p` is outside `[0, 1]`.
-    pub fn quantile(&self, p: JsValue) -> Result<f64, JsValue> {
+    pub fn quantile(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] p: JsValue,
+    ) -> Result<f64, JsValue> {
         self.inner.quantile(js_f64(&p, "p")?).map_err(to_js_err)
     }
 
     /// Draw recovery rates with a seeded generator.
-    /// @param n_samples - Number of draws; a safe non-negative integer.
+    /// @param nSamples - Number of draws; a safe non-negative integer.
     /// @param seed - Seed for reproducible draws, as a safe integer or `bigint`.
     /// @returns The sampled recovery rates.
     ///
@@ -101,7 +116,11 @@ impl JsBetaRecovery {
     /// Throws a `TypeError` if a count is not a safe integer, and a
     /// `validation` error if sampling fails.
     #[wasm_bindgen(js_name = sampleSeeded)]
-    pub fn sample_seeded(&self, n_samples: JsValue, seed: JsValue) -> Result<Box<[f64]>, JsValue> {
+    pub fn sample_seeded(
+        &self,
+        #[wasm_bindgen(js_name = "nSamples", unchecked_param_type = "number")] n_samples: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number | bigint")] seed: JsValue,
+    ) -> Result<Box<[f64]>, JsValue> {
         let n_samples: usize = js_uint(&n_samples, "nSamples")?;
         let seed = js_u64(&seed, "seed")?;
         self.inner
@@ -124,7 +143,7 @@ pub fn seniority_calibration_ids() -> Result<Vec<String>, JsValue> {
 
 /// Historical Beta recovery distribution for a debt seniority class.
 /// @param seniority - Seniority class label such as `"senior_secured"`, `"senior_unsecured"` or `"subordinated"`.
-/// @param calibration_id - Exact registry methodology ID, such as `"moodys_recovery_1982_2023"` or `"sp_recovery_historical"`; aliases are rejected.
+/// @param calibrationId - Exact registry methodology ID, such as `"moodys_recovery_1982_2023"` or `"sp_recovery_historical"`; aliases are rejected.
 /// @returns The calibrated `BetaRecovery` handle.
 ///
 /// # Errors
@@ -132,7 +151,8 @@ pub fn seniority_calibration_ids() -> Result<Vec<String>, JsValue> {
 /// Throws a `validation` error for an unrecognized seniority and a `not_found` error for an unknown calibration ID.
 #[wasm_bindgen(js_name = seniorityRecoveryStats)]
 pub fn seniority_recovery_stats(
-    seniority: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] seniority: JsValue,
+    #[wasm_bindgen(js_name = "calibrationId", unchecked_param_type = "string")]
     calibration_id: JsValue,
 ) -> Result<JsBetaRecovery, JsValue> {
     let seniority = js_string(&seniority, "seniority")?;
@@ -143,6 +163,15 @@ pub fn seniority_recovery_stats(
 }
 
 /// Direct and indirect workout cost rates, each a fraction of exposure at default.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const costs = new models.credit.lgd.WorkoutCosts(0.05, 0.03);
+/// console.log(costs.totalRate, models.credit.lgd.WorkoutCosts.zero().totalRate);
+/// costs.free();
+/// ```
 #[wasm_bindgen(js_name = WorkoutCosts)]
 #[derive(Clone, Copy)]
 pub struct JsWorkoutCosts {
@@ -154,15 +183,17 @@ json_round_trip!(JsWorkoutCosts, WorkoutCosts);
 #[wasm_bindgen(js_class = WorkoutCosts)]
 impl JsWorkoutCosts {
     /// Workout cost rates.
-    /// @param direct_cost_rate - Direct costs (legal, administrative) as a fraction of EAD; non-negative.
-    /// @param indirect_cost_rate - Indirect costs (internal overhead) as a fraction of EAD; non-negative.
+    /// @param directCostRate - Direct costs (legal, administrative) as a fraction of EAD; non-negative.
+    /// @param indirectCostRate - Indirect costs (internal overhead) as a fraction of EAD; non-negative.
     ///
     /// # Errors
     ///
     /// Throws a `validation` error if a rate is negative or non-finite.
     #[wasm_bindgen(constructor)]
     pub fn new(
+        #[wasm_bindgen(js_name = "directCostRate", unchecked_param_type = "number")]
         direct_cost_rate: JsValue,
+        #[wasm_bindgen(js_name = "indirectCostRate", unchecked_param_type = "number")]
         indirect_cost_rate: JsValue,
     ) -> Result<JsWorkoutCosts, JsValue> {
         WorkoutCosts::new(
@@ -213,6 +244,20 @@ impl JsWorkoutCosts {
 }
 
 /// Workout LGD model: collateral waterfall, resolution costs and time value.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const workout = models.credit.lgd.WorkoutLgd.builder()
+///   .collateral({ collateral_type: "real_estate", book_value: 800000, haircut: 0.3 })
+///   .workoutYears(2)
+///   .discountRate(0.05)
+///   .costs(new models.credit.lgd.WorkoutCosts(0.05, 0.03))
+///   .build();
+/// console.log(workout.evaluate(1000000).lgd, workout.evaluate(1000000).recovery_rate);
+/// workout.free();
+/// ```
 #[wasm_bindgen(js_name = WorkoutLgd)]
 pub struct JsWorkoutLgd {
     pub(crate) inner: WorkoutLgd,
@@ -237,7 +282,11 @@ impl JsWorkoutLgd {
     /// # Errors
     ///
     /// Throws a `validation` error if `ead` is not positive and finite.
-    pub fn evaluate(&self, ead: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(unchecked_return_type = "generated.models.WorkoutLgdResult")]
+    pub fn evaluate(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] ead: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let result = self
             .inner
             .evaluate(js_f64(&ead, "ead")?)
@@ -253,14 +302,17 @@ impl JsWorkoutLgd {
     ///
     /// Throws a `validation` error if `ead` is not positive and finite.
     #[wasm_bindgen(js_name = netRecovery)]
-    pub fn net_recovery(&self, ead: JsValue) -> Result<f64, JsValue> {
+    pub fn net_recovery(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] ead: JsValue,
+    ) -> Result<f64, JsValue> {
         self.inner
             .net_recovery(js_f64(&ead, "ead")?)
             .map_err(to_js_err)
     }
 
     /// Collateral pieces in waterfall order, as `CollateralPiece` objects.
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, unchecked_return_type = "generated.models.CollateralPiece[]")]
     pub fn collateral(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner.collateral())
     }
@@ -288,6 +340,19 @@ impl JsWorkoutLgd {
 
 /// Fluent builder for `WorkoutLgd`. Each setter consumes the builder and
 /// returns the updated one, so chain the calls.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const workout = models.credit.lgd.WorkoutLgd.builder()
+///   .collateral({ collateral_type: "real_estate", book_value: 800000, haircut: 0.3 })
+///   .workoutYears(2)
+///   .discountRate(0.05)
+///   .build();
+/// console.log(workout.evaluate(1000000).lgd);
+/// workout.free();
+/// ```
 #[wasm_bindgen(js_name = WorkoutLgdBuilder)]
 pub struct JsWorkoutLgdBuilder {
     inner: WorkoutLgdBuilder,
@@ -303,7 +368,11 @@ impl JsWorkoutLgdBuilder {
     ///
     /// Throws a `validation` error if the piece is malformed, its book value
     /// is negative or its haircut is outside `[0, 1]`.
-    pub fn collateral(self, piece: JsValue) -> Result<JsWorkoutLgdBuilder, JsValue> {
+    pub fn collateral(
+        self,
+        #[wasm_bindgen(unchecked_param_type = "generated.models.CollateralPiece | string")]
+        piece: JsValue,
+    ) -> Result<JsWorkoutLgdBuilder, JsValue> {
         let piece = from_js_json(&piece, "piece")?;
         Ok(Self {
             inner: self.inner.collateral(piece),
@@ -318,7 +387,13 @@ impl JsWorkoutLgdBuilder {
     ///
     /// Throws a `validation` error if any piece is malformed or out of range.
     #[wasm_bindgen(js_name = collateralPieces)]
-    pub fn collateral_pieces(self, pieces: JsValue) -> Result<JsWorkoutLgdBuilder, JsValue> {
+    pub fn collateral_pieces(
+        self,
+        #[wasm_bindgen(
+            unchecked_param_type = "readonly generated.models.CollateralPiece[] | string"
+        )]
+        pieces: JsValue,
+    ) -> Result<JsWorkoutLgdBuilder, JsValue> {
         let pieces = from_js_json::<Vec<CollateralPiece>>(&pieces, "pieces")?;
         Ok(Self {
             inner: self.inner.collateral_pieces(pieces),
@@ -334,7 +409,10 @@ impl JsWorkoutLgdBuilder {
     /// Throws a `TypeError` if `years` is not a number; the range is checked
     /// by `build`.
     #[wasm_bindgen(js_name = workoutYears)]
-    pub fn workout_years(self, years: JsValue) -> Result<JsWorkoutLgdBuilder, JsValue> {
+    pub fn workout_years(
+        self,
+        #[wasm_bindgen(unchecked_param_type = "number")] years: JsValue,
+    ) -> Result<JsWorkoutLgdBuilder, JsValue> {
         Ok(Self {
             inner: self.inner.workout_years(js_f64(&years, "years")?),
         })
@@ -349,7 +427,10 @@ impl JsWorkoutLgdBuilder {
     /// Throws a `TypeError` if `rate` is not a number; the range is checked by
     /// `build`.
     #[wasm_bindgen(js_name = discountRate)]
-    pub fn discount_rate(self, rate: JsValue) -> Result<JsWorkoutLgdBuilder, JsValue> {
+    pub fn discount_rate(
+        self,
+        #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
+    ) -> Result<JsWorkoutLgdBuilder, JsValue> {
         Ok(Self {
             inner: self.inner.discount_rate(js_f64(&rate, "rate")?),
         })
@@ -400,12 +481,24 @@ impl JsWorkoutLgdBuilder {
 /// and a `validation` error if it is malformed, the book value is negative or
 /// non-finite, or the haircut is outside `[0, 1]`.
 #[wasm_bindgen(js_name = collateralPieceLiquidationValue)]
-pub fn collateral_piece_liquidation_value(piece: JsValue) -> Result<f64, JsValue> {
+pub fn collateral_piece_liquidation_value(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.CollateralPiece | string")]
+    piece: JsValue,
+) -> Result<f64, JsValue> {
     let piece: CollateralPiece = from_js_json(&piece, "piece")?;
     Ok(piece.liquidation_value())
 }
 
 /// Downturn LGD adjustment: Frye-Jacobs style stress or a regulatory add-on with a floor.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const downturn = models.credit.lgd.DownturnLgd.regulatoryFloor(0.08, 0.1);
+/// console.log(downturn.method, downturn.adjust(0.35));
+/// downturn.free();
+/// ```
 #[wasm_bindgen(js_name = DownturnLgd)]
 pub struct JsDownturnLgd {
     pub(crate) inner: DownturnLgd,
@@ -416,17 +509,20 @@ json_round_trip!(JsDownturnLgd, DownturnLgd, validate);
 #[wasm_bindgen(js_class = DownturnLgd)]
 impl JsDownturnLgd {
     /// Stressed-factor downturn adjustment.
-    /// @param asset_correlation - Asset correlation with the systematic factor, from 0 to 1.
-    /// @param lgd_sensitivity - Sensitivity of LGD to the systematic factor; non-negative.
-    /// @param stress_quantile - Stress quantile of the systematic factor, strictly between 0 and 1 (for example 0.999).
+    /// @param assetCorrelation - Asset correlation with the systematic factor, from 0 to 1.
+    /// @param lgdSensitivity - Sensitivity of LGD to the systematic factor; non-negative.
+    /// @param stressQuantile - Stress quantile of the systematic factor, strictly between 0 and 1 (for example 0.999).
     /// @returns The stressed downturn adjustment.
     ///
     /// # Errors
     ///
     /// Throws a `validation` error on out-of-range inputs.
     pub fn stressed(
+        #[wasm_bindgen(js_name = "assetCorrelation", unchecked_param_type = "number")]
         asset_correlation: JsValue,
+        #[wasm_bindgen(js_name = "lgdSensitivity", unchecked_param_type = "number")]
         lgd_sensitivity: JsValue,
+        #[wasm_bindgen(js_name = "stressQuantile", unchecked_param_type = "number")]
         stress_quantile: JsValue,
     ) -> Result<JsDownturnLgd, JsValue> {
         DownturnLgd::stressed(
@@ -439,7 +535,7 @@ impl JsDownturnLgd {
     }
 
     /// Regulatory downturn adjustment: `max(baseLgd + addOn, floor)`.
-    /// @param add_on - Additive LGD add-on as a fraction; non-negative.
+    /// @param addOn - Additive LGD add-on as a fraction; non-negative.
     /// @param floor - Minimum downturn LGD as a fraction from 0 through 1.
     /// @returns The regulatory-floor downturn adjustment.
     ///
@@ -447,7 +543,10 @@ impl JsDownturnLgd {
     ///
     /// Throws a `validation` error on out-of-range inputs.
     #[wasm_bindgen(js_name = regulatoryFloor)]
-    pub fn regulatory_floor(add_on: JsValue, floor: JsValue) -> Result<JsDownturnLgd, JsValue> {
+    pub fn regulatory_floor(
+        #[wasm_bindgen(js_name = "addOn", unchecked_param_type = "number")] add_on: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] floor: JsValue,
+    ) -> Result<JsDownturnLgd, JsValue> {
         DownturnLgd::regulatory_floor(js_f64(&add_on, "addOn")?, js_f64(&floor, "floor")?)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
@@ -461,7 +560,9 @@ impl JsDownturnLgd {
     ///
     /// Throws a `not_found` error if no calibration is registered under `id`.
     #[wasm_bindgen(js_name = fromRegistryId)]
-    pub fn from_registry_id(id: JsValue) -> Result<JsDownturnLgd, JsValue> {
+    pub fn from_registry_id(
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    ) -> Result<JsDownturnLgd, JsValue> {
         DownturnLgd::from_registry_id(&js_string(&id, "id")?)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
@@ -481,13 +582,16 @@ impl JsDownturnLgd {
     }
 
     /// Apply the downturn adjustment to a through-the-cycle LGD.
-    /// @param base_lgd - Through-the-cycle LGD as a fraction from 0 through 1.
+    /// @param baseLgd - Through-the-cycle LGD as a fraction from 0 through 1.
     /// @returns The downturn LGD as a fraction in `[0, 1]`.
     ///
     /// # Errors
     ///
     /// Throws a `validation` error if `baseLgd` is outside `[0, 1]`.
-    pub fn adjust(&self, base_lgd: JsValue) -> Result<f64, JsValue> {
+    pub fn adjust(
+        &self,
+        #[wasm_bindgen(js_name = "baseLgd", unchecked_param_type = "number")] base_lgd: JsValue,
+    ) -> Result<f64, JsValue> {
         self.inner
             .adjust(js_f64(&base_lgd, "baseLgd")?)
             .map_err(to_js_err)
@@ -500,13 +604,22 @@ impl JsDownturnLgd {
     }
 
     /// Method parameters as a plain object in canonical JSON form.
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, unchecked_return_type = "generated.models.DownturnMethod")]
     pub fn params(&self) -> Result<JsValue, JsValue> {
         to_js_value(self.inner.method())
     }
 }
 
 /// Exposure-at-default calculator for drawn and undrawn commitments.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const ead = new models.credit.lgd.EadCalculator(600, 400, 0.75);
+/// console.log(ead.ead, ead.utilization, ead.totalCommitment);
+/// ead.free();
+/// ```
 #[wasm_bindgen(js_name = EadCalculator)]
 pub struct JsEadCalculator {
     pub(crate) inner: EadCalculator,
@@ -525,7 +638,11 @@ impl JsEadCalculator {
     ///
     /// Throws a `validation` error on negative, non-finite or out-of-range inputs.
     #[wasm_bindgen(constructor)]
-    pub fn new(drawn: JsValue, undrawn: JsValue, ccf: JsValue) -> Result<JsEadCalculator, JsValue> {
+    pub fn new(
+        #[wasm_bindgen(unchecked_param_type = "number")] drawn: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] undrawn: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] ccf: JsValue,
+    ) -> Result<JsEadCalculator, JsValue> {
         let ccf = CreditConversionFactor::new(js_f64(&ccf, "ccf")?).map_err(to_js_err)?;
         EadCalculator::new(js_f64(&drawn, "drawn")?, js_f64(&undrawn, "undrawn")?, ccf)
             .map(|inner| Self { inner })
@@ -540,7 +657,9 @@ impl JsEadCalculator {
     ///
     /// Throws a `validation` error if `drawn` is negative or non-finite.
     #[wasm_bindgen(js_name = termLoan)]
-    pub fn term_loan(drawn: JsValue) -> Result<JsEadCalculator, JsValue> {
+    pub fn term_loan(
+        #[wasm_bindgen(unchecked_param_type = "number")] drawn: JsValue,
+    ) -> Result<JsEadCalculator, JsValue> {
         EadCalculator::term_loan(js_f64(&drawn, "drawn")?)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
@@ -554,7 +673,10 @@ impl JsEadCalculator {
     /// # Errors
     ///
     /// Throws a `validation` error on negative or non-finite inputs.
-    pub fn revolver(drawn: JsValue, undrawn: JsValue) -> Result<JsEadCalculator, JsValue> {
+    pub fn revolver(
+        #[wasm_bindgen(unchecked_param_type = "number")] drawn: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] undrawn: JsValue,
+    ) -> Result<JsEadCalculator, JsValue> {
         EadCalculator::revolver(js_f64(&drawn, "drawn")?, js_f64(&undrawn, "undrawn")?)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
@@ -579,14 +701,18 @@ impl JsEadCalculator {
     }
 
     /// Loan-equivalent factor implied by an observed exposure at default.
-    /// @param observed_ead - Realized exposure at default in monetary units.
+    /// @param observedEad - Realized exposure at default in monetary units.
     /// @returns `(observedEad - drawn) / undrawn`, or `undefined` when nothing is undrawn.
     ///
     /// # Errors
     ///
     /// Throws a `TypeError` if `observedEad` is not a number.
     #[wasm_bindgen(js_name = leqFromObservedEad)]
-    pub fn leq_from_observed_ead(&self, observed_ead: JsValue) -> Result<Option<f64>, JsValue> {
+    pub fn leq_from_observed_ead(
+        &self,
+        #[wasm_bindgen(js_name = "observedEad", unchecked_param_type = "number")]
+        observed_ead: JsValue,
+    ) -> Result<Option<f64>, JsValue> {
         Ok(self
             .inner
             .leq_from_observed_ead(js_f64(&observed_ead, "observedEad")?))

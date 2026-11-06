@@ -135,14 +135,16 @@ pub fn equal_weight_constituents(count: usize) -> Vec<CdsIndexConstituent> {
 pub fn standard_single_curve_index(id: &str, start: Date, end: Date, notional: f64) -> CdsIndex {
     CdsIndex::from_preset(
         &standard_cdx_params(),
-        id,
-        Money::new(notional, Currency::USD).expect("valid money fixture"),
-        PayReceive::Pay,
-        start,
-        end,
-        STANDARD_RECOVERY_SENIOR,
-        "USD-OIS",
-        "HZ-INDEX",
+        finstack_quant_valuations::instruments::credit_derivatives::cds::CdsTradeParams {
+            id: id.into(),
+            notional: Money::new(notional, Currency::USD).expect("valid money fixture"),
+            side: PayReceive::Pay,
+            start,
+            end,
+            recovery_rate: STANDARD_RECOVERY_SENIOR,
+            discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
+            credit_curve_id: finstack_quant_core::types::CurveId::new("HZ-INDEX"),
+        },
     )
     .expect("valid test parameters")
 }
@@ -157,14 +159,16 @@ pub fn standard_constituents_index(
 ) -> CdsIndex {
     CdsIndex::from_preset(
         &standard_cdx_params(),
-        id,
-        Money::new(notional, Currency::USD).expect("valid money fixture"),
-        PayReceive::Pay,
-        start,
-        end,
-        STANDARD_RECOVERY_SENIOR,
-        "USD-OIS",
-        "HZ-INDEX",
+        finstack_quant_valuations::instruments::credit_derivatives::cds::CdsTradeParams {
+            id: id.into(),
+            notional: Money::new(notional, Currency::USD).expect("valid money fixture"),
+            side: PayReceive::Pay,
+            start,
+            end,
+            recovery_rate: STANDARD_RECOVERY_SENIOR,
+            discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
+            credit_curve_id: finstack_quant_core::types::CurveId::new("HZ-INDEX"),
+        },
     )
     .expect("valid test parameters")
     .with_constituents(equal_weight_constituents(num_constituents))

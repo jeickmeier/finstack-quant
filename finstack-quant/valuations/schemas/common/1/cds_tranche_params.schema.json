@@ -47,7 +47,8 @@
       "description": "Notional amount"
     },
     "realized_loss": {
-      "description": "Realized (settled) loss as a decimal fraction of the original portfolio notional, in `[0.0, 1.0]`",
+      "default": 0.0,
+      "description": "Realized (settled) loss as a decimal fraction of the original portfolio notional, in `[0.0, 1.0]`\n(`0.0` when omitted from the wire form).",
       "format": "double",
       "type": "number"
     },
@@ -66,8 +67,7 @@
     "detach_pct",
     "notional",
     "maturity",
-    "coupon_bp",
-    "realized_loss"
+    "coupon_bp"
   ],
   "title": "CdsTrancheParams",
   "type": "object"

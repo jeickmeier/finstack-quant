@@ -2,25 +2,68 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import ts from 'typescript';
-import {
-  documentationBlocks,
-  isLegacyPlaceholderExample,
-  LEGACY_CATCH_ALL_THROW,
-} from './typescript-docs-shared.mjs';
 
+// The exact catch-all `@throws` sentence an old generator wrote; it documents nothing.
+const LEGACY_CATCH_ALL_THROW =
+  '@throws Error - Thrown when supplied values are malformed, violate the documented constraints, or the underlying calculation cannot complete.';
+
+// A JSDoc comment split into tag-anchored blocks (`prose`, `param`, `returns`,
+// `throws`, `example`).
+function documentationBlocks(documentationText) {
+  if (!documentationText) return [];
+  let body = documentationText;
+  if (body.startsWith('/**')) body = body.slice(3).trimStart();
+  if (body.endsWith('*/')) body = body.slice(0, -2).trimEnd();
+  const lines = body.split('\n').map((line) => line.replace(/^\s*\* ?/, '').trimEnd());
+  while (lines.length && !lines[0].trim()) lines.shift();
+  while (lines.length && !lines.at(-1)?.trim()) lines.pop();
+  const blocks = [];
+  let current = { kind: 'prose', lines: [] };
+  for (const line of lines) {
+    const tag = line.trim().match(/^@(param|returns|throws|example)\b/);
+    if (tag) {
+      if (current.lines.length) blocks.push(current);
+      current = { kind: tag[1], lines: [line] };
+    } else {
+      current.lines.push(line);
+    }
+  }
+  if (current.lines.length) blocks.push(current);
+  return blocks;
+}
+
+// The three shapes of non-executable `@example` an old generator wrote.
+function isLegacyPlaceholderExample(block) {
+  if (block.kind !== 'example') return false;
+  const value = block.lines.map((line) => line.trim()).join('\n');
+  const common =
+    value.startsWith('@example\n```typescript\n') &&
+    value.includes('from "finstack-quant-wasm";\nawait init();\n');
+  if (!common || !value.endsWith('\n```')) return false;
+  return (
+    /\nconst api: [A-Za-z_$][\w$]* = [^;]+;\nvoid api;\n```$/.test(value) ||
+    /\nconst factory: [A-Za-z_$][\w$]* = [^;]+;\nvoid factory;\n```$/.test(value) ||
+    /\n\/\/ Supply the documented arguments to ([A-Za-z_$][\w$]*)\(\.\.\.\) for your use case\.\nvoid \1;\n```$/.test(
+      value
+    )
+  );
+}
+
+// The published declarations: wasm-bindgen's `pkg/finstack_quant_wasm.d.ts`,
+// whose JSDoc is the Rustdoc of `src/api/**` (and `src/prelude.d.ts`), and the
+// generated facade `index.d.ts`, whose JSDoc comes from `exports/**`.
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const option = process.argv.find((value) => value.startsWith('--declaration='));
-const declarationPath = option
-  ? resolve(process.cwd(), option.slice('--declaration='.length))
-  : join(root, 'index.d.ts');
-const sourceText = readFileSync(declarationPath, 'utf8');
-const sourceFile = ts.createSourceFile(
-  declarationPath,
-  sourceText,
-  ts.ScriptTarget.Latest,
-  true,
-  ts.ScriptKind.TS
-);
+const declarationPaths = option
+  ? [resolve(process.cwd(), option.slice('--declaration='.length))]
+  : [join(root, 'pkg', 'finstack_quant_wasm.d.ts'), join(root, 'index.d.ts')];
+// wasm-bindgen's own glue: the initializer and its types, and the ownership
+// members every class gets (`WasmOwned` in the prelude documents `free`).
+const GLUE = new Set(['InitInput', 'InitOutput', 'SyncInitInput', 'initSync', '__wbg_init']);
+const GLUE_MEMBERS = new Set(['free', '[Symbol.dispose]']);
+let declarationPath;
+let sourceText;
+let sourceFile;
 const maxErrors = Number.parseInt(
   process.argv.find((value) => value.startsWith('--max-errors='))?.split('=')[1] ?? '200',
   10
@@ -236,6 +279,26 @@ function checkInterface(node) {
     ) {
       checkDocumentedNode(member, `${name}.${declarationName(member)}`, { callable: true });
     } else if (ts.isPropertySignature(member)) {
+      const type = member.type;
+      // A facade member re-exporting a package value (`typeof wasm.X`) or
+      // naming a nested namespace is documented where that is declared.
+      if (type && (ts.isTypeQueryNode(type) || type.getText(sourceFile).endsWith('Namespace')))
+        continue;
+      if (type && ts.isFunctionTypeNode(type)) {
+        // A facade wrapper: the JSDoc on the property documents the function type.
+        const label = `${name}.${declarationName(member)}`;
+        checkDocumentedNode(member, label);
+        const documentationText = documentation(member);
+        const documented = parameterTags(documentationText);
+        for (const parameter of type.parameters) {
+          const parameterName = parameter.name.getText(sourceFile);
+          if (!documented.has(parameterName))
+            error(member, `${label}: missing @param for \`${parameterName}\``);
+        }
+        if (type.type.kind !== ts.SyntaxKind.VoidKeyword && !hasTag(documentationText, 'returns'))
+          error(member, `${label}: missing @returns`);
+        continue;
+      }
       checkDocumentedNode(member, `${name}.${declarationName(member)}`);
     }
   }
@@ -243,10 +306,14 @@ function checkInterface(node) {
 
 function checkClass(node) {
   const name = declarationName(node);
-  checkDocumentedNode(node, `class ${name}`);
+  // A class is a handle type a consumer constructs: it needs a runnable
+  // example, on the class or on its constructor.
+  const ctor = node.members.find(ts.isConstructorDeclaration);
+  const ctorExample = ctor ? hasTag(documentation(ctor), 'example') : false;
+  checkDocumentedNode(node, `class ${name}`, { example: !ctorExample });
 
   for (const member of node.members) {
-    if (hasPrivateModifier(member)) {
+    if (hasPrivateModifier(member) || GLUE_MEMBERS.has(declarationName(member))) {
       continue;
     }
     if (ts.isConstructorDeclaration(member)) {
@@ -263,31 +330,54 @@ function checkClass(node) {
   }
 }
 
-for (const statement of sourceFile.statements) {
-  if (ts.isInterfaceDeclaration(statement) && isExported(statement)) {
-    checkInterface(statement);
-  } else if (ts.isClassDeclaration(statement)) {
-    // `declare class` handles are published through the namespace interfaces.
-    checkClass(statement);
-  } else if (ts.isTypeAliasDeclaration(statement) && isExported(statement)) {
-    checkDocumentedNode(statement, `type ${declarationName(statement)}`);
-  } else if (ts.isFunctionDeclaration(statement) && isExported(statement)) {
-    checkDocumentedNode(statement, `function ${declarationName(statement)}`, {
-      callable: true,
-      example: true,
-    });
-  } else if (ts.isVariableStatement(statement) && isExported(statement)) {
-    for (const declaration of statement.declarationList.declarations) {
-      checkDocumentedNode(statement, `constant ${declarationName(declaration)}`);
+function checkStatements(statements) {
+  for (const statement of statements) {
+    if (statement.name && GLUE.has(declarationName(statement))) continue;
+    if (ts.isModuleDeclaration(statement)) {
+      // The facade's augmentation of the package module documents the members
+      // it adds; `declare global` only names `Symbol.dispose`.
+      if (statement.name.text === 'global' || !statement.body) continue;
+      for (const inner of statement.body.statements)
+        if (ts.isInterfaceDeclaration(inner))
+          for (const member of inner.members)
+            checkDocumentedNode(member, `${declarationName(inner)}.${declarationName(member)}`, {
+              callable: ts.isMethodSignature(member),
+            });
+    } else if (ts.isInterfaceDeclaration(statement) && isExported(statement)) {
+      checkInterface(statement);
+    } else if (ts.isClassDeclaration(statement)) {
+      checkClass(statement);
+    } else if (ts.isTypeAliasDeclaration(statement) && isExported(statement)) {
+      checkDocumentedNode(statement, `type ${declarationName(statement)}`);
+    } else if (ts.isFunctionDeclaration(statement) && isExported(statement)) {
+      checkDocumentedNode(statement, `function ${declarationName(statement)}`, { callable: true });
+    } else if (ts.isVariableStatement(statement) && isExported(statement)) {
+      for (const declaration of statement.declarationList.declarations) {
+        // A namespace constant is documented by its `*Namespace` interface.
+        if (declaration.type?.getText(sourceFile).endsWith('Namespace')) continue;
+        checkDocumentedNode(statement, `constant ${declarationName(declaration)}`);
+      }
     }
   }
 }
 
-// A JSDoc block followed directly by another documents nothing: only the last
-// block before a declaration is attached to it.
-for (const match of sourceText.matchAll(/\*\/[ \t]*\n[ \t]*\/\*\*/g)) {
-  const line = sourceFile.getLineAndCharacterOfPosition(match.index).line + 1;
-  failures.push(`${declarationPath}:${line}: orphan JSDoc block before another JSDoc block`);
+for (const path of declarationPaths) {
+  declarationPath = path;
+  sourceText = readFileSync(path, 'utf8');
+  sourceFile = ts.createSourceFile(
+    path,
+    sourceText,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS
+  );
+  checkStatements(sourceFile.statements);
+  // A JSDoc block followed directly by another documents nothing: only the
+  // last block before a declaration is attached to it.
+  for (const match of sourceText.matchAll(/\*\/[ \t]*\n[ \t]*\/\*\*/g)) {
+    const line = sourceFile.getLineAndCharacterOfPosition(match.index).line + 1;
+    failures.push(`${declarationPath}:${line}: orphan JSDoc block before another JSDoc block`);
+  }
 }
 
 if (failures.length > 0) {

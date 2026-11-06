@@ -285,6 +285,40 @@ macro_rules! instrument_payload {
     (as_dyn boxed $value:expr_2021) => { $value.as_ref() as &dyn Instrument };
 }
 
+/// Equality probe for [`InstrumentJson::semantic_eq`], resolved per payload type
+/// by autoref specialization.
+///
+/// `(&EqProbe(a, b)).probe_eq()` finds [`EqViaPartialEq::probe_eq`] by value
+/// when the payload type implements `PartialEq`, and otherwise falls back to
+/// [`EqUnavailable::probe_eq`], which needs one more autoref. The choice is made
+/// at each concrete call site in the generated `match`, so the payload types
+/// keep their own `PartialEq` decisions and no type has to opt in.
+struct EqProbe<'a, T>(&'a T, &'a T);
+
+/// The `PartialEq` arm of [`EqProbe`]: compares the two payloads.
+trait EqViaPartialEq {
+    /// `Some(a == b)`.
+    fn probe_eq(&self) -> Option<bool>;
+}
+
+impl<T: PartialEq> EqViaPartialEq for EqProbe<'_, T> {
+    fn probe_eq(&self) -> Option<bool> {
+        Some(self.0 == self.1)
+    }
+}
+
+/// The fallback arm of [`EqProbe`] for payload types without `PartialEq`.
+trait EqUnavailable {
+    /// `None`: the payload type has no typed equality.
+    fn probe_eq(&self) -> Option<bool>;
+}
+
+impl<T> EqUnavailable for &EqProbe<'_, T> {
+    fn probe_eq(&self) -> Option<bool> {
+        None
+    }
+}
+
 macro_rules! define_instrument_json {
     (
         []
@@ -339,6 +373,29 @@ macro_rules! define_instrument_json {
             fn as_dyn_instrument(&self) -> &dyn Instrument {
                 match self {
                     $(Self::$variant(instrument) => instrument_payload!(as_dyn $kind instrument),)*
+                }
+            }
+
+            /// Typed equality of two payloads, for the instrument types whose Rust
+            /// type implements `PartialEq`.
+            ///
+            /// Persistence tests use it to check a decode → encode → decode round trip
+            /// left the value unchanged, beyond the canonical bytes.
+            ///
+            /// # Arguments
+            ///
+            /// * `other` - The payload to compare with `self`.
+            ///
+            /// # Returns
+            ///
+            /// `Some(true)` or `Some(false)` when both payloads are of the same
+            /// instrument type and that type implements `PartialEq`; `None` when it
+            /// does not; `Some(false)` when the instrument types differ.
+            #[must_use]
+            pub fn semantic_eq(&self, other: &Self) -> Option<bool> {
+                match (self, other) {
+                    $((Self::$variant(first), Self::$variant(second)) => (&EqProbe(first, second)).probe_eq(),)*
+                    _ => Some(false),
                 }
             }
 
@@ -1284,19 +1341,19 @@ mod tests {
     fn test_cap_floor_defaults_when_optional_fields_omitted() {
         use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 
-        let option = CapFloor::new(
-            InstrumentId::new("IROPT-DEFAULTS"),
-            RateOptionType::Cap,
-            Money::from((1_000_000_i64, Currency::USD)),
-            0.03,
-            Date::from_calendar_date(2026, Month::January, 1).expect("Valid test date"),
-            Date::from_calendar_date(2028, Month::January, 1).expect("Valid test date"),
-            Some(Tenor::quarterly()),
-            DayCount::Act360,
-            CurveId::new("USD-OIS"),
-            CurveId::new("USD-SOFR-3M"),
-            CurveId::new("USD-CAPFLOOR-VOL"),
-        )
+        let option = CapFloor::new(crate::instruments::rates::cap_floor::CapFloorParams {
+            id: InstrumentId::new("IROPT-DEFAULTS"),
+            rate_option_type: RateOptionType::Cap,
+            notional: Money::from((1_000_000_i64, Currency::USD)),
+            strike: 0.03,
+            start_date: Date::from_calendar_date(2026, Month::January, 1).expect("Valid test date"),
+            maturity: Date::from_calendar_date(2028, Month::January, 1).expect("Valid test date"),
+            frequency: Some(Tenor::quarterly()),
+            day_count: DayCount::Act360,
+            discount_curve_id: CurveId::new("USD-OIS"),
+            forward_curve_id: CurveId::new("USD-SOFR-3M"),
+            vol_surface_id: CurveId::new("USD-CAPFLOOR-VOL"),
+        })
         .expect("valid strike");
         let mut json = serde_json::to_value(InstrumentJson::CapFloor(option))
             .expect("CapFloor JSON serialization should succeed");

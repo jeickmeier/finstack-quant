@@ -26,6 +26,15 @@ use wasm_bindgen::prelude::*;
 /// SABR model parameters `(alpha, beta, nu, rho)` with optional `shift`.
 ///
 /// Hagan SABR (2002): see docs/REFERENCES.md#hagan-2002-sabr.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const params = new models.volatility.SabrParameters(0.2, 1.0, 0.3, -0.2);
+/// console.log(params.alpha, params.rho, params.impliedVol(100, 105, 1));
+/// params.free();
+/// ```
 #[wasm_bindgen(js_name = SabrParameters)]
 pub struct JsSabrParameters {
     pub(crate) inner: SabrParameters,
@@ -49,11 +58,11 @@ impl JsSabrParameters {
     /// outside `[-1, 1]`, or a supplied `shift` is not finite and positive.
     #[wasm_bindgen(constructor)]
     pub fn new(
-        alpha: JsValue,
-        beta: JsValue,
-        nu: JsValue,
-        rho: JsValue,
-        shift: Option<JsValue>,
+        #[wasm_bindgen(unchecked_param_type = "number")] alpha: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] beta: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] nu: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] rho: JsValue,
+        #[wasm_bindgen(unchecked_optional_param_type = "number")] shift: Option<JsValue>,
     ) -> Result<JsSabrParameters, JsValue> {
         let alpha = js_f64(&alpha, "alpha")?;
         let beta = js_f64(&beta, "beta")?;
@@ -69,6 +78,7 @@ impl JsSabrParameters {
     }
 
     /// Default SABR parameters for equity underlyings.
+    /// @returns A `SabrParameters` handle.
     #[wasm_bindgen(js_name = equityDefault)]
     pub fn equity_default() -> JsSabrParameters {
         Self {
@@ -77,6 +87,7 @@ impl JsSabrParameters {
     }
 
     /// Default SABR parameters for rates underlyings.
+    /// @returns A `SabrParameters` handle.
     #[wasm_bindgen(js_name = ratesDefault)]
     pub fn rates_default() -> JsSabrParameters {
         Self {
@@ -99,11 +110,14 @@ impl JsSabrParameters {
     /// Throws a `FinstackError` (kind `validation`) if `alpha` is not finite
     /// and positive, `nu` is negative or non-finite, `rho` is outside
     /// `[-1, 1]`.
+    /// @param alpha - Positive initial volatility on the `beta = 0.5` CEV backbone (decimal).
+    /// @param nu - Finite non-negative volatility of volatility per square-root year.
+    /// @param rho - Forward/volatility correlation in `[-1, 1]`.
     #[wasm_bindgen(js_name = ratesStandard)]
     pub fn rates_standard(
-        alpha: JsValue,
-        nu: JsValue,
-        rho: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] alpha: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] nu: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] rho: JsValue,
     ) -> Result<JsSabrParameters, JsValue> {
         let alpha = js_f64(&alpha, "alpha")?;
         let nu = js_f64(&nu, "nu")?;
@@ -128,8 +142,15 @@ impl JsSabrParameters {
     /// Throws a `FinstackError` (kind `validation`) if `alpha` is not finite
     /// and positive, `nu` is negative or non-finite, `rho` is outside
     /// `[-1, 1]`.
+    /// @param alpha - Positive initial normal volatility in absolute rate units.
+    /// @param nu - Finite non-negative volatility of volatility per square-root year.
+    /// @param rho - Forward/volatility correlation in `[-1, 1]`.
     #[wasm_bindgen]
-    pub fn normal(alpha: JsValue, nu: JsValue, rho: JsValue) -> Result<JsSabrParameters, JsValue> {
+    pub fn normal(
+        #[wasm_bindgen(unchecked_param_type = "number")] alpha: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] nu: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] rho: JsValue,
+    ) -> Result<JsSabrParameters, JsValue> {
         let alpha = js_f64(&alpha, "alpha")?;
         let nu = js_f64(&nu, "nu")?;
         let rho = js_f64(&rho, "rho")?;
@@ -153,11 +174,14 @@ impl JsSabrParameters {
     /// Throws a `FinstackError` (kind `validation`) if `alpha` is not finite
     /// and positive, `nu` is negative or non-finite, `rho` is outside
     /// `[-1, 1]`.
+    /// @param alpha - Positive initial Black volatility as a decimal.
+    /// @param nu - Finite non-negative volatility of volatility per square-root year.
+    /// @param rho - Forward/volatility correlation in `[-1, 1]`.
     #[wasm_bindgen]
     pub fn lognormal(
-        alpha: JsValue,
-        nu: JsValue,
-        rho: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] alpha: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] nu: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] rho: JsValue,
     ) -> Result<JsSabrParameters, JsValue> {
         let alpha = js_f64(&alpha, "alpha")?;
         let nu = js_f64(&nu, "nu")?;
@@ -183,12 +207,16 @@ impl JsSabrParameters {
     /// Throws a `FinstackError` (kind `validation`) if `alpha` is not finite
     /// and positive, `nu` is negative or non-finite, `rho` is outside
     /// `[-1, 1]` or `shift` is not finite and positive.
+    /// @param alpha - Positive initial normal volatility in absolute rate units.
+    /// @param nu - Finite non-negative volatility of volatility per square-root year.
+    /// @param rho - Forward/volatility correlation in `[-1, 1]`.
+    /// @param shift - Positive displacement added to forward and strike, in the forward's rate units.
     #[wasm_bindgen(js_name = shiftedNormal)]
     pub fn shifted_normal(
-        alpha: JsValue,
-        nu: JsValue,
-        rho: JsValue,
-        shift: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] alpha: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] nu: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] rho: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] shift: JsValue,
     ) -> Result<JsSabrParameters, JsValue> {
         let alpha = js_f64(&alpha, "alpha")?;
         let nu = js_f64(&nu, "nu")?;
@@ -215,12 +243,16 @@ impl JsSabrParameters {
     /// Throws a `FinstackError` (kind `validation`) if `alpha` is not finite
     /// and positive, `nu` is negative or non-finite, `rho` is outside
     /// `[-1, 1]` or `shift` is not finite and positive.
+    /// @param alpha - Positive initial Black volatility of the shifted forward `F + shift` (decimal).
+    /// @param nu - Finite non-negative volatility of volatility per square-root year.
+    /// @param rho - Forward/volatility correlation in `[-1, 1]`.
+    /// @param shift - Positive displacement added to forward and strike, in the forward's rate units.
     #[wasm_bindgen(js_name = shiftedLognormal)]
     pub fn shifted_lognormal(
-        alpha: JsValue,
-        nu: JsValue,
-        rho: JsValue,
-        shift: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] alpha: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] nu: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] rho: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] shift: JsValue,
     ) -> Result<JsSabrParameters, JsValue> {
         let alpha = js_f64(&alpha, "alpha")?;
         let nu = js_f64(&nu, "nu")?;
@@ -262,12 +294,14 @@ impl JsSabrParameters {
     }
 
     /// Whether a displacement (shift) is configured.
+    /// @returns `true` when a SABR displacement shift is configured.
     #[wasm_bindgen(js_name = isShifted)]
     pub fn is_shifted(&self) -> bool {
         self.inner.is_shifted()
     }
 
     /// Whether the parameterization admits negative forwards.
+    /// @returns `true` when the SABR parameterization admits negative forwards.
     #[wasm_bindgen(js_name = supportsNegativeRates)]
     pub fn supports_negative_rates(&self) -> bool {
         self.inner.supports_negative_rates()
@@ -283,12 +317,13 @@ impl JsSabrParameters {
     /// Throws a JavaScript exception if `t` is not positive, the forward or
     /// strike lies outside the selected shifted or unshifted SABR domain, or
     /// the Hagan expansion produces an undefined or non-finite volatility.
+    /// @returns Hagan-2002 implied volatility: normal vol in absolute rate units when beta < 1e-4, Black decimal volatility otherwise.
     #[wasm_bindgen(js_name = impliedVol)]
     pub fn implied_vol(
         &self,
-        forward: JsValue,
-        strike: JsValue,
-        t: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] forward: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] t: JsValue,
     ) -> Result<f64, JsValue> {
         let forward = js_f64(&forward, "forward")?;
         let strike = js_f64(&strike, "strike")?;
@@ -308,6 +343,17 @@ impl JsSabrParameters {
 /// Volatility smile generator for a fixed `(forward, t)` pair.
 ///
 /// Hagan SABR (2002): see docs/REFERENCES.md#hagan-2002-sabr.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const params = models.volatility.SabrParameters.ratesDefault();
+/// const smile = new models.volatility.SabrSmile(params, 0.03, 2);
+/// console.log(smile.generateSmile([0.02, 0.03, 0.04]));
+/// smile.free();
+/// params.free();
+/// ```
 #[wasm_bindgen(js_name = SabrSmile)]
 pub struct JsSabrSmile {
     inner: SabrSmile,
@@ -322,8 +368,8 @@ impl JsSabrSmile {
     #[wasm_bindgen(constructor)]
     pub fn new(
         params: &JsSabrParameters,
-        forward: JsValue,
-        t: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] forward: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] t: JsValue,
     ) -> Result<JsSabrSmile, JsValue> {
         let forward = js_f64(&forward, "forward")?;
         let t = js_f64(&t, "t")?;
@@ -339,6 +385,7 @@ impl JsSabrSmile {
     /// Throws a JavaScript exception if the smile's expiry or effective forward
     /// is outside the model domain, or the ATM calculation produces an invalid
     /// volatility.
+    /// @returns ATM implied volatility for this smile's `(forward, t)`: normal vol in absolute rate units when beta < 1e-4, Black decimal vol otherwise.
     #[wasm_bindgen(js_name = atmVol)]
     pub fn atm_vol(&self) -> Result<f64, JsValue> {
         self.inner.atm_vol().map_err(to_js_err)
@@ -355,7 +402,10 @@ impl JsSabrSmile {
     /// requested `strike` is outside the model domain or the Hagan expansion
     /// fails.
     #[wasm_bindgen(js_name = impliedVol)]
-    pub fn implied_vol(&self, strike: JsValue) -> Result<f64, JsValue> {
+    pub fn implied_vol(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    ) -> Result<f64, JsValue> {
         let strike = js_f64(&strike, "strike")?;
         self.inner.implied_vol(strike).map_err(to_js_err)
     }
@@ -368,8 +418,12 @@ impl JsSabrSmile {
     /// Throws a JavaScript exception if the smile's expiry or forward, or any
     /// supplied strike, is outside the model domain, or the Hagan expansion
     /// produces an invalid volatility.
+    /// @returns One implied vol per strike, in the same order as `strikes` (normal vol when beta < 1e-4, Black decimal vol otherwise).
     #[wasm_bindgen(js_name = generateSmile)]
-    pub fn generate_smile(&self, strikes: JsValue) -> Result<Box<[f64]>, JsValue> {
+    pub fn generate_smile(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number[]")] strikes: JsValue,
+    ) -> Result<Box<[f64]>, JsValue> {
         let strikes = js_f64_seq(&strikes, "strikes")?;
         self.inner
             .generate_smile(&strikes)
@@ -391,8 +445,13 @@ impl JsSabrSmile {
     /// stored smile and supplied strikes, strikes are non-finite or not strictly
     /// ascending, the rate is non-finite, call prices are non-finite, or the
     /// result cannot be converted to a JavaScript value.
-    #[wasm_bindgen(js_name = validateNoArbitrage)]
-    pub fn validate_no_arbitrage(&self, strikes: JsValue, r: JsValue) -> Result<JsValue, JsValue> {
+    /// @returns The Rust `ArbitrageValidationResult` for the supplied strike grid.
+    #[wasm_bindgen(js_name = validateNoArbitrage, unchecked_return_type = "ArbitrageValidationResult")]
+    pub fn validate_no_arbitrage(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray")] strikes: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] r: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let r = js_f64(&r, "r")?;
         let strikes = js_f64_seq(&strikes, "strikes")?;
         let result = self
@@ -419,8 +478,14 @@ impl JsSabrSmile {
     /// Throws a `FinstackError` (kind `validation`) if `delta` is outside
     /// `(0, 1)`, the smile coordinates are outside the model domain, or the
     /// strike overflows.
+    /// @param delta - Absolute undiscounted forward delta strictly between 0 and 1.
+    /// @param isCall - `true` for call delta, `false` for absolute put delta.
     #[wasm_bindgen(js_name = strikeFromDelta)]
-    pub fn strike_from_delta(&self, delta: JsValue, is_call: JsValue) -> Result<f64, JsValue> {
+    pub fn strike_from_delta(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] delta: JsValue,
+        #[wasm_bindgen(js_name = "isCall", unchecked_param_type = "boolean")] is_call: JsValue,
+    ) -> Result<f64, JsValue> {
         let delta = js_f64(&delta, "delta")?;
         let is_call = js_bool(&is_call, "isCall")?;
         self.inner
@@ -444,8 +509,14 @@ impl JsSabrSmile {
     /// Throws a `FinstackError` (kind `validation`) if any violation is found,
     /// the grid is not finite and strictly ascending, `r` is non-finite, or the
     /// smile cannot be evaluated on the grid.
+    /// @param strikes - Finite, strictly ascending strikes with arbitrary spacing.
+    /// @param r - Finite continuously compounded risk-free rate (decimal) that discounts the forward-based Black call prices.
     #[wasm_bindgen(js_name = checkNoArbitrage)]
-    pub fn check_no_arbitrage(&self, strikes: JsValue, r: JsValue) -> Result<(), JsValue> {
+    pub fn check_no_arbitrage(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray")] strikes: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] r: JsValue,
+    ) -> Result<(), JsValue> {
         let strikes = js_f64_seq(&strikes, "strikes")?;
         let r = js_f64(&r, "r")?;
         self.inner
@@ -471,12 +542,15 @@ impl JsSabrSmile {
     /// `FinstackError` (kind `validation`) if the grid is not finite and
     /// strictly ascending, `r` is non-finite, or the smile or a price
     /// inversion fails.
+    /// @param strikes - Finite, strictly ascending strikes in the model domain.
+    /// @param r - Finite continuously compounded risk-free rate (decimal) that discounts the forward-based Black call prices.
+    /// @param maxIterations - Maximum number of repair passes (non-negative integer).
     #[wasm_bindgen(js_name = repairArbitrage)]
     pub fn repair_arbitrage(
         &self,
-        strikes: JsValue,
-        r: JsValue,
-        max_iterations: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray")] strikes: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] r: JsValue,
+        #[wasm_bindgen(js_name = "maxIterations", unchecked_param_type = "number")] max_iterations: JsValue,
     ) -> Result<Box<[f64]>, JsValue> {
         let strikes = js_f64_seq(&strikes, "strikes")?;
         let r = js_f64(&r, "r")?;
@@ -503,6 +577,16 @@ impl JsSabrSmile {
 /// SABR calibrator (Levenberg-Marquardt with beta fixed).
 ///
 /// Hagan SABR (2002): see docs/REFERENCES.md#hagan-2002-sabr.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const calibrator = models.volatility.SabrCalibrator.highPrecision();
+/// const tighter = calibrator.withTolerance(1e-10);
+/// tighter.free();
+/// calibrator.free();
+/// ```
 #[wasm_bindgen(js_name = SabrCalibrator)]
 pub struct JsSabrCalibrator {
     inner: SabrCalibrator,
@@ -519,6 +603,7 @@ impl JsSabrCalibrator {
     }
 
     /// Calibrator preset with tighter convergence tolerances.
+    /// @returns A `SabrCalibrator` handle.
     #[wasm_bindgen(js_name = highPrecision)]
     pub fn high_precision() -> JsSabrCalibrator {
         Self {
@@ -530,8 +615,12 @@ impl JsSabrCalibrator {
     /// quote error, preserving all other settings (e.g. the iteration cap from
     /// `highPrecision`).
     /// @param tolerance - Positive finite maximum relative error of any final volatility quote; 1e-4 permits 0.01% of each quote. Invalid settings or a fit outside this budget throw during calibration.
+    /// @returns A `SabrCalibrator` handle.
     #[wasm_bindgen(js_name = withTolerance)]
-    pub fn with_tolerance(&self, tolerance: JsValue) -> Result<JsSabrCalibrator, JsValue> {
+    pub fn with_tolerance(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] tolerance: JsValue,
+    ) -> Result<JsSabrCalibrator, JsValue> {
         let tolerance = js_f64(&tolerance, "tolerance")?;
         Ok(Self {
             inner: self.inner.clone().with_tolerance(tolerance),
@@ -540,7 +629,7 @@ impl JsSabrCalibrator {
 
     /// Return a copy of this calibrator with an overridden iteration cap,
     /// preserving all other settings.
-    /// @param max_iterations - Positive cap on solver iterations before a
+    /// @param maxIterations - Positive cap on solver iterations before a
     /// non-convergence error; a finite non-negative integer no greater than
     /// 4294967295. Zero is rejected by the canonical calibrator when used.
     ///
@@ -548,10 +637,11 @@ impl JsSabrCalibrator {
     ///
     /// Throws if `max_iterations` is non-finite, fractional, negative, or
     /// exceeds the wasm32 integer range.
+    /// @returns A `SabrCalibrator` handle.
     #[wasm_bindgen(js_name = withMaxIterations)]
     pub fn with_max_iterations(
         &self,
-        max_iterations: JsValue,
+        #[wasm_bindgen(js_name = "maxIterations", unchecked_param_type = "number")] max_iterations: JsValue,
     ) -> Result<JsSabrCalibrator, JsValue> {
         let max_iterations: usize = js_uint(&max_iterations, "maxIterations")?;
         Ok(Self {
@@ -562,7 +652,7 @@ impl JsSabrCalibrator {
     /// Calibrate `(alpha, nu, rho)` to market vols with `beta` fixed.
     /// @param forward - Forward price or rate in the same quote convention as the strike.
     /// @param strikes - Option strikes aligned one-for-one with market_vols.
-    /// @param market_vols - Positive quotes aligned with strikes: absolute decimal-rate normal volatilities for beta near zero, otherwise annual Black volatilities in relative decimals.
+    /// @param marketVols - Positive quotes aligned with strikes: absolute decimal-rate normal volatilities for beta near zero, otherwise annual Black volatilities in relative decimals.
     /// @param t - Positive time to expiry in years.
     /// @param beta - SABR CEV elasticity in `[0, 1]`, held fixed during calibration.
     /// @returns Calibrated parameters, signed model-minus-market quote errors, and deterministic solver diagnostics.
@@ -572,13 +662,15 @@ impl JsSabrCalibrator {
     /// Throws a JavaScript exception if the strike and volatility lengths
     /// differ, the quote arrays are empty, the SABR inputs or fitted parameters
     /// are invalid, or the calibration solver does not converge.
+    #[wasm_bindgen(unchecked_return_type = "SabrCalibrationOutcome")]
     pub fn calibrate(
         &self,
-        forward: JsValue,
-        strikes: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] forward: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number[]")] strikes: JsValue,
+        #[wasm_bindgen(js_name = "marketVols", unchecked_param_type = "number[]")]
         market_vols: JsValue,
-        t: JsValue,
-        beta: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] t: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] beta: JsValue,
     ) -> Result<JsValue, JsValue> {
         let forward = js_f64(&forward, "forward")?;
         let strikes = js_f64_seq(&strikes, "strikes")?;
@@ -606,8 +698,12 @@ impl JsSabrCalibrator {
     /// other than `"auto"` or any other shape the Rust `SabrShift` wire form
     /// rejects, and a `TypeError` (`kind: "invalid_type"`) for a non-finite
     /// number or a value JSON cannot represent.
+    /// @returns A `SabrCalibrator` handle.
     #[wasm_bindgen(js_name = withShift)]
-    pub fn with_shift(&self, shift: JsValue) -> Result<JsSabrCalibrator, JsValue> {
+    pub fn with_shift(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number | 'auto' | null | undefined")] shift: JsValue,
+    ) -> Result<JsSabrCalibrator, JsValue> {
         // `undefined` is the omitted argument: the same as `null`.
         let wire = if shift.is_undefined() {
             serde_json::Value::Null
@@ -626,11 +722,16 @@ impl JsSabrCalibrator {
 
     /// Return a copy of this calibrator with exact ATM pinning enabled or
     /// disabled, preserving all other settings.
-    /// @param atm_pinning - When `true`, alpha is solved analytically so the
+    /// @param atmPinning - When `true`, alpha is solved analytically so the
     /// model reproduces the ATM volatility interpolated from the quotes
     /// exactly, and only nu and rho are fitted to the smile.
+    /// @returns A `SabrCalibrator` handle.
     #[wasm_bindgen(js_name = withAtmPinning)]
-    pub fn with_atm_pinning(&self, atm_pinning: JsValue) -> Result<JsSabrCalibrator, JsValue> {
+    pub fn with_atm_pinning(
+        &self,
+        #[wasm_bindgen(js_name = "atmPinning", unchecked_param_type = "boolean")]
+        atm_pinning: JsValue,
+    ) -> Result<JsSabrCalibrator, JsValue> {
         let atm_pinning = js_bool(&atm_pinning, "atmPinning")?;
         Ok(Self {
             inner: self.inner.clone().with_atm_pinning(atm_pinning),
@@ -651,7 +752,7 @@ impl JsSabrCalibrator {
 
     /// Displacement policy: `null` (no shift), a fixed numeric shift in the
     /// forward's units, or `"auto"` — the same forms `withShift` accepts.
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, unchecked_return_type = "number | 'auto' | null")]
     pub fn shift(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner.shift())
     }
@@ -691,13 +792,18 @@ impl Default for JsSabrCalibrator {
 /// Throws a `FinstackError` (kind `validation`) if `forward` or `strike` is
 /// non-finite, `t` is not positive, `price` is negative, non-finite or below
 /// intrinsic value, or the solver does not converge.
+/// @param price - Non-negative undiscounted option price (forward premium per unit annuity) in the forward's units.
+/// @param forward - Finite forward rate or price; negative values are allowed.
+/// @param strike - Finite strike in the forward's units; negative values are allowed.
+/// @param t - Strictly positive time to expiry in years.
+/// @param isCall - `true` for a call, `false` for a put.
 #[wasm_bindgen(js_name = impliedVolBachelier)]
 pub fn implied_vol_bachelier(
-    price: JsValue,
-    forward: JsValue,
-    strike: JsValue,
-    t: JsValue,
-    is_call: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] price: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] forward: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] t: JsValue,
+    #[wasm_bindgen(js_name = "isCall", unchecked_param_type = "boolean")] is_call: JsValue,
 ) -> Result<f64, JsValue> {
     let price = js_f64(&price, "price")?;
     let forward = js_f64(&forward, "forward")?;
@@ -730,13 +836,18 @@ pub fn implied_vol_bachelier(
 /// is not positive and finite, `price` is negative or non-finite, `price` is
 /// below intrinsic value or at/above the upper bound (forward for a call,
 /// strike for a put), or the solver does not converge.
+/// @param price - Non-negative undiscounted option price (forward premium per unit annuity) in the forward's units.
+/// @param forward - Strictly positive forward rate or price.
+/// @param strike - Strictly positive strike in the forward's units.
+/// @param t - Strictly positive time to expiry in years.
+/// @param isCall - `true` for a call, `false` for a put.
 #[wasm_bindgen(js_name = impliedVolBlack)]
 pub fn implied_vol_black(
-    price: JsValue,
-    forward: JsValue,
-    strike: JsValue,
-    t: JsValue,
-    is_call: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] price: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] forward: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] t: JsValue,
+    #[wasm_bindgen(js_name = "isCall", unchecked_param_type = "boolean")] is_call: JsValue,
 ) -> Result<f64, JsValue> {
     let price = js_f64(&price, "price")?;
     let forward = js_f64(&forward, "forward")?;
@@ -767,12 +878,27 @@ pub fn implied_vol_black(
 ///
 /// Throws a JavaScript exception if a convention cannot be decoded, an input
 /// is outside its domain, or the price-matching solver fails to converge.
+/// @param vol - Input volatility in the source convention: decimal Black vol for `"lognormal"` / shifted-lognormal, absolute vol in the forward's rate units for `"normal"`. Must be positive.
+/// @param fromConvention - `"normal"`, `"lognormal"`, or `{"shifted_lognormal": {"shift": s}}` (serde form of `VolatilityConvention`).
+/// @param toConvention - Target convention in the same encoding.
+/// @param forwardRate - ATM forward rate or price; must satisfy the target convention's domain.
+/// @param timeToExpiry - Time to expiry in years (non-negative).
+/// @returns Volatility in the target convention (decimal Black vol, or absolute normal vol).
 #[wasm_bindgen(js_name = convertAtmVolatility)]
 pub fn convert_atm_volatility(
-    vol: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] vol: JsValue,
+    #[wasm_bindgen(
+        js_name = "fromConvention",
+        unchecked_param_type = "VolatilityConvention"
+    )]
     from_convention: JsValue,
+    #[wasm_bindgen(
+        js_name = "toConvention",
+        unchecked_param_type = "VolatilityConvention"
+    )]
     to_convention: JsValue,
-    forward_rate: JsValue,
+    #[wasm_bindgen(js_name = "forwardRate", unchecked_param_type = "number")] forward_rate: JsValue,
+    #[wasm_bindgen(js_name = "timeToExpiry", unchecked_param_type = "number")]
     time_to_expiry: JsValue,
 ) -> Result<f64, JsValue> {
     let vol = js_f64(&vol, "vol")?;
@@ -801,12 +927,17 @@ pub fn convert_atm_volatility(
 /// Throws a JavaScript exception if lengths differ, fewer than five quotes are
 /// supplied, an input is outside its domain, the optimizer fails to converge,
 /// or the fit violates the SVI no-arbitrage conditions.
-#[wasm_bindgen(js_name = calibrateSvi)]
+/// @param strikes - Positive strikes (at least five).
+/// @param vols - Black implied vols (decimal) aligned one-for-one with `strikes`.
+/// @param forward - Positive forward at `expiry`.
+/// @param expiry - Positive time to expiry in years.
+/// @returns Validated SVI parameters `{ a, b, rho, m, sigma }`.
+#[wasm_bindgen(js_name = calibrateSvi, unchecked_return_type = "SviParams")]
 pub fn calibrate_svi(
-    strikes: JsValue,
-    vols: JsValue,
-    forward: JsValue,
-    expiry: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number[]")] strikes: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number[]")] vols: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] forward: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
 ) -> Result<JsValue, JsValue> {
     let strikes = js_f64_seq(&strikes, "strikes")?;
     let vols = js_f64_seq(&vols, "vols")?;
@@ -830,8 +961,16 @@ pub fn calibrate_svi(
 ///
 /// Throws a JavaScript exception if `params` fails validation, `t` is not
 /// positive, or the total variance at `k` is negative.
+/// @param params - SVI parameter object `{a, b, rho, m, sigma}` (validated on decode).
+/// @param k - Log-moneyness `ln(K / F)`.
+/// @param t - Positive time to expiry in years.
+/// @returns Annualized Black volatility as a decimal.
 #[wasm_bindgen(js_name = sviImpliedVol)]
-pub fn svi_implied_vol(params: JsValue, k: JsValue, t: JsValue) -> Result<f64, JsValue> {
+pub fn svi_implied_vol(
+    #[wasm_bindgen(unchecked_param_type = "SviParams")] params: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] k: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] t: JsValue,
+) -> Result<f64, JsValue> {
     let k = js_f64(&k, "k")?;
     let t = js_f64(&t, "t")?;
     let params: finstack_quant_models::volatility::svi::SviParams =
@@ -857,13 +996,19 @@ pub fn svi_implied_vol(params: JsValue, k: JsValue, t: JsValue) -> Result<f64, J
 ///
 /// Throws a JavaScript exception for out-of-grid coordinates, invalid SABR
 /// model inputs, or a shifted-lognormal or undecodable `convention`.
+/// @param cube - Structurally validated data-only volatility cube.
+/// @param expiry - Positive option expiry in years within the cube grid.
+/// @param tenor - Positive underlying tenor in years within the cube grid.
+/// @param strike - Finite strike in the same rate units as the stored forwards.
+/// @param convention - Output quote convention: `"lognormal"` (decimal Black, shifted by the cube's own SABR shifts where it stores them) or `"normal"` (absolute Bachelier vol in the forward's rate units). The serde form `{"shifted_lognormal": {"shift": s}}` is rejected because the cube already carries its own shifts.
+/// @returns Annualized volatility: decimal Black for `"lognormal"`, absolute rate units for `"normal"`.
 #[wasm_bindgen(js_name = getCubeVol)]
 pub fn get_cube_vol(
     cube: &JsVolCube,
-    expiry: JsValue,
-    tenor: JsValue,
-    strike: JsValue,
-    convention: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] tenor: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "VolatilityConvention")] convention: JsValue,
 ) -> Result<f64, JsValue> {
     let expiry = js_f64(&expiry, "expiry")?;
     let tenor = js_f64(&tenor, "tenor")?;
@@ -892,13 +1037,19 @@ pub fn get_cube_vol(
 ///
 /// Throws a JavaScript exception for a non-numeric coordinate or an
 /// undecodable `convention`.
+/// @param cube - Structurally validated data-only volatility cube.
+/// @param expiry - Finite option expiry in years; clamped to the stored grid.
+/// @param tenor - Finite underlying tenor in years; clamped to the stored grid.
+/// @param strike - Finite strike in the same rate units as the stored forwards.
+/// @param convention - Output quote convention: `"lognormal"` (decimal Black, shifted by the cube's own SABR shifts where it stores them) or `"normal"` (absolute Bachelier vol in the forward's rate units). The serde form `{"shifted_lognormal": {"shift": s}}` is rejected because the cube already carries its own shifts. A shifted-lognormal convention yields `NaN`.
+/// @returns Annualized volatility in `convention`, or `NaN` when undefined (including a shifted-lognormal `convention`).
 #[wasm_bindgen(js_name = getCubeVolClamped)]
 pub fn get_cube_vol_clamped(
     cube: &JsVolCube,
-    expiry: JsValue,
-    tenor: JsValue,
-    strike: JsValue,
-    convention: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] tenor: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "VolatilityConvention")] convention: JsValue,
 ) -> Result<f64, JsValue> {
     let expiry = js_f64(&expiry, "expiry")?;
     let tenor = js_f64(&tenor, "tenor")?;
@@ -924,10 +1075,13 @@ pub fn get_cube_vol_clamped(
 ///
 /// Throws a JavaScript exception when `expiry_index` is non-finite, fractional,
 /// negative, exceeds the wasm32 integer range, or is outside the surface.
+/// @param surface - Structurally validated data-only FX delta surface.
+/// @param expiryIndex - Zero-based stored expiry index.
+/// @returns Three annualized decimal volatilities in ATM, put, call order.
 #[wasm_bindgen(js_name = getFxDeltaPillarVols)]
 pub fn get_fx_delta_pillar_vols(
     surface: &JsFxDeltaVolSurface,
-    expiry_index: JsValue,
+    #[wasm_bindgen(js_name = "expiryIndex", unchecked_param_type = "number")] expiry_index: JsValue,
 ) -> Result<Box<[f64]>, JsValue> {
     let expiry_index: usize = js_uint(&expiry_index, "expiryIndex")?;
     vol::get_fx_delta_pillar_vols(&surface.inner, expiry_index)
@@ -948,12 +1102,17 @@ pub fn get_fx_delta_pillar_vols(
 ///
 /// Throws a JavaScript exception for invalid coordinates or a non-positive
 /// reconstructed wing volatility.
+/// @param surface - Structurally validated data-only FX delta surface.
+/// @param expiry - Positive option expiry in years.
+/// @param strike - Positive strike in the FX quote currency.
+/// @param forward - Positive FX forward in quote currency per base currency.
+/// @returns Annualized Black volatility as a decimal.
 #[wasm_bindgen(js_name = getFxDeltaVol)]
 pub fn get_fx_delta_vol(
     surface: &JsFxDeltaVolSurface,
-    expiry: JsValue,
-    strike: JsValue,
-    forward: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] forward: JsValue,
 ) -> Result<f64, JsValue> {
     let expiry = js_f64(&expiry, "expiry")?;
     let strike = js_f64(&strike, "strike")?;
@@ -969,12 +1128,17 @@ pub fn get_fx_delta_vol(
 /// * `forward` - Positive forward in the same units as the returned strike.
 /// * `vol` - Positive annualized Black volatility as a decimal.
 /// * `expiry` - Positive option expiry in years.
+/// @param delta - Forward call delta as a decimal probability in `(0, 1)`.
+/// @param forward - Positive forward in the same units as the returned strike.
+/// @param vol - Positive annualized Black volatility as a decimal.
+/// @param expiry - Positive option expiry in years.
+/// @returns Strike in the same units as `forward`.
 #[wasm_bindgen(js_name = deltaToStrike)]
 pub fn delta_to_strike(
-    delta: JsValue,
-    forward: JsValue,
-    vol: JsValue,
-    expiry: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] delta: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] forward: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] vol: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
 ) -> Result<f64, JsValue> {
     let delta = js_f64(&delta, "delta")?;
     let forward = js_f64(&forward, "forward")?;
@@ -991,12 +1155,17 @@ pub fn delta_to_strike(
 /// * `forward` - Positive forward in the same units as `strike`.
 /// * `vol` - Positive annualized Black volatility as a decimal.
 /// * `expiry` - Positive option expiry in years.
+/// @param strike - Positive strike in the same units as `forward`.
+/// @param forward - Positive forward in the same units as `strike`.
+/// @param vol - Positive annualized Black volatility as a decimal.
+/// @param expiry - Positive option expiry in years.
+/// @returns Forward call delta as a decimal probability.
 #[wasm_bindgen(js_name = strikeToDelta)]
 pub fn strike_to_delta(
-    strike: JsValue,
-    forward: JsValue,
-    vol: JsValue,
-    expiry: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] forward: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] vol: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
 ) -> Result<f64, JsValue> {
     let strike = js_f64(&strike, "strike")?;
     let forward = js_f64(&forward, "forward")?;
@@ -1016,7 +1185,10 @@ pub fn strike_to_delta(
 ///
 /// Throws a `validation` error if `params` is malformed or fails validation.
 #[wasm_bindgen(js_name = sviTotalVariance)]
-pub fn svi_total_variance(params: JsValue, k: JsValue) -> Result<f64, JsValue> {
+pub fn svi_total_variance(
+    #[wasm_bindgen(unchecked_param_type = "SviParams")] params: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] k: JsValue,
+) -> Result<f64, JsValue> {
     let params: SviParams = from_js_json(&params, "params")?;
     Ok(params.total_variance(js_f64(&k, "k")?))
 }
@@ -1033,7 +1205,10 @@ pub fn svi_total_variance(params: JsValue, k: JsValue) -> Result<f64, JsValue> {
 ///
 /// Throws a `validation` error if `params` is malformed or fails validation.
 #[wasm_bindgen(js_name = sviDurrlemanG)]
-pub fn svi_durrleman_g(params: JsValue, k: JsValue) -> Result<f64, JsValue> {
+pub fn svi_durrleman_g(
+    #[wasm_bindgen(unchecked_param_type = "SviParams")] params: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] k: JsValue,
+) -> Result<f64, JsValue> {
     let params: SviParams = from_js_json(&params, "params")?;
     Ok(params.durrleman_g(js_f64(&k, "k")?))
 }
@@ -1069,10 +1244,10 @@ pub fn svi_durrleman_g(params: JsValue, k: JsValue) -> Result<f64, JsValue> {
 /// strikes, is not an unshifted Black strike surface, `forwards` has
 /// the wrong length or a non-positive entry, or the surface has butterfly or
 /// calendar arbitrage at a node (the message names the node).
-#[wasm_bindgen(js_name = localVolFromImpliedVol)]
+#[wasm_bindgen(js_name = localVolFromImpliedVol, unchecked_return_type = "generated.models.LocalVolSurface")]
 pub fn local_vol_from_implied_vol(
     surface: &JsVolSurface,
-    forwards: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] forwards: JsValue,
 ) -> Result<JsValue, JsValue> {
     let forwards = js_f64_seq(&forwards, "forwards")?;
     let local = LocalVolSurface::from_implied_vol(&surface.inner, &forwards).map_err(to_js_err)?;
@@ -1087,7 +1262,7 @@ pub fn local_vol_from_implied_vol(
 /// non-positive Dupire density on market-calibrated grids.
 /// @param surface - `core.VolSurface` handle, as for `localVolFromImpliedVol`.
 /// @param forwards - One forward per surface expiry, as for `localVolFromImpliedVol`.
-/// @param sigma_strikes - Standard deviation of the Gaussian kernel in strike (price) units, non-negative; zero disables smoothing.
+/// @param sigmaStrikes - Standard deviation of the Gaussian kernel in strike (price) units, non-negative; zero disables smoothing.
 /// @returns The `LocalVolSurface` object on the grid of `surface`.
 ///
 /// @example
@@ -1109,10 +1284,11 @@ pub fn local_vol_from_implied_vol(
 /// Throws a `TypeError` if an argument has the wrong JavaScript type, and a
 /// `validation` error if `sigmaStrikes` is negative or non-finite, or for any
 /// error of `localVolFromImpliedVol` on the smoothed surface.
-#[wasm_bindgen(js_name = localVolFromImpliedVolSmoothed)]
+#[wasm_bindgen(js_name = localVolFromImpliedVolSmoothed, unchecked_return_type = "generated.models.LocalVolSurface")]
 pub fn local_vol_from_implied_vol_smoothed(
     surface: &JsVolSurface,
-    forwards: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] forwards: JsValue,
+    #[wasm_bindgen(js_name = "sigmaStrikes", unchecked_param_type = "number")]
     sigma_strikes: JsValue,
 ) -> Result<JsValue, JsValue> {
     let forwards = js_f64_seq(&forwards, "forwards")?;
@@ -1127,7 +1303,7 @@ pub fn local_vol_from_implied_vol_smoothed(
 /// outside it.
 ///
 /// Twin of the Rust and Python `LocalVolSurface.value`.
-/// @param local_vol - `LocalVolSurface` object or JSON (`expiries`, `strikes`, `local_vols`), validated on decode.
+/// @param localVol - `LocalVolSurface` object or JSON (`expiries`, `strikes`, `local_vols`), validated on decode.
 /// @param expiry - Time in years from the valuation date.
 /// @param strike - Level of the underlying in price units.
 /// @returns The local volatility as an annualized decimal.
@@ -1149,9 +1325,13 @@ pub fn local_vol_from_implied_vol_smoothed(
 /// not match the grid.
 #[wasm_bindgen(js_name = localVolValue)]
 pub fn local_vol_value(
+    #[wasm_bindgen(
+        js_name = "localVol",
+        unchecked_param_type = "generated.models.LocalVolSurface | string"
+    )]
     local_vol: JsValue,
-    expiry: JsValue,
-    strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
 ) -> Result<f64, JsValue> {
     let local_vol: LocalVolSurface = from_js_json(&local_vol, "localVol")?;
     Ok(local_vol.value(js_f64(&expiry, "expiry")?, js_f64(&strike, "strike")?))
@@ -1165,7 +1345,7 @@ fn grid_tolerance(tolerance: Option<&JsValue>) -> Result<f64, JsValue> {
 /// @param strikes - Strictly increasing strike grid shared by every row.
 /// @param expiries - Strictly increasing expiries in years, one per row of `vols`.
 /// @param vols - Implied volatilities as nested rows: one `number[]` per expiry, one decimal volatility per strike.
-/// @param forward_prices - One forward price to broadcast, or one per expiry.
+/// @param forwardPrices - One forward price to broadcast, or one per expiry.
 /// @param tolerance - Optional non-negative violation tolerance; omitted uses the Rust `DEFAULT_ARBITRAGE_TOLERANCE` (1e-10).
 /// @returns The `ArbitrageViolation` objects found (empty when the grid is clean).
 ///
@@ -1173,13 +1353,14 @@ fn grid_tolerance(tolerance: Option<&JsValue>) -> Result<f64, JsValue> {
 ///
 /// Throws a `validation` error if the grid or forwards are invalid or the
 /// tolerance is negative or non-finite.
-#[wasm_bindgen(js_name = checkButterflyGrid)]
+#[wasm_bindgen(js_name = checkButterflyGrid, unchecked_return_type = "generated.models.ArbitrageViolation[]")]
 pub fn check_butterfly_grid(
-    strikes: JsValue,
-    expiries: JsValue,
-    vols: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] strikes: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] expiries: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray[]")] vols: JsValue,
+    #[wasm_bindgen(js_name = "forwardPrices", unchecked_param_type = "NumericArray")]
     forward_prices: JsValue,
-    tolerance: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "number")] tolerance: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let violations = model_arbitrage::check_butterfly_grid(
         &js_f64_seq(&strikes, "strikes")?,
@@ -1196,7 +1377,7 @@ pub fn check_butterfly_grid(
 /// @param strikes - Strictly increasing strike grid shared by every row.
 /// @param expiries - Strictly increasing expiries in years, one per row of `vols`.
 /// @param vols - Implied volatilities as nested rows: one `number[]` per expiry, one decimal volatility per strike.
-/// @param forward_prices - One forward price to broadcast, or one per expiry.
+/// @param forwardPrices - One forward price to broadcast, or one per expiry.
 /// @param tolerance - Optional non-negative violation tolerance; omitted uses the Rust `DEFAULT_ARBITRAGE_TOLERANCE` (1e-10).
 /// @returns The `ArbitrageViolation` objects found (empty when the grid is clean).
 ///
@@ -1204,13 +1385,14 @@ pub fn check_butterfly_grid(
 ///
 /// Throws a `validation` error if the grid or forwards are invalid or the
 /// tolerance is negative or non-finite.
-#[wasm_bindgen(js_name = checkCalendarSpreadGrid)]
+#[wasm_bindgen(js_name = checkCalendarSpreadGrid, unchecked_return_type = "generated.models.ArbitrageViolation[]")]
 pub fn check_calendar_spread_grid(
-    strikes: JsValue,
-    expiries: JsValue,
-    vols: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] strikes: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] expiries: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray[]")] vols: JsValue,
+    #[wasm_bindgen(js_name = "forwardPrices", unchecked_param_type = "NumericArray")]
     forward_prices: JsValue,
-    tolerance: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "number")] tolerance: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let violations = model_arbitrage::check_calendar_spread_grid(
         &js_f64_seq(&strikes, "strikes")?,
@@ -1227,18 +1409,19 @@ pub fn check_calendar_spread_grid(
 /// @param strikes - Strictly increasing strike grid shared by every row.
 /// @param expiries - Strictly increasing expiries in years, one per row of `vols`.
 /// @param vols - Implied volatilities as nested rows: one `number[]` per expiry, one decimal volatility per strike.
-/// @param forward_prices - One forward price per expiry.
+/// @param forwardPrices - One forward price per expiry.
 /// @returns The `ArbitrageViolation` objects found (empty when the grid is clean).
 ///
 /// # Errors
 ///
 /// Throws a `validation` error if the grid is invalid or the forwards do not
 /// match the expiries.
-#[wasm_bindgen(js_name = checkLocalVolDensityGrid)]
+#[wasm_bindgen(js_name = checkLocalVolDensityGrid, unchecked_return_type = "generated.models.ArbitrageViolation[]")]
 pub fn check_local_vol_density_grid(
-    strikes: JsValue,
-    expiries: JsValue,
-    vols: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] strikes: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] expiries: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray[]")] vols: JsValue,
+    #[wasm_bindgen(js_name = "forwardPrices", unchecked_param_type = "NumericArray")]
     forward_prices: JsValue,
 ) -> Result<JsValue, JsValue> {
     let violations = model_arbitrage::check_local_vol_density_grid(
@@ -1255,7 +1438,7 @@ pub fn check_local_vol_density_grid(
 /// @param strikes - Strictly increasing strike grid shared by every row.
 /// @param expiries - Strictly increasing expiries in years, one per row of `vols`.
 /// @param vols - Implied volatilities as nested rows: one `number[]` per expiry, one decimal volatility per strike.
-/// @param forward_prices - One forward price to broadcast, or one per expiry.
+/// @param forwardPrices - One forward price to broadcast, or one per expiry.
 /// @param tolerance - Optional non-negative violation tolerance; omitted uses the Rust `DEFAULT_ARBITRAGE_TOLERANCE` (1e-10).
 /// @returns The `ArbitrageReport` object (`vol_surface_id`, `violations`, `passed`, `counts_by_type`, `counts_by_severity`).
 ///
@@ -1263,13 +1446,14 @@ pub fn check_local_vol_density_grid(
 ///
 /// Throws a `validation` error if the grid or forwards are invalid or the
 /// tolerance is negative or non-finite.
-#[wasm_bindgen(js_name = checkSurfaceGrid)]
+#[wasm_bindgen(js_name = checkSurfaceGrid, unchecked_return_type = "generated.models.ArbitrageReport")]
 pub fn check_surface_grid(
-    strikes: JsValue,
-    expiries: JsValue,
-    vols: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] strikes: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] expiries: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray[]")] vols: JsValue,
+    #[wasm_bindgen(js_name = "forwardPrices", unchecked_param_type = "NumericArray")]
     forward_prices: JsValue,
-    tolerance: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "number")] tolerance: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let report = model_arbitrage::check_surface_grid(
         &js_f64_seq(&strikes, "strikes")?,
@@ -1294,8 +1478,11 @@ pub fn check_surface_grid(
 /// non-positive or of the wrong length, the tolerance is negative or
 /// non-finite, or the surface is normal-quoted, shifted-Black or on a tenor
 /// axis.
-#[wasm_bindgen(js_name = checkSurface)]
-pub fn check_surface(surface: &JsVolSurface, config: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = checkSurface, unchecked_return_type = "generated.models.ArbitrageReport")]
+pub fn check_surface(
+    surface: &JsVolSurface,
+    #[wasm_bindgen(unchecked_param_type = "generated.models.ArbitrageCheckConfig | string")] config: JsValue,
+) -> Result<JsValue, JsValue> {
     let config = from_js_json::<model_arbitrage::ArbitrageCheckConfig>(&config, "config")?;
     let report = model_arbitrage::check_surface(&surface.inner, &config).map_err(to_js_err)?;
     to_js_value(&report)
@@ -1313,8 +1500,8 @@ pub fn check_surface(surface: &JsVolSurface, config: JsValue) -> Result<JsValue,
 #[wasm_bindgen(js_name = getSurfaceVol)]
 pub fn get_surface_vol(
     surface: &JsVolSurface,
-    expiry: JsValue,
-    strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
 ) -> Result<f64, JsValue> {
     vol::get_surface_vol(
         &surface.inner,
@@ -1337,8 +1524,8 @@ pub fn get_surface_vol(
 #[wasm_bindgen(js_name = getSurfaceVolClamped)]
 pub fn get_surface_vol_clamped(
     surface: &JsVolSurface,
-    expiry: JsValue,
-    strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
 ) -> Result<f64, JsValue> {
     Ok(vol::get_surface_vol_clamped(
         &surface.inner,
@@ -1362,9 +1549,9 @@ pub fn get_surface_vol_clamped(
 #[wasm_bindgen(js_name = materializeCubeTenorSlice)]
 pub fn materialize_cube_tenor_slice(
     cube: &JsVolCube,
-    tenor: JsValue,
-    strikes: JsValue,
-    convention: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] tenor: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] strikes: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "VolatilityConvention")] convention: JsValue,
 ) -> Result<JsVolSurface, JsValue> {
     let surface = vol::materialize_cube_tenor_slice(
         &cube.inner,
@@ -1391,9 +1578,9 @@ pub fn materialize_cube_tenor_slice(
 #[wasm_bindgen(js_name = materializeCubeExpirySlice)]
 pub fn materialize_cube_expiry_slice(
     cube: &JsVolCube,
-    expiry: JsValue,
-    strikes: JsValue,
-    convention: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] strikes: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "VolatilityConvention")] convention: JsValue,
 ) -> Result<JsVolCubeExpirySlice, JsValue> {
     let surface = vol::materialize_cube_expiry_slice(
         &cube.inner,
@@ -1420,8 +1607,8 @@ pub fn materialize_cube_expiry_slice(
 #[wasm_bindgen(js_name = getCubeExpirySliceVol)]
 pub fn get_cube_expiry_slice_vol(
     slice: &JsVolCubeExpirySlice,
-    tenor: JsValue,
-    strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] tenor: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
 ) -> Result<f64, JsValue> {
     vol::get_cube_expiry_slice_vol(
         &slice.inner,
@@ -1444,8 +1631,8 @@ pub fn get_cube_expiry_slice_vol(
 #[wasm_bindgen(js_name = getCubeExpirySliceVolClamped)]
 pub fn get_cube_expiry_slice_vol_clamped(
     slice: &JsVolCubeExpirySlice,
-    tenor: JsValue,
-    strike: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] tenor: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
 ) -> Result<f64, JsValue> {
     Ok(vol::get_cube_expiry_slice_vol_clamped(
         &slice.inner,
@@ -1457,8 +1644,8 @@ pub fn get_cube_expiry_slice_vol_clamped(
 /// Materialize an FX delta-quoted surface as an expiry by strike volatility surface.
 /// @param surface - `core.FxDeltaVolSurface` handle.
 /// @param spot - FX spot rate (domestic per unit of foreign); positive.
-/// @param domestic_rate - Continuously compounded domestic rate, as a decimal.
-/// @param foreign_rate - Continuously compounded foreign rate, as a decimal.
+/// @param domesticRate - Continuously compounded domestic rate, as a decimal.
+/// @param foreignRate - Continuously compounded foreign rate, as a decimal.
 /// @returns The strike-space `core.VolSurface` handle.
 ///
 /// # Errors
@@ -1468,9 +1655,10 @@ pub fn get_cube_expiry_slice_vol_clamped(
 #[wasm_bindgen(js_name = materializeFxDeltaSurface)]
 pub fn materialize_fx_delta_surface(
     surface: &JsFxDeltaVolSurface,
-    spot: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
+    #[wasm_bindgen(js_name = "domesticRate", unchecked_param_type = "number")]
     domestic_rate: JsValue,
-    foreign_rate: JsValue,
+    #[wasm_bindgen(js_name = "foreignRate", unchecked_param_type = "number")] foreign_rate: JsValue,
 ) -> Result<JsVolSurface, JsValue> {
     let materialized = vol::materialize_fx_delta_surface(
         &surface.inner,

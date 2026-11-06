@@ -8,17 +8,10 @@ that produce DV01, CS01, Greeks, spreads, and VaR.
 
 ## Where it sits
 
-Depends on (see [`Cargo.toml`](Cargo.toml)):
-
-| Crate | Used for |
-|-------|----------|
-| [`finstack-quant-core`](../core/README.md) | `Money`, `Currency`, dates/day-count, `MarketContext`, curves/surfaces, math, config |
-| [`finstack-quant-cashflows`](../cashflows/README.md) | schedule generation, accrual, the `CashflowProvider` supertrait of `Instrument` |
-| [`finstack-quant-covenants`](../covenants/README.md) | `CovenantReport` attached to `ValuationResult::covenants` |
-| [`finstack-quant-margin`](../margin/README.md) | `Marginable` bridge (`Instrument::as_marginable`) for VM/IM and XVA |
-| [`finstack-quant-models`](../models/README.md) | closed-form/Fourier formulas, SABR, PDE/tree engines, structural credit, correlation, and Monte Carlo |
-| [`finstack-quant-valuations-core`](core/README.md) and the seven family crates | pricing framework (`Instrument`, registries, metrics, results, conventions) and instrument implementations (`rates`, `fixed-income`, `structured-credit`, `credit`, `equity`, `fx`, `exotics`) |
-| `finstack-quant-valuations-macros` | `FinancialBuilder` derive, which generates `Type::builder()` (`macros/`) |
+Depends on `core`, `cashflows`, `covenants`, `margin`, `models`, the pricing
+framework [`core/`](core/README.md) and the seven family crates; the reasons and
+the workspace-wide dependency direction are in
+[`ARCHITECTURE.md`](../../ARCHITECTURE.md).
 
 Consumed by [`attribution`](../attribution/README.md),
 [`statements`](../statements/README.md), `statements-analytics`,
@@ -49,7 +42,7 @@ and the closed world around them.
 | [`exotics/`](exotics/README.md) | `finstack-quant-valuations-exotics`: the exotics family (Asian, barrier, lookback options, range accruals, TARN, snowball) and the commodity family (forwards, futures, swaps, options), one `EXOTICS` registration static; re-exported as `instruments::exotics` and `instruments::commodity`; `Basket` stays here under `instruments::exotics::basket` |
 | [`fx/`](fx/README.md) | `finstack-quant-valuations-fx`: the FX family (spot, forwards, swaps, NDFs, listed futures, vanilla/barrier/digital/touch/variance/quanto options) with its `FX` registration static; re-exported as `instruments::fx` |
 | [`src/instruments/`](src/instruments/README.md) | The façade modules of the family crates; the umbrella-resident instruments — `exotics::basket` and `equity::real_estate` (both register with `STANDARD`); `composite`; `json_loader` (`InstrumentJson`, the closed world); the JSON cashflow-export entry points |
-| `src/pricer/` | `FAMILIES`, the `STANDARD` family and `STANDARD.pricers()`, and the JSON pricing entry points (`src/pricer/json.rs`, re-exported flat from `pricer`) |
+| `src/pricer/` | `FAMILIES`, the `STANDARD` family and `STANDARD.pricers()`, the JSON pricing entry points (`src/pricer/json.rs`) and the registry catalog (`src/pricer/catalog.rs`), both lifted flat into `pricer` |
 | `src/results.rs` | Core result façade; metrics are re-exported directly from the core crate |
 | `src/schema.rs` | Accessors and validators for the checked-in JSON Schema artifacts |
 | `src/bin/gen_schemas.rs` | `gen_schemas` binary that writes/checks [`schemas/`](schemas/README.md) |
@@ -90,9 +83,9 @@ families build on are defined in [`core/src/instruments/`](core/src/instruments/
 are at `instruments::*` and `instruments::pricing`, the same paths as before the
 split.
 
-`pricer::InstrumentType` has 71 variants; the JSON registry in
-`instruments/json_loader.rs` covers 70 loadable instrument types. Several
-instruments carry their own README — for example
+`pricer::InstrumentType` lists every instrument type, and the JSON registry in
+`instruments/json_loader.rs` makes each one loadable; the registry tests keep
+the two equal. Several instruments carry their own README — for example
 [`fixed_income/bond`](fixed-income/src/bond/README.md),
 [`structured_credit`](structured-credit/src/structured_credit/README.md),
 and [`rates/irs`](rates/src/irs/README.md).
@@ -246,8 +239,8 @@ cargo nextest run -p finstack-quant-valuations --lib --test '*'
 cargo bench -p finstack-quant-valuations --bench bond_pricing
 
 # Schemas (regenerate after changing any public serde type)
-mise run rust-gen-schemas
-mise run rust-check-schemas
+mise run gen-write
+mise run gen-check
 ```
 
 Do not run `cargo test` directly — it would also run doc tests, which this

@@ -19,12 +19,16 @@ def test_funded_bond_carry_matches_gross_endpoint_pnl() -> None:
     )
     result = attribute_pnl(
         json.dumps(fixture["instrument"]),
-        json.dumps(fixture["market"]),
-        json.dumps(fixture["market"]),
-        fixture["as_of_t0"],
-        fixture["as_of_t1"],
-        "metrics_based",
-        {"metrics": ["theta", "carry_total", "coupon_income", "pull_to_par", "roll_down", "funding_cost"]},
+        {
+            "market_t0": fixture["market"],
+            "market_t1": fixture["market"],
+            "as_of_t0": fixture["as_of_t0"],
+            "as_of_t1": fixture["as_of_t1"],
+            "method": "metrics_based",
+            "config": {
+                "metrics": ["theta", "carry_total", "coupon_income", "pull_to_par", "roll_down", "funding_cost"]
+            },
+        },
     )
     payload = json.loads(result.to_json())
     detail = payload["carry_detail"]
@@ -43,11 +47,13 @@ def test_convertible_credit_move_is_not_counted_as_rates(method: str | dict) -> 
     )
     result = attribute_pnl(
         json.dumps(fixture["instrument"]),
-        json.dumps(fixture["market_t0"]),
-        json.dumps(fixture["market_t1"]),
-        fixture["as_of_t0"],
-        fixture["as_of_t1"],
-        method,
+        {
+            "market_t0": fixture["market_t0"],
+            "market_t1": fixture["market_t1"],
+            "as_of_t0": fixture["as_of_t0"],
+            "as_of_t1": fixture["as_of_t1"],
+            "method": method,
+        },
     )
     payload = json.loads(result.to_json())
     assert float(payload["rates_curves_pnl"]["amount"]) == 0.0

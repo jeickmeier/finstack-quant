@@ -264,7 +264,7 @@ cargo run -p finstack-quant --bin gen_models_schemas -- --write
 cargo run -p finstack-quant --bin gen_models_schemas -- --check
 ```
 
-`mise run rust-gen-schemas` and `mise run rust-check-schemas` do this for every
+`mise run gen-write` and `mise run gen-check` do this for every
 crate at once. The Rust serde types and strict loaders remain authoritative for
 semantic validation.
 

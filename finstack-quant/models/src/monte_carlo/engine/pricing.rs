@@ -2,7 +2,7 @@
 //!
 use super::config::{MAX_CAPTURED_PATHS, MAX_NUM_PATHS, McEngineConfig};
 use super::path_capture::PathCaptureMode;
-use super::simulation::{NoiseHook, run_path_loop};
+use super::simulation::{NoiseHook, PathBuffers, PathLoop, run_path_loop};
 use crate::monte_carlo::captured_path_stats::apply_captured_path_statistics;
 use crate::monte_carlo::estimate::Estimate;
 use crate::monte_carlo::paths::{PathDataset, PathSamplingMethod, ProcessParams, SimulatedPath};
@@ -339,20 +339,9 @@ impl McEngine {
     ///
     /// # Arguments
     ///
-    /// * `rng` - Random stream used to generate per-path shocks.
-    /// * `process` - Stochastic process defining drift, diffusion, and state layout.
-    /// * `disc` - Time-stepping scheme compatible with `process`.
-    /// * `initial_state` - Initial process state. Its length must equal `process.dim()`.
-    /// * `payoff` - Payoff accumulator evaluated on each simulated path.
-    /// * `currency` - Currency tag for the returned [`MoneyEstimate`].
-    /// * `discount_factor` - Present-value multiplier for the payoff horizon.
-    ///   Scalar only: the engine multiplies every path by this single factor
-    ///   and does not apply a pathwise numeraire. Hull-White and LMM
-    ///   derivative pricing belongs in the valuations pathwise-numeraire
-    ///   pricers. Do not pass a curve discount factor on top of
-    ///   `lmm_numeraire`. Callers holding a flat continuously compounded
-    ///   rate and a year fraction should build the scalar with
-    ///   [`finstack_quant_core::cashflow::flat_discount_factor`].
+    /// * `inputs` - Random stream, process, discretization, initial state,
+    ///   payoff, result currency and scalar discount factor of the run; see
+    ///   [`McPricingInputs`] for each field's units and constraints.
     ///
     /// # Returns
     ///
@@ -387,7 +376,7 @@ impl McEngine {
     /// ```
     /// use finstack_quant_core::currency::Currency;
     /// use finstack_quant_models::monte_carlo::discretization::exact::ExactGbm;
-    /// use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
+    /// use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig, McPricingInputs};
     /// use finstack_quant_models::monte_carlo::payoff::vanilla::European;
     /// use finstack_quant_models::types::OptionType;
     /// use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
@@ -405,29 +394,22 @@ impl McEngine {
     /// let discount_factor = (-0.03_f64).exp();
     ///
     /// let result = engine
-    ///     .price(
-    ///         &rng,
-    ///         &process,
-    ///         &disc,
-    ///         &[100.0],
-    ///         &payoff,
-    ///         Currency::USD,
+    ///     .price(McPricingInputs {
+    ///         rng: &rng,
+    ///         process: &process,
+    ///         disc: &disc,
+    ///         initial_state: &[100.0],
+    ///         payoff: &payoff,
+    ///         currency: Currency::USD,
     ///         discount_factor,
-    ///     )
+    ///     })
     ///     .expect("pricing should succeed");
     ///
     /// assert!(result.mean.amount() >= 0.0);
     /// ```
-    #[allow(clippy::too_many_arguments)]
     pub fn price<R, P, D, F>(
         &self,
-        rng: &R,
-        process: &P,
-        disc: &D,
-        initial_state: &[f64],
-        payoff: &F,
-        currency: Currency,
-        discount_factor: f64,
+        inputs: McPricingInputs<'_, R, P, D, F>,
     ) -> Result<MoneyEstimate>
     where
         R: RandomStream,
@@ -445,22 +427,9 @@ impl McEngine {
         )
         .entered();
 
-        self.validate_rng(rng)?;
-        self.validate_runtime(process, initial_state, discount_factor, None)?;
-        Self::validate_scheme_pairing(process, disc)?;
-        self.validate_scheme_grid(disc)?;
-        self.validate_payoff_schedule(payoff)?;
+        self.validate_inputs(inputs, None)?;
 
-        let estimate = self.run_loops(
-            rng,
-            process,
-            disc,
-            initial_state,
-            payoff,
-            currency,
-            discount_factor,
-            /* capture = */ false,
-        )?;
+        let estimate = self.run_loops(inputs, /* capture = */ false)?;
 
         tracing::debug!(
             mean = estimate.0.mean,
@@ -469,7 +438,32 @@ impl McEngine {
             "mc_price completed"
         );
 
-        MoneyEstimate::from_estimate(estimate.0, currency)
+        MoneyEstimate::from_estimate(estimate.0, inputs.currency)
+    }
+
+    /// Run every pre-simulation check shared by [`Self::price`] and
+    /// [`Self::price_with_capture`].
+    fn validate_inputs<R, P, D, F>(
+        &self,
+        inputs: McPricingInputs<'_, R, P, D, F>,
+        process_params: Option<&ProcessParams>,
+    ) -> Result<()>
+    where
+        R: RandomStream,
+        P: StochasticProcess,
+        D: Discretization<P>,
+        F: Payoff,
+    {
+        self.validate_rng(inputs.rng)?;
+        self.validate_runtime(
+            inputs.process,
+            inputs.initial_state,
+            inputs.discount_factor,
+            process_params,
+        )?;
+        Self::validate_scheme_pairing(inputs.process, inputs.disc)?;
+        self.validate_scheme_grid(inputs.disc)?;
+        self.validate_payoff_schedule(inputs.payoff)
     }
 
     /// Price a payoff and optionally return captured paths.
@@ -480,13 +474,9 @@ impl McEngine {
     ///
     /// # Arguments
     ///
-    /// * `rng` - Random stream supplying the Monte Carlo uniforms / Gaussians
-    /// * `process` - Stochastic process that evolves the simulated state vector
-    /// * `disc` - Discretization scheme paired with `process` for path stepping
-    /// * `initial_state` - Process state at time zero; length must match the factor count
-    /// * `payoff` - Pathwise payoff evaluated on each simulated trajectory
-    /// * `currency` - Currency stamped onto the returned monetary estimate
-    /// * `discount_factor` - Scalar present-value factor applied to payoff units
+    /// * `inputs` - Random stream, process, discretization, initial state,
+    ///   payoff, result currency and scalar discount factor of the run; see
+    ///   [`McPricingInputs`].
     /// * `process_params` - Metadata describing the captured state layout,
     ///   process parameters, and optional correlation matrix
     ///
@@ -507,7 +497,7 @@ impl McEngine {
     /// use finstack_quant_core::currency::Currency;
     /// use finstack_quant_models::monte_carlo::discretization::exact::ExactGbm;
     /// use finstack_quant_models::monte_carlo::engine::{
-    ///     McEngine, McEngineConfig, PathCaptureConfig,
+    ///     McEngine, McEngineConfig, McPricingInputs, PathCaptureConfig,
     /// };
     /// use finstack_quant_models::monte_carlo::paths::ProcessParams;
     /// use finstack_quant_models::monte_carlo::payoff::vanilla::European;
@@ -530,29 +520,24 @@ impl McEngine {
     ///
     /// let result = engine
     ///     .price_with_capture(
-    ///         &rng,
-    ///         &process,
-    ///         &disc,
-    ///         &[100.0],
-    ///         &payoff,
-    ///         Currency::USD,
-    ///         discount_factor,
+    ///         McPricingInputs {
+    ///             rng: &rng,
+    ///             process: &process,
+    ///             disc: &disc,
+    ///             initial_state: &[100.0],
+    ///             payoff: &payoff,
+    ///             currency: Currency::USD,
+    ///             discount_factor,
+    ///         },
     ///         process_params,
     ///     )
     ///     .expect("pricing with capture should succeed");
     ///
     /// assert!(result.estimate.mean.amount().is_finite());
     /// ```
-    #[allow(clippy::too_many_arguments)]
     pub fn price_with_capture<R, P, D, F>(
         &self,
-        rng: &R,
-        process: &P,
-        disc: &D,
-        initial_state: &[f64],
-        payoff: &F,
-        currency: Currency,
-        discount_factor: f64,
+        inputs: McPricingInputs<'_, R, P, D, F>,
         process_params: ProcessParams,
     ) -> Result<MonteCarloResult>
     where
@@ -561,31 +546,13 @@ impl McEngine {
         D: Discretization<P> + Clone,
         F: Payoff,
     {
-        self.validate_rng(rng)?;
-        self.validate_runtime(
-            process,
-            initial_state,
-            discount_factor,
-            Some(&process_params),
-        )?;
-        Self::validate_scheme_pairing(process, disc)?;
-        self.validate_scheme_grid(disc)?;
-        self.validate_payoff_schedule(payoff)?;
+        self.validate_inputs(inputs, Some(&process_params))?;
 
         let capture_enabled = self.config.path_capture.enabled;
 
-        let (estimate, collected_paths) = self.run_loops(
-            rng,
-            process,
-            disc,
-            initial_state,
-            payoff,
-            currency,
-            discount_factor,
-            capture_enabled,
-        )?;
+        let (estimate, collected_paths) = self.run_loops(inputs, capture_enabled)?;
 
-        self.finalize_captured_result(estimate, collected_paths, currency, process_params)
+        self.finalize_captured_result(estimate, collected_paths, inputs.currency, process_params)
     }
 
     /// Assemble a [`MonteCarloResult`] from a raw [`Estimate`] and the paths
@@ -654,16 +621,9 @@ impl McEngine {
     /// When `capture` is `true`, the engine validates that antithetic is
     /// disabled (see [`Self::validate_runtime`]) and fills the vector with the
     /// sampled subset of captured paths in path-id order.
-    #[allow(clippy::too_many_arguments)]
     fn run_loops<R, P, D, F>(
         &self,
-        rng: &R,
-        process: &P,
-        disc: &D,
-        initial_state: &[f64],
-        payoff: &F,
-        currency: Currency,
-        discount_factor: f64,
+        inputs: McPricingInputs<'_, R, P, D, F>,
         capture: bool,
     ) -> Result<(Estimate, Vec<SimulatedPath>)>
     where
@@ -674,27 +634,9 @@ impl McEngine {
     {
         #[cfg(not(target_arch = "wasm32"))]
         if self.config.use_parallel {
-            return self.price_parallel(
-                rng,
-                process,
-                disc,
-                initial_state,
-                payoff,
-                currency,
-                discount_factor,
-                capture,
-            );
+            return self.price_parallel(inputs, capture);
         }
-        self.price_serial(
-            rng,
-            process,
-            disc,
-            initial_state,
-            payoff,
-            currency,
-            discount_factor,
-            capture,
-        )
+        self.price_serial(inputs, capture)
     }
 
     /// Prepare the scheme and correlation factor shared by every path of a run.
@@ -746,57 +688,24 @@ impl McEngine {
                 .should_capture(path_id, self.config.num_paths)
         });
         let payoff_value = if let Some(paths) = captured {
-            let (v, path) = self.simulate_path_with_capture(
-                rng,
-                inputs.process,
-                inputs.disc,
-                inputs.initial_state,
-                &mut s.payoff,
-                &mut s.state,
-                &mut s.z,
-                &mut s.z_raw,
-                &mut s.work,
-                inputs.correlation,
-                path_id,
-                inputs.discount_factor,
-                inputs.currency,
-            )?;
+            let (payoff, buffers) = s.primary();
+            let (v, path) =
+                self.simulate_path_with_capture(rng, inputs, payoff, buffers, path_id)?;
             paths.push(path);
             v
-        } else if let Some(payoff_anti) = s.payoff_anti.as_mut() {
-            payoff_anti.reset();
-            self.simulate_antithetic_pair(
-                rng,
-                inputs.process,
-                inputs.disc,
-                inputs.initial_state,
-                &mut s.payoff,
-                payoff_anti,
-                &mut s.state,
-                &mut s.state_anti,
-                &mut s.z,
-                &mut s.z_anti,
-                &mut s.z_raw,
-                &mut s.work,
-                &mut s.work_anti,
-                inputs.correlation,
-                inputs.currency,
-            )?
+        } else if s.payoff_anti.is_some() {
+            self.simulate_antithetic_pair(rng, inputs, s)?
         } else {
-            run_path_loop(
-                rng,
-                &self.config.time_grid,
-                inputs.process,
-                inputs.disc,
-                inputs.initial_state,
-                &mut s.payoff,
-                &mut s.state,
-                &mut s.z,
-                &mut s.z_raw,
-                &mut s.work,
-                NoiseHook::Correlation(inputs.correlation),
-                inputs.currency,
-            )?
+            let (payoff, buffers) = s.primary();
+            let path = PathLoop {
+                time_grid: &self.config.time_grid,
+                process: inputs.process,
+                disc: inputs.disc,
+                initial_state: inputs.initial_state,
+                hook: NoiseHook::Correlation(inputs.correlation),
+                currency: inputs.currency,
+            };
+            run_path_loop(rng, &path, payoff, buffers)?
         };
         validate_discounted_payoff(path_id, payoff_value, inputs.discount_factor)
     }
@@ -873,16 +782,9 @@ impl McEngine {
     }
 
     /// Serial pricing implementation with optional path capture.
-    #[allow(clippy::too_many_arguments)]
     fn price_serial<R, P, D, F>(
         &self,
-        rng: &R,
-        process: &P,
-        disc: &D,
-        initial_state: &[f64],
-        payoff: &F,
-        currency: Currency,
-        discount_factor: f64,
+        run: McPricingInputs<'_, R, P, D, F>,
         capture: bool,
     ) -> Result<(Estimate, Vec<SimulatedPath>)>
     where
@@ -891,16 +793,17 @@ impl McEngine {
         D: Discretization<P> + Clone,
         F: Payoff,
     {
-        let (disc, correlation) = self.prepare_run(process, disc)?;
+        let rng = run.rng;
+        let (disc, correlation) = self.prepare_run(run.process, run.disc)?;
         let inputs = PathInputs {
-            process,
+            process: run.process,
             disc: &disc,
-            initial_state,
+            initial_state: run.initial_state,
             correlation: correlation.as_ref(),
-            currency,
-            discount_factor,
+            currency: run.currency,
+            discount_factor: run.discount_factor,
         };
-        let mut scratch = PathScratch::new(inputs, payoff, self.config.antithetic);
+        let mut scratch = PathScratch::new(inputs, run.payoff, self.config.antithetic);
 
         let mut captured_paths: Vec<SimulatedPath> = if capture {
             let estimated_capacity = match self.config.path_capture.capture_mode {
@@ -955,16 +858,9 @@ impl McEngine {
 
     /// Parallel pricing implementation with optional path capture.
     #[cfg(not(target_arch = "wasm32"))]
-    #[allow(clippy::too_many_arguments)]
     fn price_parallel<R, P, D, F>(
         &self,
-        rng: &R,
-        process: &P,
-        disc: &D,
-        initial_state: &[f64],
-        payoff: &F,
-        currency: Currency,
-        discount_factor: f64,
+        run: McPricingInputs<'_, R, P, D, F>,
         capture: bool,
     ) -> Result<(Estimate, Vec<SimulatedPath>)>
     where
@@ -975,14 +871,15 @@ impl McEngine {
     {
         use rayon::prelude::*;
 
-        let (disc, correlation) = self.prepare_run(process, disc)?;
+        let (rng, payoff) = (run.rng, run.payoff);
+        let (disc, correlation) = self.prepare_run(run.process, run.disc)?;
         let inputs = PathInputs {
-            process,
+            process: run.process,
             disc: &disc,
-            initial_state,
+            initial_state: run.initial_state,
             correlation: correlation.as_ref(),
-            currency,
-            discount_factor,
+            currency: run.currency,
+            discount_factor: run.discount_factor,
         };
 
         // `None` requests adaptive chunking; `Some(n)` uses exactly `n`.
@@ -1020,6 +917,45 @@ impl McEngine {
     }
 }
 
+/// Inputs of one [`McEngine::price`] or [`McEngine::price_with_capture`] run.
+///
+/// Every field is borrowed or `Copy`, so the struct itself is `Copy` and is
+/// passed by value.
+pub struct McPricingInputs<'a, R, P, D, F> {
+    /// Random stream used to generate per-path shocks. A splittable stream
+    /// (e.g. `PhiloxRng`) gives path `i` the substream `rng.split(i)`; a
+    /// non-splittable one is consumed path after path (serial runs only).
+    pub rng: &'a R,
+    /// Stochastic process defining drift, diffusion, and state layout.
+    pub process: &'a P,
+    /// Time-stepping scheme compatible with `process`; the engine prepares a
+    /// copy per run.
+    pub disc: &'a D,
+    /// Process state at time zero; its length must equal `process.dim()`.
+    pub initial_state: &'a [f64],
+    /// Payoff accumulator, cloned and reset for every simulated path.
+    pub payoff: &'a F,
+    /// Currency tag stamped on the payoff amounts and the returned estimate.
+    pub currency: Currency,
+    /// Present-value multiplier for the payoff horizon, finite and
+    /// non-negative. Scalar only: the engine multiplies every path by this
+    /// single factor and does not apply a pathwise numeraire. Hull-White and
+    /// LMM derivative pricing belongs in the valuations pathwise-numeraire
+    /// pricers. Do not pass a curve discount factor on top of
+    /// `lmm_numeraire`. Callers holding a flat continuously compounded rate
+    /// and a year fraction should build the scalar with
+    /// [`finstack_quant_core::cashflow::flat_discount_factor`].
+    pub discount_factor: f64,
+}
+
+impl<R, P, D, F> Clone for McPricingInputs<'_, R, P, D, F> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<R, P, D, F> Copy for McPricingInputs<'_, R, P, D, F> {}
+
 /// Path-invariant inputs shared by every path of one run.
 pub(crate) struct PathInputs<'a, P, D> {
     /// Process driving the simulated state.
@@ -1048,17 +984,17 @@ impl<P, D> Copy for PathInputs<'_, P, D> {}
 ///
 /// The antithetic buffers and second payoff exist only for antithetic runs.
 pub(crate) struct PathScratch<F> {
-    state: Vec<f64>,
-    z: Vec<f64>,
+    pub(super) state: Vec<f64>,
+    pub(super) z: Vec<f64>,
     /// Independent shocks when the engine applies correlation; zero-length
     /// otherwise.
-    z_raw: Vec<f64>,
-    work: Vec<f64>,
-    state_anti: Vec<f64>,
-    z_anti: Vec<f64>,
-    work_anti: Vec<f64>,
-    payoff: F,
-    payoff_anti: Option<F>,
+    pub(super) z_raw: Vec<f64>,
+    pub(super) work: Vec<f64>,
+    pub(super) state_anti: Vec<f64>,
+    pub(super) z_anti: Vec<f64>,
+    pub(super) work_anti: Vec<f64>,
+    pub(super) payoff: F,
+    pub(super) payoff_anti: Option<F>,
 }
 
 impl<F: Payoff> PathScratch<F> {
@@ -1090,6 +1026,19 @@ impl<F: Payoff> PathScratch<F> {
             payoff: payoff.clone(),
             payoff_anti: antithetic.then(|| payoff.clone()),
         }
+    }
+
+    /// Borrow the primary payoff together with the primary path buffers.
+    fn primary(&mut self) -> (&mut F, PathBuffers<'_>) {
+        (
+            &mut self.payoff,
+            PathBuffers {
+                state: &mut self.state,
+                z: &mut self.z,
+                z_raw: &mut self.z_raw,
+                work: &mut self.work,
+            },
+        )
     }
 }
 

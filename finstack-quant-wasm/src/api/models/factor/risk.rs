@@ -40,8 +40,12 @@ use wasm_bindgen::prelude::*;
 /// kind, dimensions that disagree with the position ids, an invalid
 /// covariance, too few scenarios for the tail, a confidence outside
 /// `(0.5, 1)` or a malformed budget; `invalid_type` for a non-finite number.
-#[wasm_bindgen(js_name = positionRiskReport)]
-pub fn position_risk_report(request: JsValue) -> Result<JsValue, JsValue> {
+/// @param request - `PositionRiskRequest` object or JSON text: `position_ids`, an optional `confidence` (decimal in `(0.5, 1)`, default 0.95), a `source` tagged by `kind` (`{kind: "parametric", weights, covariance, compute_incremental}` with exposures in portfolio currency, an `n x n` covariance in position order and incremental VaR off by default, or `{kind: "historical", pnls}` with one row of scenario P&L per position, losses negative) and an optional `budget` (`{targets, utilization_threshold}`, target VaR shares in position order summing to ~1).
+/// @returns `decomposition` (portfolio and per-position VaR/ES, losses negative), `budget` (`null` without a budget) and `stress` (`null` for a parametric source).
+#[wasm_bindgen(js_name = positionRiskReport, unchecked_return_type = "PositionRiskReport")]
+pub fn position_risk_report(
+    #[wasm_bindgen(unchecked_param_type = "PositionRiskRequest | string")] request: JsValue,
+) -> Result<JsValue, JsValue> {
     let request: finstack_quant_factor::risk::PositionRiskRequest =
         from_js_json(&request, "request")?;
     let report = finstack_quant_factor::risk::position_risk_report(&request).map_err(to_js_err)?;
@@ -56,11 +60,11 @@ pub fn position_risk_report(request: JsValue) -> Result<JsValue, JsValue> {
 /// duplicate position-id rejection) and the default `utilizationThreshold`
 /// live in the canonical Rust `evaluate_risk_budget` /
 /// `DEFAULT_UTILIZATION_THRESHOLD` path shared with the Python binding.
-/// @param position_ids - Position identifiers, one per budget row.
-/// @param actual_var - Actual component VaR per position, in portfolio currency (loss-signed as the engine reports it).
-/// @param target_var_pct - Target share of portfolio VaR per position; non-empty targets must sum to one.
-/// @param portfolio_var - Total portfolio VaR used to convert risk-budget shares into absolute amounts.
-/// @param utilization_threshold - Optional actual-to-target risk ratio that
+/// @param positionIds - Position identifiers, one per budget row.
+/// @param actualVar - Actual component VaR per position, in portfolio currency (loss-signed as the engine reports it).
+/// @param targetVarPct - Target share of portfolio VaR per position; non-empty targets must sum to one.
+/// @param portfolioVar - Total portfolio VaR used to convert risk-budget shares into absolute amounts.
+/// @param utilizationThreshold - Optional actual-to-target risk ratio that
 ///   flags a budget breach; omit for the Rust default of 1.2.
 ///
 /// # Errors
@@ -71,12 +75,20 @@ pub fn position_risk_report(request: JsValue) -> Result<JsValue, JsValue> {
 /// [0, 1], non-empty target shares do not sum to one within 0.05, risk inputs
 /// are non-finite, the utilization threshold is non-finite or non-positive, or
 /// nonzero component risk is paired with zero `portfolioVar`.
-#[wasm_bindgen(js_name = evaluateRiskBudget)]
+/// @returns The canonical `RiskBudgetResult` with per-position utilization and excess.
+#[wasm_bindgen(js_name = evaluateRiskBudget, unchecked_return_type = "RiskBudgetResult")]
 pub fn evaluate_risk_budget(
+    #[wasm_bindgen(js_name = "positionIds", unchecked_param_type = "string[]")]
     position_ids: JsValue,
+    #[wasm_bindgen(js_name = "actualVar", unchecked_param_type = "NumericArray")]
     actual_var: JsValue,
-    target_var_pct: JsValue,
+    #[wasm_bindgen(js_name = "targetVarPct", unchecked_param_type = "NumericArray")] target_var_pct: JsValue,
+    #[wasm_bindgen(js_name = "portfolioVar", unchecked_param_type = "number")]
     portfolio_var: JsValue,
+    #[wasm_bindgen(
+        js_name = "utilizationThreshold",
+        unchecked_optional_param_type = "number | null"
+    )]
     utilization_threshold: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let portfolio_var = js_f64(&portfolio_var, "portfolioVar")?;
@@ -105,8 +117,8 @@ pub fn evaluate_risk_budget(
 /// `evaluate_risk_budget_from_decomposition`): reads each position's component
 /// VaR and the portfolio VaR from `decomp`. Rows keep the decomposition's order.
 /// @param decomp - `PositionRiskDecomposition` object or JSON, such as a `positionRiskReport` result's `decomposition`.
-/// @param target_var_pct - Target fraction of portfolio VaR in `[0, 1]` per position, aligned with `decomp.var_contributions`; non-empty targets must sum to one within 0.05.
-/// @param utilization_threshold - Optional actual-to-target ratio that flags a budget breach; omit for the Rust default of 1.2.
+/// @param targetVarPct - Target fraction of portfolio VaR in `[0, 1]` per position, aligned with `decomp.var_contributions`; non-empty targets must sum to one within 0.05.
+/// @param utilizationThreshold - Optional actual-to-target ratio that flags a budget breach; omit for the Rust default of 1.2.
 /// @returns `RiskBudgetResult`: per-position `positions` rows, `total_overbudget` and `has_breach`.
 ///
 /// # Errors
@@ -116,10 +128,18 @@ pub fn evaluate_risk_budget(
 /// entry per position, targets are non-finite, outside [0, 1] or do not sum to
 /// one, the threshold is non-positive, or nonzero component VaR is paired with
 /// zero portfolio VaR.
-#[wasm_bindgen(js_name = evaluateRiskBudgetFromDecomposition)]
+#[wasm_bindgen(js_name = evaluateRiskBudgetFromDecomposition, unchecked_return_type = "RiskBudgetResult")]
 pub fn evaluate_risk_budget_from_decomposition(
-    decomp: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "PositionRiskDecomposition | string")] decomp: JsValue,
+    #[wasm_bindgen(
+        js_name = "targetVarPct",
+        unchecked_param_type = "number[] | Float64Array"
+    )]
     target_var_pct: JsValue,
+    #[wasm_bindgen(
+        js_name = "utilizationThreshold",
+        unchecked_optional_param_type = "number | null"
+    )]
     utilization_threshold: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let decomp: PositionRiskDecomposition = from_js_json(&decomp, "decomp")?;
@@ -154,8 +174,8 @@ pub fn default_utilization_threshold() -> f64 {
 /// Returns the canonical `StressAttribution` (the object Python's
 /// `build_stress_attribution` returns): the VaR threshold, the tail scenarios
 /// and each position's average tail P&L and share of the tail loss.
-/// @param position_ids - Position identifiers, one per row of `positionPnls`.
-/// @param position_pnls - Position-major P&L matrix as nested rows: one row per position, one column per scenario, in reporting-currency amounts.
+/// @param positionIds - Position identifiers, one per row of `positionPnls`.
+/// @param positionPnls - Position-major P&L matrix as nested rows: one row per position, one column per scenario, in reporting-currency amounts.
 /// @param confidence - Optional tail confidence in `(0.5, 1)`; omitted or `null` defaults to 0.95.
 /// @returns The `StressAttribution` object.
 ///
@@ -164,11 +184,13 @@ pub fn default_utilization_threshold() -> f64 {
 /// Throws a `TypeError` if an argument has the wrong JavaScript type, and a
 /// `validation` error if the dimensions disagree, a P&L is non-finite,
 /// `confidence` is outside `(0.5, 1)`, or the tail holds no scenario.
-#[wasm_bindgen(js_name = buildStressAttribution)]
+#[wasm_bindgen(js_name = buildStressAttribution, unchecked_return_type = "generated.models.StressAttribution")]
 pub fn build_stress_attribution(
+    #[wasm_bindgen(js_name = "positionIds", unchecked_param_type = "string[]")]
     position_ids: JsValue,
+    #[wasm_bindgen(js_name = "positionPnls", unchecked_param_type = "NumericArray[]")]
     position_pnls: JsValue,
-    confidence: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "number")] confidence: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     use finstack_quant_factor::risk::{build_stress_attribution, flatten_position_pnls};
     let ids = js_string_seq(&position_ids, "positionIds")?;
@@ -182,7 +204,7 @@ pub fn build_stress_attribution(
 
 /// One position's component VaR from a position risk decomposition.
 /// @param decomp - `PositionRiskDecomposition` object or JSON, such as a `positionRiskReport` result's `decomposition`.
-/// @param position_id - Position identifier exactly as it appears in the decomposition.
+/// @param positionId - Position identifier exactly as it appears in the decomposition.
 /// @returns The position's Euler-allocated component VaR (losses negative).
 ///
 /// # Errors
@@ -190,7 +212,10 @@ pub fn build_stress_attribution(
 /// Throws a `validation` error if `decomp` is malformed, and a `not_found`
 /// error if the position is not in the decomposition.
 #[wasm_bindgen(js_name = positionComponentVar)]
-pub fn position_component_var(decomp: JsValue, position_id: JsValue) -> Result<f64, JsValue> {
+pub fn position_component_var(
+    #[wasm_bindgen(unchecked_param_type = "PositionRiskDecomposition | string")] decomp: JsValue,
+    #[wasm_bindgen(js_name = "positionId", unchecked_param_type = "string")] position_id: JsValue,
+) -> Result<f64, JsValue> {
     let decomp: PositionRiskDecomposition = from_js_json(&decomp, "decomp")?;
     let position_id = js_string(&position_id, "positionId")?;
     decomp.component_var(&position_id).map_err(to_js_err)
@@ -214,9 +239,9 @@ pub fn position_component_var(decomp: JsValue, position_id: JsValue) -> Result<f
 /// as the `riskMeasureJson` input: `"variance"` or `"volatility"`, or an
 /// object carrying `confidence` for `var` / `expected_shortfall`. The Python
 /// `RiskDecomposition.measure` getter returns the same value.
-/// @param sensitivities_json - Canonical factor-sensitivity JSON with required `base_currency`, ordered `position_ids`/`factor_ids`, and nested `data[position][factor]` rows; `JSON.stringify` the result of `computeFactorSensitivities`. Python `SensitivityMatrix.to_json()` uses the same contract. Unknown fields, inconsistent dimensions, and non-finite entries are rejected.
-/// @param covariance_json - Factor covariance-matrix JSON aligned with the supplied sensitivities.
-/// @param risk_measure_json - `RiskMeasure` wire value selecting the decomposition metric: `"variance"`, `"volatility"`, an object such as `{ var: { confidence: 0.99 } }`, or the same value as JSON text; omit for `"variance"`.
+/// @param sensitivitiesJson - Canonical factor-sensitivity JSON with required `base_currency`, ordered `position_ids`/`factor_ids`, and nested `data[position][factor]` rows; `JSON.stringify` the result of `computeFactorSensitivities`. Python `SensitivityMatrix.to_json()` uses the same contract. Unknown fields, inconsistent dimensions, and non-finite entries are rejected.
+/// @param covarianceJson - Factor covariance-matrix JSON aligned with the supplied sensitivities.
+/// @param riskMeasureJson - `RiskMeasure` wire value selecting the decomposition metric: `"variance"`, `"volatility"`, an object such as `{ var: { confidence: 0.99 } }`, or the same value as JSON text; omit for `"variance"`.
 ///
 /// # Errors
 ///
@@ -226,10 +251,16 @@ pub fn position_component_var(decomp: JsValue, position_id: JsValue) -> Result<f
 /// covariance factor axes disagree; the covariance matrix or risk measure is
 /// invalid; or decomposition produces invalid variance or another non-finite
 /// value.
-#[wasm_bindgen(js_name = decomposeFactors)]
+/// @returns Returns a structured `RiskDecomposition` object.
+#[wasm_bindgen(js_name = decomposeFactors, unchecked_return_type = "RiskDecomposition")]
 pub fn decompose_factors(
+    #[wasm_bindgen(js_name = "sensitivitiesJson", unchecked_param_type = "JsonInput")]
     sensitivities_json: JsValue,
-    covariance_json: JsValue,
+    #[wasm_bindgen(js_name = "covarianceJson", unchecked_param_type = "JsonInput")] covariance_json: JsValue,
+    #[wasm_bindgen(
+        js_name = "riskMeasureJson",
+        unchecked_optional_param_type = "JsonInput"
+    )]
     risk_measure_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let wire: finstack_quant_portfolio::sensitivity::SensitivityMatrixJson =

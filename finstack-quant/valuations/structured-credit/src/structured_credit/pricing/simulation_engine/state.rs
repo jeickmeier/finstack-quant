@@ -796,7 +796,6 @@ impl<'a> SimulationState<'a> {
     /// Clones the template's maps and vectors in declaration order so every
     /// path's FxHashMaps have identical key sets and insertion sequences,
     /// keeping downstream `.values()` iteration order path-independent.
-    #[allow(clippy::too_many_arguments)]
     pub(super) fn from_template(
         template: &StateTemplate,
         pool: &'a AssetPool,

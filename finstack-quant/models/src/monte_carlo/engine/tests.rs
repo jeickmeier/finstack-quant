@@ -262,15 +262,15 @@ fn test_basic_pricing() {
     let payoff = DummyPayoff;
 
     let result = engine
-        .price(
-            &rng,
-            &process,
-            &disc,
-            &initial_state,
-            &payoff,
-            Currency::USD,
-            1.0,
-        )
+        .price(crate::monte_carlo::engine::McPricingInputs {
+            rng: &rng,
+            process: &process,
+            disc: &disc,
+            initial_state: &initial_state,
+            payoff: &payoff,
+            currency: Currency::USD,
+            discount_factor: 1.0,
+        })
         .expect("should succeed");
 
     assert_eq!(result.mean.amount(), 100.0);
@@ -293,15 +293,15 @@ fn test_parallel_execution_error_propagation() {
     let initial_state = vec![100.0];
     let payoff = DummyPayoff;
 
-    let result = engine.price(
-        &rng,
-        &process,
-        &disc,
-        &initial_state,
-        &payoff,
-        Currency::USD,
-        1.0,
-    );
+    let result = engine.price(crate::monte_carlo::engine::McPricingInputs {
+        rng: &rng,
+        process: &process,
+        disc: &disc,
+        initial_state: &initial_state,
+        payoff: &payoff,
+        currency: Currency::USD,
+        discount_factor: 1.0,
+    });
 
     assert!(result.is_ok());
     let estimate = result.expect("MC pricing should succeed in test");
@@ -337,27 +337,27 @@ fn test_serial_vs_parallel_consistency() {
     let payoff = DummyPayoff;
 
     let serial_result = engine_serial
-        .price(
-            &rng_serial,
-            &process,
-            &disc,
-            &initial_state,
-            &payoff,
-            Currency::USD,
-            1.0,
-        )
+        .price(crate::monte_carlo::engine::McPricingInputs {
+            rng: &rng_serial,
+            process: &process,
+            disc: &disc,
+            initial_state: &initial_state,
+            payoff: &payoff,
+            currency: Currency::USD,
+            discount_factor: 1.0,
+        })
         .expect("should succeed");
 
     let parallel_result = engine_parallel
-        .price(
-            &rng_parallel,
-            &process,
-            &disc,
-            &initial_state,
-            &payoff,
-            Currency::USD,
-            1.0,
-        )
+        .price(crate::monte_carlo::engine::McPricingInputs {
+            rng: &rng_parallel,
+            process: &process,
+            disc: &disc,
+            initial_state: &initial_state,
+            payoff: &payoff,
+            currency: Currency::USD,
+            discount_factor: 1.0,
+        })
         .expect("should succeed");
 
     // Both should succeed and produce same results (deterministic RNG)
@@ -392,26 +392,26 @@ fn test_serial_vs_parallel_bit_identical_for_varying_payoff() {
     let payoff = CapturedValuePayoff::default();
 
     let serial = engine_serial
-        .price(
-            &rng,
-            &process,
-            &disc,
-            &initial_state,
-            &payoff,
-            Currency::USD,
-            1.0,
-        )
+        .price(crate::monte_carlo::engine::McPricingInputs {
+            rng: &rng,
+            process: &process,
+            disc: &disc,
+            initial_state: &initial_state,
+            payoff: &payoff,
+            currency: Currency::USD,
+            discount_factor: 1.0,
+        })
         .expect("serial pricing should succeed");
     let parallel = engine_parallel
-        .price(
-            &rng,
-            &process,
-            &disc,
-            &initial_state,
-            &payoff,
-            Currency::USD,
-            1.0,
-        )
+        .price(crate::monte_carlo::engine::McPricingInputs {
+            rng: &rng,
+            process: &process,
+            disc: &disc,
+            initial_state: &initial_state,
+            payoff: &payoff,
+            currency: Currency::USD,
+            discount_factor: 1.0,
+        })
         .expect("parallel pricing should succeed");
 
     assert_eq!(serial.num_paths, parallel.num_paths);
@@ -442,15 +442,15 @@ fn test_default_chunking_bit_identical_across_thread_pool_sizes() {
                 .build()
                 .expect("McEngine builder should succeed");
             engine
-                .price(
-                    &PathIndexedRng::root(),
-                    &DummyProcess,
-                    &DummyDisc,
-                    &[100.0],
-                    &CapturedValuePayoff::default(),
-                    Currency::USD,
-                    1.0,
-                )
+                .price(crate::monte_carlo::engine::McPricingInputs {
+                    rng: &PathIndexedRng::root(),
+                    process: &DummyProcess,
+                    disc: &DummyDisc,
+                    initial_state: &[100.0],
+                    payoff: &CapturedValuePayoff::default(),
+                    currency: Currency::USD,
+                    discount_factor: 1.0,
+                })
                 .expect("pricing should succeed")
                 .mean
                 .amount()
@@ -492,15 +492,15 @@ fn test_engine_rejects_generic_scheme_for_dedicated_process() {
     )
     .expect("valid dividend schedule");
     let err = engine
-        .price(
-            &rng,
-            &div_process,
-            &EulerMaruyama::new(),
-            &[100.0],
-            &payoff,
-            Currency::USD,
-            1.0,
-        )
+        .price(crate::monte_carlo::engine::McPricingInputs {
+            rng: &rng,
+            process: &div_process,
+            disc: &EulerMaruyama::new(),
+            initial_state: &[100.0],
+            payoff: &payoff,
+            currency: Currency::USD,
+            discount_factor: 1.0,
+        })
         .expect_err("Euler + GbmWithDividends must be rejected");
     assert!(err.to_string().contains("dedicated discretization"));
 }
@@ -538,15 +538,15 @@ fn test_engine_rejects_generic_scheme_for_lmm_process() {
         initial_forwards: vec![0.03, 0.03, 0.03],
     });
     let err = engine
-        .price(
-            &rng,
-            &lmm,
-            &EulerMaruyama::new(),
-            &[0.03, 0.03, 0.03],
-            &payoff,
-            Currency::USD,
-            1.0,
-        )
+        .price(crate::monte_carlo::engine::McPricingInputs {
+            rng: &rng,
+            process: &lmm,
+            disc: &EulerMaruyama::new(),
+            initial_state: &[0.03, 0.03, 0.03],
+            payoff: &payoff,
+            currency: Currency::USD,
+            discount_factor: 1.0,
+        })
         .expect_err("Euler + LmmProcess must be rejected");
     assert!(err.to_string().contains("dedicated discretization"));
 }
@@ -566,15 +566,15 @@ fn test_antithetic_mirrors_initial_uniform() {
         .expect("engine should build");
 
     let result = engine
-        .price(
-            &crate::monte_carlo::rng::philox::PhiloxRng::new(7),
-            &DummyProcess,
-            &DummyDisc,
-            &[100.0],
-            &CapturedValuePayoff::default(),
-            Currency::USD,
-            1.0,
-        )
+        .price(crate::monte_carlo::engine::McPricingInputs {
+            rng: &crate::monte_carlo::rng::philox::PhiloxRng::new(7),
+            process: &DummyProcess,
+            disc: &DummyDisc,
+            initial_state: &[100.0],
+            payoff: &CapturedValuePayoff::default(),
+            currency: Currency::USD,
+            discount_factor: 1.0,
+        })
         .expect("pricing should succeed");
 
     assert!(
@@ -627,15 +627,15 @@ fn test_serial_with_non_splittable_rng_succeeds() {
     let payoff = DummyPayoff;
 
     let result = engine
-        .price(
-            &rng,
-            &process,
-            &disc,
-            &initial_state,
-            &payoff,
-            Currency::USD,
-            1.0,
-        )
+        .price(crate::monte_carlo::engine::McPricingInputs {
+            rng: &rng,
+            process: &process,
+            disc: &disc,
+            initial_state: &initial_state,
+            payoff: &payoff,
+            currency: Currency::USD,
+            discount_factor: 1.0,
+        })
         .expect("serial engine should consume non-splittable RNGs sequentially");
 
     assert_eq!(result.num_paths, 100);
@@ -659,15 +659,15 @@ fn test_parallel_with_non_splittable_rng_returns_error() {
     let initial_state = vec![100.0];
     let payoff = DummyPayoff;
 
-    let result = engine.price(
-        &rng,
-        &process,
-        &disc,
-        &initial_state,
-        &payoff,
-        Currency::USD,
-        1.0,
-    );
+    let result = engine.price(crate::monte_carlo::engine::McPricingInputs {
+        rng: &rng,
+        process: &process,
+        disc: &disc,
+        initial_state: &initial_state,
+        payoff: &payoff,
+        currency: Currency::USD,
+        discount_factor: 1.0,
+    });
 
     // When the parallel feature is enabled this must be an Err; when it is
     // disabled the engine falls back to serial, so the guard is never
@@ -707,15 +707,15 @@ fn test_engine_rejects_quasi_random_rng_even_in_serial_mode() {
     let payoff = DummyPayoff;
 
     let err = engine
-        .price(
-            &rng,
-            &process,
-            &disc,
-            &initial_state,
-            &payoff,
-            Currency::USD,
-            1.0,
-        )
+        .price(crate::monte_carlo::engine::McPricingInputs {
+            rng: &rng,
+            process: &process,
+            disc: &disc,
+            initial_state: &initial_state,
+            payoff: &payoff,
+            currency: Currency::USD,
+            discount_factor: 1.0,
+        })
         .expect_err("serial engine must reject quasi-random streams");
     let err_str = err.to_string();
     assert!(
@@ -757,15 +757,15 @@ fn test_price_rejects_non_finite_payoffs() {
         let payoff = OverflowAfterDiscountPayoff;
 
         let err = engine
-            .price(
-                &rng,
-                &process,
-                &disc,
-                &initial_state,
-                &payoff,
-                Currency::USD,
-                1.0e300,
-            )
+            .price(crate::monte_carlo::engine::McPricingInputs {
+                rng: &rng,
+                process: &process,
+                disc: &disc,
+                initial_state: &initial_state,
+                payoff: &payoff,
+                currency: Currency::USD,
+                discount_factor: 1.0e300,
+            })
             .expect_err("non-finite discounted payoff should fail pricing");
         assert!(
             err.to_string().contains("non-finite discounted payoff"),
@@ -792,13 +792,15 @@ fn test_price_with_capture_parallel_non_splittable_returns_error() {
     let params = ProcessParams::new("test");
 
     let result = engine.price_with_capture(
-        &rng,
-        &process,
-        &disc,
-        &initial_state,
-        &payoff,
-        Currency::USD,
-        1.0,
+        crate::monte_carlo::engine::McPricingInputs {
+            rng: &rng,
+            process: &process,
+            disc: &disc,
+            initial_state: &initial_state,
+            payoff: &payoff,
+            currency: Currency::USD,
+            discount_factor: 1.0,
+        },
         params,
     );
 
@@ -824,15 +826,15 @@ fn test_price_rejects_zero_paths() {
     });
 
     let err = engine
-        .price(
-            &DummyRng,
-            &DummyProcess,
-            &DummyDisc,
-            &[100.0],
-            &DummyPayoff,
-            Currency::USD,
-            1.0,
-        )
+        .price(crate::monte_carlo::engine::McPricingInputs {
+            rng: &DummyRng,
+            process: &DummyProcess,
+            disc: &DummyDisc,
+            initial_state: &[100.0],
+            payoff: &DummyPayoff,
+            currency: Currency::USD,
+            discount_factor: 1.0,
+        })
         .expect_err("zero-path configuration should be rejected");
 
     assert!(err.to_string().contains("num_paths"));
@@ -849,15 +851,15 @@ fn test_price_rejects_one_independent_estimator_including_an_antithetic_pair() {
                     .antithetic(antithetic),
             );
             let err = engine
-                .price(
-                    &DummyRng,
-                    &DummyProcess,
-                    &DummyDisc,
-                    &[100.0],
-                    &DummyPayoff,
-                    Currency::USD,
-                    1.0,
-                )
+                .price(crate::monte_carlo::engine::McPricingInputs {
+                    rng: &DummyRng,
+                    process: &DummyProcess,
+                    disc: &DummyDisc,
+                    initial_state: &[100.0],
+                    payoff: &DummyPayoff,
+                    currency: Currency::USD,
+                    discount_factor: 1.0,
+                })
                 .expect_err("one independent estimator cannot define a confidence interval");
             assert!(
                 err.to_string()
@@ -874,13 +876,15 @@ fn test_price_rejects_one_independent_estimator_including_an_antithetic_pair() {
     );
     let err = engine
         .price_with_capture(
-            &DummyRng,
-            &DummyProcess,
-            &DummyDisc,
-            &[100.0],
-            &DummyPayoff,
-            Currency::USD,
-            1.0,
+            crate::monte_carlo::engine::McPricingInputs {
+                rng: &DummyRng,
+                process: &DummyProcess,
+                disc: &DummyDisc,
+                initial_state: &[100.0],
+                payoff: &DummyPayoff,
+                currency: Currency::USD,
+                discount_factor: 1.0,
+            },
             ProcessParams::new("test"),
         )
         .expect_err("capture must enforce the same independent sample requirement");
@@ -904,15 +908,15 @@ fn test_price_rejects_zero_chunk_size() {
     });
 
     let err = engine
-        .price(
-            &DummyRng,
-            &DummyProcess,
-            &DummyDisc,
-            &[100.0],
-            &DummyPayoff,
-            Currency::USD,
-            1.0,
-        )
+        .price(crate::monte_carlo::engine::McPricingInputs {
+            rng: &DummyRng,
+            process: &DummyProcess,
+            disc: &DummyDisc,
+            initial_state: &[100.0],
+            payoff: &DummyPayoff,
+            currency: Currency::USD,
+            discount_factor: 1.0,
+        })
         .expect_err("zero chunk size should be rejected");
 
     assert!(err.to_string().contains("chunk_size"));
@@ -953,25 +957,27 @@ fn captured_rough_heston_paths_reset_history_and_match_streaming_prices() {
             .antithetic(false)
             .chunk_size(2);
         let streaming = McEngine::new(config.clone())
-            .price(
-                &rng,
-                &process,
-                &disc,
-                &[100.0, 0.04],
-                &payoff,
-                Currency::USD,
-                1.0,
-            )
+            .price(crate::monte_carlo::engine::McPricingInputs {
+                rng: &rng,
+                process: &process,
+                disc: &disc,
+                initial_state: &[100.0, 0.04],
+                payoff: &payoff,
+                currency: Currency::USD,
+                discount_factor: 1.0,
+            })
             .unwrap();
         let captured = McEngine::new(config.path_capture(PathCaptureConfig::all()))
             .price_with_capture(
-                &rng,
-                &process,
-                &disc,
-                &[100.0, 0.04],
-                &payoff,
-                Currency::USD,
-                1.0,
+                crate::monte_carlo::engine::McPricingInputs {
+                    rng: &rng,
+                    process: &process,
+                    disc: &disc,
+                    initial_state: &[100.0, 0.04],
+                    payoff: &payoff,
+                    currency: Currency::USD,
+                    discount_factor: 1.0,
+                },
                 process.metadata(),
             )
             .unwrap();
@@ -993,15 +999,15 @@ fn test_price_rejects_initial_state_dimension_mismatch() {
         .expect("McEngine builder should succeed with valid test data");
 
     let err = engine
-        .price(
-            &DummyRng,
-            &DummyProcess,
-            &DummyDisc,
-            &[],
-            &DummyPayoff,
-            Currency::USD,
-            1.0,
-        )
+        .price(crate::monte_carlo::engine::McPricingInputs {
+            rng: &DummyRng,
+            process: &DummyProcess,
+            disc: &DummyDisc,
+            initial_state: &[],
+            payoff: &DummyPayoff,
+            currency: Currency::USD,
+            discount_factor: 1.0,
+        })
         .expect_err("state dimension mismatch should be rejected");
 
     assert!(err.to_string().contains("initial_state"));
@@ -1021,13 +1027,15 @@ fn test_price_with_capture_rejects_invalid_sample_count() {
 
     let err = engine
         .price_with_capture(
-            &DummyRng,
-            &DummyProcess,
-            &DummyDisc,
-            &[100.0],
-            &DummyPayoff,
-            Currency::USD,
-            1.0,
+            crate::monte_carlo::engine::McPricingInputs {
+                rng: &DummyRng,
+                process: &DummyProcess,
+                disc: &DummyDisc,
+                initial_state: &[100.0],
+                payoff: &DummyPayoff,
+                currency: Currency::USD,
+                discount_factor: 1.0,
+            },
             ProcessParams::new("test"),
         )
         .expect_err("zero sample count should be rejected");
@@ -1049,13 +1057,15 @@ fn test_price_with_capture_rejects_full_capture_above_budget() {
 
     let err = engine
         .price_with_capture(
-            &DummyRng,
-            &DummyProcess,
-            &DummyDisc,
-            &[100.0],
-            &DummyPayoff,
-            Currency::USD,
-            1.0,
+            crate::monte_carlo::engine::McPricingInputs {
+                rng: &DummyRng,
+                process: &DummyProcess,
+                disc: &DummyDisc,
+                initial_state: &[100.0],
+                payoff: &DummyPayoff,
+                currency: Currency::USD,
+                discount_factor: 1.0,
+            },
             ProcessParams::new("test"),
         )
         .expect_err("full path capture above the diagnostics budget should be rejected");
@@ -1077,13 +1087,15 @@ fn test_price_with_capture_rejects_antithetic_capture_combination() {
 
     let err = engine
         .price_with_capture(
-            &DummyRng,
-            &DummyProcess,
-            &DummyDisc,
-            &[100.0],
-            &DummyPayoff,
-            Currency::USD,
-            1.0,
+            crate::monte_carlo::engine::McPricingInputs {
+                rng: &DummyRng,
+                process: &DummyProcess,
+                disc: &DummyDisc,
+                initial_state: &[100.0],
+                payoff: &DummyPayoff,
+                currency: Currency::USD,
+                discount_factor: 1.0,
+            },
             ProcessParams::new("test"),
         )
         .expect_err("antithetic + path capture should be rejected");
@@ -1104,15 +1116,15 @@ fn test_price_rejects_parallel_auto_stop_configuration() {
         antithetic: false,
     });
 
-    let result = engine.price(
-        &DummyRng,
-        &DummyProcess,
-        &DummyDisc,
-        &[100.0],
-        &DummyPayoff,
-        Currency::USD,
-        1.0,
-    );
+    let result = engine.price(crate::monte_carlo::engine::McPricingInputs {
+        rng: &DummyRng,
+        process: &DummyProcess,
+        disc: &DummyDisc,
+        initial_state: &[100.0],
+        payoff: &DummyPayoff,
+        currency: Currency::USD,
+        discount_factor: 1.0,
+    });
 
     {
         let err = result.expect_err("parallel auto-stop should be rejected");
@@ -1134,13 +1146,15 @@ fn test_price_with_capture_captures_initial_event_cashflows_and_payoff() {
 
     let result = engine
         .price_with_capture(
-            &DummyRng,
-            &DummyProcess,
-            &DummyDisc,
-            &[100.0],
-            &InitialCashflowPayoff { value: 7.0 },
-            Currency::USD,
-            1.0,
+            crate::monte_carlo::engine::McPricingInputs {
+                rng: &DummyRng,
+                process: &DummyProcess,
+                disc: &DummyDisc,
+                initial_state: &[100.0],
+                payoff: &InitialCashflowPayoff { value: 7.0 },
+                currency: Currency::USD,
+                discount_factor: 1.0,
+            },
             ProcessParams::new("test"),
         )
         .expect("capture should succeed");
@@ -1172,13 +1186,15 @@ fn test_price_with_capture_preserves_cashflows_across_multiple_timesteps() {
 
     let result = engine
         .price_with_capture(
-            &DummyRng,
-            &DummyProcess,
-            &DummyDisc,
-            &[100.0],
-            &RecurringCashflowPayoff,
-            Currency::USD,
-            1.0,
+            crate::monte_carlo::engine::McPricingInputs {
+                rng: &DummyRng,
+                process: &DummyProcess,
+                disc: &DummyDisc,
+                initial_state: &[100.0],
+                payoff: &RecurringCashflowPayoff,
+                currency: Currency::USD,
+                discount_factor: 1.0,
+            },
             ProcessParams::new("test"),
         )
         .expect("captured pricing should succeed");
@@ -1222,13 +1238,15 @@ fn test_price_with_capture_uses_actual_path_count_after_auto_stop() {
 
     let result = engine
         .price_with_capture(
-            &DummyRng,
-            &DummyProcess,
-            &DummyDisc,
-            &[100.0],
-            &DummyPayoff,
-            Currency::USD,
-            1.0,
+            crate::monte_carlo::engine::McPricingInputs {
+                rng: &DummyRng,
+                process: &DummyProcess,
+                disc: &DummyDisc,
+                initial_state: &[100.0],
+                payoff: &DummyPayoff,
+                currency: Currency::USD,
+                discount_factor: 1.0,
+            },
             ProcessParams::new("test"),
         )
         .expect("pricing should succeed");
@@ -1260,13 +1278,15 @@ fn test_price_with_capture_serial_populates_captured_path_statistics() {
 
     let result = engine
         .price_with_capture(
-            &PathIndexedRng::root(),
-            &DummyProcess,
-            &DummyDisc,
-            &[100.0],
-            &CapturedValuePayoff::default(),
-            Currency::USD,
-            1.0,
+            crate::monte_carlo::engine::McPricingInputs {
+                rng: &PathIndexedRng::root(),
+                process: &DummyProcess,
+                disc: &DummyDisc,
+                initial_state: &[100.0],
+                payoff: &CapturedValuePayoff::default(),
+                currency: Currency::USD,
+                discount_factor: 1.0,
+            },
             ProcessParams::new("test"),
         )
         .expect("captured pricing should succeed");
@@ -1287,13 +1307,15 @@ fn test_price_with_capture_parallel_populates_captured_path_statistics() {
 
     let result = engine
         .price_with_capture(
-            &PathIndexedRng::root(),
-            &DummyProcess,
-            &DummyDisc,
-            &[100.0],
-            &CapturedValuePayoff::default(),
-            Currency::USD,
-            1.0,
+            crate::monte_carlo::engine::McPricingInputs {
+                rng: &PathIndexedRng::root(),
+                process: &DummyProcess,
+                disc: &DummyDisc,
+                initial_state: &[100.0],
+                payoff: &CapturedValuePayoff::default(),
+                currency: Currency::USD,
+                discount_factor: 1.0,
+            },
             ProcessParams::new("test"),
         )
         .expect("captured pricing should succeed");
@@ -1387,15 +1409,15 @@ fn test_engine_antithetic_records_simulated_path_count() {
         .expect("build engine");
     let rng = PhiloxRng::new(7);
     let res = engine
-        .price(
-            &rng,
-            &process,
-            &disc,
-            &[100.0],
-            &payoff,
-            Currency::USD,
-            discount,
-        )
+        .price(crate::monte_carlo::engine::McPricingInputs {
+            rng: &rng,
+            process: &process,
+            disc: &disc,
+            initial_state: &[100.0],
+            payoff: &payoff,
+            currency: Currency::USD,
+            discount_factor: discount,
+        })
         .expect("price");
     assert_eq!(res.num_paths, requested);
     assert_eq!(res.num_simulated_paths, requested);
@@ -1409,15 +1431,15 @@ fn test_engine_antithetic_records_simulated_path_count() {
         .expect("build engine");
     let rng_anti = PhiloxRng::new(7);
     let res_anti = engine_anti
-        .price(
-            &rng_anti,
-            &process,
-            &disc,
-            &[100.0],
-            &payoff,
-            Currency::USD,
-            discount,
-        )
+        .price(crate::monte_carlo::engine::McPricingInputs {
+            rng: &rng_anti,
+            process: &process,
+            disc: &disc,
+            initial_state: &[100.0],
+            payoff: &payoff,
+            currency: Currency::USD,
+            discount_factor: discount,
+        })
         .expect("price");
     assert_eq!(res_anti.num_paths, requested);
     assert_eq!(res_anti.num_simulated_paths, requested * 2);
@@ -1469,26 +1491,26 @@ mod correlation_regression {
                 .expect("valid");
 
         let est_neg = engine
-            .price(
-                &rng,
-                &h_neg,
-                &disc,
-                &[100.0, 0.04],
-                &payoff,
-                Currency::USD,
-                discount,
-            )
+            .price(crate::monte_carlo::engine::McPricingInputs {
+                rng: &rng,
+                process: &h_neg,
+                disc: &disc,
+                initial_state: &[100.0, 0.04],
+                payoff: &payoff,
+                currency: Currency::USD,
+                discount_factor: discount,
+            })
             .expect("neg rho price");
         let est_pos = engine
-            .price(
-                &rng,
-                &h_pos,
-                &disc,
-                &[100.0, 0.04],
-                &payoff,
-                Currency::USD,
-                discount,
-            )
+            .price(crate::monte_carlo::engine::McPricingInputs {
+                rng: &rng,
+                process: &h_pos,
+                disc: &disc,
+                initial_state: &[100.0, 0.04],
+                payoff: &payoff,
+                currency: Currency::USD,
+                discount_factor: discount,
+            })
             .expect("pos rho price");
 
         // Negative rho produces a heavier left tail and lighter right tail,
@@ -1521,26 +1543,26 @@ mod correlation_regression {
             .expect("valid");
 
         let euler = config
-            .price(
-                &rng,
-                &h0,
-                &EulerMaruyama::new(),
-                &[100.0, 0.04],
-                &payoff,
-                Currency::USD,
-                discount,
-            )
+            .price(crate::monte_carlo::engine::McPricingInputs {
+                rng: &rng,
+                process: &h0,
+                disc: &EulerMaruyama::new(),
+                initial_state: &[100.0, 0.04],
+                payoff: &payoff,
+                currency: Currency::USD,
+                discount_factor: discount,
+            })
             .expect("euler price");
         let qe = config
-            .price(
-                &rng,
-                &h0,
-                &QeHeston::new(),
-                &[100.0, 0.04],
-                &payoff,
-                Currency::USD,
-                discount,
-            )
+            .price(crate::monte_carlo::engine::McPricingInputs {
+                rng: &rng,
+                process: &h0,
+                disc: &QeHeston::new(),
+                initial_state: &[100.0, 0.04],
+                payoff: &payoff,
+                currency: Currency::USD,
+                discount_factor: discount,
+            })
             .expect("qe price");
 
         let tol = 4.0 * euler.stderr.max(qe.stderr);
@@ -1621,26 +1643,26 @@ mod correlation_regression {
         let disc = EulerMaruyama::new();
 
         let v_low = engine
-            .price(
-                &rng,
-                &p_low,
-                &disc,
-                &[100.0, 100.0],
-                &payoff,
-                Currency::USD,
-                discount,
-            )
+            .price(crate::monte_carlo::engine::McPricingInputs {
+                rng: &rng,
+                process: &p_low,
+                disc: &disc,
+                initial_state: &[100.0, 100.0],
+                payoff: &payoff,
+                currency: Currency::USD,
+                discount_factor: discount,
+            })
             .expect("low corr price");
         let v_high = engine
-            .price(
-                &rng,
-                &p_high,
-                &disc,
-                &[100.0, 100.0],
-                &payoff,
-                Currency::USD,
-                discount,
-            )
+            .price(crate::monte_carlo::engine::McPricingInputs {
+                rng: &rng,
+                process: &p_high,
+                disc: &disc,
+                initial_state: &[100.0, 100.0],
+                payoff: &payoff,
+                currency: Currency::USD,
+                discount_factor: discount,
+            })
             .expect("high corr price");
 
         assert!(
@@ -1655,15 +1677,15 @@ mod correlation_regression {
         // agrees with ExactMultiGbm (also using engine Cholesky).
         let disc_exact = crate::monte_carlo::discretization::exact::ExactMultiGbm::new();
         let v_exact_low = engine
-            .price(
-                &rng,
-                &p_low,
-                &disc_exact,
-                &[100.0, 100.0],
-                &payoff,
-                Currency::USD,
-                discount,
-            )
+            .price(crate::monte_carlo::engine::McPricingInputs {
+                rng: &rng,
+                process: &p_low,
+                disc: &disc_exact,
+                initial_state: &[100.0, 100.0],
+                payoff: &payoff,
+                currency: Currency::USD,
+                discount_factor: discount,
+            })
             .expect("exact low corr price");
         let tol = 5.0 * v_low.stderr.max(v_exact_low.stderr);
         assert!(
@@ -1693,13 +1715,15 @@ fn hull_white_capture_uses_metadata_for_rate_slot_zero() {
     );
     let result = engine
         .price_with_capture(
-            &PhiloxRng::new(42),
-            &process,
-            &ExactHullWhite1F::new(),
-            &[0.03],
-            &DummyPayoff,
-            Currency::USD,
-            1.0,
+            crate::monte_carlo::engine::McPricingInputs {
+                rng: &PhiloxRng::new(42),
+                process: &process,
+                disc: &ExactHullWhite1F::new(),
+                initial_state: &[0.03],
+                payoff: &DummyPayoff,
+                currency: Currency::USD,
+                discount_factor: 1.0,
+            },
             process.metadata(),
         )
         .expect("captured rates");

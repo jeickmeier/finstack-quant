@@ -25,7 +25,7 @@
     },
     {
       "id": "VALUATIONS-RATES-05-CAP-FLOOR-PRICING",
-      "title": "Cap/floor projection, volatility conventions and Hull\u2013White approximation",
+      "title": "Cap/floor projection, volatility conventions and Hull–White approximation",
       "path": "05-cap-floor-pricing.md"
     },
     {
@@ -40,7 +40,7 @@
     },
     {
       "id": "VALUATIONS-RATES-08-HULL-WHITE-SWAPTIONS",
-      "title": "Hull\u2013White swaption exercise, tree reuse and regression policy",
+      "title": "Hull–White swaption exercise, tree reuse and regression policy",
       "path": "08-hull-white-swaptions.md"
     },
     {
@@ -944,7 +944,7 @@
       "sha256": "fa6354cfa6eb5b9b1dc11ca4b19396acf614a6b124e8281bdddf319094ef9ff9"
     },
     {
-      "path": "finstack-quant/valuations/rates/src/swaption/pricing/numeraire_tests.rs",
+      "path": "finstack-quant/valuations/rates/src/swaption/pricing/tests/numeraire.rs",
       "classification": "test",
       "records": [
         "VALUATIONS-RATES-08-HULL-WHITE-SWAPTIONS",

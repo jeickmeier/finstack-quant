@@ -1594,33 +1594,33 @@ fn two_time_blocks_match_full_replay_at_cash_amortization_exercise_boundary() {
     let mut segment = Vec::new();
     let low = template
         .replay_block(
-            &tree,
-            &bond,
-            &config,
-            seed,
-            0,
-            false,
+            TrainingRun {
+                tree: &tree,
+                bond: &bond,
+                config: &config,
+                seed,
+                terms: &ReplayTerms::new(&template, &tree, &bond, &config).expect("terms"),
+            },
+            (0, false),
             &checkpoint_zero,
-            0,
-            1,
+            (0, 1),
             None,
-            &ReplayTerms::new(&template, &tree, &bond, &config).expect("terms"),
             &mut segment,
         )
         .expect("low block");
     let high = template
         .replay_block(
-            &tree,
-            &bond,
-            &config,
-            seed,
-            0,
-            false,
+            TrainingRun {
+                tree: &tree,
+                bond: &bond,
+                config: &config,
+                seed,
+                terms: &ReplayTerms::new(&template, &tree, &bond, &config).expect("terms"),
+            },
+            (0, false),
             &checkpoint_two,
-            1,
-            2,
+            (1, 2),
             None,
-            &ReplayTerms::new(&template, &tree, &bond, &config).expect("terms"),
             &mut segment,
         )
         .expect("high block");

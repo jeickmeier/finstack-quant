@@ -6,7 +6,7 @@ is where the three language surfaces drifted: the same Rust result used to come
 back as a typed object in Python and a JSON string in WASM.
 
 The table below is deliberately kept in the same order, with the same entry
-names, as ``finstack-quant-wasm/tests/return_shapes.rs``. A divergence between
+names, as ``finstack-quant-wasm/tests/facade/return_shapes.test.mjs``. A divergence between
 the two files should read as a one-screen diff.
 
 Shapes:

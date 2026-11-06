@@ -116,22 +116,40 @@ impl FxDeltaConvention {
     /// * `kind` - Spot, forward, or premium-adjusted quoting convention.
     /// * `premium_currency` - Currency in which premium is paid.
     /// * `venue` - Non-empty venue or quoting-source identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when `venue` is blank (see [`Self::validate`]).
     pub fn new(
         kind: FxDeltaConventionKind,
         premium_currency: Currency,
         venue: impl Into<String>,
     ) -> finstack_quant_core::Result<Self> {
-        let venue = venue.into();
-        if venue.trim().is_empty() {
+        let convention = Self {
+            kind,
+            premium_currency,
+            venue: venue.into(),
+        };
+        convention.validate()?;
+        Ok(convention)
+    }
+
+    /// Check the convention's own invariant: the venue is not blank.
+    ///
+    /// [`Self::new`] runs this; call it on a value deserialized from its
+    /// serde form, which does not. Whether the premium currency belongs to an
+    /// option's pair is checked by [`FxOption::validate`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when `venue` is empty or only whitespace.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        if self.venue.trim().is_empty() {
             return Err(finstack_quant_core::Error::Validation(
                 "FX delta convention venue must not be blank".to_string(),
             ));
         }
-        Ok(Self {
-            kind,
-            premium_currency,
-            venue,
-        })
+        Ok(())
     }
 }
 
@@ -213,6 +231,35 @@ pub struct FxOption {
     pub attributes: Attributes,
 }
 
+/// Inputs of [`FxOption::european`].
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct FxOptionParams {
+    /// Unique instrument identifier.
+    pub id: InstrumentId,
+    /// Base (foreign) currency: the notional currency.
+    pub base_currency: Currency,
+    /// Quote (domestic) currency: the strike and PV currency.
+    pub quote_currency: Currency,
+    /// Strike exchange rate, quote currency per unit of base currency.
+    pub strike: f64,
+    /// Expiry date; the cash payoff settles on this date.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub expiry: Date,
+    /// Notional in `base_currency`.
+    pub notional: Money,
+    /// FX volatility surface identifier.
+    pub vol_surface_id: CurveId,
+    /// `call` or `put` on the base currency.
+    pub option_type: OptionType,
+    /// Delta quoting convention: kind, premium currency (base or quote) and venue.
+    pub delta_convention: FxDeltaConvention,
+}
+
 // FxOption uses both domestic and foreign curves for Garman-Kohlhagen pricing
 impl FxOption {
     /// Validate FX option currency invariants.
@@ -237,11 +284,7 @@ impl FxOption {
                 self.delta_convention.premium_currency, self.base_currency, self.quote_currency
             )));
         }
-        if self.delta_convention.venue.trim().is_empty() {
-            return Err(finstack_quant_core::Error::Validation(
-                "FxOption delta convention venue must not be blank".to_string(),
-            ));
-        }
+        self.delta_convention.validate()?;
         if !self.strike.is_finite() || self.strike < 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "FxOption strike must be finite and non-negative, got {}",
@@ -286,23 +329,32 @@ impl FxOption {
 
     /// Create a European FX option on a pair with standard conventions.
     ///
+    /// The model day count is ACT/365F and the discount curves are
+    /// `<QUOTE>-OIS` (domestic) and `<BASE>-OIS` (foreign).
+    ///
+    /// # Arguments
+    ///
+    /// * `params` - Identifier, currency pair, strike, expiry, notional,
+    ///   volatility surface, call/put and delta convention; see
+    ///   [`FxOptionParams`].
+    ///
     /// # Errors
     ///
     /// Returns an error if the builder fails validation.
-    #[allow(clippy::too_many_arguments)]
-    pub fn european(
-        id: impl Into<InstrumentId>,
-        base_currency: Currency,
-        quote_currency: Currency,
-        strike: f64,
-        expiry: Date,
-        notional: Money,
-        vol_surface_id: impl Into<CurveId>,
-        option_type: OptionType,
-        delta_convention: FxDeltaConvention,
-    ) -> finstack_quant_core::Result<Self> {
+    pub fn european(params: FxOptionParams) -> finstack_quant_core::Result<Self> {
+        let FxOptionParams {
+            id,
+            base_currency,
+            quote_currency,
+            strike,
+            expiry,
+            notional,
+            vol_surface_id,
+            option_type,
+            delta_convention,
+        } = params;
         Self::builder()
-            .id(id.into())
+            .id(id)
             .base_currency(base_currency)
             .quote_currency(quote_currency)
             .strike(strike)
@@ -313,7 +365,7 @@ impl FxOption {
             .notional(notional)
             .domestic_discount_curve_id(CurveId::new(format!("{quote_currency}-OIS")))
             .foreign_discount_curve_id(CurveId::new(format!("{base_currency}-OIS")))
-            .vol_surface_id(vol_surface_id.into())
+            .vol_surface_id(vol_surface_id)
             .attributes(Attributes::new())
             .build()
     }

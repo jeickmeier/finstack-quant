@@ -265,7 +265,7 @@ impl RangeAccrualMcPricer {
 
         config.seed = seed;
         let pricer = PathDependentPricer::new(config);
-        let result = pricer.price_with_grid(
+        let result = pricer.price(
             &process,
             initial_spot,
             time_grid,

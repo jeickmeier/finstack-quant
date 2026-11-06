@@ -86,16 +86,15 @@ it(
       );
       expect(serializeHost(updated)).toBe(
         serializeHost(
-          native.goalSeek(
-            modelJson,
-            run.targetNode,
-            run.targetPeriod,
-            run.targetValue,
-            run.driverNode,
-            run.driverPeriod,
-            true,
+          native.goalSeek(modelJson, {
+            target_node: run.targetNode,
+            target_period: run.targetPeriod,
+            target_value: run.targetValue,
+            driver_node: run.driverNode,
+            driver_period: run.driverPeriod,
+            update_model: true,
             bounds,
-          ),
+          }),
         ),
       );
       // The returned model carries the solved driver value and validates natively.
@@ -113,10 +112,10 @@ it(
       await expect(
         query.fetchQuery(goalSeekOptions(client, 1, unbounded)),
       ).rejects.toThrow(/Goal seek failed to find solution/);
-      // A cleared target reaches Rust as NaN; a cleared bound is rejected at the boundary.
-      await expect(fails({ targetValue: Number.NaN })).rejects.toThrow(
-        /Goal-seek target must be finite/,
-      );
+      // A cleared target or bound is NaN, which the facade's JSON boundary rejects.
+      await expect(fails({ targetValue: Number.NaN })).rejects.toMatchObject({
+        kind: "invalid_type",
+      });
       await expect(
         fails({ bounds: [Number.NaN, 500000000] }),
       ).rejects.toMatchObject({ kind: "invalid_type" });
@@ -221,16 +220,15 @@ it("presents the returned solution and hides Apply without a handler", () => {
 });
 
 it("applies the returned model only on an explicit Apply, and blocks a stale or model-less result", async () => {
-  const updated = native.goalSeek(
-    modelJson,
-    run.targetNode,
-    run.targetPeriod,
-    run.targetValue,
-    run.driverNode,
-    run.driverPeriod,
-    true,
+  const updated = native.goalSeek(modelJson, {
+    target_node: run.targetNode,
+    target_period: run.targetPeriod,
+    target_value: run.targetValue,
+    driver_node: run.driverNode,
+    driver_period: run.driverPeriod,
+    update_model: true,
     bounds,
-  ) as GoalSeekResult;
+  }) as GoalSeekResult;
   const apply = vi.fn(async () => null);
   const { rerender } = render(
     <GoalSeekForm
@@ -267,16 +265,15 @@ it("applies the returned model only on an explicit Apply, and blocks a stale or 
 });
 
 it("shows a native apply error as returned", async () => {
-  const updated = native.goalSeek(
-    modelJson,
-    run.targetNode,
-    run.targetPeriod,
-    run.targetValue,
-    run.driverNode,
-    run.driverPeriod,
-    true,
+  const updated = native.goalSeek(modelJson, {
+    target_node: run.targetNode,
+    target_period: run.targetPeriod,
+    target_value: run.targetValue,
+    driver_node: run.driverNode,
+    driver_period: run.driverPeriod,
+    update_model: true,
     bounds,
-  ) as GoalSeekResult;
+  }) as GoalSeekResult;
   render(
     <GoalSeekForm
       nodeIds={nodeIds}

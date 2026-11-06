@@ -205,7 +205,7 @@ Fourteen schemas, one per entry of `schema::ARTIFACTS`, are checked in under
 `floating_coupon_spec`, `prepayment_model_spec`, `recovery_model_spec`,
 `schedule_params` and `step_up_coupon_spec`. They are indexed by
 [`schemas/index.json`](schemas/index.json). Regenerate with
-`mise run rust-gen-schemas`; verify with `mise run rust-check-schemas`.
+`mise run gen-write`; verify with `mise run gen-check`.
 Validation renders the same registry, and the Rust serde types remain
 authoritative for semantic validation.
 

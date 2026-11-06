@@ -7,12 +7,8 @@ cases through the WASM binding and asserts the same values, so both hosts are
 pinned to one Rust result. Python returns JSON text where WASM returns plain
 objects; the cases compare the parsed documents.
 
-Regenerate the golden after an intended change with::
-
-    UPDATE_SCHEMA_PARITY_GOLDEN=1 uv run --no-sync pytest \
-        finstack-quant-py/tests/test_schema_wasm_parity.py
-    (cd finstack-quant-wasm && npx --no-install prettier --write \
-        tests/facade/schema_parity.golden.json)
+The golden is derived from the published schemas; ``mise run gen-write``
+regenerates it (through the ``UPDATE_SCHEMA_PARITY_GOLDEN=1`` branch below).
 """
 
 from __future__ import annotations

@@ -42,8 +42,13 @@ fn map_date(
 /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
 /// `validation`) if `month` is outside `1..=12` or `year` is outside the
 /// supported date range.
+/// @param month - Calendar month number, `1` through `12`.
+/// @param year - Four-digit calendar year.
 #[wasm_bindgen(js_name = thirdWednesday)]
-pub fn third_wednesday(month: JsValue, year: JsValue) -> Result<i32, JsValue> {
+pub fn third_wednesday(
+    #[wasm_bindgen(unchecked_param_type = "number")] month: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] year: JsValue,
+) -> Result<i32, JsValue> {
     let (month, year) = month_year(&month, &year)?;
     rust_dates::third_wednesday(month, year)
         .map(days_since_epoch)
@@ -61,8 +66,13 @@ pub fn third_wednesday(month: JsValue, year: JsValue) -> Result<i32, JsValue> {
 /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
 /// `validation`) if `month` is outside `1..=12` or `year` is outside the
 /// supported date range.
+/// @param month - Calendar month number, `1` through `12`.
+/// @param year - Four-digit calendar year.
 #[wasm_bindgen(js_name = thirdFriday)]
-pub fn third_friday(month: JsValue, year: JsValue) -> Result<i32, JsValue> {
+pub fn third_friday(
+    #[wasm_bindgen(unchecked_param_type = "number")] month: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] year: JsValue,
+) -> Result<i32, JsValue> {
     let (month, year) = month_year(&month, &year)?;
     rust_dates::third_friday(month, year)
         .map(days_since_epoch)
@@ -79,8 +89,11 @@ pub fn third_friday(month: JsValue, year: JsValue) -> Result<i32, JsValue> {
 /// as epoch days.
 /// @throws `TypeError` if `date` is not an integer; `FinstackError` (kind
 /// `validation`) if it is outside the supported date range.
+/// @param date - Reference date as days since 1970-01-01.
 #[wasm_bindgen(js_name = nextImm)]
-pub fn next_imm(date: JsValue) -> Result<i32, JsValue> {
+pub fn next_imm(
+    #[wasm_bindgen(unchecked_param_type = "number")] date: JsValue,
+) -> Result<i32, JsValue> {
     map_date(&date, rust_dates::next_imm)
 }
 
@@ -93,8 +106,11 @@ pub fn next_imm(date: JsValue) -> Result<i32, JsValue> {
 /// @returns `true` on the third Wednesday of March, June, September or December.
 /// @throws `TypeError` if `date` is not an integer; `FinstackError` (kind
 /// `validation`) if it is outside the supported date range.
+/// @param date - Date as days since 1970-01-01.
 #[wasm_bindgen(js_name = isImmDate)]
-pub fn is_imm_date(date: JsValue) -> Result<bool, JsValue> {
+pub fn is_imm_date(
+    #[wasm_bindgen(unchecked_param_type = "number")] date: JsValue,
+) -> Result<bool, JsValue> {
     Ok(rust_dates::is_imm_date(js_epoch_days(&date, "date")?))
 }
 
@@ -107,8 +123,11 @@ pub fn is_imm_date(date: JsValue) -> Result<bool, JsValue> {
 /// @returns `true` on the 20th of March, June, September or December.
 /// @throws `TypeError` if `date` is not an integer; `FinstackError` (kind
 /// `validation`) if it is outside the supported date range.
+/// @param date - Date as days since 1970-01-01.
 #[wasm_bindgen(js_name = isCdsDate)]
-pub fn is_cds_date(date: JsValue) -> Result<bool, JsValue> {
+pub fn is_cds_date(
+    #[wasm_bindgen(unchecked_param_type = "number")] date: JsValue,
+) -> Result<bool, JsValue> {
     Ok(rust_dates::is_cds_date(js_epoch_days(&date, "date")?))
 }
 
@@ -121,8 +140,11 @@ pub fn is_cds_date(date: JsValue) -> Result<bool, JsValue> {
 /// @returns The next 20th of March, June, September or December, as epoch days.
 /// @throws `TypeError` if `date` is not an integer; `FinstackError` (kind
 /// `validation`) if it is outside the supported date range.
+/// @param date - Reference date as days since 1970-01-01.
 #[wasm_bindgen(js_name = nextCdsDate)]
-pub fn next_cds_date(date: JsValue) -> Result<i32, JsValue> {
+pub fn next_cds_date(
+    #[wasm_bindgen(unchecked_param_type = "number")] date: JsValue,
+) -> Result<i32, JsValue> {
     map_date(&date, rust_dates::next_cds_date)
 }
 
@@ -136,8 +158,11 @@ pub fn next_cds_date(date: JsValue) -> Result<i32, JsValue> {
 /// `date`, as epoch days; a roll date returns the preceding roll.
 /// @throws `TypeError` if `date` is not an integer; `FinstackError` (kind
 /// `validation`) if it is outside the supported date range.
+/// @param date - Reference date as days since 1970-01-01.
 #[wasm_bindgen(js_name = prevCdsDate)]
-pub fn prev_cds_date(date: JsValue) -> Result<i32, JsValue> {
+pub fn prev_cds_date(
+    #[wasm_bindgen(unchecked_param_type = "number")] date: JsValue,
+) -> Result<i32, JsValue> {
     map_date(&date, rust_dates::prev_cds_date)
 }
 
@@ -152,8 +177,11 @@ pub fn prev_cds_date(date: JsValue) -> Result<i32, JsValue> {
 /// epoch days.
 /// @throws `TypeError` if `date` is not an integer; `FinstackError` (kind
 /// `validation`) if it is outside the supported date range.
+/// @param date - Reference date as days since 1970-01-01.
 #[wasm_bindgen(js_name = prevCdsSemiannualRoll)]
-pub fn prev_cds_semiannual_roll(date: JsValue) -> Result<i32, JsValue> {
+pub fn prev_cds_semiannual_roll(
+    #[wasm_bindgen(unchecked_param_type = "number")] date: JsValue,
+) -> Result<i32, JsValue> {
     map_date(&date, rust_dates::prev_cds_semiannual_roll)
 }
 
@@ -169,8 +197,11 @@ pub fn prev_cds_semiannual_roll(date: JsValue) -> Result<i32, JsValue> {
 /// days; a date already on that grid is returned unchanged.
 /// @throws `TypeError` if `date` is not an integer; `FinstackError` (kind
 /// `validation`) if it is outside the supported date range.
+/// @param date - Unadjusted candidate maturity (roll date plus tenor) as days since 1970-01-01.
 #[wasm_bindgen(js_name = nextSemiannualCdsMaturity)]
-pub fn next_semiannual_cds_maturity(date: JsValue) -> Result<i32, JsValue> {
+pub fn next_semiannual_cds_maturity(
+    #[wasm_bindgen(unchecked_param_type = "number")] date: JsValue,
+) -> Result<i32, JsValue> {
     map_date(&date, rust_dates::next_semiannual_cds_maturity)
 }
 
@@ -186,8 +217,13 @@ pub fn next_semiannual_cds_maturity(date: JsValue) -> Result<i32, JsValue> {
 /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
 /// `validation`) if `month` is outside `1..=12` or `year` is outside the
 /// supported date range.
+/// @param month - Calendar month number, `1` through `12`.
+/// @param year - Four-digit calendar year.
 #[wasm_bindgen(js_name = immOptionExpiry)]
-pub fn imm_option_expiry(month: JsValue, year: JsValue) -> Result<i32, JsValue> {
+pub fn imm_option_expiry(
+    #[wasm_bindgen(unchecked_param_type = "number")] month: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] year: JsValue,
+) -> Result<i32, JsValue> {
     let (month, year) = month_year(&month, &year)?;
     rust_dates::imm_option_expiry(month, year)
         .map(days_since_epoch)
@@ -204,8 +240,11 @@ pub fn imm_option_expiry(month: JsValue, year: JsValue) -> Result<i32, JsValue> 
 /// @returns The next March/June/September/December IMM option expiry, as epoch days.
 /// @throws `TypeError` if `date` is not an integer; `FinstackError` (kind
 /// `validation`) if it is outside the supported date range.
+/// @param date - Reference date as days since 1970-01-01.
 #[wasm_bindgen(js_name = nextImmOptionExpiry)]
-pub fn next_imm_option_expiry(date: JsValue) -> Result<i32, JsValue> {
+pub fn next_imm_option_expiry(
+    #[wasm_bindgen(unchecked_param_type = "number")] date: JsValue,
+) -> Result<i32, JsValue> {
     map_date(&date, rust_dates::next_imm_option_expiry)
 }
 
@@ -219,8 +258,11 @@ pub fn next_imm_option_expiry(date: JsValue) -> Result<i32, JsValue> {
 /// @returns The next third Friday of a month, as epoch days.
 /// @throws `TypeError` if `date` is not an integer; `FinstackError` (kind
 /// `validation`) if it is outside the supported date range.
+/// @param date - Reference date as days since 1970-01-01.
 #[wasm_bindgen(js_name = nextThirdFriday)]
-pub fn next_third_friday(date: JsValue) -> Result<i32, JsValue> {
+pub fn next_third_friday(
+    #[wasm_bindgen(unchecked_param_type = "number")] date: JsValue,
+) -> Result<i32, JsValue> {
     map_date(&date, rust_dates::next_third_friday)
 }
 
@@ -296,10 +338,12 @@ impl JsSifmaSettlementClass {
     /// @returns The inferred `SifmaSettlementClass`.
     /// @throws `TypeError` if `agency` is not a string or `termYears` is not a
     /// non-negative integer.
+    /// @param agency - Agency program label; a value containing `GNMA` or `GN` (any case) is treated as Ginnie Mae.
+    /// @param termYears - Original mortgage term in whole years: 15-year pools are class B, conventional 30-year pools class A, GNMA 30-year pools class C, anything else class D.
     #[wasm_bindgen(js_name = fromAgencyTerm)]
     pub fn from_agency_term(
-        agency: JsValue,
-        term_years: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] agency: JsValue,
+        #[wasm_bindgen(js_name = "termYears", unchecked_param_type = "number")] term_years: JsValue,
     ) -> Result<JsSifmaSettlementClass, JsValue> {
         Ok(Self::from_inner(SifmaSettlementClass::from_agency_term(
             &js_string(&agency, "agency")?,
@@ -329,6 +373,9 @@ impl JsSifmaSettlementClass {
 /// * `year` - Settlement year.
 /// * `settlement_class` - Agency-MBS settlement class whose date is requested.
 ///
+/// @param month - Settlement month number, `1` through `12`.
+/// @param year - Settlement year.
+/// @param settlementClass - Agency-MBS settlement class whose date is requested.
 /// @returns The published date as epoch days, or `undefined` when that month
 /// and class are outside the embedded SIFMA calendar (dates are never
 /// approximated).
@@ -336,9 +383,9 @@ impl JsSifmaSettlementClass {
 /// `validation`) if `month` is outside `1..=12`.
 #[wasm_bindgen(js_name = sifmaSettlementDate)]
 pub fn sifma_settlement_date(
-    month: JsValue,
-    year: JsValue,
-    settlement_class: &JsSifmaSettlementClass,
+    #[wasm_bindgen(unchecked_param_type = "number")] month: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] year: JsValue,
+    #[wasm_bindgen(js_name = "settlementClass")] settlement_class: &JsSifmaSettlementClass,
 ) -> Result<Option<i32>, JsValue> {
     let (month, year) = month_year(&month, &year)?;
     Ok(
@@ -358,14 +405,16 @@ pub fn sifma_settlement_date(
 /// * `month` - Settlement month number, `1` through `12`.
 /// * `year` - Settlement year.
 ///
+/// @param month - Settlement month number, `1` through `12`.
+/// @param year - Settlement year.
 /// @returns The published date as epoch days, or `undefined` when the month
 /// is outside the embedded SIFMA calendar.
 /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
 /// `validation`) if `month` is outside `1..=12`.
 #[wasm_bindgen(js_name = sifmaSettlementDateDefaultClass)]
 pub fn sifma_settlement_date_default_class(
-    month: JsValue,
-    year: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] month: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] year: JsValue,
 ) -> Result<Option<i32>, JsValue> {
     let (month, year) = month_year(&month, &year)?;
     Ok(
@@ -391,11 +440,14 @@ pub fn sifma_settlement_date_default_class(
 /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
 /// `validation`) if `month` is outside `1..=12` or `year` is outside the
 /// supported date range.
+/// @param month - Settlement month number, `1` through `12`.
+/// @param year - Settlement year.
+/// @param settlementClass - Agency-MBS settlement class whose business-day anchor is used.
 #[wasm_bindgen(js_name = estimatedSifmaSettlementDate)]
 pub fn estimated_sifma_settlement_date(
-    month: JsValue,
-    year: JsValue,
-    settlement_class: &JsSifmaSettlementClass,
+    #[wasm_bindgen(unchecked_param_type = "number")] month: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] year: JsValue,
+    #[wasm_bindgen(js_name = "settlementClass")] settlement_class: &JsSifmaSettlementClass,
 ) -> Result<i32, JsValue> {
     let (month, year) = month_year(&month, &year)?;
     rust_dates::estimated_sifma_settlement_date(month, year, settlement_class.inner)
@@ -415,8 +467,11 @@ pub fn estimated_sifma_settlement_date(
 /// required month is outside the embedded SIFMA calendar.
 /// @throws `TypeError` if `date` is not an integer; `FinstackError` (kind
 /// `validation`) if it is outside the supported date range.
+/// @param date - Reference date as days since 1970-01-01; a settlement on this date is not returned.
 #[wasm_bindgen(js_name = nextSifmaSettlement)]
-pub fn next_sifma_settlement(date: JsValue) -> Result<Option<i32>, JsValue> {
+pub fn next_sifma_settlement(
+    #[wasm_bindgen(unchecked_param_type = "number")] date: JsValue,
+) -> Result<Option<i32>, JsValue> {
     Ok(rust_dates::next_sifma_settlement(js_epoch_days(&date, "date")?).map(days_since_epoch))
 }
 
@@ -433,8 +488,15 @@ pub fn next_sifma_settlement(date: JsValue) -> Result<Option<i32>, JsValue> {
 /// @returns The 30/360 day count.
 /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
 /// `validation`) for an unknown variant or a date outside the supported range.
+/// @param start - Inclusive accrual start as days since 1970-01-01.
+/// @param end - Exclusive accrual end as days since 1970-01-01; an earlier end gives a negative count rather than an error.
+/// @param convention - Variant name: `"us_sia"`, `"isda"`, `"european"` or `"italian"`, in any ASCII case.
 #[wasm_bindgen(js_name = days30360)]
-pub fn days_30_360(start: JsValue, end: JsValue, convention: JsValue) -> Result<i32, JsValue> {
+pub fn days_30_360(
+    #[wasm_bindgen(unchecked_param_type = "number")] start: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] end: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] convention: JsValue,
+) -> Result<i32, JsValue> {
     let convention: Thirty360Convention = js_string(&convention, "convention")?
         .parse()
         .map_err(to_js_err)?;
@@ -458,10 +520,14 @@ pub fn days_30_360(start: JsValue, end: JsValue, convention: JsValue) -> Result<
 /// @returns The 30E/360 ISDA day count.
 /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
 /// `validation`) for a date outside the supported range.
+/// @param start - Inclusive accrual start as days since 1970-01-01.
+/// @param end - Exclusive accrual end as days since 1970-01-01; an earlier end gives a negative count rather than an error.
+/// @param endIsTerminationDate - Whether `end` is the instrument's final maturity, which keeps a February month-end day unadjusted.
 #[wasm_bindgen(js_name = days30e360Isda)]
 pub fn days_30e_360_isda(
-    start: JsValue,
-    end: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] start: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] end: JsValue,
+    #[wasm_bindgen(js_name = "endIsTerminationDate", unchecked_param_type = "boolean")]
     end_is_termination_date: JsValue,
 ) -> Result<i32, JsValue> {
     Ok(rust_dates::days_30e_360_isda(
@@ -536,8 +602,11 @@ impl JsTenorUnit {
     /// @throws `TypeError` (kind `invalid_type`) if `name` is not a string;
     /// `FinstackError` (kind `validation`) if it is not exactly one of the
     /// four unit letters.
+    /// @param name - Exactly one character: `D`, `W`, `M` or `Y`, in either case.
     #[wasm_bindgen(js_name = fromName)]
-    pub fn from_name(name: JsValue) -> Result<JsTenorUnit, JsValue> {
+    pub fn from_name(
+        #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
+    ) -> Result<JsTenorUnit, JsValue> {
         let text = js_string(&name, "name")?;
         text.parse::<TenorUnit>()
             .map(Self::from_inner)

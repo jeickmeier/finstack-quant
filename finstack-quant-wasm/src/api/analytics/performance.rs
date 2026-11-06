@@ -164,8 +164,25 @@ impl JsPerformance {
     /// Rejects a malformed panel or unknown field (kind `validation`), a
     /// non-finite number (kind `invalid_type`), invalid series or dates
     /// (kind `validation`) and an unknown benchmark ticker (kind `not_found`).
+    /// @param panel - `PerformancePanel` object or JSON text: strictly ascending ISO-8601 `dates`, ticker-major `series` (`series[i][t]` is ticker `i` at `dates[t]`; a leading or trailing gap is `null`), `kind` (`"prices"` for strictly positive prices or `"returns"` for simple decimal returns), unique `ticker_names`, an optional `benchmark_ticker` (the first ticker when omitted) and an optional `frequency` token (daily when omitted).
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { analytics } from "finstack-quant-wasm";
+    /// await init();
+    /// const perf = new analytics.Performance({
+    ///   dates: ["2024-01-01", "2024-01-02", "2024-01-03"],
+    ///   series: [[100, 101, 103]],
+    ///   kind: "prices",
+    ///   ticker_names: ["FUND"],
+    /// });
+    /// console.log(perf.getTickerNames()); // ["FUND"]
+    /// perf.free();
+    /// ```
     #[wasm_bindgen(constructor)]
-    pub fn new(panel: JsValue) -> Result<JsPerformance, JsValue> {
+    pub fn new(
+        #[wasm_bindgen(unchecked_param_type = "PerformancePanel | string")] panel: JsValue,
+    ) -> Result<JsPerformance, JsValue> {
         let panel: PerformancePanel = from_js_json(&panel, "panel")?;
         let inner = Performance::new(&panel).map_err(to_js_err)?;
         Ok(JsPerformance { inner })
@@ -179,7 +196,11 @@ impl JsPerformance {
     /// @param start - Inclusive ISO-8601 start date for the active analysis window.
     /// @param end - Inclusive ISO-8601 end date for the active analysis window.
     #[wasm_bindgen(js_name = resetDateRange)]
-    pub fn reset_date_range(&mut self, start: JsValue, end: JsValue) -> Result<(), JsValue> {
+    pub fn reset_date_range(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "string")] start: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] end: JsValue,
+    ) -> Result<(), JsValue> {
         let start: &str = &js_string(&start, "start")?;
         let end: &str = &js_string(&end, "end")?;
         self.inner
@@ -195,7 +216,10 @@ impl JsPerformance {
     /// match a loaded ticker name (kind `not_found`).
     /// @param ticker - Existing ticker label to use as the benchmark return series.
     #[wasm_bindgen(js_name = resetBenchTicker)]
-    pub fn reset_bench_ticker(&mut self, ticker: JsValue) -> Result<(), JsValue> {
+    pub fn reset_bench_ticker(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "string")] ticker: JsValue,
+    ) -> Result<(), JsValue> {
         let ticker: &str = &js_string(&ticker, "ticker")?;
         self.inner.reset_bench_ticker(ticker).map_err(to_js_err)
     }
@@ -206,7 +230,7 @@ impl JsPerformance {
     ///
     /// Rejects if the ticker-name vector cannot be serialized to JavaScript.
     /// @returns Ticker labels in column order as a JavaScript string array.
-    #[wasm_bindgen(js_name = getTickerNames)]
+    #[wasm_bindgen(js_name = getTickerNames, unchecked_return_type = "string[]")]
     pub fn get_ticker_names(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner.get_ticker_names())
     }
@@ -222,8 +246,12 @@ impl JsPerformance {
     /// Rejects a non-string value (kind `invalid_type`) or a name absent from the
     /// panel (kind `not_found`).
     /// @returns Zero-based column index for the loaded ticker.
+    /// @param ticker - Case-sensitive ticker label supplied when the panel was constructed.
     #[wasm_bindgen(js_name = getTickerIndex)]
-    pub fn get_ticker_index(&self, ticker: JsValue) -> Result<usize, JsValue> {
+    pub fn get_ticker_index(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] ticker: JsValue,
+    ) -> Result<usize, JsValue> {
         let ticker = js_string(&ticker, "ticker")?;
         self.inner.get_ticker_index(&ticker).map_err(to_js_err)
     }
@@ -271,10 +299,13 @@ impl JsPerformance {
     /// # Errors
     ///
     /// Rejects when `ticker_idx` is outside the loaded ticker columns.
-    /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
+    /// @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
     /// @returns ISO-8601 dates for that ticker's active return series, in chronological order.
     #[wasm_bindgen(js_name = getActiveDatesForTicker)]
-    pub fn get_active_dates_for_ticker(&self, ticker_idx: JsValue) -> Result<Vec<String>, JsValue> {
+    pub fn get_active_dates_for_ticker(
+        &self,
+        #[wasm_bindgen(js_name = "tickerIdx", unchecked_param_type = "number")] ticker_idx: JsValue,
+    ) -> Result<Vec<String>, JsValue> {
         let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
         Ok(self
             .inner
@@ -299,12 +330,15 @@ impl JsPerformance {
     /// id (kind `not_found`, with suggestions), a missing calendar when
     /// `bus_252` is requested, or a ticker whose active range has no
     /// positive holding period.
-    /// @param day_count - Optional day-count: `"act365_25"` or a core name such as `"act_365f"`; defaults to Act/365.25.
-    /// @param calendar_id - Optional holiday-calendar id, or `+`-joined ids for a union calendar (`"nyse+gblo"`); required for `bus_252`.
+    /// @param dayCount - Optional day-count: `"act365_25"` or a core name such as `"act_365f"`; defaults to Act/365.25.
+    /// @param calendarId - Optional holiday-calendar id, or `+`-joined ids for a union calendar (`"nyse+gblo"`); required for `bus_252`.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
+    #[wasm_bindgen(unchecked_return_type = "Float64Array")]
     pub fn cagr(
         &self,
+        #[wasm_bindgen(js_name = "dayCount", unchecked_optional_param_type = "string")]
         day_count: Option<JsValue>,
+        #[wasm_bindgen(js_name = "calendarId", unchecked_optional_param_type = "string")]
         calendar_id: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
         let day_count = js_opt_string(day_count.as_ref(), "dayCount")?;
@@ -317,8 +351,11 @@ impl JsPerformance {
     /// Mean periodic return per asset (annualized by default).
     /// @param annualize - Whether to annualize by the configured frequency; defaults to true.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
-    #[wasm_bindgen(js_name = meanReturn)]
-    pub fn mean_return(&self, annualize: Option<JsValue>) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = meanReturn, unchecked_return_type = "Float64Array")]
+    pub fn mean_return(
+        &self,
+        #[wasm_bindgen(unchecked_optional_param_type = "boolean")] annualize: Option<JsValue>,
+    ) -> Result<JsValue, JsValue> {
         let annualize = js_opt_bool(annualize.as_ref(), "annualize")?;
         Ok(vec_f64_to_js(
             &self
@@ -330,7 +367,11 @@ impl JsPerformance {
     /// Return volatility per asset (annualized by default).
     /// @param annualize - Whether to annualize by the configured frequency; defaults to true.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
-    pub fn volatility(&self, annualize: Option<JsValue>) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(unchecked_return_type = "Float64Array")]
+    pub fn volatility(
+        &self,
+        #[wasm_bindgen(unchecked_optional_param_type = "boolean")] annualize: Option<JsValue>,
+    ) -> Result<JsValue, JsValue> {
         let annualize = js_opt_bool(annualize.as_ref(), "annualize")?;
         Ok(vec_f64_to_js(
             &self
@@ -340,9 +381,14 @@ impl JsPerformance {
     }
 
     /// Sharpe ratio per asset for the given risk-free rate.
-    /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
+    /// @param riskFreeRate - Annualized decimal risk-free rate; defaults to 0.0.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
-    pub fn sharpe(&self, risk_free_rate: Option<JsValue>) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(unchecked_return_type = "Float64Array")]
+    pub fn sharpe(
+        &self,
+        #[wasm_bindgen(js_name = "riskFreeRate", unchecked_optional_param_type = "number")]
+        risk_free_rate: Option<JsValue>,
+    ) -> Result<JsValue, JsValue> {
         let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
         Ok(vec_f64_to_js(
             &self
@@ -354,7 +400,11 @@ impl JsPerformance {
     /// Sortino ratio per asset for the given per-period minimum acceptable return.
     /// @param mar - Per-period minimum acceptable return as a decimal; defaults to 0.0.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
-    pub fn sortino(&self, mar: Option<JsValue>) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(unchecked_return_type = "Float64Array")]
+    pub fn sortino(
+        &self,
+        #[wasm_bindgen(unchecked_optional_param_type = "number")] mar: Option<JsValue>,
+    ) -> Result<JsValue, JsValue> {
         let mar = js_opt_f64(mar.as_ref(), "mar")?;
         Ok(vec_f64_to_js(
             &self.inner.sortino(mar.unwrap_or(DEFAULT_MAR)),
@@ -371,20 +421,21 @@ impl JsPerformance {
     /// Rejects when any ticker's active range has no positive holding period
     /// and therefore cannot produce CAGR.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
+    #[wasm_bindgen(unchecked_return_type = "Float64Array")]
     pub fn calmar(&self) -> Result<JsValue, JsValue> {
         result_vec_f64_to_js(self.inner.calmar())
     }
 
     /// Mean drawdown per asset.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
-    #[wasm_bindgen(js_name = meanDrawdown)]
+    #[wasm_bindgen(js_name = meanDrawdown, unchecked_return_type = "Float64Array")]
     pub fn mean_drawdown(&self) -> JsValue {
         vec_f64_to_js(&self.inner.mean_drawdown())
     }
 
     /// Maximum drawdown per asset.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
-    #[wasm_bindgen(js_name = maxDrawdown)]
+    #[wasm_bindgen(js_name = maxDrawdown, unchecked_return_type = "Float64Array")]
     pub fn max_drawdown(&self) -> JsValue {
         vec_f64_to_js(&self.inner.max_drawdown())
     }
@@ -393,8 +444,11 @@ impl JsPerformance {
     /// @param confidence - Tail confidence as a decimal probability; defaults to 0.95.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
     /// @throws Error - Rejects a `confidence` outside the open interval (0, 1).
-    #[wasm_bindgen(js_name = valueAtRisk)]
-    pub fn value_at_risk(&self, confidence: Option<JsValue>) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = valueAtRisk, unchecked_return_type = "Float64Array")]
+    pub fn value_at_risk(
+        &self,
+        #[wasm_bindgen(unchecked_optional_param_type = "number")] confidence: Option<JsValue>,
+    ) -> Result<JsValue, JsValue> {
         let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
         result_vec_f64_to_js(
             self.inner
@@ -407,8 +461,11 @@ impl JsPerformance {
     /// @param confidence - Tail confidence as a decimal probability; defaults to 0.95.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
     /// @throws Error - Rejects a `confidence` outside the open interval (0, 1).
-    #[wasm_bindgen(js_name = expectedShortfall)]
-    pub fn expected_shortfall(&self, confidence: Option<JsValue>) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = expectedShortfall, unchecked_return_type = "Float64Array")]
+    pub fn expected_shortfall(
+        &self,
+        #[wasm_bindgen(unchecked_optional_param_type = "number")] confidence: Option<JsValue>,
+    ) -> Result<JsValue, JsValue> {
         let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
         result_vec_f64_to_js(
             self.inner
@@ -418,33 +475,35 @@ impl JsPerformance {
 
     /// Tracking error versus the benchmark per asset.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
-    #[wasm_bindgen(js_name = trackingError)]
+    #[wasm_bindgen(js_name = trackingError, unchecked_return_type = "Float64Array")]
     pub fn tracking_error(&self) -> JsValue {
         vec_f64_to_js(&self.inner.tracking_error())
     }
 
     /// Information ratio versus the benchmark per asset.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
-    #[wasm_bindgen(js_name = informationRatio)]
+    #[wasm_bindgen(js_name = informationRatio, unchecked_return_type = "Float64Array")]
     pub fn information_ratio(&self) -> JsValue {
         vec_f64_to_js(&self.inner.information_ratio())
     }
 
     /// Return skewness per asset.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
+    #[wasm_bindgen(unchecked_return_type = "Float64Array")]
     pub fn skewness(&self) -> JsValue {
         vec_f64_to_js(&self.inner.skewness())
     }
 
     /// Excess kurtosis of returns per asset.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
+    #[wasm_bindgen(unchecked_return_type = "Float64Array")]
     pub fn kurtosis(&self) -> JsValue {
         vec_f64_to_js(&self.inner.kurtosis())
     }
 
     /// Geometric mean return per asset.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
-    #[wasm_bindgen(js_name = geometricMean)]
+    #[wasm_bindgen(js_name = geometricMean, unchecked_return_type = "Float64Array")]
     pub fn geometric_mean(&self) -> JsValue {
         vec_f64_to_js(&self.inner.geometric_mean())
     }
@@ -452,8 +511,11 @@ impl JsPerformance {
     /// Downside deviation per asset below the per-period minimum acceptable return.
     /// @param mar - Per-period minimum acceptable return as a decimal; defaults to 0.0.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
-    #[wasm_bindgen(js_name = downsideDeviation)]
-    pub fn downside_deviation(&self, mar: Option<JsValue>) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = downsideDeviation, unchecked_return_type = "Float64Array")]
+    pub fn downside_deviation(
+        &self,
+        #[wasm_bindgen(unchecked_optional_param_type = "number")] mar: Option<JsValue>,
+    ) -> Result<JsValue, JsValue> {
         let mar = js_opt_f64(mar.as_ref(), "mar")?;
         Ok(vec_f64_to_js(
             &self.inner.downside_deviation(mar.unwrap_or(DEFAULT_MAR)),
@@ -466,7 +528,7 @@ impl JsPerformance {
     ///
     /// Rejects if the duration vector cannot be serialized to JavaScript.
     /// @returns Per-ticker longest drawdown duration in calendar days, as a JavaScript number array.
-    #[wasm_bindgen(js_name = maxDrawdownDuration)]
+    #[wasm_bindgen(js_name = maxDrawdownDuration, unchecked_return_type = "number[]")]
     pub fn max_drawdown_duration(&self) -> Result<JsValue, JsValue> {
         // `i64` day counts do not fit a `Float64Array` contract; they cross as a
         // plain JS number array through the serde path.
@@ -475,21 +537,21 @@ impl JsPerformance {
 
     /// Empyrical-style annualized geometric up-capture versus the benchmark per asset.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
-    #[wasm_bindgen(js_name = upCapture)]
+    #[wasm_bindgen(js_name = upCapture, unchecked_return_type = "Float64Array")]
     pub fn up_capture(&self) -> JsValue {
         vec_f64_to_js(&self.inner.up_capture())
     }
 
     /// Empyrical-style annualized geometric down-capture versus the benchmark per asset.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
-    #[wasm_bindgen(js_name = downCapture)]
+    #[wasm_bindgen(js_name = downCapture, unchecked_return_type = "Float64Array")]
     pub fn down_capture(&self) -> JsValue {
         vec_f64_to_js(&self.inner.down_capture())
     }
 
     /// Empyrical-style annualized geometric up/down capture ratio versus the benchmark per asset.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
-    #[wasm_bindgen(js_name = captureRatio)]
+    #[wasm_bindgen(js_name = captureRatio, unchecked_return_type = "Float64Array")]
     pub fn capture_ratio(&self) -> JsValue {
         vec_f64_to_js(&self.inner.capture_ratio())
     }
@@ -497,8 +559,11 @@ impl JsPerformance {
     /// Omega ratio per asset for the given threshold return.
     /// @param threshold - Per-period threshold return as a decimal; defaults to 0.0.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
-    #[wasm_bindgen(js_name = omegaRatio)]
-    pub fn omega_ratio(&self, threshold: Option<JsValue>) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = omegaRatio, unchecked_return_type = "Float64Array")]
+    pub fn omega_ratio(
+        &self,
+        #[wasm_bindgen(unchecked_optional_param_type = "number")] threshold: Option<JsValue>,
+    ) -> Result<JsValue, JsValue> {
         let threshold = js_opt_f64(threshold.as_ref(), "threshold")?;
         Ok(vec_f64_to_js(
             &self.inner.omega_ratio(threshold.unwrap_or(DEFAULT_MAR)),
@@ -509,9 +574,14 @@ impl JsPerformance {
     /// A non-finite risk-free rate gives `NaN`. With absolute beta below
     /// `1e-10`, nonzero finite excess return gives signed infinity and zero
     /// excess return gives `0`.
-    /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
+    /// @param riskFreeRate - Annualized decimal risk-free rate; defaults to 0.0.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
-    pub fn treynor(&self, risk_free_rate: Option<JsValue>) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(unchecked_return_type = "Float64Array")]
+    pub fn treynor(
+        &self,
+        #[wasm_bindgen(js_name = "riskFreeRate", unchecked_optional_param_type = "number")]
+        risk_free_rate: Option<JsValue>,
+    ) -> Result<JsValue, JsValue> {
         let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
         Ok(vec_f64_to_js(
             &self
@@ -522,14 +592,14 @@ impl JsPerformance {
 
     /// Gain-to-pain ratio per asset.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
-    #[wasm_bindgen(js_name = gainToPain)]
+    #[wasm_bindgen(js_name = gainToPain, unchecked_return_type = "Float64Array")]
     pub fn gain_to_pain(&self) -> JsValue {
         vec_f64_to_js(&self.inner.gain_to_pain())
     }
 
     /// Ulcer index per asset.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
-    #[wasm_bindgen(js_name = ulcerIndex)]
+    #[wasm_bindgen(js_name = ulcerIndex, unchecked_return_type = "Float64Array")]
     pub fn ulcer_index(&self) -> JsValue {
         vec_f64_to_js(&self.inner.ulcer_index())
     }
@@ -543,21 +613,21 @@ impl JsPerformance {
     /// Rejects when any ticker's active range has no positive holding period
     /// and therefore cannot produce CAGR.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
-    #[wasm_bindgen(js_name = martinRatio)]
+    #[wasm_bindgen(js_name = martinRatio, unchecked_return_type = "Float64Array")]
     pub fn martin_ratio(&self) -> Result<JsValue, JsValue> {
         result_vec_f64_to_js(self.inner.martin_ratio())
     }
 
     /// Recovery factor (total return over max drawdown) per asset.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
-    #[wasm_bindgen(js_name = recoveryFactor)]
+    #[wasm_bindgen(js_name = recoveryFactor, unchecked_return_type = "Float64Array")]
     pub fn recovery_factor(&self) -> JsValue {
         vec_f64_to_js(&self.inner.recovery_factor())
     }
 
     /// Pain index (mean drawdown magnitude) per asset.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
-    #[wasm_bindgen(js_name = painIndex)]
+    #[wasm_bindgen(js_name = painIndex, unchecked_return_type = "Float64Array")]
     pub fn pain_index(&self) -> JsValue {
         vec_f64_to_js(&self.inner.pain_index())
     }
@@ -570,10 +640,14 @@ impl JsPerformance {
     ///
     /// Rejects when any ticker's active range has no positive holding period
     /// and therefore cannot produce CAGR.
-    /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
+    /// @param riskFreeRate - Annualized decimal risk-free rate; defaults to 0.0.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
-    #[wasm_bindgen(js_name = painRatio)]
-    pub fn pain_ratio(&self, risk_free_rate: Option<JsValue>) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = painRatio, unchecked_return_type = "Float64Array")]
+    pub fn pain_ratio(
+        &self,
+        #[wasm_bindgen(js_name = "riskFreeRate", unchecked_optional_param_type = "number")]
+        risk_free_rate: Option<JsValue>,
+    ) -> Result<JsValue, JsValue> {
         let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
         result_vec_f64_to_js(
             self.inner
@@ -585,8 +659,11 @@ impl JsPerformance {
     /// @param confidence - Tail confidence as a decimal probability; defaults to 0.95.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
     /// @throws Error - Rejects a `confidence` outside the open interval (0, 1).
-    #[wasm_bindgen(js_name = tailRatio)]
-    pub fn tail_ratio(&self, confidence: Option<JsValue>) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = tailRatio, unchecked_return_type = "Float64Array")]
+    pub fn tail_ratio(
+        &self,
+        #[wasm_bindgen(unchecked_optional_param_type = "number")] confidence: Option<JsValue>,
+    ) -> Result<JsValue, JsValue> {
         let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
         result_vec_f64_to_js(
             self.inner
@@ -596,14 +673,14 @@ impl JsPerformance {
 
     /// R-squared of returns against the benchmark per asset.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
-    #[wasm_bindgen(js_name = rSquared)]
+    #[wasm_bindgen(js_name = rSquared, unchecked_return_type = "Float64Array")]
     pub fn r_squared(&self) -> JsValue {
         vec_f64_to_js(&self.inner.r_squared())
     }
 
     /// Share of periods beating the benchmark per asset.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
-    #[wasm_bindgen(js_name = battingAverage)]
+    #[wasm_bindgen(js_name = battingAverage, unchecked_return_type = "Float64Array")]
     pub fn batting_average(&self) -> JsValue {
         vec_f64_to_js(&self.inner.batting_average())
     }
@@ -613,13 +690,14 @@ impl JsPerformance {
     /// `horizonPeriods` omitted is one-period VaR. A positive `h` scales
     /// mean by `h` and volatility by `√h`.
     /// @param confidence - Tail confidence as a decimal probability; defaults to 0.95.
-    /// @param horizon_periods - Optional horizon in observation periods; omitted is one-period VaR.
+    /// @param horizonPeriods - Optional horizon in observation periods; omitted is one-period VaR.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
     /// @throws Error - Rejects a `confidence` outside the open interval (0, 1).
-    #[wasm_bindgen(js_name = parametricVar)]
+    #[wasm_bindgen(js_name = parametricVar, unchecked_return_type = "Float64Array")]
     pub fn parametric_var(
         &self,
-        confidence: Option<JsValue>,
+        #[wasm_bindgen(unchecked_optional_param_type = "number")] confidence: Option<JsValue>,
+        #[wasm_bindgen(js_name = "horizonPeriods", unchecked_optional_param_type = "number")]
         horizon_periods: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
         let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
@@ -635,13 +713,14 @@ impl JsPerformance {
     /// `horizonPeriods` omitted is one-period VaR. A positive `h` scales
     /// Cornish–Fisher moments to that horizon.
     /// @param confidence - Tail confidence as a decimal probability; defaults to 0.95.
-    /// @param horizon_periods - Optional horizon in observation periods; omitted is one-period VaR.
+    /// @param horizonPeriods - Optional horizon in observation periods; omitted is one-period VaR.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
     /// @throws Error - Rejects a `confidence` outside the open interval (0, 1).
-    #[wasm_bindgen(js_name = cornishFisherVar)]
+    #[wasm_bindgen(js_name = cornishFisherVar, unchecked_return_type = "Float64Array")]
     pub fn cornish_fisher_var(
         &self,
-        confidence: Option<JsValue>,
+        #[wasm_bindgen(unchecked_optional_param_type = "number")] confidence: Option<JsValue>,
+        #[wasm_bindgen(js_name = "horizonPeriods", unchecked_optional_param_type = "number")]
         horizon_periods: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
         let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
@@ -657,17 +736,25 @@ impl JsPerformance {
     /// @param confidence - Tail confidence as a decimal probability; defaults to 0.95.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
     /// @throws Error - Rejects a `confidence` outside the open interval (0, 1).
-    pub fn cdar(&self, confidence: Option<JsValue>) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(unchecked_return_type = "Float64Array")]
+    pub fn cdar(
+        &self,
+        #[wasm_bindgen(unchecked_optional_param_type = "number")] confidence: Option<JsValue>,
+    ) -> Result<JsValue, JsValue> {
         let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
         result_vec_f64_to_js(self.inner.cdar(confidence.unwrap_or(DEFAULT_CONFIDENCE)))
     }
 
     /// Linearly annualized M-squared per asset. Cash subtraction and addition
     /// both use the decompounded period cash rate multiplied by periods per year.
-    /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
+    /// @param riskFreeRate - Annualized decimal risk-free rate; defaults to 0.0.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
-    #[wasm_bindgen(js_name = mSquared)]
-    pub fn m_squared(&self, risk_free_rate: Option<JsValue>) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = mSquared, unchecked_return_type = "Float64Array")]
+    pub fn m_squared(
+        &self,
+        #[wasm_bindgen(js_name = "riskFreeRate", unchecked_optional_param_type = "number")]
+        risk_free_rate: Option<JsValue>,
+    ) -> Result<JsValue, JsValue> {
         let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
         Ok(vec_f64_to_js(&self.inner.m_squared(
             risk_free_rate.unwrap_or(DEFAULT_RISK_FREE_RATE),
@@ -680,18 +767,19 @@ impl JsPerformance {
     /// The panel frequency supplies the periods-per-year scaling for both
     /// terms, including the horizon decay of skewness and excess kurtosis;
     /// the denominator is not one-period VaR.
-    /// @param risk_free_rate - Annualized decimal risk-free rate, decompounded
+    /// @param riskFreeRate - Annualized decimal risk-free rate, decompounded
     /// to the panel frequency before constructing annualized excess return;
     /// defaults to 0.0.
     /// @param confidence - Annual-horizon tail confidence as a decimal
     /// probability; defaults to 0.95.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
     /// @throws Error - Rejects a `confidence` outside the open interval (0, 1).
-    #[wasm_bindgen(js_name = modifiedSharpe)]
+    #[wasm_bindgen(js_name = modifiedSharpe, unchecked_return_type = "Float64Array")]
     pub fn modified_sharpe(
         &self,
+        #[wasm_bindgen(js_name = "riskFreeRate", unchecked_optional_param_type = "number")]
         risk_free_rate: Option<JsValue>,
-        confidence: Option<JsValue>,
+        #[wasm_bindgen(unchecked_optional_param_type = "number")] confidence: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
         let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
         let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
@@ -709,14 +797,15 @@ impl JsPerformance {
     ///
     /// Rejects when any ticker's active range has no positive holding period
     /// and therefore cannot produce CAGR.
-    /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
+    /// @param riskFreeRate - Annualized decimal risk-free rate; defaults to 0.0.
     /// @param n - Finite non-negative integer count of largest drawdowns; defaults to 5. Invalid numeric values are rejected.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
-    #[wasm_bindgen(js_name = sterlingRatio)]
+    #[wasm_bindgen(js_name = sterlingRatio, unchecked_return_type = "Float64Array")]
     pub fn sterling_ratio(
         &self,
+        #[wasm_bindgen(js_name = "riskFreeRate", unchecked_optional_param_type = "number")]
         risk_free_rate: Option<JsValue>,
-        n: Option<JsValue>,
+        #[wasm_bindgen(unchecked_optional_param_type = "number")] n: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
         let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
         let n = js_opt_uint(n.as_ref(), "n")?;
@@ -734,14 +823,15 @@ impl JsPerformance {
     ///
     /// Rejects when any ticker's active range has no positive holding period
     /// and therefore cannot produce CAGR.
-    /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
+    /// @param riskFreeRate - Annualized decimal risk-free rate; defaults to 0.0.
     /// @param n - Finite non-negative integer count of largest drawdowns; defaults to 5. Invalid numeric values are rejected.
     /// @returns Per-ticker values as a Float64Array in `getTickerNames()` order.
-    #[wasm_bindgen(js_name = burkeRatio)]
+    #[wasm_bindgen(js_name = burkeRatio, unchecked_return_type = "Float64Array")]
     pub fn burke_ratio(
         &self,
+        #[wasm_bindgen(js_name = "riskFreeRate", unchecked_optional_param_type = "number")]
         risk_free_rate: Option<JsValue>,
-        n: Option<JsValue>,
+        #[wasm_bindgen(unchecked_optional_param_type = "number")] n: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
         let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
         let n = js_opt_uint(n.as_ref(), "n")?;
@@ -758,7 +848,7 @@ impl JsPerformance {
     /// un-compounding `cumulativeReturns`. Series are span-aware and therefore
     /// ragged across assets on edge-ragged panels.
     /// @returns One Float64Array of simple decimal returns per ticker in `getTickerNames()` order.
-    #[wasm_bindgen(js_name = getReturns)]
+    #[wasm_bindgen(js_name = getReturns, unchecked_return_type = "Float64Array[]")]
     pub fn get_returns(&self) -> JsValue {
         matrix_f64_to_js(&self.inner.get_returns())
     }
@@ -768,10 +858,13 @@ impl JsPerformance {
     /// # Errors
     ///
     /// Rejects when `ticker_idx` is outside the loaded ticker columns.
-    /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
+    /// @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
     /// @returns Simple decimal returns for the selected ticker, in date order.
-    #[wasm_bindgen(js_name = getReturnsForTicker)]
-    pub fn get_returns_for_ticker(&self, ticker_idx: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = getReturnsForTicker, unchecked_return_type = "Float64Array")]
+    pub fn get_returns_for_ticker(
+        &self,
+        #[wasm_bindgen(js_name = "tickerIdx", unchecked_param_type = "number")] ticker_idx: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
         let series = self
             .inner
@@ -782,7 +875,7 @@ impl JsPerformance {
 
     /// Cumulative return series per asset.
     /// @returns One Float64Array per ticker in `getTickerNames()` order.
-    #[wasm_bindgen(js_name = cumulativeReturns)]
+    #[wasm_bindgen(js_name = cumulativeReturns, unchecked_return_type = "Float64Array[]")]
     pub fn cumulative_returns(&self) -> JsValue {
         matrix_f64_to_js(&self.inner.cumulative_returns())
     }
@@ -802,13 +895,20 @@ impl JsPerformance {
     ///
     /// Throws a JavaScript exception if the panel is too short to annualize
     /// (`cagr` / `calmar`) or the table cannot be converted.
-    /// @param risk_free_rate - Annualized risk-free rate as a decimal (0.02 = 2%); affects only `sharpe`. Defaults to 0.0.
+    /// @param riskFreeRate - Annualized risk-free rate as a decimal (0.02 = 2%); affects only `sharpe`. Defaults to 0.0.
     /// @param confidence - Tail confidence as a decimal probability applied to VaR, ES and tail ratio; defaults to 0.95.
-    #[wasm_bindgen(js_name = summary)]
+    /// @returns Column-oriented table envelope of the summary metrics.
+    #[wasm_bindgen(js_name = summary, unchecked_return_type = "TableEnvelope")]
     pub fn summary(
         &self,
+        #[wasm_bindgen(
+            js_name = "riskFreeRate",
+            unchecked_optional_param_type = "number | null"
+        )]
         risk_free_rate: Option<JsValue>,
-        confidence: Option<JsValue>,
+        #[wasm_bindgen(unchecked_optional_param_type = "number | null")] confidence: Option<
+            JsValue,
+        >,
     ) -> Result<JsValue, JsValue> {
         let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
         let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
@@ -841,8 +941,26 @@ impl JsPerformance {
     /// Rejects an unsupported frequency, an unrepresentable period boundary,
     /// or a panel that cannot be serialized to JavaScript.
     /// @returns Ticker-major nested arrays of chronological Rust `PeriodicReturn` `{ date, value }` points with simple decimal returns.
-    #[wasm_bindgen(js_name = periodicReturns)]
-    pub fn periodic_returns(&self, frequency: Option<JsValue>) -> Result<JsValue, JsValue> {
+    /// @param frequency - Optional calendar frequency token: `"daily"`, `"weekly"`, `"monthly"`, `"quarterly"`, `"semi_annual"`, or `"annual"`; defaults to `"monthly"`.
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { analytics } from "finstack-quant-wasm";
+    /// await init();
+    /// const perf = new analytics.Performance({
+    ///   dates: ["2024-01-01", "2024-01-02"],
+    ///   series: [[0.01, 0.02]],
+    ///   kind: "returns",
+    ///   ticker_names: ["FUND"],
+    /// });
+    /// const [[point]] = perf.periodicReturns();
+    /// console.log(point.date, point.value); // "2024-01-02", 0.0302
+    /// ```
+    #[wasm_bindgen(js_name = periodicReturns, unchecked_return_type = "PeriodicReturn[][]")]
+    pub fn periodic_returns(
+        &self,
+        #[wasm_bindgen(unchecked_optional_param_type = "string")] frequency: Option<JsValue>,
+    ) -> Result<JsValue, JsValue> {
         let frequency = js_opt_string(frequency.as_ref(), "frequency")?;
         let kind = parse_frequency(frequency.as_deref(), DEFAULT_PERIODIC_FREQUENCY)?;
         to_js_value(&self.inner.periodic_returns(kind).map_err(to_js_err)?)
@@ -850,7 +968,7 @@ impl JsPerformance {
 
     /// Drawdown series per asset.
     /// @returns One Float64Array per ticker in `getTickerNames()` order.
-    #[wasm_bindgen(js_name = getDrawdownSeries)]
+    #[wasm_bindgen(js_name = getDrawdownSeries, unchecked_return_type = "Float64Array[]")]
     pub fn get_drawdown_series(&self) -> JsValue {
         matrix_f64_to_js(&self.inner.get_drawdown_series())
     }
@@ -868,7 +986,7 @@ impl JsPerformance {
     /// Rejects a degenerate pair or a matrix that cannot be repaired to a
     /// valid correlation matrix.
     /// @returns `{ matrix, repaired }`: the square correlation matrix as nested Float64Array rows in `getTickerNames()` order, with a diagonal of exactly 1 and every coefficient inside [-1, 1], and `true` when Higham repair was applied.
-    #[wasm_bindgen(js_name = correlationMatrix)]
+    #[wasm_bindgen(js_name = correlationMatrix, unchecked_return_type = "{ matrix: Float64Array[]; repaired: boolean }")]
     pub fn correlation_matrix(&self) -> Result<JsValue, JsValue> {
         let (matrix, repaired) = self.inner.correlation_matrix().map_err(to_js_err)?;
         obj_from_pairs(&[
@@ -879,14 +997,14 @@ impl JsPerformance {
 
     /// Cumulative outperformance versus the benchmark per asset.
     /// @returns One Float64Array per ticker in `getTickerNames()` order.
-    #[wasm_bindgen(js_name = cumulativeReturnsOutperformance)]
+    #[wasm_bindgen(js_name = cumulativeReturnsOutperformance, unchecked_return_type = "Float64Array[]")]
     pub fn cumulative_returns_outperformance(&self) -> JsValue {
         matrix_f64_to_js(&self.inner.cumulative_returns_outperformance())
     }
 
     /// Difference between asset and benchmark drawdown series.
     /// @returns One Float64Array per ticker in `getTickerNames()` order.
-    #[wasm_bindgen(js_name = drawdownDifference)]
+    #[wasm_bindgen(js_name = drawdownDifference, unchecked_return_type = "Float64Array[]")]
     pub fn drawdown_difference(&self) -> JsValue {
         matrix_f64_to_js(&self.inner.drawdown_difference())
     }
@@ -904,11 +1022,11 @@ impl JsPerformance {
     /// @param rf - Risk-free return series as decimal values aligned with active panel dates.
     /// @param nperiods - Optional periods per year used to decompound annual `rf`; omit to use the engine frequency, or pass `1` for already-periodic `rf`.
     /// @returns One Float64Array per ticker in `getTickerNames()` order.
-    #[wasm_bindgen(js_name = excessReturns)]
+    #[wasm_bindgen(js_name = excessReturns, unchecked_return_type = "Float64Array[]")]
     pub fn excess_returns(
         &self,
-        rf: JsValue,
-        nperiods: Option<JsValue>,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray")] rf: JsValue,
+        #[wasm_bindgen(unchecked_optional_param_type = "number")] nperiods: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
         let nperiods = js_opt_f64(nperiods.as_ref(), "nperiods")?;
         let rf = js_f64_seq(&rf, "rf")?;
@@ -925,6 +1043,7 @@ impl JsPerformance {
     ///
     /// Rejects if the beta results cannot be serialized to JavaScript.
     /// @returns Per-ticker `{ beta, std_err, ci_lower, ci_upper, n_obs, confidence_level }` objects in `getTickerNames()` order; `n_obs` is the paired-observation count and `confidence_level` the decimal level (0.95) of the bounds.
+    #[wasm_bindgen(unchecked_return_type = "BetaResult[]")]
     pub fn beta(&self) -> Result<JsValue, JsValue> {
         to_js_rows_numeric(&self.inner.beta())
     }
@@ -934,9 +1053,14 @@ impl JsPerformance {
     /// # Errors
     ///
     /// Rejects if the regression results cannot be serialized to JavaScript.
-    /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
+    /// @param riskFreeRate - Annualized decimal risk-free rate; defaults to 0.0.
     /// @returns Per-ticker `{ alpha, beta, r_squared, adjusted_r_squared, n_obs }` objects in `getTickerNames()` order; `n_obs` is the paired-observation count.
-    pub fn greeks(&self, risk_free_rate: Option<JsValue>) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(unchecked_return_type = "GreeksResult[]")]
+    pub fn greeks(
+        &self,
+        #[wasm_bindgen(js_name = "riskFreeRate", unchecked_optional_param_type = "number")]
+        risk_free_rate: Option<JsValue>,
+    ) -> Result<JsValue, JsValue> {
         let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
         to_js_rows_numeric(
             &self
@@ -951,15 +1075,16 @@ impl JsPerformance {
     ///
     /// Rejects when `ticker_idx` is outside the loaded ticker columns or the
     /// JavaScript result object's properties cannot be created.
-    /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
+    /// @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
     /// @param window - Finite positive integer observation count; defaults to 63 periods. Invalid numeric values are rejected.
-    /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
+    /// @param riskFreeRate - Annualized decimal risk-free rate; defaults to 0.0.
     /// @returns `{ dates, alphas, betas }` series for the selected ticker.
-    #[wasm_bindgen(js_name = rollingGreeks)]
+    #[wasm_bindgen(js_name = rollingGreeks, unchecked_return_type = "RollingGreeks")]
     pub fn rolling_greeks(
         &self,
-        ticker_idx: JsValue,
-        window: Option<JsValue>,
+        #[wasm_bindgen(js_name = "tickerIdx", unchecked_param_type = "number")] ticker_idx: JsValue,
+        #[wasm_bindgen(unchecked_optional_param_type = "number")] window: Option<JsValue>,
+        #[wasm_bindgen(js_name = "riskFreeRate", unchecked_optional_param_type = "number")]
         risk_free_rate: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
         let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
@@ -982,14 +1107,14 @@ impl JsPerformance {
     ///
     /// Rejects when `ticker_idx` is outside the loaded ticker columns or the
     /// JavaScript result object's properties cannot be created.
-    /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
+    /// @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
     /// @param window - Finite positive integer observation count; defaults to 63 periods. Invalid numeric values are rejected.
     /// @returns `{ values, dates, value_column }` series for the selected ticker; `value_column` is `"volatility"`.
-    #[wasm_bindgen(js_name = rollingVolatility)]
+    #[wasm_bindgen(js_name = rollingVolatility, unchecked_return_type = "DatedSeries")]
     pub fn rolling_volatility(
         &self,
-        ticker_idx: JsValue,
-        window: Option<JsValue>,
+        #[wasm_bindgen(js_name = "tickerIdx", unchecked_param_type = "number")] ticker_idx: JsValue,
+        #[wasm_bindgen(unchecked_optional_param_type = "number")] window: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
         let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
         let window = js_opt_uint(window.as_ref(), "window")?;
@@ -1006,16 +1131,16 @@ impl JsPerformance {
     ///
     /// Rejects when `ticker_idx` is outside the loaded ticker columns or the
     /// JavaScript result object's properties cannot be created.
-    /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
+    /// @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
     /// @param window - Finite positive integer observation count; defaults to 63 periods. Invalid numeric values are rejected.
     /// @param mar - Per-period minimum acceptable return as a decimal; defaults to 0.0.
     /// @returns `{ values, dates, value_column }` series for the selected ticker; `value_column` is `"sortino"`.
-    #[wasm_bindgen(js_name = rollingSortino)]
+    #[wasm_bindgen(js_name = rollingSortino, unchecked_return_type = "DatedSeries")]
     pub fn rolling_sortino(
         &self,
-        ticker_idx: JsValue,
-        window: Option<JsValue>,
-        mar: Option<JsValue>,
+        #[wasm_bindgen(js_name = "tickerIdx", unchecked_param_type = "number")] ticker_idx: JsValue,
+        #[wasm_bindgen(unchecked_optional_param_type = "number")] window: Option<JsValue>,
+        #[wasm_bindgen(unchecked_optional_param_type = "number")] mar: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
         let mar = js_opt_f64(mar.as_ref(), "mar")?;
         let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
@@ -1037,15 +1162,16 @@ impl JsPerformance {
     ///
     /// Rejects when `ticker_idx` is outside the loaded ticker columns or the
     /// JavaScript result object's properties cannot be created.
-    /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
+    /// @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
     /// @param window - Finite positive integer observation count; defaults to 63 periods. Invalid numeric values are rejected.
-    /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
+    /// @param riskFreeRate - Annualized decimal risk-free rate; defaults to 0.0.
     /// @returns `{ values, dates, value_column }` series for the selected ticker; `value_column` is `"sharpe"`.
-    #[wasm_bindgen(js_name = rollingSharpe)]
+    #[wasm_bindgen(js_name = rollingSharpe, unchecked_return_type = "DatedSeries")]
     pub fn rolling_sharpe(
         &self,
-        ticker_idx: JsValue,
-        window: Option<JsValue>,
+        #[wasm_bindgen(js_name = "tickerIdx", unchecked_param_type = "number")] ticker_idx: JsValue,
+        #[wasm_bindgen(unchecked_optional_param_type = "number")] window: Option<JsValue>,
+        #[wasm_bindgen(js_name = "riskFreeRate", unchecked_optional_param_type = "number")]
         risk_free_rate: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
         let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
@@ -1069,14 +1195,14 @@ impl JsPerformance {
     /// Rejects when `ticker_idx` is outside the loaded ticker columns or the
     /// JavaScript result object's properties cannot be created. An
     /// overlong `window` returns an empty series; a zero window is rejected.
-    /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
+    /// @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
     /// @param window - Finite positive integer observation count. Zero, fractional, non-finite, and out-of-range values are rejected.
     /// @returns `{ values, dates, value_column }` series for the selected ticker; `value_column` is `"return"`.
-    #[wasm_bindgen(js_name = rollingReturns)]
+    #[wasm_bindgen(js_name = rollingReturns, unchecked_return_type = "DatedSeries")]
     pub fn rolling_returns(
         &self,
-        ticker_idx: JsValue,
-        window: JsValue,
+        #[wasm_bindgen(js_name = "tickerIdx", unchecked_param_type = "number")] ticker_idx: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] window: JsValue,
     ) -> Result<JsValue, JsValue> {
         let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
         let window = js_uint(&window, "window")?;
@@ -1093,14 +1219,14 @@ impl JsPerformance {
     ///
     /// Rejects when `ticker_idx` is outside the loaded ticker columns or the
     /// drawdown details cannot be serialized to JavaScript.
-    /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
+    /// @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
     /// @param n - Finite non-negative integer count of episodes; defaults to 5. Invalid numeric values are rejected.
     /// @returns Drawdown episode objects for the selected ticker, largest first.
-    #[wasm_bindgen(js_name = drawdownDetails)]
+    #[wasm_bindgen(js_name = drawdownDetails, unchecked_return_type = "DrawdownEpisode[]")]
     pub fn drawdown_details(
         &self,
-        ticker_idx: JsValue,
-        n: Option<JsValue>,
+        #[wasm_bindgen(js_name = "tickerIdx", unchecked_param_type = "number")] ticker_idx: JsValue,
+        #[wasm_bindgen(unchecked_optional_param_type = "number")] n: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
         let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
         let n = js_opt_uint(n.as_ref(), "n")?;
@@ -1127,17 +1253,20 @@ impl JsPerformance {
     /// volatility that cannot be represented as a finite value, or a result
     /// that cannot be serialized to JavaScript. Constant responses retain
     /// undefined `NaN` R-squared statistics.
-    /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
-    /// @param factor_returns - Matrix of aligned already-excess decimal factor-return series, one row per factor.
-    /// @param return_kind - `"excess"` or `"total"`; defaults to `"excess"`.
-    /// @param risk_free_rate - Annualized decimal risk-free rate, used only when `returnKind` is `"total"`; defaults to 0.0 and must be 0.0 for `"excess"`.
+    /// @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
+    /// @param factorReturns - Matrix of aligned already-excess decimal factor-return series, one row per factor.
+    /// @param returnKind - `"excess"` or `"total"`; defaults to `"excess"`.
+    /// @param riskFreeRate - Annualized decimal risk-free rate, used only when `returnKind` is `"total"`; defaults to 0.0 and must be 0.0 for `"excess"`.
     /// @returns `{ alpha, betas, r_squared, adjusted_r_squared, residual_vol, n_obs }` for the selected ticker; `n_obs` is the observation count.
-    #[wasm_bindgen(js_name = multiFactorGreeks)]
+    #[wasm_bindgen(js_name = multiFactorGreeks, unchecked_return_type = "MultiFactorResult")]
     pub fn multi_factor_greeks(
         &self,
-        ticker_idx: JsValue,
+        #[wasm_bindgen(js_name = "tickerIdx", unchecked_param_type = "number")] ticker_idx: JsValue,
+        #[wasm_bindgen(js_name = "factorReturns", unchecked_param_type = "NumericMatrix")]
         factor_returns: JsValue,
+        #[wasm_bindgen(js_name = "returnKind", unchecked_optional_param_type = "string")]
         return_kind: Option<JsValue>,
+        #[wasm_bindgen(js_name = "riskFreeRate", unchecked_optional_param_type = "number")]
         risk_free_rate: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
         let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
@@ -1179,8 +1308,13 @@ impl JsPerformance {
     /// Rejects an invalid ISO `ref_date`, an omitted one while no dates are active,
     /// or a result that cannot be serialized to JavaScript.
     /// @returns The window end `ref_date` and per-ticker `{ mtd, qtd, ytd, fytd }` numeric arrays of lookback returns as decimal fractions; `fytd` is never null.
-    #[wasm_bindgen(js_name = lookbackReturns)]
-    pub fn lookback_returns(&self, ref_date: Option<JsValue>) -> Result<JsValue, JsValue> {
+    /// @param refDate - ISO-8601 date on which MTD, QTD, YTD, and FYTD windows end. Omitted or `null` is the last active date; the result's `ref_date` states the date used.
+    #[wasm_bindgen(js_name = lookbackReturns, unchecked_return_type = "LookbackReturns")]
+    pub fn lookback_returns(
+        &self,
+        #[wasm_bindgen(js_name = "refDate", unchecked_optional_param_type = "string | null")]
+        ref_date: Option<JsValue>,
+    ) -> Result<JsValue, JsValue> {
         let ref_date = crate::utils::wire::js_opt_date(ref_date.as_ref(), "refDate")?;
         to_js_value(
             &self
@@ -1200,13 +1334,21 @@ impl JsPerformance {
     /// Rejects an invalid ISO `ref_date`, an omitted one while no dates are active,
     /// or a result that cannot be serialized to JavaScript.
     /// @param ref_date - ISO-8601 date on which MTD, QTD, YTD, and FYTD windows end; omitted or `null` is the last active date.
-    /// @param fiscal_config - FiscalConfig handle whose start sets the FYTD window.
+    /// @param fiscalConfig - FiscalConfig handle whose start sets the FYTD window.
     /// @returns The window end `ref_date` and per-ticker `{ mtd, qtd, ytd, fytd }` numeric arrays of lookback returns as decimal fractions.
-    #[wasm_bindgen(js_name = lookbackReturnsWithFiscalConfig)]
+    #[wasm_bindgen(
+        skip_typescript,
+        js_name = lookbackReturnsWithFiscalConfig,
+        unchecked_return_type = "LookbackReturns"
+    )]
     pub fn lookback_returns_with_fiscal_config(
         &self,
+        #[wasm_bindgen(
+            js_name = "refDate",
+            unchecked_param_type = "string | null | undefined"
+        )]
         ref_date: Option<JsValue>,
-        fiscal_config: &JsFiscalConfig,
+        #[wasm_bindgen(js_name = "fiscalConfig")] fiscal_config: &JsFiscalConfig,
     ) -> Result<JsValue, JsValue> {
         let ref_date = crate::utils::wire::js_opt_date(ref_date.as_ref(), "refDate")?;
         to_js_value(
@@ -1225,14 +1367,18 @@ impl JsPerformance {
     /// Rejects an unsupported `aggregation_frequency`, an out-of-range
     /// `ticker_idx`, an unrepresentable period boundary, or period statistics
     /// that cannot be serialized to JavaScript.
-    /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
-    /// @param aggregation_frequency - Optional aggregation frequency token; defaults to monthly.
-    /// @param fiscal_config - Optional FiscalConfig handle; omitted or null buckets Gregorian periods with ISO weeks.
+    /// @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
+    /// @param aggregationFrequency - Optional aggregation frequency token; defaults to monthly.
+    /// @param fiscalConfig - Optional FiscalConfig handle; omitted or null buckets Gregorian periods with ISO weeks.
     /// @returns Period statistics object for the selected ticker at the requested frequency.
-    #[wasm_bindgen(js_name = periodStats)]
+    #[wasm_bindgen(js_name = periodStats, unchecked_return_type = "PeriodStats")]
     pub fn period_stats(
         &self,
-        ticker_idx: JsValue,
+        #[wasm_bindgen(js_name = "tickerIdx", unchecked_param_type = "number")] ticker_idx: JsValue,
+        #[wasm_bindgen(
+            js_name = "aggregationFrequency",
+            unchecked_optional_param_type = "string"
+        )]
         aggregation_frequency: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
         period_stats_js(&self.inner, ticker_idx, aggregation_frequency, None)
@@ -1252,14 +1398,22 @@ impl JsPerformance {
     /// that cannot be serialized to JavaScript.
     /// @param ticker_idx - Finite non-negative integer column index in tickerNames order.
     /// @param aggregation_frequency - Optional aggregation frequency token; defaults to monthly.
-    /// @param fiscal_config - FiscalConfig handle whose start sets the period boundaries.
+    /// @param fiscalConfig - FiscalConfig handle whose start sets the period boundaries.
     /// @returns Period statistics object for the selected ticker at the requested frequency.
-    #[wasm_bindgen(js_name = periodStatsWithFiscalConfig)]
+    #[wasm_bindgen(
+        skip_typescript,
+        js_name = periodStatsWithFiscalConfig,
+        unchecked_return_type = "PeriodStats"
+    )]
     pub fn period_stats_with_fiscal_config(
         &self,
-        ticker_idx: JsValue,
+        #[wasm_bindgen(js_name = "tickerIdx", unchecked_param_type = "number")] ticker_idx: JsValue,
+        #[wasm_bindgen(
+            js_name = "aggregationFrequency",
+            unchecked_param_type = "string | null | undefined"
+        )]
         aggregation_frequency: Option<JsValue>,
-        fiscal_config: &JsFiscalConfig,
+        #[wasm_bindgen(js_name = "fiscalConfig")] fiscal_config: &JsFiscalConfig,
     ) -> Result<JsValue, JsValue> {
         period_stats_js(
             &self.inner,
@@ -1293,7 +1447,9 @@ impl JsPerformance {
     /// @param json - `Performance` JSON string produced by `toJson`, or the equivalent parsed object.
     /// @returns A `Performance` handle equivalent to the serialized one.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsPerformance, JsValue> {
+    pub fn from_json(
+        #[wasm_bindgen(unchecked_param_type = "string | Record<string, unknown>")] json: JsValue,
+    ) -> Result<JsPerformance, JsValue> {
         let json: &str = &json_text(&json, "json")?;
         let inner: Performance = serde_json::from_str(json).map_err(to_js_err)?;
         Ok(JsPerformance { inner })

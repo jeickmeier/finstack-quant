@@ -204,11 +204,7 @@ pub(crate) fn emit_fixed_coupons_on(
                 let day_count_ctx = crate::builder::periods::period_day_count_context(
                     period,
                     calendar,
-                    spec.schedule.frequency,
-                    spec.schedule.day_count,
-                    spec.schedule.stub,
-                    spec.schedule.end_of_month,
-                    spec.schedule.roll_rule,
+                    crate::builder::periods::AccrualConventions::from_schedule(&spec.schedule),
                     is_termination_date,
                 );
                 let coupon_period = day_count_ctx.coupon_period;
@@ -308,15 +304,10 @@ fn floating_accrual_context(
     period: &SchedulePeriod,
     end: Date,
 ) -> finstack_quant_core::dates::DayCountContext<'static> {
-    let params = &schedule.spec.schedule;
     crate::builder::periods::period_day_count_context(
         period,
         schedule.calendar,
-        params.frequency,
-        params.day_count,
-        params.stub,
-        params.end_of_month,
-        params.roll_rule,
+        crate::builder::periods::AccrualConventions::from_schedule(&schedule.spec.schedule),
         schedule.terminal_accrual_end == Some(end),
     )
 }

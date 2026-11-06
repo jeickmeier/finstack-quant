@@ -18,6 +18,7 @@ import {
 import { startWorker } from "../../shared/worker/harness.mjs";
 import manifest from "./pricing-cases.json";
 import { budget } from "../../shared/budget";
+import { priceExtras } from "../../shared/price-extras.mjs";
 
 type Case = (typeof manifest.cases)[number];
 const repository = resolve(
@@ -75,8 +76,7 @@ function direct(request: PriceRequest) {
     request.asOf,
     request.model ?? undefined,
     request.metrics ? [...request.metrics] : undefined,
-    request.metricPricingOverrides ?? undefined,
-    request.marketHistory ?? undefined,
+    priceExtras(request),
   );
 }
 function same(

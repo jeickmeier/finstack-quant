@@ -6,7 +6,7 @@ from datetime import date
 from typing import Any
 import pandas as pd
 from finstack_quant.core.currency import Currency
-from finstack_quant.core.dates import BusinessDayConvention, DayCount, Period, Tenor
+from finstack_quant.core.dates import Period
 from finstack_quant.core.money import Money
 from finstack_quant.statements._capital_structure import WaterfallSpec
 from finstack_quant.statements._registry import Registry
@@ -480,40 +480,32 @@ class ModelBuilder:
         """
         ...
 
-    def add_swap(
-        self,
-        id: str,
-        notional: Money,
-        fixed_rate: float,
-        start_date: date | str,
-        maturity_date: date | str,
-        discount_curve_id: str,
-        forward_curve_id: str,
-    ) -> ModelBuilder:
+    def add_swap(self, params: dict[str, Any] | str) -> ModelBuilder:
         """
 
-        Add an interest rate swap to the capital structure (US conventions).
+        Add a pay-fixed interest rate swap to the capital structure (US conventions).
 
-        Rejected inputs leave this builder usable with its accumulated model intact.
+        Uses semi-annual 30/360 fixed coupons, quarterly ACT/360 floating coupons,
+        Modified Following and simple floating compounding. Rejected inputs leave
+        this builder usable with its accumulated model intact.
 
         Parameters
         ----------
-        id:
-            Swap identifier.
-        notional:
-            Notional amount as a :class:`Money` value.
-        fixed_rate:
-            Fixed leg rate as a decimal (e.g. ``0.04`` for 4%).
-        start_date:
-            Contractual accrual start for both legs as datetime.date or ISO
-            YYYY-MM-DD; must precede maturity.
-        maturity_date:
-            Final contractual accrual end as datetime.date or ISO YYYY-MM-DD;
-            must follow the start date.
-        discount_curve_id:
-            Curve ID for discounting.
-        forward_curve_id:
-            Curve ID for forward rates.
+        params:
+            The Rust ``SwapParams`` serde form, as a dict or JSON text. Every key
+            is required and an unknown key raises ``ValueError``:
+
+            * ``id`` (str): swap identifier; market-aware evaluation rejects
+              duplicates.
+            * ``notional`` (Money | dict): notional as a :class:`Money` value or
+              its wire form ``{"amount": "1000000", "currency": "USD"}``.
+            * ``fixed_rate`` (float): fixed leg rate as a decimal (``0.04`` for 4%).
+            * ``start_date`` (datetime.date | str): contractual accrual start for
+              both legs, as a date or ISO ``YYYY-MM-DD``; must precede maturity.
+            * ``maturity_date`` (datetime.date | str): final contractual accrual
+              end, as a date or ISO ``YYYY-MM-DD``.
+            * ``discount_curve_id`` (str): curve ID for discounting.
+            * ``forward_curve_id`` (str): curve ID for floating-leg forward rates.
 
         Returns
         -------
@@ -523,22 +515,29 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If the swap constructor rejects its rate, notional, curve configuration,
+            If ``params`` is malformed, misses a key or carries an unknown one,
+            the swap constructor rejects its rate, notional, curve configuration,
             or dates, or the builder has already been consumed.
 
+        Examples
+        --------
+        >>> from datetime import date
+        >>> from finstack_quant.core.money import Money
+        >>> from finstack_quant.statements import ModelBuilder
+        >>> builder = ModelBuilder("cs-model")
+        >>> _ = builder.add_swap({
+        ...     "id": "SWAP-1",
+        ...     "notional": Money(1_000_000.0, "USD"),
+        ...     "fixed_rate": 0.04,
+        ...     "start_date": date(2025, 1, 15),
+        ...     "maturity_date": date(2030, 1, 15),
+        ...     "discount_curve_id": "USD-OIS",
+        ...     "forward_curve_id": "USD-SOFR-3M",
+        ... })
         """
         ...
 
-    def add_bond_with_convention(
-        self,
-        id: str,
-        notional: Money,
-        coupon_rate: float,
-        issue_date: date | str,
-        maturity_date: date | str,
-        convention: str,
-        discount_curve_id: str,
-    ) -> ModelBuilder:
+    def add_bond_with_convention(self, params: dict[str, Any] | str) -> ModelBuilder:
         """
 
         Add a fixed-rate bond with a market convention preset.
@@ -551,25 +550,26 @@ class ModelBuilder:
 
         Parameters
         ----------
-        id:
-            Bond identifier.
-        notional:
-            Face value as a :class:`Money` amount.
-        coupon_rate:
-            Annual coupon rate as a decimal (e.g. ``0.03`` for 3%).
-        issue_date:
-            Contractual issue and accrual start as datetime.date or ISO YYYY-MM-DD;
-            must precede maturity.
-        maturity_date:
-            Final contractual repayment as datetime.date or ISO YYYY-MM-DD;
-            must follow the issue date.
-        convention:
-            Regional preset as the canonical snake_case identifier:
-            ``"us_treasury"``, ``"us_agency"``, ``"german_bund"``,
-            ``"uk_gilt"``, ``"french_oat"``, ``"jgb"``, ``"us_corporate"``,
-            or ``"eur_corporate"``.
-        discount_curve_id:
-            Curve ID for discounting (e.g. ``"EUR-OIS"``).
+        params:
+            The Rust ``BondConventionParams`` serde form, as a dict or JSON text.
+            Every key is required and an unknown key raises ``ValueError``:
+
+            * ``id`` (str): bond identifier; market-aware evaluation rejects
+              duplicates.
+            * ``notional`` (Money | dict): face value as a :class:`Money` value
+              or its wire form ``{"amount": "10000000", "currency": "EUR"}``.
+            * ``coupon_rate`` (float): finite annual coupon rate as a decimal
+              (``0.03`` for 3%).
+            * ``issue_date`` (datetime.date | str): contractual issue and accrual
+              start, as a date or ISO ``YYYY-MM-DD``; must precede maturity.
+            * ``maturity_date`` (datetime.date | str): final contractual
+              repayment, as a date or ISO ``YYYY-MM-DD``.
+            * ``convention`` (str): regional preset as the canonical snake_case
+              identifier: ``"us_treasury"``, ``"us_agency"``, ``"german_bund"``,
+              ``"uk_gilt"``, ``"french_oat"``, ``"jgb"``, ``"us_corporate"``, or
+              ``"eur_corporate"``.
+            * ``discount_curve_id`` (str): curve ID for discounting (e.g.
+              ``"EUR-OIS"``).
 
         Returns
         -------
@@ -579,8 +579,10 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If the convention is unknown, the bond constructor rejects its rate,
-            notional, curve configuration, or dates, or the builder was consumed.
+            If ``params`` is malformed, misses a key or carries an unknown one,
+            the convention is unknown, the coupon is not finite, the bond
+            constructor rejects its notional, curve configuration, or dates, or
+            the builder was consumed.
 
         Examples
         --------
@@ -589,71 +591,56 @@ class ModelBuilder:
         >>> from finstack_quant.core.money import Money
         >>> from finstack_quant.statements import ModelBuilder
         >>> builder = ModelBuilder("cs-model")
-        >>> _ = builder.add_bond_with_convention(
-        ...     "BUND-001",
-        ...     Money(10_000_000.0, Currency("EUR")),
-        ...     0.03,
-        ...     date(2025, 1, 15),
-        ...     date(2030, 1, 15),
-        ...     "german_bund",
-        ...     "EUR-OIS",
-        ... )
+        >>> _ = builder.add_bond_with_convention({
+        ...     "id": "BUND-001",
+        ...     "notional": Money(10_000_000.0, Currency("EUR")),
+        ...     "coupon_rate": 0.03,
+        ...     "issue_date": date(2025, 1, 15),
+        ...     "maturity_date": date(2030, 1, 15),
+        ...     "convention": "german_bund",
+        ...     "discount_curve_id": "EUR-OIS",
+        ... })
         """
         ...
 
     def add_swap_with_conventions(
         self,
-        id: str,
-        notional: Money,
-        fixed_rate: float,
-        start_date: date | str,
-        maturity_date: date | str,
-        discount_curve_id: str,
-        forward_curve_id: str,
-        fixed_frequency: Tenor | str,
-        fixed_day_count: DayCount,
-        float_frequency: Tenor | str,
-        float_day_count: DayCount,
-        business_day_convention: BusinessDayConvention | str | None = None,
+        params: dict[str, Any] | str,
+        conventions: dict[str, Any] | str,
     ) -> ModelBuilder:
         """
 
-        Add an interest rate swap with custom leg conventions.
+        Add a pay-fixed interest rate swap with custom leg conventions.
 
         Rejected inputs leave this builder usable with its accumulated model intact.
 
         Exposes day-count, frequency, and business-day-convention parameters
         for non-USD swaps (e.g. EUR annual ACT/360 fixed legs);
-        :meth:`add_swap` uses US conventions instead.
+        :meth:`add_swap` uses US conventions instead. Floating compounding stays
+        simple.
 
         Parameters
         ----------
-        id:
-            Swap identifier.
-        notional:
-            Notional amount as a :class:`Money` value.
-        fixed_rate:
-            Fixed leg rate as a decimal (e.g. ``0.04`` for 4%).
-        start_date:
-            Contractual accrual start for both legs as datetime.date or ISO
-            YYYY-MM-DD; must precede maturity.
-        maturity_date:
-            Final contractual accrual end as datetime.date or ISO YYYY-MM-DD;
-            must follow the start date.
-        discount_curve_id:
-            Curve ID for discounting.
-        forward_curve_id:
-            Curve ID for floating-leg forward rates.
-        fixed_frequency:
-            Payment frequency of the fixed leg (e.g. ``"1Y"``).
-        fixed_day_count:
-            Day-count convention applied to the fixed leg.
-        float_frequency:
-            Payment / fixing frequency of the floating leg (e.g. ``"3M"``).
-        float_day_count:
-            Day-count convention applied to the floating leg.
-        business_day_convention:
-            Schedule-date rolling convention (default Modified Following).
+        params:
+            The Rust ``SwapParams`` serde form (dict or JSON text) with the keys
+            ``id``, ``notional``, ``fixed_rate``, ``start_date``,
+            ``maturity_date``, ``discount_curve_id`` and ``forward_curve_id``,
+            exactly as for :meth:`add_swap`.
+        conventions:
+            The Rust ``SwapConventions`` serde form, as a dict or JSON text; an
+            unknown key raises ``ValueError``:
+
+            * ``fixed_frequency`` (dict): fixed-leg payment cadence as a tenor
+              wire object, e.g. ``{"count": 1, "unit": "years"}``; ``unit`` is
+              ``"days"``, ``"weeks"``, ``"months"`` or ``"years"``.
+            * ``fixed_day_count`` (str): fixed-leg day count label, e.g.
+              ``"act_360"``, ``"30_360"`` or ``"act_365f"``.
+            * ``float_frequency`` (dict): floating-leg payment and fixing cadence,
+              e.g. ``{"count": 3, "unit": "months"}``.
+            * ``float_day_count`` (str): floating-leg day count label.
+            * ``business_day_convention`` (str, optional): schedule-date rolling
+              rule, e.g. ``"modified_following"`` or ``"following"``; omitted
+              uses the Rust default, Modified Following.
 
         Returns
         -------
@@ -663,30 +650,35 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If a tenor, day count, convention, rate, notional, curve configuration,
-            or date is rejected, or the builder has already been consumed.
+            If either object is malformed, misses a required key or carries an
+            unknown one, a tenor, day count, convention, rate, notional, curve
+            configuration, or date is rejected, or the builder has already been
+            consumed.
 
         Examples
         --------
         >>> from datetime import date
         >>> from finstack_quant.core.currency import Currency
-        >>> from finstack_quant.core.dates import DayCount
         >>> from finstack_quant.core.money import Money
         >>> from finstack_quant.statements import ModelBuilder
         >>> builder = ModelBuilder("cs-model")
         >>> _ = builder.add_swap_with_conventions(
-        ...     "SWAP-EUR",
-        ...     Money(5_000_000.0, Currency("EUR")),
-        ...     0.03,
-        ...     date(2025, 1, 15),
-        ...     date(2030, 1, 15),
-        ...     "EUR-OIS",
-        ...     "EUR-EURIBOR-6M",
-        ...     "1Y",
-        ...     DayCount.ACT_360,
-        ...     "6M",
-        ...     DayCount.ACT_360,
-        ...     "modified_following",
+        ...     {
+        ...         "id": "SWAP-EUR",
+        ...         "notional": Money(5_000_000.0, Currency("EUR")),
+        ...         "fixed_rate": 0.03,
+        ...         "start_date": date(2025, 1, 15),
+        ...         "maturity_date": date(2030, 1, 15),
+        ...         "discount_curve_id": "EUR-OIS",
+        ...         "forward_curve_id": "EUR-EURIBOR-6M",
+        ...     },
+        ...     {
+        ...         "fixed_frequency": {"count": 1, "unit": "years"},
+        ...         "fixed_day_count": "act_360",
+        ...         "float_frequency": {"count": 6, "unit": "months"},
+        ...         "float_day_count": "act_360",
+        ...         "business_day_convention": "modified_following",
+        ...     },
         ... )
         """
         ...

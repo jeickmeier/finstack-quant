@@ -13,24 +13,28 @@
 //!
 //! # Examples
 //! ```rust
-//! use finstack_quant_models::types::OptionType;
+//! use finstack_quant_models::types::{OptionMarketParams, OptionType};
 //! use finstack_quant_models::closed_form::{
 //!     asian_option_price, barrier_option_price,
 //! };
 //! use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
 //!
-//! let barrier_call = barrier_option_price(
-//!     100.0, 100.0, 90.0, 0.05, 0.02, 0.20, 1.0, "down", "out", OptionType::Call,
-//! )?;
+//! let call = OptionMarketParams {
+//!     spot: 100.0,
+//!     strike: 100.0,
+//!     rate: 0.05,
+//!     volatility: 0.20,
+//!     time_to_expiry: 1.0,
+//!     dividend_yield: 0.02,
+//!     option_type: OptionType::Call,
+//! };
+//! let barrier_call = barrier_option_price(&call, 90.0, "down", "out")?;
 //! assert!(barrier_call > 0.0);
-//! let barrier_put = barrier_option_price(
-//!     100.0, 100.0, 90.0, 0.05, 0.02, 0.20, 1.0, "down", "out", OptionType::Put,
-//! )?;
+//! let put = OptionMarketParams { option_type: OptionType::Put, ..call.clone() };
+//! let barrier_put = barrier_option_price(&put, 90.0, "down", "out")?;
 //! assert!(barrier_put >= 0.0);
 //!
-//! let asian = asian_option_price(
-//!     100.0, 100.0, 0.05, 0.02, 0.20, 1.0, 12, AveragingMethod::Arithmetic, OptionType::Call,
-//! )?;
+//! let asian = asian_option_price(&call, 12, AveragingMethod::Arithmetic)?;
 //! assert!(asian > 0.0);
 //! # Ok::<(), finstack_quant_core::Error>(())
 //! ```
@@ -48,7 +52,7 @@ use super::vanilla::{
     checked_closed_form_value, require_finite_positive, validate_spot_model_inputs,
 };
 use crate::monte_carlo::payoff::asian::AveragingMethod;
-use crate::types::OptionType;
+use crate::types::{OptionMarketParams, OptionType};
 use finstack_quant_core::types::BarrierType;
 
 /// Averaging convention host bindings use when `averaging` is omitted from
@@ -80,35 +84,34 @@ fn parse_barrier_type(direction: &str, knock: &str) -> Result<BarrierType> {
 ///
 /// # Arguments
 ///
-/// * `spot` - Current spot price of the underlying.
-/// * `strike` - Option strike price in the same units as `spot`.
+/// * `market` - Spot and strike in the same price units, continuously
+///   compounded risk-free `rate` and `dividend_yield` (foreign rate for FX) as
+///   decimals, annualized decimal `volatility`, `time_to_expiry` in years and
+///   the call/put `option_type`.
 /// * `barrier` - Continuously monitored barrier level in the same units as `spot`.
-/// * `rate` - Risk-free rate, continuously compounded decimal.
-/// * `div_yield` - Continuous dividend yield (or foreign rate for FX), decimal.
-/// * `vol` - Annualized volatility, decimal.
-/// * `expiry` - Time to expiry in years.
 /// * `direction` - `"up"` for an upper barrier or `"down"` for a lower barrier.
 /// * `knock` - `"in"` for knock-in or `"out"` for knock-out.
-/// * `option_type` - Call or put payoff convention.
 ///
 /// # Errors
 ///
 /// Returns `Error::Validation` if `(direction, knock)` is not a supported
 /// pair, if any input is outside its valid domain, or if the resulting
 /// barrier price is non-finite.
-#[allow(clippy::too_many_arguments)]
 pub fn barrier_option_price(
-    spot: f64,
-    strike: f64,
+    market: &OptionMarketParams,
     barrier: f64,
-    rate: f64,
-    div_yield: f64,
-    vol: f64,
-    expiry: f64,
     direction: &str,
     knock: &str,
-    option_type: OptionType,
 ) -> Result<f64> {
+    let &OptionMarketParams {
+        spot,
+        strike,
+        rate,
+        volatility: vol,
+        time_to_expiry: expiry,
+        dividend_yield: div_yield,
+        option_type,
+    } = market;
     let barrier_type = parse_barrier_type(direction, knock)?;
     validate_spot_model_inputs("barrier", spot, rate, div_yield, vol, expiry)?;
     require_finite_positive("barrier", "strike", strike)?;
@@ -126,33 +129,32 @@ pub fn barrier_option_price(
 ///
 /// # Arguments
 ///
-/// * `spot` - Current spot price of the underlying.
-/// * `strike` - Option strike price in the same units as `spot`.
-/// * `rate` - Risk-free rate, continuously compounded decimal.
-/// * `div_yield` - Continuous dividend yield, decimal.
-/// * `vol` - Annualized volatility, decimal.
-/// * `expiry` - Time to expiry in years.
+/// * `market` - Spot and strike in the same price units, continuously
+///   compounded risk-free `rate` and `dividend_yield` (foreign rate for FX) as
+///   decimals, annualized decimal `volatility`, `time_to_expiry` in years and
+///   the call/put `option_type`.
 /// * `num_fixings` - Positive number of equally spaced averaging observations.
 /// * `averaging` - [`AveragingMethod::Arithmetic`] (Turnbull-Wakeman) or
 ///   [`AveragingMethod::Geometric`] (Kemna-Vorst).
-/// * `option_type` - Call or put payoff convention.
 ///
 /// # Errors
 ///
 /// Returns `Error::Validation` if `num_fixings` is zero, any input is outside
 /// its valid domain, or the resulting option price is non-finite.
-#[allow(clippy::too_many_arguments)]
 pub fn asian_option_price(
-    spot: f64,
-    strike: f64,
-    rate: f64,
-    div_yield: f64,
-    vol: f64,
-    expiry: f64,
+    market: &OptionMarketParams,
     num_fixings: usize,
     averaging: AveragingMethod,
-    option_type: OptionType,
 ) -> Result<f64> {
+    let &OptionMarketParams {
+        spot,
+        strike,
+        rate,
+        volatility: vol,
+        time_to_expiry: expiry,
+        dividend_yield: div_yield,
+        ..
+    } = market;
     if num_fixings == 0 {
         return Err(Error::Validation(
             "asian option num_fixings must be positive".to_string(),
@@ -161,26 +163,8 @@ pub fn asian_option_price(
     validate_spot_model_inputs("asian option", spot, rate, div_yield, vol, expiry)?;
     require_finite_positive("asian option", "strike", strike)?;
     let value = match averaging {
-        AveragingMethod::Arithmetic => arithmetic_asian_tw_price(
-            spot,
-            strike,
-            expiry,
-            rate,
-            div_yield,
-            vol,
-            num_fixings,
-            option_type,
-        ),
-        AveragingMethod::Geometric => geometric_asian_price(
-            spot,
-            strike,
-            expiry,
-            rate,
-            div_yield,
-            vol,
-            num_fixings,
-            option_type,
-        ),
+        AveragingMethod::Arithmetic => arithmetic_asian_tw_price(market, num_fixings),
+        AveragingMethod::Geometric => geometric_asian_price(market, num_fixings),
     };
     checked_closed_form_value(value, "asian option price")
 }
@@ -193,33 +177,33 @@ pub fn asian_option_price(
 ///
 /// # Arguments
 ///
-/// * `spot` - Current spot price of the underlying.
-/// * `strike` - Option strike price (ignored for `"floating"`).
-/// * `rate` - Risk-free rate, continuously compounded decimal.
-/// * `div_yield` - Continuous dividend yield, decimal.
-/// * `vol` - Annualized volatility, decimal.
-/// * `expiry` - Time to expiry in years.
+/// * `market` - Spot and strike in the same price units, continuously
+///   compounded risk-free `rate` and `dividend_yield` (foreign rate for FX) as
+///   decimals, annualized decimal `volatility`, `time_to_expiry` in years and
+///   the call/put `option_type`. The
+///   `strike` is ignored (but must be finite) for `"floating"`.
 /// * `extremum` - Observed running extremum to date, in `spot` units.
 /// * `strike_type` - `"fixed"` or `"floating"`.
-/// * `option_type` - Call or put payoff convention.
 ///
 /// # Errors
 ///
 /// Returns `Error::Validation` if `strike_type` is not a supported
 /// convention, any input is outside its valid domain, or the resulting
 /// option price is non-finite.
-#[allow(clippy::too_many_arguments)]
 pub fn lookback_option_price(
-    spot: f64,
-    strike: f64,
-    rate: f64,
-    div_yield: f64,
-    vol: f64,
-    expiry: f64,
+    market: &OptionMarketParams,
     extremum: f64,
     strike_type: &str,
-    option_type: OptionType,
 ) -> Result<f64> {
+    let &OptionMarketParams {
+        spot,
+        strike,
+        rate,
+        volatility: vol,
+        time_to_expiry: expiry,
+        dividend_yield: div_yield,
+        option_type,
+    } = market;
     if !matches!(strike_type, "fixed" | "floating") {
         return Err(Error::Validation(format!(
             "unknown strike_type '{strike_type}'; expected 'fixed' or 'floating'"
@@ -263,34 +247,34 @@ pub fn lookback_option_price(
 ///
 /// # Arguments
 ///
-/// * `spot` - Spot price of the foreign asset in foreign currency.
-/// * `strike` - Strike in foreign currency.
-/// * `expiry` - Time to expiry in years.
-/// * `rate_domestic` - Domestic risk-free rate, continuously compounded decimal.
+/// * `market` - The foreign asset: `spot` and `strike` in foreign currency,
+///   `rate` = the **domestic** risk-free rate and `dividend_yield` = the
+///   asset's continuous dividend yield (continuously compounded decimals),
+///   `volatility` = the annualized foreign-asset volatility (decimal),
+///   `time_to_expiry` in years and the call/put `option_type`.
 /// * `rate_foreign` - Foreign risk-free rate, continuously compounded decimal.
-/// * `div_yield` - Foreign asset continuous dividend yield, decimal.
-/// * `vol_asset` - Annualized foreign-asset volatility, decimal.
 /// * `vol_fx` - Annualized FX-rate volatility, decimal.
 /// * `correlation` - Correlation between asset and FX returns, in `[-1, 1]`.
-/// * `option_type` - Call or put payoff convention.
 ///
 /// # Errors
 ///
 /// Returns `Error::Validation` if any input is outside its valid domain or
 /// if the resulting option price is non-finite.
-#[allow(clippy::too_many_arguments)]
 pub fn quanto_option_price(
-    spot: f64,
-    strike: f64,
-    expiry: f64,
-    rate_domestic: f64,
+    market: &OptionMarketParams,
     rate_foreign: f64,
-    div_yield: f64,
-    vol_asset: f64,
     vol_fx: f64,
     correlation: f64,
-    option_type: OptionType,
 ) -> Result<f64> {
+    let &OptionMarketParams {
+        spot,
+        strike,
+        rate: rate_domestic,
+        volatility: vol_asset,
+        time_to_expiry: expiry,
+        dividend_yield: div_yield,
+        ..
+    } = market;
     validate_spot_model_inputs(
         "quanto option",
         spot,
@@ -315,18 +299,7 @@ pub fn quanto_option_price(
             "quanto option correlation must be in [-1, 1], got {correlation}"
         )));
     }
-    let value = quanto_price(
-        spot,
-        strike,
-        expiry,
-        rate_domestic,
-        rate_foreign,
-        div_yield,
-        vol_asset,
-        vol_fx,
-        correlation,
-        option_type,
-    );
+    let value = quanto_price(market, rate_foreign, vol_fx, correlation);
     checked_closed_form_value(value, "quanto option price")
 }
 
@@ -338,7 +311,21 @@ mod tests {
     fn barrier_dispatch_matches_leaf_functions() {
         let (s, k, b, t, r, q, sigma) = (100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.20);
         assert_eq!(
-            barrier_option_price(s, k, b, r, q, sigma, t, "down", "out", OptionType::Call).unwrap(),
+            barrier_option_price(
+                &OptionMarketParams {
+                    spot: s,
+                    strike: k,
+                    rate: r,
+                    volatility: sigma,
+                    time_to_expiry: t,
+                    dividend_yield: q,
+                    option_type: OptionType::Call
+                },
+                b,
+                "down",
+                "out"
+            )
+            .unwrap(),
             barrier_price(
                 &BarrierParams::new(s, k, b, t, r, q, sigma),
                 BarrierType::DownAndOut,
@@ -346,7 +333,21 @@ mod tests {
             )
         );
         assert_eq!(
-            barrier_option_price(s, k, b, r, q, sigma, t, "down", "in", OptionType::Call).unwrap(),
+            barrier_option_price(
+                &OptionMarketParams {
+                    spot: s,
+                    strike: k,
+                    rate: r,
+                    volatility: sigma,
+                    time_to_expiry: t,
+                    dividend_yield: q,
+                    option_type: OptionType::Call
+                },
+                b,
+                "down",
+                "in"
+            )
+            .unwrap(),
             barrier_price(
                 &BarrierParams::new(s, k, b, t, r, q, sigma),
                 BarrierType::DownAndIn,
@@ -355,8 +356,21 @@ mod tests {
         );
         let b_up = 120.0;
         assert_eq!(
-            barrier_option_price(s, k, b_up, r, q, sigma, t, "up", "out", OptionType::Call)
-                .unwrap(),
+            barrier_option_price(
+                &OptionMarketParams {
+                    spot: s,
+                    strike: k,
+                    rate: r,
+                    volatility: sigma,
+                    time_to_expiry: t,
+                    dividend_yield: q,
+                    option_type: OptionType::Call
+                },
+                b_up,
+                "up",
+                "out"
+            )
+            .unwrap(),
             barrier_price(
                 &BarrierParams::new(s, k, b_up, t, r, q, sigma),
                 BarrierType::UpAndOut,
@@ -364,7 +378,21 @@ mod tests {
             )
         );
         assert_eq!(
-            barrier_option_price(s, k, b_up, r, q, sigma, t, "up", "in", OptionType::Call).unwrap(),
+            barrier_option_price(
+                &OptionMarketParams {
+                    spot: s,
+                    strike: k,
+                    rate: r,
+                    volatility: sigma,
+                    time_to_expiry: t,
+                    dividend_yield: q,
+                    option_type: OptionType::Call
+                },
+                b_up,
+                "up",
+                "in"
+            )
+            .unwrap(),
             barrier_price(
                 &BarrierParams::new(s, k, b_up, t, r, q, sigma),
                 BarrierType::UpAndIn,
@@ -377,7 +405,21 @@ mod tests {
     fn barrier_put_dispatch_matches_leaf_functions() {
         let (s, k, b, t, r, q, sigma) = (100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.20);
         assert_eq!(
-            barrier_option_price(s, k, b, r, q, sigma, t, "down", "out", OptionType::Put).unwrap(),
+            barrier_option_price(
+                &OptionMarketParams {
+                    spot: s,
+                    strike: k,
+                    rate: r,
+                    volatility: sigma,
+                    time_to_expiry: t,
+                    dividend_yield: q,
+                    option_type: OptionType::Put
+                },
+                b,
+                "down",
+                "out"
+            )
+            .unwrap(),
             barrier_price(
                 &BarrierParams::new(s, k, b, t, r, q, sigma),
                 BarrierType::DownAndOut,
@@ -385,7 +427,21 @@ mod tests {
             )
         );
         assert_eq!(
-            barrier_option_price(s, k, b, r, q, sigma, t, "down", "in", OptionType::Put).unwrap(),
+            barrier_option_price(
+                &OptionMarketParams {
+                    spot: s,
+                    strike: k,
+                    rate: r,
+                    volatility: sigma,
+                    time_to_expiry: t,
+                    dividend_yield: q,
+                    option_type: OptionType::Put
+                },
+                b,
+                "down",
+                "in"
+            )
+            .unwrap(),
             barrier_price(
                 &BarrierParams::new(s, k, b, t, r, q, sigma),
                 BarrierType::DownAndIn,
@@ -394,7 +450,21 @@ mod tests {
         );
         let b_up = 120.0;
         assert_eq!(
-            barrier_option_price(s, k, b_up, r, q, sigma, t, "up", "out", OptionType::Put).unwrap(),
+            barrier_option_price(
+                &OptionMarketParams {
+                    spot: s,
+                    strike: k,
+                    rate: r,
+                    volatility: sigma,
+                    time_to_expiry: t,
+                    dividend_yield: q,
+                    option_type: OptionType::Put
+                },
+                b_up,
+                "up",
+                "out"
+            )
+            .unwrap(),
             barrier_price(
                 &BarrierParams::new(s, k, b_up, t, r, q, sigma),
                 BarrierType::UpAndOut,
@@ -402,7 +472,21 @@ mod tests {
             )
         );
         assert_eq!(
-            barrier_option_price(s, k, b_up, r, q, sigma, t, "up", "in", OptionType::Put).unwrap(),
+            barrier_option_price(
+                &OptionMarketParams {
+                    spot: s,
+                    strike: k,
+                    rate: r,
+                    volatility: sigma,
+                    time_to_expiry: t,
+                    dividend_yield: q,
+                    option_type: OptionType::Put
+                },
+                b_up,
+                "up",
+                "in"
+            )
+            .unwrap(),
             barrier_price(
                 &BarrierParams::new(s, k, b_up, t, r, q, sigma),
                 BarrierType::UpAndIn,
@@ -410,24 +494,39 @@ mod tests {
             )
         );
         assert!(
-            barrier_option_price(s, k, b, r, q, sigma, t, "sideways", "out", OptionType::Put)
-                .is_err()
+            barrier_option_price(
+                &OptionMarketParams {
+                    spot: s,
+                    strike: k,
+                    rate: r,
+                    volatility: sigma,
+                    time_to_expiry: t,
+                    dividend_yield: q,
+                    option_type: OptionType::Put
+                },
+                b,
+                "sideways",
+                "out"
+            )
+            .is_err()
         );
     }
 
     #[test]
     fn barrier_dispatch_rejects_unknown_selector() {
         let err = barrier_option_price(
-            100.0,
-            100.0,
+            &OptionMarketParams {
+                spot: 100.0,
+                strike: 100.0,
+                rate: 0.05,
+                volatility: 0.20,
+                time_to_expiry: 1.0,
+                dividend_yield: 0.02,
+                option_type: OptionType::Call,
+            },
             90.0,
-            0.05,
-            0.02,
-            0.20,
-            1.0,
             "sideways",
             "out",
-            OptionType::Call,
         )
         .unwrap_err();
         let msg = err.to_string();
@@ -440,33 +539,59 @@ mod tests {
         let (s, k, t, r, q, sigma, n) = (100.0, 100.0, 1.0, 0.05, 0.02, 0.20, 12);
         assert_eq!(
             asian_option_price(
-                s,
-                k,
-                r,
-                q,
-                sigma,
-                t,
+                &OptionMarketParams {
+                    spot: s,
+                    strike: k,
+                    rate: r,
+                    volatility: sigma,
+                    time_to_expiry: t,
+                    dividend_yield: q,
+                    option_type: OptionType::Call
+                },
                 n,
-                AveragingMethod::Arithmetic,
-                OptionType::Call
+                AveragingMethod::Arithmetic
             )
             .unwrap(),
-            arithmetic_asian_tw_price(s, k, t, r, q, sigma, n, OptionType::Call)
+            arithmetic_asian_tw_price(
+                &OptionMarketParams {
+                    spot: s,
+                    strike: k,
+                    rate: r,
+                    volatility: sigma,
+                    time_to_expiry: t,
+                    dividend_yield: q,
+                    option_type: OptionType::Call
+                },
+                n
+            )
         );
         assert_eq!(
             asian_option_price(
-                s,
-                k,
-                r,
-                q,
-                sigma,
-                t,
+                &OptionMarketParams {
+                    spot: s,
+                    strike: k,
+                    rate: r,
+                    volatility: sigma,
+                    time_to_expiry: t,
+                    dividend_yield: q,
+                    option_type: OptionType::Put
+                },
                 n,
-                AveragingMethod::Geometric,
-                OptionType::Put
+                AveragingMethod::Geometric
             )
             .unwrap(),
-            geometric_asian_price(s, k, t, r, q, sigma, n, OptionType::Put)
+            geometric_asian_price(
+                &OptionMarketParams {
+                    spot: s,
+                    strike: k,
+                    rate: r,
+                    volatility: sigma,
+                    time_to_expiry: t,
+                    dividend_yield: q,
+                    option_type: OptionType::Put
+                },
+                n
+            )
         );
     }
 
@@ -474,15 +599,17 @@ mod tests {
     fn asian_dispatch_rejects_zero_fixings() {
         for averaging in [AveragingMethod::Arithmetic, AveragingMethod::Geometric] {
             let err = asian_option_price(
-                100.0,
-                100.0,
-                0.05,
-                0.02,
-                0.20,
-                1.0,
+                &OptionMarketParams {
+                    spot: 100.0,
+                    strike: 100.0,
+                    rate: 0.05,
+                    volatility: 0.20,
+                    time_to_expiry: 1.0,
+                    dividend_yield: 0.02,
+                    option_type: OptionType::Call,
+                },
                 0,
                 averaging,
-                OptionType::Call,
             )
             .unwrap_err();
             assert!(err.to_string().contains("num_fixings must be positive"));
@@ -493,11 +620,37 @@ mod tests {
     fn lookback_dispatch_matches_leaf_functions() {
         let (s, k, t, r, q, sigma, m) = (100.0, 100.0, 1.0, 0.05, 0.02, 0.20, 100.0);
         assert_eq!(
-            lookback_option_price(s, k, r, q, sigma, t, m, "fixed", OptionType::Call).unwrap(),
+            lookback_option_price(
+                &OptionMarketParams {
+                    spot: s,
+                    strike: k,
+                    rate: r,
+                    volatility: sigma,
+                    time_to_expiry: t,
+                    dividend_yield: q,
+                    option_type: OptionType::Call
+                },
+                m,
+                "fixed"
+            )
+            .unwrap(),
             fixed_strike_lookback_call(s, k, t, r, q, sigma, m)
         );
         assert_eq!(
-            lookback_option_price(s, k, r, q, sigma, t, m, "floating", OptionType::Put).unwrap(),
+            lookback_option_price(
+                &OptionMarketParams {
+                    spot: s,
+                    strike: k,
+                    rate: r,
+                    volatility: sigma,
+                    time_to_expiry: t,
+                    dividend_yield: q,
+                    option_type: OptionType::Put
+                },
+                m,
+                "floating"
+            )
+            .unwrap(),
             floating_strike_lookback_put(s, t, r, q, sigma, m)
         );
     }
@@ -505,15 +658,17 @@ mod tests {
     #[test]
     fn lookback_dispatch_rejects_unknown_strike_type() {
         let err = lookback_option_price(
-            100.0,
-            100.0,
-            0.05,
-            0.02,
-            0.20,
-            1.0,
+            &OptionMarketParams {
+                spot: 100.0,
+                strike: 100.0,
+                rate: 0.05,
+                volatility: 0.20,
+                time_to_expiry: 1.0,
+                dividend_yield: 0.02,
+                option_type: OptionType::Call,
+            },
             100.0,
             "adaptive",
-            OptionType::Call,
         )
         .unwrap_err();
         assert!(err.to_string().contains("unknown strike_type 'adaptive'"));
@@ -522,47 +677,53 @@ mod tests {
     #[test]
     fn quanto_dispatch_matches_leaf_functions_and_checks_finiteness() {
         let price = quanto_option_price(
-            100.0,
-            100.0,
-            1.0,
-            0.03,
+            &OptionMarketParams {
+                spot: 100.0,
+                strike: 100.0,
+                rate: 0.03,
+                volatility: 0.20,
+                time_to_expiry: 1.0,
+                dividend_yield: 0.0,
+                option_type: OptionType::Call,
+            },
             0.01,
-            0.0,
-            0.20,
             0.10,
             0.3,
-            OptionType::Call,
         )
         .unwrap();
         assert_eq!(
             price,
             quanto_price(
-                100.0,
-                100.0,
-                1.0,
-                0.03,
+                &OptionMarketParams {
+                    spot: 100.0,
+                    strike: 100.0,
+                    rate: 0.03,
+                    volatility: 0.20,
+                    time_to_expiry: 1.0,
+                    dividend_yield: 0.0,
+                    option_type: OptionType::Call
+                },
                 0.01,
-                0.0,
-                0.20,
                 0.10,
-                0.3,
-                OptionType::Call
+                0.3
             )
         );
         // Degenerate maturity with a negative domestic rate drives the price
         // non-finite; the dispatcher must reject it.
         assert!(
             quanto_option_price(
-                100.0,
-                100.0,
-                1.0e6,
-                -1.0,
+                &OptionMarketParams {
+                    spot: 100.0,
+                    strike: 100.0,
+                    rate: -1.0,
+                    volatility: 0.20,
+                    time_to_expiry: 1.0e6,
+                    dividend_yield: 0.0,
+                    option_type: OptionType::Put
+                },
                 0.01,
-                0.0,
-                0.20,
                 0.10,
-                0.3,
-                OptionType::Put,
+                0.3
             )
             .is_err()
         );

@@ -53,17 +53,16 @@ fn evaluated_results_json() -> String {
 #[wasm_bindgen_test]
 fn goal_seek_finds_revenue_for_target_gross_profit() {
     let model_json = test_model_json();
-    let result = goal_seek(
-        JsValue::from(&model_json),
-        JsValue::from("gross_profit"),
-        JsValue::from("2024Q1"),
-        JsValue::from(80_000.0),
-        JsValue::from("revenue"),
-        JsValue::from("2024Q1"),
-        JsValue::from(true),
-        Some(crate::js_object(&[50_000.0, 200_000.0])),
-    )
-    .unwrap();
+    let spec = serde_json::json!({
+        "target_node": "gross_profit",
+        "target_period": "2024Q1",
+        "target_value": 80_000.0,
+        "driver_node": "revenue",
+        "driver_period": "2024Q1",
+        "update_model": true,
+        "bounds": [50_000.0, 200_000.0],
+    });
+    let result = goal_seek(JsValue::from(&model_json), JsValue::from(spec.to_string())).unwrap();
     let obj: serde_json::Value = serde_wasm_bindgen::from_value(result).unwrap();
     let solved = obj["solved_value"].as_f64().unwrap();
     assert!(
@@ -242,17 +241,16 @@ fn monetary_goal_seek_returns_a_valid_updated_model() {
         model_builder.build().unwrap()
     };
     let json = serde_json::to_string(&model).unwrap();
-    let result = goal_seek(
-        JsValue::from(&json),
-        JsValue::from("profit"),
-        JsValue::from("2025"),
-        JsValue::from(60.0),
-        JsValue::from("revenue"),
-        JsValue::from("2025"),
-        JsValue::from(true),
-        Some(crate::js_object(&[1.0, 200.0])),
-    )
-    .unwrap();
+    let spec = serde_json::json!({
+        "target_node": "profit",
+        "target_period": "2025",
+        "target_value": 60.0,
+        "driver_node": "revenue",
+        "driver_period": "2025",
+        "update_model": true,
+        "bounds": [1.0, 200.0],
+    });
+    let result = goal_seek(JsValue::from(&json), JsValue::from(spec.to_string())).unwrap();
     let output: serde_json::Value = serde_wasm_bindgen::from_value(result).unwrap();
     let updated = {
         let model_builder =

@@ -16,6 +16,14 @@ use finstack_quant_models::correlation::{
 use wasm_bindgen::prelude::*;
 
 /// Copula model specification for configuration and deferred construction.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const copula = models.correlation.CopulaSpec.gaussian().build();
+/// console.log(copula.modelName, copula.numFactors);
+/// ```
 #[wasm_bindgen(js_name = CopulaSpec)]
 pub struct JsCopulaSpec {
     inner: CopulaSpec,
@@ -26,6 +34,7 @@ json_round_trip!(JsCopulaSpec, CopulaSpec);
 #[wasm_bindgen(js_class = CopulaSpec)]
 impl JsCopulaSpec {
     /// One-factor Gaussian copula (market standard).
+    /// @returns A `CopulaSpec` handle for deferred construction.
     #[wasm_bindgen(js_name = gaussian)]
     pub fn gaussian() -> Self {
         Self {
@@ -40,8 +49,12 @@ impl JsCopulaSpec {
     ///
     /// Throws a JavaScript exception if `degreesOfFreedom` is not finite and
     /// strictly greater than two.
+    /// @returns A `CopulaSpec` handle for deferred construction.
     #[wasm_bindgen(js_name = studentT)]
-    pub fn student_t(degrees_of_freedom: JsValue) -> Result<JsCopulaSpec, JsValue> {
+    pub fn student_t(
+        #[wasm_bindgen(js_name = "degreesOfFreedom", unchecked_param_type = "number")]
+        degrees_of_freedom: JsValue,
+    ) -> Result<JsCopulaSpec, JsValue> {
         let degrees_of_freedom = js_f64(&degrees_of_freedom, "degreesOfFreedom")?;
         CopulaSpec::student_t(degrees_of_freedom)
             .map(|inner| Self { inner })
@@ -49,9 +62,13 @@ impl JsCopulaSpec {
     }
 
     /// Random Factor Loading copula with stochastic correlation.
-    /// @param loading_vol - Factor-loading volatility (standard deviation of the loading); clamped to `[0, 0.5]`, typically 0.05 to 0.20.
+    /// @param loadingVol - Factor-loading volatility (standard deviation of the loading); clamped to `[0, 0.5]`, typically 0.05 to 0.20.
+    /// @returns A `CopulaSpec` handle for deferred construction.
     #[wasm_bindgen(js_name = randomFactorLoading)]
-    pub fn random_factor_loading(loading_vol: JsValue) -> Result<Self, JsValue> {
+    pub fn random_factor_loading(
+        #[wasm_bindgen(js_name = "loadingVol", unchecked_param_type = "number")]
+        loading_vol: JsValue,
+    ) -> Result<Self, JsValue> {
         let loading_vol = js_f64(&loading_vol, "loadingVol")?;
         Ok(Self {
             inner: CopulaSpec::random_factor_loading(loading_vol),
@@ -59,6 +76,7 @@ impl JsCopulaSpec {
     }
 
     /// Global-plus-sector two-factor Gaussian copula.
+    /// @returns A `CopulaSpec` handle for deferred construction.
     #[wasm_bindgen(js_name = multiFactor)]
     pub fn multi_factor() -> Self {
         Self {
@@ -73,6 +91,7 @@ impl JsCopulaSpec {
     /// Throws a JavaScript exception if a Student-t specification contains
     /// non-finite degrees of freedom or a value at most two, or random-loading
     /// volatility is non-finite or outside `[0, 0.5]`.
+    /// @returns A concrete `Copula` handle.
     #[wasm_bindgen(js_name = build)]
     pub fn build(&self) -> Result<JsCopula, JsValue> {
         self.inner
@@ -107,6 +126,15 @@ impl JsCopulaSpec {
 }
 
 /// Concrete copula model for portfolio default correlation.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const copula = models.correlation.CopulaSpec.gaussian().build();
+/// console.log(copula.modelName, copula.numFactors);
+/// copula.free();
+/// ```
 #[wasm_bindgen(js_name = Copula)]
 pub struct JsCopula {
     inner: Box<dyn Copula + Send + Sync>,
@@ -115,8 +143,8 @@ pub struct JsCopula {
 #[wasm_bindgen(js_class = Copula)]
 impl JsCopula {
     /// Conditional default probability given factor realization(s).
-    /// @param default_threshold - Latent-variable default threshold corresponding to the marginal default probability.
-    /// @param factor_realization - Realized systematic-factor value conditioning the default probability.
+    /// @param defaultThreshold - Latent-variable default threshold corresponding to the marginal default probability.
+    /// @param factorRealization - Realized systematic-factor value conditioning the default probability.
     /// @param correlation - Asset correlation as a decimal in `[0, 1]`; values outside this range throw.
     ///
     /// # Errors
@@ -124,12 +152,15 @@ impl JsCopula {
     /// Throws a JavaScript exception if the factor count does not match the
     /// copula, any input is non-finite, `correlation` is outside `[0, 1]`, or
     /// the model produces a probability outside `[0, 1]`.
+    /// @returns Conditional default probability in `[0, 1]`.
     #[wasm_bindgen(js_name = conditionalDefaultProb)]
     pub fn conditional_default_prob(
         &self,
+        #[wasm_bindgen(js_name = "defaultThreshold", unchecked_param_type = "number")]
         default_threshold: JsValue,
+        #[wasm_bindgen(js_name = "factorRealization", unchecked_param_type = "number[]")]
         factor_realization: JsValue,
-        correlation: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] correlation: JsValue,
     ) -> Result<f64, JsValue> {
         let default_threshold = js_f64(&default_threshold, "defaultThreshold")?;
         let factor_realization: &[f64] = &js_f64_seq(&factor_realization, "factorRealization")?;
@@ -158,8 +189,12 @@ impl JsCopula {
     /// calibrated clipped-normal loading distribution. Gaussian models have
     /// zero tail dependence except at perfect correlation.
     /// @param correlation - Dependence correlation from -1 through 1 under the selected copula or recovery model.
+    /// @returns Lower-tail dependence `λ_L` in `[0, 1]` for valid inputs; a non-finite `correlation` yields `NaN`.
     #[wasm_bindgen(js_name = tailDependence)]
-    pub fn tail_dependence(&self, correlation: JsValue) -> Result<f64, JsValue> {
+    pub fn tail_dependence(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] correlation: JsValue,
+    ) -> Result<f64, JsValue> {
         let correlation = js_f64(&correlation, "correlation")?;
         Ok(self.inner.tail_dependence(correlation))
     }
@@ -176,8 +211,12 @@ impl JsCopula {
     ///
     /// Throws a JavaScript exception if this copula is not a Random Factor
     /// Loading model.
+    /// @returns Heuristic extra correlation mass in the high-loading tail; 0 in the Gaussian limit.
     #[wasm_bindgen(js_name = stressCorrelationProxy)]
-    pub fn stress_correlation_proxy(&self, correlation: JsValue) -> Result<f64, JsValue> {
+    pub fn stress_correlation_proxy(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] correlation: JsValue,
+    ) -> Result<f64, JsValue> {
         let correlation = js_f64(&correlation, "correlation")?;
         self.inner
             .stress_correlation_proxy(correlation)
@@ -186,6 +225,14 @@ impl JsCopula {
 }
 
 /// Recovery model specification for configuration and deferred construction.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const recovery = models.correlation.RecoverySpec.constant(0.4).build();
+/// console.log(recovery.expectedRecovery, recovery.lgd);
+/// ```
 #[wasm_bindgen(js_name = RecoverySpec)]
 pub struct JsRecoverySpec {
     inner: corr::RecoverySpec,
@@ -202,8 +249,11 @@ impl JsRecoverySpec {
     ///
     /// Throws a JavaScript exception if `rate` is not finite or lies outside
     /// `[0, 1]`.
+    /// @returns A `RecoverySpec` handle for deferred construction.
     #[wasm_bindgen(js_name = constant)]
-    pub fn constant(rate: JsValue) -> Result<JsRecoverySpec, JsValue> {
+    pub fn constant(
+        #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
+    ) -> Result<JsRecoverySpec, JsValue> {
         let rate = js_f64(&rate, "rate")?;
         corr::RecoverySpec::constant(rate)
             .map(|inner| Self { inner })
@@ -219,11 +269,12 @@ impl JsRecoverySpec {
     ///
     /// Throws a JavaScript exception if `mean` is not finite or lies outside
     /// `[0, 1]`, or if `vol` or `correlation` is non-finite or outside its supported range.
+    /// @returns A `RecoverySpec` handle for deferred construction.
     #[wasm_bindgen(js_name = marketCorrelated)]
     pub fn market_correlated(
-        mean: JsValue,
-        vol: JsValue,
-        correlation: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] mean: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] vol: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] correlation: JsValue,
     ) -> Result<JsRecoverySpec, JsValue> {
         let mean = js_f64(&mean, "mean")?;
         let vol = js_f64(&vol, "vol")?;
@@ -236,6 +287,7 @@ impl JsRecoverySpec {
     /// Market-standard stochastic recovery (40% mean, 25% vol, +40% corr —
     /// recovery falls in stress under the canonical low-factor-stress
     /// convention).
+    /// @returns A `RecoverySpec` handle for deferred construction.
     #[wasm_bindgen(js_name = marketStandardStochastic)]
     pub fn market_standard_stochastic() -> Result<Self, JsValue> {
         corr::RecoverySpec::market_standard_stochastic()
@@ -260,6 +312,15 @@ impl JsRecoverySpec {
 }
 
 /// Concrete recovery model for credit portfolio pricing.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const recovery = models.correlation.RecoverySpec.constant(0.4).build();
+/// console.log(recovery.expectedRecovery, recovery.lgd); // 0.4 0.6
+/// recovery.free();
+/// ```
 #[wasm_bindgen(js_name = RecoveryModel)]
 pub struct JsRecoveryModel {
     inner: Box<dyn RecoveryModel + Send + Sync>,
@@ -276,9 +337,13 @@ impl JsRecoveryModel {
     /// Expected recovery conditional on the systematic market factor, integrating the independent obligor shock.
     /// @returns Conditional mean recovery in `[0, 1]`.
     /// @throws Throws a `validation` error for a non-finite factor or a `computation` error if integration fails.
-    /// @param market_factor - Realized standardized market factor used to condition recovery or loss given default.
+    /// @param marketFactor - Realized standardized market factor used to condition recovery or loss given default.
     #[wasm_bindgen(js_name = conditionalRecovery)]
-    pub fn conditional_recovery(&self, market_factor: JsValue) -> Result<f64, JsValue> {
+    pub fn conditional_recovery(
+        &self,
+        #[wasm_bindgen(js_name = "marketFactor", unchecked_param_type = "number")]
+        market_factor: JsValue,
+    ) -> Result<f64, JsValue> {
         let market_factor = js_f64(&market_factor, "marketFactor")?;
         self.inner
             .conditional_recovery(market_factor)
@@ -294,22 +359,28 @@ impl JsRecoveryModel {
     /// Conditional expected LGD given the systematic market factor.
     /// @returns One minus conditional mean recovery.
     /// @throws Throws a `validation` error for a non-finite factor or a `computation` error if integration fails.
-    /// @param market_factor - Realized standardized market factor used to condition recovery or loss given default.
+    /// @param marketFactor - Realized standardized market factor used to condition recovery or loss given default.
     #[wasm_bindgen(js_name = conditionalLgd)]
-    pub fn conditional_lgd(&self, market_factor: JsValue) -> Result<f64, JsValue> {
+    pub fn conditional_lgd(
+        &self,
+        #[wasm_bindgen(js_name = "marketFactor", unchecked_param_type = "number")]
+        market_factor: JsValue,
+    ) -> Result<f64, JsValue> {
         let market_factor = js_f64(&market_factor, "marketFactor")?;
         self.inner.conditional_lgd(market_factor).map_err(to_js_err)
     }
 
     /// Sample bounded recovery from the canonical logistic-normal law.
-    /// @param market_factor - Finite systematic standard-normal shock; low values represent credit stress.
-    /// @param idiosyncratic_normal - Finite independent obligor standard-normal shock; ignored for constant or perfectly systematic models.
+    /// @param marketFactor - Finite systematic standard-normal shock; low values represent credit stress.
+    /// @param idiosyncraticNormal - Finite independent obligor standard-normal shock; ignored for constant or perfectly systematic models.
     /// @returns Sampled recovery as a decimal fraction of notional in `[0, 1]`.
     /// @throws Throws a `validation` error if either shock is non-finite.
     #[wasm_bindgen(js_name = sampleRecovery)]
     pub fn sample_recovery(
         &self,
+        #[wasm_bindgen(js_name = "marketFactor", unchecked_param_type = "number")]
         market_factor: JsValue,
+        #[wasm_bindgen(js_name = "idiosyncraticNormal", unchecked_param_type = "number")]
         idiosyncratic_normal: JsValue,
     ) -> Result<f64, JsValue> {
         let market_factor = js_f64(&market_factor, "marketFactor")?;
@@ -354,8 +425,12 @@ impl JsRecoveryModel {
 ///
 /// Throws a JavaScript exception if either marginal probability is non-finite
 /// or outside `[0, 1]`.
+/// @returns `[rho_min, rho_max]` Fréchet-Hoeffding bounds for the two Bernoulli marginals.
 #[wasm_bindgen(js_name = correlationBounds)]
-pub fn correlation_bounds(p1: JsValue, p2: JsValue) -> Result<Box<[f64]>, JsValue> {
+pub fn correlation_bounds(
+    #[wasm_bindgen(unchecked_param_type = "number")] p1: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] p2: JsValue,
+) -> Result<Box<[f64]>, JsValue> {
     let p1 = js_f64(&p1, "p1")?;
     let p2 = js_f64(&p2, "p2")?;
     let (lo, hi) = probability::correlation_bounds(p1, p2).map_err(to_js_err)?;
@@ -384,8 +459,13 @@ pub fn correlation_bounds(p1: JsValue, p2: JsValue) -> Result<Box<[f64]>, JsValu
 /// length is not `n * n`; if a diagonal entry is not one, an entry is outside
 /// the correlation bounds, the matrix is not symmetric, or the matrix is not
 /// positive semidefinite.
+/// @param matrix - Flat row-major `n * n` correlation coefficients; unit diagonal, off-diagonals in `[-1, 1]`.
+/// @param n - Finite non-negative integer square-matrix dimension no greater than `4294967295`; `matrix` must contain exactly `n * n` entries, and an empty matrix uses zero.
 #[wasm_bindgen(js_name = validateCorrelationMatrix)]
-pub fn validate_correlation_matrix(matrix: JsValue, n: JsValue) -> Result<(), JsValue> {
+pub fn validate_correlation_matrix(
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] matrix: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] n: JsValue,
+) -> Result<(), JsValue> {
     let matrix: &[f64] = &js_f64_seq(&matrix, "matrix")?;
     let n: usize = js_uint(&n, "n")?;
     linalg::validate_correlation_matrix(matrix, n).map_err(to_js_err)
@@ -416,12 +496,19 @@ pub fn validate_correlation_matrix(matrix: JsValue, n: JsValue) -> Result<(), Js
 /// if `n * n` overflows, the flat length is not `n * n` or the input has a
 /// gross diagonal or symmetry violation; and a `computation` error if the
 /// projection does not converge within `maxIter` iterations at `tol`.
+/// @param matrix - Flat row-major `n * n` near-correlation matrix to project onto the correlation set.
+/// @param n - Non-negative integer square-matrix dimension; `matrix` must contain exactly `n * n` entries, and an empty matrix uses zero.
+/// @param maxIter - Optional non-negative integer limit on Higham projection iterations; omitted uses Rust `NearestCorrelationOpts::default()` (200).
+/// @param tol - Optional positive convergence tolerance for the projection; omitted uses Rust `NearestCorrelationOpts::default()` (`1e-10`).
+/// @returns Nearest valid correlation matrix as a flat row-major `Float64Array` of `n * n` entries.
 #[wasm_bindgen(js_name = nearestCorrelation)]
 pub fn nearest_correlation(
-    matrix: JsValue,
-    n: JsValue,
-    max_iter: Option<JsValue>,
-    tol: Option<JsValue>,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] matrix: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] n: JsValue,
+    #[wasm_bindgen(js_name = "maxIter", unchecked_optional_param_type = "number")] max_iter: Option<
+        JsValue,
+    >,
+    #[wasm_bindgen(unchecked_optional_param_type = "number")] tol: Option<JsValue>,
 ) -> Result<Box<[f64]>, JsValue> {
     let matrix = js_f64_seq(&matrix, "matrix")?;
     let tol = js_opt_f64(tol.as_ref(), "tol")?;
@@ -445,6 +532,15 @@ pub fn nearest_correlation(
 /// Mirrors the Rust `PortfolioLossResult` and the Python class of the same
 /// name. Build one from a simulated loss vector with `fromLosses`, or load one
 /// with `fromJson`; the aggregates are always recomputed from the losses.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const result = models.correlation.PortfolioLossResult.fromLosses([0, 1, 2, 5, 10], 0.75);
+/// const equity = result.trancheLossStatistics(0, 0.03, 100);
+/// console.log(result.var, equity.expected_loss_fraction);
+/// ```
 #[wasm_bindgen(js_name = PortfolioLossResult)]
 pub struct JsPortfolioLossResult {
     pub(crate) inner: corr::PortfolioLossResult,
@@ -470,8 +566,8 @@ impl JsPortfolioLossResult {
     /// or negative, or `confidence` is outside `(0, 1)`.
     #[wasm_bindgen(js_name = fromLosses)]
     pub fn from_losses(
-        losses: JsValue,
-        confidence: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray")] losses: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] confidence: JsValue,
     ) -> Result<JsPortfolioLossResult, JsValue> {
         let confidence = js_f64(&confidence, "confidence")?;
         let losses = crate::utils::input::js_f64_seq(&losses, "losses")?;
@@ -524,18 +620,20 @@ impl JsPortfolioLossResult {
     /// `prob_attachment_breached`, and `prob_full_writedown`.
     /// @param attachment - Lower tranche boundary as a fraction of pool notional from 0 through 1.
     /// @param detachment - Upper tranche boundary as a fraction of pool notional, strictly above the attachment and at most 1.
-    /// @param pool_notional - Total pool notional, finite and strictly positive, in the same unit as the losses.
+    /// @param poolNotional - Total pool notional, finite and strictly positive, in the same unit as the losses.
     ///
     /// # Errors
     ///
     /// Throws a `validation` error if the tranche boundaries are invalid,
     /// `poolNotional` is not finite and positive, or a derived statistic is
     /// non-finite.
-    #[wasm_bindgen(js_name = trancheLossStatistics)]
+    /// @returns The tranche notional, expected loss, VaR, expected shortfall, and breach probabilities.
+    #[wasm_bindgen(js_name = trancheLossStatistics, unchecked_return_type = "TrancheLossStatistics")]
     pub fn tranche_loss_statistics(
         &self,
-        attachment: JsValue,
-        detachment: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] attachment: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] detachment: JsValue,
+        #[wasm_bindgen(js_name = "poolNotional", unchecked_param_type = "number")]
         pool_notional: JsValue,
     ) -> Result<JsValue, JsValue> {
         let attachment = js_f64(&attachment, "attachment")?;
@@ -553,6 +651,15 @@ impl JsPortfolioLossResult {
 ///
 /// The requested correlation is clamped to the Fréchet-Hoeffding bounds of the
 /// two marginals; `correlation` reports the value actually achieved.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const pair = new models.correlation.CorrelatedBernoulli(0.1, 0.2, 0.3);
+/// console.log(pair.jointP11, pair.jointProbabilities(), pair.sampleFromUniform(0.5));
+/// pair.free();
+/// ```
 #[wasm_bindgen(js_name = CorrelatedBernoulli)]
 pub struct JsCorrelatedBernoulli {
     pub(crate) inner: CorrelatedBernoulli,
@@ -571,9 +678,9 @@ impl JsCorrelatedBernoulli {
     /// correlation is non-finite or outside `[-1, 1]`.
     #[wasm_bindgen(constructor)]
     pub fn new(
-        p1: JsValue,
-        p2: JsValue,
-        correlation: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] p1: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] p2: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] correlation: JsValue,
     ) -> Result<JsCorrelatedBernoulli, JsValue> {
         CorrelatedBernoulli::new(
             js_f64(&p1, "p1")?,
@@ -662,7 +769,10 @@ impl JsCorrelatedBernoulli {
     ///
     /// Throws a `validation` error if `u` is non-finite or outside `[0, 1]`.
     #[wasm_bindgen(js_name = sampleFromUniform)]
-    pub fn sample_from_uniform(&self, u: JsValue) -> Result<Box<[u8]>, JsValue> {
+    pub fn sample_from_uniform(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] u: JsValue,
+    ) -> Result<Box<[u8]>, JsValue> {
         let (x1, x2) = self
             .inner
             .sample_from_uniform(js_f64(&u, "u")?)
@@ -672,6 +782,15 @@ impl JsCorrelatedBernoulli {
 }
 
 /// Latent-factor model specification for deferred construction.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const spec = models.correlation.LatentFactorSpec.twoFactor(0.2, 0.25, -0.3);
+/// const kind = spec.build();
+/// console.log(kind.modelName, kind.numFactors, kind.volatilities);
+/// ```
 #[wasm_bindgen(js_name = LatentFactorSpec)]
 pub struct JsLatentFactorSpec {
     inner: LatentFactorSpec,
@@ -681,7 +800,7 @@ pub struct JsLatentFactorSpec {
 impl JsLatentFactorSpec {
     /// One mean-reverting systematic factor.
     /// @param volatility - Annualized factor volatility as a decimal; non-negative.
-    /// @param mean_reversion - Mean-reversion speed per year; non-negative.
+    /// @param meanReversion - Mean-reversion speed per year; non-negative.
     /// @returns The single-factor specification.
     ///
     /// # Errors
@@ -690,8 +809,8 @@ impl JsLatentFactorSpec {
     /// error if a model input is non-finite or outside its documented range.
     #[wasm_bindgen(js_name = singleFactor)]
     pub fn single_factor(
-        volatility: JsValue,
-        mean_reversion: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] volatility: JsValue,
+        #[wasm_bindgen(js_name = "meanReversion", unchecked_param_type = "number")] mean_reversion: JsValue,
     ) -> Result<JsLatentFactorSpec, JsValue> {
         Ok(Self {
             inner: LatentFactorSpec::single_factor(
@@ -703,8 +822,8 @@ impl JsLatentFactorSpec {
     }
 
     /// Correlated prepayment and credit factors.
-    /// @param prepay_vol - Annualized prepayment-factor volatility as a decimal; non-negative.
-    /// @param credit_vol - Annualized credit-factor volatility as a decimal; non-negative.
+    /// @param prepayVol - Annualized prepayment-factor volatility as a decimal; non-negative.
+    /// @param creditVol - Annualized credit-factor volatility as a decimal; non-negative.
     /// @param correlation - Correlation between the two factors, from -1 through 1.
     /// @returns The two-factor specification.
     ///
@@ -714,9 +833,9 @@ impl JsLatentFactorSpec {
     /// error if a model input is non-finite or outside its documented range.
     #[wasm_bindgen(js_name = twoFactor)]
     pub fn two_factor(
-        prepay_vol: JsValue,
-        credit_vol: JsValue,
-        correlation: JsValue,
+        #[wasm_bindgen(js_name = "prepayVol", unchecked_param_type = "number")] prepay_vol: JsValue,
+        #[wasm_bindgen(js_name = "creditVol", unchecked_param_type = "number")] credit_vol: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] correlation: JsValue,
     ) -> Result<JsLatentFactorSpec, JsValue> {
         Ok(Self {
             inner: LatentFactorSpec::two_factor(
@@ -750,6 +869,15 @@ impl JsLatentFactorSpec {
 }
 
 /// Concrete latent-factor model built from a `LatentFactorSpec`.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const kind = models.correlation.LatentFactorSpec.twoFactor(0.2, 0.25, -0.3).build();
+/// console.log(kind.modelName, kind.numFactors);
+/// kind.free();
+/// ```
 #[wasm_bindgen(js_name = LatentFactorKind)]
 pub struct JsLatentFactorKind {
     inner: LatentFactorKind,
@@ -792,7 +920,7 @@ impl JsLatentFactorKind {
     }
 
     /// Contribution of one factor's own (diagonal) shock to its value.
-    /// @param factor_index - Zero-based factor index; an index beyond the model returns 0.
+    /// @param factorIndex - Zero-based factor index; an index beyond the model returns 0.
     /// @param z - Independent standard normal draw for that factor.
     /// @returns The diagonal Cholesky loading times `z` times the factor volatility.
     ///
@@ -803,8 +931,9 @@ impl JsLatentFactorKind {
     #[wasm_bindgen(js_name = diagonalFactorContribution)]
     pub fn diagonal_factor_contribution(
         &self,
+        #[wasm_bindgen(js_name = "factorIndex", unchecked_param_type = "number")]
         factor_index: JsValue,
-        z: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] z: JsValue,
     ) -> Result<f64, JsValue> {
         Ok(self
             .inner
@@ -813,6 +942,15 @@ impl JsLatentFactorKind {
 }
 
 /// Single mean-reverting latent factor.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const factor = new models.correlation.LatentSingleFactor(0.25, 0.1);
+/// console.log(factor.volatility, factor.meanReversion, factor.numFactors);
+/// factor.free();
+/// ```
 #[wasm_bindgen(js_name = LatentSingleFactor)]
 pub struct JsLatentSingleFactor {
     inner: LatentSingleFactor,
@@ -822,7 +960,7 @@ pub struct JsLatentSingleFactor {
 impl JsLatentSingleFactor {
     /// Single-factor model; inputs are validated by Rust.
     /// @param volatility - Annualized factor volatility as a decimal; non-negative.
-    /// @param mean_reversion - Mean-reversion speed per year; non-negative.
+    /// @param meanReversion - Mean-reversion speed per year; non-negative.
     ///
     /// # Errors
     ///
@@ -830,8 +968,8 @@ impl JsLatentSingleFactor {
     /// error if a model input is non-finite or outside its documented range.
     #[wasm_bindgen(constructor)]
     pub fn new(
-        volatility: JsValue,
-        mean_reversion: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] volatility: JsValue,
+        #[wasm_bindgen(js_name = "meanReversion", unchecked_param_type = "number")] mean_reversion: JsValue,
     ) -> Result<JsLatentSingleFactor, JsValue> {
         Ok(Self {
             inner: LatentSingleFactor::new(
@@ -862,6 +1000,15 @@ impl JsLatentSingleFactor {
 }
 
 /// Correlated prepayment and credit latent factors.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const factors = models.correlation.LatentTwoFactor.rmbsStandard();
+/// console.log(factors.prepayVol, factors.creditVol, factors.correlation, factors.choleskyL11);
+/// factors.free();
+/// ```
 #[wasm_bindgen(js_name = LatentTwoFactor)]
 pub struct JsLatentTwoFactor {
     inner: LatentTwoFactor,
@@ -870,8 +1017,8 @@ pub struct JsLatentTwoFactor {
 #[wasm_bindgen(js_class = LatentTwoFactor)]
 impl JsLatentTwoFactor {
     /// Two-factor model; inputs are validated by Rust.
-    /// @param prepay_vol - Annualized prepayment-factor volatility as a decimal; non-negative.
-    /// @param credit_vol - Annualized credit-factor volatility as a decimal; non-negative.
+    /// @param prepayVol - Annualized prepayment-factor volatility as a decimal; non-negative.
+    /// @param creditVol - Annualized credit-factor volatility as a decimal; non-negative.
     /// @param correlation - Correlation between the two factors, from -1 through 1.
     ///
     /// # Errors
@@ -880,9 +1027,9 @@ impl JsLatentTwoFactor {
     /// error if a model input is non-finite or outside its documented range.
     #[wasm_bindgen(constructor)]
     pub fn new(
-        prepay_vol: JsValue,
-        credit_vol: JsValue,
-        correlation: JsValue,
+        #[wasm_bindgen(js_name = "prepayVol", unchecked_param_type = "number")] prepay_vol: JsValue,
+        #[wasm_bindgen(js_name = "creditVol", unchecked_param_type = "number")] credit_vol: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] correlation: JsValue,
     ) -> Result<JsLatentTwoFactor, JsValue> {
         Ok(Self {
             inner: LatentTwoFactor::new(
@@ -950,6 +1097,15 @@ impl JsLatentTwoFactor {
 }
 
 /// General correlated latent-factor model with a Cholesky factorization.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const model = new models.correlation.LatentMultiFactor(2, [0.2, 0.3], [1, 0.5, 0.5, 1]);
+/// console.log(model.generateCorrelatedFactors([1, -1]));
+/// model.free();
+/// ```
 #[wasm_bindgen(js_name = LatentMultiFactor)]
 pub struct JsLatentMultiFactor {
     inner: LatentMultiFactor,
@@ -958,7 +1114,7 @@ pub struct JsLatentMultiFactor {
 #[wasm_bindgen(js_class = LatentMultiFactor)]
 impl JsLatentMultiFactor {
     /// Multi-factor model from volatilities and a correlation matrix.
-    /// @param num_factors - Number of systematic factors; a positive safe integer.
+    /// @param numFactors - Number of systematic factors; a positive safe integer.
     /// @param volatilities - Annualized factor volatilities, one per factor; non-negative.
     /// @param correlations - Flat row-major `numFactors * numFactors` correlation matrix; symmetric, unit diagonal, positive semidefinite.
     ///
@@ -969,9 +1125,10 @@ impl JsLatentMultiFactor {
     /// correlation matrix.
     #[wasm_bindgen(constructor)]
     pub fn new(
+        #[wasm_bindgen(js_name = "numFactors", unchecked_param_type = "number")]
         num_factors: JsValue,
-        volatilities: JsValue,
-        correlations: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray")] volatilities: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray")] correlations: JsValue,
     ) -> Result<JsLatentMultiFactor, JsValue> {
         LatentMultiFactor::new(
             js_uint(&num_factors, "numFactors")?,
@@ -983,7 +1140,7 @@ impl JsLatentMultiFactor {
     }
 
     /// Model with independent factors (identity correlation).
-    /// @param num_factors - Positive number of systematic factors; zero is rejected.
+    /// @param numFactors - Positive number of systematic factors; zero is rejected.
     /// @param volatilities - Annualized factor volatilities, one per factor; must be finite, non-negative and match the factor count.
     /// @returns The uncorrelated multi-factor model.
     ///
@@ -992,8 +1149,9 @@ impl JsLatentMultiFactor {
     /// Throws a `TypeError` if `numFactors` is not a safe non-negative integer
     /// or `volatilities` is not an array of numbers. Throws a validation error for a zero factor count, a length mismatch, or negative or non-finite volatility.
     pub fn uncorrelated(
+        #[wasm_bindgen(js_name = "numFactors", unchecked_param_type = "number")]
         num_factors: JsValue,
-        volatilities: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray")] volatilities: JsValue,
     ) -> Result<JsLatentMultiFactor, JsValue> {
         LatentMultiFactor::uncorrelated(
             js_uint(&num_factors, "numFactors")?,
@@ -1022,7 +1180,7 @@ impl JsLatentMultiFactor {
     }
 
     /// Turn independent standard normal draws into correlated, volatility-scaled factors.
-    /// @param independent_z - Independent standard normal draws, exactly one per factor.
+    /// @param independentZ - Independent standard normal draws, exactly one per factor.
     /// @returns The correlated factor values, one per factor.
     ///
     /// # Errors
@@ -1032,6 +1190,7 @@ impl JsLatentMultiFactor {
     #[wasm_bindgen(js_name = generateCorrelatedFactors)]
     pub fn generate_correlated_factors(
         &self,
+        #[wasm_bindgen(js_name = "independentZ", unchecked_param_type = "NumericArray")]
         independent_z: JsValue,
     ) -> Result<Box<[f64]>, JsValue> {
         self.inner
@@ -1059,7 +1218,10 @@ pub fn max_portfolio_loss_paths() -> usize {
 /// Throws a `validation` error if the length is not `n * n` or the matrix is
 /// not a valid positive-semidefinite correlation matrix.
 #[wasm_bindgen(js_name = choleskyCorrelation)]
-pub fn cholesky_correlation(matrix: JsValue, n: JsValue) -> Result<Box<[f64]>, JsValue> {
+pub fn cholesky_correlation(
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] matrix: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] n: JsValue,
+) -> Result<Box<[f64]>, JsValue> {
     let matrix = js_f64_seq(&matrix, "matrix")?;
     let n: usize = js_uint(&n, "n")?;
     finstack_quant_core::math::linalg::cholesky_correlation(&matrix, n)
@@ -1083,8 +1245,12 @@ pub fn cholesky_correlation(matrix: JsValue, n: JsValue) -> Result<Box<[f64]>, J
 /// recovery specification cannot build, or a simulated loss is non-finite.
 #[wasm_bindgen(js_name = simulatePortfolioLoss)]
 pub fn simulate_portfolio_loss(
+    #[wasm_bindgen(unchecked_param_type = "readonly generated.models.CreditExposure[] | string")]
     exposures: JsValue,
-    config: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.models.PortfolioLossConfig | string")] config: JsValue,
+    #[wasm_bindgen(
+        unchecked_optional_param_type = "generated.models.RecoverySpec | string | null"
+    )]
     recovery: Option<JsValue>,
 ) -> Result<JsPortfolioLossResult, JsValue> {
     let exposures: Vec<CreditExposure> = from_js_json(&exposures, "exposures")?;

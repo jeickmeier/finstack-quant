@@ -1,0 +1,70 @@
+{
+  "$defs": {
+    "OptionType": {
+      "description": "Option payoff direction used by analytical and numerical model engines.",
+      "oneOf": [
+        {
+          "const": "call",
+          "description": "Call option.",
+          "type": "string"
+        },
+        {
+          "const": "put",
+          "description": "Put option.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/option_market_params.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Spot, strike, rates, volatility, expiry and payoff direction of an option model call.",
+  "properties": {
+    "dividend_yield": {
+      "description": "Continuous dividend yield or cost of carry as a decimal.",
+      "format": "double",
+      "type": "number"
+    },
+    "option_type": {
+      "$ref": "#/$defs/OptionType",
+      "description": "Call or put payoff direction."
+    },
+    "rate": {
+      "description": "Continuously compounded annual risk-free rate as a decimal.",
+      "format": "double",
+      "type": "number"
+    },
+    "spot": {
+      "description": "Current spot or forward price in the instrument's quote units.",
+      "format": "double",
+      "type": "number"
+    },
+    "strike": {
+      "description": "Strike price in the same quote units as `spot`.",
+      "format": "double",
+      "type": "number"
+    },
+    "time_to_expiry": {
+      "description": "Time to expiry in years.",
+      "format": "double",
+      "type": "number"
+    },
+    "volatility": {
+      "description": "Annualized volatility as a decimal.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "spot",
+    "strike",
+    "rate",
+    "volatility",
+    "time_to_expiry",
+    "dividend_yield",
+    "option_type"
+  ],
+  "title": "OptionMarketParams",
+  "type": "object"
+}

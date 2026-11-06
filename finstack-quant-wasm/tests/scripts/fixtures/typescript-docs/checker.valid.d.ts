@@ -68,6 +68,10 @@ export const math: MathNamespace;
 
 /**
  * Reusable WebAssembly report handle used by the documentation checker fixture.
+ * @example
+ * ```typescript
+ * console.log(report.toJson());
+ * ```
  */
 export declare class ReportHandle {
   /**

@@ -44,33 +44,14 @@ pub struct PyRecoveryClaim {
 impl PyRecoveryClaim {
     #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryClaim.__init__")]
     #[new]
-    #[pyo3(signature = (id, seniority, priority, principal, accrued, penalties, collateral_haircut, collateral_value=None))]
     #[pyo3(
-        text_signature = "(id, seniority, priority, principal, accrued, penalties, collateral_haircut, collateral_value=None)"
+        signature = (**fields),
+        text_signature = "(*, id, seniority, priority, principal, accrued, penalties, collateral_haircut, collateral_value=None)"
     )]
-    #[allow(clippy::too_many_arguments)]
-    fn new(
-        id: String,
-        seniority: String,
-        priority: u32,
-        principal: f64,
-        accrued: f64,
-        penalties: f64,
-        collateral_haircut: f64,
-        collateral_value: Option<f64>,
-    ) -> Self {
-        Self {
-            inner: RecoveryClaim {
-                id,
-                seniority,
-                priority,
-                principal,
-                accrued,
-                penalties,
-                collateral_value,
-                collateral_haircut,
-            },
-        }
+    fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
+        let inner: RecoveryClaim =
+            crate::bindings::module_utils::fields_from_py(py, fields, "RecoveryClaim")?;
+        Ok(Self { inner })
     }
 
     #[doc = pydoc!("finstack_quant.models.credit.recovery_waterfall", "RecoveryClaim.id")]
