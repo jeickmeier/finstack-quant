@@ -3058,15 +3058,15 @@ mod cases {
                     - sum_on(&flows.cashflows, date);
                 assert!(
                     interest_gap.abs() <= RECONCILE_TOLERANCE,
-                    "{id} interest on {date} is off by {interest_gap}"
+                    "interest payments do not reconcile with cashflows"
                 );
                 assert!(
                     principal_gap.abs() <= RECONCILE_TOLERANCE,
-                    "{id} principal on {date} is off by {principal_gap}"
+                    "principal payments do not reconcile with cashflows"
                 );
                 assert!(
                     cash_gap.abs() <= RECONCILE_TOLERANCE,
-                    "{id} cash on {date} is off by {cash_gap}"
+                    "total payments do not reconcile with cashflows"
                 );
             }
         }

@@ -1,0 +1,720 @@
+{
+  "schema": "finstack_quant.calibration/1",
+  "result": {
+    "final_market": {
+      "schema_version": 1,
+      "curves": [
+        {
+          "type": "hazard",
+          "id": "CDX-NA-IG-46",
+          "base": "2026-05-08",
+          "knot_points": [
+            [
+              1.1333333333333333,
+              0.008281414431872202
+            ],
+            [
+              3.1638888888888888,
+              0.014969844588757105
+            ],
+            [
+              5.191666666666666,
+              0.024149828285938122
+            ],
+            [
+              7.222222222222222,
+              0.02355838539884717
+            ],
+            [
+              10.266666666666667,
+              0.025312484499633043
+            ]
+          ],
+          "recovery_rate": 0.4,
+          "issuer": "CDX.NA.IG.46",
+          "seniority": "senior",
+          "currency": "USD",
+          "day_count": "act_360",
+          "par_points": [
+            [
+              1.1333333333333333,
+              50.0
+            ],
+            [
+              3.1638888888888888,
+              75.0
+            ],
+            [
+              5.191666666666666,
+              100.0
+            ],
+            [
+              7.222222222222222,
+              110.0
+            ],
+            [
+              10.266666666666667,
+              120.0
+            ]
+          ],
+          "par_interp": "linear",
+          "hazard_calibration": {
+            "hazard_params": {
+              "base_date": "2026-05-08",
+              "currency": "USD",
+              "curve_id": "CDX-NA-IG-46",
+              "discount_curve_id": "USD-OIS",
+              "entity": "CDX.NA.IG.46",
+              "method": "bootstrap",
+              "notional": 1.0,
+              "par_interp": "linear",
+              "recovery_rate": 0.4,
+              "seniority": "senior"
+            },
+            "calibration_inputs": [
+              {
+                "quote": {
+                  "convention": {
+                    "currency": "USD",
+                    "doc_clause": "isda_na"
+                  },
+                  "entity": "CDX.NA.IG.46",
+                  "id": "CDX-IG-46-1Y",
+                  "pillar": {
+                    "tenor": {
+                      "count": 1,
+                      "unit": "years"
+                    }
+                  },
+                  "recovery_rate": 0.4,
+                  "spread_bp": 50.0,
+                  "type": "cds_par_spread"
+                },
+                "pillar_date": "2027-06-20",
+                "pillar_time": 1.1333333333333333
+              },
+              {
+                "quote": {
+                  "convention": {
+                    "currency": "USD",
+                    "doc_clause": "isda_na"
+                  },
+                  "entity": "CDX.NA.IG.46",
+                  "id": "CDX-IG-46-3Y",
+                  "pillar": {
+                    "tenor": {
+                      "count": 3,
+                      "unit": "years"
+                    }
+                  },
+                  "recovery_rate": 0.4,
+                  "spread_bp": 75.0,
+                  "type": "cds_par_spread"
+                },
+                "pillar_date": "2029-06-20",
+                "pillar_time": 3.1638888888888888
+              },
+              {
+                "quote": {
+                  "convention": {
+                    "currency": "USD",
+                    "doc_clause": "isda_na"
+                  },
+                  "entity": "CDX.NA.IG.46",
+                  "id": "CDX-IG-46-5Y",
+                  "pillar": {
+                    "tenor": {
+                      "count": 5,
+                      "unit": "years"
+                    }
+                  },
+                  "recovery_rate": 0.4,
+                  "spread_bp": 100.0,
+                  "type": "cds_par_spread"
+                },
+                "pillar_date": "2031-06-20",
+                "pillar_time": 5.191666666666666
+              },
+              {
+                "quote": {
+                  "convention": {
+                    "currency": "USD",
+                    "doc_clause": "isda_na"
+                  },
+                  "entity": "CDX.NA.IG.46",
+                  "id": "CDX-IG-46-7Y",
+                  "pillar": {
+                    "tenor": {
+                      "count": 7,
+                      "unit": "years"
+                    }
+                  },
+                  "recovery_rate": 0.4,
+                  "spread_bp": 110.0,
+                  "type": "cds_par_spread"
+                },
+                "pillar_date": "2033-06-20",
+                "pillar_time": 7.222222222222222
+              },
+              {
+                "quote": {
+                  "convention": {
+                    "currency": "USD",
+                    "doc_clause": "isda_na"
+                  },
+                  "entity": "CDX.NA.IG.46",
+                  "id": "CDX-IG-46-10Y",
+                  "pillar": {
+                    "tenor": {
+                      "count": 10,
+                      "unit": "years"
+                    }
+                  },
+                  "recovery_rate": 0.4,
+                  "spread_bp": 120.0,
+                  "type": "cds_par_spread"
+                },
+                "pillar_date": "2036-06-20",
+                "pillar_time": 10.266666666666667
+              }
+            ],
+            "spread_risk_inputs": [
+              {
+                "quote": {
+                  "convention": {
+                    "currency": "USD",
+                    "doc_clause": "isda_na"
+                  },
+                  "entity": "CDX.NA.IG.46",
+                  "id": "CDX-IG-46-1Y",
+                  "pillar": {
+                    "tenor": {
+                      "count": 1,
+                      "unit": "years"
+                    }
+                  },
+                  "recovery_rate": 0.4,
+                  "spread_bp": 50.0,
+                  "type": "cds_par_spread"
+                },
+                "pillar_date": "2027-06-20",
+                "pillar_time": 1.1333333333333333
+              },
+              {
+                "quote": {
+                  "convention": {
+                    "currency": "USD",
+                    "doc_clause": "isda_na"
+                  },
+                  "entity": "CDX.NA.IG.46",
+                  "id": "CDX-IG-46-3Y",
+                  "pillar": {
+                    "tenor": {
+                      "count": 3,
+                      "unit": "years"
+                    }
+                  },
+                  "recovery_rate": 0.4,
+                  "spread_bp": 75.0,
+                  "type": "cds_par_spread"
+                },
+                "pillar_date": "2029-06-20",
+                "pillar_time": 3.1638888888888888
+              },
+              {
+                "quote": {
+                  "convention": {
+                    "currency": "USD",
+                    "doc_clause": "isda_na"
+                  },
+                  "entity": "CDX.NA.IG.46",
+                  "id": "CDX-IG-46-5Y",
+                  "pillar": {
+                    "tenor": {
+                      "count": 5,
+                      "unit": "years"
+                    }
+                  },
+                  "recovery_rate": 0.4,
+                  "spread_bp": 100.0,
+                  "type": "cds_par_spread"
+                },
+                "pillar_date": "2031-06-20",
+                "pillar_time": 5.191666666666666
+              },
+              {
+                "quote": {
+                  "convention": {
+                    "currency": "USD",
+                    "doc_clause": "isda_na"
+                  },
+                  "entity": "CDX.NA.IG.46",
+                  "id": "CDX-IG-46-7Y",
+                  "pillar": {
+                    "tenor": {
+                      "count": 7,
+                      "unit": "years"
+                    }
+                  },
+                  "recovery_rate": 0.4,
+                  "spread_bp": 110.0,
+                  "type": "cds_par_spread"
+                },
+                "pillar_date": "2033-06-20",
+                "pillar_time": 7.222222222222222
+              },
+              {
+                "quote": {
+                  "convention": {
+                    "currency": "USD",
+                    "doc_clause": "isda_na"
+                  },
+                  "entity": "CDX.NA.IG.46",
+                  "id": "CDX-IG-46-10Y",
+                  "pillar": {
+                    "tenor": {
+                      "count": 10,
+                      "unit": "years"
+                    }
+                  },
+                  "recovery_rate": 0.4,
+                  "spread_bp": 120.0,
+                  "type": "cds_par_spread"
+                },
+                "pillar_date": "2036-06-20",
+                "pillar_time": 10.266666666666667
+              }
+            ],
+            "calibration_config": {
+              "compute_diagnostics": false,
+              "discount_curve": {
+                "allow_non_monotonic_final": null,
+                "bootstrap_seed_global_solve": true,
+                "df_hard_max": 1000000.0,
+                "df_hard_min": 1e-12,
+                "jacobian_step_size": 1e-6,
+                "min_scan_grid_points": 20,
+                "scan_grid_points": 48,
+                "scan_grid_step": 0.0001,
+                "validation_tolerance": 1e-8,
+                "weighting_scheme": "sqrt_time"
+              },
+              "fail_on_bad_fit": false,
+              "forward_curve": {
+                "validation_tolerance": 1e-8,
+                "weighting_scheme": "sqrt_time"
+              },
+              "fx": {
+                "cache_capacity": 256,
+                "enable_triangulation": true,
+                "pivot_currency": "USD"
+              },
+              "hazard_curve": {
+                "hazard_hard_max": 10.0,
+                "hazard_hard_min": 0.0,
+                "validation_tolerance": 1e-8,
+                "weighting_scheme": "sqrt_time"
+              },
+              "inflation_curve": {
+                "cpi_hard_max": 10000.0,
+                "cpi_hard_min": 1.0,
+                "validation_tolerance": 1e-8,
+                "weighting_scheme": "sqrt_time"
+              },
+              "rate_bounds": {
+                "max_rate": 0.5,
+                "min_rate": -0.02
+              },
+              "rate_bounds_policy": "auto_currency",
+              "solver": {
+                "max_iterations": 100,
+                "tolerance": 1e-12
+              },
+              "use_parallel": false,
+              "validation": {
+                "allow_negative_rates": false,
+                "check_arbitrage": true,
+                "check_forward_positivity": true,
+                "check_monotonicity": true,
+                "max_cpi_growth": 0.5,
+                "max_forward_rate": 0.5,
+                "max_fwd_inflation": 0.5,
+                "max_hazard_rate": 0.5,
+                "max_volatility": 5.0,
+                "min_cpi_growth": -0.1,
+                "min_forward_rate": -0.01,
+                "min_fwd_inflation": -0.2,
+                "minimum_lgd_for_hazard_guess": 1e-6,
+                "recovery_rate_abs_tolerance": 1e-12,
+                "tolerance": 1e-10
+              },
+              "validation_mode": "error",
+              "vol_surface": {
+                "validation_tolerance": 0.001
+              }
+            }
+          },
+          "fx_policy": null
+        },
+        {
+          "type": "discount",
+          "id": "USD-OIS",
+          "base": "2026-05-08",
+          "day_count": "act_365f",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.0958904109589041,
+              0.994921753549591
+            ],
+            [
+              0.26301369863013696,
+              0.98631263002696
+            ],
+            [
+              1.0164383561643835,
+              0.9500181643912101
+            ],
+            [
+              2.0246575342465754,
+              0.9065521544949642
+            ],
+            [
+              5.019178082191781,
+              0.7999882376694798
+            ],
+            [
+              10.024657534246575,
+              0.667772846665791
+            ]
+          ],
+          "interp_style": "linear",
+          "extrapolation": "flat_forward",
+          "min_forward_rate": -0.005,
+          "allow_non_monotonic": false,
+          "min_forward_tenor": 1e-6,
+          "rate_calibration": {
+            "currency": "USD",
+            "method": "bootstrap",
+            "curve_day_count": "act_365f",
+            "ois_compounding": null,
+            "role": {
+              "discount": {
+                "projection_curve_id": "USD-OIS"
+              }
+            },
+            "quotes": [
+              {
+                "deposit": {
+                  "index_id": "USD-SOFR-OIS",
+                  "pillar": {
+                    "tenor": {
+                      "count": 1,
+                      "unit": "months"
+                    }
+                  },
+                  "rate": 0.0525
+                }
+              },
+              {
+                "deposit": {
+                  "index_id": "USD-SOFR-OIS",
+                  "pillar": {
+                    "tenor": {
+                      "count": 3,
+                      "unit": "months"
+                    }
+                  },
+                  "rate": 0.052
+                }
+              },
+              {
+                "swap": {
+                  "index_id": "USD-SOFR-OIS",
+                  "pillar": {
+                    "tenor": {
+                      "count": 1,
+                      "unit": "years"
+                    }
+                  },
+                  "rate": 0.051,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "index_id": "USD-SOFR-OIS",
+                  "pillar": {
+                    "tenor": {
+                      "count": 2,
+                      "unit": "years"
+                    }
+                  },
+                  "rate": 0.049,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "index_id": "USD-SOFR-OIS",
+                  "pillar": {
+                    "tenor": {
+                      "count": 5,
+                      "unit": "years"
+                    }
+                  },
+                  "rate": 0.045,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "index_id": "USD-SOFR-OIS",
+                  "pillar": {
+                    "tenor": {
+                      "count": 10,
+                      "unit": "years"
+                    }
+                  },
+                  "rate": 0.041,
+                  "spread_decimal": null
+                }
+              }
+            ]
+          },
+          "fx_policy": null
+        }
+      ],
+      "fx": null,
+      "surfaces": [
+        {
+          "id": "CDX-NA-IG-46-CDSO-VOL",
+          "expiries": [
+            0.1095890410958904,
+            0.36164383561643837,
+            0.6109589041095891
+          ],
+          "strikes": [
+            0.004,
+            0.01,
+            0.0125
+          ],
+          "secondary_axis": "strike",
+          "quote_type": "black_lognormal",
+          "interpolation_mode": "total_variance",
+          "vols_row_major": [
+            0.36030048295382633,
+            0.3602999999999778,
+            0.3603000000000639,
+            0.3700004681571535,
+            0.369999999777432,
+            0.3700000002433254,
+            0.3800003895840514,
+            0.37999999217093017,
+            0.3800000069053627
+          ]
+        }
+      ],
+      "prices": {},
+      "series": [],
+      "inflation_indices": [],
+      "dividends": [],
+      "credit_indices": [],
+      "fx_delta_vol_surfaces": [],
+      "vol_cubes": [],
+      "hierarchy": null
+    },
+    "report": {
+      "success": true,
+      "residuals": {
+        "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260617-0.004:tolerance_ratio": 0.0004829538263195765,
+        "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260617-0.0100:tolerance_ratio": 2.220446049250313e-11,
+        "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260617-0.0125:tolerance_ratio": 6.389333506717776e-11,
+        "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260917-0.004:tolerance_ratio": 0.0004681571534881357,
+        "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260917-0.0100:tolerance_ratio": 2.2256801956999084e-7,
+        "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260917-0.0125:tolerance_ratio": 2.4332541537219754e-7,
+        "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20261217-0.004:tolerance_ratio": 0.00038958405140787633,
+        "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20261217-0.0100:tolerance_ratio": 7.82906983687326e-6,
+        "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20261217-0.0125:tolerance_ratio": 6.905362670561743e-6
+      },
+      "iterations": 673,
+      "objective_value": 0.00025912252334499915,
+      "max_residual": 4.829538263195765e-7,
+      "rmse": 2.5912252334499917e-7,
+      "max_residual_ratio": 0.0004829538263195765,
+      "rmse_ratio": 0.00025912252334499915,
+      "validation_passed": true,
+      "convergence_reason": "Plan execution completed",
+      "metadata": {
+        "bid_ask_validation": "not_applicable_single_side_quote_schema",
+        "market_freshness_status": "unverified",
+        "market_quote_side": "mid",
+        "raw_residuals": "retained_in_step_reports",
+        "solver_tolerance": "1.00e-12",
+        "type": "plan_execution"
+      },
+      "solver_config": {
+        "tolerance": 1e-12,
+        "max_iterations": 100
+      },
+      "results_meta": {
+        "numeric_mode": "f64",
+        "rounding": {
+          "mode": "bankers",
+          "ingest_scale_by_currency": {},
+          "output_scale_by_currency": {},
+          "tolerances": {
+            "generic_epsilon": 1e-10
+          },
+          "version": 1
+        },
+        "fx_policy_applied": null,
+        "version": "0.11.0"
+      },
+      "explanation": {
+        "type": "calibration_plan",
+        "entries": [
+          {
+            "kind": "computation_step",
+            "name": "step:CDX-NA-IG-46-CDSO-VOL-STEP",
+            "description": "Begin step trace"
+          },
+          {
+            "kind": "computation_step",
+            "name": "surface_built",
+            "description": "Vol surface constructed"
+          }
+        ]
+      },
+      "worst_quote_id": "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260617-0.004:tolerance_ratio",
+      "worst_quote_residual": 0.0004829538263195765,
+      "solver_method": "plan_execution",
+      "residual_units": "absolute_residual_over_step_tolerance"
+    },
+    "step_reports": {
+      "CDX-NA-IG-46-CDSO-VOL-STEP": {
+        "success": true,
+        "residuals": {
+          "CDX-NA-IG-46-VOL-20260617-0.004": 4.829538263195765e-7,
+          "CDX-NA-IG-46-VOL-20260617-0.0100": -2.220446049250313e-14,
+          "CDX-NA-IG-46-VOL-20260617-0.0125": 6.389333506717776e-14,
+          "CDX-NA-IG-46-VOL-20260917-0.004": 4.681571534881357e-7,
+          "CDX-NA-IG-46-VOL-20260917-0.0100": -2.2256801956999084e-10,
+          "CDX-NA-IG-46-VOL-20260917-0.0125": 2.4332541537219754e-10,
+          "CDX-NA-IG-46-VOL-20261217-0.004": 3.8958405140787633e-7,
+          "CDX-NA-IG-46-VOL-20261217-0.0100": -7.82906983687326e-9,
+          "CDX-NA-IG-46-VOL-20261217-0.0125": 6.905362670561743e-9
+        },
+        "iterations": 673,
+        "objective_value": 2.5912252334499917e-7,
+        "max_residual": 4.829538263195765e-7,
+        "rmse": 2.5912252334499917e-7,
+        "validation_passed": true,
+        "convergence_reason": "vol surface calibration converged: max_residual (4.83e-7) within tolerance (1.00e-3)",
+        "metadata": {
+          "calibrated_expiries": "0.109589,0.361644,0.610959",
+          "calibrated_expiry_count": "3",
+          "expiry_extrapolation_policy": "clamp",
+          "sabr_parameters_at_bounds": "T=0.109589:nu;T=0.361644:nu;T=0.610959:nu",
+          "sabr_residual_evaluations": "T=0.109589:2879;T=0.361644:1348;T=0.610959:1251",
+          "sabr_winning_iterations": "T=0.109589:18;T=0.361644:17;T=0.610959:16",
+          "sabr_winning_starts": "T=0.109589:alpha=0.36030000,nu=0.15000000,rho=-0.60000000;T=0.361644:alpha=0.37000000,nu=0.15000000,rho=-0.60000000;T=0.610959:alpha=0.38000000,nu=0.40000000,rho=0.60000000",
+          "solver_max_iterations": "100",
+          "solver_tolerance": "1.00e-12",
+          "type": "vol_surface"
+        },
+        "solver_config": {
+          "tolerance": 1e-12,
+          "max_iterations": 100
+        },
+        "results_meta": {
+          "numeric_mode": "f64",
+          "rounding": {
+            "mode": "bankers",
+            "ingest_scale_by_currency": {},
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "generic_epsilon": 1e-10
+            },
+            "version": 1
+          },
+          "fx_policy_applied": null,
+          "version": "0.11.0"
+        },
+        "explanation": {
+          "type": "vol_surface",
+          "entries": [
+            {
+              "kind": "computation_step",
+              "name": "surface_built",
+              "description": "Vol surface constructed"
+            }
+          ]
+        },
+        "worst_quote_id": "CDX-NA-IG-46-VOL-20260617-0.004",
+        "worst_quote_residual": 4.829538263195765e-7,
+        "success_tolerance": 0.001,
+        "solver_method": "per_slice_least_squares",
+        "residual_units": "quoted_volatility",
+        "fitted_slices": [
+          {
+            "expiry": 0.1095890410958904,
+            "parameters": {
+              "sabr": {
+                "alpha": 0.36029999682243546,
+                "beta": 1.0,
+                "nu": 0.001,
+                "rho": -0.00019570798230972297
+              }
+            },
+            "iterations": 361,
+            "max_relative_quote_error": 1.3404213886194185e-6
+          },
+          {
+            "expiry": 0.36164383561643837,
+            "parameters": {
+              "sabr": {
+                "alpha": 0.369999988972421,
+                "beta": 1.0,
+                "nu": 0.0010000000000084973,
+                "rho": -0.00016332054716172717
+              }
+            },
+            "iterations": 161,
+            "max_relative_quote_error": 1.2652896040219883e-6
+          },
+          {
+            "expiry": 0.6109589041095891,
+            "parameters": {
+              "sabr": {
+                "alpha": 0.37999997246667355,
+                "beta": 1.0,
+                "nu": 0.001,
+                "rho": -9.427498626979336e-6
+              }
+            },
+            "iterations": 151,
+            "max_relative_quote_error": 1.025221187915464e-6
+          }
+        ]
+      }
+    },
+    "results_meta": {
+      "numeric_mode": "f64",
+      "rounding": {
+        "mode": "bankers",
+        "ingest_scale_by_currency": {},
+        "output_scale_by_currency": {},
+        "tolerances": {
+          "generic_epsilon": 1e-10
+        },
+        "version": 1
+      },
+      "fx_policy_applied": null,
+      "version": "0.11.0"
+    }
+  }
+}

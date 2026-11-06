@@ -1,0 +1,44 @@
+{
+  "status": "all_required_gate_stages_passed_after_targeted_repairs",
+  "production_revision": "779e1ed192",
+  "post_revision_changes": [
+    "test-local dc renamed to day_count",
+    "generated valuations cross-host integration fixture refreshed",
+    "benchmark evidence and report"
+  ],
+  "rust_tests": {
+    "passed": 16269,
+    "skipped": 86
+  },
+  "python_initial": {
+    "passed": 13945,
+    "failed": 1,
+    "skipped": 112
+  },
+  "python_corrected_file": {
+    "passed": 7,
+    "failed": 0
+  },
+  "wasm_facade": {
+    "passed": 1089,
+    "failed": 0
+  },
+  "ui": {
+    "files": 125,
+    "passed": 1525,
+    "failed": 0
+  },
+  "audits": "passed",
+  "rust_doc": "passed",
+  "log_sha256": {
+    "initial_all": "cbca6158429e3bc8851ab38178095d2b926d90ae388598bf946c814d6c4f04cc",
+    "generation": "22d0a7a75451ae2af8458f190d32316d7c37aa2e10ed7be028e50c74a92e3b22",
+    "rust_tests": "6e48e03d3a1dfbf4fb3b7cdf8624b22a4b9a49d5f6f33e4a80cfb541c0aca207",
+    "wasm_tests": "f27745dea749cc7b9fb9ee02bd193c71521bec8b42f18de02817f13cd9ad8374",
+    "python_ui_audit_initial": "a84368bd8d5bca9d356d7b9604e90cb70e6a39d955325343314cf19a7ff27080",
+    "python_parity_recheck": "71cbce5918ae1670df7865200f5b52af4856516fadfe432b51be9cea00ceceea",
+    "wasm_parity_recheck": "e99cebbef9dc601a023b0927ba4ad06eeb0918e9748c76d38237445898c277c9",
+    "ui": "6f2bb45b0cc114383ca72beffb372ce220859ffb4f0c06c49ed396e2e1d6aa68",
+    "rust_doc": "2951c27608a09db055e2660cc2de61111cab8aea43f77590c55cde4b33288bd6"
+  }
+}

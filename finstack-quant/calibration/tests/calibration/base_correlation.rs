@@ -317,3 +317,59 @@ fn base_correlation_rejects_thin_tranche_mispricing_above_ten_basis_points() {
         .expect_err("170 bp error on a 3% tranche must fail calibration");
     assert!(err.to_string().contains("exceeds tolerance"), "{err}");
 }
+
+#[test]
+fn credit_performance_calibrated_off_grid_accuracy() {
+    use finstack_quant_core::contract::LoadLimits;
+    let input = CalibrationEnvelope::from_slice_strict(
+        include_bytes!("../../examples/market_bootstrap/05_cdx_base_correlation.json"),
+        &LoadLimits::default(),
+    )
+    .expect("example envelope")
+    .0;
+    let output = engine::calibrate(&input).expect("calibration");
+    assert!(output.result.report.success);
+    let market = MarketContext::try_from(output.result.final_market).expect("market");
+    let actual = market
+        .get_base_correlation("CDX-NA-IG-46_CORR")
+        .expect("correlation");
+    // S0's original-engine calibrated smile, retained in the benchmark evidence.
+    // Price both curves on identical market inputs to isolate the smile change.
+    let original = BaseCorrelationCurve::builder("S0")
+        .knots([
+            (3.0, 0.20066202918105408),
+            (7.0, 0.21114989424558556),
+            (10.0, 0.21967934116464416),
+            (15.0, 0.2317704160688706),
+            (30.0, 0.24896498928161678),
+        ])
+        .build()
+        .expect("S0 smile");
+    let as_of = Date::from_calendar_date(2026, Month::May, 8).expect("date");
+    let maturity = Date::from_calendar_date(2031, Month::June, 20).expect("date");
+    for (attachment, detachment) in [(0.01, 0.05), (0.06, 0.061), (0.12, 0.25)] {
+        let q = quote(attachment, detachment, maturity);
+        let mut tranche = build_tranche(&q, as_of, 10_000_000.0);
+        tranche.credit_index_id = "CDX-NA-IG-46".into();
+        let prepared = CdsTranchePricer::new()
+            .prepare(&tranche, &market, as_of)
+            .expect("prepare");
+        let expected = prepared
+            .price(&original)
+            .expect("S0 off-grid price")
+            .amount();
+        let value = prepared
+            .price(&actual)
+            .expect("new off-grid price")
+            .amount();
+        // S0's bound: 4e-10/width erosion, two protection variations per
+        // coupon period plus 5% annual premium exposure. This instrument has
+        // at most 22 quarterly periods and a horizon below six years.
+        let bound =
+            tranche.notional.amount() * 4e-10 / (detachment - attachment) * (44.0 + 0.05 * 6.0);
+        assert!(
+            (value - expected).abs() <= bound,
+            "off-grid {attachment}-{detachment}: {value} vs {expected}, bound {bound}"
+        );
+    }
+}

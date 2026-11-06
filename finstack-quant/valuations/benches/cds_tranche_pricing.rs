@@ -226,14 +226,36 @@ fn bench_cds_tranche_npv(c: &mut Criterion) {
         ("junior_mezz_3_7", 3.0, 7.0),
         ("senior_mezz_7_10", 7.0, 10.0),
         ("senior_10_15", 10.0, 15.0),
+        ("thin_6_6_1", 6.0, 6.1),
+        ("high_60_100", 60.0, 100.0),
     ];
 
     for (name, attach, detach) in tranches {
         let tranche = create_tranche(attach, detach, 5);
         group.bench_with_input(BenchmarkId::from_parameter(name), name, |b, _| {
-            b.iter(|| tranche.value(black_box(&market), black_box(as_of)));
+            b.iter(|| {
+                tranche
+                    .value(black_box(&market), black_box(as_of))
+                    .expect("tranche must price")
+            });
         });
     }
+    let long = create_tranche(3.0, 7.0, 10);
+    group.bench_function("ten_year", |b| {
+        b.iter(|| {
+            long.value(black_box(&market), black_box(as_of))
+                .expect("ten-year tranche must price")
+        });
+    });
+    let mut seasoned = create_tranche(7.0, 15.0, 5);
+    seasoned.realized_loss = 0.02;
+    group.bench_function("seasoned", |b| {
+        b.iter(|| {
+            seasoned
+                .value(black_box(&market), black_box(as_of))
+                .expect("seasoned tranche must price")
+        });
+    });
     group.finish();
 }
 
@@ -270,7 +292,9 @@ fn bench_cds_tranche_correlation_delta(c: &mut Criterion) {
 
     group.bench_function("correlation_delta", |b| {
         b.iter(|| {
-            pricer.calculate_correlation_delta(&tranche, black_box(&market), black_box(as_of))
+            pricer
+                .calculate_correlation_delta(&tranche, black_box(&market), black_box(as_of))
+                .expect("tranche measure must succeed")
         });
     });
 
@@ -286,7 +310,11 @@ fn bench_cds_tranche_jump_to_default(c: &mut Criterion) {
     let pricer = CdsTranchePricer::new();
 
     group.bench_function("jump_to_default", |b| {
-        b.iter(|| pricer.calculate_jump_to_default(&tranche, black_box(&market), black_box(as_of)));
+        b.iter(|| {
+            pricer
+                .calculate_jump_to_default(&tranche, black_box(&market), black_box(as_of))
+                .expect("tranche measure must succeed")
+        });
     });
 
     group.finish();
@@ -301,7 +329,11 @@ fn bench_cds_tranche_par_spread(c: &mut Criterion) {
     let pricer = CdsTranchePricer::new();
 
     group.bench_function("par_spread", |b| {
-        b.iter(|| pricer.calculate_par_spread(&tranche, black_box(&market), black_box(as_of)));
+        b.iter(|| {
+            pricer
+                .calculate_par_spread(&tranche, black_box(&market), black_box(as_of))
+                .expect("tranche measure must succeed")
+        });
     });
 
     group.finish();
@@ -326,11 +358,15 @@ fn bench_cds_tranche_all_metrics(c: &mut Criterion) {
                 )
                 .unwrap();
 
-            let _corr_delta =
-                pricer.calculate_correlation_delta(&tranche, black_box(&market), black_box(as_of));
-            let _jtd =
-                pricer.calculate_jump_to_default(&tranche, black_box(&market), black_box(as_of));
-            let _par = pricer.calculate_par_spread(&tranche, black_box(&market), black_box(as_of));
+            let _corr_delta = pricer
+                .calculate_correlation_delta(&tranche, black_box(&market), black_box(as_of))
+                .expect("tranche measure must succeed");
+            let _jtd = pricer
+                .calculate_jump_to_default(&tranche, black_box(&market), black_box(as_of))
+                .expect("tranche measure must succeed");
+            let _par = pricer
+                .calculate_par_spread(&tranche, black_box(&market), black_box(as_of))
+                .expect("tranche measure must succeed");
         });
     });
 
@@ -368,10 +404,83 @@ fn bench_cds_tranche_heterogeneous(c: &mut Criterion) {
             BenchmarkId::new("npv_hetero", pool_size),
             &pool_size,
             |b, _| {
-                b.iter(|| tranche.value(black_box(&market), black_box(as_of)));
+                b.iter(|| {
+                    tranche
+                        .value(black_box(&market), black_box(as_of))
+                        .expect("tranche must price")
+                });
             },
         );
     }
+    group.finish();
+}
+
+fn bench_cds_tranche_prepared(c: &mut Criterion) {
+    let mut group = c.benchmark_group("cds_tranche_prepared");
+    let market = create_market();
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+    let tranche = create_tranche(3.0, 7.0, 5);
+    let pricer = CdsTranchePricer::new();
+    let prepared = pricer.prepare(&tranche, &market, as_of).unwrap();
+    let index = market.get_credit_index("CDX.NA.IG.42").unwrap();
+    let correlation = index.base_correlation_curve();
+    assert_eq!(
+        prepared.price(correlation).unwrap(),
+        pricer.price_tranche(&tranche, &market, as_of).unwrap()
+    );
+    group.bench_function("prepare_only_3_7", |b| {
+        b.iter(|| {
+            pricer
+                .prepare(black_box(&tranche), black_box(&market), black_box(as_of))
+                .unwrap()
+        })
+    });
+    group.bench_function("reuse_3_7", |b| {
+        b.iter(|| prepared.price(black_box(correlation)).unwrap())
+    });
+    let noncontiguous = create_tranche(4.0, 7.0, 5);
+    let prepared_noncontiguous = pricer.prepare(&noncontiguous, &market, as_of).unwrap();
+    let trials: Vec<_> = [0.26, 0.27]
+        .into_iter()
+        .map(|rho| {
+            BaseCorrelationCurve::builder("interpolated_trial")
+                .knots([(3.0, 0.25), (7.0, rho), (100.0, rho)])
+                .build()
+                .unwrap()
+        })
+        .collect();
+    for trial in &trials {
+        assert_eq!(
+            prepared_noncontiguous.price(trial).unwrap(),
+            pricer
+                .prepare(&noncontiguous, &market, as_of)
+                .unwrap()
+                .price(trial)
+                .unwrap()
+        );
+    }
+    // Alternate the detachment knot so the actual interpolated attachment
+    // correlation changes on every trial: this is a cache-invalidation control.
+    group.bench_function("reuse_interpolated_4_7", |b| {
+        let mut trial = 0usize;
+        b.iter(|| {
+            trial ^= 1;
+            prepared_noncontiguous
+                .price(black_box(&trials[trial]))
+                .unwrap()
+        })
+    });
+    group.bench_function("prepare_and_price_interpolated_4_7", |b| {
+        let mut trial = 0usize;
+        b.iter(|| {
+            trial ^= 1;
+            pricer
+                .prepare(black_box(&noncontiguous), black_box(&market), as_of)
+                .unwrap()
+                .price(black_box(&trials[trial]))
+                .unwrap()
+        })
+    });
     group.finish();
 }
 
@@ -384,6 +493,7 @@ criterion_group!(
     bench_cds_tranche_par_spread,
     bench_cds_tranche_all_metrics,
     bench_cds_tranche_student_t_npv,
-    bench_cds_tranche_heterogeneous
+    bench_cds_tranche_heterogeneous,
+    bench_cds_tranche_prepared
 );
 criterion_main!(benches);

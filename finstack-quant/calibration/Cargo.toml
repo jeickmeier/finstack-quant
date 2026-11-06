@@ -60,6 +60,10 @@ name = "calibration"
 harness = false
 
 [[bench]]
+name = "credit_calibration"
+harness = false
+
+[[bench]]
 name = "global_calibration"
 harness = false
 

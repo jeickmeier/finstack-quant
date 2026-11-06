@@ -426,6 +426,7 @@ impl CdsPricer {
                     as_of,
                     disc,
                     surv,
+                    grid_cache: None,
                 })?;
             }
         }

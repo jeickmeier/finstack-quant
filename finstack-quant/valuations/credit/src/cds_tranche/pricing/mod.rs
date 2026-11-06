@@ -60,10 +60,13 @@ mod engine;
 mod expected_loss;
 mod heterogeneous;
 mod integration;
+mod pool;
+mod prepared;
 mod pricer;
 mod sensitivities;
 
 #[cfg(test)]
 mod tests;
 
+pub use prepared::PreparedTranche;
 pub use pricer::CdsTranchePricer;
