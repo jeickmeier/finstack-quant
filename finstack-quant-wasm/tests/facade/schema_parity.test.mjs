@@ -3,17 +3,18 @@
  * per-crate `index` / `get` / `validate` registries, the whole-workspace
  * `schema` namespace, the cashflow resources and the instrument validators.
  *
- * Expected values come from `schema_parity.golden.json`, which
- * `finstack-quant-py/tests/test_schema_wasm_parity.py` generates (in
- * `mise run gen-write`) and asserts through the Python binding, so each case is
- * a cross-host golden. Python
- * returns JSON text where WASM returns plain objects.
+ * Expected values come from `schema_parity.golden.json`, which this suite
+ * writes through the WASM binding when `UPDATE_SCHEMA_PARITY_GOLDEN=1` (in
+ * `mise run gen-write`), and which
+ * `finstack-quant-py/tests/test_schema_wasm_parity.py` asserts through the
+ * Python binding, so each case is a cross-host golden. Python returns JSON text
+ * where WASM returns plain objects.
  *
  * Requires the wasm-pack web build: npm run build (mise run wasm-build).
  */
 
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { test } from 'node:test';
 import init, * as facade from '../../index.js';
 
@@ -21,14 +22,30 @@ await init({
   module_or_path: readFileSync(new URL('../../pkg/finstack_quant_wasm_bg.wasm', import.meta.url)),
 });
 
-const golden = JSON.parse(
-  readFileSync(new URL('./schema_parity.golden.json', import.meta.url), 'utf8')
-);
+const GOLDEN = new URL('./schema_parity.golden.json', import.meta.url);
+
+/** Facade namespace path (`""` is the workspace registry) -> artifact exercised. */
+const REGISTRIES = {
+  core: 'period_plan.schema.json',
+  attribution: 'attribution.schema.json',
+  calibration: 'calibration.schema.json',
+  cashflows: 'amortization_spec.schema.json',
+  margin: 'schemas/margin/1/ead_result.schema.json',
+  'models.factor': 'factor_model_config.schema.json',
+  portfolio: 'cell_config.schema.json',
+  scenarios: 'scenario.schema.json',
+  statements: 'financial_model_spec.schema.json',
+  valuations: 'bond.schema.json',
+  '': 'https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json',
+};
+/** A payload no published object schema accepts, sent as JSON text by both hosts. */
+const INVALID_PAYLOAD = '{"not_a_field": 1}';
 
 /** The `schema` namespace at a facade path (`""` is the workspace registry). */
 const schemaAt = (path) =>
   path.split('.').reduce((node, key) => (key ? node[key] : node), facade).schema;
 
+/** Identity of a schema document: enough to tell both hosts read the same one. */
 const summary = (document) => ({
   id: document.$id ?? null,
   title: document.title ?? null,
@@ -36,12 +53,56 @@ const summary = (document) => ({
   definitions: Object.keys(document.$defs ?? {}).sort(),
 });
 
+/** An index without its prose columns: `bytes` pins each rendered document's size. */
 const INDEX_COLUMNS = ['domain', 'path', '$id', 'type_name', 'kind', 'bytes'];
 const indexSummary = (index) => ({
   schema_index_version: index.schema_index_version,
   artifacts: index.artifacts.map((row) =>
     Object.fromEntries(INDEX_COLUMNS.filter((key) => key in row).map((key) => [key, row[key]]))
   ),
+});
+
+/** Every golden case, computed through the WASM binding. */
+function cases() {
+  const registries = Object.fromEntries(
+    Object.entries(REGISTRIES).map(([path, selector]) => {
+      const schema = schemaAt(path);
+      return [
+        path,
+        {
+          selector,
+          index: indexSummary(schema.index()),
+          canonical: summary(schema.get(selector)),
+          llm: summary(schema.get(selector, 'llm')),
+          report: schema.validate(selector, INVALID_PAYLOAD),
+        },
+      ];
+    })
+  );
+  const { schema } = facade.valuations;
+  const json = JSON.stringify(schema.instrumentSchema('bond').examples[0]);
+  const resources = facade.cashflows.schema.resources();
+  return {
+    invalid_payload: INVALID_PAYLOAD,
+    registries,
+    domains: facade.schema.domains(),
+    cashflows_resources: Object.fromEntries(
+      Object.entries(resources).map(([uri, document]) => [uri, summary(document)])
+    ),
+    instrument: {
+      json,
+      envelope: schema.validateInstrumentEnvelopeJson(json),
+      typed: schema.validateInstrumentTypeJson('bond', json),
+    },
+  };
+}
+
+if (process.env.UPDATE_SCHEMA_PARITY_GOLDEN === '1')
+  writeFileSync(GOLDEN, `${JSON.stringify(cases(), null, 2)}\n`);
+const golden = JSON.parse(readFileSync(GOLDEN, 'utf8'));
+
+test('WASM matches the cross-host golden', () => {
+  assert.deepEqual(cases(), golden);
 });
 
 for (const [path, expected] of Object.entries(golden.registries)) {

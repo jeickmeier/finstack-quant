@@ -4,10 +4,20 @@ import {
   readRepoJson,
   readRepoText,
 } from "../../../scripts/fixture-inputs.mjs";
+// The CDX base-correlation calibration is the slowest native run behind the
+// fixtures, so this reuses the market tests/calibration/generate.mjs (run
+// first) recorded instead of calibrating the same input again.
 const source =
   "finstack-quant/calibration/examples/market_bootstrap/05_cdx_base_correlation.json";
 const input = await readRepoText(source);
-const calibrated = native.calibrate(input).result.final_market;
+const calibration = (
+  await readRepoJson("finstack-quant-ui/tests/calibration/cases.json")
+).find((entry) => entry.source === source && entry.variant === undefined);
+if (calibration?.sha256 !== sha256(input))
+  throw new Error(
+    `tests/calibration/cases.json does not hold the current ${source}; run \`mise run ui-fixtures\`.`,
+  );
+const calibrated = calibration.result.result.final_market;
 const variants = await readRepoJson(
   "finstack-quant-ui/registry/core/components/curve-link-example/market.json",
 );

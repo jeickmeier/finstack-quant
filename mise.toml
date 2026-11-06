@@ -155,11 +155,11 @@ run = ["cargo clean", "python3 scripts/clean_workspace.py"]
 # libpython, which plain cargo cannot find. pytest covers the bindings, and
 # rust-lint still type-checks the crate.
 #
-# rust-test, rust-gen-schemas, rust-check-schemas and the generate_contracts
-# runs in gen-write and gen-check all select `--workspace --exclude
-# finstack-quant-py`, so each reuses the others' build. Cargo turns on a
-# crate's `default` feature only when the crate is selected, so a
-# `-p finstack-quant-wasm` build compiles every workspace crate a second time.
+# rust-test, rust-check-schemas and the generator builds in gen-write and
+# gen-check all select `--workspace --exclude finstack-quant-py`, so each
+# reuses the others' build. Cargo turns on a crate's `default` feature only
+# when the crate is selected, so a `-p finstack-quant-wasm` build compiles
+# every workspace crate a second time.
 
 [tasks.rust-build]
 description = "Build the Rust library crates"
@@ -351,16 +351,6 @@ cargo bench -p "${usage_package?}" --bench "${usage_bench?}" -- \
   --noplot
 '''
 
-[tasks.rust-gen-schemas]
-# The schema step of gen-write. The rust-test build already holds every gen_*
-# binary, so this reuses it.
-description = "Regenerate the JSON schemas from Rust types (a step of gen-write)"
-hide = true
-run = [
-  "cargo nextest run --workspace --exclude finstack-quant-py --lib --test '*' --no-run",
-  "uv run --no-sync python scripts/check_schema_generation.py --write",
-]
-
 [tasks.rust-check-schemas]
 description = "Verify the JSON schemas and serde coverage match the Rust types (a stage of gen-check)"
 hide = true
@@ -410,22 +400,14 @@ run = [
 description = "Regenerate every checked-in generated file (schemas, fixtures, TypeScript bindings, UI files, facade surface, registry snapshot, schema parity golden)"
 run = [
   "uv run --no-project python finstack-quant/core/build/generate_reference_data.py",
-  { task = "rust-gen-schemas" },
-  # The pinned registry snapshot. The run writes the file and passes; the
-  # snapshot is embedded with include_str!, so the next rust-test rebuilds the
-  # binary and checks the new bytes.
-  "UPDATE_REGISTRY_SNAPSHOT=1 cargo nextest run --workspace --exclude finstack-quant-py --lib --test '*' -E 'binary_id(finstack-quant-valuations::valuations) & test(standard_registries_match_the_pinned_snapshot)'",
-  # The cross-host schema golden pins every published schema's identity and
-  # byte size; the Python binding embeds the schemas written above, so it is
-  # rebuilt first. The WASM facade suite checks the same golden.
-  { task = "python-build" },
-  "UPDATE_SCHEMA_PARITY_GOLDEN=1 uv run --no-sync pytest -q -p no:cacheprovider finstack-quant-py/tests/test_schema_wasm_parity.py -k cross_host_golden",
-  "finstack-quant-wasm/node_modules/.bin/prettier --log-level warn --write finstack-quant-wasm/tests/facade/schema_parity.golden.json",
-  # `cargo run` cannot select the workspace, so build, then run the binary.
-  '''
-  cargo build --workspace --exclude finstack-quant-py --example generate_contracts
-  "${CARGO_TARGET_DIR:-target}/debug/examples/generate_contracts" --write
-  ''',
+  # Build only the generators: the gen_* binaries and the generate_contracts
+  # example, together (an example build turns on dev-dependency features, so
+  # building them apart compiles the workspace twice). `cargo run` cannot select
+  # the workspace, so the binaries run from the target directory.
+  "cargo build --workspace --exclude finstack-quant-py --bins --example generate_contracts",
+  "uv run --no-sync python scripts/check_schema_generation.py --write",
+  '"${CARGO_TARGET_DIR:-target}/debug/gen_registry_snapshot" --write',
+  '"${CARGO_TARGET_DIR:-target}/debug/examples/generate_contracts" --write',
   "node finstack-quant-wasm/scripts/generate-contract-types.mjs",
   "uv run --no-sync python scripts/sync_generated_ts_index.py",
   # The facade declarations, the facade surface and the UI read the built WASM
@@ -433,6 +415,11 @@ run = [
   { task = "wasm-build" },
   { task = "wasm-build-node" },
   "node finstack-quant-wasm/scripts/gen-facade-dts.mjs",
+  # The cross-host schema golden pins every published schema's identity and
+  # byte size, computed through the WASM binding, which embeds the schemas
+  # written above; the Python suite checks the same golden.
+  "UPDATE_SCHEMA_PARITY_GOLDEN=1 node --test finstack-quant-wasm/tests/facade/schema_parity.test.mjs",
+  "finstack-quant-wasm/node_modules/.bin/prettier --log-level warn --write finstack-quant-wasm/tests/facade/schema_parity.golden.json",
   # The test writes plain JSON.stringify output; Prettier gives the committed form.
   "UPDATE_FACADE_SURFACE=1 node --test finstack-quant-wasm/tests/facade/surface.test.mjs",
   "finstack-quant-wasm/node_modules/.bin/prettier --log-level warn --write finstack-quant-wasm/facade-surface.json",
