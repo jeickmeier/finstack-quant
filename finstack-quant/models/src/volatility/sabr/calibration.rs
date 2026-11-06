@@ -573,6 +573,37 @@ where
     })
 }
 
+struct SabrJacobian<'a> {
+    strikes: &'a [super::expansion::PreparedSabrStrike],
+    weights: &'a [f64],
+    beta: f64,
+}
+
+impl finstack_quant_core::math::solver_multi::AnalyticalDerivatives for SabrJacobian<'_> {
+    fn residual_count(&self) -> usize {
+        self.strikes.len()
+    }
+
+    fn jacobian(&self, coordinates: &[f64], output: &mut [Vec<f64>]) -> Option<()> {
+        let alpha = coordinates[0].exp();
+        let nu = unconstrained_to_bounded(coordinates[1], 0.001, 2.0);
+        let rho = unconstrained_to_bounded(coordinates[2], -0.99, 0.99);
+        let parameters = SabrParameters::new(alpha, self.beta, nu, rho).ok()?;
+        let chain = [
+            alpha,
+            (nu - 0.001) * (2.0 - nu) / (2.0 - 0.001),
+            (rho + 0.99) * (0.99 - rho) / 1.98,
+        ];
+        for ((strike, weight), row) in self.strikes.iter().zip(self.weights).zip(output) {
+            let physical = strike.gradient(&parameters).ok()?;
+            for j in 0..3 {
+                row[j] = weight * physical[j] * chain[j];
+            }
+        }
+        Some(())
+    }
+}
+
 impl SabrCalibrator {
     fn validate_settings(&self) -> Result<()> {
         if !self.tolerance.is_finite() || self.tolerance <= 0.0 || self.max_iterations == 0 {
@@ -833,7 +864,12 @@ impl SabrCalibrator {
                             .map_or(1e6, |model_vol| weight * (model_vol - market_vol));
                     }
                 };
-                let solution = solver.solve_system(residuals, &initial, market_vols.len());
+                let derivatives = SabrJacobian {
+                    strikes: &prepared,
+                    weights: &weights,
+                    beta,
+                };
+                let solution = solver.solve_system_with_jacobian(residuals, &derivatives, &initial);
                 (solution, calls.get())
             },
             |solution| {
@@ -1254,6 +1290,82 @@ mod acceptance_tests {
     }
 
     #[test]
+    fn sabr_jacobian_matches_transformed_residuals() {
+        use finstack_quant_core::math::solver_multi::AnalyticalDerivatives;
+        for beta in [0.0, 0.5, 1.0] {
+            let template = SabrParameters::new(0.3, beta, 0.5, 0.0).expect("parameters");
+            let strikes: Vec<_> = [0.005, 0.009999999, 0.01, 0.010000001, 0.02]
+                .into_iter()
+                .map(|k| {
+                    super::super::expansion::PreparedSabrStrike::new(&template, 0.01, k, 2.0)
+                        .expect("strike")
+                })
+                .collect();
+            let weights = [0.25, 0.5, 1.0, 0.5, 0.25];
+            let derivative = SabrJacobian {
+                strikes: &strikes,
+                weights: &weights,
+                beta,
+            };
+            for coordinates in [
+                [-2.0, -2.0, -2.0],
+                [-2.0, 2.0, 2.0],
+                [-2.0, -20.0, 20.0],
+                [-2.0, 20.0, -20.0],
+            ] {
+                let mut jacobian = vec![vec![0.0; 3]; strikes.len()];
+                if derivative.jacobian(&coordinates, &mut jacobian).is_none() {
+                    let parameters = SabrParameters::new(
+                        coordinates[0].exp(),
+                        beta,
+                        unconstrained_to_bounded(coordinates[1], 0.001, 2.0),
+                        unconstrained_to_bounded(coordinates[2], -0.99, 0.99),
+                    )
+                    .expect("parameters");
+                    assert!(
+                        strikes
+                            .iter()
+                            .any(|strike| strike.evaluate(&parameters).is_err()),
+                        "valid trial unexpectedly lacks derivatives"
+                    );
+                    continue;
+                }
+                let residual = |x: &[f64; 3], i: usize| {
+                    let parameters = SabrParameters::new(
+                        x[0].exp(),
+                        beta,
+                        unconstrained_to_bounded(x[1], 0.001, 2.0),
+                        unconstrained_to_bounded(x[2], -0.99, 0.99),
+                    )
+                    .expect("transformed parameters");
+                    weights[i] * strikes[i].evaluate(&parameters).expect("vol")
+                };
+                for (i, row) in jacobian.iter().enumerate() {
+                    for j in 0..3 {
+                        let mut matches = 0;
+                        for h in [1e-3, 3e-4, 1e-4, 3e-5] {
+                            let mut up = coordinates;
+                            let mut down = coordinates;
+                            up[j] += h;
+                            down[j] -= h;
+                            let finite = (residual(&up, i) - residual(&down, i)) / (2.0 * h);
+                            if (finite - row[j]).abs()
+                                < 2e-6 * finite.abs().max(row[j].abs()) + 2e-8
+                            {
+                                matches += 1;
+                            }
+                        }
+                        assert!(
+                            matches >= 2,
+                            "beta={beta} x={coordinates:?} i={i} j={j} analytic={row:?}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
     fn sabr_preparation_fit_snapshot() {
         let mut outcomes = Vec::new();
         for beta in [0.0, 0.5, 1.0] {
@@ -1291,12 +1403,43 @@ mod acceptance_tests {
                             } else {
                                 SabrShift::None
                             });
-                    let mut outcome = serde_json::to_value(
-                        calibrator
-                            .calibrate(forward, &strikes, &vols, 2.0, beta)
-                            .expect("fit"),
-                    )
-                    .expect("outcome");
+                    let fit = calibrator
+                        .calibrate(forward, &strikes, &vols, 2.0, beta)
+                        .expect("fit");
+                    let repeat = calibrator
+                        .calibrate(forward, &strikes, &vols, 2.0, beta)
+                        .expect("repeat");
+                    assert_eq!(
+                        serde_json::to_string(&fit).expect("serialize"),
+                        serde_json::to_string(&repeat).expect("serialize"),
+                        "deterministic fit"
+                    );
+                    for (actual, expected) in [
+                        (fit.parameters.alpha, source.alpha),
+                        (fit.parameters.nu, source.nu),
+                        (fit.parameters.rho, source.rho),
+                    ] {
+                        assert!(
+                            (actual - expected).abs() < 1e-6,
+                            "identified synthetic parameter {actual} vs {expected}"
+                        );
+                    }
+                    for i in 0..41 {
+                        let strike = forward + (i as f64 - 20.0) * 0.0003;
+                        let actual = fit
+                            .parameters
+                            .implied_vol(forward, strike, 2.0)
+                            .expect("fit off grid");
+                        let expected = source
+                            .implied_vol(forward, strike, 2.0)
+                            .expect("source off grid");
+                        assert!(
+                            (actual - expected).abs() < 1e-8 * expected.abs().max(0.01),
+                            "off-grid smile {actual} vs {expected}"
+                        );
+                    }
+                    assert!(fit.parameters_at_bounds.is_empty());
+                    let mut outcome = serde_json::to_value(fit).expect("outcome");
                     outcome
                         .as_object_mut()
                         .expect("object")

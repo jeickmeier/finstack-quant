@@ -579,6 +579,233 @@ pub(super) fn normal_beta_zero(alpha: f64, nu: f64, rho: f64, f: f64, k: f64, t:
 mod performance_tests {
     use super::*;
 
+    type GradientReference = (f64, f64, f64, f64, f64, f64, [f64; 3]);
+
+    #[derive(serde::Deserialize)]
+    struct DerivativeReferences {
+        chi: Vec<(f64, f64, f64, f64)>,
+        ratio: Vec<(bool, f64, f64, f64, f64)>,
+        grid: Vec<GradientReference>,
+        boundaries: Vec<GradientReference>,
+    }
+
+    fn derivative_references() -> DerivativeReferences {
+        serde_json::from_str(include_str!(
+            "../../../tests/fixtures/sabr_derivative_references.json"
+        ))
+        .expect("independent references")
+    }
+
+    fn check_gradient_references(cases: &[GradientReference]) {
+        for &(alpha, beta, nu, rho, forward, strike, expected) in cases {
+            let parameters = SabrParameters::new(alpha, beta, nu, rho).expect("parameters");
+            let actual = PreparedSabrStrike::new(&parameters, forward, strike, 2.0)
+                .expect("prepare")
+                .gradient(&parameters)
+                .expect("gradient");
+            for (a, e) in actual.into_iter().zip(expected) {
+                assert!(
+                    (a - e).abs() < 2e-8 + 2e-6 * e.abs(),
+                    "alpha={alpha} beta={beta} nu={nu} rho={rho} strike={strike}: actual={actual:?} expected={expected:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn sabr_gradients_match_high_precision_grid() {
+        let references = derivative_references();
+        assert!(references.grid.len() > 900);
+        check_gradient_references(&references.grid);
+    }
+
+    #[test]
+    fn prepared_sabr_gradients_match_independent_difference_steps() {
+        for beta in [0.0, 0.00005, 0.0001, 0.5, 0.99995, 1.0] {
+            for alpha in [0.02, 0.3] {
+                for nu in [0.5, 1.999] {
+                    for rho in [-0.3, 0.0] {
+                        let parameters =
+                            SabrParameters::new(alpha, beta, nu, rho).expect("parameters");
+                        for relative in [-0.5, -1e-4, -1e-7, 0.0, 1e-7, 1e-4, 0.5] {
+                            let strike = 0.02 * (1.0 + relative);
+                            let prepared = PreparedSabrStrike::new(&parameters, 0.02, strike, 2.0)
+                                .expect("prepare");
+                            if prepared.evaluate(&parameters).is_err() {
+                                continue;
+                            }
+                            let gradient = prepared.gradient(&parameters).expect("gradient");
+                            for j in 0..3 {
+                                let mut matches = 0;
+                                for h in [1e-3, 3e-4, 1e-4, 3e-5] {
+                                    let scale = [alpha, nu.max(0.1), 1.0][j];
+                                    let step = h * scale;
+                                    let mut up = parameters.clone();
+                                    let mut down = parameters.clone();
+                                    match j {
+                                        0 => {
+                                            up.alpha += step;
+                                            down.alpha -= step;
+                                        }
+                                        1 => {
+                                            up.nu += step;
+                                            down.nu -= step;
+                                        }
+                                        _ => {
+                                            up.rho += step;
+                                            down.rho -= step;
+                                        }
+                                    }
+                                    let (Ok(u), Ok(d)) =
+                                        (prepared.evaluate(&up), prepared.evaluate(&down))
+                                    else {
+                                        continue;
+                                    };
+                                    let mut far_up = up.clone();
+                                    let mut far_down = down.clone();
+                                    match j {
+                                        0 => {
+                                            far_up.alpha += step;
+                                            far_down.alpha -= step;
+                                        }
+                                        1 => {
+                                            far_up.nu += step;
+                                            far_down.nu -= step;
+                                        }
+                                        _ => {
+                                            far_up.rho += step;
+                                            far_down.rho -= step;
+                                        }
+                                    }
+                                    let (Ok(uu), Ok(dd)) =
+                                        (prepared.evaluate(&far_up), prepared.evaluate(&far_down))
+                                    else {
+                                        continue;
+                                    };
+                                    let finite = (-uu + 8.0 * u - 8.0 * d + dd) / (12.0 * step);
+                                    let tolerance =
+                                        2e-6 * finite.abs().max(gradient[j].abs()) + 2e-8;
+                                    if (finite - gradient[j]).abs() <= tolerance {
+                                        matches += 1;
+                                    }
+                                }
+                                assert!(
+                                    matches >= 2,
+                                    "beta={beta} alpha={alpha} nu={nu} rho={rho} relative={relative} j={j} gradient={gradient:?}"
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // Independent 80-decimal central differences (h=1e-25) of the
+    // Hagan chi/Taylor/smoothstep definitions, on both sides of each seam.
+    #[test]
+    fn chi_derivatives_match_high_precision_seam_references() {
+        let references = derivative_references();
+        let cases = &references.chi;
+        for &(z, rho, dz, drho) in cases {
+            let actual = chi_partials(z, rho).expect("chi partials");
+            assert!(
+                (actual.0 - dz).abs() < 2e-10,
+                "z={z} rho={rho} dz={actual:?} expected={dz}"
+            );
+            assert!(
+                (actual.1 - drho).abs() < 2e-12,
+                "z={z} rho={rho} drho={actual:?} expected={drho}"
+            );
+        }
+    }
+    #[test]
+    fn sabr_gradients_match_inward_differences_at_fit_bounds() {
+        // Independent 80-digit inward differences avoid f64 cancellation at low nu.
+        let references = derivative_references();
+        assert!(references.boundaries.len() >= 30);
+        check_gradient_references(&references.boundaries);
+    }
+
+    #[test]
+    fn chi_seam_derivatives_match_each_one_sided_branch() {
+        for z in [-1e-3, -1e-5, 1e-5, 1e-3] {
+            for rho in [-0.99, 0.0, 0.99] {
+                let expected = chi_partials(z, rho).expect("partial").0;
+                for h in [-1e-7, 1e-7] {
+                    let finite = (-3.0 * chi(z, rho).expect("base")
+                        + 4.0 * chi(z + h, rho).expect("one")
+                        - chi(z + 2.0 * h, rho).expect("two"))
+                        / (2.0 * h);
+                    assert!(
+                        (finite - expected).abs() < 1e-6,
+                        "z={z} rho={rho} h={h}: {finite} vs {expected}"
+                    );
+                }
+            }
+        }
+    }
+    #[test]
+    fn ratio_derivatives_match_high_precision_seam_references() {
+        let references = derivative_references();
+        let cases = &references.ratio;
+        for &(normal, z, rho, dz, drho) in cases {
+            let (_, az, ar) = ratio_partials(z, rho, normal).expect("ratio partials");
+            assert!(
+                (az - dz).abs() < 2e-7,
+                "normal={normal} z={z} rho={rho} dz={az} expected={dz}"
+            );
+            assert!(
+                (ar - drho).abs() < 2e-9,
+                "normal={normal} z={z} rho={rho} drho={ar} expected={drho}"
+            );
+        }
+    }
+
+    // Independent Decimal(80) derivatives at two cancellation-sensitive cases.
+    #[test]
+    fn sabr_small_nu_gradients_match_high_precision_reference() {
+        for (alpha, beta, nu, rho, forward, strike, expected) in [
+            (
+                0.02,
+                0.0,
+                0.0011,
+                0.0,
+                0.02,
+                0.01,
+                [
+                    1.0000001512499996,
+                    9.166667204347227e-6,
+                    -5.500000415937412e-6,
+                ],
+            ),
+            (
+                0.1,
+                0.5,
+                0.001,
+                0.99,
+                0.01,
+                0.005,
+                [
+                    12.885403567964877,
+                    -0.0036341904249088245,
+                    -4.20867446750879e-6,
+                ],
+            ),
+        ] {
+            let parameters = SabrParameters::new(alpha, beta, nu, rho).expect("parameters");
+            let actual = PreparedSabrStrike::new(&parameters, forward, strike, 2.0)
+                .expect("prepare")
+                .gradient(&parameters)
+                .expect("gradient");
+            for (a, e) in actual.into_iter().zip(expected) {
+                assert!(
+                    (a - e).abs() < 2e-8 + 2e-6 * e.abs(),
+                    "actual={actual:?} expected={expected:?}"
+                );
+            }
+        }
+    }
+
     #[test]
     fn sabr_preparation_value_snapshot() {
         let mut bits = Vec::new();
@@ -827,6 +1054,161 @@ impl PreparedSabrStrike {
                     ))
                 }
             }
+        }
+    }
+}
+
+// Partials of the existing piecewise chi approximation, in z/rho order.
+// The fitting transform confines rho to [-0.99, 0.99], away from the
+// separate degenerate-rho limits of the public expansion.
+fn chi_partials(z: f64, rho: f64) -> Result<(f64, f64)> {
+    if !z.is_finite() || !rho.is_finite() || rho.abs() > 0.99 {
+        return Err(Error::Validation(
+            "SABR derivative outside fitting domain".into(),
+        ));
+    }
+    let z2 = z * z;
+    let z3 = z2 * z;
+    let z4 = z2 * z2;
+    let c2 = rho / 2.0;
+    let c3 = (3.0 * rho * rho - 1.0) / 6.0;
+    let c4 = rho * (5.0 * rho * rho - 3.0) / 8.0;
+    let series = z + c2 * z2 + c3 * z3 + c4 * z4;
+    let series_z = 1.0 + 2.0 * c2 * z + 3.0 * c3 * z2 + 4.0 * c4 * z3;
+    let series_rho = 0.5 * z2 + rho * z3 + (15.0 * rho * rho - 3.0) / 8.0 * z4;
+    if z.abs() < 1e-5 {
+        return Ok((series_z, series_rho));
+    }
+    let root = (1.0 - 2.0 * rho * z + z2).sqrt();
+    let numerator = root + z - rho;
+    let exact = (numerator / (1.0 - rho)).ln();
+    let exact_z = 1.0 / root;
+    let exact_rho = (-z / root - 1.0) / numerator + 1.0 / (1.0 - rho);
+    if z.abs() > 1e-3 {
+        return Ok((exact_z, exact_rho));
+    }
+    let t = (z.abs() - 1e-5) / (1e-3 - 1e-5);
+    let blend = t * t * (3.0 - 2.0 * t);
+    let blend_z = 6.0 * t * (1.0 - t) * z.signum() / (1e-3 - 1e-5);
+    Ok((
+        (1.0 - blend) * series_z + blend * exact_z + blend_z * (exact - series),
+        (1.0 - blend) * series_rho + blend * exact_rho,
+    ))
+}
+
+fn ratio_partials(z: f64, rho: f64, normal: bool) -> Result<(f64, f64, f64)> {
+    let cutoff = if normal { 1e-6 } else { 1e-5 };
+    if z.abs() < cutoff {
+        let a = (2.0 - 3.0 * rho * rho) / 12.0;
+        let b = if normal {
+            0.0
+        } else {
+            rho * (5.0 - 6.0 * rho * rho) / 24.0
+        };
+        return Ok((
+            1.0 - 0.5 * rho * z + a * z * z + b * z * z * z,
+            -0.5 * rho + 2.0 * a * z + 3.0 * b * z * z,
+            -0.5 * z - 0.5 * rho * z * z
+                + if normal {
+                    0.0
+                } else {
+                    (5.0 - 18.0 * rho * rho) / 24.0 * z * z * z
+                },
+        ));
+    }
+    let value = chi(z, rho)?;
+    let (dz, drho) = chi_partials(z, rho)?;
+    Ok((
+        z / value,
+        (value - z * dz) / (value * value),
+        -z * drho / (value * value),
+    ))
+}
+
+impl PreparedSabrStrike {
+    // Physical partials in alpha, nu, rho order; beta and strike state are fixed.
+    pub(super) fn gradient(&self, parameters: &SabrParameters) -> Result<[f64; 3]> {
+        self.evaluate(parameters)?;
+        let alpha = parameters.alpha;
+        let nu = parameters.nu;
+        let rho = parameters.rho;
+        let gradient = match self {
+            Self::Normal {
+                forward,
+                strike,
+                time,
+            } => {
+                let m = forward - strike;
+                let z = nu / alpha * m;
+                let (ratio, rz, rr) = ratio_partials(z, rho, true)?;
+                let correction = 1.0 + (2.0 - 3.0 * rho * rho) * nu * nu * time / 24.0;
+                [
+                    ratio * correction - alpha * rz * z / alpha * correction,
+                    alpha * rz * m / alpha * correction
+                        + alpha * ratio * (2.0 - 3.0 * rho * rho) * nu * time / 12.0,
+                    alpha * rr * correction - alpha * ratio * rho * nu * nu * time / 4.0,
+                ]
+            }
+            Self::Lognormal(p) => {
+                if p.atm && alpha.abs() < 1e-14 {
+                    return Ok([0.0; 3]);
+                }
+                let (denominator, a, b, ratio, rz, rr, z, z_nu) = if p.atm {
+                    let f_beta = p.atm_f_beta;
+                    (
+                        f_beta,
+                        (1.0 - p.beta).powi(2) / 24.0 / (f_beta * f_beta),
+                        0.25 * p.beta / f_beta,
+                        1.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                    )
+                } else {
+                    let z = if p.beta_is_one {
+                        (nu / alpha) * p.log_moneyness
+                    } else {
+                        (nu / alpha) * p.f_mid_beta * p.log_moneyness
+                    };
+                    let (ratio, rz, rr) = ratio_partials(z, rho, false)?;
+                    (
+                        if p.f_mid_beta.abs() < 1e-14 {
+                            1.0
+                        } else {
+                            p.f_mid_beta * p.correction_term
+                        },
+                        (1.0 - p.beta).powi(2) / 24.0 / p.f_mid_power,
+                        0.25 * p.beta / p.f_mid_beta,
+                        ratio,
+                        rz,
+                        rr,
+                        z,
+                        if p.beta_is_one {
+                            p.log_moneyness / alpha
+                        } else {
+                            p.f_mid_beta * p.log_moneyness / alpha
+                        },
+                    )
+                };
+                let c = (2.0 - 3.0 * rho * rho) / 24.0;
+                let correction =
+                    1.0 + p.t * (a * alpha * alpha + b * rho * nu * alpha + c * nu * nu);
+                let factor = alpha / denominator;
+                [
+                    ratio * correction / denominator - factor * rz * z / alpha * correction
+                        + factor * ratio * p.t * (2.0 * a * alpha + b * rho * nu),
+                    factor * rz * z_nu * correction
+                        + factor * ratio * p.t * (b * rho * alpha + 2.0 * c * nu),
+                    factor * rr * correction
+                        + factor * ratio * p.t * (b * nu * alpha - rho * nu * nu / 4.0),
+                ]
+            }
+        };
+        if gradient.iter().all(|v| v.is_finite()) {
+            Ok(gradient)
+        } else {
+            Err(Error::Validation("SABR derivative is non-finite".into()))
         }
     }
 }

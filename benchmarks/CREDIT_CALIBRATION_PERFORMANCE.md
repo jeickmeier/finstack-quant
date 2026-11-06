@@ -556,3 +556,73 @@ and the separate V1 formula baseline; timing settings match V1. No native
 financial fixture changes are needed because reports are identical.
 
 Execution status: V2 complete; V3 in progress. The final gate remains pending.
+
+## V3 — Analytic free-alpha SABR Jacobian
+
+Accepted. The existing LM analytic-derivative interface now receives the
+alpha/nu/rho derivatives of the canonical normal, lognormal, ATM, Taylor and
+smoothstep branches, chained through the existing bounded coordinates. All nine
+starts, weights, bounds, strict score comparisons and tolerances are unchanged.
+ATM-pinned fitting retains its distinct numerical derivative algorithm.
+
+| Workload | V2 mean µs | V3 mean µs | Change |
+|---|---:|---:|---:|
+| credit_vol/small_3x3 | 421.716 | 297.900 | -29.4% |
+| credit_vol/large_10x21 | 1324.088 | 888.515 | -32.9% |
+| credit_vol/free_21 | 111.903 | 69.543 | -37.9% |
+| credit_vol/pinned_21 | 123.033 | 122.414 | -0.5% |
+| sabr_slice_calibration | 136.567 | 80.237 | -41.2% |
+| sabr_formula/normal_21 | 0.135 | 0.135 | -0.4% |
+| sabr_formula/cev_21 | 0.577 | 0.579 | +0.3% |
+| sabr_formula/lognormal_21 | 0.382 | 0.380 | -0.4% |
+
+Validation: 2,060 model tests and 571 calibration tests passed, with scoped
+models/calibration lint. Independent standard-library Decimal calculations at
+80 digits cover 1001 valid physical-parameter cases,
+36 inward boundary cases, and both sides of the chi/ratio
+seams. The generator and pins are retained under `models/tests/fixtures`.
+Interior references use `h=1e-25`; inward references use `h=1e-18`. Multi-step,
+higher-order double-precision differences additionally cover well-conditioned
+regions. Initial tiny-nu double-precision difference failures were investigated
+against independent values; the analytic derivatives were correct, and the
+reference method was improved without loosening derivative tolerances.
+
+Twelve normal/lognormal/shifted free/pinned synthetic fits are deterministic,
+recover the known parameters and pass 41 off-grid checks each. Their largest
+parameter change from V0 is below `8e-14`; one selected start changes at nearly
+machine-zero residual. The ten-expiry benchmark's largest parameter change is
+`5.5e-15`; one selected start changes. In the flat three-expiry fixture all
+selected starts change, but the same lower-nu bounds remain active and the
+largest parameter change is only `3.82e-9` in rho. Its worst quote residual is
+`4.82953857e-7`, versus `4.82953826e-7` before. These selections are immaterial
+rounding/trajectory differences, not a changed acceptance policy.
+
+The standalone native check in `v3/offgrid-comparison.rs` prices 81 strikes
+from 0.002 to 0.020 for each of the thirteen expiry fits, using their actual
+discount-derived forwards. Across 1,053 points the maximum absolute decimal-vol
+change is `3.303e-12`, below the preset `1e-9` comparison bound. Direct 21-strike
+free-fit off-grid changes are below `2.84e-15`. Pinned fits and all five saved
+base/hazard calibration reports are exactly unchanged. Public formula/error
+snapshots remain bitwise equal to V0.
+
+Actual residual calls fall from 374 to 74 for the direct free fit, from 3,897
+to 777 across the large surface, and from 5,478 to 1,194 across the small
+surface. These counts exclude derivative work; end-to-end timings include all
+Jacobian evaluation and validation costs. Pinned calls remain 323. The Jacobian
+adapter borrows existing strike/weight slices and retains no additional trial
+history; LM's existing Jacobian allocation is unchanged.
+
+Evidence uses V1's 20 samples, 3 s warmup, 10 s measurement and 10,000 resamples.
+The standalone diagnostic links the matching release rlibs with optimization
+level 3, fat LTO and one codegen unit; its source and full point results are
+retained. No timings include that untimed diagnostic. Relative to V0, the small
+and large surface gains are about 45% and 55%, respectively.
+
+Execution status: S0, BC1–BC5, H1–H3 and V1–V3 accepted; BC6 rejected as
+documented above. Fixture regeneration and final integration checks are pending.
+The separate CDS-option IV proposal remains outside these main phases.
+
+V3 integration preparation: `gen-write` and `all-fmt` passed. Regenerated native
+UI/gallery cases change by at most `3.68e-12` in decimal volatility and
+`5.06e-9` in fitted parameters. Every success/failure flag is unchanged,
+including the deliberately failing calibration fixture.

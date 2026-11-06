@@ -4989,9 +4989,9 @@
               "quote_type": "black_lognormal",
               "interpolation_mode": "total_variance",
               "vols_row_major": [
-                0.36030048295373357, 0.3602999999999754, 0.3603000000000731,
-                0.37000046815681514, 0.36999999977739906, 0.3700000002433817,
-                0.3800003895843079, 0.3799999921709213, 0.38000000690527524
+                0.36030048295376427, 0.3602999999999741, 0.36030000000006684,
+                0.3700004681570287, 0.36999999977741754, 0.37000000024336244,
+                0.38000038958181936, 0.3799999921706909, 0.38000000690562036
               ]
             }
           ],
@@ -5007,15 +5007,15 @@
         "report": {
           "success": true,
           "residuals": {
-            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260617-0.004:tolerance_ratio": 0.0004829537335604428,
-            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260617-0.0100:tolerance_ratio": 2.4591439995447217e-11,
-            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260617-0.0125:tolerance_ratio": 7.310818617156656e-11,
-            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260917-0.004:tolerance_ratio": 0.00046815681514766894,
-            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260917-0.0100:tolerance_ratio": 2.2260093768267097e-7,
-            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260917-0.0125:tolerance_ratio": 2.4338170367954604e-7,
-            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20261217-0.004:tolerance_ratio": 0.000389584307869395,
-            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20261217-0.0100:tolerance_ratio": 0.000007829078718657456,
-            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20261217-0.0125:tolerance_ratio": 0.000006905275240498554,
+            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260617-0.004:tolerance_ratio": 0.00048295376425810943,
+            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260617-0.0100:tolerance_ratio": 2.5923707624997405e-11,
+            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260617-0.0125:tolerance_ratio": 6.683542608243442e-11,
+            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260917-0.004:tolerance_ratio": 0.0004681570286990677,
+            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260917-0.0100:tolerance_ratio": 2.2258245246931097e-7,
+            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260917-0.0125:tolerance_ratio": 2.433624413100688e-7,
+            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20261217-0.004:tolerance_ratio": 0.0003895818193599965,
+            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20261217-0.0100:tolerance_ratio": 0.000007829309089935066,
+            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20261217-0.0125:tolerance_ratio": 0.000006905620353325759,
             "CDX-NA-IG-46:CDX-IG-46-10Y:tolerance_ratio": 7.461479351045242e-8,
             "CDX-NA-IG-46:CDX-IG-46-1Y:tolerance_ratio": 1.7705021476688287e-8,
             "CDX-NA-IG-46:CDX-IG-46-3Y:tolerance_ratio": 0.00004780826342448696,
@@ -5028,12 +5028,12 @@
             "USD-OIS:USD-SOFR-DEP-1M:tolerance_ratio": 6.366462912410498e-10,
             "USD-OIS:USD-SOFR-DEP-3M:tolerance_ratio": 2.9103830456733704e-9
           },
-          "iterations": 1037,
-          "objective_value": 0.00017415309859170102,
-          "max_residual": 4.829537335604428e-7,
-          "rmse": 1.7382464315410678e-7,
-          "max_residual_ratio": 0.0004829537335604428,
-          "rmse_ratio": 0.00017415309859170102,
+          "iterations": 1096,
+          "objective_value": 0.00017415285440924811,
+          "max_residual": 4.829537642581094e-7,
+          "rmse": 1.7382439851025114e-7,
+          "max_residual_ratio": 0.00048295376425810943,
+          "rmse_ratio": 0.00017415285440924811,
           "validation_passed": true,
           "convergence_reason": "Plan execution completed",
           "metadata": {
@@ -5063,7 +5063,7 @@
             "version": "0.11.0"
           },
           "worst_quote_id": "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260617-0.004:tolerance_ratio",
-          "worst_quote_residual": 0.0004829537335604428,
+          "worst_quote_residual": 0.00048295376425810943,
           "solver_method": "plan_execution",
           "residual_units": "absolute_residual_over_step_tolerance"
         },
@@ -5119,20 +5119,20 @@
           "CDX-NA-IG-46-CDSO-VOL-STEP": {
             "success": true,
             "residuals": {
-              "CDX-NA-IG-46-VOL-20260617-0.004": 4.829537335604428e-7,
-              "CDX-NA-IG-46-VOL-20260617-0.0100": -2.4591439995447217e-14,
-              "CDX-NA-IG-46-VOL-20260617-0.0125": 7.310818617156656e-14,
-              "CDX-NA-IG-46-VOL-20260917-0.004": 4.6815681514766894e-7,
-              "CDX-NA-IG-46-VOL-20260917-0.0100": -2.2260093768267097e-10,
-              "CDX-NA-IG-46-VOL-20260917-0.0125": 2.4338170367954604e-10,
-              "CDX-NA-IG-46-VOL-20261217-0.004": 3.89584307869395e-7,
-              "CDX-NA-IG-46-VOL-20261217-0.0100": -7.829078718657456e-9,
-              "CDX-NA-IG-46-VOL-20261217-0.0125": 6.905275240498554e-9
+              "CDX-NA-IG-46-VOL-20260617-0.004": 4.829537642581094e-7,
+              "CDX-NA-IG-46-VOL-20260617-0.0100": -2.5923707624997405e-14,
+              "CDX-NA-IG-46-VOL-20260617-0.0125": 6.683542608243442e-14,
+              "CDX-NA-IG-46-VOL-20260917-0.004": 4.681570286990677e-7,
+              "CDX-NA-IG-46-VOL-20260917-0.0100": -2.2258245246931097e-10,
+              "CDX-NA-IG-46-VOL-20260917-0.0125": 2.433624413100688e-10,
+              "CDX-NA-IG-46-VOL-20261217-0.004": 3.8958181935999647e-7,
+              "CDX-NA-IG-46-VOL-20261217-0.0100": -7.829309089935066e-9,
+              "CDX-NA-IG-46-VOL-20261217-0.0125": 6.905620353325759e-9
             },
-            "iterations": 648,
-            "objective_value": 2.591224788381018e-7,
-            "max_residual": 4.829537335604428e-7,
-            "rmse": 2.591224788381018e-7,
+            "iterations": 707,
+            "objective_value": 2.591221141445741e-7,
+            "max_residual": 4.829537642581094e-7,
+            "rmse": 2.591221141445741e-7,
             "validation_passed": true,
             "convergence_reason": "vol surface calibration converged: max_residual (4.83e-7) within tolerance (1.00e-3)",
             "metadata": {
@@ -5140,9 +5140,9 @@
               "calibrated_expiry_count": "3",
               "expiry_extrapolation_policy": "clamp",
               "sabr_parameters_at_bounds": "T=0.109589:nu;T=0.361644:nu;T=0.610959:nu",
-              "sabr_residual_evaluations": "T=0.109589:2339;T=0.361644:1677;T=0.610959:1320",
-              "sabr_winning_iterations": "T=0.109589:17;T=0.361644:19;T=0.610959:20",
-              "sabr_winning_starts": "T=0.109589:alpha=0.36030000,nu=0.40000000,rho=0.60000000;T=0.361644:alpha=0.37000000,nu=0.90000000,rho=0.00000000;T=0.610959:alpha=0.38000000,nu=0.90000000,rho=0.00000000",
+              "sabr_residual_evaluations": "T=0.109589:653;T=0.361644:281;T=0.610959:258",
+              "sabr_winning_iterations": "T=0.109589:23;T=0.361644:18;T=0.610959:18",
+              "sabr_winning_starts": "T=0.109589:alpha=0.36030000,nu=0.40000000,rho=0.60000000;T=0.361644:alpha=0.37000000,nu=0.40000000,rho=0.60000000;T=0.610959:alpha=0.38000000,nu=0.40000000,rho=0.60000000",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "vol_surface"
@@ -5166,7 +5166,7 @@
               "version": "0.11.0"
             },
             "worst_quote_id": "CDX-NA-IG-46-VOL-20260617-0.004",
-            "worst_quote_residual": 4.829537335604428e-7,
+            "worst_quote_residual": 4.829537642581094e-7,
             "success_tolerance": 0.001,
             "solver_method": "per_slice_least_squares",
             "residual_units": "quoted_volatility",
@@ -5175,40 +5175,40 @@
                 "expiry": 0.1095890410958904,
                 "parameters": {
                   "sabr": {
-                    "alpha": 0.3602999968224336,
+                    "alpha": 0.3602999968224323,
                     "beta": 1,
                     "nu": 0.001,
-                    "rho": -0.00019570774481436626
+                    "rho": -0.0001957078824789127
                   }
                 },
-                "iterations": 290,
-                "max_relative_quote_error": 0.0000013404211311696997
+                "iterations": 406,
+                "max_relative_quote_error": 0.0000013404212163699956
               },
               {
                 "expiry": 0.36164383561643837,
                 "parameters": {
                   "sabr": {
-                    "alpha": 0.36999998897239345,
+                    "alpha": 0.36999998897241326,
                     "beta": 1,
-                    "nu": 0.0010000000000000252,
-                    "rho": -0.00016331996915519564
+                    "nu": 0.0010000000000000024,
+                    "rho": -0.00016332037731625615
                   }
                 },
-                "iterations": 199,
-                "max_relative_quote_error": 0.0000012652886895882944
+                "iterations": 154,
+                "max_relative_quote_error": 0.0000012652892667542371
               },
               {
                 "expiry": 0.6109589041095891,
                 "parameters": {
                   "sabr": {
-                    "alpha": 0.3799999724666688,
+                    "alpha": 0.37999997246639994,
                     "beta": 1,
                     "nu": 0.001,
-                    "rho": -0.000009428116105048012
+                    "rho": -0.000009423063321967184
                   }
                 },
-                "iterations": 159,
-                "max_relative_quote_error": 0.0000010252218628141973
+                "iterations": 147,
+                "max_relative_quote_error": 0.0000010252153141052538
               }
             ]
           },
@@ -7013,9 +7013,9 @@
               "quote_type": "black_lognormal",
               "interpolation_mode": "total_variance",
               "vols_row_major": [
-                0.28063965861484597, 0.24937421137657426, 0.2203390835152477,
-                0.2705621121569472, 0.23935538806313694, 0.2102760183534404,
-                0.26051184707236874, 0.22936711130374277, 0.20023563367780867
+                0.2806396586120538, 0.2493742113759758, 0.22033908351684492,
+                0.2705621121606222, 0.23935538806404652, 0.21027601835156337,
+                0.2605118470727095, 0.22936711130378248, 0.2002356336775428
               ]
             }
           ],
@@ -7082,15 +7082,15 @@
         "report": {
           "success": true,
           "residuals": {
-            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20260808-155.0:tolerance_ratio": 0.6396582598588996,
-            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20260808-175.0:tolerance_ratio": 0.6257889755775792,
-            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20260808-195.0:tolerance_ratio": 0.339083162532533,
-            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20261108-155.0:tolerance_ratio": 0.5621121764734505,
-            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20261108-175.0:tolerance_ratio": 0.6446119174066678,
-            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20261108-195.0:tolerance_ratio": 0.2760183730401433,
-            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20270508-155.0:tolerance_ratio": 0.5118470723687318,
-            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20270508-175.0:tolerance_ratio": 0.6328886962572444,
-            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20270508-195.0:tolerance_ratio": 0.2356336778086554,
+            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20260808-155.0:tolerance_ratio": 0.6396582570667442,
+            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20260808-175.0:tolerance_ratio": 0.6257889761760449,
+            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20260808-195.0:tolerance_ratio": 0.33908316412975537,
+            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20261108-155.0:tolerance_ratio": 0.5621121801484552,
+            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20261108-175.0:tolerance_ratio": 0.6446119164970898,
+            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20261108-195.0:tolerance_ratio": 0.276018371163117,
+            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20270508-155.0:tolerance_ratio": 0.5118470727095148,
+            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20270508-175.0:tolerance_ratio": 0.6328886962175262,
+            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20270508-195.0:tolerance_ratio": 0.23563367754278475,
             "USD-OIS:USD-OIS-SWAP-10Y:tolerance_ratio": 3.725290298461914e-7,
             "USD-OIS:USD-OIS-SWAP-1Y:tolerance_ratio": 1.8044374883174896e-7,
             "USD-OIS:USD-OIS-SWAP-2Y:tolerance_ratio": 2.0227162167429921e-7,
@@ -7098,12 +7098,12 @@
             "USD-OIS:USD-SOFR-DEP-1M:tolerance_ratio": 6.366462912410498e-10,
             "USD-OIS:USD-SOFR-DEP-3M:tolerance_ratio": 2.9103830456733704e-9
           },
-          "iterations": 296,
-          "objective_value": 0.4034428043057938,
-          "max_residual": 0.0006446119174066678,
-          "rmse": 0.0004034428043057763,
-          "max_residual_ratio": 0.6446119174066678,
-          "rmse_ratio": 0.4034428043057938,
+          "iterations": 292,
+          "objective_value": 0.4034428043352187,
+          "max_residual": 0.0006446119164970898,
+          "rmse": 0.0004034428043352012,
+          "max_residual_ratio": 0.6446119164970898,
+          "rmse_ratio": 0.4034428043352187,
           "validation_passed": true,
           "convergence_reason": "Plan execution completed",
           "metadata": {
@@ -7133,7 +7133,7 @@
             "version": "0.11.0"
           },
           "worst_quote_id": "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20261108-175.0:tolerance_ratio",
-          "worst_quote_residual": 0.6446119174066678,
+          "worst_quote_residual": 0.6446119164970898,
           "solver_method": "plan_execution",
           "residual_units": "absolute_residual_over_step_tolerance"
         },
@@ -7141,20 +7141,20 @@
           "AAPL-EQUITY-VOL-STEP": {
             "success": true,
             "residuals": {
-              "AAPL-VOL-20260808-155.0": 0.0006396582598588996,
-              "AAPL-VOL-20260808-175.0": -0.0006257889755775792,
-              "AAPL-VOL-20260808-195.0": 0.000339083162532533,
-              "AAPL-VOL-20261108-155.0": 0.0005621121764734505,
-              "AAPL-VOL-20261108-175.0": -0.0006446119174066678,
-              "AAPL-VOL-20261108-195.0": 0.0002760183730401433,
-              "AAPL-VOL-20270508-155.0": 0.0005118470723687318,
-              "AAPL-VOL-20270508-175.0": -0.0006328886962572444,
-              "AAPL-VOL-20270508-195.0": 0.0002356336778086554
+              "AAPL-VOL-20260808-155.0": 0.0006396582570667442,
+              "AAPL-VOL-20260808-175.0": -0.0006257889761760449,
+              "AAPL-VOL-20260808-195.0": 0.00033908316412975537,
+              "AAPL-VOL-20261108-155.0": 0.0005621121801484552,
+              "AAPL-VOL-20261108-175.0": -0.0006446119164970898,
+              "AAPL-VOL-20261108-195.0": 0.000276018371163117,
+              "AAPL-VOL-20270508-155.0": 0.0005118470727095148,
+              "AAPL-VOL-20270508-175.0": -0.0006328886962175262,
+              "AAPL-VOL-20270508-195.0": 0.00023563367754278475
             },
-            "iterations": 250,
-            "objective_value": 0.0005208424207411631,
-            "max_residual": 0.0006446119174066678,
-            "rmse": 0.0005208424207411631,
+            "iterations": 246,
+            "objective_value": 0.0005208424207791505,
+            "max_residual": 0.0006446119164970898,
+            "rmse": 0.0005208424207791505,
             "validation_passed": true,
             "convergence_reason": "vol surface calibration converged: max_residual (6.45e-4) within tolerance (1.00e-3)",
             "metadata": {
@@ -7162,9 +7162,9 @@
               "calibrated_expiry_count": "3",
               "expiry_extrapolation_policy": "clamp",
               "sabr_parameters_at_bounds": "T=0.252055:rho;T=0.504110:rho;T=1.000000:rho",
-              "sabr_residual_evaluations": "T=0.252055:660;T=0.504110:730;T=1.000000:917",
-              "sabr_winning_iterations": "T=0.252055:10;T=0.504110:9;T=1.000000:11",
-              "sabr_winning_starts": "T=0.252055:alpha=3.29160147,nu=0.90000000,rho=0.00000000;T=0.504110:alpha=3.14325364,nu=0.40000000,rho=0.00000000;T=1.000000:alpha=2.97542361,nu=0.90000000,rho=0.00000000",
+              "sabr_residual_evaluations": "T=0.252055:148;T=0.504110:153;T=1.000000:208",
+              "sabr_winning_iterations": "T=0.252055:7;T=0.504110:10;T=1.000000:11",
+              "sabr_winning_starts": "T=0.252055:alpha=3.29160147,nu=0.40000000,rho=-0.60000000;T=0.504110:alpha=3.14325364,nu=0.90000000,rho=0.00000000;T=1.000000:alpha=2.97542361,nu=0.90000000,rho=0.60000000",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "vol_surface"
@@ -7188,7 +7188,7 @@
               "version": "0.11.0"
             },
             "worst_quote_id": "AAPL-VOL-20261108-175.0",
-            "worst_quote_residual": -0.0006446119174066678,
+            "worst_quote_residual": -0.0006446119164970898,
             "success_tolerance": 0.001,
             "solver_method": "per_slice_least_squares",
             "residual_units": "quoted_volatility",
@@ -7197,40 +7197,40 @@
                 "expiry": 0.25205479452054796,
                 "parameters": {
                   "sabr": {
-                    "alpha": 3.2969272810141526,
+                    "alpha": 3.2969272810064942,
                     "beta": 0.5,
-                    "nu": 0.4099276636186598,
+                    "nu": 0.4099276635794846,
                     "rho": -0.99
                   }
                 },
-                "iterations": 70,
-                "max_relative_quote_error": 0.0025031634386476487
+                "iterations": 67,
+                "max_relative_quote_error": 0.0025031634410415116
               },
               {
                 "expiry": 0.5041095890410959,
                 "parameters": {
                   "sabr": {
-                    "alpha": 3.161298638305924,
+                    "alpha": 3.161298638317382,
                     "beta": 0.5,
-                    "nu": 0.42030544065457,
+                    "nu": 0.42030544070526704,
                     "rho": -0.99
                   }
                 },
                 "iterations": 78,
-                "max_relative_quote_error": 0.0026858829139527847
+                "max_relative_quote_error": 0.002685882910162876
               },
               {
                 "expiry": 1,
                 "parameters": {
                   "sabr": {
-                    "alpha": 3.0199191024773024,
+                    "alpha": 3.0199191024776617,
                     "beta": 0.5,
-                    "nu": 0.43703951528790463,
-                    "rho": -0.99
+                    "nu": 0.4370395152937751,
+                    "rho": -0.9899999999999863
                   }
                 },
-                "iterations": 102,
-                "max_relative_quote_error": 0.0027516899837271495
+                "iterations": 101,
+                "max_relative_quote_error": 0.0027516899835544617
               }
             ]
           },
