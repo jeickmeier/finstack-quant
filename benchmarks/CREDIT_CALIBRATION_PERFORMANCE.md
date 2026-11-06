@@ -142,7 +142,7 @@ reference, 15 base-correlation tests, 91 umbrella tranche tests, and the scoped
 public-input documentation check passed. One nextest process-leak report cleared
 on a focused rerun. No independent references or tolerances changed.
 
-Execution status: S0 and BC1–BC5 complete; BC6 rejected after workload review; H1 complete; H2 in progress. Remaining slices are
+Execution status: S0 and BC1–BC5 complete; BC6 rejected after workload review; H1–H2 complete; H3 in progress. Remaining slices are
 pending. The fixed implementation plan is unchanged.
 
 ## BC3: bounded raw attachment reuse
@@ -374,3 +374,63 @@ snapshot independence and invalid/missing-input errors. Existing rolled-
 coupon, survival-floor and independent AoD integral checks remain intact.
 Raw reports/samples are in `h0` and `h1`. No financial outputs or generated
 fixtures changed; no new host binding surface is required for this workspace.
+
+## H2: retained ISDA integration windows
+
+Each prepared CDS now keeps discount windows for its last actual hazard
+base date, day count and exact knot-time bits. Changing topology replaces the
+bounded interval map; changing only rates reuses it. Contract, as-of,
+discount snapshot, settlement rules and calendar are fixed by the owner.
+The shared integration loop still computes survival and hazard rates for each
+trial in the original arithmetic order. Ordinary pricing uses the same loop
+without retained windows.
+
+Discount/date errors are stored per window and observed only after the
+original positive-default-mass predicate. Survival-floor exits still precede
+grid construction. This preserves errors for zero-hazard and exhausted cases.
+
+| Workload (mean ms) | H1 | H2 |
+| --- | ---: | ---: |
+| Hazard isolated | 35.070 | 3.615 |
+| Hazard full plan | 42.495 | 11.053 |
+| Distressed | 27.618 | 3.023 |
+| Upfront quoted | 35.322 | 4.104 |
+| Long tenor | 100.691 | 10.093 |
+| Parallel replay | 69.710 | 7.265 |
+| Global hazard, six quotes | 51.740 | 13.524 |
+| Bootstrap hazard, six quotes | 64.535 | 15.034 |
+| CDS bucketed CS01 | 379.332 | 40.262 |
+| Base correlation full plan | 292.795 | 278.390 |
+
+Standard isolated hazard is 89.7% faster; its full plan is 74.0% faster. All
+five complete calibration reports match H1 exactly, including solver work,
+knots, residuals and metadata. The global and umbrella tests remain clean.
+
+Five-year prepared reuse falls from 85.711 to 7.253 microseconds. Preparation
+alone remains 1.272 microseconds; cold preparation plus pricing rises from
+86.749 to 90.034 microseconds (3.285 microseconds for cache construction).
+Ordinary CDS pricing remains within about 1%; the added construction cost is
+included in the calibration improvements above.
+
+The initial isolated base-correlation control moved from 249.764 to 268.206
+ms. Longer adjacent retained-binary comparisons measured 257.027/263.514 ms for H1/H2, a 2.5% difference rather than the initial 7.4%. This small
+control cost is retained explicitly; no claim of unchanged isolated-base
+latency is made. The full base plan improves because its prerequisite hazard
+calibration benefits. Both runs use 20 samples, 3 s warmup, 20 s measurement
+and 10,000 resamples; samples are in `h1-base-adjacent`/`h2-base-adjacent`.
+
+An untimed test records 22 grid builds for the first five-year trial and zero
+for a rate-only repeat. It retains 277 windows at 80 bytes of window/boundary
+payload each (22,160 bytes), plus extra endpoints, vector capacities, map and
+Arc/mutex metadata. Only the last topology is retained. Storage scales with
+the contract's coupon/protection windows and knot layout, not trial count.
+
+Validation: 233 credit tests, 568 enabled calibration tests, 453 CDS-related
+umbrella tests and scoped credit/calibration lint passed. New tests cover
+prefix growth, reordered topologies, exact knot changes, changed curve clocks,
+negative rates, settlement delays, zero default mass and deferred DF errors.
+No numerical fixtures moved. `h2` contains full raw reports/samples and the
+work-count log. It also establishes H3's new batch baseline, with fresh provider
+construction and fingerprinting included: one bump 7.235 ms, five ascending
+36.218 ms, five reversed 36.178 ms, five concurrent 15.117 ms. Thread creation
+is included in the concurrent timing.

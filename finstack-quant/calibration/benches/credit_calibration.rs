@@ -187,10 +187,99 @@ fn bench_hazard_variants(c: &mut Criterion) {
     }
 }
 
+fn bench_hazard_bucket_batches(c: &mut Criterion) {
+    use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
+    use finstack_quant_valuations_core::recalibration::{
+        HazardRecalibrationAction, HazardRecalibrationRequest, RecalibrationProvider,
+    };
+    use std::sync::Arc;
+    let envelope = load_example(include_str!(
+        "../examples/market_bootstrap/03_single_name_hazard.json"
+    ));
+    let output = checked_calibrate(&envelope);
+    let market = Arc::new(MarketContext::try_from(output.result.final_market).expect("market"));
+    let hazard = market.get_hazard("ISSUER-A-CDS").expect("hazard");
+    let requests: Vec<_> = (0..5)
+        .map(|quote_index| HazardRecalibrationRequest {
+            hazard: Arc::clone(&hazard),
+            source_market: Arc::clone(&market),
+            target_market: Arc::clone(&market),
+            discount_curve_id: CurveId::new("USD-OIS"),
+            doc_clause: None,
+            cds_valuation_convention: None,
+            deal_quote_override: None,
+            action: HazardRecalibrationAction::ExactQuoteIndexBump {
+                quote_index,
+                bump_bp: 1.0,
+            },
+        })
+        .collect();
+    let mut group = c.benchmark_group("hazard_bucket_batch");
+    group.bench_function("one_bump", |b| {
+        b.iter(|| {
+            let provider = CachedRecalibrationProvider::default();
+            black_box(
+                provider
+                    .rebuild_hazard_curve(black_box(&requests[0]))
+                    .expect("one bump"),
+            );
+        })
+    });
+    for reversed in [false, true] {
+        let order: Vec<_> = if reversed {
+            (0..5).rev().collect()
+        } else {
+            (0..5).collect()
+        };
+        group.bench_function(
+            if reversed {
+                "five_reverse"
+            } else {
+                "five_ascending"
+            },
+            |b| {
+                b.iter(|| {
+                    let provider = CachedRecalibrationProvider::default();
+                    for &index in &order {
+                        black_box(
+                            provider
+                                .rebuild_hazard_curve(black_box(&requests[index]))
+                                .expect("bucket"),
+                        );
+                    }
+                })
+            },
+        );
+    }
+    group.bench_function("five_concurrent", |b| {
+        b.iter(|| {
+            let provider = CachedRecalibrationProvider::default();
+            std::thread::scope(|scope| {
+                let workers: Vec<_> = requests
+                    .iter()
+                    .map(|request| {
+                        let provider = &provider;
+                        scope.spawn(move || {
+                            provider
+                                .rebuild_hazard_curve(black_box(request))
+                                .expect("concurrent bucket")
+                        })
+                    })
+                    .collect();
+                for worker in workers {
+                    black_box(worker.join().expect("worker"));
+                }
+            });
+        })
+    });
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_hazard_bootstrap,
     bench_hazard_variants,
+    bench_hazard_bucket_batches,
     bench_base_correlation_bootstrap
 );
 criterion_main!(benches);
