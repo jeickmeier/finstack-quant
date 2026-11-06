@@ -6107,7 +6107,8 @@ export interface SabrCalibrationOutcome {
    */
   quote_errors: number[];
   /**
-   * Total objective residual evaluations.
+   * Actual objective residual invocations across all deterministic starts,
+   * including attempts rejected by the solver or final quote-fit checks.
    */
   residual_evaluations: number;
   /**

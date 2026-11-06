@@ -275,11 +275,131 @@ fn bench_hazard_bucket_batches(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_credit_vol(c: &mut Criterion) {
+    use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
+    use finstack_quant_models::volatility::sabr::{SabrCalibrator, SabrParameters};
+    let small = isolate_last(&load_example(include_str!(
+        "../examples/market_bootstrap/06_cdx_index_vol.json"
+    )))
+    .expect("isolate vol prerequisites");
+    record_evidence(&small);
+    c.bench_function("credit_vol/small_3x3", |b| {
+        b.iter(|| checked_calibrate(black_box(&small)))
+    });
+    let mut json = serde_json::to_value(&small).expect("small envelope");
+    json["plan"]["id"] = "credit_vol_large_10x21".into();
+    let base = Date::from_calendar_date(2026, time::Month::May, 8).expect("base");
+    let strikes: Vec<f64> = (0..21).map(|i| 0.005 + i as f64 * 0.0005).collect();
+    let expiries: Vec<_> = (1..=10)
+        .map(|i| base + time::Duration::days(i * 180))
+        .collect();
+    let times: Vec<_> = expiries
+        .iter()
+        .map(|&expiry| {
+            DayCount::Act365F
+                .year_fraction(base, expiry, DayCountContext::default())
+                .expect("time")
+        })
+        .collect();
+    let step = &mut json["plan"]["steps"][0];
+    step["discount_curve_id"] = "CREDIT-FLAT".into();
+    step["target_expiries"] = serde_json::json!(times);
+    step["target_strikes"] = serde_json::json!(strikes);
+    let quote_set = step["quote_set"].as_str().expect("set").to_owned();
+    let underlying = step["underlying_ticker"]
+        .as_str()
+        .expect("underlying")
+        .to_owned();
+    let mut quotes = Vec::new();
+    let mut ids = Vec::new();
+    for (i, (&expiry, &t)) in expiries.iter().zip(&times).enumerate() {
+        let parameters =
+            SabrParameters::new(0.28 + 0.005 * i as f64, 1.0, 0.5, -0.25).expect("parameters");
+        for (j, &strike) in strikes.iter().enumerate() {
+            let id = format!("CREDIT-VOL-{i}-{j}");
+            ids.push(id.clone());
+            quotes.push(serde_json::json!({"kind":"vol_quote","option_vol":{
+                "id":id,"underlying":underlying,"expiry":expiry,"strike":strike,
+                "vol":parameters.implied_vol(0.01,strike,t).expect("quote"),"option_type":"call"
+            }}));
+        }
+    }
+    json["market_data"] = serde_json::json!(quotes);
+    json["plan"]["quote_sets"][&quote_set] = serde_json::json!(ids);
+    let discount =
+        finstack_quant_core::market_data::term_structures::DiscountCurve::builder("CREDIT-FLAT")
+            .base_date(base)
+            .knots([(0.0, 1.0), (10.0, 1.0)])
+            .build()
+            .expect("flat discount");
+    json["prior_market"] =
+        serde_json::to_value(vec![PriorMarketObject::DiscountCurve(discount)]).expect("prior");
+    let large = load_example(&serde_json::to_string(&json).expect("large JSON"));
+    record_evidence(&large);
+    c.bench_function("credit_vol/large_10x21", |b| {
+        b.iter(|| checked_calibrate(black_box(&large)))
+    });
+    let truth = SabrParameters::new(0.3, 1.0, 0.5, -0.25).expect("truth");
+    let vols: Vec<_> = strikes
+        .iter()
+        .map(|&k| truth.implied_vol(0.01, k, 2.0).expect("vol"))
+        .collect();
+    for pinned in [false, true] {
+        let calibrator = SabrCalibrator::new().with_atm_pinning(pinned);
+        if let Ok(directory) = std::env::var("FQ_CREDIT_EVIDENCE_DIR") {
+            let outcome = calibrator
+                .calibrate(0.01, &strikes, &vols, 2.0, 1.0)
+                .expect("fit");
+            let off_grid: Vec<_> = (0..41)
+                .map(|i| {
+                    let strike = 0.0049 + i as f64 * 0.00026;
+                    (
+                        strike,
+                        outcome
+                            .parameters
+                            .implied_vol(0.01, strike, 2.0)
+                            .expect("off grid"),
+                    )
+                })
+                .collect();
+            std::fs::write(
+                std::path::Path::new(&directory).join(format!("sabr_pinned_{pinned}.json")),
+                serde_json::to_vec_pretty(
+                    &serde_json::json!({"outcome":outcome,"off_grid":off_grid}),
+                )
+                .expect("serialize"),
+            )
+            .expect("write model evidence");
+        }
+        c.bench_function(
+            if pinned {
+                "credit_vol/pinned_21"
+            } else {
+                "credit_vol/free_21"
+            },
+            |b| {
+                b.iter(|| {
+                    calibrator
+                        .calibrate(
+                            black_box(0.01),
+                            black_box(&strikes),
+                            black_box(&vols),
+                            black_box(2.0),
+                            black_box(1.0),
+                        )
+                        .expect("fit")
+                })
+            },
+        );
+    }
+}
+
 criterion_group!(
     benches,
     bench_hazard_bootstrap,
     bench_hazard_variants,
     bench_hazard_bucket_batches,
-    bench_base_correlation_bootstrap
+    bench_base_correlation_bootstrap,
+    bench_credit_vol
 );
 criterion_main!(benches);

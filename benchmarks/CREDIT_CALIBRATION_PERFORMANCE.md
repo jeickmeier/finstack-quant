@@ -477,3 +477,45 @@ H3 evidence note: `calibration_discount_step` and
 `calibration_discount_then_forward_steps` directories were copied from earlier
 controls by the broad prefix collector; they are not fresh H3 measurements and
 are excluded from H3 conclusions. All H3 table rows and CDS controls are fresh.
+
+## V1 — Correct SABR work accounting
+
+Accepted telemetry foundation. `residual_evaluations` now counts actual residual
+closure calls across every start, including failed solves and rejected final
+candidates. Winning-start statistics, strict score tie-breaking and all nine
+starts remain unchanged. No stopping/acceptance tolerances changed.
+
+| Workload | V0 mean µs | V1 mean µs | Change |
+|---|---:|---:|---:|
+| credit_vol/small_3x3 | 538.209 | 544.889 | +1.2% |
+| credit_vol/large_10x21 | 1964.126 | 1980.468 | +0.8% |
+| credit_vol/free_21 | 175.039 | 176.508 | +0.8% |
+| credit_vol/pinned_21 | 175.387 | 176.639 | +0.7% |
+| sabr_slice_calibration | 229.293 | 229.091 | -0.1% |
+
+These are fresh volatility baselines, with 20 samples, 3 s warmup, 10 s
+measurement and 10,000 resamples. The 10×21 surface uses beta 1, ten half-year
+expiries and 21 spread strikes, with a flat discount curve and known non-flat
+SABR quotes. Prerequisite calibration/parsing is excluded; restoration, quote
+preparation, all fits, validation and reports are included. Direct 21-strike
+free/ATM-pinned fits and the existing beta-0.5 slice are separate controls.
+Every timed fit must succeed. V0/V1 evidence includes raw samples and confidence
+intervals, full surface reports, direct fitted parameters and off-grid smiles.
+
+The direct free fit reports 374 calls rather than the old winning-start-only
+36; the pinned fit reports 323 rather than 26. The three-expiry fixture reports
+2,879 / 1,348 / 1,251 calls instead of 147 / 146 / 131. These increases correct
+telemetry; they do not represent additional solver work. All compared outputs
+are exactly equal after excluding this counter, including fitted parameters,
+selected starts, quote residuals, off-grid vols and iteration counts.
+
+Validation: 2,052 enabled model tests and 571 calibration tests passed, with
+scoped models/calibration lint. Controlled starts cover failed solves,
+reconstruction rejection, residual rejection and tied winning scores. Twelve
+normal/lognormal/shifted free/pinned fit snapshots and 11,664 formula/error
+snapshots provide same-build checks for subsequent preparation. Public counter
+documentation and generated reports are updated together. The counter adds one
+stack-local integer per active solve, with no retained per-evaluation data.
+
+Execution status: V1 complete; V2 in progress. V3 and the final integration gate
+remain pending. No performance improvement is claimed for this telemetry slice.

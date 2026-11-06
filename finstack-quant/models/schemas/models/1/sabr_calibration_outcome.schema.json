@@ -97,7 +97,7 @@
       "type": "array"
     },
     "residual_evaluations": {
-      "description": "Total objective residual evaluations.",
+      "description": "Actual objective residual invocations across all deterministic starts,\nincluding attempts rejected by the solver or final quote-fit checks.",
       "format": "uint",
       "minimum": 0,
       "type": "integer"

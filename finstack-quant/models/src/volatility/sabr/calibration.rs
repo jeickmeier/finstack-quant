@@ -387,7 +387,8 @@ pub struct SabrCalibrationOutcome {
     pub total_iterations: usize,
     /// Iterations consumed by the selected start.
     pub winning_iterations: usize,
-    /// Total objective residual evaluations.
+    /// Actual objective residual invocations across all deterministic starts,
+    /// including attempts rejected by the solver or final quote-fit checks.
     pub residual_evaluations: usize,
     /// Initial alpha, nu, and rho values for the selected start.
     pub winning_start: [f64; 3],
@@ -520,15 +521,18 @@ fn run_deterministic_sabr_starts<Solve, Reconstruct>(
     mut reconstruct: Reconstruct,
 ) -> Result<SabrMultiStartResult>
 where
-    Solve: FnMut([f64; 3]) -> Result<LmSolution>,
+    Solve: FnMut([f64; 3]) -> (Result<LmSolution>, usize),
     Reconstruct: FnMut(&LmSolution) -> Option<[f64; 3]>,
 {
     let mut best: Option<(f64, LmSolution, [f64; 3], [f64; 3])> = None;
     let mut rejected = RejectedSabrStarts::default();
     let mut total_iterations = 0;
+    let mut residual_evaluations = 0;
 
     for physical_start in starts {
-        let Ok(solution) = solve(physical_start) else {
+        let (solution, calls) = solve(physical_start);
+        residual_evaluations += calls;
+        let Ok(solution) = solution else {
             rejected.record_solver_failure();
             continue;
         };
@@ -559,7 +563,7 @@ where
             parameters: SabrParameters::new(physical[0], beta, physical[1], physical[2])?,
             total_iterations,
             winning_iterations: solution.stats.iterations,
-            residual_evaluations: solution.stats.residual_evals,
+            residual_evaluations,
             winning_start,
             quote_errors: Vec::new(),
             max_relative_quote_error: f64::INFINITY,
@@ -798,7 +802,9 @@ impl SabrCalibrator {
                     bounded_to_unconstrained(physical_start[1], 0.001, 2.0),
                     bounded_to_unconstrained(physical_start[2], -0.99, 0.99),
                 ];
+                let calls = std::cell::Cell::new(0);
                 let residuals = |unconstrained: &[f64], output: &mut [f64]| {
+                    calls.set(calls.get() + 1);
                     let alpha = unconstrained[0].exp();
                     let nu = unconstrained_to_bounded(unconstrained[1], 0.001, 2.0);
                     let rho = unconstrained_to_bounded(unconstrained[2], -0.99, 0.99);
@@ -815,7 +821,8 @@ impl SabrCalibrator {
                             .map_or(1e6, |model_vol| weight * (model_vol - market_vol));
                     }
                 };
-                solver.solve_system(residuals, &initial, market_vols.len())
+                let solution = solver.solve_system(residuals, &initial, market_vols.len());
+                (solution, calls.get())
             },
             |solution| {
                 let physical = [
@@ -953,7 +960,9 @@ impl SabrCalibrator {
                     bounded_to_unconstrained(physical_start[1], 0.001, 2.0),
                     bounded_to_unconstrained(physical_start[2], -0.99, 0.99),
                 ];
+                let calls = std::cell::Cell::new(0);
                 let residuals = |unconstrained: &[f64], output: &mut [f64]| {
+                    calls.set(calls.get() + 1);
                     let nu = unconstrained_to_bounded(unconstrained[0], 0.001, 2.0);
                     let rho = unconstrained_to_bounded(unconstrained[1], -0.99, 0.99);
                     let Ok(alpha) = solve_alpha_for_atm(
@@ -980,7 +989,8 @@ impl SabrCalibrator {
                             .map_or(1e6, |model_vol| weights[index] * (model_vol - market_vol));
                     }
                 };
-                solver.solve_system(residuals, &initial, market_vols.len())
+                let solution = solver.solve_system(residuals, &initial, market_vols.len());
+                (solution, calls.get())
             },
             |solution| {
                 let nu = unconstrained_to_bounded(solution.params[0], 0.001, 2.0);
@@ -1177,18 +1187,21 @@ mod acceptance_tests {
                 } else {
                     (1.0e-5, LmTerminationReason::ConvergedResidualNorm, 3)
                 };
-                Ok(LmSolution {
-                    params: vec![0.02, start[1], start[2]],
-                    stats: LmStats {
-                        iterations,
-                        residual_evals: iterations + 1,
-                        jacobian_evals: iterations,
-                        termination_reason: reason,
-                        final_residual_norm: score,
-                        final_step_norm: 0.0,
-                        lambda_final: 1.0,
-                    },
-                })
+                (
+                    Ok(LmSolution {
+                        params: vec![0.02, start[1], start[2]],
+                        stats: LmStats {
+                            iterations,
+                            residual_evals: iterations + 1,
+                            jacobian_evals: iterations,
+                            termination_reason: reason,
+                            final_residual_norm: score,
+                            final_step_norm: 0.0,
+                            lambda_final: 1.0,
+                        },
+                    }),
+                    iterations + 1,
+                )
             },
             |solution| {
                 Some(
@@ -1203,6 +1216,7 @@ mod acceptance_tests {
         .expect("converged candidate within tolerance should win");
 
         assert_eq!(result.outcome.winning_start, starts[1]);
+        assert_eq!(result.outcome.residual_evaluations, 7);
         assert_eq!(result.outcome.parameters.alpha, 0.02);
         assert_eq!(result.outcome.parameters.nu, 0.4);
         assert_eq!(result.outcome.parameters.rho, 0.0);
@@ -1213,6 +1227,128 @@ mod acceptance_tests {
             Some((score, LmTerminationReason::MaxIterations, 2))
                 if score == 1.0e-2
         ));
+    }
+
+    #[test]
+    fn sabr_preparation_fit_snapshot() {
+        let mut outcomes = Vec::new();
+        for beta in [0.0, 0.5, 1.0] {
+            for shifted in [false, true] {
+                for pinned in [false, true] {
+                    let forward = if shifted { -0.01 } else { 0.02 };
+                    let strikes: Vec<_> =
+                        (0..9).map(|i| forward + (i as f64 - 4.0) * 0.001).collect();
+                    let alpha = if beta == 0.0 {
+                        0.01
+                    } else if beta == 0.5 {
+                        0.05
+                    } else {
+                        0.3
+                    };
+                    let source = if shifted {
+                        SabrParameters::new_with_shift(alpha, beta, 0.5, -0.3, 0.03)
+                    } else {
+                        SabrParameters::new(alpha, beta, 0.5, -0.3)
+                    }
+                    .expect("source");
+                    let vols: Vec<_> = strikes
+                        .iter()
+                        .map(|&strike| {
+                            source
+                                .implied_vol(forward, strike, 2.0)
+                                .expect("source volatility")
+                        })
+                        .collect();
+                    let calibrator =
+                        SabrCalibrator::new()
+                            .with_atm_pinning(pinned)
+                            .with_shift(if shifted {
+                                SabrShift::Fixed(0.03)
+                            } else {
+                                SabrShift::None
+                            });
+                    let mut outcome = serde_json::to_value(
+                        calibrator
+                            .calibrate(forward, &strikes, &vols, 2.0, beta)
+                            .expect("fit"),
+                    )
+                    .expect("outcome");
+                    outcome
+                        .as_object_mut()
+                        .expect("object")
+                        .remove("residual_evaluations");
+                    outcomes.push(outcome);
+                }
+            }
+        }
+        if let Ok(path) = std::env::var("FQ_SABR_FIT_SNAPSHOT") {
+            std::fs::write(
+                path,
+                serde_json::to_vec_pretty(&outcomes).expect("snapshot"),
+            )
+            .expect("write snapshot");
+        }
+        if let Ok(path) = std::env::var("FQ_SABR_FIT_REFERENCE") {
+            let expected = std::fs::read_to_string(path).expect("read reference");
+            assert_eq!(
+                serde_json::to_string_pretty(&outcomes).expect("serialize"),
+                expected.trim_end(),
+                "same-build fit parameters, work, selected start and quote residuals"
+            );
+        }
+    }
+
+    #[test]
+    fn deterministic_runner_counts_failed_rejected_and_tied_attempts() {
+        let starts = vec![
+            [0.02, 0.15, -0.6],
+            [0.02, 0.4, 0.0],
+            [0.02, 0.9, 0.6],
+            [0.02, 0.4, 0.6],
+        ];
+        let mut attempt = 0;
+        let result = run_deterministic_sabr_starts(
+            starts.clone(),
+            1e-4,
+            "count test",
+            0.5,
+            |start| {
+                attempt += 1;
+                if attempt == 1 {
+                    return (Err(Error::Validation("forced failed solve".into())), 5);
+                }
+                (
+                    Ok(LmSolution {
+                        params: start.to_vec(),
+                        stats: LmStats {
+                            iterations: 2,
+                            residual_evals: 999,
+                            jacobian_evals: 1,
+                            termination_reason: LmTerminationReason::ConvergedResidualNorm,
+                            final_residual_norm: 1e-5,
+                            final_step_norm: 0.0,
+                            lambda_final: 1.0,
+                        },
+                    }),
+                    attempt * 3,
+                )
+            },
+            |solution| {
+                (solution.params[1] != 0.9)
+                    .then(|| solution.params.as_slice().try_into().expect("parameters"))
+            },
+        )
+        .expect("accepted starts");
+        assert_eq!(attempt, 4);
+        assert_eq!(result.outcome.residual_evaluations, 5 + 6 + 9 + 12);
+        assert_eq!(
+            result.outcome.winning_start, starts[1],
+            "strict score ties retain first"
+        );
+        assert_eq!(result.outcome.total_iterations, 6);
+        assert_eq!(result.outcome.winning_iterations, 2);
+        assert_eq!(result.rejected.solver_failures, 1);
+        assert_eq!(result.rejected.rejected_starts, 1);
     }
 
     #[test]

@@ -646,3 +646,52 @@ pub(super) fn normal_beta_zero(alpha: f64, nu: f64, rho: f64, f: f64, k: f64, t:
     };
     alpha * ratio * (1.0 + (2.0 - 3.0 * rho * rho) * nu * nu * t / 24.0)
 }
+
+#[cfg(test)]
+mod performance_tests {
+    use super::*;
+
+    #[test]
+    fn sabr_preparation_value_snapshot() {
+        let mut bits = Vec::new();
+        for beta in [0.0, 0.00005, 0.0001, 0.5, 0.99995, 1.0] {
+            for alpha in [1e-15, 0.02, 0.3] {
+                for nu in [0.001, 0.5, 2.0] {
+                    for rho in [-0.99, -0.3, 0.0, 0.99] {
+                        for shift in [None, Some(0.03)] {
+                            let parameters = if let Some(shift) = shift {
+                                SabrParameters::new_with_shift(alpha, beta, nu, rho, shift)
+                            } else {
+                                SabrParameters::new(alpha, beta, nu, rho)
+                            }
+                            .expect("valid parameters");
+                            let forward = if shift.is_some() { -0.01 } else { 0.02 };
+                            for relative in [-0.7, -1e-4, -1e-7, -1e-9, 0.0, 1e-9, 1e-7, 1e-4, 0.7]
+                            {
+                                let strike = forward + 0.02 * relative;
+                                for t in [0.01, 1.0, 10.0] {
+                                    let result = parameters.implied_vol(forward, strike, t);
+                                    bits.push(match result {
+                                        Ok(value) => format!("{:016x}", value.to_bits()),
+                                        Err(error) => format!("error:{error}"),
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let text = serde_json::to_string_pretty(&bits).expect("snapshot");
+        if let Ok(path) = std::env::var("FQ_SABR_SNAPSHOT") {
+            std::fs::write(path, &text).expect("write snapshot");
+        }
+        if let Ok(path) = std::env::var("FQ_SABR_BITWISE_REFERENCE") {
+            let expected: Vec<String> =
+                serde_json::from_str(&std::fs::read_to_string(path).expect("read snapshot"))
+                    .expect("reference");
+            assert_eq!(bits, expected, "same-build SABR value and error semantics");
+        }
+        assert_eq!(bits.len(), 11664);
+    }
+}
