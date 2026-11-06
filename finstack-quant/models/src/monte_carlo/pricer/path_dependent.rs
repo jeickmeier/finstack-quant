@@ -1147,13 +1147,10 @@ impl<'a> RandomStream for SobolPathStream<'a> {
     }
 
     fn fill_std_normals(&mut self, out: &mut [f64]) {
-        let n = out.len();
-        let end = self.cursor + n;
-        debug_assert!(
-            end <= self.z_increments.len(),
-            "SobolPathStream exhausted: requested {n} beyond remaining {}",
-            self.z_increments.len() - self.cursor
-        );
+        // The pricer sizes `z_increments` to every normal one path draws
+        // (`num_steps * num_factors`), so the slice below never overruns; if it
+        // did, the slice index panics with the requested range and the length.
+        let end = self.cursor + out.len();
         out.copy_from_slice(&self.z_increments[self.cursor..end]);
         self.cursor = end;
     }
