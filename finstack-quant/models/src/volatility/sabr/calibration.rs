@@ -791,6 +791,18 @@ impl SabrCalibrator {
         let atm_vol = self.find_atm_vol(forward, strikes, market_vols)?;
         let alpha_start = initial_alpha_guess(atm_vol, forward, beta);
         let starts = deterministic_sabr_starts(alpha_start);
+        let template = SabrParameters::new(1.0, beta, 0.4, 0.0)?;
+        let prepared: Vec<_> = strikes
+            .iter()
+            .map(|&strike| {
+                super::expansion::PreparedSabrStrike::new(
+                    &template,
+                    forward,
+                    strike,
+                    time_to_expiry,
+                )
+            })
+            .collect::<Result<_>>()?;
         let outcome = run_deterministic_sabr_starts(
             starts,
             residual_tolerance,
@@ -812,12 +824,12 @@ impl SabrCalibrator {
                         output.fill(1e6);
                         return;
                     };
-                    for (index, (&strike, &market_vol)) in
-                        strikes.iter().zip(market_vols).enumerate()
+                    for (index, (strike, &market_vol)) in
+                        prepared.iter().zip(market_vols).enumerate()
                     {
                         let weight = weights[index];
-                        output[index] = parameters
-                            .implied_vol(forward, strike, time_to_expiry)
+                        output[index] = strike
+                            .evaluate(&parameters)
                             .map_or(1e6, |model_vol| weight * (model_vol - market_vol));
                     }
                 };
@@ -946,6 +958,18 @@ impl SabrCalibrator {
         let atm_vol = self.find_atm_vol(forward, strikes, market_vols)?;
         let alpha_start = initial_alpha_guess(atm_vol, forward, beta);
         let starts = deterministic_sabr_starts(alpha_start);
+        let template = SabrParameters::new(1.0, beta, 0.4, 0.0)?;
+        let prepared: Vec<_> = strikes
+            .iter()
+            .map(|&strike| {
+                super::expansion::PreparedSabrStrike::new(
+                    &template,
+                    forward,
+                    strike,
+                    time_to_expiry,
+                )
+            })
+            .collect::<Result<_>>()?;
         let residual_tolerance = self.tolerance;
         let solver = LevenbergMarquardtSolver::new()
             .with_tolerance(residual_tolerance.min(1e-10))
@@ -981,11 +1005,11 @@ impl SabrCalibrator {
                         output.fill(1e6);
                         return;
                     };
-                    for (index, (&strike, &market_vol)) in
-                        strikes.iter().zip(market_vols).enumerate()
+                    for (index, (strike, &market_vol)) in
+                        prepared.iter().zip(market_vols).enumerate()
                     {
-                        output[index] = parameters
-                            .implied_vol(forward, strike, time_to_expiry)
+                        output[index] = strike
+                            .evaluate(&parameters)
                             .map_or(1e6, |model_vol| weights[index] * (model_vol - market_vol));
                     }
                 };

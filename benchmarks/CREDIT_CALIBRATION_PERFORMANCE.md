@@ -519,3 +519,40 @@ stack-local integer per active solve, with no retained per-evaluation data.
 
 Execution status: V1 complete; V2 in progress. V3 and the final integration gate
 remain pending. No performance improvement is claimed for this telemetry slice.
+
+## V2 — Prepare SABR strike constants
+
+Accepted. Free-alpha and ATM-pinned fits prepare forward/strike/beta/time/shift
+constants once per expiry and reuse the canonical expansion over all starts.
+The ATM branch prepares only the terms it uses; snapped beta-one powers are
+exactly one. Initial candidates introduced ordinary-formula overhead, which
+was removed before acceptance. `v2`, `v2-refined` and `v2-inline` retain those
+experiments; `v2-beta` is the accepted implementation. Inlining alone was
+neutral and its annotations were removed.
+
+| Workload | V1 mean µs | V2 mean µs | Change |
+|---|---:|---:|---:|
+| credit_vol/small_3x3 | 544.889 | 421.716 | -22.6% |
+| credit_vol/large_10x21 | 1980.468 | 1324.088 | -33.1% |
+| credit_vol/free_21 | 176.508 | 111.903 | -36.6% |
+| credit_vol/pinned_21 | 176.639 | 123.033 | -30.3% |
+| sabr_slice_calibration | 229.091 | 136.567 | -40.4% |
+| sabr_formula/normal_21 | 0.139 | 0.135 | -2.5% |
+| sabr_formula/cev_21 | 0.578 | 0.577 | -0.3% |
+| sabr_formula/lognormal_21 | 0.384 | 0.382 | -0.5% |
+
+All nine saved calibration/direct-fit reports match V1 exactly, including
+residual counts, parameters, selected starts, residuals and off-grid smiles.
+The 11,664 value/error and twelve fitted-outcome snapshots match the pre-V1
+baseline exactly (excluding only V1's corrected count). The first preparation
+passed 2,052 model tests and 571 calibration tests; the ATM refinement passed
+all 79 SABR tests and scoped models lint. Calibration lint also passed.
+
+End-to-end fit timing includes preparation. State is one fixed-size private
+record per strike, retained only for the active expiry solve, with no per-trial
+cache growth. Ordinary public formula controls include preparation on every
+call. Raw samples and confidence intervals are retained for both candidates
+and the separate V1 formula baseline; timing settings match V1. No native
+financial fixture changes are needed because reports are identical.
+
+Execution status: V2 complete; V3 in progress. The final gate remains pending.

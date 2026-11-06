@@ -394,12 +394,36 @@ fn bench_credit_vol(c: &mut Criterion) {
     }
 }
 
+fn bench_sabr_formula(c: &mut Criterion) {
+    use finstack_quant_models::volatility::sabr::SabrParameters;
+    for (label, alpha, beta) in [
+        ("normal", 0.01, 0.0),
+        ("cev", 0.05, 0.5),
+        ("lognormal", 0.3, 1.0),
+    ] {
+        let parameters = SabrParameters::new(alpha, beta, 0.5, -0.25).expect("parameters");
+        let strikes: Vec<_> = (0..21).map(|i| 0.005 + i as f64 * 0.0005).collect();
+        c.bench_function(&format!("sabr_formula/{label}_21"), |b| {
+            b.iter(|| {
+                for &strike in &strikes {
+                    black_box(
+                        parameters
+                            .implied_vol(black_box(0.01), black_box(strike), black_box(2.0))
+                            .expect("valid vol"),
+                    );
+                }
+            })
+        });
+    }
+}
+
 criterion_group!(
     benches,
     bench_hazard_bootstrap,
     bench_hazard_variants,
     bench_hazard_bucket_batches,
     bench_base_correlation_bootstrap,
-    bench_credit_vol
+    bench_credit_vol,
+    bench_sabr_formula
 );
 criterion_main!(benches);

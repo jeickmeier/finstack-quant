@@ -129,7 +129,13 @@ impl SabrParameters {
 
     /// Lognormal ATM implied volatility (Hagan et al. (2002) eq. 2.18).
     #[inline]
-    fn atm_lognormal(&self, forward: f64, time_to_expiry: f64, beta: f64) -> Result<f64> {
+    fn atm_lognormal(
+        &self,
+        forward: f64,
+        time_to_expiry: f64,
+        beta: f64,
+        f_beta: f64,
+    ) -> Result<f64> {
         let alpha = self.alpha;
         let nu = self.nu;
         let rho = self.rho;
@@ -137,12 +143,6 @@ impl SabrParameters {
         if alpha.abs() < 1e-14 {
             return Ok(0.0);
         }
-
-        let f_beta = if forward.abs() < 1e-14 {
-            1e-14_f64.powf(1.0 - beta)
-        } else {
-            forward.powf(1.0 - beta)
-        };
 
         let alpha_term = (1.0 - beta).powi(2) / 24.0 * alpha.powi(2) / (f_beta * f_beta);
         let rho_term = 0.25 * rho * beta * nu * alpha / f_beta;
@@ -495,79 +495,7 @@ impl SabrParameters {
             )));
         }
 
-        let alpha = self.alpha;
-        let nu = self.nu;
-        let rho = self.rho;
-
-        // Snap β to 0 or 1 with the same `BETA_SNAP_TOL` used by
-        // `implied_vol` / `quote_convention`, so smile and ATM paths take
-        // the same branch for a given raw β.
-        let raw_beta = self.beta;
-        let beta_is_zero = raw_beta < BETA_SNAP_TOL;
-        let beta_is_one = !beta_is_zero && (1.0 - raw_beta).abs() < BETA_SNAP_TOL;
-        let beta = if beta_is_zero {
-            0.0
-        } else if beta_is_one {
-            1.0
-        } else {
-            raw_beta
-        };
-
-        let f_mid = (effective_f * effective_k).sqrt();
-        let f_mid_beta = f_mid.powf(1.0 - beta);
-
-        // ATM detection uses relative moneyness only. The previous
-        // `z.abs() < 1e-8` clause was small both for genuine ATM (F≈K) AND
-        // whenever ν→0, so it short-circuited every strike to the flat ATM vol
-        // in the pure-CEV limit. The ν→0 limit is handled by the general
-        // formula (z/χ(z)→1).
-        let relative_diff =
-            (effective_f - effective_k).abs() / effective_f.abs().max(effective_k.abs());
-        if relative_diff < 1e-8 {
-            return self.atm_lognormal(effective_f, t, beta);
-        }
-
-        let log_moneyness = (effective_f / effective_k).ln();
-
-        // Obloj (2008) correction: use geometric-mean-based z for the z/χ(z)
-        // ratio: z = (ν/α) * f_mid^{1-β} * ln(F/K).
-        let z_corrected = if beta_is_one {
-            (nu / alpha) * log_moneyness
-        } else {
-            (nu / alpha) * f_mid_beta * log_moneyness
-        };
-
-        let x = chi(z_corrected, self.rho)?;
-
-        let factor1 = if f_mid_beta.abs() < 1e-14 {
-            alpha
-        } else {
-            let correction_term = 1.0
-                + (1.0 - beta).powi(2) / 24.0 * log_moneyness.powi(2)
-                + (1.0 - beta).powi(4) / 1920.0 * log_moneyness.powi(4);
-            alpha / (f_mid_beta * correction_term)
-        };
-
-        let factor2 = self.z_over_chi(z_corrected, x)?;
-
-        let time_correction = (1.0 - beta).powi(2) / 24.0 * alpha.powi(2)
-            / f_mid.powf(2.0 * (1.0 - beta))
-            + 0.25 * rho * beta * nu * alpha / f_mid_beta
-            + (2.0 - 3.0 * rho.powi(2)) / 24.0 * nu.powi(2);
-
-        let factor3 = 1.0 + t * time_correction;
-
-        let volatility = factor1 * factor2 * factor3;
-
-        if volatility <= 0.0 || !volatility.is_finite() {
-            return Err(Error::Validation(format!(
-                "SABR produced invalid volatility={:.6} for forward={:.6}, strike={:.6}, T={:.4}. \
-                 Check parameter values.",
-                volatility, f, k, t
-            )));
-        }
-
-        Ok(volatility)
+        PreparedLognormal::new(self, f, k, t).evaluate(self)
     }
 
     /// Normal SABR implied volatility with checked error semantics.
@@ -671,6 +599,19 @@ mod performance_tests {
                                 let strike = forward + 0.02 * relative;
                                 for t in [0.01, 1.0, 10.0] {
                                     let result = parameters.implied_vol(forward, strike, t);
+                                    let prepared =
+                                        PreparedSabrStrike::new(&parameters, forward, strike, t)
+                                            .and_then(|prepared| prepared.evaluate(&parameters));
+                                    assert_eq!(
+                                        result
+                                            .as_ref()
+                                            .map(|v| v.to_bits())
+                                            .map_err(ToString::to_string),
+                                        prepared
+                                            .as_ref()
+                                            .map(|v| v.to_bits())
+                                            .map_err(ToString::to_string)
+                                    );
                                     bits.push(match result {
                                         Ok(value) => format!("{:016x}", value.to_bits()),
                                         Err(error) => format!("error:{error}"),
@@ -693,5 +634,199 @@ mod performance_tests {
             assert_eq!(bits, expected, "same-build SABR value and error semantics");
         }
         assert_eq!(bits.len(), 11664);
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct PreparedLognormal {
+    f: f64,
+    k: f64,
+    effective_f: f64,
+    t: f64,
+    beta: f64,
+    beta_is_one: bool,
+    f_mid_beta: f64,
+    f_mid_power: f64,
+    log_moneyness: f64,
+    correction_term: f64,
+    atm: bool,
+    atm_f_beta: f64,
+}
+
+impl PreparedLognormal {
+    fn new(parameters: &SabrParameters, f: f64, k: f64, t: f64) -> Self {
+        let (effective_f, effective_k) = parameters.effective_rates(f, k);
+        let raw_beta = parameters.beta;
+        let beta_is_zero = raw_beta < BETA_SNAP_TOL;
+        let beta_is_one = !beta_is_zero && (1.0 - raw_beta).abs() < BETA_SNAP_TOL;
+        let beta = if beta_is_zero {
+            0.0
+        } else if beta_is_one {
+            1.0
+        } else {
+            raw_beta
+        };
+        let relative_diff =
+            (effective_f - effective_k).abs() / effective_f.abs().max(effective_k.abs());
+        if relative_diff < 1e-8 {
+            let atm_f_beta = if effective_f.abs() < 1e-14 {
+                1e-14_f64.powf(1.0 - beta)
+            } else {
+                effective_f.powf(1.0 - beta)
+            };
+            return Self {
+                f,
+                k,
+                effective_f,
+                t,
+                beta,
+                beta_is_one,
+                f_mid_beta: 0.0,
+                f_mid_power: 0.0,
+                log_moneyness: 0.0,
+                correction_term: 0.0,
+                atm: true,
+                atm_f_beta,
+            };
+        }
+        let f_mid = (effective_f * effective_k).sqrt();
+        let (f_mid_beta, f_mid_power) = if beta_is_one {
+            (1.0, 1.0)
+        } else {
+            (f_mid.powf(1.0 - beta), f_mid.powf(2.0 * (1.0 - beta)))
+        };
+        let log_moneyness = (effective_f / effective_k).ln();
+        let correction_term = 1.0
+            + (1.0 - beta).powi(2) / 24.0 * log_moneyness.powi(2)
+            + (1.0 - beta).powi(4) / 1920.0 * log_moneyness.powi(4);
+        Self {
+            f,
+            k,
+            effective_f,
+            t,
+            beta,
+            beta_is_one,
+            f_mid_beta,
+            f_mid_power,
+            log_moneyness,
+            correction_term,
+            atm: false,
+            atm_f_beta: 0.0,
+        }
+    }
+
+    fn evaluate(&self, parameters: &SabrParameters) -> Result<f64> {
+        let Self {
+            f,
+            k,
+            effective_f,
+            t,
+            beta,
+            beta_is_one,
+            f_mid_beta,
+            f_mid_power,
+            log_moneyness,
+            correction_term,
+            atm,
+            atm_f_beta,
+        } = *self;
+        let alpha = parameters.alpha;
+        let nu = parameters.nu;
+        let rho = parameters.rho;
+        if atm {
+            return parameters.atm_lognormal(effective_f, t, beta, atm_f_beta);
+        }
+        // Obloj (2008) correction: use geometric-mean-based z for the z/χ(z)
+        // ratio: z = (ν/α) * f_mid^{1-β} * ln(F/K).
+        let z_corrected = if beta_is_one {
+            (nu / alpha) * log_moneyness
+        } else {
+            (nu / alpha) * f_mid_beta * log_moneyness
+        };
+
+        let x = chi(z_corrected, parameters.rho)?;
+
+        let factor1 = if f_mid_beta.abs() < 1e-14 {
+            alpha
+        } else {
+            alpha / (f_mid_beta * correction_term)
+        };
+
+        let factor2 = parameters.z_over_chi(z_corrected, x)?;
+
+        let time_correction = (1.0 - beta).powi(2) / 24.0 * alpha.powi(2) / f_mid_power
+            + 0.25 * rho * beta * nu * alpha / f_mid_beta
+            + (2.0 - 3.0 * rho.powi(2)) / 24.0 * nu.powi(2);
+
+        let factor3 = 1.0 + t * time_correction;
+
+        let volatility = factor1 * factor2 * factor3;
+
+        if volatility <= 0.0 || !volatility.is_finite() {
+            return Err(Error::Validation(format!(
+                "SABR produced invalid volatility={:.6} for forward={:.6}, strike={:.6}, T={:.4}. \
+                 Check parameter values.",
+                volatility, f, k, t
+            )));
+        }
+
+        Ok(volatility)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(super) enum PreparedSabrStrike {
+    Normal {
+        forward: f64,
+        strike: f64,
+        time: f64,
+    },
+    Lognormal(PreparedLognormal),
+}
+
+impl PreparedSabrStrike {
+    pub(super) fn new(
+        parameters: &SabrParameters,
+        forward: f64,
+        strike: f64,
+        time: f64,
+    ) -> Result<Self> {
+        parameters.validate_inputs(forward, strike, time)?;
+        Ok(if parameters.beta < BETA_SNAP_TOL {
+            Self::Normal {
+                forward,
+                strike,
+                time,
+            }
+        } else {
+            Self::Lognormal(PreparedLognormal::new(parameters, forward, strike, time))
+        })
+    }
+
+    pub(super) fn evaluate(&self, parameters: &SabrParameters) -> Result<f64> {
+        match self {
+            Self::Lognormal(prepared) => prepared.evaluate(parameters),
+            Self::Normal {
+                forward,
+                strike,
+                time,
+            } => {
+                let vol = normal_beta_zero(
+                    parameters.alpha,
+                    parameters.nu,
+                    parameters.rho,
+                    *forward,
+                    *strike,
+                    *time,
+                );
+                if vol.is_finite() && vol > 0.0 {
+                    Ok(vol)
+                } else {
+                    Err(Error::Validation(
+                        "normal SABR produced invalid volatility".to_owned(),
+                    ))
+                }
+            }
+        }
     }
 }
