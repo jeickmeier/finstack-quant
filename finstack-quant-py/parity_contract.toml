@@ -1299,6 +1299,8 @@ python_package = "finstack_quant.statements"
 visibility = "pub"
 status = "exists"
 
+# The Python NodeSpec constructor is keyword-only and read by Rust as the
+# NodeSpec serde struct (WASM node specs are plain objects).
 [crates.statements.modules]
 adjustments      = { python = "finstack_quant.statements.adjustments",       status = "missing", note = "Bindings are currently exported from finstack_quant.statements root" }
 builder          = { python = "finstack_quant.statements.builder",           status = "missing", note = "Bindings are exported from finstack_quant.statements root. Canonical mutable setters preserve builder state on failure; Python add_bond/add_swap and their convention variants delegate to the same Rust setters. ModelBuilder::resolve_period_columns is a Rust-only import-validation seam used by Python from_dataframe to validate all input columns before mutating the builder. add_swap, add_bond_with_convention and add_swap_with_conventions take the serde forms of BondConventionParams, SwapParams and SwapConventions (Python dict or JSON text, WASM plain object or JSON text), exactly as Rust does." }
@@ -1386,6 +1388,11 @@ python_package = "finstack_quant.statements_analytics"
 visibility = "pub"
 status = "exists"
 
+# The Python data-class constructors (ThreeStatementMapping, CreditMapping,
+# PeerFilter, QualitativeFlags, StagingConfig, Exposure, LeaseSpec,
+# PropertyTemplateNodes) are keyword-only and read by Rust as the serde struct;
+# Exposure also takes current_pd / origination_pd, which the Python object
+# holds beside the Rust Exposure. WASM passes these as plain objects.
 [crates.statements_analytics.modules]
 analysis                    = { python = "finstack_quant.statements_analytics.analysis",         status = "missing", note = "Bindings are currently exported from finstack_quant.statements_analytics root" }
 comps                       = { python = "finstack_quant.statements_analytics",                  status = "flattened", note = "analysis::comps is pub(crate) in Rust — not a crate-boundary module — reached only via the flattened comparable-company functions/types re-exported through analysis and bound flat on finstack_quant.statements_analytics" }

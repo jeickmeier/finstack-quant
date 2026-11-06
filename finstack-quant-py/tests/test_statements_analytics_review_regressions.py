@@ -93,18 +93,42 @@ def test_staging_json_rejects_invalid_enabled_relative_threshold() -> None:
 
 
 def test_relative_staging_rejects_positive_pd_from_zero_origination() -> None:
-    exposure = Exposure("zero-origin", 1_000.0, 0.45, 0.06, 3.0, 0.005, 0.0)
+    exposure = Exposure(
+        id="zero-origin",
+        ead=1_000.0,
+        lgd=0.45,
+        eir=0.06,
+        remaining_maturity_years=3.0,
+        current_pd=0.005,
+        origination_pd=0.0,
+    )
     with pytest.raises(ValueError, match="ratio"):
         classify_stage(exposure)
 
 
 def test_relative_staging_keeps_both_zero_pds_in_stage_one() -> None:
-    exposure = Exposure("both-zero", 1_000.0, 0.45, 0.06, 3.0, 0.0, 0.0)
+    exposure = Exposure(
+        id="both-zero",
+        ead=1_000.0,
+        lgd=0.45,
+        eir=0.06,
+        remaining_maturity_years=3.0,
+        current_pd=0.0,
+        origination_pd=0.0,
+    )
     assert classify_stage(exposure).stage is Stage.Stage1
 
 
 def test_disabled_relative_staging_uses_absolute_trigger_from_zero_origination() -> None:
-    exposure = Exposure("absolute-only", 1_000.0, 0.45, 0.06, 3.0, 0.005, 0.0)
+    exposure = Exposure(
+        id="absolute-only",
+        ead=1_000.0,
+        lgd=0.45,
+        eir=0.06,
+        remaining_maturity_years=3.0,
+        current_pd=0.005,
+        origination_pd=0.0,
+    )
     config = StagingConfig(pd_delta_relative=None)
     assert classify_stage(exposure, config).stage is Stage.Stage1
     config = StagingConfig(pd_delta_absolute=0.001, pd_delta_relative=None)
@@ -209,7 +233,7 @@ def test_binding_requires_values_without_a_rust_default() -> None:
     builder = ModelBuilder("re")
     builder.periods("2025Q1..Q2", None)
     model = builder.build()
-    lease = LeaseSpec("lease_a", "2025Q1", 100.0)
+    lease = LeaseSpec(node_id="lease_a", start="2025Q1", base_rent=100.0)
     with pytest.raises(TypeError):
         add_property_operating_statement(model, [lease])  # type: ignore[call-arg]
     assert add_property_operating_statement(model, [lease], [], [], []).has_node("ncf")

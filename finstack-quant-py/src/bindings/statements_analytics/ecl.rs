@@ -140,6 +140,9 @@ pub(crate) fn extract_stage(obj: &Bound<'_, PyAny>) -> PyResult<rust_ecl::Stage>
 
 /// Qualitative SICR and default-evidence flags for staging (IFRS 9 B5.5.17 / B5.5.37).
 ///
+/// Every parameter is keyword-only and optional; Rust reads them as the serde
+/// struct and rejects unknown keywords (``ValueError``).
+///
 /// Parameters
 /// ----------
 /// watchlist : bool
@@ -180,39 +183,14 @@ pub struct PyQualitativeFlags {
 #[pymethods]
 impl PyQualitativeFlags {
     #[new]
-    #[pyo3(signature = (
-        watchlist=false,
-        forbearance=false,
-        adverse_conditions=false,
-        custom=Vec::new(),
-        bankruptcy=false,
-        distressed_modification=false,
-        cross_default=false,
-        other_default_evidence=Vec::new(),
-    ))]
-    #[allow(clippy::too_many_arguments)]
-    fn new(
-        watchlist: bool,
-        forbearance: bool,
-        adverse_conditions: bool,
-        custom: Vec<String>,
-        bankruptcy: bool,
-        distressed_modification: bool,
-        cross_default: bool,
-        other_default_evidence: Vec<String>,
-    ) -> Self {
-        Self {
-            inner: rust_ecl::QualitativeFlags {
-                watchlist,
-                forbearance,
-                adverse_conditions,
-                custom,
-                bankruptcy,
-                distressed_modification,
-                cross_default,
-                other_default_evidence,
-            },
-        }
+    #[pyo3(
+        signature = (**fields),
+        text_signature = "(*, watchlist=False, forbearance=False, adverse_conditions=False, custom=[], bankruptcy=False, distressed_modification=False, cross_default=False, other_default_evidence=[])"
+    )]
+    fn new(py: Python<'_>, fields: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
+        let inner: rust_ecl::QualitativeFlags =
+            crate::bindings::module_utils::fields_from_py(py, fields, "QualitativeFlags")?;
+        Ok(Self { inner })
     }
 
     /// Internal watchlist flag (SICR indicator).
@@ -289,36 +267,39 @@ wire_methods!(
 /// IFRS 9 staging policy: SICR thresholds, days-past-due backstops, qualitative
 /// switches and curing windows.
 ///
-/// Omitted parameters use the canonical Rust ``StagingConfig::default()``
-/// values, so ``StagingConfig()`` is the standard policy. Explicit ``None``
-/// disables the relative PD trigger.
+/// Every parameter is keyword-only and read by Rust as the serde struct: an
+/// omitted keyword takes the Rust ``StagingConfig::default()`` value, so
+/// ``StagingConfig()`` is the standard policy. Explicit ``None`` disables the
+/// relative PD trigger; the other fields do not take ``None``.
 ///
 /// Parameters
 /// ----------
-/// pd_delta_absolute : float | None
+/// pd_delta_absolute : float
 ///     Absolute remaining-window PD increase (decimal, ``0.01`` = 1pp) that fires the
-///     Stage 2 SICR trigger.
+///     Stage 2 SICR trigger. Default ``0.01``.
 /// pd_delta_relative : float | None
 ///     Finite non-negative relative remaining-window PD multiple that fires
 ///     Stage 2. Omitted uses ``2.0`` (PD doubled); ``None`` disables the trigger.
-/// rating_downgrade_notches : int | None
+/// rating_downgrade_notches : int
 ///     Downgrade notches from origination that fire Stage 2; ``0`` disables
-///     the trigger.
+///     the trigger. Default ``3``.
 /// rating_scale_labels : list[str] | None
 ///     Ordered best-to-worst rating labels used to count notches; ``None``
 ///     uses the 10-state S&P/Fitch scale.
-/// dpd_stage2_threshold : int | None
+/// dpd_stage2_threshold : int
 ///     Days past due at or above which the Stage 2 backstop fires (default 30).
-/// dpd_stage3_threshold : int | None
+/// dpd_stage3_threshold : int
 ///     Days past due at or above which Stage 3 is forced (default 90).
-/// qualitative_triggers_enabled : bool | None
-///     Whether any active SICR flag fires Stage 2.
-/// stage3_qualitative_triggers_enabled : bool | None
-///     Whether default-evidence flags force Stage 3.
-/// cure_periods_stage2_to_1 : int | None
+/// qualitative_triggers_enabled : bool
+///     Whether any active SICR flag fires Stage 2. Default ``True``.
+/// stage3_qualitative_triggers_enabled : bool
+///     Whether default-evidence flags force Stage 3. Default ``True``.
+/// cure_periods_stage2_to_1 : int
 ///     Consecutive performing periods required to cure Stage 2 to Stage 1.
-/// cure_periods_stage3_to_2 : int | None
+///     Default ``3``.
+/// cure_periods_stage3_to_2 : int
 ///     Consecutive performing periods required to cure Stage 3 to Stage 2.
+///     Default ``12``.
 ///
 /// Raises
 /// ------
@@ -343,49 +324,13 @@ pub struct PyStagingConfig {
 #[pymethods]
 impl PyStagingConfig {
     #[new]
-    #[pyo3(signature = (
-        pd_delta_absolute=None,
-        pd_delta_relative=rust_ecl::StagingConfig::default().pd_delta_relative,
-        rating_downgrade_notches=None,
-        rating_scale_labels=None,
-        dpd_stage2_threshold=None,
-        dpd_stage3_threshold=None,
-        qualitative_triggers_enabled=None,
-        stage3_qualitative_triggers_enabled=None,
-        cure_periods_stage2_to_1=None,
-        cure_periods_stage3_to_2=None,
-    ))]
-    #[allow(clippy::too_many_arguments)]
-    fn new(
-        pd_delta_absolute: Option<f64>,
-        pd_delta_relative: Option<f64>,
-        rating_downgrade_notches: Option<u32>,
-        rating_scale_labels: Option<Vec<String>>,
-        dpd_stage2_threshold: Option<u32>,
-        dpd_stage3_threshold: Option<u32>,
-        qualitative_triggers_enabled: Option<bool>,
-        stage3_qualitative_triggers_enabled: Option<bool>,
-        cure_periods_stage2_to_1: Option<u32>,
-        cure_periods_stage3_to_2: Option<u32>,
-    ) -> PyResult<Self> {
-        let defaults = rust_ecl::StagingConfig::default();
-        let inner = rust_ecl::StagingConfig {
-            pd_delta_absolute: pd_delta_absolute.unwrap_or(defaults.pd_delta_absolute),
-            pd_delta_relative,
-            rating_downgrade_notches: rating_downgrade_notches
-                .unwrap_or(defaults.rating_downgrade_notches),
-            rating_scale_labels: rating_scale_labels.or(defaults.rating_scale_labels),
-            dpd_stage2_threshold: dpd_stage2_threshold.unwrap_or(defaults.dpd_stage2_threshold),
-            dpd_stage3_threshold: dpd_stage3_threshold.unwrap_or(defaults.dpd_stage3_threshold),
-            qualitative_triggers_enabled: qualitative_triggers_enabled
-                .unwrap_or(defaults.qualitative_triggers_enabled),
-            stage3_qualitative_triggers_enabled: stage3_qualitative_triggers_enabled
-                .unwrap_or(defaults.stage3_qualitative_triggers_enabled),
-            cure_periods_stage2_to_1: cure_periods_stage2_to_1
-                .unwrap_or(defaults.cure_periods_stage2_to_1),
-            cure_periods_stage3_to_2: cure_periods_stage3_to_2
-                .unwrap_or(defaults.cure_periods_stage3_to_2),
-        };
+    #[pyo3(
+        signature = (**fields),
+        text_signature = "(*, pd_delta_absolute=0.01, pd_delta_relative=2.0, rating_downgrade_notches=3, rating_scale_labels=None, dpd_stage2_threshold=30, dpd_stage3_threshold=90, qualitative_triggers_enabled=True, stage3_qualitative_triggers_enabled=True, cure_periods_stage2_to_1=3, cure_periods_stage3_to_2=12)"
+    )]
+    fn new(py: Python<'_>, fields: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
+        let inner: rust_ecl::StagingConfig =
+            crate::bindings::module_utils::fields_from_py(py, fields, "StagingConfig")?;
         inner.validate().map_err(core_to_py)?;
         Ok(Self { inner })
     }
@@ -543,8 +488,13 @@ wire_methods!(PyStageResult, rust_ecl::StageResult, "StageResult");
 /// simplified SICR test compares. ``classify_stage`` reads days past due,
 /// qualitative flags, rating labels, previous stage and performing periods
 /// (``ead``, ``lgd`` and ``eir`` do not affect staging); ``compute_ecl`` prices
-/// ``ead + undrawn * ccf`` with ``lgd``, ``eir``, ``remaining_maturity`` and
+/// ``ead + undrawn * ccf`` with ``lgd``, ``eir``, ``remaining_maturity_years`` and
 /// any ``ead_schedule``.
+///
+/// Every parameter is keyword-only. ``current_pd`` and ``origination_pd`` are
+/// held by the Python object; Rust reads the other keywords as its serde
+/// ``Exposure``, supplying the defaults and rejecting unknown keywords. Keywords
+/// and properties carry the Rust field names.
 ///
 /// Parameters
 /// ----------
@@ -559,20 +509,19 @@ wire_methods!(PyStageResult, rust_ecl::StageResult, "StageResult");
 /// eir : float
 ///     Effective interest rate as a decimal annual rate, used as the IFRS 9
 ///     discount rate.
-/// remaining_maturity : float
+/// remaining_maturity_years : float
 ///     Remaining maturity in years.
 /// current_pd : float
 ///     Current probability of default from reporting over
-///     ``h = min(remaining_maturity, 30.0)`` years, as a decimal in ``[0, 1]``.
+///     ``h = min(remaining_maturity_years, 30.0)`` years, as a decimal in ``[0, 1]``.
 /// origination_pd : float
 ///     Initial-recognition expected PD for that same remaining window,
 ///     conditional on survival to the reporting date, as a decimal in ``[0, 1]``.
 ///     For original cumulative curve ``F``, elapsed years ``a`` and the capped
-///     horizon ``h = min(remaining_maturity, 30.0)``, supply
+///     horizon ``h = min(remaining_maturity_years, 30.0)``, supply
 ///     ``(F(a + h) - F(a)) / (1 - F(a))``.
-/// dpd : int | None
-///     Days past due. ``None`` uses the Rust ``Exposure`` default of ``0``
-///     (performing).
+/// days_past_due : int
+///     Days past due. Default ``0`` (performing).
 /// undrawn : float
 ///     Undrawn commitment in the same currency as ``ead``. Default ``0.0``.
 /// ccf : float
@@ -583,31 +532,39 @@ wire_methods!(PyStageResult, rust_ecl::StageResult, "StageResult");
 ///     rating-downgrade trigger. Default ``None``.
 /// origination_rating : str | None
 ///     Rating label at initial recognition. Default ``None``.
-/// qualitative_flags : QualitativeFlags | None
+/// qualitative_flags : QualitativeFlags
 ///     SICR and default-evidence flags. Default: no flags.
 /// previous_stage : Stage | str | None
 ///     Stage assigned at the previous reporting date, enabling the curing
 ///     rules. Accepts a ``Stage`` or ``"stage1"``, ``"stage2"``, or
 ///     ``"stage3"``. Default ``None``.
-/// consecutive_performing_periods : int | None
-///     Performing periods since the last trigger, for curing. ``None`` uses
-///     the Rust ``Exposure`` default of ``0``.
+/// consecutive_performing_periods : int
+///     Performing periods since the last trigger, for curing. Default ``0``.
 /// ead_schedule : list[tuple[float, float]] | None
 ///     Optional EAD amortisation profile as ``(time_years, ead)`` knots.
-/// segments : list[str] | None
+/// segments : list[str]
 ///     Portfolio segment keys. Default ``[]``.
 ///
 /// Raises
 /// ------
 /// ValueError
-///     If a non-``None`` ``previous_stage`` is neither a ``Stage`` nor a
+///     If a required keyword is missing, a keyword is unknown, a value has
+///     the wrong wire form, or ``previous_stage`` is neither a ``Stage`` nor a
 ///     recognized stage string. Financial inputs are validated by staging and
 ///     ECL calculations.
 ///
 /// Examples
 /// --------
 /// >>> from finstack_quant.statements_analytics import Exposure
-/// >>> Exposure("loan", 1_000_000.0, 0.45, 0.06, 3.0, 0.02, 0.015).dpd
+/// >>> Exposure(
+/// ...     id="loan",
+/// ...     ead=1_000_000.0,
+/// ...     lgd=0.45,
+/// ...     eir=0.06,
+/// ...     remaining_maturity_years=3.0,
+/// ...     current_pd=0.02,
+/// ...     origination_pd=0.015,
+/// ... ).days_past_due
 /// 0
 #[pyclass(
     name = "Exposure",
@@ -627,69 +584,37 @@ pub struct PyExposure {
     pub origination_pd: f64,
 }
 
+/// Remove one of the two staging PDs from the constructor keywords.
+///
+/// ``current_pd`` and ``origination_pd`` belong to the Python ``Exposure``
+/// (they feed ``classify_stage``), not to the Rust ``Exposure`` the remaining
+/// keywords deserialize into.
+fn take_staging_pd(fields: &Bound<'_, PyDict>, name: &str) -> PyResult<f64> {
+    let value = fields.get_item(name)?.ok_or_else(|| {
+        crate::errors::value_error(format!("invalid Exposure: missing field `{name}`"))
+    })?;
+    fields.del_item(name)?;
+    value.extract()
+}
+
 #[pymethods]
 impl PyExposure {
     #[new]
-    #[pyo3(signature = (
-        id,
-        ead,
-        lgd,
-        eir,
-        remaining_maturity,
-        current_pd,
-        origination_pd,
-        dpd=None,
-        undrawn=0.0,
-        ccf=rust_ecl::DEFAULT_REVOLVER_CCF,
-        current_rating=None,
-        origination_rating=None,
-        qualitative_flags=None,
-        previous_stage=None,
-        consecutive_performing_periods=None,
-        ead_schedule=None,
-        segments=None,
-    ))]
-    #[allow(clippy::too_many_arguments)]
-    fn new(
-        id: String,
-        ead: f64,
-        lgd: f64,
-        eir: f64,
-        remaining_maturity: f64,
-        current_pd: f64,
-        origination_pd: f64,
-        dpd: Option<u32>,
-        undrawn: f64,
-        ccf: f64,
-        current_rating: Option<String>,
-        origination_rating: Option<String>,
-        qualitative_flags: Option<PyQualitativeFlags>,
-        previous_stage: Option<&Bound<'_, PyAny>>,
-        consecutive_performing_periods: Option<u32>,
-        ead_schedule: Option<Vec<(f64, f64)>>,
-        segments: Option<Vec<String>>,
-    ) -> PyResult<Self> {
-        let previous_stage = previous_stage.map(extract_stage).transpose()?;
+    #[pyo3(
+        signature = (**fields),
+        text_signature = "(*, id, ead, lgd, eir, remaining_maturity_years, current_pd, origination_pd, days_past_due=0, undrawn=0.0, ccf=0.75, current_rating=None, origination_rating=None, qualitative_flags=..., previous_stage=None, consecutive_performing_periods=0, ead_schedule=None, segments=[])"
+    )]
+    fn new(py: Python<'_>, fields: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
+        let fields = match fields {
+            Some(fields) => fields.copy()?,
+            None => PyDict::new(py),
+        };
+        let current_pd = take_staging_pd(&fields, "current_pd")?;
+        let origination_pd = take_staging_pd(&fields, "origination_pd")?;
+        let inner: rust_ecl::Exposure =
+            crate::bindings::module_utils::fields_from_py(py, Some(&fields), "Exposure")?;
         Ok(Self {
-            inner: rust_ecl::Exposure {
-                id,
-                segments: segments.unwrap_or_default(),
-                ead,
-                undrawn,
-                ccf,
-                eir,
-                remaining_maturity_years: remaining_maturity,
-                lgd,
-                days_past_due: dpd.unwrap_or_default(),
-                current_rating,
-                origination_rating,
-                qualitative_flags: qualitative_flags
-                    .map(|flags| flags.inner)
-                    .unwrap_or_default(),
-                consecutive_performing_periods: consecutive_performing_periods.unwrap_or_default(),
-                previous_stage,
-                ead_schedule,
-            },
+            inner,
             current_pd,
             origination_pd,
         })
@@ -763,24 +688,24 @@ impl PyExposure {
 
     /// Remaining maturity in years.
     #[getter]
-    fn remaining_maturity(&self) -> f64 {
+    fn remaining_maturity_years(&self) -> f64 {
         self.inner.remaining_maturity_years
     }
 
     #[setter]
-    fn set_remaining_maturity(&mut self, years: f64) {
+    fn set_remaining_maturity_years(&mut self, years: f64) {
         self.inner.remaining_maturity_years = years;
     }
 
     /// Days past due.
     #[getter]
-    fn dpd(&self) -> u32 {
+    fn days_past_due(&self) -> u32 {
         self.inner.days_past_due
     }
 
     #[setter]
-    fn set_dpd(&mut self, dpd: u32) {
-        self.inner.days_past_due = dpd;
+    fn set_days_past_due(&mut self, days_past_due: u32) {
+        self.inner.days_past_due = days_past_due;
     }
 
     /// Current rating label, or ``None``.
@@ -869,11 +794,11 @@ impl PyExposure {
     /// Export the exposure as a single-row pandas ``DataFrame``.
     ///
     /// Columns: ``id``, ``ead``, ``undrawn``, ``ccf``, ``lgd``, ``eir``,
-    /// ``remaining_maturity``, ``current_pd``, ``origination_pd``, ``dpd``,
+    /// ``remaining_maturity_years``, ``current_pd``, ``origination_pd``, ``days_past_due``,
     /// ``current_rating``, ``origination_rating``. Amounts are in the
     /// exposure's base currency; ``ccf``, ``lgd`` and the PDs are decimal
-    /// fractions; ``eir`` is a decimal annual rate; ``remaining_maturity`` is
-    /// in years; ``dpd`` is whole days.
+    /// fractions; ``eir`` is a decimal annual rate; ``remaining_maturity_years`` is
+    /// in years; ``days_past_due`` is whole days.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let data = PyDict::new(py);
         data.set_item("id", vec![self.inner.id.clone()])?;
@@ -883,12 +808,12 @@ impl PyExposure {
         data.set_item("lgd", vec![self.inner.lgd])?;
         data.set_item("eir", vec![self.inner.eir])?;
         data.set_item(
-            "remaining_maturity",
+            "remaining_maturity_years",
             vec![self.inner.remaining_maturity_years],
         )?;
         data.set_item("current_pd", vec![self.current_pd])?;
         data.set_item("origination_pd", vec![self.origination_pd])?;
-        data.set_item("dpd", vec![self.inner.days_past_due])?;
+        data.set_item("days_past_due", vec![self.inner.days_past_due])?;
         data.set_item("current_rating", vec![self.inner.current_rating.clone()])?;
         data.set_item(
             "origination_rating",
@@ -900,8 +825,8 @@ impl PyExposure {
     fn __repr__(&self) -> String {
         format!(
             "Exposure(id='{}', ead={:.2}, undrawn={:.2}, ccf={:.2}, lgd={:.4}, \
-             eir={:.4}, remaining_maturity={:.2}, current_pd={:.4}, origination_pd={:.4}, \
-             dpd={}, current_rating={}, origination_rating={})",
+             eir={:.4}, remaining_maturity_years={:.2}, current_pd={:.4}, origination_pd={:.4}, \
+             days_past_due={}, current_rating={}, origination_rating={})",
             self.inner.id,
             self.inner.ead,
             self.inner.undrawn,
@@ -1065,7 +990,15 @@ impl_repr_html_via_dataframe!(PyEclResult);
 /// Examples
 /// --------
 /// >>> from finstack_quant.statements_analytics import Exposure, compute_ecl
-/// >>> exp = Exposure("loan", 1_000_000.0, 0.45, 0.06, 3.0, 0.02, 0.015)
+/// >>> exp = Exposure(
+/// ...     id="loan",
+/// ...     ead=1_000_000.0,
+/// ...     lgd=0.45,
+/// ...     eir=0.06,
+/// ...     remaining_maturity_years=3.0,
+/// ...     current_pd=0.02,
+/// ...     origination_pd=0.015,
+/// ... )
 /// >>> result = compute_ecl(exp, [(1.0, 0.02), (3.0, 0.06)], stage="stage2")
 /// >>> result.stage.value
 /// 'stage2'
@@ -1183,7 +1116,7 @@ fn staging_config(config: Option<&PyStagingConfig>) -> rust_ecl::StagingConfig {
 /// default-evidence flags, the absolute and relative PD-delta SICR tests
 /// (``current_pd`` versus ``origination_pd``), the rating-downgrade notch test,
 /// qualitative SICR flags, the Stage 2 days-past-due backstop and curing.
-/// Both supplied PDs must cover ``min(remaining_maturity, 30.0)`` years from
+/// Both supplied PDs must cover ``min(remaining_maturity_years, 30.0)`` years from
 /// reporting; the original PD must be conditional on survival to reporting.
 /// The caller aligns these scalar risks to that window before classification.
 ///
@@ -1212,7 +1145,16 @@ fn staging_config(config: Option<&PyStagingConfig>) -> rust_ecl::StagingConfig {
 /// Examples
 /// --------
 /// >>> from finstack_quant.statements_analytics import Exposure, classify_stage
-/// >>> exp = Exposure("loan", 1_000_000.0, 0.45, 0.06, 3.0, 0.02, 0.015, dpd=35)
+/// >>> exp = Exposure(
+/// ...     id="loan",
+/// ...     ead=1_000_000.0,
+/// ...     lgd=0.45,
+/// ...     eir=0.06,
+/// ...     remaining_maturity_years=3.0,
+/// ...     current_pd=0.02,
+/// ...     origination_pd=0.015,
+/// ...     days_past_due=35,
+/// ... )
 /// >>> classify_stage(exp).stage.value
 /// 'stage2'
 #[pyfunction]
@@ -1234,7 +1176,7 @@ fn classify_stage(
 /// Compute single-scenario ECL for one exposure.
 ///
 /// The priced exposure at default is ``ead + undrawn * ccf``; ``lgd``, ``eir``,
-/// ``remaining_maturity`` and any ``ead_schedule`` are read from the exposure.
+/// ``remaining_maturity_years`` and any ``ead_schedule`` are read from the exposure.
 ///
 /// Parameters
 /// ----------
@@ -1270,7 +1212,15 @@ fn classify_stage(
 /// Examples
 /// --------
 /// >>> from finstack_quant.statements_analytics import Exposure, compute_ecl
-/// >>> exp = Exposure("loan", 1_000_000.0, 0.45, 0.06, 3.0, 0.02, 0.015)
+/// >>> exp = Exposure(
+/// ...     id="loan",
+/// ...     ead=1_000_000.0,
+/// ...     lgd=0.45,
+/// ...     eir=0.06,
+/// ...     remaining_maturity_years=3.0,
+/// ...     current_pd=0.02,
+/// ...     origination_pd=0.015,
+/// ... )
 /// >>> compute_ecl(exp, [(1.0, 0.02), (3.0, 0.06)], stage="stage1").ecl > 0
 /// True
 #[pyfunction]
@@ -1331,7 +1281,15 @@ fn compute_ecl(
 /// Examples
 /// --------
 /// >>> from finstack_quant.statements_analytics import Exposure, compute_ecl_weighted
-/// >>> exp = Exposure("loan", 1_000_000.0, 0.45, 0.06, 1.0, 0.02, 0.015)
+/// >>> exp = Exposure(
+/// ...     id="loan",
+/// ...     ead=1_000_000.0,
+/// ...     lgd=0.45,
+/// ...     eir=0.06,
+/// ...     remaining_maturity_years=1.0,
+/// ...     current_pd=0.02,
+/// ...     origination_pd=0.015,
+/// ... )
 /// >>> scenarios = [(0.7, [(1.0, 0.02)]), (0.3, [(1.0, 0.05)])]
 /// >>> len(compute_ecl_weighted(exp, scenarios, stage="stage1").scenario_breakdown)
 /// 2

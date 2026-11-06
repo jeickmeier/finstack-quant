@@ -238,7 +238,7 @@ def analytics_cases() -> dict[str, Any]:
         ead=1000.0,
         lgd=0.4,
         eir=0.05,
-        remaining_maturity=3.0,
+        remaining_maturity_years=3.0,
         current_pd=0.03,
         origination_pd=0.02,
     )

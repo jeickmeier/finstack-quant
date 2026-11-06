@@ -35,6 +35,23 @@ from finstack_quant.margin import SaCcrTrade
 from finstack_quant.models.credit.recovery_waterfall import RecoveryClaim
 from finstack_quant.models.credit.scoring import AltmanZScoreInput, OhlsonOScoreInput
 from finstack_quant.models.liquidity import LiquidityProfile
+from finstack_quant.statements import ForecastSpec, NodeSpec, NodeType
+from finstack_quant.statements_analytics import (
+    CreditMapping,
+    Exposure,
+    FreeRentWindowSpec,
+    LeaseGrowthConvention,
+    LeaseSpec,
+    PeerFilter,
+    PropertyTemplateNodes,
+    QualitativeFlags,
+    RenewalSpec,
+    RentRollOutputNodes,
+    RentStepSpec,
+    Stage,
+    StagingConfig,
+    ThreeStatementMapping,
+)
 from finstack_quant.valuations.instruments import (
     AssetPool,
     CdsTrancheParams,
@@ -61,6 +78,24 @@ TRANCHE_GETTERS = [
     "maturity",
     "coupon_bp",
     "realized_loss",
+]
+EXPOSURE_GETTERS = [
+    "id",
+    "ead",
+    "lgd",
+    "eir",
+    "remaining_maturity_years",
+    "current_pd",
+    "origination_pd",
+    "days_past_due",
+    "undrawn",
+    "ccf",
+    "current_rating",
+    "origination_rating",
+    "previous_stage",
+    "consecutive_performing_periods",
+    "ead_schedule",
+    "segments",
 ]
 
 
@@ -420,12 +455,176 @@ CASES: dict[str, Any] = {
         excess_spread_account=Money(6.0, USD),
         original_balance=Money(7.0, USD),
     ),
+    # --- statements ---
+    "NodeSpec.min": lambda: NodeSpec(node_id="revenue", node_type=NodeType.value()),
+    "NodeSpec.full": lambda: NodeSpec(
+        node_id="revenue",
+        node_type=NodeType.mixed(),
+        name="Revenue",
+        values={"2025Q1": Money(100.0, USD), "2025Q2": Money(110.5, USD)},
+        forecast=ForecastSpec.growth(0.05),
+        formula_text="lag(revenue, 1) * 1.02",
+        where_text="revenue > 0",
+        tags=["income", "top_line"],
+        rollup="sum",
+    ),
+    "NodeSpec.scalar": lambda: NodeSpec(
+        node_id="margin",
+        node_type="calculated",
+        values={"2025Q1": 0.25},
+        formula_text="ebitda / revenue",
+        rollup="formula",
+    ),
+    # --- statements_analytics ---
+    "ThreeStatementMapping.min": lambda: ThreeStatementMapping(
+        cash_node="cash",
+        retained_earnings_node="re",
+        net_income_node="ni",
+        assets_nodes=["assets"],
+        liabilities_nodes=["liabilities"],
+        equity_nodes=["equity"],
+    ),
+    "ThreeStatementMapping.full": lambda: ThreeStatementMapping(
+        cash_node="cash",
+        retained_earnings_node="re",
+        net_income_node="ni",
+        assets_nodes=["assets"],
+        liabilities_nodes=["liabilities"],
+        equity_nodes=["equity"],
+        ppe_node="ppe",
+        depreciation_node="da",
+        interest_expense_node="int",
+        tax_expense_node="tax",
+        pretax_income_node="ebt",
+        cfo_node="cfo",
+        cfi_node="cfi",
+        cff_node="cff",
+        total_cf_node="tcf",
+        capex_node="capex",
+        dividends_node="div",
+        ppe_additions_node="ppe_add",
+        intangible_additions_node="int_add",
+        dividends_equity_node="div_eq",
+        debt_balance_nodes=[("debt", "rate"), ("bond", None)],
+        cs_interest_node="cs_int",
+        wc_change_cf_node="wc",
+        current_assets_nodes=["ca"],
+        current_liabilities_nodes=["cl"],
+    ),
+    "CreditMapping.min": lambda: CreditMapping(
+        debt_node="total_debt", ebitda_node="ebitda", interest_expense_node="interest_expense"
+    ),
+    "CreditMapping.full": lambda: CreditMapping(
+        debt_node="total_debt",
+        ebitda_node="ebitda",
+        interest_expense_node="interest_expense",
+        fcf_node="fcf",
+        cash_node="cash",
+        cash_burn_node="burn",
+        leverage_warn=(4.0, 6.0),
+        coverage_min_warn=2.0,
+    ),
+    "PeerFilter.min": PeerFilter,
+    "PeerFilter.full": lambda: PeerFilter(
+        gics_sectors=["45"],
+        gics_industries=["4510"],
+        countries=["US"],
+        market_cap_min=1e9,
+        market_cap_max=5e10,
+        ratings=["BB", "B"],
+        required_tags=["public"],
+        excluded_tags=["spac"],
+        selectors=["meta.region == 'NA'"],
+    ),
+    "QualitativeFlags.min": QualitativeFlags,
+    "QualitativeFlags.full": lambda: QualitativeFlags(
+        watchlist=True,
+        forbearance=True,
+        adverse_conditions=True,
+        custom=["sector"],
+        bankruptcy=True,
+        distressed_modification=True,
+        cross_default=True,
+        other_default_evidence=["fraud"],
+    ),
+    "StagingConfig.min": StagingConfig,
+    "StagingConfig.full": lambda: StagingConfig(
+        pd_delta_absolute=0.02,
+        pd_delta_relative=None,
+        rating_downgrade_notches=3,
+        rating_scale_labels=["A", "B", "C", "D"],
+        dpd_stage2_threshold=31,
+        dpd_stage3_threshold=91,
+        qualitative_triggers_enabled=False,
+        stage3_qualitative_triggers_enabled=False,
+        cure_periods_stage2_to_1=4,
+        cure_periods_stage3_to_2=6,
+    ),
+    "StagingConfig.relative": lambda: StagingConfig(pd_delta_relative=3.0),
+    "Exposure.min": lambda: Exposure(
+        id="loan",
+        ead=1_000_000.0,
+        lgd=0.45,
+        eir=0.06,
+        remaining_maturity_years=3.0,
+        current_pd=0.02,
+        origination_pd=0.015,
+    ),
+    "Exposure.full": lambda: Exposure(
+        id="rev",
+        ead=500_000.0,
+        lgd=0.4,
+        eir=0.05,
+        remaining_maturity_years=2.5,
+        current_pd=0.03,
+        origination_pd=0.02,
+        days_past_due=35,
+        undrawn=250_000.0,
+        ccf=0.5,
+        current_rating="BB",
+        origination_rating="BBB",
+        qualitative_flags=QualitativeFlags(watchlist=True),
+        previous_stage=Stage.Stage2,
+        consecutive_performing_periods=2,
+        ead_schedule=[(0.0, 500_000.0), (2.5, 0.0)],
+        segments=["corporate", "US"],
+    ),
+    "LeaseSpec.min": lambda: LeaseSpec(node_id="lease_a", start="2025Q1", base_rent=100.0),
+    "LeaseSpec.full": lambda: LeaseSpec(
+        node_id="lease_b",
+        start="2025Q1",
+        base_rent=1000.0,
+        end="2026Q4",
+        growth_rate=0.03,
+        growth_convention=LeaseGrowthConvention.PerPeriod,
+        rent_steps=[RentStepSpec("2026Q1", 1100.0)],
+        free_rent_periods=1,
+        free_rent_windows=[FreeRentWindowSpec("2025Q3", 1)],
+        occupancy=0.95,
+        renewal=RenewalSpec(4, 0.6, downtime_periods=1, rent_factor=1.05, free_rent_periods=1),
+    ),
+    "PropertyTemplateNodes.min": PropertyTemplateNodes,
+    "PropertyTemplateNodes.full": lambda: PropertyTemplateNodes(
+        rent_roll=RentRollOutputNodes("pgi", "free", "vac", "eff"),
+        other_income_total_node="oi",
+        egi_node="e",
+        management_fee_node="mf",
+        opex_total_node="ox",
+        noi_node="n",
+        capex_total_node="cx",
+        ncf_node="c",
+    ),
 }
 
 
 def _wire(value: Any) -> str:
     if hasattr(value, "to_json"):
         return value.to_json()
+    if isinstance(value, Exposure):
+        # ``Exposure`` carries getters only; pin each getter's text form.
+        rows = [(name, str(getattr(value, name))) for name in EXPOSURE_GETTERS]
+        rows.append(("qualitative_flags", value.qualitative_flags.to_json()))
+        return repr(rows)
     # ``CdsTrancheParams`` carries getters only; pin each getter's text form.
     return repr([(name, str(getattr(value, name))) for name in TRANCHE_GETTERS])
 
@@ -445,6 +644,10 @@ def test_every_golden_entry_is_pinned() -> None:
         lambda: FloatingRateSpec("USD-SOFR", "0", Tenor.parse("3M")),
         lambda: RecoveryClaim("SEN", "secured", 1, 100.0, 0.0, 0.0, 0.0),
         lambda: FixedLegSpec("USD-OIS", "0.04", Tenor.semi_annual(), DayCount.THIRTY_360, START, END),
+        lambda: NodeSpec("revenue", NodeType.value()),
+        lambda: ThreeStatementMapping("cash", "re", "ni", ["assets"], ["liabilities"], ["equity"]),
+        lambda: Exposure("loan", 1_000_000.0, 0.45, 0.06, 3.0, 0.02, 0.015),
+        lambda: LeaseSpec("lease_a", "2025Q1", 100.0),
     ],
 )
 def test_positional_fields_are_rejected(build: Any) -> None:
@@ -467,6 +670,19 @@ def test_positional_fields_are_rejected(build: Any) -> None:
             total_claim=1.0,
         ),
         lambda: _pool().with_accounts(assets=[]),
+        lambda: QualitativeFlags(watch_list=True),
+        lambda: StagingConfig(pd_delta=0.02),
+        lambda: PeerFilter(sectors=["45"]),
+        lambda: PropertyTemplateNodes(noi="noi"),
+        lambda: Exposure(
+            id="loan",
+            ead=1.0,
+            lgd=0.45,
+            eir=0.06,
+            remaining_maturity=3.0,
+            current_pd=0.02,
+            origination_pd=0.015,
+        ),
     ],
 )
 def test_unknown_keywords_are_rejected_by_rust(build: Any) -> None:
@@ -484,3 +700,13 @@ def test_decimal_fields_take_the_exact_wire_string_not_a_float() -> None:
             start=START,
             end=END,
         )
+
+
+def test_exposure_requires_both_staging_pds() -> None:
+    with pytest.raises(ValueError, match="missing field `origination_pd`"):
+        Exposure(id="loan", ead=1.0, lgd=0.45, eir=0.06, remaining_maturity_years=3.0, current_pd=0.02)
+
+
+def test_staging_config_still_validates_its_thresholds() -> None:
+    with pytest.raises(ValueError, match="non-negative and finite"):
+        StagingConfig(pd_delta_absolute=-0.01)

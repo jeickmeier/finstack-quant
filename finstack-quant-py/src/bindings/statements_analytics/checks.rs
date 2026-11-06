@@ -17,10 +17,6 @@ use pyo3::prelude::*;
 
 type NodePair = (String, Option<String>);
 
-fn node_ids(values: Vec<String>) -> Vec<NodeId> {
-    values.into_iter().map(NodeId::from).collect()
-}
-
 fn node_strings(values: &[NodeId]) -> Vec<String> {
     values.iter().map(ToString::to_string).collect()
 }
@@ -34,6 +30,8 @@ fn opt_node_str(value: &Option<NodeId>) -> Option<&str> {
 /// Required ids name the balance-sheet articulation nodes; optional ids switch
 /// on the reconciliation checks that need them (depreciation, interest, tax,
 /// cash-flow subtotals, capex, dividends, working capital, debt roll-forwards).
+/// Every parameter is keyword-only and read by Rust as the serde struct, so an
+/// unknown keyword or a missing required id raises ``ValueError``.
 ///
 /// Parameters
 /// ----------
@@ -91,7 +89,14 @@ fn opt_node_str(value: &Option<NodeId>) -> Option<&str> {
 /// Examples
 /// --------
 /// >>> from finstack_quant.statements_analytics import ThreeStatementMapping
-/// >>> m = ThreeStatementMapping("cash", "retained_earnings", "net_income", ["cash"], [], ["retained_earnings"])
+/// >>> m = ThreeStatementMapping(
+/// ...     cash_node="cash",
+/// ...     retained_earnings_node="retained_earnings",
+/// ...     net_income_node="net_income",
+/// ...     assets_nodes=["cash"],
+/// ...     liabilities_nodes=[],
+/// ...     equity_nodes=["retained_earnings"],
+/// ... )
 /// >>> m.cash_node
 /// 'cash'
 #[pyclass(
@@ -107,93 +112,14 @@ pub struct PyThreeStatementMapping {
 #[pymethods]
 impl PyThreeStatementMapping {
     #[new]
-    #[pyo3(signature = (
-        cash_node,
-        retained_earnings_node,
-        net_income_node,
-        assets_nodes,
-        liabilities_nodes,
-        equity_nodes,
-        ppe_node=None,
-        depreciation_node=None,
-        interest_expense_node=None,
-        tax_expense_node=None,
-        pretax_income_node=None,
-        cfo_node=None,
-        cfi_node=None,
-        cff_node=None,
-        total_cf_node=None,
-        capex_node=None,
-        dividends_node=None,
-        ppe_additions_node=None,
-        intangible_additions_node=None,
-        dividends_equity_node=None,
-        debt_balance_nodes=Vec::new(),
-        cs_interest_node=None,
-        wc_change_cf_node=None,
-        current_assets_nodes=Vec::new(),
-        current_liabilities_nodes=Vec::new(),
-    ))]
-    #[allow(clippy::too_many_arguments)]
-    fn new(
-        cash_node: String,
-        retained_earnings_node: String,
-        net_income_node: String,
-        assets_nodes: Vec<String>,
-        liabilities_nodes: Vec<String>,
-        equity_nodes: Vec<String>,
-        ppe_node: Option<String>,
-        depreciation_node: Option<String>,
-        interest_expense_node: Option<String>,
-        tax_expense_node: Option<String>,
-        pretax_income_node: Option<String>,
-        cfo_node: Option<String>,
-        cfi_node: Option<String>,
-        cff_node: Option<String>,
-        total_cf_node: Option<String>,
-        capex_node: Option<String>,
-        dividends_node: Option<String>,
-        ppe_additions_node: Option<String>,
-        intangible_additions_node: Option<String>,
-        dividends_equity_node: Option<String>,
-        debt_balance_nodes: Vec<NodePair>,
-        cs_interest_node: Option<String>,
-        wc_change_cf_node: Option<String>,
-        current_assets_nodes: Vec<String>,
-        current_liabilities_nodes: Vec<String>,
-    ) -> Self {
-        Self {
-            inner: ThreeStatementMapping {
-                assets_nodes: node_ids(assets_nodes),
-                liabilities_nodes: node_ids(liabilities_nodes),
-                equity_nodes: node_ids(equity_nodes),
-                cash_node: cash_node.into(),
-                retained_earnings_node: retained_earnings_node.into(),
-                ppe_node: ppe_node.map(NodeId::from),
-                net_income_node: net_income_node.into(),
-                depreciation_node: depreciation_node.map(NodeId::from),
-                interest_expense_node: interest_expense_node.map(NodeId::from),
-                tax_expense_node: tax_expense_node.map(NodeId::from),
-                pretax_income_node: pretax_income_node.map(NodeId::from),
-                cfo_node: cfo_node.map(NodeId::from),
-                cfi_node: cfi_node.map(NodeId::from),
-                cff_node: cff_node.map(NodeId::from),
-                total_cf_node: total_cf_node.map(NodeId::from),
-                capex_node: capex_node.map(NodeId::from),
-                dividends_node: dividends_node.map(NodeId::from),
-                ppe_additions_node: ppe_additions_node.map(NodeId::from),
-                intangible_additions_node: intangible_additions_node.map(NodeId::from),
-                dividends_equity_node: dividends_equity_node.map(NodeId::from),
-                debt_balance_nodes: debt_balance_nodes
-                    .into_iter()
-                    .map(|(balance, rate)| (NodeId::from(balance), rate.map(NodeId::from)))
-                    .collect(),
-                cs_interest_node: cs_interest_node.map(NodeId::from),
-                wc_change_cf_node: wc_change_cf_node.map(NodeId::from),
-                current_assets_nodes: node_ids(current_assets_nodes),
-                current_liabilities_nodes: node_ids(current_liabilities_nodes),
-            },
-        }
+    #[pyo3(
+        signature = (**fields),
+        text_signature = "(*, cash_node, retained_earnings_node, net_income_node, assets_nodes, liabilities_nodes, equity_nodes, ppe_node=None, depreciation_node=None, interest_expense_node=None, tax_expense_node=None, pretax_income_node=None, cfo_node=None, cfi_node=None, cff_node=None, total_cf_node=None, capex_node=None, dividends_node=None, ppe_additions_node=None, intangible_additions_node=None, dividends_equity_node=None, debt_balance_nodes=[], cs_interest_node=None, wc_change_cf_node=None, current_assets_nodes=[], current_liabilities_nodes=[])"
+    )]
+    fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
+        let inner: ThreeStatementMapping =
+            crate::bindings::module_utils::fields_from_py(py, fields, "ThreeStatementMapping")?;
+        Ok(Self { inner })
     }
 
     /// Cash balance node.
@@ -369,6 +295,9 @@ wire_methods!(
 
 /// Node-id mapping for the credit-underwriting check suite.
 ///
+/// Every parameter is keyword-only and read by Rust as the serde struct, so an
+/// unknown keyword or a missing required id raises ``ValueError``.
+///
 /// Parameters
 /// ----------
 /// debt_node : str
@@ -393,7 +322,12 @@ wire_methods!(
 /// Examples
 /// --------
 /// >>> from finstack_quant.statements_analytics import CreditMapping
-/// >>> CreditMapping("total_debt", "ebitda", "interest_expense", leverage_warn=(4.0, 6.0)).leverage_warn
+/// >>> CreditMapping(
+/// ...     debt_node="total_debt",
+/// ...     ebitda_node="ebitda",
+/// ...     interest_expense_node="interest_expense",
+/// ...     leverage_warn=(4.0, 6.0),
+/// ... ).leverage_warn
 /// (4.0, 6.0)
 #[pyclass(
     name = "CreditMapping",
@@ -408,39 +342,14 @@ pub struct PyCreditMapping {
 #[pymethods]
 impl PyCreditMapping {
     #[new]
-    #[pyo3(signature = (
-        debt_node,
-        ebitda_node,
-        interest_expense_node,
-        fcf_node=None,
-        cash_node=None,
-        cash_burn_node=None,
-        leverage_warn=None,
-        coverage_min_warn=None,
-    ))]
-    #[allow(clippy::too_many_arguments)]
-    fn new(
-        debt_node: String,
-        ebitda_node: String,
-        interest_expense_node: String,
-        fcf_node: Option<String>,
-        cash_node: Option<String>,
-        cash_burn_node: Option<String>,
-        leverage_warn: Option<(f64, f64)>,
-        coverage_min_warn: Option<f64>,
-    ) -> Self {
-        Self {
-            inner: CreditMapping {
-                debt_node: debt_node.into(),
-                ebitda_node: ebitda_node.into(),
-                interest_expense_node: interest_expense_node.into(),
-                fcf_node: fcf_node.map(NodeId::from),
-                cash_node: cash_node.map(NodeId::from),
-                cash_burn_node: cash_burn_node.map(NodeId::from),
-                leverage_warn,
-                coverage_min_warn,
-            },
-        }
+    #[pyo3(
+        signature = (**fields),
+        text_signature = "(*, debt_node, ebitda_node, interest_expense_node, fcf_node=None, cash_node=None, cash_burn_node=None, leverage_warn=None, coverage_min_warn=None)"
+    )]
+    fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
+        let inner: CreditMapping =
+            crate::bindings::module_utils::fields_from_py(py, fields, "CreditMapping")?;
+        Ok(Self { inner })
     }
 
     /// Total-debt node.
@@ -663,7 +572,14 @@ fn run_checks(
 /// >>> _ = b.value("equity", [("2025Q1", 60.0)])
 /// >>> _ = b.value("retained_earnings", [("2025Q1", 60.0)])
 /// >>> _ = b.value("net_income", [("2025Q1", 0.0)])
-/// >>> mapping = ThreeStatementMapping("cash", "retained_earnings", "net_income", ["cash"], ["debt"], ["equity"])
+/// >>> mapping = ThreeStatementMapping(
+/// ...     cash_node="cash",
+/// ...     retained_earnings_node="retained_earnings",
+/// ...     net_income_node="net_income",
+/// ...     assets_nodes=["cash"],
+/// ...     liabilities_nodes=["debt"],
+/// ...     equity_nodes=["equity"],
+/// ... )
 /// >>> run_three_statement_checks(b.build(), mapping).passed
 /// True
 #[pyfunction]
@@ -715,7 +631,10 @@ fn run_three_statement_checks(
 /// >>> _ = b.value("total_debt", [("2025Q1", 100.0)])
 /// >>> _ = b.value("ebitda", [("2025Q1", 40.0)])
 /// >>> _ = b.value("interest_expense", [("2025Q1", 10.0)])
-/// >>> report = run_credit_underwriting_checks(b.build(), CreditMapping("total_debt", "ebitda", "interest_expense"))
+/// >>> mapping = CreditMapping(
+/// ...     debt_node="total_debt", ebitda_node="ebitda", interest_expense_node="interest_expense"
+/// ... )
+/// >>> report = run_credit_underwriting_checks(b.build(), mapping)
 /// >>> report.passed, report.total_findings
 /// (True, 0)
 #[pyfunction]
@@ -759,7 +678,10 @@ fn run_credit_underwriting_checks(
 /// >>> _ = b.value("total_debt", [("2025Q1", 100.0)])
 /// >>> _ = b.value("ebitda", [("2025Q1", 40.0)])
 /// >>> _ = b.value("interest_expense", [("2025Q1", 10.0)])
-/// >>> report = run_credit_underwriting_checks(b.build(), CreditMapping("total_debt", "ebitda", "interest_expense"))
+/// >>> mapping = CreditMapping(
+/// ...     debt_node="total_debt", ebitda_node="ebitda", interest_expense_node="interest_expense"
+/// ... )
+/// >>> report = run_credit_underwriting_checks(b.build(), mapping)
 /// >>> render_check_report_text(report).splitlines()[0]
 /// '══ Check Report ══'
 #[pyfunction]
@@ -794,7 +716,10 @@ fn render_check_report_text(py: Python<'_>, report: &Bound<'_, PyAny>) -> PyResu
 /// >>> _ = b.value("total_debt", [("2025Q1", 100.0)])
 /// >>> _ = b.value("ebitda", [("2025Q1", 40.0)])
 /// >>> _ = b.value("interest_expense", [("2025Q1", 10.0)])
-/// >>> report = run_credit_underwriting_checks(b.build(), CreditMapping("total_debt", "ebitda", "interest_expense"))
+/// >>> mapping = CreditMapping(
+/// ...     debt_node="total_debt", ebitda_node="ebitda", interest_expense_node="interest_expense"
+/// ... )
+/// >>> report = run_credit_underwriting_checks(b.build(), mapping)
 /// >>> render_check_report_html(report).startswith("<div")
 /// True
 #[pyfunction]

@@ -7,6 +7,8 @@ from datetime import date
 from typing import Any
 import pandas as pd
 
+from finstack_quant.core.money import Money
+
 class ForecastMethod:
     """
     Available forecast methods for projecting node values.
@@ -1453,47 +1455,75 @@ class NodeSpec:
 
     def __init__(
         self,
+        *,
         node_id: str,
-        node_type: NodeType,
+        node_type: NodeType | str,
         name: str | None = None,
-        values: Mapping[str, float] | None = None,
+        values: Mapping[str, float | Money] | None = None,
+        availability_dates: Mapping[str, date | str] = ...,
         forecast: ForecastSpec | None = None,
         formula_text: str | None = None,
         where_text: str | None = None,
-        tags: list[str] | None = None,
+        tags: list[str] = ...,
+        value_type: Any | None = None,
         rollup: str | None = None,
+        meta: Mapping[str, Any] = ...,
     ) -> None:
-        """Construct a node specification.
+        """Construct a node specification from keyword-only fields.
+
+        Rust reads the keywords as the ``NodeSpec`` serde struct: each field
+        takes its wire form (or a typed object written as that form), Rust
+        supplies the defaults and an unknown keyword raises.
 
         Parameters
         ----------
         node_id : str
             Node identifier; must not use a reserved prefix, DSL keyword, or the export timeline name ``period_id``.
-        node_type : NodeType
-            ``value``, ``calculated`` or ``mixed``.
+        node_type : NodeType | str
+            ``NodeType.value()``, ``NodeType.calculated()`` or ``NodeType.mixed()``,
+            or the serde name ``"value"`` / ``"calculated"`` / ``"mixed"``.
         name : str, optional
             Human-readable label.
-        values : Mapping[str, float], optional
-            Explicit observations keyed by period id (e.g. ``"2025Q1"``).
+        values : Mapping[str, float | Money], optional
+            Explicit observations keyed by period id (e.g. ``"2025Q1"``);
+            ``Money`` cells make the node monetary, floats make it scalar.
+        availability_dates : Mapping[str, date | str], default {}
+            Publication date of each explicit observation, keyed by period id;
+            an omitted period is available at its period end.
         forecast : ForecastSpec, optional
             Forecast rule applied to forecast periods.
         formula_text : str, optional
             Statements DSL expression for calculated and mixed nodes.
         where_text : str, optional
             DSL guard; periods where it is false evaluate to 0.
-        tags : list[str], optional
+        tags : list[str], default []
             Free-form labels for grouping and filtering. They do not affect rollups.
+        value_type : dict, optional
+            Serde ``NodeValueType`` (``{"type": "monetary", "currency": "USD"}``
+            or ``{"type": "scalar"}``); ``None`` infers it from the values.
         rollup : str, optional
             How the line rolls up to a coarser frequency: ``"sum"`` (flows),
             ``"period_end"`` (balances, trailing metrics) or ``"formula"``
             (ratios, which need a formula). Without it the line sums. A
             :class:`RollupSpec` entry overrides it.
+        meta : Mapping[str, Any], default {}
+            Free-form JSON metadata.
 
         Raises
         ------
         ValueError
-            If the node id, formula or period ids are rejected, or ``rollup`` is
-            not a recognized method.
+            If a required field is missing, a keyword is unknown, a value does
+            not have its wire form, a period id does not parse, or ``rollup``
+            is not a recognized method.
+        TypeError
+            If a positional argument is passed.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import NodeSpec, NodeType
+        >>> node = NodeSpec(node_id="revenue", node_type=NodeType.value(), values={"2025Q1": 100.0}, rollup="sum")
+        >>> (node.node_id, node.values, node.rollup)
+        ('revenue', {'2025Q1': 100.0}, 'sum')
 
         """
         ...

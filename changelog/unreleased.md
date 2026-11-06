@@ -23,7 +23,14 @@ and the schedule enums (`BusinessDayConvention`, `StubKind`, `RollRule`,
 `to_json()` built from the same inputs is unchanged. Rust defaults added:
 `LiquidityProfile.spread_volatility_kind` (`relative`) and `observation_days`
 (20), `CdsTrancheParams.realized_loss` (0.0); `RecoveryClaim` gains
-`deny_unknown_fields`; new `CdsTrancheParams::validate`.
+`deny_unknown_fields`; new `CdsTrancheParams::validate`. The statements
+classes follow the same rule: Rust `StagingConfig` and `QualitativeFlags`
+default every omitted field (`StagingConfig::default()`, all flags off) and
+`Exposure` defaults `segments` and `qualitative_flags`; `QualitativeFlags`
+gains `deny_unknown_fields`. The params hook also encodes `NodeType`, `Stage`
+and `LeaseGrowthConvention` as their wire labels, and a non-finite float in any
+params mapping raises `ValueError` "non-finite float" (JSON carries only finite
+floats) instead of a serde parse error.
 
 ### Cashflows: `FloatingRateSpec`, `ScheduleParams` and `FeeSpec.periodic_bp` are keyword-only
 
@@ -41,6 +48,20 @@ and the schedule enums (`BusinessDayConvention`, `StubKind`, `RollRule`,
 - Python `RecoveryClaim("SEN", "secured", 1, 100.0, 0.0, 0.0, 0.0)` → `RecoveryClaim(id="SEN", seniority="secured", priority=1, principal=100.0, accrued=0.0, penalties=0.0, collateral_haircut=0.0)`
 - Python `AltmanZScoreInput`, `AltmanZPrimeInput`, `AltmanZDoublePrimeInput`, `OhlsonOScoreInput`, `ZmijewskiInput`: calls unchanged (already keyword-only); a missing ratio now raises `ValueError` instead of `TypeError`
 - Python `MertonModel.new_with_dynamics`, `almgren_chriss_impact`, `hw1f_cap_floor_price` and WASM `almgrenChrissImpact`, `hw1fCapFloorPrice`: unchanged (seven inputs)
+
+### Statements: `NodeSpec` is keyword-only
+
+- Python `NodeSpec("revenue", NodeType.value(), values=[("2025Q1", 1.0)], rollup="sum")` → `NodeSpec(node_id="revenue", node_type=NodeType.value(), values={"2025Q1": 1.0}, rollup="sum")`: `values` is the wire mapping (period id → float or `Money`), not a list of pairs or a `pd.Series`; the Rust fields `availability_dates`, `value_type` and `meta` are keywords too
+
+### Statements analytics: the mapping, filter, ECL and real-estate data classes are keyword-only
+
+- Python `ThreeStatementMapping("cash", "re", "ni", ["assets"], ["liabilities"], ["equity"])` → `ThreeStatementMapping(cash_node="cash", retained_earnings_node="re", net_income_node="ni", assets_nodes=["assets"], liabilities_nodes=["liabilities"], equity_nodes=["equity"])`
+- Python `CreditMapping("total_debt", "ebitda", "interest_expense")` → `CreditMapping(debt_node="total_debt", ebitda_node="ebitda", interest_expense_node="interest_expense")`
+- Python `PeerFilter(...)`, `QualitativeFlags(...)`, `PropertyTemplateNodes(...)`: keyword calls unchanged; positional calls and unknown keywords are rejected; `PropertyTemplateNodes(rent_roll=None)` is rejected (omit it for the default)
+- Python `StagingConfig(...)`: keyword calls unchanged, except `None` for a field other than `pd_delta_relative` (`StagingConfig(pd_delta_absolute=None)`) is rejected: omit the keyword for the Rust default
+- `StagingConfig` JSON (Rust `from_json`, Python `from_json`, WASM `classifyStage`): an omitted field now takes `StagingConfig::default()`. For `pd_delta_relative` that changes the meaning of an omitted key from "relative SICR trigger disabled" to the documented default `2.0`; pass `"pd_delta_relative": null` to disable it
+- Python `Exposure("loan", 1e6, 0.45, 0.06, 3.0, 0.02, 0.015, dpd=35)` → `Exposure(id="loan", ead=1e6, lgd=0.45, eir=0.06, remaining_maturity_years=3.0, current_pd=0.02, origination_pd=0.015, days_past_due=35)`: the maturity and days-past-due keywords are the Rust field names (`remaining_maturity` → `remaining_maturity_years`, `dpd` → `days_past_due`); the `remaining_maturity` / `dpd` properties and `to_dataframe` columns are renamed the same way, so every Python name is the Rust field name; `None` for `days_past_due`, `consecutive_performing_periods`, `qualitative_flags` or `segments` is rejected (omit it for the default)
+- Python `LeaseSpec("lease_a", "2025Q1", 100.0, end="2025Q4")` → `LeaseSpec(node_id="lease_a", start="2025Q1", base_rent=100.0, end="2025Q4")`; `growth_convention` also takes its serde name (`"per_period"`)
 
 ### Valuations: leg specs, `CdsTrancheParams` and the structured-credit inputs are keyword-only
 

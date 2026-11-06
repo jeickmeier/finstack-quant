@@ -122,7 +122,9 @@ pub(crate) fn attach_submodule(
 ///   `OvernightIndexConstraintApplication`, `FloatingRateFallback`,
 ///   `FeeAccrualBasis`) give their serde wire form (`{"count": 6, "unit":
 ///   "months"}`, `"act_360"`, `"short_front"`), the form those fields take;
-///   none carries a ``to_json`` of its own.
+///   none carries a ``to_json`` of its own. The statements enums
+///   `NodeType`, `Stage` and `LeaseGrowthConvention` do the same (`"value"`,
+///   `"stage2"`, `"per_period"`).
 /// - Wrappers with ``to_dict`` use it; the others use the ``to_json`` every
 ///   result and spec wrapper (and `Money`, `Currency`) exposes.
 /// - A ``decimal.Decimal`` gives its ``str``, the wire form of every exact
@@ -145,6 +147,9 @@ fn json_default<'py>(py: Python<'py>, obj: &Bound<'py, PyAny>) -> PyResult<Bound
     use crate::bindings::core::dates::schedule::PyStubKind;
     use crate::bindings::core::dates::tenor::PyTenor;
     use crate::bindings::pandas_utils::serde_to_py;
+    use crate::bindings::statements::types::PyNodeType;
+    use crate::bindings::statements_analytics::ecl::PyStage;
+    use crate::bindings::statements_analytics::templates_real_estate::PyLeaseGrowthConvention;
 
     /// Return the serde wire form of the first matching frozen wrapper.
     macro_rules! wire_of_wrapper {
@@ -166,7 +171,15 @@ fn json_default<'py>(py: Python<'py>, obj: &Bound<'py, PyAny>) -> PyResult<Bound
         PyOvernightIndexConstraintApplication,
         PyFloatingRateFallback,
         PyFeeAccrualBasis,
+        PyNodeType,
     );
+    // Simple-enum pyclasses that are their own serde type.
+    if let Ok(value) = obj.cast::<PyStage>() {
+        return serde_to_py(py, value.get());
+    }
+    if let Ok(value) = obj.cast::<PyLeaseGrowthConvention>() {
+        return serde_to_py(py, value.get());
+    }
     if obj.is_instance(&py.import("decimal")?.getattr("Decimal")?)? {
         return Ok(obj.str()?.into_any());
     }
@@ -240,7 +253,9 @@ pub(crate) fn py_to_json_string<'py>(
 ///
 /// Releases the GIL for the serde step. Prefer this over re-declaring a local
 /// copy per binding module: the conversion and its error shape are the same
-/// everywhere, and duplicates drift.
+/// everywhere, and duplicates drift. JSON carries only finite floats, so a
+/// ``nan`` or ``inf`` anywhere in `obj` raises ``ValueError`` "invalid
+/// {label}: ... non-finite float" before Rust sees it.
 pub(crate) fn py_to_serde<'py, T: serde::de::DeserializeOwned + Send>(
     py: Python<'py>,
     obj: &Bound<'py, PyAny>,
@@ -249,8 +264,18 @@ pub(crate) fn py_to_serde<'py, T: serde::de::DeserializeOwned + Send>(
     let json_mod = py.import("json")?;
     let kwargs = pyo3::types::PyDict::new(py);
     kwargs.set_item("default", typed_wrapper_json_hook(py)?)?;
+    kwargs.set_item("allow_nan", false)?;
     let json_str: String = json_mod
-        .call_method("dumps", (obj,), Some(&kwargs))?
+        .call_method("dumps", (obj,), Some(&kwargs))
+        .map_err(|err| {
+            if err.to_string().contains("Out of range float") {
+                crate::errors::value_error(format!(
+                    "invalid {label}: non-finite float ({err}); float fields must be finite"
+                ))
+            } else {
+                err
+            }
+        })?
         .extract()?;
     py.detach(move || serde_json::from_str(&json_str))
         .map_err(|e| crate::errors::serde_json_to_py(e, &format!("invalid {label}")))

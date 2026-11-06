@@ -391,8 +391,8 @@ def test_check_specs_have_no_python_only_defaults_or_grammar() -> None:
     suite = CheckSuiteSpec("s", builtin_checks=[{"type": "non_finite"}], formula_checks=[spec])
     report = run_checks(goal_seek_model(), suite)
     assert report.total_findings == 0
-    with pytest.raises(TypeError):
-        ThreeStatementMapping("cash", "re", "ni")  # type: ignore[call-arg]
+    with pytest.raises(ValueError, match="missing field `assets_nodes`"):
+        ThreeStatementMapping(cash_node="cash", retained_earnings_node="re", net_income_node="ni")  # type: ignore[call-arg]
     assert json.loads(CheckConfig().to_json()) == json.loads(CheckConfig(0.01, 1e-9, 0.0, "info").to_json())
 
 

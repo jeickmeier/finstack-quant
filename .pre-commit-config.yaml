@@ -101,7 +101,7 @@ repos:
 
       - id: rust-lint-suppressions
         name: Rust forbidden lint suppressions (check_lint_suppressions.py)
-        entry: uv run --no-sync python scripts/check_lint_suppressions.py --report
+        entry: uv run --no-sync python scripts/check_lint_suppressions.py
         language: system
         files: (\.rs|scripts/check_lint_suppressions\.py|scripts/rust_source\.py)$
         pass_filenames: false

@@ -255,8 +255,13 @@ class Exposure:
     simplified SICR test compares. ``classify_stage`` reads days past due,
     qualitative flags, rating labels, previous stage and performing periods
     (``ead``, ``lgd`` and ``eir`` do not affect staging); ``compute_ecl`` prices
-    ``ead + undrawn * ccf`` with ``lgd``, ``eir``, ``remaining_maturity`` and
+    ``ead + undrawn * ccf`` with ``lgd``, ``eir``, ``remaining_maturity_years`` and
     any ``ead_schedule``.
+
+    Every parameter is keyword-only. ``current_pd`` and ``origination_pd`` are
+    held by the Python object; Rust reads the other keywords as its serde
+    ``Exposure``, supplying the defaults and rejecting unknown keywords. Keywords
+    and properties carry the Rust field names.
 
     Parameters
     ----------
@@ -271,20 +276,19 @@ class Exposure:
     eir : float
         Effective interest rate as a decimal annual rate, used as the IFRS 9
         discount rate.
-    remaining_maturity : float
+    remaining_maturity_years : float
         Remaining maturity in years.
     current_pd : float
         Current probability of default from reporting over
-        ``h = min(remaining_maturity, 30.0)`` years, as a decimal in ``[0, 1]``.
+        ``h = min(remaining_maturity_years, 30.0)`` years, as a decimal in ``[0, 1]``.
     origination_pd : float
         Initial-recognition expected PD for that same remaining window,
         conditional on survival to the reporting date, as a decimal in ``[0, 1]``.
         For original cumulative curve ``F``, elapsed years ``a`` and the capped
-        horizon ``h = min(remaining_maturity, 30.0)``, supply
+        horizon ``h = min(remaining_maturity_years, 30.0)``, supply
         ``(F(a + h) - F(a)) / (1 - F(a))``.
-    dpd : int | None
-        Days past due. ``None`` uses the Rust ``Exposure`` default of ``0``
-        (performing).
+    days_past_due : int
+        Days past due. Default ``0`` (performing).
     undrawn : float
         Undrawn commitment in the same currency as ``ead``. Default ``0.0``.
     ccf : float
@@ -295,52 +299,64 @@ class Exposure:
         rating-downgrade trigger. Default ``None``.
     origination_rating : str | None
         Rating label at initial recognition. Default ``None``.
-    qualitative_flags : QualitativeFlags | None
+    qualitative_flags : QualitativeFlags
         SICR and default-evidence flags. Default: no flags.
     previous_stage : Stage | str | None
         Stage assigned at the previous reporting date, enabling the curing
         rules. Accepts a ``Stage`` or ``"stage1"``, ``"stage2"``, or
         ``"stage3"``. Default ``None``.
-    consecutive_performing_periods : int | None
-        Performing periods since the last trigger, for curing. ``None`` uses
-        the Rust ``Exposure`` default of ``0``.
+    consecutive_performing_periods : int
+        Performing periods since the last trigger, for curing. Default ``0``.
     ead_schedule : list[tuple[float, float]] | None
         Optional EAD amortisation profile as ``(time_years, ead)`` knots.
-    segments : list[str] | None
+    segments : list[str]
         Portfolio segment keys. Default ``[]``.
 
     Raises
     ------
     ValueError
-        If a non-``None`` ``previous_stage`` is neither a ``Stage`` nor a
+        If a required keyword is missing, a keyword is unknown, a value does
+        not have its wire form (``None`` for a non-optional field, a
+        non-finite float), or ``previous_stage`` is neither a ``Stage`` nor a
         recognized stage string. Financial inputs are validated by staging and
         ECL calculations.
+    TypeError
+        If a positional argument is passed.
 
     Examples
     --------
     >>> from finstack_quant.statements_analytics import Exposure
-    >>> Exposure("loan", 1_000_000.0, 0.45, 0.06, 3.0, 0.02, 0.015).dpd
+    >>> Exposure(
+    ...     id="loan",
+    ...     ead=1_000_000.0,
+    ...     lgd=0.45,
+    ...     eir=0.06,
+    ...     remaining_maturity_years=3.0,
+    ...     current_pd=0.02,
+    ...     origination_pd=0.015,
+    ... ).days_past_due
     0
     """
     def __init__(
         self,
+        *,
         id: str,
         ead: float,
         lgd: float,
         eir: float,
-        remaining_maturity: float,
+        remaining_maturity_years: float,
         current_pd: float,
         origination_pd: float,
-        dpd: int | None = None,
+        days_past_due: int = 0,
         undrawn: float = 0.0,
         ccf: float = 0.75,
         current_rating: str | None = None,
         origination_rating: str | None = None,
-        qualitative_flags: QualitativeFlags | None = None,
-        previous_stage: Any | None = None,
-        consecutive_performing_periods: int | None = None,
+        qualitative_flags: QualitativeFlags = ...,
+        previous_stage: Stage | str | None = None,
+        consecutive_performing_periods: int = 0,
         ead_schedule: list[tuple[float, float]] | None = None,
-        segments: list[str] | None = None,
+        segments: list[str] = ...,
     ) -> None: ...
     @property
     def current_pd(self) -> float:
@@ -352,7 +368,7 @@ class Exposure:
         -------
         float
             Decimal probability in ``[0, 1]`` over
-            ``min(remaining_maturity, 30.0)`` years, covering the same window
+            ``min(remaining_maturity_years, 30.0)`` years, covering the same window
             as ``origination_pd``; validated when staging runs.
         """
     @current_pd.setter
@@ -362,7 +378,7 @@ class Exposure:
         Parameters
         ----------
         value : float
-            Decimal PD from reporting over ``min(remaining_maturity, 30.0)`` years.
+            Decimal PD from reporting over ``min(remaining_maturity_years, 30.0)`` years.
             Staging rejects non-finite values or probabilities outside ``[0, 1]``.
 
         This setter stores the value, does not raise, and leaves validation to staging.
@@ -378,7 +394,7 @@ class Exposure:
         float
             Decimal PD conditional on survival to reporting. For original
             cumulative curve ``F``, age ``a`` and
-            ``h = min(remaining_maturity, 30.0)``, this is
+            ``h = min(remaining_maturity_years, 30.0)``, this is
             ``(F(a + h) - F(a)) / (1 - F(a))``.
         """
     @origination_pd.setter
@@ -466,7 +482,7 @@ class Exposure:
             Effective interest rate as a decimal annual rate.
         """
     @property
-    def remaining_maturity(self) -> float:
+    def remaining_maturity_years(self) -> float:
         """
         Remaining maturity in years.
 
@@ -478,7 +494,7 @@ class Exposure:
             Remaining maturity in years.
         """
     @property
-    def dpd(self) -> int:
+    def days_past_due(self) -> int:
         """
         Days the exposure is past due at the reporting date.
 
@@ -578,16 +594,16 @@ class Exposure:
         Export the exposure as a single-row pandas ``DataFrame``.
 
         Columns: ``id``, ``ead``, ``undrawn``, ``ccf``, ``lgd``, ``eir``,
-        ``remaining_maturity``, ``current_pd``, ``origination_pd``, ``dpd``,
+        ``remaining_maturity_years``, ``current_pd``, ``origination_pd``, ``days_past_due``,
         ``current_rating``, ``origination_rating``. Amounts are in the
         exposure's base currency; ``ccf``, ``lgd`` and the PDs are decimal
-        fractions; ``eir`` is a decimal annual rate; ``remaining_maturity`` is
-        in years; ``dpd`` is whole days.
+        fractions; ``eir`` is a decimal annual rate; ``remaining_maturity_years`` is
+        in years; ``days_past_due`` is whole days.
 
         Returns
         -------
         pd.DataFrame
-            Export the exposure as a single-row pandas ``DataFrame``. Columns: ``id``, ``ead``, ``undrawn``, ``ccf``, ``lgd``, ``eir``, ``remaining_maturity``, ``current_pd``, ``origination_pd``, ``dpd``, ``current_rating``, ``origination_rating``. Amounts are in the exposure's base currency; ``ccf``, ``lgd`` and the PDs are decimal fractions; ``eir`` is a decimal annual rate; ``remaining_maturity`` is in years; ``dpd`` is whole days.
+            Export the exposure as a single-row pandas ``DataFrame``. Columns: ``id``, ``ead``, ``undrawn``, ``ccf``, ``lgd``, ``eir``, ``remaining_maturity_years``, ``current_pd``, ``origination_pd``, ``days_past_due``, ``current_rating``, ``origination_rating``. Amounts are in the exposure's base currency; ``ccf``, ``lgd`` and the PDs are decimal fractions; ``eir`` is a decimal annual rate; ``remaining_maturity_years`` is in years; ``days_past_due`` is whole days.
 
         Raises
         ------
@@ -601,7 +617,16 @@ class QualitativeFlags:
     """
     Qualitative SICR and default-evidence flags for staging (IFRS 9 B5.5.17 / B5.5.37).
 
-    The constructor stores the supplied values and does not raise.
+    Every parameter is keyword-only: Rust reads the keywords as the
+    ``QualitativeFlags`` serde struct, in which every flag defaults to
+    ``False`` and every list to ``[]``.
+
+    Raises
+    ------
+    ValueError
+        If a keyword is unknown or a value does not have its wire form.
+    TypeError
+        If a positional argument is passed.
 
     Parameters
     ----------
@@ -633,6 +658,7 @@ class QualitativeFlags:
     """
     def __init__(
         self,
+        *,
         watchlist: bool = False,
         forbearance: bool = False,
         adverse_conditions: bool = False,
@@ -967,41 +993,49 @@ class StagingConfig:
     IFRS 9 staging policy: SICR thresholds, days-past-due backstops, qualitative
     switches and curing windows.
 
-    Omitted parameters use the canonical Rust ``StagingConfig::default()``
-    values, so ``StagingConfig()`` is the standard policy. Explicit ``None``
-    disables the relative PD trigger.
+    Every parameter is keyword-only: Rust reads the keywords as the
+    ``StagingConfig`` serde struct, and an omitted keyword takes the Rust
+    ``StagingConfig::default()`` value (the embedded default IFRS 9 policy), so
+    ``StagingConfig()`` is the standard policy. Explicit ``None`` disables the
+    relative PD trigger; no other field takes ``None``.
 
     Raises
     ------
     ValueError
-        If the absolute or enabled relative threshold is negative or non-finite.
+        If a keyword is unknown, a value does not have its wire form (``None``
+        for a non-optional field, a non-finite float), or the absolute or
+        enabled relative threshold is negative.
+    TypeError
+        If a positional argument is passed.
 
     Parameters
     ----------
-    pd_delta_absolute : float | None
+    pd_delta_absolute : float
         Absolute remaining-window PD increase (decimal, ``0.01`` = 1pp) that fires the
-        Stage 2 SICR trigger.
+        Stage 2 SICR trigger. Default ``0.01``.
     pd_delta_relative : float | None
         Finite non-negative relative remaining-window PD multiple that fires
         Stage 2. Omitted uses ``2.0`` (PD doubled); ``None`` disables the trigger.
-    rating_downgrade_notches : int | None
+    rating_downgrade_notches : int
         Downgrade notches from origination that fire Stage 2; ``0`` disables
-        the trigger.
+        the trigger. Default ``3``.
     rating_scale_labels : list[str] | None
         Ordered best-to-worst rating labels used to count notches; ``None``
-        uses the 10-state S&P/Fitch scale.
-    dpd_stage2_threshold : int | None
+        (default) uses the 10-state S&P/Fitch scale.
+    dpd_stage2_threshold : int
         Days past due at or above which the Stage 2 backstop fires (default 30).
-    dpd_stage3_threshold : int | None
+    dpd_stage3_threshold : int
         Days past due at or above which Stage 3 is forced (default 90).
-    qualitative_triggers_enabled : bool | None
-        Whether any active SICR flag fires Stage 2.
-    stage3_qualitative_triggers_enabled : bool | None
-        Whether default-evidence flags force Stage 3.
-    cure_periods_stage2_to_1 : int | None
+    qualitative_triggers_enabled : bool
+        Whether any active SICR flag fires Stage 2. Default ``True``.
+    stage3_qualitative_triggers_enabled : bool
+        Whether default-evidence flags force Stage 3. Default ``True``.
+    cure_periods_stage2_to_1 : int
         Consecutive performing periods required to cure Stage 2 to Stage 1.
-    cure_periods_stage3_to_2 : int | None
+        Default ``3``.
+    cure_periods_stage3_to_2 : int
         Consecutive performing periods required to cure Stage 3 to Stage 2.
+        Default ``12``.
 
     Examples
     --------
@@ -1011,16 +1045,17 @@ class StagingConfig:
     """
     def __init__(
         self,
-        pd_delta_absolute: float | None = None,
+        *,
+        pd_delta_absolute: float = 0.01,
         pd_delta_relative: float | None = 2.0,
-        rating_downgrade_notches: int | None = None,
+        rating_downgrade_notches: int = 3,
         rating_scale_labels: list[str] | None = None,
-        dpd_stage2_threshold: int | None = None,
-        dpd_stage3_threshold: int | None = None,
-        qualitative_triggers_enabled: bool | None = None,
-        stage3_qualitative_triggers_enabled: bool | None = None,
-        cure_periods_stage2_to_1: int | None = None,
-        cure_periods_stage3_to_2: int | None = None,
+        dpd_stage2_threshold: int = 30,
+        dpd_stage3_threshold: int = 90,
+        qualitative_triggers_enabled: bool = True,
+        stage3_qualitative_triggers_enabled: bool = True,
+        cure_periods_stage2_to_1: int = 3,
+        cure_periods_stage3_to_2: int = 12,
     ) -> None: ...
     @property
     def pd_delta_absolute(self) -> float:
@@ -1193,7 +1228,15 @@ class WeightedEclResult:
     Examples
     --------
     >>> from finstack_quant.statements_analytics import Exposure, compute_ecl
-    >>> exp = Exposure("loan", 1_000_000.0, 0.45, 0.06, 3.0, 0.02, 0.015)
+    >>> exp = Exposure(
+    ...     id="loan",
+    ...     ead=1_000_000.0,
+    ...     lgd=0.45,
+    ...     eir=0.06,
+    ...     remaining_maturity_years=3.0,
+    ...     current_pd=0.02,
+    ...     origination_pd=0.015,
+    ... )
     >>> result = compute_ecl(exp, [(1.0, 0.02), (3.0, 0.06)], stage="stage2")
     >>> result.stage.value
     'stage2'
@@ -1332,7 +1375,7 @@ def classify_stage(exposure: Exposure, config: StagingConfig | None = None) -> S
     default-evidence flags, the absolute and relative PD-delta SICR tests
     (``current_pd`` versus ``origination_pd``), the rating-downgrade notch test,
     qualitative SICR flags, the Stage 2 days-past-due backstop and curing.
-    Both supplied PDs must cover ``min(remaining_maturity, 30.0)`` years from
+    Both supplied PDs must cover ``min(remaining_maturity_years, 30.0)`` years from
     reporting; the original PD must be conditional on survival to reporting.
     The caller aligns these scalar risks to that window before classification.
 
@@ -1361,7 +1404,16 @@ def classify_stage(exposure: Exposure, config: StagingConfig | None = None) -> S
     Examples
     --------
     >>> from finstack_quant.statements_analytics import Exposure, classify_stage
-    >>> exp = Exposure("loan", 1_000_000.0, 0.45, 0.06, 3.0, 0.02, 0.015, dpd=35)
+    >>> exp = Exposure(
+    ...     id="loan",
+    ...     ead=1_000_000.0,
+    ...     lgd=0.45,
+    ...     eir=0.06,
+    ...     remaining_maturity_years=3.0,
+    ...     current_pd=0.02,
+    ...     origination_pd=0.015,
+    ...     days_past_due=35,
+    ... )
     >>> classify_stage(exp).stage.value
     'stage2'
     """
@@ -1376,7 +1428,7 @@ def compute_ecl(
     """Compute single-scenario ECL for one exposure.
 
     The priced exposure at default is ``ead + undrawn * ccf``; ``lgd``, ``eir``,
-    ``remaining_maturity`` and any ``ead_schedule`` are read from the exposure.
+    ``remaining_maturity_years`` and any ``ead_schedule`` are read from the exposure.
 
     Parameters
     ----------
@@ -1412,7 +1464,15 @@ def compute_ecl(
     Examples
     --------
     >>> from finstack_quant.statements_analytics import Exposure, classify_stage, compute_ecl
-    >>> exp = Exposure("loan", 1_000_000.0, 0.45, 0.06, 3.0, 0.02, 0.015)
+    >>> exp = Exposure(
+    ...     id="loan",
+    ...     ead=1_000_000.0,
+    ...     lgd=0.45,
+    ...     eir=0.06,
+    ...     remaining_maturity_years=3.0,
+    ...     current_pd=0.02,
+    ...     origination_pd=0.015,
+    ... )
     >>> stage = classify_stage(exp).stage
     >>> compute_ecl(exp, [(1.0, 0.02), (3.0, 0.06)], stage).ecl > 0
     True
@@ -1457,7 +1517,15 @@ def compute_ecl_weighted(
     Examples
     --------
     >>> from finstack_quant.statements_analytics import Exposure, compute_ecl_weighted
-    >>> exp = Exposure("loan", 1_000_000.0, 0.45, 0.06, 1.0, 0.02, 0.015)
+    >>> exp = Exposure(
+    ...     id="loan",
+    ...     ead=1_000_000.0,
+    ...     lgd=0.45,
+    ...     eir=0.06,
+    ...     remaining_maturity_years=1.0,
+    ...     current_pd=0.02,
+    ...     origination_pd=0.015,
+    ... )
     >>> scenarios = [(0.7, [(1.0, 0.02)]), (0.3, [(1.0, 0.05)])]
     >>> len(compute_ecl_weighted(exp, scenarios, stage="stage1").scenario_breakdown)
     2

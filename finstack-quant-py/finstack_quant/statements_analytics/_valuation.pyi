@@ -743,8 +743,16 @@ class LboCheckMappings:
     Examples
     --------
     >>> from finstack_quant.statements_analytics import CreditMapping, LboCheckMappings, ThreeStatementMapping
-    >>> three = ThreeStatementMapping("cash", "re", "ni", ["assets"], ["liabilities"], ["equity"])
-    >>> m = LboCheckMappings(three, CreditMapping("debt", "ebitda", "interest"))
+    >>> three = ThreeStatementMapping(
+    ...     cash_node="cash",
+    ...     retained_earnings_node="re",
+    ...     net_income_node="ni",
+    ...     assets_nodes=["assets"],
+    ...     liabilities_nodes=["liabilities"],
+    ...     equity_nodes=["equity"],
+    ... )
+    >>> credit = CreditMapping(debt_node="debt", ebitda_node="ebitda", interest_expense_node="interest")
+    >>> m = LboCheckMappings(three, credit)
     >>> m.credit.debt_node
     'debt'
     """

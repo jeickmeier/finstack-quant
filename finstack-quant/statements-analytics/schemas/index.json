@@ -164,7 +164,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/ecl_config.schema.json",
-      "bytes": 12984,
+      "bytes": 13156,
       "kind": "input",
       "path": "schemas/statements_analytics/1/ecl_config.schema.json",
       "summary": "Configuration for ECL calculation.",
@@ -191,7 +191,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/exposure.schema.json",
-      "bytes": 8334,
+      "bytes": 8938,
       "kind": "component",
       "path": "schemas/statements_analytics/1/exposure.schema.json",
       "summary": "A single credit exposure for ECL computation.",
