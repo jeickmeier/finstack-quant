@@ -7,12 +7,13 @@ globs:
 
 ## Overview
 
-To ensure consistency and maintainability across the `finstack-quant` workspace, we are adopting a dual-crate approach for error handling:
+To ensure consistency and maintainability across the `finstack-quant` workspace ([ADR 0006](../../../docs/decisions/standards/0006-structured-errors.md), [ADR 0036](../../../docs/decisions/standards/0036-safe-rust-and-recoverable-failures.md), [ADR 0049](../../../docs/decisions/standards/0049-explicit-public-error-matching.md)):
 
-1. **`thiserror`** for **library crates** (`core`, `statements`, `valuations`, etc.).
-2. **`anyhow`** for **application-level crates** (binaries, examples, and language bindings like `finstack-quant-py` and `finstack-quant-wasm`).
+1. **Structured domain errors (`thiserror`)** for **library crates** (`core`, `statements`, `valuations`, etc.).
+2. **Centralized, kind-aware adapters** for **language bindings** (`finstack-quant-py` via `crate::errors::core_to_py` / `kind_to_py`, and `finstack-quant-wasm` via `crate::utils::to_js_err`).
+3. **`anyhow`** only for standalone CLI binaries or examples where structured caller handling is not required.
 
-This approach provides the best of both worlds: structured, specific error types for libraries, and convenient, easy-to-manage error propagation for applications. It avoids over-engineering by using simple, popular, and well-understood crates.
+This approach preserves structured error categories (`NotFound`, `Validation`, `Computation`) and diagnostic context across Rust, Python, and WASM without parsing message strings.
 
 ## 1. Library Crates: `thiserror`
 
@@ -88,22 +89,23 @@ pub fn do_something(currency_code: &str) -> Result<()> {
 }
 ```
 
-## 2. Application & Binding Crates: `anyhow`
+## 2. Language Bindings: Centralized Kind-Aware Adapters
 
-Application-level crates (anything with a `main.rs`, examples, and the `finstack-quant-py`/`finstack-quant-wasm` binding crates) **SHOULD** use `anyhow` for error handling. `anyhow::Error` is a dynamic error type that can wrap any error that implements `std::error::Error`, which includes all of our library errors derived with `thiserror`.
+Language bindings (`finstack-quant-py` and `finstack-quant-wasm`) **MUST NOT** erase error structure with `anyhow` or bare string errors (`JsValue::from_str`). Instead, Rust determines the error category and diagnostic fields, and bindings adapt them through centralized helpers ([ADR 0006](../../../docs/decisions/standards/0006-structured-errors.md), [ADR 0049](../../../docs/decisions/standards/0049-explicit-public-error-matching.md)):
 
-### Guidelines
+- **Python (`finstack-quant-py`)**: Map Rust errors through `crate::errors::core_to_py` (or the centralized domain adapters in `finstack-quant-py/src/errors.rs`), preserving `KeyError` (`NotFound`), `ValueError` (`Validation`), and `RuntimeError` / domain subclasses (`Computation`).
+- **WASM (`finstack-quant-wasm`)**: Map Rust errors through `crate::utils::to_js_err`, which constructs a structured `FinstackError` carrying the canonical `kind` and diagnostic metadata.
+- **Explicit variant matching ([ADR 0049](../../../docs/decisions/standards/0049-explicit-public-error-matching.md))**: Keep exhaustive semantic classification (`kind()`, `code()`, conversions) in the owning Rust crate so new variants require explicit review at their semantic boundary.
 
-- Functions should return `anyhow::Result<T>`.
-- Use the `?` operator to propagate errors. It will automatically convert `thiserror`-based errors into `anyhow::Error`.
-- Use `anyhow::Context` to add explanatory context to errors as they propagate up the call stack.
-- Use `anyhow::bail!` or `anyhow::ensure!` for new errors within application-level code.
+## 3. Standalone Binaries & Examples: `anyhow`
+
+Standalone binaries (`main.rs`) and examples may use `anyhow::Result<T>` for convenient top-level reporting.
 
 ### Example: `finstack-quant/examples/some_example.rs`
 
 ```rust
 use anyhow::{Context, Result};
-use finstack_quant_core::some_module; // Assuming this has functions returning `finstack_quant_core::errors::Result`
+use finstack_quant_core::some_module;
 
 fn main() -> Result<()> {
     run_example().context("Failed to run example")?;
@@ -111,27 +113,13 @@ fn main() -> Result<()> {
 }
 
 fn run_example() -> Result<()> {
-    // The `?` operator converts `finstack_quant_core::errors::Error` into `anyhow::Error`
     some_module::do_something("USD")
         .context("Initial operation failed")?;
-
-    // ... more code
-
     Ok(())
 }
 ```
 
 ## Rationale
 
-- **Libraries as Contracts**: Library error types are part of their public API. `thiserror` allows us to define a stable, well-documented contract for library consumers.
-- **Application Simplicity**: Applications often don't need to handle every specific error type. Their main concern is to report the error to the user (e.g., log it, print it to the console) and terminate gracefully. `anyhow` excels at this.
-- **Idiomatic Rust**: This pattern is widely adopted and considered a best practice in the Rust community.
-
-## Implementation Plan
-
-1. **Add Dependencies**:
-    - Add `thiserror = "1.0"` to the `[dependencies]` section of each library crate's `Cargo.toml`.
-    - Add `anyhow = "1.0"` to the `[dependencies]` section of application/binding crates' `Cargo.toml`.
-2. **Create Error Types**: Create `errors.rs` modules and define `thiserror`-based `Error` enums for each library crate.
-3. **Refactor Functions**: Update functions in library crates to return the new crate-specific `Result` type.
-4. **Update Application-Level Crates**: Refactor `main` functions, examples, and binding entry points to use `anyhow::Result` for their return types.
+- **Libraries as Contracts**: Library error types are part of their public API. `thiserror` and explicit semantic classifiers allow callers to handle failures reliably without parsing message text.
+- **Cross-Language Parity**: Centralized binding adapters (`core_to_py` and `to_js_err`) guarantee that Python and WASM callers observe the same failure categories and context as Rust callers.

@@ -175,13 +175,13 @@ pub fn evaluate<T: Numeric>(input: &[T]) -> T { ... }
 - Variants with identical field shapes and similar names (e.g., `InvalidCurve`, `BadCurve`, `MalformedCurve`).
 - Variants that are only used once and could be replaced with a `source()` chain.
 
-**Finstack Quant-specific shape:** Per-crate `Error` enums in `analytics`, `valuations`, `statements` that each have their own `ParseError`, `ValidationError`, `InvalidInput`, etc., with no shared structure. Bindings then map them all to the same Python/JS error anyway via `core_to_py()` / `JsValue::from_str`.
+**Finstack Quant-specific shape:** Per-crate `Error` enums in `analytics`, `valuations`, `statements` that each have their own `ParseError`, `ValidationError`, `InvalidInput`, etc., with no shared structure. Bindings then map them all to the same Python/JS error category anyway via `core_to_py()` / `crate::utils::to_js_err`.
 
 **Fix:**
 - Delete unused variants.
 - Merge variants that differ only in message text into one variant with a context field.
 - Consolidate under a single crate-level `Error` with well-chosen variants; use `thiserror::#[source]` for chaining instead of new variants per source type.
-- Remember: bindings flatten all of these to strings eventually. Error-enum refinement past the point of binding flattening is pure tax.
+- Remember: bindings preserve the structured error category (`kind()`) and required diagnostic fields, not arbitrary internal variant proliferation. Error-enum refinement past the point of semantic category or diagnostic distinction is pure tax.
 
 ---
 

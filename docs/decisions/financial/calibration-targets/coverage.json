@@ -1,0 +1,327 @@
+{
+  "scope": "calibration-targets",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "CALIBRATION-TARGETS-001",
+      "title": "Quote identity, domains and risk units",
+      "path": "01-quote-contracts.md"
+    },
+    {
+      "id": "CALIBRATION-TARGETS-002",
+      "title": "Rate quote preparation, knot grids and objective weighting",
+      "path": "02-rate-preparation-and-residuals.md"
+    },
+    {
+      "id": "CALIBRATION-TARGETS-003",
+      "title": "Discount-factor bootstrap, global zero-rate fit and polishing",
+      "path": "03-discount-calibration.md"
+    },
+    {
+      "id": "CALIBRATION-TARGETS-004",
+      "title": "Contractual-reset projection-curve global calibration",
+      "path": "04-forward-calibration.md"
+    },
+    {
+      "id": "CALIBRATION-TARGETS-005",
+      "title": "CDS hazard calibration and par-spread risk representation",
+      "path": "05-hazard-calibration.md"
+    },
+    {
+      "id": "CALIBRATION-TARGETS-006",
+      "title": "Lagged CPI anchors and inflation-swap calibration",
+      "path": "06-inflation-calibration.md"
+    },
+    {
+      "id": "CALIBRATION-TARGETS-007",
+      "title": "Foreign discount calibration and derived zero-spread curves",
+      "path": "07-xccy-calibration.md"
+    },
+    {
+      "id": "CALIBRATION-TARGETS-008",
+      "title": "NS/NSS calibration through exact-date discount samples",
+      "path": "08-parametric-calibration.md"
+    },
+    {
+      "id": "CALIBRATION-TARGETS-009",
+      "title": "Equity spot and carry resolution for smile calibration",
+      "path": "09-equity-forward-inputs.md"
+    },
+    {
+      "id": "CALIBRATION-TARGETS-010",
+      "title": "Expiry interpolation and published surface acceptance",
+      "path": "10-total-variance-materialization.md"
+    },
+    {
+      "id": "CALIBRATION-TARGETS-011",
+      "title": "Per-expiry equity SABR calibration",
+      "path": "11-equity-sabr.md"
+    },
+    {
+      "id": "CALIBRATION-TARGETS-012",
+      "title": "Per-expiry SVI calibration and finite-grid density diagnostics",
+      "path": "12-equity-svi.md"
+    },
+    {
+      "id": "CALIBRATION-TARGETS-013",
+      "title": "Contractual swaption coordinates, schedules and calibration forwards",
+      "path": "13-swaption-forwards.md"
+    },
+    {
+      "id": "CALIBRATION-TARGETS-014",
+      "title": "SABR swaption buckets, parameter interpolation and cube acceptance",
+      "path": "14-swaption-cube.md"
+    },
+    {
+      "id": "CALIBRATION-TARGETS-015",
+      "title": "Tranche upfront bootstrap to monotone base correlations",
+      "path": "15-base-correlation.md"
+    },
+    {
+      "id": "CALIBRATION-TARGETS-016",
+      "title": "Single-tranche Student-t degrees-of-freedom calibration",
+      "path": "16-student-t.md"
+    },
+    {
+      "id": "CALIBRATION-TARGETS-017",
+      "title": "Rate and hazard calibration recipe semantics",
+      "path": "17-calibration-replay.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/calibration/src/hazard_curve_tests.rs",
+      "classification": "test",
+      "records": [
+        "CALIBRATION-TARGETS-001",
+        "CALIBRATION-TARGETS-005",
+        "CALIBRATION-TARGETS-017"
+      ],
+      "reason": "Dedicated test fixtures/assertions: selected repricing, replay and domain evidence inspected; other cases located; not executed.",
+      "sha256": "560454d385d167a35c4aea89b7bb7ddbfa9f429c959bd47eb3e0caa35a4627a2"
+    },
+    {
+      "path": "finstack-quant/calibration/src/quotes/cds.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-TARGETS-001"
+      ],
+      "reason": "CDS recovery/spread/coupon validation and par-space mutation/conversion.",
+      "sha256": "c04f0b971600938d651c96329f6a681a8675761c955b5de6350ffc0c5a9e8de1"
+    },
+    {
+      "path": "finstack-quant/calibration/src/quotes/cds_tranche.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-TARGETS-001"
+      ],
+      "reason": "Tranche fraction, ordering, upfront and running-coupon domains.",
+      "sha256": "6ae9b9169fef978b0c2da9ee42d982ab828a9af92b4935128c89229d3d11fc60"
+    },
+    {
+      "path": "finstack-quant/calibration/src/quotes/ids.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-TARGETS-001"
+      ],
+      "reason": "Quote ID wire validation and constructor asymmetry; tenor/date pillar parsing.",
+      "sha256": "8291a8c441f74e1bfa4be91e1b9d8330f3712533e002c5c02f5821f97c1e4a85"
+    },
+    {
+      "path": "finstack-quant/calibration/src/quotes/inflation.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-TARGETS-001"
+      ],
+      "reason": "Inflation quote variant selection, economic fields and finite-rate domain.",
+      "sha256": "8fe3c32cb063495698775ca78f43084709a8d9cdf30110cc2bad48853d40c153"
+    },
+    {
+      "path": "finstack-quant/calibration/src/quotes/market_quote.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-TARGETS-001"
+      ],
+      "reason": "Quote identity validation, class dispatch and filtered extraction.",
+      "sha256": "a0829d0e3843560802a57e2bed824fc74f71e980d72a69923adb0d0c2a6137de"
+    },
+    {
+      "path": "finstack-quant/calibration/src/quotes/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Module declarations and re-exports only; runtime contents inspected.",
+      "sha256": "2b3f148532325b054df71eccccc5d70c44034f9f7730882294faef6c3d539b09"
+    },
+    {
+      "path": "finstack-quant/calibration/src/quotes/rates.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-TARGETS-001"
+      ],
+      "reason": "Rate/futures quote domains, implied-rate conversion and rate-bp mutation.",
+      "sha256": "b6a19425d0401c178ea78eb6dec6cddb09c576e5e916f812aa85a9fca2001c54"
+    },
+    {
+      "path": "finstack-quant/calibration/src/quotes/vol.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-TARGETS-001"
+      ],
+      "reason": "Volatility/strike/date domain and quote-type contract.",
+      "sha256": "fc3037fc46abe4728c0f20af7ba5544a9a65f5ae305b3531ca4ae202eb7e2818"
+    },
+    {
+      "path": "finstack-quant/calibration/src/quotes/xccy.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-TARGETS-001"
+      ],
+      "reason": "XCCY basis and optional FX-spot domains.",
+      "sha256": "33183b06c61fbdda5c4b7c97d520c1d99ee65c486edab8f5b8257a248fb8c861"
+    },
+    {
+      "path": "finstack-quant/calibration/src/repricing_tests.rs",
+      "classification": "test",
+      "records": [
+        "CALIBRATION-TARGETS-003",
+        "CALIBRATION-TARGETS-004",
+        "CALIBRATION-TARGETS-005",
+        "CALIBRATION-TARGETS-006",
+        "CALIBRATION-TARGETS-017"
+      ],
+      "reason": "Dedicated test fixtures/assertions: selected repricing, replay and domain evidence inspected; other cases located; not executed.",
+      "sha256": "b3cbaa9182d0d1b93a349ea4b1fc3855aeece5782c28e9e137cf5abb17dd9c52"
+    },
+    {
+      "path": "finstack-quant/calibration/src/targets/base_correlation.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-TARGETS-015"
+      ],
+      "reason": "Tranche identity/maturity binding, monotone correlation scans, approximate knots and index rebinding.",
+      "sha256": "38002ce8dec5127996f2cddc6386af2093400cbf30a66f5962ff298a6a191ea9"
+    },
+    {
+      "path": "finstack-quant/calibration/src/targets/discount.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-TARGETS-003"
+      ],
+      "reason": "DF bootstrap scans, global zero parameters, nonlocal polishing, numerical Jacobian and alias/final construction.",
+      "sha256": "439c804dbd89342d57345ad6fe8da27d97e8eb4cbde396d2a1edc3cbfebcb5f0"
+    },
+    {
+      "path": "finstack-quant/calibration/src/targets/forward.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-TARGETS-004"
+      ],
+      "reason": "Contractual projection/control grids, collision resolution, global residuals, bounds and sidecar attachment.",
+      "sha256": "55d96686f91e6be7114dcc80960b1cb3b07c0ed6280860c168a5c1d43ae6e2b8"
+    },
+    {
+      "path": "finstack-quant/calibration/src/targets/hazard.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-TARGETS-005",
+        "CALIBRATION-TARGETS-017"
+      ],
+      "reason": "CDS convention binding, hazard seed/scans, bootstrap/global objectives, par-space derivation and replay validation.",
+      "sha256": "7301faf5c30ce66ade1bcfa566c5f52ae700567a39584329b1e5e16a45059468"
+    },
+    {
+      "path": "finstack-quant/calibration/src/targets/inflation.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-TARGETS-006"
+      ],
+      "reason": "Month-lag reference anchors, observed-base precedence, CPI seeds/bounds and swap residuals.",
+      "sha256": "7bb0d39861c4fca9950ae5b3b31b4def564c47bf7652e6e7f0724c13adeba194"
+    },
+    {
+      "path": "finstack-quant/calibration/src/targets/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Module declarations and re-exports only; runtime contents inspected.",
+      "sha256": "1fb46a1e56dab9d2b9a4697b9daac9a062c645c2199fc2cae6f7aa8fc3015fd4"
+    },
+    {
+      "path": "finstack-quant/calibration/src/targets/parametric.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-TARGETS-008"
+      ],
+      "reason": "NS/NSS seeds/bounds/decay repair, daily exact-date adapter and global PV objective.",
+      "sha256": "01ba5863154635486ca839528b697f4f9f50674684aacc101fb44751573798aa"
+    },
+    {
+      "path": "finstack-quant/calibration/src/targets/rate_recipe.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-TARGETS-017"
+      ],
+      "reason": "Typed quote/role/compounding recipe conversion and generated-ID replay semantics.",
+      "sha256": "eb2b0633825e3800b24d573723a86d30a32309861ef0951ee9734ce4e2560cd0"
+    },
+    {
+      "path": "finstack-quant/calibration/src/targets/student_t.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-TARGETS-016"
+      ],
+      "reason": "Fixed-correlation single-tranche df inverse solve, error treatment, bounded scan and final fit checks.",
+      "sha256": "cfaf9c1d8ae1ca759ef23b0cbbbe6eec8fc5cbde49b6abd0f6780dff3652c9d7"
+    },
+    {
+      "path": "finstack-quant/calibration/src/targets/svi.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-TARGETS-010",
+        "CALIBRATION-TARGETS-012"
+      ],
+      "reason": "SVI slice solve, fixed-strike variance fill, density scan and final quote validation.",
+      "sha256": "6b5996a29446411f9a8a083539b6d4f1b77cc313fa17750db254cb3fd836f26c"
+    },
+    {
+      "path": "finstack-quant/calibration/src/targets/swaption.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-TARGETS-013",
+        "CALIBRATION-TARGETS-014"
+      ],
+      "reason": "Quote coordinates/schedules/forwards, SABR buckets, parameter interpolation/fallback and delivered-cube residuals; runtime after early test-only import inspected.",
+      "sha256": "abd35702b6aa6d47748fdc6898163c3519e27168f18d8330218699c19c3cfe85"
+    },
+    {
+      "path": "finstack-quant/calibration/src/targets/util.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-TARGETS-002",
+        "CALIBRATION-TARGETS-009",
+        "CALIBRATION-TARGETS-010"
+      ],
+      "reason": "Rate preparation/clock selection, objective weights, knot sorting, equity carry, published residuals and total-variance interpolation.",
+      "sha256": "b53086bdb4b9434570ef56e11bba9bd23004b22fc364d13001d5c9ed1373ca7c"
+    },
+    {
+      "path": "finstack-quant/calibration/src/targets/vol.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-TARGETS-010",
+        "CALIBRATION-TARGETS-011"
+      ],
+      "reason": "Equity SABR slice selection, controls, total-variance materialization and artifact acceptance.",
+      "sha256": "3d10d4373215989c38544d859e70ff7e15713ebd9b7541b9c2c1cf663f4d7181"
+    },
+    {
+      "path": "finstack-quant/calibration/src/targets/xccy_basis.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-TARGETS-007"
+      ],
+      "reason": "Merged foreign-curve bootstrap, spot precedence, solver/final policies and derived zero-spread byproduct.",
+      "sha256": "12d7d8f6ef6dcf7493697d79fa3391bec03f5a2e4082d9cd37a6fac96fbc3ad4"
+    }
+  ]
+}

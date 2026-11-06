@@ -1,0 +1,829 @@
+{
+  "scope": "valuations-bonds",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "VALUATIONS-BONDS-01",
+      "title": "Schedule construction, balance events and holder cashflows",
+      "path": "01-schedule-and-holder-cashflows.md"
+    },
+    {
+      "id": "VALUATIONS-BONDS-02",
+      "title": "Settlement carry, ex-coupon entitlement and model clocks",
+      "path": "02-settlement-and-clocks.md"
+    },
+    {
+      "id": "VALUATIONS-BONDS-03",
+      "title": "PV selection, quote pinning, discounting and fractional recovery of par",
+      "path": "03-pv-models.md"
+    },
+    {
+      "id": "VALUATIONS-BONDS-04",
+      "title": "Rates-only lattice valuation, event mapping and exercise",
+      "path": "04-rates-tree-exercise.md"
+    },
+    {
+      "id": "VALUATIONS-BONDS-05",
+      "title": "MOIC/XIRR return floors as issuer exercise-price constraints",
+      "path": "05-return-floors.md"
+    },
+    {
+      "id": "VALUATIONS-BONDS-06",
+      "title": "Joint rates-credit pathwise coupon, principal and recovery replay",
+      "path": "06-joint-coupon-replay.md"
+    },
+    {
+      "id": "VALUATIONS-BONDS-07",
+      "title": "Joint bond continuation regression, make-whole projection and sampling",
+      "path": "07-lsmc-policy.md"
+    },
+    {
+      "id": "VALUATIONS-BONDS-08",
+      "title": "Structural GBM default simulation, PIK elections and loss outputs",
+      "path": "08-merton-simulation.md"
+    },
+    {
+      "id": "VALUATIONS-BONDS-09",
+      "title": "Low-sample structural-parameter calibration to a cash-equivalent quote",
+      "path": "09-merton-calibration.md"
+    },
+    {
+      "id": "VALUATIONS-BONDS-10",
+      "title": "Street, Moosm\u00fcller and Japanese yield pricing and inversion",
+      "path": "10-quoted-yield.md"
+    },
+    {
+      "id": "VALUATIONS-BONDS-11",
+      "title": "Workout enumeration, yield to worst and inverse workout pricing",
+      "path": "11-workout-yield.md"
+    },
+    {
+      "id": "VALUATIONS-BONDS-12",
+      "title": "Z-spread, discount margin, I/G spreads and OAS inversions",
+      "path": "12-spread-quotes.md"
+    },
+    {
+      "id": "VALUATIONS-BONDS-13",
+      "title": "Asset-swap annuities, projection and market/par spread conventions",
+      "path": "13-asset-swaps.md"
+    },
+    {
+      "id": "VALUATIONS-BONDS-14",
+      "title": "Quoted-yield duration, convexity and signed yield DV01",
+      "path": "14-yield-risk.md"
+    },
+    {
+      "id": "VALUATIONS-BONDS-15",
+      "title": "Quote-reproducing curve DV01, key-rate risk and effective convexity",
+      "path": "15-curve-risk.md"
+    },
+    {
+      "id": "VALUATIONS-BONDS-16",
+      "title": "Par-CDS CS01 versus bond-spread fallback and spread duration",
+      "path": "16-spread-credit-risk.md"
+    },
+    {
+      "id": "VALUATIONS-BONDS-17",
+      "title": "Recovery01 and immediate jump-to-default on hazard-priced bonds",
+      "path": "17-default-risk.md"
+    },
+    {
+      "id": "VALUATIONS-BONDS-18",
+      "title": "Holder embedded-option value and short-rate model vega",
+      "path": "18-embedded-option-risk.md"
+    },
+    {
+      "id": "VALUATIONS-BONDS-19",
+      "title": "Bond carry clock and cash-payment weighted average life",
+      "path": "19-carry-and-life.md"
+    },
+    {
+      "id": "VALUATIONS-BONDS-20",
+      "title": "Issue-cost MOIC/XIRR and worst-exit lifetime returns",
+      "path": "20-lifetime-returns.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/cashflow_spec.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-01"
+      ],
+      "reason": "Coupon-spec constructors/default calendars and reset lags, amortization wrapping, frequency/day-count access and coupon-type conversion.",
+      "sha256": "81e9eb8434b6c2be9fe5ee656961c74f6ae481569c1a7b89407102c6703c4d0e"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/metrics/accrued.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-01",
+        "VALUATIONS-BONDS-02"
+      ],
+      "reason": "Settlement-date accrual, holder-entitlement cache and context convention propagation.",
+      "sha256": "44b3e57dcb33ddcebe1ff25e2d06441a040be759dde2068f2fb1778de87c43a8"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/metrics/carry.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-02",
+        "VALUATIONS-BONDS-19"
+      ],
+      "reason": "Street yield accretion with coupon-spec frequency, ICMA reference periods and segmented ACT/365L time.",
+      "sha256": "6e1577155f57447280175b877bf4e92e7b4153c81517d78e9a1b172100557f4c"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/metrics/convexity.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-14",
+        "VALUATIONS-BONDS-15"
+      ],
+      "reason": "Yield second derivative with /100 quote scale and optional CallableOas effective-risk branch.",
+      "sha256": "ae7d88f2ab64a601548ca5c7ac8292124123f45a9646a2501b3f6b1812afe1e7"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/metrics/cs01.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-12",
+        "VALUATIONS-BONDS-16"
+      ],
+      "reason": "Active-credit-model routing, replayability gate, selected-model Z/OAS bumps, settlement carry and instrument-key fallback.",
+      "sha256": "5677fde2216767d2e778d4b377f25ba9849028de348043a7d5afd0bcd3752354"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/metrics/default_risk.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-17"
+      ],
+      "reason": "Hazard-only metric domain, OAS-pinned recovery repricing and immediate cash-date outstanding recovery minus PV.",
+      "sha256": "5dc097da69f38d86b976eacdd1ecdb6a609bd50bf64d380ce06f7cb8023318af"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/metrics/duration_macaulay.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-14"
+      ],
+      "reason": "Settlement/workout yield-discounted time weighting with zero-price handling and compensated sums.",
+      "sha256": "f40a924f4bf03368b7d4d659e369804f4ee19a2d13103efd4bf9a40d6e45e003"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/metrics/duration_modified.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-14",
+        "VALUATIONS-BONDS-15"
+      ],
+      "reason": "Workout-yield denominator versus optional CallableOas effective-duration dispatch and dynamic metric dependencies.",
+      "sha256": "c0cb534fe8b2984fc2c5eac7d76bd860d884c34ce122a2462b5877cff84fbd1c"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/metrics/dv01.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-14",
+        "VALUATIONS-BONDS-15"
+      ],
+      "reason": "Quote/exercise-dependent yield versus curve DV01 selection; single-tree-curve central bump and triangular-key-rate risk view.",
+      "sha256": "712f1c9fe4d5a38f4e9b580801c1d8c0d771b6c7a723ad890991901cac30f1a0"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/metrics/effective.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-15"
+      ],
+      "reason": "Fixed-OAS quote normalization, \u00b125 bp tree-curve duration/convexity and zero-base-value branch.",
+      "sha256": "21bde67529814f9d57b1cb7042ebee8bb5b9b68ddeac5f79388ddba580d32a5f"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/metrics/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-14",
+        "VALUATIONS-BONDS-15",
+        "VALUATIONS-BONDS-16",
+        "VALUATIONS-BONDS-17",
+        "VALUATIONS-BONDS-18",
+        "VALUATIONS-BONDS-19",
+        "VALUATIONS-BONDS-20"
+      ],
+      "reason": "Active model/risk-basis selection, OAS/Z pinning, cached workout risk basis and metric-specific calculator/default registration.",
+      "sha256": "50140fa3efcfffd7fd1a6297e1417eb3a65be0d19103e5b49a4e19e352a3c27d"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/metrics/price_yield_spread/asw.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-13"
+      ],
+      "reason": "Plain, workout and custom ASW calculator selection, equivalent coupon, direct forward/discounter annuity routes.",
+      "sha256": "5223e2db61f3b98eef2af0b8e8d05a0c5b7dcfed891d80b97bc6c31c0dc34dab"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/metrics/price_yield_spread/dm.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-12"
+      ],
+      "reason": "Floating-only DM, cleared price overrides, frozen projected coupon kernel and settlement target inversion.",
+      "sha256": "79d1d53354cee73cf1ed43bcad88036cac7872f404ee2fcfdf58ae90b26a3e41"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/metrics/price_yield_spread/embedded_option_value.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-18"
+      ],
+      "reason": "Fixed-OAS holder option-minus-straight repricing preserving selected model and other inputs.",
+      "sha256": "55712dcf2dd6ab7a361fcda4f7d56a7a4aa4d35d64979b83bc1f384e82ac8373"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/metrics/price_yield_spread/g_spread.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-12"
+      ],
+      "reason": "Explicit government-curve requirement and yield/workout minus benchmark par rate.",
+      "sha256": "64925dc8beb6b005a57b31e4b2da3721485101a0bc7c40668ff5247562dee4c8"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/metrics/price_yield_spread/i_spread.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-12"
+      ],
+      "reason": "Discount-curve par benchmark at maturity or quoted workout horizon subtracted from corresponding yield.",
+      "sha256": "dfc70230785feb98734da8ec5922936775205c279ff98a3fd994a7f7f294509b"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/metrics/price_yield_spread/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-02",
+        "VALUATIONS-BONDS-10"
+      ],
+      "reason": "Quote-date dirty target and Japanese clean-price simple-yield metric; not only module reexports.",
+      "sha256": "bfe6e67716a10e3b4ab3fab9830857f3e3f42c0d831777c9b5b596f68c37157e"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/metrics/price_yield_spread/oas.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-12"
+      ],
+      "reason": "Quoted-OAS pass-through, quote-derived settlement target, model-preserving prepared solve and optional final MC CI gate.",
+      "sha256": "d04ce27854e0948d010c1932325995243f711895b43d728db06cc018c86c3bfa"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/metrics/price_yield_spread/prices.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-02",
+        "VALUATIONS-BONDS-03"
+      ],
+      "reason": "Direct quote normalization or detached-cash settlement carry, then dirty-minus-accrued clean currency price.",
+      "sha256": "dd3ccdf949dbc482505fd1c453659ecea684adf200bfdaa15b67fdcc438260b7"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/metrics/price_yield_spread/vega.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-18"
+      ],
+      "reason": "Model-specific sigma channel, asymmetric lower-bound bump and option-only price-point vega normalization.",
+      "sha256": "17895bc823878f77bd503f59d006456eed635575fc97b1b4cd4b89fcd317872a"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/metrics/price_yield_spread/ytm.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-02",
+        "VALUATIONS-BONDS-10"
+      ],
+      "reason": "Settlement entitlement/timing cache, compounding selection and dirty-target quoted-yield inversion.",
+      "sha256": "a3b773ed8f5fe83cbfea46dc0d1aaadb422b8a3cd57947e021be11d271f4c86d"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/metrics/price_yield_spread/ytw.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-11"
+      ],
+      "reason": "Exercise-right and clean-quote domain, effective return-floor lowering and minimum workout yield.",
+      "sha256": "9bde55fa297f37e5a6fa35292340cdebc8ddf3eba1a537695299725658709e25"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/metrics/price_yield_spread/z_spread.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-12"
+      ],
+      "reason": "Quoted Z retrieval or settlement-target inversion through periodic spread/workout kernel.",
+      "sha256": "a31ae5cb4892ae90dda436073cbba9f9ab79284239816774c3d6772e3b7172be"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/metrics/return_metrics/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-BONDS-20"
+      ],
+      "reason": "Module declarations for MOIC/XIRR only; economic behavior is implemented in children.",
+      "sha256": "662a743b285b0052926584151fb7d1b085c5557aa74a77223e3198c63d072170"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/metrics/return_metrics/moic.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-20"
+      ],
+      "reason": "Issue cost, lifetime holder streams, effective exercise redemption and minimum positive-inflow money multiple.",
+      "sha256": "985f4f9b660a5bb33376d5ab4246ee9134f78461621e258d427dd79155f3399b"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/metrics/return_metrics/xirr.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-20"
+      ],
+      "reason": "Floor-selected annualization, signed lifetime/exit paths and silent skip of failed early-exit XIRRs.",
+      "sha256": "b58c93732c693aee491d3b581585b71965e3c082067461581e837c31005cb1cf"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/metrics/risk_view.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-15",
+        "VALUATIONS-BONDS-16",
+        "VALUATIONS-BONDS-17"
+      ],
+      "reason": "Price-driver removal, Z versus OAS quote-reproducing clone selection and credit-model recognition.",
+      "sha256": "bc6a3d00fc172a08060caba70e0359c61a79f007edddaeeeb1905c47875e8163"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/metrics/spread_duration.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-16"
+      ],
+      "reason": "Always-Z forward-bump duration with notional-relative denominator guard and finite-result validation.",
+      "sha256": "1b9e8bd81f005e8a2837cc492e1197c9b4c24373e987c2cd3ff4a25d017f6102"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/metrics/wal.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-19"
+      ],
+      "reason": "Positive amortization/notional cash amounts and cash dates weighted with ACT/365F; zero when no principal.",
+      "sha256": "52ce7550bd628d8677ac75f31c5805111582b1d5f6a0cd5b57c8fe679b7395bf"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/metrics/yield_dv01.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-14",
+        "VALUATIONS-BONDS-15"
+      ],
+      "reason": "Signed one-bp yield P&L using yield-basis price and the currently selected modified/effective duration.",
+      "sha256": "730036f24bad1b71ef0a2387eeeb62f1fae29e76b792ad1378f4bf94f9b4b472"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-BONDS-01",
+        "VALUATIONS-BONDS-02",
+        "VALUATIONS-BONDS-03",
+        "VALUATIONS-BONDS-04"
+      ],
+      "reason": "Public module/type exports and explanatory prose only; no runtime construction or dispatch.",
+      "sha256": "961b3715452a203937aba9764e84052930bbbb56a0a0e2e08f4ac7102fb931dd"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/discount.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-03"
+      ],
+      "reason": "Entitled-flow DF sum, quote-compounding-to-continuous OAS conversion and compensated PV accumulation.",
+      "sha256": "46f96e7fe109bc7581fa94d255a860fe5cb205e0fe51949deb5c3ae082295aa2"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/hazard.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-02",
+        "VALUATIONS-BONDS-03"
+      ],
+      "reason": "Straight-only hazard domain plus production daily conditional FRP integration after interleaved cfg(test) wrappers.",
+      "sha256": "9e3324ef241c74668afd974cbc223d1c6c977f4393c7367bc3254a73171db539"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/merton_mc/calibration.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-09"
+      ],
+      "reason": "Cash-equivalent target conversion, single-parameter brackets, common-random-number bisection and residual failure.",
+      "sha256": "a92eca96fa95fc35ed302d1ef0cd29cf1ee32d51396605b742512fd0225c5ba6"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/merton_mc/engine.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-08"
+      ],
+      "reason": "Estimator streams, GBM/bridge default, PIK/toggle state, recovery, coupon timing, DF interpolation and loss/spread statistics.",
+      "sha256": "9ebc3bcb58f8d15728f08ec22b2823c06e2ae0ca45a338571ffbe904da25513f"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/merton_mc/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-BONDS-08",
+        "VALUATIONS-BONDS-09"
+      ],
+      "reason": "Module visibility and Merton engine/result/calibration reexports; no runtime engine selection.",
+      "sha256": "018fdb0a8b06cb0a6a157d5d7c5b6ef27f31ff92da5a26cab3055de945986005"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/merton_mc/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-02",
+        "VALUATIONS-BONDS-08",
+        "VALUATIONS-BONDS-09"
+      ],
+      "reason": "Model adapter ordering, quote/schedule discount basis, optional cash calibration then full-budget curve-DF run and diagnostics.",
+      "sha256": "b1195af0c87ac1f62b61a8826d5dd702604dec3a2e47104ae1827db82129ac16"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/merton_mc/tests.rs",
+      "classification": "test",
+      "records": [
+        "VALUATIONS-BONDS-08",
+        "VALUATIONS-BONDS-09"
+      ],
+      "reason": "Test-only fixtures/assertions for simulation branches, configuration, seeded samples, toggle/PIK, statistics and standard error.",
+      "sha256": "8614f529144a5d6e61614d35a0ed20c92218006576be62de2d2d51813070a473"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/merton_mc/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-08"
+      ],
+      "reason": "Embedded simulation defaults, monitoring-mode default, configuration validation and economically interpreted result/statistic shapes.",
+      "sha256": "4520b6b45afb3034384ea63fa613c81e6d5de9e711f99121df2eb1fec777c3a5"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-03",
+        "VALUATIONS-BONDS-07",
+        "VALUATIONS-BONDS-08"
+      ],
+      "reason": "Registry family pricing envelope, supported model dispatch, quote/raw ordering and joint MC estimate/result diagnostics.",
+      "sha256": "a73c751930c4e045dd16857c00a623696c88090efcae26a26ff316d385f7b0c7"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/quote_conversions/annuity.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-12",
+        "VALUATIONS-BONDS-13"
+      ],
+      "reason": "Fixed/floating annuities, discount/dual-curve par benchmarks, calibration-quote interpolation and ASW settlement/workout schedules.",
+      "sha256": "90b63256361f0f1d53a14ef643a90697c0ce9d6e0b5f970f7bf3a26886a4fb4a"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/quote_conversions/compute.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-02",
+        "VALUATIONS-BONDS-03",
+        "VALUATIONS-BONDS-10",
+        "VALUATIONS-BONDS-11",
+        "VALUATIONS-BONDS-12",
+        "VALUATIONS-BONDS-13"
+      ],
+      "reason": "Quote input normalization, inverse-method dispatch, eligible quote set construction, error propagation and finite-option sanitization.",
+      "sha256": "fec4f3a44cd2c0434e40f320f8ffd320c428f0a523489fef052b1ec78a098743"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/quote_conversions/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-BONDS-11"
+      ],
+      "reason": "Module/reexports and passive ExitCandidate data carrier; exit generation and price calculations live in children.",
+      "sha256": "1ba9a51a86f1ac7caf5ba26119b26aca0fb16064551c3f4306c6fa99bab7b6af"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/quote_conversions/spread_price.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-11",
+        "VALUATIONS-BONDS-12",
+        "VALUATIONS-BONDS-13"
+      ],
+      "reason": "Workout cashflow selection, periodic Z pricing kernel, Brent spread solves and price inversions for DM/OAS/I-spread/ASW.",
+      "sha256": "7eec9c85e530809160e3df97c8f1a0392858694b66c75dfb0009b4aeb33a513c"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/quote_conversions/tests.rs",
+      "classification": "test",
+      "records": [
+        "VALUATIONS-BONDS-10",
+        "VALUATIONS-BONDS-11",
+        "VALUATIONS-BONDS-12",
+        "VALUATIONS-BONDS-13"
+      ],
+      "reason": "Test-only quote conversions, round trips, forward-DF projection and applicable/inapplicable/error-field behavior.",
+      "sha256": "6d1435e686fb4b7413fea7f2be4dd24c4940494971cfc11433d5761776022d90"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/quote_conversions/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-03",
+        "VALUATIONS-BONDS-10"
+      ],
+      "reason": "Supported yield compounding alternatives and quote units/nullability contract; table export itself is representation-only.",
+      "sha256": "8e8bcc5a4ab4846fc6ff7692c248817cc3b37be834cc8770e4e7e4ca7c8a1106"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/quote_conversions/workout_ladder.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-11"
+      ],
+      "reason": "Settlement target requirements, ladder row construction, nullable nonfinite metrics and selected worst-exit reporting.",
+      "sha256": "107c36d00c1df76da8171f8e9d9f7a3091a5f5e28f90deb278e56cbc112f73e3"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/quote_conversions/yield_price.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-02",
+        "VALUATIONS-BONDS-10",
+        "VALUATIONS-BONDS-11"
+      ],
+      "reason": "Street/Moosmuller kernels and inversion, ACT/365L times, candidate enumeration, principal/accrued/make-whole redemption and inverse YTW.",
+      "sha256": "884441749852201bc0e55f54f0251fd1db8d18071f4b4c8da601124cf93bfb64"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/return_floor.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-05",
+        "VALUATIONS-BONDS-20"
+      ],
+      "reason": "Protected windows/distributions, MOIC/XIRR clean-strike calculation and merging/creating issuer calls.",
+      "sha256": "05dce15407b0c8bfd5c2874bc5d484f7b920598f74e9cb918579d38af72ba225"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/settlement.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-01",
+        "VALUATIONS-BONDS-02",
+        "VALUATIONS-BONDS-03",
+        "VALUATIONS-BONDS-17"
+      ],
+      "reason": "Strict business-day settlement, detached-cash carry bridge, quote accrual and actual-repayment-date recovery balances.",
+      "sha256": "363c9138c469eb79c5a21f4d407b0e5d69b1e92b6833c6437680bed1dedd6331"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/time_basis.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-02",
+        "VALUATIONS-BONDS-08",
+        "VALUATIONS-BONDS-19"
+      ],
+      "reason": "Coupon-period metadata, ACT/365L segmentation, model clocks, Merton exact coupon times and curve-DF knots.",
+      "sha256": "2e23afa3b3eafa174c1138129967fd092c78bba30e80897e8fdfc000ab2c0f1e"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/tree/bond_valuator.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-02",
+        "VALUATIONS-BONDS-04",
+        "VALUATIONS-BONDS-05",
+        "VALUATIONS-BONDS-06"
+      ],
+      "reason": "Cash/grid PV preservation, principal/accrual/exercise mapping, deterministic and stochastic rollback, FRP and node exercise ordering.",
+      "sha256": "90d3a5754e9eebabb8bc6247c5b4d44be1d5cd07e693668bb0d5de9c0a44a391"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/tree/config.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-04"
+      ],
+      "reason": "Public model/default resolver, scalar Hull\u2013White inputs, explicit BDT/BK requirements and compounding choices.",
+      "sha256": "2dbe2ce287614d10aa797c04182c2c2b73ea90c49b6c685e5a7cae373f777ed7"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/tree/lsmc/build.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-05",
+        "VALUATIONS-BONDS-06",
+        "VALUATIONS-BONDS-07"
+      ],
+      "reason": "Historical/static schedule compilation, dynamic term/overnight observations, index-basis shocks, event grid and make-whole reference basis.",
+      "sha256": "ce3aefd1187e5726a10c3d01ed646ccf34e465066f877ca7749dce135dca4f85"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/tree/lsmc/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-06",
+        "VALUATIONS-BONDS-07"
+      ],
+      "reason": "All production below interleaved tests declaration inspected: sampling defaults/stage seeds, CI gate, parallel ordering and checkpoint orchestration.",
+      "sha256": "3090560432497f78763ebdacfdd89eabed62f44ad27ce199e3272e3cdd0a13dd"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/tree/lsmc/policy.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-07"
+      ],
+      "reason": "Standardized polynomial continuation/make-whole fitting, independent-policy backward exercise and replay blocks.",
+      "sha256": "73dd1f0b5bc0922c01f7af3ed8163ad676aec3b961cee74803b87b1991ba149e"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/tree/lsmc/replay.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-05",
+        "VALUATIONS-BONDS-06",
+        "VALUATIONS-BONDS-07"
+      ],
+      "reason": "Chronological coupon/PIK/balance/accrual state, FRP interval accumulation, exercise decisions and path/block replay.",
+      "sha256": "e20ce1fedcc24ddbc9814800a68269d22059847bdf1cf17a8d88c88bedcd2448"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/tree/lsmc/state.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-05",
+        "VALUATIONS-BONDS-06",
+        "VALUATIONS-BONDS-07"
+      ],
+      "reason": "Return-floor/conditional-index formulas plus production after test-only reference helper: checkpoint state, static replay and cached FRP interval policy.",
+      "sha256": "e73560ad449149870bb869d66f4e4e03d3a64a1a35224f9784a3338e14d75688"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/tree/lsmc/tests.rs",
+      "classification": "test",
+      "records": [
+        "VALUATIONS-BONDS-05",
+        "VALUATIONS-BONDS-06",
+        "VALUATIONS-BONDS-07"
+      ],
+      "reason": "Test-only event timing, accrual/PIK, conditional-forward, policy recovery, stage independence, checkpoint and estimator fixtures.",
+      "sha256": "71402a2c3c48dff77fdd1cecccf31150d962e05ced39dab5d75fc49435e630fd"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/tree/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-BONDS-04",
+        "VALUATIONS-BONDS-06",
+        "VALUATIONS-BONDS-07"
+      ],
+      "reason": "Module/type reexports including production tree_pricer declaration after cfg(test); no numerical dispatch.",
+      "sha256": "69e752da3cdb151d8fd4c8c45c33945da227489e4b47fb8f2d95974089f47357"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/tree/tests.rs",
+      "classification": "test",
+      "records": [
+        "VALUATIONS-BONDS-04",
+        "VALUATIONS-BONDS-05",
+        "VALUATIONS-BONDS-06",
+        "VALUATIONS-BONDS-12"
+      ],
+      "reason": "Test-only lattice/exercise/OAS/curve-target and deterministic floating/return-floor fixtures.",
+      "sha256": "4362ed204f6f34cd1e55bc08958c869204a487f2ff0544355711d1ff575d7156"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/tree/tree_pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-03",
+        "VALUATIONS-BONDS-04",
+        "VALUATIONS-BONDS-06",
+        "VALUATIONS-BONDS-07",
+        "VALUATIONS-BONDS-12"
+      ],
+      "reason": "Model preparation/deterministic-versus-sampled dispatch, aligned grids and calibration quality; post-test-marker OasPricer rollback dispatch inspected.",
+      "sha256": "a0326cc0083372e3a801708a2841f24f930c0aadba317b4833b9842997ff8fdf"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/pricing/ytm_solver.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-10"
+      ],
+      "reason": "Single-flow inverse shortcut, current-yield/pull-to-par initial guess and fallible high-precision Brent solve.",
+      "sha256": "974ce7541b60ba86448fa592a243209514cec6322e4b19eb69440fc44c5af3be"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/types/construction.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-01",
+        "VALUATIONS-BONDS-05"
+      ],
+      "reason": "Convention constructors, custom-cashflow validation/frequency inference and immutable builder transformations.",
+      "sha256": "d00f2f75aa435c02a2c3d9cfb9740456c42ea7ef85036083685576be2b02d3c7"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/types/definitions.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-01",
+        "VALUATIONS-BONDS-03",
+        "VALUATIONS-BONDS-04"
+      ],
+      "reason": "Positive-notional/date/coupon/option/override validation, custom issue-date deserialization and exercise/dependency contracts.",
+      "sha256": "bd43d5b6d389349fc1f3117fc1b3c55a0413973bd5a47ff7f4c7141f63f12752"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/types/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-BONDS-01",
+        "VALUATIONS-BONDS-05"
+      ],
+      "reason": "Module declarations, test modules and public type reexports only; no runtime behavior.",
+      "sha256": "8a85cc27f99d64675516bf8de0ed83350e2ac3848a9a55b0b05f6ab386f04c68"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/types/pricing.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-01",
+        "VALUATIONS-BONDS-02",
+        "VALUATIONS-BONDS-03",
+        "VALUATIONS-BONDS-05"
+      ],
+      "reason": "Canonical schedule building, entitlement/ex-coupon filters, native model dispatch, quote precedence and floor lowering.",
+      "sha256": "a2ed5ece646c658bba627494c14ebd0c0d4aeee64d95a9f5e19b9fa9f97fe59a"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/types/return_floor.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-05",
+        "VALUATIONS-BONDS-20"
+      ],
+      "reason": "Issue price resolution, floor domain validation, protected date windows and default annualization.",
+      "sha256": "b6d9034ebd6a84d9dab5ed87cc180771773100573da273f3467a5281ba3d480f"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/types/tests.rs",
+      "classification": "test",
+      "records": [
+        "VALUATIONS-BONDS-01",
+        "VALUATIONS-BONDS-03"
+      ],
+      "reason": "Test-only construction/custom-schedule, conventions, validation and pricing-domain behavior.",
+      "sha256": "f580a58de0eba8797b23b7b08c5ed5149530eb444ad5f7bd354b888636ed400d"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/types/tests_stepup.rs",
+      "classification": "test",
+      "records": [
+        "VALUATIONS-BONDS-01"
+      ],
+      "reason": "Test-only step-up/serde issue-date, split floating cash/PIK signs and schedule validation fixtures.",
+      "sha256": "85de41410a661c598606eb43cf49e09815f9e1fa4fe4ee339648155c7f0d69d8"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond/types/traits.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-BONDS-01",
+        "VALUATIONS-BONDS-02",
+        "VALUATIONS-BONDS-03",
+        "VALUATIONS-BONDS-08"
+      ],
+      "reason": "Instrument/market dependency selection, schedule exports, metrics-equivalent cash bond and Merton scalar bond-term adaptation.",
+      "sha256": "b9e2ba66525b09c9e9903e012c58de97fe1f3a1dfa863a68d5f5466eb6df21e0"
+    }
+  ]
+}

@@ -1,0 +1,356 @@
+{
+  "scope": "statements-evaluation",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "STATEMENTS-EVALUATION-001",
+      "title": "Dependency graph, cell precedence and prepared evaluation",
+      "path": "01-graph-precedence-and-prepared-plans.md"
+    },
+    {
+      "id": "STATEMENTS-EVALUATION-002",
+      "title": "Scalar formulas, boolean control flow and undefined values",
+      "path": "02-scalar-formulas-and-undefined-values.md"
+    },
+    {
+      "id": "STATEMENTS-EVALUATION-003",
+      "title": "Historical offsets, growth rates and reporting windows",
+      "path": "03-temporal-operators-and-period-windows.md"
+    },
+    {
+      "id": "STATEMENTS-EVALUATION-004",
+      "title": "Rolling, cumulative, ranked and exponentially weighted statistics",
+      "path": "04-historical-statistics-and-ewm.md"
+    },
+    {
+      "id": "STATEMENTS-EVALUATION-005",
+      "title": "Forecast segment anchoring, overrides and output bounds",
+      "path": "05-forecast-segments-and-bounds.md"
+    },
+    {
+      "id": "STATEMENTS-EVALUATION-006",
+      "title": "Deterministic growth, override curves and convergence forecasts",
+      "path": "06-deterministic-forecasts-and-fades.md"
+    },
+    {
+      "id": "STATEMENTS-EVALUATION-007",
+      "title": "Normal, lognormal, mean-reverting and bootstrap forecasts",
+      "path": "07-stochastic-forecast-kernels.md"
+    },
+    {
+      "id": "STATEMENTS-EVALUATION-008",
+      "title": "Latent one-peer correlation and execution order",
+      "path": "08-correlated-shocks.md"
+    },
+    {
+      "id": "STATEMENTS-EVALUATION-009",
+      "title": "Linear, damped Holt and moving-average trend forecasts",
+      "path": "09-trend-extrapolation.md"
+    },
+    {
+      "id": "STATEMENTS-EVALUATION-010",
+      "title": "Seasonal decomposition and phase-preserving projection",
+      "path": "10-seasonal-decomposition.md"
+    },
+    {
+      "id": "STATEMENTS-EVALUATION-011",
+      "title": "Monte Carlo paths, quantiles and breach probabilities",
+      "path": "11-monte-carlo-evaluation.md"
+    },
+    {
+      "id": "STATEMENTS-EVALUATION-012",
+      "title": "Contractual cashflows, waterfall feedback and period snapshots",
+      "path": "12-capital-state-orchestration.md"
+    },
+    {
+      "id": "STATEMENTS-EVALUATION-013",
+      "title": "Result units, Money views, tables and dated flow exports",
+      "path": "13-result-units-and-exports.md"
+    },
+    {
+      "id": "STATEMENTS-EVALUATION-014",
+      "title": "Flow, balance and formula rollup to coarser periods",
+      "path": "14-period-rollup.md"
+    },
+    {
+      "id": "STATEMENTS-EVALUATION-015",
+      "title": "Ordered normalization bridges, caps and result merging",
+      "path": "15-normalization-adjustments.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/statements/src/adjustments/engine.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-EVALUATION-015"
+      ],
+      "reason": "Ordered normalization, per-adjustment reference caps, compensated bridges and validated whole-node merge.",
+      "sha256": "3357d2b0a084e718b7f1066a00109c4b584fa0ced1464763fa7359f463c81020"
+    },
+    {
+      "path": "finstack-quant/statements/src/adjustments/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Module documentation and re-exports only; adjustment implementations are inspected in engine/types.",
+      "sha256": "89f2a2c5be291e03f30d7720ba625e3942e364d8a06e6485d27bd098afe536d6"
+    },
+    {
+      "path": "finstack-quant/statements/src/adjustments/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-EVALUATION-015"
+      ],
+      "reason": "Adjustment/cap defaults, validation boundaries, signed amount representation and duplicate-ID behavior.",
+      "sha256": "2d71dffecdd5b756fab9b2cc7b8ea9d5baccf3a45a66cd58f50ea1f28e9d58b5"
+    },
+    {
+      "path": "finstack-quant/statements/src/evaluator/capital_structure_runtime.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-EVALUATION-012"
+      ],
+      "reason": "Opening debt initialization, contract/waterfall state updates, dependent reevaluation and reporting-currency snapshot conversion.",
+      "sha256": "a23a6db1370bc5652f849e9b8cfaf9a35148a829030d15b4411a8125b4266b97"
+    },
+    {
+      "path": "finstack-quant/statements/src/evaluator/cashflow_export.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-EVALUATION-013"
+      ],
+      "reason": "Dated schedule timing, model-period ordering, missing-cell omission and raw-value/perspective boundary.",
+      "sha256": "99fdc2afe8c8f5afe51e04c697b341ade4df8174ef39f8ab3ca2c76a5bffe96f"
+    },
+    {
+      "path": "finstack-quant/statements/src/evaluator/context.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-EVALUATION-001",
+        "STATEMENTS-EVALUATION-003",
+        "STATEMENTS-EVALUATION-004",
+        "STATEMENTS-EVALUATION-012"
+      ],
+      "reason": "Current/historical values and capital snapshots, lookup errors, cache invalidation and model-date access.",
+      "sha256": "17f687ff69ddf784a5ea7a47221027952197f1ac160aeec53fb76c54ecc83b13"
+    },
+    {
+      "path": "finstack-quant/statements/src/evaluator/dag.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-EVALUATION-001",
+        "STATEMENTS-EVALUATION-008"
+      ],
+      "reason": "Current-period dependency graph, cycle detection, topological order and absence of forecast-peer edges.",
+      "sha256": "b98af29eb87e5a2d3d6004b6538f3fd1d033613d789bb11d4a92f6533461cda3"
+    },
+    {
+      "path": "finstack-quant/statements/src/evaluator/engine.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-EVALUATION-001",
+        "STATEMENTS-EVALUATION-005",
+        "STATEMENTS-EVALUATION-011",
+        "STATEMENTS-EVALUATION-012",
+        "STATEMENTS-EVALUATION-013"
+      ],
+      "reason": "Preparation/fingerprints, precedence and availability, period loop, capital feedback, result finalization and evaluation-mode differences.",
+      "sha256": "88fd847d8c0536def0dda6951e050880f6ab0329d1ec1aefca12bbf66b616bf3"
+    },
+    {
+      "path": "finstack-quant/statements/src/evaluator/export.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-EVALUATION-013"
+      ],
+      "reason": "Long/wide table layout, missing values, numeric monetary representation and unit/source export semantics.",
+      "sha256": "5b949238c58452a3ed249ba13633281ddba2905957a37680a6f1aef1d5c51700"
+    },
+    {
+      "path": "finstack-quant/statements/src/evaluator/forecast_eval.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-EVALUATION-005",
+        "STATEMENTS-EVALUATION-008"
+      ],
+      "reason": "Forecast anchors/runs, cached segments, explicit overrides, latent shock collection and correlation prerequisites.",
+      "sha256": "8273450a9ef63ab7835fca5e568e59746a9cb972e6bb934f52c85456ec24b248"
+    },
+    {
+      "path": "finstack-quant/statements/src/evaluator/formula.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-EVALUATION-002",
+        "STATEMENTS-EVALUATION-003",
+        "STATEMENTS-EVALUATION-004"
+      ],
+      "reason": "Arithmetic/control flow, diagnostics and arbitrary-expression historical collection/reevaluation.",
+      "sha256": "8fac738ac5ba9acca79aaf858460ffac2ea9c1488bd5504c838ae0fdde48dcc2"
+    },
+    {
+      "path": "finstack-quant/statements/src/evaluator/formula_aggregates.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-EVALUATION-003",
+        "STATEMENTS-EVALUATION-004"
+      ],
+      "reason": "Rolling/full-history/cumulative estimators, finite filtering, surplus arity behavior and reporting-period aggregates.",
+      "sha256": "22fe86e7bc3f86787238fe53b81d956288c4bc8573c9b9b52ec6ce6a8adc3e78"
+    },
+    {
+      "path": "finstack-quant/statements/src/evaluator/formula_dispatch.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-EVALUATION-002",
+        "STATEMENTS-EVALUATION-004"
+      ],
+      "reason": "Function selection, scalar/annualization kernels, n-ary missing behavior, rank and quantile rules.",
+      "sha256": "cbe9d5a27086145a56f13a5be6d084fdc254e73cfdd724156aa7995a24339145"
+    },
+    {
+      "path": "finstack-quant/statements/src/evaluator/formula_ewm.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-EVALUATION-004"
+      ],
+      "reason": "Recursive decaying weighted moments, gap handling and variance bias correction.",
+      "sha256": "2359af72297601f532e0e6317778a911539b68619d49dc2d204b9dc99d6d7ac7"
+    },
+    {
+      "path": "finstack-quant/statements/src/evaluator/formula_helpers.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-EVALUATION-002",
+        "STATEMENTS-EVALUATION-004"
+      ],
+      "reason": "Finite truth convention, no-lookahead history and capital-reference collection plus rolling observation extraction.",
+      "sha256": "358b6e15688c94b4e8cf9e76e8796be17c6260205fa8984e90b2bafbb1d70181"
+    },
+    {
+      "path": "finstack-quant/statements/src/evaluator/formula_timeseries.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-EVALUATION-003"
+      ],
+      "reason": "Lag/shift/difference/percentage/growth formulas, fiscal date navigation and daily/weekly ActualActual clock.",
+      "sha256": "598247e5ed1ae34c2922f78af5e83a2ef5a97d98e88b04d664ab0d21f95003d9"
+    },
+    {
+      "path": "finstack-quant/statements/src/evaluator/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Evaluator module documentation, declarations and re-exports; no separate numerical/default implementation.",
+      "sha256": "6d37f17c5a93e4f2a92a4e2e0077ef3891478990234fecab7d0052a050505a98"
+    },
+    {
+      "path": "finstack-quant/statements/src/evaluator/monte_carlo.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-EVALUATION-011"
+      ],
+      "reason": "Seeded path orchestration, finite forecast gate, exact quantiles, deterministic warning/failure reduction and pathwise breach/replay.",
+      "sha256": "96a1497fff2bdc6bdb0af1e04f04f9cec05ade4628154d65d495ffc3f8a46671"
+    },
+    {
+      "path": "finstack-quant/statements/src/evaluator/period_history.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-EVALUATION-001",
+        "STATEMENTS-EVALUATION-003"
+      ],
+      "reason": "Columnar optional-value history layout, duplicate-period replacement, row normalization and historical access.",
+      "sha256": "9b4b8c3610341927356ec3251294dbf1fe8dd8bc366972b2100b03a5d3f7c4cb"
+    },
+    {
+      "path": "finstack-quant/statements/src/evaluator/precedence.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-EVALUATION-001",
+        "STATEMENTS-EVALUATION-005"
+      ],
+      "reason": "Explicit/forecast/formula precedence and availability-sensitive effective actual selection.",
+      "sha256": "cc48c6d0ade41c43cfc8fe1ec2bd30827f92a7f6c632e76030a5f8b1dcfd0761"
+    },
+    {
+      "path": "finstack-quant/statements/src/evaluator/results.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-EVALUATION-013",
+        "STATEMENTS-EVALUATION-014"
+      ],
+      "reason": "Raw numeric/Money/source result representation, nonfinite wire codec/getters, metadata and export/rollup delegates.",
+      "sha256": "4ccbca14ec8bec719b7aaaccd02587ad45768d91ef398e29849d74704032cce4"
+    },
+    {
+      "path": "finstack-quant/statements/src/evaluator/rollup.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-EVALUATION-014"
+      ],
+      "reason": "Coarser nested period construction, method precedence, Sum/PeriodEnd/Formula algorithms and result/provenance reconstruction.",
+      "sha256": "fe86828630d77693ffac3765ad4f3d340ff759b6d8dae3590c25b0625870b857"
+    },
+    {
+      "path": "finstack-quant/statements/src/forecast/deterministic.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-EVALUATION-006"
+      ],
+      "reason": "Forward fill and finite discrete growth/curve recurrence, per-step units and sign-domain warnings.",
+      "sha256": "1a0568473b227ce0bc510755049e2a8a84ab72011fe5b26edf200cf1673e1cdc"
+    },
+    {
+      "path": "finstack-quant/statements/src/forecast/fade.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-EVALUATION-006"
+      ],
+      "reason": "Linear, raw-ratio geometric and exponential half-life fades, validation order and finite-output checks.",
+      "sha256": "6d43645611b50c5ce43ce7a9cddfd3049f1037da66431b3fb35edbfc4486334a"
+    },
+    {
+      "path": "finstack-quant/statements/src/forecast/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-EVALUATION-005",
+        "STATEMENTS-EVALUATION-006",
+        "STATEMENTS-EVALUATION-007",
+        "STATEMENTS-EVALUATION-008",
+        "STATEMENTS-EVALUATION-009",
+        "STATEMENTS-EVALUATION-010"
+      ],
+      "reason": "Typed method dispatch, node-specific seed mixing, latent-shock dispatch and finite output-bound clipping.",
+      "sha256": "7b3b1508c03bd6f7c0521b7918e080b90bd67e5f12d63816073bd19adb265451"
+    },
+    {
+      "path": "finstack-quant/statements/src/forecast/override_method.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-EVALUATION-006"
+      ],
+      "reason": "Period-key parsing and alias rejection, in-horizon validation and sequential explicit-value carry.",
+      "sha256": "239a449cf9bb54a23495b035808ae07ad6e408414f68ba22653402f5236c8fe1"
+    },
+    {
+      "path": "finstack-quant/statements/src/forecast/statistical.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-EVALUATION-007",
+        "STATEMENTS-EVALUATION-008"
+      ],
+      "reason": "PCG normal/lognormal/MR/bootstrap recurrences, exponent clamp, correlated innovation construction and seed/peer domains.",
+      "sha256": "3fe10daa3d019764cd7a0f4bd26c436089adc28920c92a0d913e45e6fef03731"
+    },
+    {
+      "path": "finstack-quant/statements/src/forecast/timeseries.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-EVALUATION-009",
+        "STATEMENTS-EVALUATION-010"
+      ],
+      "reason": "OLS, damped smoothing, centered moving-average extrapolation and seasonal decomposition/phase projection.",
+      "sha256": "3f67099cda58800e8f44d63acee756c0c06c0c4e18922905527e9c6d46d2c19c"
+    }
+  ]
+}

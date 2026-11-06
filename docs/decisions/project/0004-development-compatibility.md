@@ -1,6 +1,8 @@
 # ADR 0004: Remove obsolete paths during development
 
-**Status:** Accepted, with a lifecycle condition
+**Status:** Accepted
+
+**Lifecycle condition:** Revisit before the first final release
 
 **Decision date:** 2026-11-04
 

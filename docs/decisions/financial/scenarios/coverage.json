@@ -1,0 +1,361 @@
+{
+  "scope": "scenarios",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "SCENARIOS-001",
+      "title": "Specification validation and ordered composition",
+      "path": "01-specification-and-composition.md"
+    },
+    {
+      "id": "SCENARIOS-002",
+      "title": "Execution phases, effect ordering and partial success",
+      "path": "02-execution-and-partial-success.md"
+    },
+    {
+      "id": "SCENARIOS-003",
+      "title": "Hierarchy expansion, namespace selection and overlap precedence",
+      "path": "03-hierarchy-resolution.md"
+    },
+    {
+      "id": "SCENARIOS-004",
+      "title": "FX percentage shocks, cross-rate diagnostics and price scalars",
+      "path": "04-fx-and-equity-shocks.md"
+    },
+    {
+      "id": "SCENARIOS-005",
+      "title": "Direct discount, forward and inflation rate shocks",
+      "path": "05-direct-rate-shocks.md"
+    },
+    {
+      "id": "SCENARIOS-006",
+      "title": "Tenor matching and simultaneous native-interpolant shock delivery",
+      "path": "06-node-delivery-solve.md"
+    },
+    {
+      "id": "SCENARIOS-007",
+      "title": "Par-CDS solve-to-par replay and explicit first-order hazard shifts",
+      "path": "07-hazard-quote-shocks.md"
+    },
+    {
+      "id": "SCENARIOS-008",
+      "title": "Commodity percentage curves and volatility-index point shocks",
+      "path": "08-commodity-and-vol-index.md"
+    },
+    {
+      "id": "SCENARIOS-009",
+      "title": "Volatility bucket selection and post-shock diagnostics",
+      "path": "09-volatility-surface-shocks.md"
+    },
+    {
+      "id": "SCENARIOS-010",
+      "title": "Base-correlation and structured-credit correlation shocks",
+      "path": "10-correlation-shocks.md"
+    },
+    {
+      "id": "SCENARIOS-011",
+      "title": "Instrument price/spread override routing and composite traversal",
+      "path": "11-instrument-overrides.md"
+    },
+    {
+      "id": "SCENARIOS-012",
+      "title": "Forecast mutation and economic rate-binding conversion",
+      "path": "12-statement-bindings.md"
+    },
+    {
+      "id": "SCENARIOS-013",
+      "title": "Time-roll dates, fixing materialization and hazard replay",
+      "path": "13-market-time-roll.md"
+    },
+    {
+      "id": "SCENARIOS-014",
+      "title": "Realized-forward carry and per-currency failure-isolated aggregation",
+      "path": "14-carry-aggregation.md"
+    },
+    {
+      "id": "SCENARIOS-015",
+      "title": "Horizon attribution bridge and return normalization",
+      "path": "15-horizon-attribution-and-returns.md"
+    },
+    {
+      "id": "SCENARIOS-016",
+      "title": "Embedded stress templates, assembly order and parameter provenance",
+      "path": "16-historical-template-parameters.md"
+    },
+    {
+      "id": "SCENARIOS-017",
+      "title": "Application manifests, shock units and versioned replay envelopes",
+      "path": "17-reports-and-replay.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/scenarios/src/adapters/basecorr.rs",
+      "classification": "algorithm",
+      "records": [
+        "SCENARIOS-010"
+      ],
+      "reason": "Converts detachment units, emits additive correlation bucket effects, and previews clipping/no-match warnings.",
+      "sha256": "17b1579398d366bd667457ef973e246dad9c5804ad58d38f4c41256a7ff96036"
+    },
+    {
+      "path": "finstack-quant/scenarios/src/adapters/curves.rs",
+      "classification": "algorithm",
+      "records": [
+        "SCENARIOS-005",
+        "SCENARIOS-006",
+        "SCENARIOS-007",
+        "SCENARIOS-008"
+      ],
+      "reason": "Dispatches curve kinds, resolves tenors and discounting, solves native node delivery, and constructs direct/replayed rate, commodity and index shocks.",
+      "sha256": "3c563f94aea267e03c26da133ff788506f62b82467c030cfe821eb6b04012bec"
+    },
+    {
+      "path": "finstack-quant/scenarios/src/adapters/equity.rs",
+      "classification": "algorithm",
+      "records": [
+        "SCENARIOS-004"
+      ],
+      "reason": "Resolves exact price-scalar IDs and chooses applied effects versus missing-equity warnings.",
+      "sha256": "7458c60d53ec2becbd2d412f09c9452da3b4e92db904fec1438e40c2cad5a4a0"
+    },
+    {
+      "path": "finstack-quant/scenarios/src/adapters/fx.rs",
+      "classification": "algorithm",
+      "records": [
+        "SCENARIOS-004"
+      ],
+      "reason": "Creates pair/date percentage shocks and previews stored-cross consistency against the configured pivot.",
+      "sha256": "f4e3c738bdeb74bd864796ab2715a10aab63f6ea22da9c0cb13bebabeb541bda"
+    },
+    {
+      "path": "finstack-quant/scenarios/src/adapters/instruments.rs",
+      "classification": "algorithm",
+      "records": [
+        "SCENARIOS-011"
+      ],
+      "reason": "Matches types/attributes, compounds price and adds spread overrides, traverses composites, and chooses metadata fallback.",
+      "sha256": "122be928ab5c3a91c07ce1cf21af6a5646c5888beb052996ffe4cd503a52c538"
+    },
+    {
+      "path": "finstack-quant/scenarios/src/adapters/mod.rs",
+      "classification": "support",
+      "records": [
+        "SCENARIOS-002"
+      ],
+      "reason": "Declares internal adapter modules; contains no financial calculation.",
+      "sha256": "45a0f5669a3766767e066d7d164cbf6798d8e7fef6bc3165860df166acee3713"
+    },
+    {
+      "path": "finstack-quant/scenarios/src/adapters/statements.rs",
+      "classification": "algorithm",
+      "records": [
+        "SCENARIOS-012"
+      ],
+      "reason": "Updates existing forecast cells, preserves money representation, converts discount/forward accumulation to bound rate conventions, and invokes evaluation.",
+      "sha256": "ae088967b49ad2d75ce97b2820119095b4fad93729bff5f8f1a32b0a20a4e785"
+    },
+    {
+      "path": "finstack-quant/scenarios/src/adapters/time_roll.rs",
+      "classification": "algorithm",
+      "records": [
+        "SCENARIOS-013",
+        "SCENARIOS-014"
+      ],
+      "reason": "Resolves roll dates, projects fixings and replays calibrated hazards before commit; values carry and folds failure-isolated currency totals.",
+      "sha256": "00d2d7fdffc6596d6a2e9550c7070f7059a2be732605b2484b0247e9b6911025"
+    },
+    {
+      "path": "finstack-quant/scenarios/src/adapters/vol.rs",
+      "classification": "algorithm",
+      "records": [
+        "SCENARIOS-009"
+      ],
+      "reason": "Resolves/snap-selects volatility buckets, previews quoted-vol bumps, rejects zero vols and diagnoses calendar total variance.",
+      "sha256": "834dada04f9b058abad713df5002f26d50b9f556ee03d70dc5274b4727cf3028"
+    },
+    {
+      "path": "finstack-quant/scenarios/src/bin/gen_schemas.rs",
+      "classification": "support",
+      "records": [
+        "SCENARIOS-017"
+      ],
+      "reason": "Command-line schema generator wiring delegates to core; no alternate scenario algorithm.",
+      "sha256": "9bbbaa619481fb2cb291f4588ab9576f2455c2ebd58c15d4b218f6664d8054d0"
+    },
+    {
+      "path": "finstack-quant/scenarios/src/engine/effects.rs",
+      "classification": "algorithm",
+      "records": [
+        "SCENARIOS-002",
+        "SCENARIOS-017"
+      ],
+      "reason": "Dispatches operations, selects independent native replacement batches, commits ordered effects and records shock units/dirty targets.",
+      "sha256": "7a3968a1668e025486519a5cb4cc825ef1f4296841b7a0df110f77f3616a0aea"
+    },
+    {
+      "path": "finstack-quant/scenarios/src/engine/hierarchy.rs",
+      "classification": "algorithm",
+      "records": [
+        "SCENARIOS-003"
+      ],
+      "reason": "Expands hierarchy selectors with typed collection checks, deepest-match precedence and cumulative overlap rules.",
+      "sha256": "b6a4880d9dc6a3b0d9ad6c1be5e1c0333847282610aaadc715e41078411b3c64"
+    },
+    {
+      "path": "finstack-quant/scenarios/src/engine/instrument_shocks.rs",
+      "classification": "algorithm",
+      "records": [
+        "SCENARIOS-010",
+        "SCENARIOS-011"
+      ],
+      "reason": "Dispatches inventory shocks and applies model correlation changes with top-level selection, warning and count semantics.",
+      "sha256": "ccf041b84a46cd9b7b69c526d59f840d21f464d45fd5f25420be77a8d82756da"
+    },
+    {
+      "path": "finstack-quant/scenarios/src/engine/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "SCENARIOS-002",
+        "SCENARIOS-007",
+        "SCENARIOS-012",
+        "SCENARIOS-013"
+      ],
+      "reason": "Defines execution phases, preflights inventory, retains hazard source markets and chooses warning-versus-error/early-return paths.",
+      "sha256": "9b6e1abdd4deb83eca03c8e16a9a2bc987400c094d29ddd23d0d658290ee1c1a"
+    },
+    {
+      "path": "finstack-quant/scenarios/src/engine/tests.rs",
+      "classification": "test",
+      "records": [
+        "SCENARIOS-001",
+        "SCENARIOS-002",
+        "SCENARIOS-003",
+        "SCENARIOS-010",
+        "SCENARIOS-017"
+      ],
+      "reason": "Dedicated test module for composition, hierarchy, inventory validation, report units and model correlation routing.",
+      "sha256": "00a799a635f11bbde86e4cf5d71d03d9dd04b72af99637cba8f4f976e0d7be27"
+    },
+    {
+      "path": "finstack-quant/scenarios/src/engine/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "SCENARIOS-017"
+      ],
+      "reason": "Defines applied report semantics, deterministic dirty-set recording, effective date and complete canonical instrument-envelope conversion.",
+      "sha256": "262df59290cf6f236715e982f77a4ee6d832d11b7682d6ecf4e67deac8c9a181"
+    },
+    {
+      "path": "finstack-quant/scenarios/src/envelope.rs",
+      "classification": "algorithm",
+      "records": [
+        "SCENARIOS-001",
+        "SCENARIOS-017"
+      ],
+      "reason": "Selects strict versioned scenario decode followed by semantic validation, and delegates canonical content hashing.",
+      "sha256": "8e29902581083ce8fbd54c23d2a535df6c3b2da7c9eccc5251b87f42627b6b2e"
+    },
+    {
+      "path": "finstack-quant/scenarios/src/error.rs",
+      "classification": "support",
+      "records": [
+        "SCENARIOS-017"
+      ],
+      "reason": "Structured error constructors and public category mapping; no financial calculation or fallback choice.",
+      "sha256": "c56e94fd167b37779f432e7a2114525d713874592ceb79c6bcacdd167729a53f"
+    },
+    {
+      "path": "finstack-quant/scenarios/src/horizon.rs",
+      "classification": "algorithm",
+      "records": [
+        "SCENARIOS-013",
+        "SCENARIOS-015"
+      ],
+      "reason": "Builds projected horizon market, selects attribution request policy and computes guarded total/annualized/factor return ratios.",
+      "sha256": "167f55531156dca00d6df5124b30bfddb0815fcb865b57e98b479b2fcb3ca0c1"
+    },
+    {
+      "path": "finstack-quant/scenarios/src/lib.rs",
+      "classification": "support",
+      "records": [
+        "SCENARIOS-017"
+      ],
+      "reason": "Crate lint attributes, module visibility and public reexports only.",
+      "sha256": "d0123f0a220e07a0b4e6397f493a3ce6d9905c0f2c34f6c070f415b5cd08e4c5"
+    },
+    {
+      "path": "finstack-quant/scenarios/src/schema.rs",
+      "classification": "support",
+      "records": [
+        "SCENARIOS-017"
+      ],
+      "reason": "Publishes schema descriptors and illustrative examples, delegating schema mechanics to core; no scenario execution algorithm.",
+      "sha256": "99429182710dfa7940ce459f87e47b2ab9cffa42097fd7fdb7148c855b7bb1ba"
+    },
+    {
+      "path": "finstack-quant/scenarios/src/spec.rs",
+      "classification": "algorithm",
+      "records": [
+        "SCENARIOS-001"
+      ],
+      "reason": "Defines operation units/defaults, semantic input gates and stable-priority composition/overlap policy.",
+      "sha256": "723170aa765352b22a813adeff82b9ef3b7a63a6f40a55175d1749b1b07cd05f"
+    },
+    {
+      "path": "finstack-quant/scenarios/src/templates/json.rs",
+      "classification": "algorithm",
+      "records": [
+        "SCENARIOS-016"
+      ],
+      "reason": "Selects embedded stress documents and validates component identity/order, duplicate IDs and semantic scenario content.",
+      "sha256": "edd7722cabf2a6facd00126c33fface20323de82f9a16020f9b04032814fc48d"
+    },
+    {
+      "path": "finstack-quant/scenarios/src/templates/metadata.rs",
+      "classification": "support",
+      "records": [
+        "SCENARIOS-016"
+      ],
+      "reason": "Descriptive template metadata/enums and transport tests; no fitting or severity-calculation rule.",
+      "sha256": "166065085599ed38347671aacbca72ac1fa26e058dcedd6531f3ea311f717ea6"
+    },
+    {
+      "path": "finstack-quant/scenarios/src/templates/mod.rs",
+      "classification": "support",
+      "records": [
+        "SCENARIOS-016"
+      ],
+      "reason": "Template module declarations/reexports only.",
+      "sha256": "c016ff3717c7dbdcd4690b66de8b7b0639fb2abb7d5510a3ba7399b3fed8daeb"
+    },
+    {
+      "path": "finstack-quant/scenarios/src/templates/registry.rs",
+      "classification": "algorithm",
+      "records": [
+        "SCENARIOS-016"
+      ],
+      "reason": "Assembles fixed component-order composites with default policies, caches the registry result and resolves exact template/component selections.",
+      "sha256": "2750ff08115d1355f3904419b7f2f0e59756b5a57867746dfe5d56aa14c611bb"
+    },
+    {
+      "path": "finstack-quant/scenarios/src/utils.rs",
+      "classification": "algorithm",
+      "records": [
+        "SCENARIOS-006"
+      ],
+      "reason": "Computes bracketing interpolation weights, flat extrapolation and extrapolation-distance diagnostics.",
+      "sha256": "ceb3cad347474e3b5218e03349138d17c331889c71e54128a683e6a0d53b3be6"
+    },
+    {
+      "path": "finstack-quant/scenarios/src/warning.rs",
+      "classification": "support",
+      "records": [
+        "SCENARIOS-017"
+      ],
+      "reason": "Structured warning transport/display; financial warning conditions are owned by adapters and engine.",
+      "sha256": "0b8f30cd8ae2f2b194c7e9a50bafcb092d739929b39376089928f2902489bc82"
+    }
+  ]
+}

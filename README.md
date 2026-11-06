@@ -256,8 +256,10 @@ mise run ui-docs-build  # export the gallery
 
 ## Conventions
 
-These bite callers who assume otherwise. [`INVARIANTS.md`](INVARIANTS.md) is
-authoritative; this is the short form.
+These conventions affect callers. [`INVARIANTS.md`](INVARIANTS.md) retains
+their detailed cross-crate contracts and enforcement evidence, linked to the
+[accepted decisions](docs/decisions/README.md) that govern their scope. This is
+the short form.
 
 - **Numerics.** `Money` stores `rust_decimal::Decimal` plus a `Currency`.
   `Money::new` / `amount()` take and return `f64`; `Money::from_decimal` /

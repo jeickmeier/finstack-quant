@@ -1,0 +1,736 @@
+{
+  "scope": "core-numerics",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "CORE-NUMERICS-01",
+      "title": "Rate conversion and periodic z-spread application",
+      "path": "compounding.md"
+    },
+    {
+      "id": "CORE-NUMERICS-02",
+      "title": "Linear, log-linear and monotone Hermite interpolation",
+      "path": "value-interpolation.md"
+    },
+    {
+      "id": "CORE-NUMERICS-03",
+      "title": "Natural log-discount spline and Hagan\u2013West forward interpolation",
+      "path": "forward-interpolation.md"
+    },
+    {
+      "id": "CORE-NUMERICS-04",
+      "title": "Fixed and adaptive numerical integration",
+      "path": "quadrature.md"
+    },
+    {
+      "id": "CORE-NUMERICS-05",
+      "title": "Bracket search and Brent scalar root finding",
+      "path": "brent-root.md"
+    },
+    {
+      "id": "CORE-NUMERICS-06",
+      "title": "Damped nonlinear least squares and termination reporting",
+      "path": "levenberg-marquardt.md"
+    },
+    {
+      "id": "CORE-NUMERICS-07",
+      "title": "Positive-definite solves and semidefinite correlation factors",
+      "path": "matrix-factorization.md"
+    },
+    {
+      "id": "CORE-NUMERICS-08",
+      "title": "Explicit nearest-correlation projection",
+      "path": "nearest-correlation.md"
+    },
+    {
+      "id": "CORE-NUMERICS-09",
+      "title": "Compensated aggregation, online moments and R7 quantiles",
+      "path": "sample-statistics.md"
+    },
+    {
+      "id": "CORE-NUMERICS-10",
+      "title": "Close and OHLC realized variance estimators",
+      "path": "realized-variance.md"
+    },
+    {
+      "id": "CORE-NUMERICS-11",
+      "title": "Ledoit\u2013Wolf covariance shrinkage toward a scaled identity",
+      "path": "covariance-shrinkage.md"
+    },
+    {
+      "id": "CORE-NUMERICS-12",
+      "title": "Normal and Student-t functions and logarithmic Gaussian tails",
+      "path": "distribution-functions.md"
+    },
+    {
+      "id": "CORE-NUMERICS-13",
+      "title": "Full binomial probability mass by log recurrence",
+      "path": "binomial-mass.md"
+    },
+    {
+      "id": "CORE-NUMERICS-14",
+      "title": "Marsaglia\u2013Tsang Gamma sampling and beta-ratio fallback",
+      "path": "beta-gamma-sampling.md"
+    },
+    {
+      "id": "CORE-NUMERICS-15",
+      "title": "Chi-squared quantiles through logarithmic tail inversion",
+      "path": "chi-squared-inversion.md"
+    },
+    {
+      "id": "CORE-NUMERICS-16",
+      "title": "Feasible correlated Bernoulli joint laws",
+      "path": "correlated-bernoulli.md"
+    },
+    {
+      "id": "CORE-NUMERICS-17",
+      "title": "PCG normal draws, Brownian bridge ordering and Poisson counts",
+      "path": "pseudorandom-and-bridge.md"
+    },
+    {
+      "id": "CORE-NUMERICS-18",
+      "title": "Finite-period Sobol points and prefix-dependent scrambling",
+      "path": "sobol-sequences.md"
+    },
+    {
+      "id": "CORE-NUMERICS-19",
+      "title": "Fractional Brownian increment covariance",
+      "path": "fractional-covariance.md"
+    },
+    {
+      "id": "CORE-NUMERICS-20",
+      "title": "Simulation grids and event-to-step mapping",
+      "path": "time-grids.md"
+    },
+    {
+      "id": "CORE-NUMERICS-21",
+      "title": "Piecewise nonnegative coefficients and exponential variance integration",
+      "path": "piecewise-coefficients.md"
+    },
+    {
+      "id": "CORE-NUMERICS-22",
+      "title": "Scalar expression DAG evaluation and missing-value semantics",
+      "path": "expression-evaluation.md"
+    },
+    {
+      "id": "CORE-NUMERICS-23",
+      "title": "Rounding policy, zero tolerances and effective configuration",
+      "path": "rounding-and-config.md"
+    },
+    {
+      "id": "CORE-NUMERICS-24",
+      "title": "Numeric wire representations and canonical content identity",
+      "path": "numeric-wire-and-canonical.md"
+    },
+    {
+      "id": "CORE-NUMERICS-25",
+      "title": "Bounded contract loading, validation and deterministic diagnostics",
+      "path": "contracts-and-diagnostics.md"
+    },
+    {
+      "id": "CORE-NUMERICS-26",
+      "title": "Canonical schema publication and lossy LLM projection",
+      "path": "schema-publication.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/core/src/bin/gen_core_schemas.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-26"
+      ],
+      "reason": "Generator entry selects four owned schema roots, registry and index artifact, and propagates failures as CLI panics.",
+      "sha256": "f42019c60025ca3d7c544ed0605d87e4accfc9a5645d4c6472a06fd13d659ec6"
+    },
+    {
+      "path": "finstack-quant/core/src/canonical/value_serializer.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-24"
+      ],
+      "reason": "Recursive finite-number JSON serialization, integer/key range rules, ordered maps and raw JSON handling.",
+      "sha256": "706b7203f551f75dc2d64b7aaad68f2abbc8a73e897114b9b752cf2bf354d458"
+    },
+    {
+      "path": "finstack-quant/core/src/canonical.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-24"
+      ],
+      "reason": "Compact canonical encoding and domain/version-separated SHA-256 content hash.",
+      "sha256": "b8c93108a5d2da3a5b558a014045a4799f946ce4b4f57eb582c720e0fd45157c"
+    },
+    {
+      "path": "finstack-quant/core/src/config.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-23"
+      ],
+      "reason": "Rounding and scale defaults, absolute zero tolerances, extension key validation and metadata overlay precedence.",
+      "sha256": "231d5fb73a473e92172d4bebbfa6c7443e0b7a6b052788a135206d2ec87b52b9"
+    },
+    {
+      "path": "finstack-quant/core/src/contract/descriptor.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-25"
+      ],
+      "reason": "Strict version resolution, parse/version/structure order and located diagnostic construction.",
+      "sha256": "05b02b37fc4766b6385fe62771bbabddccb893cb83859110a869f4857e04f711"
+    },
+    {
+      "path": "finstack-quant/core/src/contract/diagnostics.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-25"
+      ],
+      "reason": "Bounded report truncation, retained-error replacement and conservative zero-cap failure classification.",
+      "sha256": "eee3947921b327f9776f47f99252db41d7d3a345c50010523854b6d433ed5116"
+    },
+    {
+      "path": "finstack-quant/core/src/contract/limits.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-25"
+      ],
+      "reason": "Default parse/collection/depth/diagnostic resource budgets and explicit overrides.",
+      "sha256": "b6be1c43ede50a874a40297cb507356b2214084c05029f774f3450a8ce5be1d0"
+    },
+    {
+      "path": "finstack-quant/core/src/contract/load.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-25"
+      ],
+      "reason": "String-aware depth precheck, byte cap, JSON parse and typed structure-error reporting.",
+      "sha256": "9bc03b61b89af89919bfdfa18b9faeaf5fe69c9b7c01991f6955dc0043caa167"
+    },
+    {
+      "path": "finstack-quant/core/src/contract/mod.rs",
+      "classification": "support",
+      "records": [
+        "CORE-NUMERICS-25"
+      ],
+      "reason": "Module declarations and reexports for contract vocabulary; no additional runtime decisions.",
+      "sha256": "055c8c1059c188ccb7dceee16be90b95352f7b91acf3757a30a09a4d7e8f6e68"
+    },
+    {
+      "path": "finstack-quant/core/src/embedded_registry.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-23"
+      ],
+      "reason": "Cached embedded parse/build or whole-document explicit config override, with no invalid-override fallback.",
+      "sha256": "aab6cb1e88a3c4ad168d6fbcc7d58167165bafdf678a3e60854c09410ceb0e84"
+    },
+    {
+      "path": "finstack-quant/core/src/error/inputs.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-24",
+        "CORE-NUMERICS-25"
+      ],
+      "reason": "Input error vocabulary and nonfinite kind classification; callers must establish nonfiniteness before classification.",
+      "sha256": "22465b912a21a88d19067c806da9c1417e8374551bb9c848abf243782270ae29"
+    },
+    {
+      "path": "finstack-quant/core/src/error/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-25"
+      ],
+      "reason": "Stable error-kind mapping, nested cause propagation/formatting and suggestion wrappers.",
+      "sha256": "3315c2fb5b175251e53931196b008c7c81da335d1c24ddbf0ee18bcff004b720"
+    },
+    {
+      "path": "finstack-quant/core/src/error/suggestions.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-25"
+      ],
+      "reason": "Unicode-lowercased substring/edit-distance filtering, stable ranking and top-three hints.",
+      "sha256": "b4c786c4087ef2628502d2ee4b60870c25c678cc8b63f34ebf1bd0a9a9b63257"
+    },
+    {
+      "path": "finstack-quant/core/src/explain.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-25"
+      ],
+      "reason": "Trace enablement defaults, capped entry retention and truncation flag; trace payload types.",
+      "sha256": "4d6a98e8d47b480789c38c0332de4dd03a43b5229e4b3abfc6496332710d1e28"
+    },
+    {
+      "path": "finstack-quant/core/src/expr/ast.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-22"
+      ],
+      "reason": "Scalar-supported function dispatch vocabulary and bit-pattern literal equality; no period-aware evaluation here.",
+      "sha256": "7115519d75004e839bb6a97022ce0e6cdda03f0baefa239e3be3b6bb668e0957"
+    },
+    {
+      "path": "finstack-quant/core/src/expr/context.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-22"
+      ],
+      "reason": "Exact column-name/index resolution and duplicate-name rejection.",
+      "sha256": "b155b6cb9f322b18cfb8cc770dba1e09ecb41fd688dbb25c6d4175398ec2d421"
+    },
+    {
+      "path": "finstack-quant/core/src/expr/dag.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-22"
+      ],
+      "reason": "Iterative depth-bounded postorder compilation, structural deduplication and nonrecursive rejected-tree disposal.",
+      "sha256": "ded3c467073e8c52ec063ef387c8c80fd03d1428205f971e8502787e5d9a0504"
+    },
+    {
+      "path": "finstack-quant/core/src/expr/eval.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-22"
+      ],
+      "reason": "Ordered arena DAG evaluation, column padding/truncation, IEEE operators and eager conditional selection.",
+      "sha256": "1ac353c6f2755b744e51f7e2271fbc482fc75d92fd35db73d9dab28c29b652f4"
+    },
+    {
+      "path": "finstack-quant/core/src/expr/eval_functions.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-22"
+      ],
+      "reason": "Elementwise scalar functions, constant round digits, invalid-argument NaN policy and clamp behavior.",
+      "sha256": "079f9b1ff3d8262509c4050a692bca62389d0bc15d79bfc335d8da27d06857b5"
+    },
+    {
+      "path": "finstack-quant/core/src/expr/mod.rs",
+      "classification": "support",
+      "records": [
+        "CORE-NUMERICS-22"
+      ],
+      "reason": "Scalar versus statements evaluator module documentation and public reexports; no separate kernel.",
+      "sha256": "396496aed618dd0057f5dca70a124e5ef3bc23ae073c9dd4f076ff3ddb4b5496"
+    },
+    {
+      "path": "finstack-quant/core/src/lib.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-25"
+      ],
+      "reason": "Crate exports/feature gates plus poison-lock recovery that keeps the inner protected value.",
+      "sha256": "236ee9e59c5e4e567082a317006356c5817fa5de59ea5983bc257afb91aa6058"
+    },
+    {
+      "path": "finstack-quant/core/src/math/compounding.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-01"
+      ],
+      "reason": "Continuous/periodic/simple rate-DF conversion, instantaneous spread mapping and periodic z-spread application.",
+      "sha256": "23cbe6c4823fb091b1aebc6d2159dedef58e430481329692fb8daa3f9a1304c1"
+    },
+    {
+      "path": "finstack-quant/core/src/math/distributions.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-13",
+        "CORE-NUMERICS-14",
+        "CORE-NUMERICS-15"
+      ],
+      "reason": "Binomial log-mass recurrence; Gamma rejection/Beta ratio with endpoint fallback; log-tail chi-square inversion.",
+      "sha256": "af03dae5eb90a881ec7a0caedf556d3364cf968a321d8e2a0a0633b070e711b8"
+    },
+    {
+      "path": "finstack-quant/core/src/math/fractional.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-19"
+      ],
+      "reason": "Hurst domain validation and dense four-corner fractional Brownian increment covariance.",
+      "sha256": "ebcd813ae9c63e9fd428c239224c64137564b352b1472de4bdcedf58a9d261a4"
+    },
+    {
+      "path": "finstack-quant/core/src/math/integration.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-04"
+      ],
+      "reason": "Fixed/adaptive Simpson and Gaussian quadrature, error-budget aggregation and normal-expectation scaling.",
+      "sha256": "e641ee743c5a1d3535d58f1e32d837183404d470bcfd7034b0a208c22d353806"
+    },
+    {
+      "path": "finstack-quant/core/src/math/interp/generic.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-02",
+        "CORE-NUMERICS-03"
+      ],
+      "reason": "Validated generic interpolation construction, serde reconstruction and strategy dispatch.",
+      "sha256": "16ecf9b6e6aa4d3ce2ce4202d5dc324bc1d6cb0d610dc386e61edaae315bc92e"
+    },
+    {
+      "path": "finstack-quant/core/src/math/interp/mod.rs",
+      "classification": "support",
+      "records": [
+        "CORE-NUMERICS-02",
+        "CORE-NUMERICS-03"
+      ],
+      "reason": "Interpolation module reexports and methodological descriptions; overbroad positive-forward claims recorded as discrepancies.",
+      "sha256": "cc6d452ae45dee1616b3fd29474714f51e805e45b031dd746933174699c73ada"
+    },
+    {
+      "path": "finstack-quant/core/src/math/interp/strategies.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-02",
+        "CORE-NUMERICS-03"
+      ],
+      "reason": "Linear/log-linear/PCHIP/natural log-DF/Hagan-West evaluation, derivatives and tails.",
+      "sha256": "fe0ff1bdc5dac555db9f02fb25523c4f5860b48849cec340d02592b3cd9dd157"
+    },
+    {
+      "path": "finstack-quant/core/src/math/interp/traits.rs",
+      "classification": "support",
+      "records": [
+        "CORE-NUMERICS-02",
+        "CORE-NUMERICS-03"
+      ],
+      "reason": "Raw-strategy interface/precondition declarations; no default numerical implementation.",
+      "sha256": "173e8588d7fec883f8175ab50ad54cb485e0d294d6dcdba10115c3c1c0e8f494"
+    },
+    {
+      "path": "finstack-quant/core/src/math/interp/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-02",
+        "CORE-NUMERICS-03"
+      ],
+      "reason": "Interpolation/validation/extrapolation defaults and runtime enum construction with forced strict log-domain policies.",
+      "sha256": "fc285aa08587422f06227cc61386467b8f4a54725e4f7bfa4cd8e7765eadd560"
+    },
+    {
+      "path": "finstack-quant/core/src/math/interp/utils.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-02",
+        "CORE-NUMERICS-03"
+      ],
+      "reason": "Finite/knot-gap/ordering checks, interval search, flat linear helper and monotonicity tolerance scan.",
+      "sha256": "ed8e59a66f4ee638115d2ed9a3d0971eb045f1a9e4dea2f5628e5303e1382a1f"
+    },
+    {
+      "path": "finstack-quant/core/src/math/linalg/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-07",
+        "CORE-NUMERICS-11"
+      ],
+      "reason": "PD/PSD factors and solves, eigen decomposition, correlation validation, dense factor application and Ledoit-Wolf shrinkage.",
+      "sha256": "7d50170bffaf5b4272251f63342d24ad7a3532e1c3ddb4b5d60d9529d7e11a13"
+    },
+    {
+      "path": "finstack-quant/core/src/math/linalg/nearest_correlation.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-08"
+      ],
+      "reason": "Explicit PSD/unit-diagonal alternating projection with Dykstra correction, fast path and final rescaling.",
+      "sha256": "da538a53168209fb2383e6612966f16c7d5e2a7a67b6006f144a9ccfa5e0c019"
+    },
+    {
+      "path": "finstack-quant/core/src/math/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-22",
+        "CORE-NUMERICS-23"
+      ],
+      "reason": "Half-away rounding, NaN-safe clamp, shared fixed zero tolerance and numerical-module exports.",
+      "sha256": "e68ecebfb4e5e841faf6c26a844290e161454df54281995a7a6bc35648f1720f"
+    },
+    {
+      "path": "finstack-quant/core/src/math/piecewise.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-21"
+      ],
+      "reason": "Validated right-continuous nonnegative coefficient steps and analytic exponentially weighted squared integral.",
+      "sha256": "d508eef74651971878355a7dd7cd07f7e7eb0ff16847cff74e85e26cf2119fcc"
+    },
+    {
+      "path": "finstack-quant/core/src/math/probability.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-16"
+      ],
+      "reason": "Bernoulli feasibility projection, near-degeneracy independence, joint/conditional probabilities and uniform sampling.",
+      "sha256": "d63d48a3df0706638733534664b6b67e7e38e6dac6e5a75424b8d9d4c362c82c"
+    },
+    {
+      "path": "finstack-quant/core/src/math/random/brownian_bridge.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-17"
+      ],
+      "reason": "Recursive midpoint plan and conditional Brownian-level construction on explicit nonuniform times; runtime after test helper inspected.",
+      "sha256": "8e72b85694fe738252468e9c75712f1886964a1f4ee204afdb4fcf9508a8e586"
+    },
+    {
+      "path": "finstack-quant/core/src/math/random/poisson.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-17"
+      ],
+      "reason": "Sequential low-intensity Poisson inversion with dependency-tail bracketing/binary-search path.",
+      "sha256": "47cb7f40d699ed1c91f07d28b49fc9f6b6e0e056abb1f5803a5caf6a0694176b"
+    },
+    {
+      "path": "finstack-quant/core/src/math/random/sobol.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-18"
+      ],
+      "reason": "Direction recurrence, finite-period index state/skip, prefix hash scrambling and midpoint inverse-normal mapping.",
+      "sha256": "a10be949407698dd33cfe083d9110aa986ea0e96c97bd2760a1dd3df905d2af7"
+    },
+    {
+      "path": "finstack-quant/core/src/math/random.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-17"
+      ],
+      "reason": "Seed/stream PCG64 construction, uniform draws and cached Box-Muller normal pairs.",
+      "sha256": "ebab8d74e6c6b8c62b8e697d0bd7dd38682d6e8f92aea34ae7c050d3ce9e48b9"
+    },
+    {
+      "path": "finstack-quant/core/src/math/solver.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-05"
+      ],
+      "reason": "Bounded bracket expansion and shared fallible/infallible Brent kernel with bracket-width termination.",
+      "sha256": "cb919b149369ad069e52b00c8a1bd61982931660842ca10eecef172e0945f66c"
+    },
+    {
+      "path": "finstack-quant/core/src/math/solver_multi.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-06"
+      ],
+      "reason": "LM residual/Jacobian evaluation, damped normal equations, trial acceptance and explicit termination statuses.",
+      "sha256": "543f91b81c8f87dbbe713f97b78a3ecffd07d7c616e9e91c9870ef202c0565b6"
+    },
+    {
+      "path": "finstack-quant/core/src/math/special_functions.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-12"
+      ],
+      "reason": "Dependency distribution wrappers, inverse-probability saturation, normal density and asymptotic logarithmic tail.",
+      "sha256": "71bb961422cfd37fd63617da5f047e2f3f2b5fcb70db55ddac87d31739ecfb33"
+    },
+    {
+      "path": "finstack-quant/core/src/math/stats.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-09",
+        "CORE-NUMERICS-10"
+      ],
+      "reason": "Online sample/population moments, merges, covariance/control beta, R7 quantiles, confidence intervals and five realized-variance variants.",
+      "sha256": "d6fa784977a885c19a78adf195714220c81e0fcd3f00ab3e9cf92233b4cb8224"
+    },
+    {
+      "path": "finstack-quant/core/src/math/summation.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-09"
+      ],
+      "reason": "Kahan and Neumaier compensation kernels; no finite-value filtering.",
+      "sha256": "923bc4dcbc9afaa444ed3aa65fe90550fed7e8ca5d2e5a08eccb544e2da63f9c"
+    },
+    {
+      "path": "finstack-quant/core/src/math/time_grid.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-20"
+      ],
+      "reason": "Uniform/custom/event-inserted grids, event filtering/deduplication and nearest-step time/date mapping.",
+      "sha256": "8c71ab04021148d31e93e6e9e7c3c3529f306be699b26ad8c730d685bc82b26b"
+    },
+    {
+      "path": "finstack-quant/core/src/math/units.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-23"
+      ],
+      "reason": "Canonical numeric representation constants for basis points and percentage conversion.",
+      "sha256": "1b2d89bab2fa2b200d8c72210a96184fbf5225d2518a53b2ffc85acebae7d099"
+    },
+    {
+      "path": "finstack-quant/core/src/parallel.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-25"
+      ],
+      "reason": "Native ordered parallel result collection versus WASM serial early error termination.",
+      "sha256": "3a535aa2d410f57bb2151e87e8b5da4a726345023e6fa1030aa8857ac7d3e028"
+    },
+    {
+      "path": "finstack-quant/core/src/schema/diagnostics.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-26"
+      ],
+      "reason": "Depth-four union failure expansion, reference traversal, const-tag branch selection and fewest-failures heuristic.",
+      "sha256": "d19d31368251407bfdf0d908d89c77a732c3e100c0c72a8ba16a53fba194128a"
+    },
+    {
+      "path": "finstack-quant/core/src/schema/externalize.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-26"
+      ],
+      "reason": "Annotation-stripped reference expansion, structural assertion comparison, external ref rewrite and reachable-def pruning.",
+      "sha256": "9703b78b362ca2032f7af58499099d5f4a5ca24dbd4f5421fc24b126a16d3511"
+    },
+    {
+      "path": "finstack-quant/core/src/schema/generator.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-26"
+      ],
+      "reason": "CLI modes, safe relative path/root ownership checks, deterministic bytes/index and stale artifact synchronization.",
+      "sha256": "5c2ef578e5d2bf7c1ff3f142f426f6711b87c4e81f69a16613233d2bf38fba4b"
+    },
+    {
+      "path": "finstack-quant/core/src/schema/llm.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-26"
+      ],
+      "reason": "Size-bounded reference inlining/handles, description transforms, enum/tuple/strict-object projection and intentionally lost assertions.",
+      "sha256": "4f54cba2d8c973d6eb15d5e76517452779177e6815d83169b6e1acf3b5620c8f"
+    },
+    {
+      "path": "finstack-quant/core/src/schema/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-26"
+      ],
+      "reason": "Schema artifact macro, owned artifact selection and runtime example generators after test-module declaration.",
+      "sha256": "9cf51eb646fc8ce95a2bb13e7bc2a117ea53db9310a8ded8303919997f018a02"
+    },
+    {
+      "path": "finstack-quant/core/src/schema/registry.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-26"
+      ],
+      "reason": "Schema metadata/defaults, generation/packager order, example rounding, one-branch collapse and artifact selector.",
+      "sha256": "b0f982bd93003a13af68ccc7bc484d0d150a035e901a67a26487fd8a598675c0"
+    },
+    {
+      "path": "finstack-quant/core/src/schema/tests.rs",
+      "classification": "test",
+      "records": [
+        "CORE-NUMERICS-26"
+      ],
+      "reason": "Dedicated schema test fixtures/cases for externalization, projection, paths and generator byte-drift behavior; no runtime owner.",
+      "sha256": "39f2d86344ac724c183f566b69b1e08709cb522e90faebcc7b39877f6996e328"
+    },
+    {
+      "path": "finstack-quant/core/src/serde_guard.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-25"
+      ],
+      "reason": "Flattened unknown-field guard rejects first unexpected key instead of silently ignoring it.",
+      "sha256": "4f8d62b7ec1bb92e768edac3d821f707026b879079f67966ab04c1d1e63f7b95"
+    },
+    {
+      "path": "finstack-quant/core/src/table.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-25"
+      ],
+      "reason": "Constructor infers row count and rejects duplicate names/unequal lengths; serde/public fields bypass that constructor.",
+      "sha256": "b0e6386d3c39ea2e17777e4ad098e29fefa9f27eb9f3f1fc9ac2c30c16454158"
+    },
+    {
+      "path": "finstack-quant/core/src/validation.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-25"
+      ],
+      "reason": "Shared finite/range/date/currency/recovery validators and registry identifier/provenance-presence checks.",
+      "sha256": "a8c7790f9edcb4a3352f19f028a54243fcd9fe64d721bd74cbca89d8cdf394e0"
+    },
+    {
+      "path": "finstack-quant/core/src/wire/bounded_f64.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-24"
+      ],
+      "reason": "Finite bounded f64 wire constructors and symmetric serialize/deserialize validation helpers.",
+      "sha256": "b0b33efe1baa0fee7c4ff4793a05a18ddbac5e6a6e53008f96fd994728cc8a07"
+    },
+    {
+      "path": "finstack-quant/core/src/wire/counts_wire.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-24"
+      ],
+      "reason": "32-bit output count range enforcement with wider host-size input acceptance.",
+      "sha256": "db6b8209ce06eee303d446d22957911f395cfc9a5f68143a63a85518a9c5137d"
+    },
+    {
+      "path": "finstack-quant/core/src/wire/date_wire.rs",
+      "classification": "support",
+      "records": [
+        "CORE-NUMERICS-24"
+      ],
+      "reason": "Transparent time::Date serde wrapper and date schema annotation; no additional calendar arithmetic.",
+      "sha256": "2018f47e412f76fb7d7e7fe0339d3b7a6a24e818150b99f5a92fc25688f7badd"
+    },
+    {
+      "path": "finstack-quant/core/src/wire/decimal_wire.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-24"
+      ],
+      "reason": "Decimal-as-string and optional Decimal wire conversion preserving decimal representation.",
+      "sha256": "7a7d70e49b2a19ed33912bcf26ac1d31c72638c9f3b977e5ad67c8736c43ea24"
+    },
+    {
+      "path": "finstack-quant/core/src/wire/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-24"
+      ],
+      "reason": "Strict v1 schema version and serde-backed label/tag parsing after test-module declaration.",
+      "sha256": "78fe6ef6aec927386a48d7ab345f9fbfe554c0b88533971754ed38aed60568b3"
+    },
+    {
+      "path": "finstack-quant/core/src/wire/non_finite.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-NUMERICS-24"
+      ],
+      "reason": "Explicit inf/-inf/nan sentinel classification, normalization and sequence adapters.",
+      "sha256": "e6faac4cb8ef3e83a947f0f42a66ec48f6d292fc87acc3016db6a6d212d312cd"
+    },
+    {
+      "path": "finstack-quant/core/src/wire/tests.rs",
+      "classification": "test",
+      "records": [
+        "CORE-NUMERICS-24"
+      ],
+      "reason": "Dedicated wire fixtures/cases for sentinel roundtrip/rejection, bounds, decimal and schema representation.",
+      "sha256": "66117b821597ab1252b170e3324e06fe95d8f276870b38a0c318fa3f6e038e74"
+    }
+  ]
+}

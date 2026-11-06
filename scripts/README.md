@@ -45,11 +45,12 @@ document each input. These enforce that on each host surface.
 
 | Script | Enforces | Driven by |
 | --- | --- | --- |
+| `check_methodology_coverage.py` | Exact source ownership and record linkage for the [audited crates](../docs/decisions/financial/README.md). `--verify-source` checks audited hashes; `--write` regenerates the readable source map. This is documentation coverage, not numerical certification. | `uv run --no-sync python scripts/check_methodology_coverage.py --verify-source` |
 | `check_public_api_input_docs.py` | Rust `# Arguments` coverage for every publicly reachable function, associated function, trait method, and constructor. Builds rustdoc JSON via `cargo public-api`, which needs the nightly toolchain `mise.toml` provisions. | `mise run rust-doc` |
 | `check_python_api_input_docs.py` | Substantive summaries plus argument/return/raises/example sections on public classes and callables in `.pyi` stubs and pure-Python modules. NumPy- and Google-style sections both parse. | `mise run python-lint`, `mise run python-doc` |
 | `check_pyo3_doc_placeholders.py` | Rejects placeholder prose left in public PyO3 runtime doc comments under `finstack-quant-py/src/bindings/`. | `mise run python-lint`, `mise run python-doc` |
 | `check_wasm_api_input_docs.py` | `@param` coverage in the Rust doc comments under `finstack-quant-wasm/src/api/` attached to `#[wasm_bindgen]` exports — the text wasm-bindgen copies into the generated TypeScript declarations. The comment must precede the attribute or it is dropped. The hand-written facade declaration `finstack-quant-wasm/index.d.ts` is checked separately by `npm run docs:check`. | `mise run wasm-doc` |
-| `check_deprecated_annotations.py` | The INVARIANTS.md §7.2 contract: every `#[deprecated]` carries `since = "X.Y.Z"`, a replacement or retention rationale, and a planned removal release. Bare `#[deprecated]` always fails. | `mise run rust-doc` |
+| `check_deprecated_annotations.py` | Legacy annotation-format checks: every `#[deprecated]` carries `since = "X.Y.Z"`, a replacement or retention rationale, and a planned removal release. Bare annotations fail. These checks do not implement ADR 0004's development replacement policy; [reconciliation is pending](../docs/decisions/FOLLOW_UPS.md#reconciliation-items). | `mise run rust-doc` |
 | `run_python_stub_doctests.py` | Extracts `>>>` examples from `.pyi` and module docstrings and executes them against the compiled `finstack_quant` package, since stubs are not importable. | `mise run python-test --doctest` (via `finstack-quant-py/tests/test_stub_doctests.py`) |
 
 ## Generated artifacts and wire contracts

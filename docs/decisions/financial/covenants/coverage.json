@@ -1,0 +1,242 @@
+{
+  "scope": "covenants",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "COVENANTS-01",
+      "title": "Contract terms, identity and metric selection",
+      "path": "01-terms-and-metric-selection.md"
+    },
+    {
+      "id": "COVENANTS-02",
+      "title": "Threshold schedules, windows and waivers",
+      "path": "02-effective-terms.md"
+    },
+    {
+      "id": "COVENANTS-03",
+      "title": "Numeric compliance, denominator validity and headroom",
+      "path": "03-comparison-and-headroom.md"
+    },
+    {
+      "id": "COVENANTS-04",
+      "title": "Scope selection, springing activation and descriptive covenants",
+      "path": "04-activation-and-scope.md"
+    },
+    {
+      "id": "COVENANTS-05",
+      "title": "Breach episodes, cure deadlines and historical state",
+      "path": "05-breach-and-cure.md"
+    },
+    {
+      "id": "COVENANTS-06",
+      "title": "Consequence conversion, ordering and retry semantics",
+      "path": "06-consequence-execution.md"
+    },
+    {
+      "id": "COVENANTS-07",
+      "title": "Dated observations, period calendars and series evaluation",
+      "path": "07-dated-series.md"
+    },
+    {
+      "id": "COVENANTS-08",
+      "title": "Deterministic forecasts, effective-term grouping and breach selection",
+      "path": "08-forecast-composition.md"
+    },
+    {
+      "id": "COVENANTS-09",
+      "title": "Lognormal overlay and analytic marginal breach probability",
+      "path": "09-analytic-probability.md"
+    },
+    {
+      "id": "COVENANTS-10",
+      "title": "Path-consistent Monte Carlo, antithetic units and sampling error",
+      "path": "10-monte-carlo.md"
+    },
+    {
+      "id": "COVENANTS-11",
+      "title": "Deal-package assembly and embedded consequence assumptions",
+      "path": "11-package-templates.md"
+    },
+    {
+      "id": "COVENANTS-12",
+      "title": "Report semantics, metadata and canonical JSON boundaries",
+      "path": "12-reports-and-json.md"
+    },
+    {
+      "id": "COVENANTS-13",
+      "title": "Schema registry, strictness and validation boundaries",
+      "path": "13-schema-contracts.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/covenants/src/bin/gen_schemas.rs",
+      "classification": "support",
+      "records": [
+        "COVENANTS-13"
+      ],
+      "reason": "CLI delegation to core schema generation with covenant output directories and registry; no independent financial calculation.",
+      "sha256": "11becfc44ed7162b0cac2d88d876df16b4350db00e5038063a8b7a10d9ce734e"
+    },
+    {
+      "path": "finstack-quant/covenants/src/engine/covenant_engine.rs",
+      "classification": "algorithm",
+      "records": [
+        "COVENANTS-01",
+        "COVENANTS-02",
+        "COVENANTS-03",
+        "COVENANTS-04",
+        "COVENANTS-05",
+        "COVENANTS-06",
+        "COVENANTS-08",
+        "COVENANTS-12",
+        "COVENANTS-13"
+      ],
+      "reason": "Engine and history validation, full-set window replacement, waiver precedence, exact compliance, scoped episode/cure transitions and transactional per-action consequences.",
+      "sha256": "a8e1feb51a7c7433d12fa5e73fa8b6cc54b3914d31e8b3394018809596d2aee0"
+    },
+    {
+      "path": "finstack-quant/covenants/src/engine/helpers.rs",
+      "classification": "algorithm",
+      "records": [
+        "COVENANTS-01",
+        "COVENANTS-03",
+        "COVENANTS-04",
+        "COVENANTS-06"
+      ],
+      "reason": "Exact metric precedence, springing/comparison rules, invalid leverage conversion, epsilon-scaled headroom and consequence mutator boundary.",
+      "sha256": "d8240499d26e0ba879567eeb120fe8cbc6c25c04c1bb8ac17ed6f2c0fbcfa21b"
+    },
+    {
+      "path": "finstack-quant/covenants/src/engine/mod.rs",
+      "classification": "support",
+      "records": [
+        "COVENANTS-01",
+        "COVENANTS-03",
+        "COVENANTS-04",
+        "COVENANTS-05"
+      ],
+      "reason": "Module declarations/reexports and convention documentation; remaining code is embedded unit-test evidence, with no additional production algorithm.",
+      "sha256": "e1cef0ac61d77a50f98168bb56e2ee42169bfec8d842742147e99eb656a91993"
+    },
+    {
+      "path": "finstack-quant/covenants/src/engine/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "COVENANTS-01",
+        "COVENANTS-02",
+        "COVENANTS-03",
+        "COVENANTS-04",
+        "COVENANTS-05",
+        "COVENANTS-06",
+        "COVENANTS-11",
+        "COVENANTS-13"
+      ],
+      "reason": "Financial variant dispatch, label and metric identities, default cure/scope/denominator policies, domain validation and serde state contracts.",
+      "sha256": "2d1e88c84294d30824fc526a8a0bc2868b1721cae367fd992e1c523fcfb945eb"
+    },
+    {
+      "path": "finstack-quant/covenants/src/forward.rs",
+      "classification": "algorithm",
+      "records": [
+        "COVENANTS-02",
+        "COVENANTS-03",
+        "COVENANTS-04",
+        "COVENANTS-08",
+        "COVENANTS-09",
+        "COVENANTS-10",
+        "COVENANTS-12",
+        "COVENANTS-13"
+      ],
+      "reason": "Period/config validation, effective-term groups, deterministic and GBM marginal risk, PCG antithetic Monte Carlo, estimator error and breach-output selection.",
+      "sha256": "764bff49951506f4328812be42d35974ad1c0bb3e35834bba8d27687f1083de5"
+    },
+    {
+      "path": "finstack-quant/covenants/src/json.rs",
+      "classification": "algorithm",
+      "records": [
+        "COVENANTS-01",
+        "COVENANTS-12",
+        "COVENANTS-13"
+      ],
+      "reason": "Typed JSON/business-validation boundaries, checked canonical representation and JSON-versus-source metric evaluation semantics.",
+      "sha256": "61a22632d585088a4d9805225e0ec21541b27f05b64f46da2d6b07bb6e64b3b0"
+    },
+    {
+      "path": "finstack-quant/covenants/src/lib.rs",
+      "classification": "support",
+      "records": [
+        "COVENANTS-01",
+        "COVENANTS-13"
+      ],
+      "reason": "Crate module/export wiring and public conventions/doctest inclusion; no independent numerical transformation.",
+      "sha256": "0883595faf83bbb18f1662fef7cf1d2a04fe9a10a2e9fae8ab408033ed952728"
+    },
+    {
+      "path": "finstack-quant/covenants/src/metric.rs",
+      "classification": "algorithm",
+      "records": [
+        "COVENANTS-01",
+        "COVENANTS-13"
+      ],
+      "reason": "Exact metric map lookup/replacement, missing-input errors and strict numeric bare-map JSON parser distinct from derived wrapped schema.",
+      "sha256": "325e508c130d7e247a9e1a394a806c9349ddf3783cd74c1dfc7540d1ad244131"
+    },
+    {
+      "path": "finstack-quant/covenants/src/report.rs",
+      "classification": "algorithm",
+      "records": [
+        "COVENANTS-12",
+        "COVENANTS-13"
+      ],
+      "reason": "Pass/fail and optional assessment field construction with default-config metadata; unchecked public builder and result serialization contract.",
+      "sha256": "34c23f2b5b3d8f9fbee6cccdfd5bce79acf48c4fca8eb46ecf798f87c9c9ae3d"
+    },
+    {
+      "path": "finstack-quant/covenants/src/schedule.rs",
+      "classification": "algorithm",
+      "records": [
+        "COVENANTS-02",
+        "COVENANTS-13"
+      ],
+      "reason": "Checked finite unique-date schedule construction/deserialization, chronological sort and last-effective-value lookup.",
+      "sha256": "a39d12393a75262764d3d8ac48983091da2848031af1b8baedffd87174700a93"
+    },
+    {
+      "path": "finstack-quant/covenants/src/schema.rs",
+      "classification": "algorithm",
+      "records": [
+        "COVENANTS-13"
+      ],
+      "reason": "Ten host root contracts, input/output/component roles and schema export selection; semantic validation remains in producing/evaluation APIs.",
+      "sha256": "7c4a715653efba69103aaac06d9121fe6246fb902fd20055f45110442f90309c"
+    },
+    {
+      "path": "finstack-quant/covenants/src/series.rs",
+      "classification": "algorithm",
+      "records": [
+        "COVENANTS-04",
+        "COVENANTS-07",
+        "COVENANTS-08",
+        "COVENANTS-12",
+        "COVENANTS-13"
+      ],
+      "reason": "Sorted daily series construction, duplicate rejection, period-date reconstruction, on-demand finite reads, stateless ordered evaluation and explicit stochastic anchor requirement.",
+      "sha256": "379fd3bb775045b9d71b2592df8c45478acb67b36f0a8dfc8981645ab584cc33"
+    },
+    {
+      "path": "finstack-quant/covenants/src/templates.rs",
+      "classification": "algorithm",
+      "records": [
+        "COVENANTS-01",
+        "COVENANTS-04",
+        "COVENANTS-06",
+        "COVENANTS-11",
+        "COVENANTS-13"
+      ],
+      "reason": "Four package dispatch paths with nonnegative threshold validation, metric/label/frequency/cure/consequence defaults and strict tagged wire form.",
+      "sha256": "fa301c9c1d62c66e60d14e621a9991ef40ced25bd1acb2fca9e4d283a8f8646a"
+    }
+  ]
+}

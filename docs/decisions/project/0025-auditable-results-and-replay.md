@@ -71,7 +71,6 @@ information for every workflow.
 
 [Market state snapshots](../../../finstack-quant/core/src/market_data/context/state_serde.rs)
 and [portfolio replay](../../../finstack-quant/portfolio/src/replay.rs) provide
-building blocks. Inventory the required evidence and coverage for saved or
-shared audit/replay results, including immutable input references, effective
-configuration, build identity, and relevant stochastic settings. This ADR
-does not add an archive service or certify universal replay completeness.
+building blocks. This ADR does not add an archive service or certify universal
+replay completeness. Evidence and workflow-coverage work is tracked in
+[FOLLOW_UPS.md](../FOLLOW_UPS.md#implementation-and-lifecycle-follow-up).

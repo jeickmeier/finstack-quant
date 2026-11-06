@@ -1,0 +1,449 @@
+{
+  "scope": "models-numerical",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "MODELS-NUMERICAL-001",
+      "title": "CRR and strike-centered Leisen\u2013Reimer construction",
+      "path": "equity-binomial-construction.md"
+    },
+    {
+      "id": "MODELS-NUMERICAL-002",
+      "title": "Escrowed cash dividends and lattice exercise ordering",
+      "path": "dividends-and-lattice-exercise.md"
+    },
+    {
+      "id": "MODELS-NUMERICAL-003",
+      "title": "Tree discounting, OAS conversion and backward induction",
+      "path": "tree-discounting-and-induction.md"
+    },
+    {
+      "id": "MODELS-NUMERICAL-004",
+      "title": "Ho\u2013Lee additive lattice and curve-fitting drift",
+      "path": "ho-lee-curve-fit.md"
+    },
+    {
+      "id": "MODELS-NUMERICAL-005",
+      "title": "BDT lognormal lattice with clamped node rates",
+      "path": "bdt-lognormal-curve-fit.md"
+    },
+    {
+      "id": "MODELS-NUMERICAL-006",
+      "title": "Black\u2013Karasinski capped log-rate trinomial",
+      "path": "black-karasinski-trinomial.md"
+    },
+    {
+      "id": "MODELS-NUMERICAL-007",
+      "title": "Hull\u2013White event-aligned trinomial and affine node bonds",
+      "path": "hull-white-event-grid-and-affine-bonds.md"
+    },
+    {
+      "id": "MODELS-NUMERICAL-008",
+      "title": "Rates/credit marginal calibration, hazard floor and variance loss",
+      "path": "rates-credit-marginal-calibration.md"
+    },
+    {
+      "id": "MODELS-NUMERICAL-009",
+      "title": "Bernoulli correlation coupling and reproducible lattice paths",
+      "path": "rates-credit-coupling-and-sampling.md"
+    },
+    {
+      "id": "MODELS-NUMERICAL-010",
+      "title": "Joint credit rollback and reset-to-payment coupon folding",
+      "path": "rates-credit-coupon-folding.md"
+    },
+    {
+      "id": "MODELS-NUMERICAL-011",
+      "title": "PDE grid mapping, interpolation and coordinate Greeks",
+      "path": "pde-grids-interpolation-and-greeks.md"
+    },
+    {
+      "id": "MODELS-NUMERICAL-012",
+      "title": "Nonuniform diffusion, monotone convection and mixed derivatives",
+      "path": "pde-spatial-stencils.md"
+    },
+    {
+      "id": "MODELS-NUMERICAL-013",
+      "title": "PDE boundary elimination and reconstruction",
+      "path": "pde-boundary-elimination.md"
+    },
+    {
+      "id": "MODELS-NUMERICAL-014",
+      "title": "Theta time marching, startup damping and Thomas solves",
+      "path": "theta-time-march-and-thomas.md"
+    },
+    {
+      "id": "MODELS-NUMERICAL-015",
+      "title": "Post-step penalty projection for early exercise",
+      "path": "pde-exercise-projection.md"
+    },
+    {
+      "id": "MODELS-NUMERICAL-016",
+      "title": "Modified Craig\u2013Sneyd ADI and split startup damping",
+      "path": "mcs-adi-time-march.md"
+    },
+    {
+      "id": "MODELS-NUMERICAL-017",
+      "title": "Black\u2013Scholes and Heston coefficient bridges",
+      "path": "black-scholes-and-heston-pde-bridges.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/models/src/lib.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Module and feature exports plus invalid_input Validation-error construction; no numerical selection or calculation.",
+      "sha256": "5a1c0644d3739f7f7a5fae6e54e9c335cbe3a751612ba3fbb6ba6545b4875a3c"
+    },
+    {
+      "path": "finstack-quant/models/src/pde/adi.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-NUMERICAL-012",
+        "MODELS-NUMERICAL-013",
+        "MODELS-NUMERICAL-014",
+        "MODELS-NUMERICAL-016"
+      ],
+      "reason": "MCS predictor/correctors, explicit mixed operator, split startup halfsteps, line solves, cached affine boundaries and corner reconstruction.",
+      "sha256": "97d09841f7ed1036935ee07c109c3dfbf55f30f8ee509043033e7c88a7c877fe"
+    },
+    {
+      "path": "finstack-quant/models/src/pde/boundary.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-NUMERICAL-013",
+        "MODELS-NUMERICAL-017"
+      ],
+      "reason": "Boundary variants and stable exponential-coordinate extrapolation ratios used by log-spot closures.",
+      "sha256": "6678257f7101a1802f17b5fac1e99e3ac3fe25aa57eba7325bd8bc8c6ddbd3c7"
+    },
+    {
+      "path": "finstack-quant/models/src/pde/bridge.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-NUMERICAL-017",
+        "MODELS-NUMERICAL-013"
+      ],
+      "reason": "Black-Scholes log-spot coefficients, vanilla payoffs and option-direction far-field selection.",
+      "sha256": "83e81785b97afe98c73c7ee137e4f4cc0333756d740e2cb59d9381f25a1aecf3"
+    },
+    {
+      "path": "finstack-quant/models/src/pde/bridge2d.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-NUMERICAL-017",
+        "MODELS-NUMERICAL-013",
+        "MODELS-NUMERICAL-016"
+      ],
+      "reason": "Heston log-spot/variance generator, variance flooring in diffusion and linear variance boundary choice.",
+      "sha256": "bec5c9cfdbee1fcdad9fc799516603c52d26c78f70a7cb45b036f1c944d60d42"
+    },
+    {
+      "path": "finstack-quant/models/src/pde/exercise.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-NUMERICAL-015"
+      ],
+      "reason": "Finite penalty post-step projection, exercise-time test, payoff validation and all adjacent exercise/continuation transitions.",
+      "sha256": "94342a867237776768d3d0146dee3c98286b9cb08cbf01768a1941b5f1b71ea6"
+    },
+    {
+      "path": "finstack-quant/models/src/pde/grid.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-NUMERICAL-011"
+      ],
+      "reason": "Uniform/custom/sinh grid construction and validation, endpoint-clamped linear interpolation, nearest/interval search policies.",
+      "sha256": "564ea3ab940450e4bad9aef5482217beb6f865f2a2a5fe1253588b004c6442a7"
+    },
+    {
+      "path": "finstack-quant/models/src/pde/grid2d.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-NUMERICAL-011"
+      ],
+      "reason": "Cartesian grid geometry and boundary-clamped bilinear interpolation in x-major storage.",
+      "sha256": "56d91b76fed5ccef16b6605fd03b8e83422114784c4c1759672b5ab23918770a"
+    },
+    {
+      "path": "finstack-quant/models/src/pde/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "PDE module visibility and public reexports only; prose reviewed separately from active engine selection.",
+      "sha256": "25ea50663461f1a640103e73cd5f8c14911c94e1dfe7660892807930b0cb74e6"
+    },
+    {
+      "path": "finstack-quant/models/src/pde/operator.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-NUMERICAL-012",
+        "MODELS-NUMERICAL-013",
+        "MODELS-NUMERICAL-014"
+      ],
+      "reason": "Nonuniform diffusion/drift stencils and monotonicity switch, affine boundary elimination, Thomas elimination and pivot checks.",
+      "sha256": "1b4586d3d01c882d17fac86a84c0d0f06eaf1627bd140f65f29366ca845357d4"
+    },
+    {
+      "path": "finstack-quant/models/src/pde/operator2d.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-NUMERICAL-012",
+        "MODELS-NUMERICAL-013",
+        "MODELS-NUMERICAL-016"
+      ],
+      "reason": "Directional assembly with half reaction/source and averaged-spacing four-corner mixed derivative.",
+      "sha256": "65632260f49edd320361e1dd74b8eae6a5c576c263f947ab61f883076ac278a1"
+    },
+    {
+      "path": "finstack-quant/models/src/pde/problem.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-NUMERICAL-012",
+        "MODELS-NUMERICAL-014",
+        "MODELS-NUMERICAL-017"
+      ],
+      "reason": "Coefficient/boundary trait fixes PDE operator conventions, zero source default and false time-homogeneity default affecting assembly.",
+      "sha256": "6a0891c452af6017d5335b9ec7dd1589dcdeeaaf6f440007e8de0f2c050198ef"
+    },
+    {
+      "path": "finstack-quant/models/src/pde/problem2d.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-NUMERICAL-012",
+        "MODELS-NUMERICAL-016",
+        "MODELS-NUMERICAL-017"
+      ],
+      "reason": "2D coefficient and mixed-derivative convention, four edge callbacks, zero source and no-cache default.",
+      "sha256": "d3e77e0982c8a0e4f4fcd91d839848eeef54391e78289cb6161fa15abeba5549"
+    },
+    {
+      "path": "finstack-quant/models/src/pde/solver.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-NUMERICAL-011",
+        "MODELS-NUMERICAL-013",
+        "MODELS-NUMERICAL-014",
+        "MODELS-NUMERICAL-015"
+      ],
+      "reason": "Builder selection, backward initialization/march, exercise eligibility/alignment, boundaries, nearest-node delta/gamma and input failures.",
+      "sha256": "1986897dd7c1cf00d30bdc8eb961644e711696b9c936a40602c6cea0ffa2a7b7"
+    },
+    {
+      "path": "finstack-quant/models/src/pde/solver2d.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-NUMERICAL-011",
+        "MODELS-NUMERICAL-013",
+        "MODELS-NUMERICAL-016"
+      ],
+      "reason": "2D terminal initialization, boundary enforcement and ADI march; nearest-y x Greeks and maturity/step validation.",
+      "sha256": "be2f5ff51f52b51fe24ba75818f154ea73ebdf883575ad98f281284ca92f4ee2"
+    },
+    {
+      "path": "finstack-quant/models/src/pde/stepper.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-NUMERICAL-014"
+      ],
+      "reason": "Theta endpoint discretization, finite theta clamp, full-step implicit startup, diffusion-only CFL check, time levels and cache policy.",
+      "sha256": "d119e844821c4159d9a36c90ecbe46cce51e922527d2379f99ed9b3dce638e0d"
+    },
+    {
+      "path": "finstack-quant/models/src/schema.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Hand-written SchemaArtifact registration table for model payload types under json-schema; schema assembly metadata, not generated code or pricing algorithms.",
+      "sha256": "fe75a3620bfeb60514aac2517f1ecfd8dd7d57a6a8e9821edcb17ed294801b90"
+    },
+    {
+      "path": "finstack-quant/models/src/trees/binomial_tree.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-NUMERICAL-001",
+        "MODELS-NUMERICAL-002",
+        "MODELS-NUMERICAL-003"
+      ],
+      "reason": "CRR/LR construction, odd-step conversion, zero-volatility path, dividend reserve and European/American/Bermudan payoff decisions.",
+      "sha256": "1574ae608953ed1f931fc9c26b45ffc720e544d142b931eaa99f96b27cb5d1d9"
+    },
+    {
+      "path": "finstack-quant/models/src/trees/hull_white_tree.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-NUMERICAL-003",
+        "MODELS-NUMERICAL-007"
+      ],
+      "reason": "Event/volatility-knot grid, variable-spacing nearest-mean probabilities, alpha fit, state prices, affine node bonds, rollback and snapping.",
+      "sha256": "1fe2b930389243b8ac7168fb9d4ec017af5557d12402425d53a014bba5c9e5e4"
+    },
+    {
+      "path": "finstack-quant/models/src/trees/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Public tree-family module declarations without runtime dispatch or defaults.",
+      "sha256": "11b2407890375469cd8b139e810657deeaf5e130c9648f48c51e0c7419ab7b38"
+    },
+    {
+      "path": "finstack-quant/models/src/trees/short_rate_tree/bdt.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-NUMERICAL-005"
+      ],
+      "reason": "Lognormal binary row scale fit with node clamps, diagnostic clamp tracking and relative-DF quality gate.",
+      "sha256": "a17327220b2e1f54c67375431ca6aec2ce22b5e3a83c7e309dca7c93ff11d4ee"
+    },
+    {
+      "path": "finstack-quant/models/src/trees/short_rate_tree/black_karasinski.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-NUMERICAL-006"
+      ],
+      "reason": "Capped trinomial moments and shifted branches in log rates, additive-log drift root fit and repricing.",
+      "sha256": "833bedceebd29b8ce07a4cc907337950589a510389a4fd757591b27206c3ba7a"
+    },
+    {
+      "path": "finstack-quant/models/src/trees/short_rate_tree/config.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-NUMERICAL-003",
+        "MODELS-NUMERICAL-004",
+        "MODELS-NUMERICAL-005",
+        "MODELS-NUMERICAL-006"
+      ],
+      "reason": "Economic model variants and volatility units, Ho-Lee default, compounding selection and configurable curve-fit gate.",
+      "sha256": "810a90988936feb9c13c2dfb91e47da9f6ee2e7eb6142479d0879adf095fa609"
+    },
+    {
+      "path": "finstack-quant/models/src/trees/short_rate_tree/ho_lee.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-NUMERICAL-004"
+      ],
+      "reason": "Normal binary rows, analytical/Brent drift fit, stored-lattice repricing and extreme node-DF rejection.",
+      "sha256": "e3282b96739bdd6fc97aa22cc92c390042673164fe64d247190d665edd0dbee2"
+    },
+    {
+      "path": "finstack-quant/models/src/trees/short_rate_tree/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Short-rate implementation modules, constants/types reexports and test-module declaration; no dispatch algorithm.",
+      "sha256": "be848dea5fb5de637b0b1e803af3418798392918dc9a7696e98398b449e536f2"
+    },
+    {
+      "path": "finstack-quant/models/src/trees/short_rate_tree/pricing.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-NUMERICAL-003",
+        "MODELS-NUMERICAL-006"
+      ],
+      "reason": "Separate capped BK rollback and shared binary rollback; per-node OAS quote conversion, compounding and callback state.",
+      "sha256": "f8b658bc01cb29ed3dca947d9a8ca3348a51a05df7f8de0c15f7a545f3f3ffa1"
+    },
+    {
+      "path": "finstack-quant/models/src/trees/short_rate_tree/tests.rs",
+      "classification": "test",
+      "records": [
+        "MODELS-NUMERICAL-003",
+        "MODELS-NUMERICAL-004",
+        "MODELS-NUMERICAL-005",
+        "MODELS-NUMERICAL-006"
+      ],
+      "reason": "Test-only curves/valuators and assertions for calibration/compounding/model dispatch, OU limits, error paths, OAS and bit pins; no production implementation.",
+      "sha256": "99231e01e502a9b851b1c571013753aaa1a03864fe36671c0c5f64d00147a36f"
+    },
+    {
+      "path": "finstack-quant/models/src/trees/short_rate_tree/tree.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-NUMERICAL-004",
+        "MODELS-NUMERICAL-005",
+        "MODELS-NUMERICAL-006"
+      ],
+      "reason": "Input/target validation, transactional model dispatch, calibration quality threshold, lattice geometry and node/time access errors.",
+      "sha256": "194388d1221cfe027fd44be92488402c14d5975c4b376975500d044f3b74fd51"
+    },
+    {
+      "path": "finstack-quant/models/src/trees/tree_framework.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-NUMERICAL-001",
+        "MODELS-NUMERICAL-003"
+      ],
+      "reason": "Compounding discount/inverse fallback policy, CRR factors and drift changes, callback node state and binary backward induction.",
+      "sha256": "1caabb87477b9cb2e66fdad7814ab3f970f1b2358f514046670a576e5518a724"
+    },
+    {
+      "path": "finstack-quant/models/src/trees/two_factor_rates_credit/band_table.rs",
+      "classification": "support",
+      "records": [
+        "MODELS-NUMERICAL-009"
+      ],
+      "reason": "Generic flat storage/index lookup for per-step cached bands; no truncation, probability weighting or financial interpolation.",
+      "sha256": "f890ad53d2cda48e2db33671de9b39917da6c2994e9d4c87c1b6477505f4d396"
+    },
+    {
+      "path": "finstack-quant/models/src/trees/two_factor_rates_credit/calibration.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-NUMERICAL-008",
+        "MODELS-NUMERICAL-009"
+      ],
+      "reason": "Conditional marginal targets and validation, normal/floored drift calibration including numerical fallbacks, variance-loss and correlation feasibility calculations.",
+      "sha256": "8b5d82632c4d51bee03719f945cd1e92a25a516939c45832af85aff889048e34"
+    },
+    {
+      "path": "finstack-quant/models/src/trees/two_factor_rates_credit/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-NUMERICAL-008",
+        "MODELS-NUMERICAL-009",
+        "MODELS-NUMERICAL-010"
+      ],
+      "reason": "Conditional-target/config economic defaults, kappa cap, affine factor-row evaluation, node-coupon domain, floor/variance/correlation diagnostics and cache band policy.",
+      "sha256": "89b08000b2445cc8e5f0e50f329af640ad1f390d8447b0f9455578eb68c83ad3"
+    },
+    {
+      "path": "finstack-quant/models/src/trees/two_factor_rates_credit/pricing.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-NUMERICAL-010",
+        "MODELS-NUMERICAL-009"
+      ],
+      "reason": "Joint OAS rollback, floored callback states, risk-free forward increments and risky reset-folded unit claims before callback survival/exercise.",
+      "sha256": "907d37e436a118cf7c6d79cffe7cb9b592bce792f605c37987e2261a2e441e44"
+    },
+    {
+      "path": "finstack-quant/models/src/trees/two_factor_rates_credit/sampling.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-NUMERICAL-008",
+        "MODELS-NUMERICAL-009",
+        "MODELS-NUMERICAL-010"
+      ],
+      "reason": "Philox stream/resumption/antithetics, Frechet Bernoulli coupling, effective node discount/survival/default terms and conditional rate-marginal unit-claim rollback.",
+      "sha256": "4a467492e326ddceab27f83ebfd353623f9d6ea3542dc77bbe09e9bd1034d279"
+    },
+    {
+      "path": "finstack-quant/models/src/trees/two_factor_rates_credit/tests.rs",
+      "classification": "test",
+      "records": [
+        "MODELS-NUMERICAL-008",
+        "MODELS-NUMERICAL-009",
+        "MODELS-NUMERICAL-010"
+      ],
+      "reason": "Test-only conditional-curve fixtures and calibration, floor/variance, Frechet, sampled-path and coupon-folding assertions; no production algorithm.",
+      "sha256": "4b497f421b1a9efb5d3365deba1c45094b29e80655289de0c951a78a6620c41e"
+    },
+    {
+      "path": "finstack-quant/models/src/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "MODELS-NUMERICAL-001"
+      ],
+      "reason": "Call/put intrinsic payoff, European exercise default and option-market validation domains; financially material shared contract.",
+      "sha256": "d729a100d0bd0d8c9bcff5d5cad8be8a7d5b08870ff53f308b2d3b177324366a"
+    }
+  ]
+}

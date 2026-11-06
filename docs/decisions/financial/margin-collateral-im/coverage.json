@@ -1,0 +1,471 @@
+{
+  "scope": "margin-collateral-im",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "MARGIN-COLLATERAL-IM-001",
+      "title": "Registry composition and contractual defaults",
+      "path": "01-registry-and-defaults.md"
+    },
+    {
+      "id": "MARGIN-COLLATERAL-IM-002",
+      "title": "SIMM parameter completeness and correlation validation",
+      "path": "02-simm-parameter-validation.md"
+    },
+    {
+      "id": "MARGIN-COLLATERAL-IM-003",
+      "title": "SIMM sensitivity identity, scaling and netting",
+      "path": "03-sensitivity-inputs.md"
+    },
+    {
+      "id": "MARGIN-COLLATERAL-IM-004",
+      "title": "SIMM interest-rate delta and vega aggregation",
+      "path": "04-simm-interest-rate.md"
+    },
+    {
+      "id": "MARGIN-COLLATERAL-IM-005",
+      "title": "SIMM qualifying-credit issuer and sector aggregation",
+      "path": "05-simm-qualifying-credit.md"
+    },
+    {
+      "id": "MARGIN-COLLATERAL-IM-006",
+      "title": "SIMM nonqualifying residual credit",
+      "path": "06-simm-nonqualifying-credit.md"
+    },
+    {
+      "id": "MARGIN-COLLATERAL-IM-007",
+      "title": "SIMM residual equity delta and vega",
+      "path": "07-simm-equity.md"
+    },
+    {
+      "id": "MARGIN-COLLATERAL-IM-008",
+      "title": "SIMM FX delta and pair-vega aggregation",
+      "path": "08-simm-fx.md"
+    },
+    {
+      "id": "MARGIN-COLLATERAL-IM-009",
+      "title": "SIMM commodity bucket netting and dependence",
+      "path": "09-simm-commodity.md"
+    },
+    {
+      "id": "MARGIN-COLLATERAL-IM-010",
+      "title": "SIMM expiry scaling and curvature aggregation",
+      "path": "10-simm-curvature.md"
+    },
+    {
+      "id": "MARGIN-COLLATERAL-IM-011",
+      "title": "SIMM component assembly, MPOR scaling and diagnostics",
+      "path": "11-simm-total-and-mpor.md"
+    },
+    {
+      "id": "MARGIN-COLLATERAL-IM-012",
+      "title": "Schedule initial margin from notional and maturity",
+      "path": "12-schedule-notional.md"
+    },
+    {
+      "id": "MARGIN-COLLATERAL-IM-013",
+      "title": "Schedule IM net-to-gross reduction",
+      "path": "13-schedule-net-gross.md"
+    },
+    {
+      "id": "MARGIN-COLLATERAL-IM-014",
+      "title": "External CCP IM and conservative exposure proxy",
+      "path": "14-ccp-external-and-proxy.md"
+    },
+    {
+      "id": "MARGIN-COLLATERAL-IM-015",
+      "title": "Collateral eligibility and haircut initial margin",
+      "path": "15-collateral-eligibility-and-haircuts.md"
+    },
+    {
+      "id": "MARGIN-COLLATERAL-IM-016",
+      "title": "Collateral concentration reporting",
+      "path": "16-collateral-concentration.md"
+    },
+    {
+      "id": "MARGIN-COLLATERAL-IM-017",
+      "title": "CSA selection and separate IM collateral terms",
+      "path": "17-csa-selection-and-im-terms.md"
+    },
+    {
+      "id": "MARGIN-COLLATERAL-IM-018",
+      "title": "Signed variation margin, MTA and rounding",
+      "path": "18-variation-margin.md"
+    },
+    {
+      "id": "MARGIN-COLLATERAL-IM-019",
+      "title": "VM call schedules and agreed-collateral replay",
+      "path": "19-margin-dates-and-replay.md"
+    },
+    {
+      "id": "MARGIN-COLLATERAL-IM-020",
+      "title": "Repo margin balance and interest cashflows",
+      "path": "20-repo-margin-cashflows.md"
+    },
+    {
+      "id": "MARGIN-COLLATERAL-IM-021",
+      "title": "Collateral adequacy, funding spread and haircut sensitivity",
+      "path": "21-collateral-metrics.md"
+    },
+    {
+      "id": "MARGIN-COLLATERAL-IM-022",
+      "title": "Sensitivity table conversion and margin wire boundaries",
+      "path": "22-wire-tables-and-provenance.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/margin/src/bin/gen_schemas.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "CLI argument parsing and delegation to the core schema generator; no owned financial calculation.",
+      "sha256": "0599b378ae0bc356d27ea5c5cab1433451ac547a3f5224481b93374a85e467b5"
+    },
+    {
+      "path": "finstack-quant/margin/src/calculators/im/clearing.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-COLLATERAL-IM-014"
+      ],
+      "reason": "CCP name dispatch, external amount precedence, MPOR metadata and conservative exposure-rate proxy.",
+      "sha256": "3a52f2f572d7f5878f288aac3c28fd41693aae1b2d89cbe52f6d83a2bc11c0c4"
+    },
+    {
+      "path": "finstack-quant/margin/src/calculators/im/haircut.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-COLLATERAL-IM-015"
+      ],
+      "reason": "Strict maturity/rating eligibility, FX mismatch, collateral exposure base and haircut IM.",
+      "sha256": "7118b8ae6ff13ae9e6d0c531f1fd3a31f505abee9227dda42b8a87220c68564b"
+    },
+    {
+      "path": "finstack-quant/margin/src/calculators/im/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-COLLATERAL-IM-012",
+        "MARGIN-COLLATERAL-IM-014"
+      ],
+      "reason": "Explicit IM exposure-base requirement and absolute-exposure conservative multiplication; external source defaults.",
+      "sha256": "dccc464e172da321d54e0078715da6c15b8cb9274426c0de2745f4fc810fa711"
+    },
+    {
+      "path": "finstack-quant/margin/src/calculators/im/schedule.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-COLLATERAL-IM-012",
+        "MARGIN-COLLATERAL-IM-013"
+      ],
+      "reason": "Maturity/class schedule selection, absolute notional margin and single net-to-gross reduction.",
+      "sha256": "96cc18687e4c4cbb64c92cadcd3a62876277aadf0ea524f6215f48c426a21cc3"
+    },
+    {
+      "path": "finstack-quant/margin/src/calculators/im/simm/curvature.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-COLLATERAL-IM-010"
+      ],
+      "reason": "Expiry scaling before factor netting, squared correlations, residual charges and theta/lambda curvature.",
+      "sha256": "c9380ade674fed8671df44a5daa2212565843f65c9b0f59f719ccdfa84a32ca3"
+    },
+    {
+      "path": "finstack-quant/margin/src/calculators/im/simm.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-COLLATERAL-IM-002",
+        "MARGIN-COLLATERAL-IM-004",
+        "MARGIN-COLLATERAL-IM-005",
+        "MARGIN-COLLATERAL-IM-006",
+        "MARGIN-COLLATERAL-IM-007",
+        "MARGIN-COLLATERAL-IM-008",
+        "MARGIN-COLLATERAL-IM-009",
+        "MARGIN-COLLATERAL-IM-010",
+        "MARGIN-COLLATERAL-IM-011"
+      ],
+      "reason": "Historical parameter selection and every class delta/vega, concentration, aggregation, MPOR and diagnostic path.",
+      "sha256": "b7d61817d0ad0ce4f6db2dc8419f79f98882c4aa5e497a8b18e26bf9cff119ce"
+    },
+    {
+      "path": "finstack-quant/margin/src/calculators/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Module declarations and public calculator/result re-exports.",
+      "sha256": "07af08be5d2e24772c91ab2292ac4b94b031d6d297b1db39959082b7785bc03f"
+    },
+    {
+      "path": "finstack-quant/margin/src/calculators/traits.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-COLLATERAL-IM-011",
+        "MARGIN-COLLATERAL-IM-022"
+      ],
+      "reason": "IM result approximation defaults and 10-day SIMM diagnostic/result contract.",
+      "sha256": "7f352f875f876f1d4db988ddc918bc746458485f43651e404d4ad324282a250e"
+    },
+    {
+      "path": "finstack-quant/margin/src/calculators/vm.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-COLLATERAL-IM-018",
+        "MARGIN-COLLATERAL-IM-019"
+      ],
+      "reason": "Signed VM diagnostics/direction, Following/business-day dates and agreed-collateral replay.",
+      "sha256": "fdd9bae06b045fd01851439ee519a274ec23f330a40214428b0752de5df1649b"
+    },
+    {
+      "path": "finstack-quant/margin/src/constants.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-COLLATERAL-IM-003",
+        "MARGIN-COLLATERAL-IM-011",
+        "MARGIN-COLLATERAL-IM-015"
+      ],
+      "reason": "Published approximation, tenor/unit, historical input-grid and haircut-horizon constants.",
+      "sha256": "c9f54e417de4e41668936d65732d883868db2043d5fb3a9e5e4da501eae7a799"
+    },
+    {
+      "path": "finstack-quant/margin/src/lib.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Crate lint policy, module declarations, public re-exports and README doctest carrier.",
+      "sha256": "9b17e06f9ba597d61faa65ef83f439d3b3676da8376787e3e75864acef54d3ed"
+    },
+    {
+      "path": "finstack-quant/margin/src/metrics/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-COLLATERAL-IM-021"
+      ],
+      "reason": "Adequacy/zero-denominator ratios, signed excess, annual funding spread and linear haircut01.",
+      "sha256": "d058f5c8b8a3761077f8199485802a4c445e56860148681cc633d26f1a3e08c5"
+    },
+    {
+      "path": "finstack-quant/margin/src/registry/embedded.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-COLLATERAL-IM-001"
+      ],
+      "reason": "Selects the five compile-time financial parameter assets and combines them into registry sections.",
+      "sha256": "16528a29c5a0c7632a02c93957366fcc76da6821b7cdf22f265945f9a05f5133"
+    },
+    {
+      "path": "finstack-quant/margin/src/registry/merge.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-COLLATERAL-IM-001"
+      ],
+      "reason": "Economically material recursive-object overlay and whole-array/scalar replacement semantics.",
+      "sha256": "b4e507a5ae738ebf292bfef420dd914eba0db2d40b59660dc04ab12539f4e0c4"
+    },
+    {
+      "path": "finstack-quant/margin/src/registry/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-COLLATERAL-IM-001",
+        "MARGIN-COLLATERAL-IM-002",
+        "MARGIN-COLLATERAL-IM-012",
+        "MARGIN-COLLATERAL-IM-014",
+        "MARGIN-COLLATERAL-IM-015",
+        "MARGIN-COLLATERAL-IM-017"
+      ],
+      "reason": "Parameter/default parsing, lookup/fallback, scalar/table/PSD domains, aliases and defaults-to-currency conversion.",
+      "sha256": "28c1d456d5c3d0d8f5cd0ce349d601220c5e47c99d7ea13f65f700e2a9f3ec7e"
+    },
+    {
+      "path": "finstack-quant/margin/src/registry/validation.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-COLLATERAL-IM-001",
+        "MARGIN-COLLATERAL-IM-002",
+        "MARGIN-COLLATERAL-IM-015"
+      ],
+      "reason": "Distinct nonnegative rate/weight versus bounded haircut validation semantics.",
+      "sha256": "aea5915102e32d12b41f4c6f42bed132a9919c707458c00a0dc365d0feb25d7d"
+    },
+    {
+      "path": "finstack-quant/margin/src/registry/wire.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-COLLATERAL-IM-001",
+        "MARGIN-COLLATERAL-IM-002"
+      ],
+      "reason": "Closed registry wire shapes, optional unused version tags and defaulted/missing table fields.",
+      "sha256": "4e96226b9fb181fb83f62982c4a7b734581ff151416f4dfdcb7f8b4a9ff9dc94"
+    },
+    {
+      "path": "finstack-quant/margin/src/schema.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-COLLATERAL-IM-020",
+        "MARGIN-COLLATERAL-IM-021",
+        "MARGIN-COLLATERAL-IM-022"
+      ],
+      "reason": "Versioned financial envelope shape boundary, schema examples/claims and generated publication selection.",
+      "sha256": "d1a48d7757133689a0346ac7d335050a2a9fdac61ce69f3c618b6a02a8754c0a"
+    },
+    {
+      "path": "finstack-quant/margin/src/table.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-COLLATERAL-IM-003",
+        "MARGIN-COLLATERAL-IM-022"
+      ],
+      "reason": "SIMM/FRTB factor encoding, sorted table export, additive row reconstruction and financial metadata defaults.",
+      "sha256": "fd3bdd2138d5192abde84a7d19dcf8f659c3337ee4da0d2cc365069aead7a6a5"
+    },
+    {
+      "path": "finstack-quant/margin/src/traits.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-COLLATERAL-IM-003",
+        "MARGIN-COLLATERAL-IM-012",
+        "MARGIN-COLLATERAL-IM-014",
+        "MARGIN-COLLATERAL-IM-017"
+      ],
+      "reason": "Marginable capability and explicit exposure-base absence semantics governing calculator inputs.",
+      "sha256": "5b9e0a73643d21429a935576992a163792186c8c4a4fd4353908d90e797e6bf8"
+    },
+    {
+      "path": "finstack-quant/margin/src/types/call.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-COLLATERAL-IM-018",
+        "MARGIN-COLLATERAL-IM-019",
+        "MARGIN-COLLATERAL-IM-020"
+      ],
+      "reason": "Transfer direction classification, default event fields and elapsed calendar-day settlement diagnostic.",
+      "sha256": "512e2488f31d50ad56d22fcf3dca1b4ef9d91cdf38a4f4490a8f59473262f8ed"
+    },
+    {
+      "path": "finstack-quant/margin/src/types/collateral.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-COLLATERAL-IM-001",
+        "MARGIN-COLLATERAL-IM-015",
+        "MARGIN-COLLATERAL-IM-016"
+      ],
+      "reason": "Collateral defaults, maturity tolerance, ordered helper lookup, additive haircuts and row-level concentration reports.",
+      "sha256": "fa95c93e078b278d96051161ef21ae25398edbd893a312167b76651d609f4709"
+    },
+    {
+      "path": "finstack-quant/margin/src/types/csa.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-COLLATERAL-IM-001",
+        "MARGIN-COLLATERAL-IM-017",
+        "MARGIN-COLLATERAL-IM-018",
+        "MARGIN-COLLATERAL-IM-019"
+      ],
+      "reason": "Contract/default constructor composition, election overrides, calendar validation and separate IM term application.",
+      "sha256": "7807b1c23a79b61b4ee734132a362cee480f7fa56d087db3ca4b8e8ab3ec392d"
+    },
+    {
+      "path": "finstack-quant/margin/src/types/enums.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-COLLATERAL-IM-017",
+        "MARGIN-COLLATERAL-IM-020"
+      ],
+      "reason": "Financial methodology, clearing and cadence selections/defaults and exact string contract.",
+      "sha256": "3f62adab236984237b6f1e82456342f0918f269cca8c30fe9da3b9d157f60a23"
+    },
+    {
+      "path": "finstack-quant/margin/src/types/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-COLLATERAL-IM-017",
+        "MARGIN-COLLATERAL-IM-019"
+      ],
+      "reason": "Currency-specific default CSA calendar selection including weekends-only fallback.",
+      "sha256": "2d5d29e310e70b5a45c9292c5866c99b5fa45755fb2034c7a6e6dc00e23a0c10"
+    },
+    {
+      "path": "finstack-quant/margin/src/types/netting.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-COLLATERAL-IM-017"
+      ],
+      "reason": "Distinct bilateral counterparty/CSA and cleared CCP-only grouping identity contract.",
+      "sha256": "fe195b66529855094eba6c8b1e2b10632ef1f0fcb34a78c8147088bf3c935a38"
+    },
+    {
+      "path": "finstack-quant/margin/src/types/otc.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-COLLATERAL-IM-005",
+        "MARGIN-COLLATERAL-IM-006",
+        "MARGIN-COLLATERAL-IM-017"
+      ],
+      "reason": "Cleared/bilateral/default selection, no-IM preservation and mandatory SIMM credit classification boundary.",
+      "sha256": "c0f3e77b872714b27b29ba2581e132f0677bd7a51ee7a2b7dbd00874d75df877"
+    },
+    {
+      "path": "finstack-quant/margin/src/types/repo_cashflows.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-COLLATERAL-IM-020"
+      ],
+      "reason": "Collateral-margin recursion, business-day settlements, prior-balance interest and cashflow direction mapping.",
+      "sha256": "f20bc3a35823b7f4fa7499b4230e9e514cbeea9d58ec97524189015385939910"
+    },
+    {
+      "path": "finstack-quant/margin/src/types/repo_margin.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-COLLATERAL-IM-020"
+      ],
+      "reason": "Repo active-type defaults, target/trigger/deficit/excess formulas and substitution/interest elections.",
+      "sha256": "17d910b948ad21fe06961800babf4244963e2709a0668996a47c11616b5f3aa6"
+    },
+    {
+      "path": "finstack-quant/margin/src/types/serde_validation.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-COLLATERAL-IM-001",
+        "MARGIN-COLLATERAL-IM-015",
+        "MARGIN-COLLATERAL-IM-017",
+        "MARGIN-COLLATERAL-IM-022"
+      ],
+      "reason": "Wire-time haircut/maturity/MPOR/deadline range guards distinct from direct and registry construction.",
+      "sha256": "fc3aef1ba5883083d389441ee3bc5c88639f245e474d308fa0cfcd323391f595"
+    },
+    {
+      "path": "finstack-quant/margin/src/types/simm_curvature.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-COLLATERAL-IM-003",
+        "MARGIN-COLLATERAL-IM-010"
+      ],
+      "reason": "Curvature financial dimension validation, FX-pair canonicalization and fixed expiry-day conversion.",
+      "sha256": "33354cb959746f842518f700bcdbc4107e31480c36d001e9d0efa262b8552da1"
+    },
+    {
+      "path": "finstack-quant/margin/src/types/simm_types.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-COLLATERAL-IM-003",
+        "MARGIN-COLLATERAL-IM-004",
+        "MARGIN-COLLATERAL-IM-005",
+        "MARGIN-COLLATERAL-IM-006",
+        "MARGIN-COLLATERAL-IM-007",
+        "MARGIN-COLLATERAL-IM-008",
+        "MARGIN-COLLATERAL-IM-009",
+        "MARGIN-COLLATERAL-IM-010",
+        "MARGIN-COLLATERAL-IM-022"
+      ],
+      "reason": "Signed sensitivity inputs, validation, classification, add/merge/scale behavior and canonical JSON.",
+      "sha256": "30b0cf87e7cfa350e2353715627d33ecdcd78657c2cd243234d4339583365699"
+    },
+    {
+      "path": "finstack-quant/margin/src/types/thresholds.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-COLLATERAL-IM-017",
+        "MARGIN-COLLATERAL-IM-018"
+      ],
+      "reason": "VM support/MTA/rounding, IM one-way threshold/MTA mechanics and methodology default choice.",
+      "sha256": "d4b99fb8ffb0238d56b8e3fd4d8324e9ffb02533cfe161159d84faec8f99024a"
+    }
+  ]
+}

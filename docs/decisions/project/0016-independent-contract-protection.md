@@ -56,13 +56,8 @@ authorization to change a settled decision.
 This is an accepted enforcement requirement, not a claim that repository
 permissions or a trusted-baseline check have been configured.
 
-The existing [parity backlog test](../../../finstack-quant-py/tests/parity/test_parity_ledger.py)
-reads its ceiling from the same candidate
-[ledger](../../../finstack-quant-py/parity_contract.toml). Raising both can pass
-that individual check. Generation checks in [mise.toml](../../../mise.toml)
-verify source/output consistency; they do not establish change authorization.
-
-[CONTRIBUTING.md](../../../CONTRIBUTING.md) documents a single-maintainer setup
-without required approving reviews, and [CODEOWNERS](../../../.github/CODEOWNERS)
-notes the limitation when the owner authors the change. Live repository
-settings have not been verified or changed by this documentation task.
+The [parity tests](../../../finstack-quant-py/tests/parity/test_parity_ledger.py)
+and generation checks in [mise.toml](../../../mise.toml) are evidence locations;
+passing candidate-tree consistency checks does not establish independent
+authorization. Implementation gaps and repository-protection verification are
+tracked in [FOLLOW_UPS.md](../FOLLOW_UPS.md#implementation-and-lifecycle-follow-up).

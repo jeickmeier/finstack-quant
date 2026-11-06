@@ -64,6 +64,10 @@ repos:
     rev: v0.43.0
     hooks:
       - id: markdownlint-fix
+        # Unpinned, nodeenv installs "latest" from nodejs.org. That index
+        # currently leads with the Node 27 alpha, which nodeenv 1.10 cannot
+        # parse, so Lint dies before any hook runs. mise already provides Node.
+        language_version: system
         # Disabled rules:
         # MD013: line length, MD033: inline HTML, MD041: first line heading
         # MD024: duplicate headings, MD040: fenced code language

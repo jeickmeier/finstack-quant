@@ -58,3 +58,6 @@ ADR 0016.
 - [Generation tasks](../../../mise.toml) include `gen-check` and schema checks.
 - [ADR 0004](../project/0004-development-compatibility.md) records the
   development-only replacement policy and required pre-release reconsideration.
+- [ADR 0047](../architecture/0047-credit-factor-wire-and-validation-contract.md)
+  applies this contract to the `CreditFactorModel` wire format, schema marker,
+  closed root, open diagnostics extension, and semantic validation boundary.

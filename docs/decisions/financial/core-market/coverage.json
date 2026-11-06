@@ -1,0 +1,734 @@
+{
+  "scope": "core-market",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "CORE-MARKET-01",
+      "title": "Discount factors, zero rates, and relative discounting",
+      "path": "discount-evaluation.md"
+    },
+    {
+      "id": "CORE-MARKET-02",
+      "title": "Term-forward projection and arithmetic forward averages",
+      "path": "forward-projection.md"
+    },
+    {
+      "id": "CORE-MARKET-03",
+      "title": "Bump units, continuous zero/forward shocks, and transform composition",
+      "path": "rate-shocks.md"
+    },
+    {
+      "id": "CORE-MARKET-04",
+      "title": "Piecewise-constant hazard, survival, and conditional default probability",
+      "path": "hazard-survival.md"
+    },
+    {
+      "id": "CORE-MARKET-05",
+      "title": "Stored CDS quote interpolation and synthetic hazard shocks",
+      "path": "hazard-quotes-and-risk.md"
+    },
+    {
+      "id": "CORE-MARKET-06",
+      "title": "Curve calibration recipe semantics and replay boundaries",
+      "path": "calibration-provenance.md"
+    },
+    {
+      "id": "CORE-MARKET-07",
+      "title": "Nelson\u2013Siegel and Svensson curve evaluation",
+      "path": "parametric-discount.md"
+    },
+    {
+      "id": "CORE-MARKET-08",
+      "title": "Signed forward-price and volatility-index level curves",
+      "path": "price-curves.md"
+    },
+    {
+      "id": "CORE-MARKET-09",
+      "title": "Basis-spread level interpolation and rolling",
+      "path": "basis-spreads.md"
+    },
+    {
+      "id": "CORE-MARKET-10",
+      "title": "Projected CPI, continuous-time lag, CAGR, and inflation shocks",
+      "path": "inflation-projection.md"
+    },
+    {
+      "id": "CORE-MARKET-11",
+      "title": "Observed reference CPI, calendar lag, and seasonality",
+      "path": "inflation-observations.md"
+    },
+    {
+      "id": "CORE-MARKET-12",
+      "title": "Scalar observations, time-series interpolation, and exact fixings",
+      "path": "scalar-series-and-fixings.md"
+    },
+    {
+      "id": "CORE-MARKET-13",
+      "title": "Dividend event representation and admissibility",
+      "path": "dividend-events.md"
+    },
+    {
+      "id": "CORE-MARKET-14",
+      "title": "Volatility quote grids, convention metadata, and bounded shocks",
+      "path": "volatility-grids-and-shocks.md"
+    },
+    {
+      "id": "CORE-MARKET-15",
+      "title": "FX ATM, risk-reversal, and butterfly quote admissibility",
+      "path": "fx-delta-quotes.md"
+    },
+    {
+      "id": "CORE-MARKET-16",
+      "title": "SABR parameter grids and materialized expiry slices",
+      "path": "sabr-cube-data.md"
+    },
+    {
+      "id": "CORE-MARKET-17",
+      "title": "Pointwise and interval forward-variance curves",
+      "path": "forward-variance.md"
+    },
+    {
+      "id": "CORE-MARKET-18",
+      "title": "Base-correlation interpolation, shape diagnostics, and clipping",
+      "path": "base-correlation.md"
+    },
+    {
+      "id": "CORE-MARKET-19",
+      "title": "Credit-index constituent coverage, weights, and fallback inputs",
+      "path": "credit-index-composition.md"
+    },
+    {
+      "id": "CORE-MARKET-20",
+      "title": "Market context selection, ordered shocks, curve rolls, and snapshot rebinding",
+      "path": "context-lifecycle.md"
+    },
+    {
+      "id": "CORE-MARKET-21",
+      "title": "Hierarchical scenario targeting and overlap resolution",
+      "path": "hierarchy-selection.md"
+    },
+    {
+      "id": "CORE-MARKET-22",
+      "title": "Curve, inflation, FX, and scalar market-change measurement",
+      "path": "market-change-measurement.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/core/src/market_data/bumps.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-03",
+        "CORE-MARKET-05",
+        "CORE-MARKET-08",
+        "CORE-MARKET-10",
+        "CORE-MARKET-12",
+        "CORE-MARKET-14",
+        "CORE-MARKET-18",
+        "CORE-MARKET-20"
+      ],
+      "reason": "Inspected standard-unit resolution, finite and bucket-order validation, half/full triangular weight with 1e-10 width floor, bump constructors and market-target dispatch data; later cfg(test) modules are tests only.",
+      "sha256": "d6ae7869dbbc346ba7b4baa0944e9b84b2d150a7151b3229bc1cba6c8a25c4a8"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/context/curve_storage.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-03",
+        "CORE-MARKET-05",
+        "CORE-MARKET-08",
+        "CORE-MARKET-09",
+        "CORE-MARKET-18",
+        "CORE-MARKET-20"
+      ],
+      "reason": "Inspected per-variant roll and bump dispatch, spread-risk selection for hazards, ID-preserving reconstruction, unchanged correlation on roll, and unsupported basis/parametric bump branches.",
+      "sha256": "b21441c99a7bb281b12de2ff7c31d95615a7218fc2a5341773653d3a2786fed9"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/context/getters.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-19",
+        "CORE-MARKET-20"
+      ],
+      "reason": "Inspected exact typed curve lookup, Price versus VolIndex kind discrimination, missing/wrong-type errors, and dedicated surface/index namespaces; no nearest-ID fallback.",
+      "sha256": "681028b03a6f445adae6663bd8fa8e1fd128b0df83a848444d1b2762305b3475"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/context/insert.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-19",
+        "CORE-MARKET-20"
+      ],
+      "reason": "Inspected replacement/insertion semantics, canonical credit-index reference rebinding, reference-state construction and credit-composite invalidation trigger.",
+      "sha256": "fabb9e0092945360a449a1ceaa253bdf7d2aaad239e92961b7cdd40e9fabed8d"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/context/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-19",
+        "CORE-MARKET-20"
+      ],
+      "reason": "Inspected same-currency FX bypass, dated default-policy rate conversion, canonical composite rebinding, failed-composite removal, and map/namespace ownership.",
+      "sha256": "885f40a5d74f11de943269fdd417650e24ebeee14d95736778286002a5f892df"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/context/ops_bump.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-03",
+        "CORE-MARKET-05",
+        "CORE-MARKET-08",
+        "CORE-MARKET-12",
+        "CORE-MARKET-14",
+        "CORE-MARKET-18",
+        "CORE-MARKET-20"
+      ],
+      "reason": "Inspected ordered copy-on-write batch composition, namespace precedence, FX percent conversion, decimal scratch-price bump, saved-state/node reversion and credit rebinding.",
+      "sha256": "584b784c31929ea3a0cc3c36b68e01cfc310fdfb0b8453cbbbedf5a43a275b47"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/context/ops_roll.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-20"
+      ],
+      "reason": "Inspected all-or-error rolling of curve namespace only; FX, surface expiries, observations and dividends remain copied; composites rebind after rolling.",
+      "sha256": "933b9135b9ddc29d57bbdd366a45a0674c4fe1e9228aa9246614ae708cd227e4"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/context/state_serde.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-06",
+        "CORE-MARKET-19",
+        "CORE-MARKET-20"
+      ],
+      "reason": "Inspected deterministic snapshots, per-namespace duplicate-ID rejection, typed composite-reference checks, quote-only FX restoration and versioned versus typed load paths.",
+      "sha256": "edb8ca64ec51004a988f47969167ccf5e34a05112b5d76c37b2345c5d72e7dbf"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/context/stats.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-19",
+        "CORE-MARKET-20"
+      ],
+      "reason": "Inspected counts/iteration plus material retain-curves rebinding/invalidation, direct surface/cube replacement and combined clearing of scalar/series/index/dividend namespaces.",
+      "sha256": "2e60570a8d8770792062ea59e691693cb3e8ede573061e0fa5e0d56d01836936"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/diff.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-05",
+        "CORE-MARKET-10",
+        "CORE-MARKET-11",
+        "CORE-MARKET-20",
+        "CORE-MARKET-22"
+      ],
+      "reason": "Inspected baseline-grid sampling, unweighted/equality-tolerant shift averaging, per-tenor differences, credit/inflation source dispatch, raw-print selection and FX/scalar unit-sensitive changes.",
+      "sha256": "7680ec306ea279465c830ff59973f1e402fe620b2bb90c5d9a96da66249297ee"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/dividends.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-13"
+      ],
+      "reason": "Inspected event sorting and cash/yield/stock-ratio domain checks, optional schedule currency, duplicate-date retention and validating wire reconstruction; no dividend PV kernel exists here.",
+      "sha256": "a42aa9579e5642545a130784fef435396b7925e48ae5a76315b77dbe898043e2"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/fixings.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-12"
+      ],
+      "reason": "Inspected exact-date historical fixing enforcement, missing-series diagnostics and CMS tenor-to-ID rounding; as_of is diagnostic rather than lookup eligibility control.",
+      "sha256": "8bb87243d1900e07a90dabed734ce9b8535a6ce56b79dc6e0bd868746180f2ab"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/hierarchy/builder.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-21"
+      ],
+      "reason": "Inspected slash-path creation, first-error retention, target-node tagging/curve assignment and final hierarchy validation.",
+      "sha256": "1f16e60a079952de007275c5087f0fb5ef6fa7c3828e62439b3c777524261ffc"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/hierarchy/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-21"
+      ],
+      "reason": "Inspected path validation, globally unique stored curve-ID rule, node traversal and validating hierarchy deserialization; existence in MarketContext is not checked.",
+      "sha256": "b7e9483e686e7ec549ebe95acc491e296c46ab57bebe59b450a6c4f6a77b3b31"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/hierarchy/resolution.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-21"
+      ],
+      "reason": "Inspected local tag predicates, subtree expansion, overlap duplication, matched-depth ranking and MostSpecificWins versus Cumulative selection.",
+      "sha256": "77578c98962808f92c8b5254a935afaa49425fa402fc1f2dd22f5e9b4e468278"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/mod.rs",
+      "classification": "support",
+      "records": [
+        "CORE-MARKET-20"
+      ],
+      "reason": "Inspected module declarations only; exposes bumps/context/diff/dividends/fixings/hierarchy/scalars/surfaces/term-structures/traits and contains no numerical or selection implementation.",
+      "sha256": "70adb56a56d048f5e058e786656379299806a40cd7bf07681b3338195e02c495"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/scalars/inflation_index.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-11",
+        "CORE-MARKET-22"
+      ],
+      "reason": "Inspected calendar-month/day lags, exact-month observation resolution, contract-month day weights, seasonality multiplication, publication metadata and ratio domain behavior.",
+      "sha256": "a010d5d96a0075421c392c9f06a8eb062f7e4d83aace11891ab3ed6c2147f3e9"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/scalars/mod.rs",
+      "classification": "support",
+      "records": [
+        "CORE-MARKET-11",
+        "CORE-MARKET-12"
+      ],
+      "reason": "Inspected private-module declarations and public re-exports of scalar/series/inflation types; no additional computation or defaults.",
+      "sha256": "0a817cfd81b6a2b104cb41255f0cadfb21ea56f400925fce222cde0f6c04f1f0"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/scalars/primitives.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-11",
+        "CORE-MARKET-12"
+      ],
+      "reason": "Inspected runtime after early cfg(test) import: finite scalar/series construction, sorted dates, Step/Linear/Exact/monthly lookup, right-tail carry, checked money and standard series shocks.",
+      "sha256": "545c30223c8e8115e1d760312951914c838d391424bd6a92fe9265936a83a7d6"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/surfaces/fx_delta_vol_surface.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-15"
+      ],
+      "reason": "Inspected aligned expiry/quote dimensions, paired 10-delta controls and arithmetic ATM+BF+/-RR/2 wing positivity; no strike inversion exists in this file.",
+      "sha256": "d774343770077645ba0f474bc9b306f2c9b7d63a259a33604486b836e871de7d"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/surfaces/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-14",
+        "CORE-MARKET-16"
+      ],
+      "reason": "Inspected re-exports and shared validate_axis kernel: nonempty finite increasing axes with singleton support; materially governs every surface/cube constructor.",
+      "sha256": "036fec8f503d483ba5adfad67140de7ecacb5e5b33caa8d668579b79bf2018d9"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/surfaces/sabr_parameter_data.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-16"
+      ],
+      "reason": "Inspected parameter bounds including nu=0, strict rho endpoints, optional finite signed shift and validating wire conversion.",
+      "sha256": "2d559069cb7656cd7930051046b578ec353cb55aa7cc397f295e39c3f0274f49"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/surfaces/vol_cube.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-16"
+      ],
+      "reason": "Inspected positive expiry/tenor grids, row-major dimensions, finite forward domain, checked node addressing and selectable Vol/TotalVariance metadata; evaluation belongs to models.",
+      "sha256": "a4dce1253ac34aef7e21139d16a79d27c5031cf145a37625d18aadb5a11e75b6"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/surfaces/vol_cube_expiry_slice.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-16"
+      ],
+      "reason": "Inspected fixed-expiry tenor/strike grid validation, nonnegative quotes, quote convention and one shifted-Black displacement per tenor row, including wire reconstruction.",
+      "sha256": "9f730808a11377b77b6c0c79d294be7c191fa61981776d4f2270d4464b92005f"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/surfaces/vol_surface.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-14"
+      ],
+      "reason": "Inspected quote/axis/interpolation controls, grid and displacement validation, floored parallel/bucket/node shocks, nearest-node selection and tolerance matching.",
+      "sha256": "731c9cc55f58bc31d0a694e024b6bb01f6e33c498885a140e029dce258259ba2"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/base_correlation.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-18"
+      ],
+      "reason": "Inspected fixed linear/flat detachment interpolation, [0,100]/[0,1] units and domains, nonblocking shape diagnostics, bucket matching and clamped shocks.",
+      "sha256": "222395bc6f2b4515037019b609623c995a46adad76046dc8fc5d4ec4a75da3b9"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/basis_spread_curve.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-09"
+      ],
+      "reason": "Inspected signed-level interpolation selection, default flat endpoint spreads, shared source-preserving roll state and rebuilding when negative cumulative offset drops that state.",
+      "sha256": "c8df26b613d41d4e99dd65174cd5c765c282b799252f313539a45ecc35d3c54b"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/common/adjustment.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-03"
+      ],
+      "reason": "Inspected merged piecewise-linear coefficients, exact segment integration with Neumaier summation, zero-rate derivative versus forward-rate shocks and scaling validation.",
+      "sha256": "79f9d38cd74821f029467294b928b2106609d9f9995b244b2d361f650d728253"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/common/mod.rs",
+      "classification": "support",
+      "records": [
+        "CORE-MARKET-03",
+        "CORE-MARKET-08",
+        "CORE-MARKET-09",
+        "CORE-MARKET-10"
+      ],
+      "reason": "Inspected declarations/re-exports of adjustment and roll helpers only; kernels are covered in their own assigned files.",
+      "sha256": "c9f91fe187a22620a971e16fdd39900003c963bd0c52ef6e9d965cd0f089258c"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/common/roll.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-03",
+        "CORE-MARKET-08",
+        "CORE-MARKET-09",
+        "CORE-MARKET-10"
+      ],
+      "reason": "Inspected retained-source offsets, pillar-consistency tolerance, negative-offset state dropping, shock-origin reinsertion and strictly-positive remaining-knot filtering.",
+      "sha256": "af7fa12490ddad35bfc4a27ddce0644d63779b57415d463ce8be6dadf321ab09"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/credit_index.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-19"
+      ],
+      "reason": "Inspected complete constituent coverage, finite/nonnegative unit-sum weights, recovery override domains and unknown-issuer aggregate/equal-weight fallbacks.",
+      "sha256": "82ea12fd63b55dc1c1900abb0287abe8e2b42d3fb9f4736c173ff0214c82cd49"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/discount_curve/builder.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-01",
+        "CORE-MARKET-03"
+      ],
+      "reason": "Inspected sorted DF ingestion, exact origin, calendar validation, named/raw validation modes, original-source interpolator construction and transformed-pillar consistency.",
+      "sha256": "038818f0a3ab51e73eebb8c0edc829bc5f0742b88d3e53ab0db149469e457d2c"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/discount_curve/curve.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-01",
+        "CORE-MARKET-02",
+        "CORE-MARKET-06"
+      ],
+      "reason": "Inspected flat/from-rates/from-dates constructors, zero/continuous-forward/date queries, day-count/calendar mapping, metadata controls and sampled simple-forward conversion.",
+      "sha256": "3a4f3365cdcb5fbe5c6f129ee467b0d6bb1332942cb6dc8a176877d7efffa382"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/discount_curve/evaluation.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-03"
+      ],
+      "reason": "Inspected source-DF normalization, offset-adjustment integral formula, exact origin, offset validation and restored public-pillar consistency.",
+      "sha256": "496ff37307004af88c504d4a011b9b056f5fe05dabad4226767fb1fb50fc1e3b"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/discount_curve/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-01",
+        "CORE-MARKET-03",
+        "CORE-MARKET-06"
+      ],
+      "reason": "Inspected default minimum-forward tenor, calendar resolution, validated wire representation including transform/rate recipe and raw validation controls; inline tests follow production.",
+      "sha256": "a2b606a685001c60b9d2c3a1dfaffc0bbacdc894b068af19001b4d49c848f398"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/discount_curve/traits.rs",
+      "classification": "support",
+      "records": [
+        "CORE-MARKET-01"
+      ],
+      "reason": "Inspected pure Discounting adapter forwarding ID/base/DF/day count/calendar to DiscountCurve; no distinct numerical kernel or policy selection beyond that delegation.",
+      "sha256": "f52f7ad97b4a8226decbbae90fef249ae2fe6c0566a09144ece62e9c7643e5b4"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/discount_curve/transform.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-03"
+      ],
+      "reason": "Inspected continuous zero-rate shock state, pillar/peak finite positivity checks, stress-policy relaxation, normalized curve rolling and expiry failure.",
+      "sha256": "19e813cd69aba4979b5cc057130b3d53f52b9dd77abba02e1c5ae5bf7b808681"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/discount_curve/validation.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-01"
+      ],
+      "reason": "Inspected preset parsing, negative-rate floor checks, nonincreasing pillar tolerance and adjacent log-DF forward validation; raw setter control values are not fully constrained.",
+      "sha256": "54efb2ed73f2b29a543225b781a0d635c76ef09e54b2d0bbbddfed31e49f4ce4"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/forward_curve/builder.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-02",
+        "CORE-MARKET-03",
+        "CORE-MARKET-06"
+      ],
+      "reason": "Inspected finite positive tenor/nonnegative reset lag, forward knots and contractual projection grid validation, excluded MonotoneConvex and retained-source transform reconstruction.",
+      "sha256": "5bc0a52ca10585ca38a379acda9103c7854f4905f75a4d58cfb6a3bac651b931"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/forward_curve/conventions.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-02"
+      ],
+      "reason": "Inspected identifier normalization/substrings, recognized currency fallbacks, day-count precedence and overnight versus term reset-lag inference.",
+      "sha256": "6404ef9260ecf8ba1669e36ce58bc3ee0c8ac51dbea0c452fbc6ace268466809"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/forward_curve/curve.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-02"
+      ],
+      "reason": "Inspected point rates, clamped date clock, contractual-period growth, numeric/grid projection log-DF loop and fixed-panel Simpson averages with exact adjustment area.",
+      "sha256": "f75374d9c3a4c40e41b4e57c828b53446563119ef429ad30de75c4d5dd8b2977"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/forward_curve/evaluation.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-03"
+      ],
+      "reason": "Inspected shifted/scaled source-rate formula, additive versus multiplicative shock composition, unsupported multiplicative buckets and transform consistency validation.",
+      "sha256": "b557ec2563f679b17982a7fe0eb6571ddc1c2917f4ed41b2cfe7af9890ae2976"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/forward_curve/mod.rs",
+      "classification": "support",
+      "records": [
+        "CORE-MARKET-02",
+        "CORE-MARKET-03",
+        "CORE-MARKET-06"
+      ],
+      "reason": "Inspected field declarations/imports and all module/re-export declarations, including transform and wire after cfg(test) mod tests; defaults/algorithms are in builder/curve/conventions.",
+      "sha256": "d880428842e517ff3a662d682b019b3e822a06db0e767271511385d30a148754"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/forward_curve/tests.rs",
+      "classification": "test",
+      "records": [
+        "CORE-MARKET-02",
+        "CORE-MARKET-03",
+        "CORE-MARKET-06"
+      ],
+      "reason": "Inspected dedicated tests and fixtures only: compounded-growth formulas, numerical tenor versus contractual grid, fixed average semantics, shocks/rolls, inferred conventions and recipe serde.",
+      "sha256": "d1d494aa750701c6c2fac0e48a0cd5b3b68bdcc21e4dabeedc28898838ad950b"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/forward_curve/transform.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-02",
+        "CORE-MARKET-03",
+        "CORE-MARKET-06"
+      ],
+      "reason": "Inspected metadata rebuild, projection-grid extension, continuous shock updates and offset/grid rolling; replacement knots discard transform while preserving recipe.",
+      "sha256": "1e9c96182fe71e123d2b53d574e6e54edf92f0e55d7e3ecd4c5a21aa954d2c56"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/forward_curve/wire.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-02",
+        "CORE-MARKET-03",
+        "CORE-MARKET-06"
+      ],
+      "reason": "Inspected serialization of projection grid/conventions/recipe/transform and validating reconstruction through the builder; transport preserves calculation controls.",
+      "sha256": "24a6197d5c7125e7c8cb6d8b756f47528fac0c608c578dedcafabbf3fc5210cb"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/forward_variance.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-17"
+      ],
+      "reason": "Inspected sorted positive point data, ordered interval-end data, linear versus right-continuous step selection, flat tails and nonfinite-query NaN.",
+      "sha256": "e67527067eaaf5e69bf6d6e7a748419543e637ee0c8519b7a22accfc0a72f91a"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/hazard_calibration.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-06"
+      ],
+      "reason": "Inspected deterministic independent input sorting, supported quote-type checks, strictly increasing pillar times and matching original/risk quote IDs; opaque JSON remains consumer-validated.",
+      "sha256": "efce49840b6c6bf8f9e1ccd56408c2f237f02085fa9c6d43d81828c3b32d56b5"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/hazard_curve/builder.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-04",
+        "CORE-MARKET-05",
+        "CORE-MARKET-06"
+      ],
+      "reason": "Inspected explicit recovery, hazard cap/nonnegative rates, sorted ending knots, weaker par-quote validation and strict log-linear survival construction.",
+      "sha256": "a1bdff560f17633c1f559b836c758b7d4e3e22022b62d0ab4ac116c76e5b1818"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/hazard_curve/curve.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-04",
+        "CORE-MARKET-05"
+      ],
+      "reason": "Inspected ending-segment hazard lookup, cumulative survival, local conditional-default integration, survival-probability inversion and quoted/log-fallback/triangle CDS spread lookup.",
+      "sha256": "21ec8dc18a1ad8acf76bb303617df2bf9be3668c7bf3ce0c7faad4ce4b9b5ba2"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/hazard_curve/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-04",
+        "CORE-MARKET-05",
+        "CORE-MARKET-06"
+      ],
+      "reason": "Inspected default hazard cap 10/year, default Linear par interpolation, bump-target enum and metadata, plus transform/wire declarations after test module declaration.",
+      "sha256": "21d37c1f261ca0a62f8d560e2ff788632bad7335c4eed58debf729496af75b2e"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/hazard_curve/tests.rs",
+      "classification": "test",
+      "records": [
+        "CORE-MARKET-04",
+        "CORE-MARKET-05",
+        "CORE-MARKET-06"
+      ],
+      "reason": "Inspected dedicated fixture/assertion file: survival derivatives, boundaries, tiny and underflowed conditional PD, recovery-scaled versus direct hazards, segment targeting, atomicity and recipe invalidation.",
+      "sha256": "c4c84ea1f5081666a3a918d939f7447be6a05c431b1a3e73b56b360997f14742"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/hazard_curve/transform.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-04",
+        "CORE-MARKET-05",
+        "CORE-MARKET-06"
+      ],
+      "reason": "Inspected recovery override, spread-to-hazard approximation, knot/tenor shock domains and selection, quote/recipe invalidation and conditional-survival rolling.",
+      "sha256": "d1ddbcaad0009bd3c6955a070ca22479d90b1f084d43765376f855f00d31d5cb"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/hazard_curve/wire.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-04",
+        "CORE-MARKET-05",
+        "CORE-MARKET-06"
+      ],
+      "reason": "Inspected default cap/par-interpolation restoration and validated reconstruction of hazards, recovery, quote metadata and replay recipe.",
+      "sha256": "be91c6646d314b390f95b742ba41bfe4217557b71fb22e1ea7a1c07648b4190d"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/inflation.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-10"
+      ],
+      "reason": "Inspected positive projected CPI anchors, months/12 lag, CAGR/index ratio, gross-factor shocks, source-preserving roll and wire domain validation.",
+      "sha256": "600d5deac1ede66147c9c6b8a0450cbe23f782d6c931c3ab0d627545beadabb1"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/mod.rs",
+      "classification": "support",
+      "records": [
+        "CORE-MARKET-01",
+        "CORE-MARKET-02",
+        "CORE-MARKET-04",
+        "CORE-MARKET-06",
+        "CORE-MARKET-07",
+        "CORE-MARKET-08",
+        "CORE-MARKET-09",
+        "CORE-MARKET-10",
+        "CORE-MARKET-17",
+        "CORE-MARKET-18",
+        "CORE-MARKET-19"
+      ],
+      "reason": "Inspected module declarations and public/internal re-exports only; the listed owning implementation files contain all financial choices.",
+      "sha256": "dd44aed731cec3f1e180197a657224999a05f2cf9c68c37c6c4da34fca8bea58"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/parametric_curve.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-07"
+      ],
+      "reason": "Inspected NS/NSS basis formulas, parameter validation, analytic forwards versus trait adapter, source-DF-ratio rolling and nonpositive-time/offset boundaries.",
+      "sha256": "4227c0e848bf6f6e816d4db633a73b5cbe07a9229918f8f59988a5050f8c6957"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/price_curve.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-08"
+      ],
+      "reason": "Inspected signed/vol-index domains, spot anchoring, interpolation/tails, unit-specific parallel/local shocks, source-preserving and backward roll rules and validated wire kind inference.",
+      "sha256": "b33375410077b1b6612a3cd27fdae668a1364e06730bc0347987d28792efa4a0"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/term_structures/rate_calibration.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-06"
+      ],
+      "reason": "Inspected financially material bootstrap/global-solve, OIS observation/compounding, curve-role and quote-convention recipe types; no inverse calibration kernel is implemented in this file.",
+      "sha256": "d74f8e0f91ee420fa41873d4a94772b3a3f8cba964138360bb76b6eca9a61c6f"
+    },
+    {
+      "path": "finstack-quant/core/src/market_data/traits.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-MARKET-01",
+        "CORE-MARKET-07"
+      ],
+      "reason": "Inspected relative DF ratio/date conversion, positive finite checks and generic adaptive-epsilon finite-difference instantaneous forward, including equal-endpoint shortcut.",
+      "sha256": "85b440634f2e5aab7ee111ca1e8bf56c532c2ffd33cc3dc425f2dc4ca886aa8c"
+    }
+  ]
+}

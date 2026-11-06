@@ -23,7 +23,7 @@ with its verification qualifications visible:
 | macOS arm64 | 3.12, 3.13, 3.14 | Build, installation, and installed-wheel smoke checks. |
 | Windows x64 | 3.12, 3.13, 3.14 | Build, installation, and installed-wheel smoke checks. |
 
-Exact browser and Node version commitments still need specification. A
+This ADR does not establish exact browser or Node version commitments. A
 development-tool version pin alone does not establish the consumer support
 policy. Upgrading tools is ordinary work when consumer commitments remain
 unchanged.
@@ -64,6 +64,6 @@ a newly executed build or a guarantee that every target has passed full tests.
 
 [Python metadata](../../../pyproject.toml) declares its interpreter minimum.
 The [WASM guide](../../../finstack-quant-wasm/README.md) describes browser and
-Node usage, and [mise.toml](../../../mise.toml) pins development tools. The
-complete consumer matrix, including explicit browser/Node version guarantees
-and evidence levels for the other surfaces, remains follow-up work.
+Node usage, and [mise.toml](../../../mise.toml) pins development tools.
+Completion and verification of the consumer matrix are tracked in
+[FOLLOW_UPS.md](../FOLLOW_UPS.md#implementation-and-lifecycle-follow-up).

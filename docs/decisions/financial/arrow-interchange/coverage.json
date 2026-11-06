@@ -1,0 +1,35 @@
+{
+  "scope": "arrow-interchange",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "ARROW-001",
+      "title": "Typed values, validity, precision and transport boundaries",
+      "path": "01-typed-values-and-null-semantics.md"
+    },
+    {
+      "id": "ARROW-002",
+      "title": "Ordered schema, semantic roles and JSON metadata",
+      "path": "02-schema-order-and-metadata.md"
+    },
+    {
+      "id": "ARROW-003",
+      "title": "Envelope admission, batch assembly, resource limits and export direction",
+      "path": "03-envelope-boundary-and-batch-assembly.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/arrow-interchange/src/lib.rs",
+      "classification": "algorithm",
+      "records": [
+        "ARROW-001",
+        "ARROW-002",
+        "ARROW-003"
+      ],
+      "reason": "Exhaustive nine-variant Arrow array dispatch, declaration-driven nullability, typed value copying, role and JSON metadata emission, ordered schema construction, explicit row-count batch validation and error mapping; embedded schema/null/metadata/empty-table tests and post-test README doctest inclusion inspected.",
+      "sha256": "ff55ce5e2b46382a1325bb9008b4701dd57a6d2db09f49b45cb0f3c4def5684d"
+    }
+  ]
+}

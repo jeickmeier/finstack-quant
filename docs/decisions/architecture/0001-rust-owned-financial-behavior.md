@@ -41,8 +41,9 @@ and WASM with checks for known prohibited calculation or defaulting paths in
 bindings. Review is still needed for semantic duplication that cannot be
 reliably detected automatically.
 
-Existing boundary and parity checks provide partial enforcement. Acceptance
-of this ADR does not establish that every binding already satisfies it.
+Acceptance of this ADR does not establish complete binding compliance.
+Implementation and coverage work is tracked in
+[FOLLOW_UPS.md](../FOLLOW_UPS.md#implementation-and-lifecycle-follow-up).
 
 ## Implementation notes and references
 
