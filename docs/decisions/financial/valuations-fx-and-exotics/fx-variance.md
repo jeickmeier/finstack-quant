@@ -1,4 +1,4 @@
-# FX variance swap observation estimator and smile-based forecast
+# VALUATIONS-FX-AND-EXOTICS-FX-VARIANCE: FX variance swap observation estimator and smile-based forecast
 
 - Record: `VALUATIONS-FX-AND-EXOTICS-FX-VARIANCE`
 - Decision status: **Draft — observed implementation, adoption pending**.

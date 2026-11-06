@@ -4,7 +4,7 @@
 
 **Implementation status:** Observed for the source responsibilities stated below; discrepancies are identified explicitly.
 
-**Validation status:** Evidence inspected/located, not executed. Source baseline and audit date: [slice README](README.md).
+**Validation status:** Evidence inspected/located, not executed. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice README](README.md)).
 
 ## Choice and input domain
 

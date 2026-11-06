@@ -1,4 +1,4 @@
-# FX barrier monitoring, rebate state and analytic/Monte Carlo pricing
+# VALUATIONS-FX-AND-EXOTICS-FX-BARRIERS: FX barrier monitoring, rebate state and analytic/Monte Carlo pricing
 
 - Record: `VALUATIONS-FX-AND-EXOTICS-FX-BARRIERS`
 - Decision status: **Draft — observed implementation, adoption pending**.

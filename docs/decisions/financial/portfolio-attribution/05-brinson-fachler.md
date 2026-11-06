@@ -1,4 +1,4 @@
-# Single-period Brinson–Fachler attribution
+# PORTFOLIO-ATTRIBUTION-005: Single-period Brinson–Fachler attribution
 
 - ID: PORTFOLIO-ATTRIBUTION-005
 - Decision status: Draft (observed implementation; adoption pending).

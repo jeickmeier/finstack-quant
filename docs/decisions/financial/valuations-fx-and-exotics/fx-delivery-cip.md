@@ -1,4 +1,4 @@
-# FX cash positions, covered-interest-parity forwards and two-leg swaps
+# VALUATIONS-FX-AND-EXOTICS-FX-DELIVERY-CIP: FX cash positions, covered-interest-parity forwards and two-leg swaps
 
 - Record: `VALUATIONS-FX-AND-EXOTICS-FX-DELIVERY-CIP`
 - Decision status: **Draft — observed implementation, adoption pending**.

@@ -1,4 +1,4 @@
-# Composite fixed, notional, metric, volatility and expression sizing
+# VALUATIONS-EQUITY-AND-COMPOSITION-23: Composite fixed, notional, metric, volatility and expression sizing
 
 - **Record:** `VALUATIONS-EQUITY-AND-COMPOSITION-23`.
 - **Decision status:** Draft — observed implementation; adoption pending.

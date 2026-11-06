@@ -1,4 +1,4 @@
-# Inflation swap CPI ratios and accrual conventions
+# VALUATIONS-RATES-13-INFLATION-SWAPS: Inflation swap CPI ratios and accrual conventions
 
 - ID: VALUATIONS-RATES-13-INFLATION-SWAPS
 - Decision status: Draft (observed implementation; adoption pending).

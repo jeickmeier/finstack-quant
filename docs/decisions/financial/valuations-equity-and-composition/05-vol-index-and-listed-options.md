@@ -1,4 +1,4 @@
-# Volatility-index futures and listed equity-option adapters
+# VALUATIONS-EQUITY-AND-COMPOSITION-05: Volatility-index futures and listed equity-option adapters
 
 - **Record:** `VALUATIONS-EQUITY-AND-COMPOSITION-05`.
 - **Decision status:** Draft — observed implementation; adoption pending.

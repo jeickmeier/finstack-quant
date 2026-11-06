@@ -1,4 +1,4 @@
-# Equity total-return futures projection
+# VALUATIONS-EQUITY-AND-COMPOSITION-04: Equity total-return futures projection
 
 - **Record:** `VALUATIONS-EQUITY-AND-COMPOSITION-04`.
 - **Decision status:** Draft — observed implementation; adoption pending.

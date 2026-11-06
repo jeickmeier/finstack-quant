@@ -1,4 +1,4 @@
-# Equal, fixed and inverse-volatility strategy weights
+# PORTFOLIO-ATTRIBUTION-001: Equal, fixed and inverse-volatility strategy weights
 
 - ID: PORTFOLIO-ATTRIBUTION-001
 - Decision status: Draft (observed implementation; adoption pending).

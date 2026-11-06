@@ -1,4 +1,4 @@
-# Rate futures projection, convexity and option rate risk
+# VALUATIONS-RATES-10-RATE-FUTURES: Rate futures projection, convexity and option rate risk
 
 - ID: VALUATIONS-RATES-10-RATE-FUTURES
 - Decision status: Draft (observed implementation; adoption pending).

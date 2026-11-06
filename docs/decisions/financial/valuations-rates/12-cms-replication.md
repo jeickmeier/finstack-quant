@@ -1,4 +1,4 @@
-# Normalized smile replication for CMS options and swaps
+# VALUATIONS-RATES-12-CMS-REPLICATION: Normalized smile replication for CMS options and swaps
 
 - ID: VALUATIONS-RATES-12-CMS-REPLICATION
 - Decision status: Draft (observed implementation; adoption pending).

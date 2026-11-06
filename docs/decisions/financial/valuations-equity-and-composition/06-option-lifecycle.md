@@ -1,4 +1,4 @@
-# Equity option exercise, expiry and settlement state
+# VALUATIONS-EQUITY-AND-COMPOSITION-06: Equity option exercise, expiry and settlement state
 
 - **Record:** `VALUATIONS-EQUITY-AND-COMPOSITION-06`.
 - **Decision status:** Draft — observed implementation; adoption pending.

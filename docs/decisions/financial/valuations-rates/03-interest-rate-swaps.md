@@ -1,4 +1,4 @@
-# IRS cashflow projection, convention resolution and sensitivity bases
+# VALUATIONS-RATES-03-INTEREST-RATE-SWAPS: IRS cashflow projection, convention resolution and sensitivity bases
 
 - ID: VALUATIONS-RATES-03-INTEREST-RATE-SWAPS
 - Decision status: Draft (observed implementation; adoption pending).

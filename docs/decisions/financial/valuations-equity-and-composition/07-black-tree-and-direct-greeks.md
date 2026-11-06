@@ -1,4 +1,4 @@
-# Black equity pricing, discrete dividends and exercise-tree Greeks
+# VALUATIONS-EQUITY-AND-COMPOSITION-07: Black equity pricing, discrete dividends and exercise-tree Greeks
 
 - **Record:** `VALUATIONS-EQUITY-AND-COMPOSITION-07`.
 - **Decision status:** Draft — observed implementation; adoption pending.

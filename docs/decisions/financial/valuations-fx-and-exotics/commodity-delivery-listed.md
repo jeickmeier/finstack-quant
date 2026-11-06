@@ -1,4 +1,4 @@
-# Commodity forwards, listed futures and delivery/fixing state
+# VALUATIONS-FX-AND-EXOTICS-COMMODITY-DELIVERY-LISTED: Commodity forwards, listed futures and delivery/fixing state
 
 - Record: `VALUATIONS-FX-AND-EXOTICS-COMMODITY-DELIVERY-LISTED`
 - Decision status: **Draft — observed implementation, adoption pending**.

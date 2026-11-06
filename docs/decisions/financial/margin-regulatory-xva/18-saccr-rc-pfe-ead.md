@@ -10,11 +10,11 @@
 
 This describes the observed design. No historical adoption rationale is inferred; the alternatives and tradeoffs below are the audit's assessment.
 
-The engine combines replacement cost and supervisory add-on PFE, then caps a margined calculation at a recalculated unmargined EAD. Collateral is positive when held by the bank. Runtime treats `collateral_value` as variation margin and adds NICA separately. Field scope is distinct from the accepted collateral sign convention.
+The engine combines replacement cost and supervisory add-on PFE, then caps a margined calculation at a recalculated unmargined EAD. Collateral is positive when held by the bank. Runtime treats `config.collateral` as variation margin and adds NICA separately. Field scope is distinct from the accepted collateral sign convention.
 
 ## Algorithm and conventions
 
-1. `V=Σ signed_MTM`, `C=collateral_value+NICA`. Unmargined replacement cost is `max(V−C,0)`; margined RC is `max(V−C, threshold+MTA−NICA, 0)`.
+1. `V=Σ signed_MTM`, `C=collateral+NICA`. Unmargined replacement cost is `max(V−C,0)`; margined RC is `max(V−C, threshold+MTA−NICA, 0)`.
 2. Let A be the sum of class add-ons (records 16–17). If `A<=0`, multiplier is `0.05`; otherwise `mult=min(1, 0.05+0.95×exp((V−C)/(1.9A)))`. PFE is `mult×A`.
 3. Initial EAD is `alpha×(RC+PFE)`, default alpha 1.4. For a margined set clone the entire config, change only `is_margined=false`, rerun validation/RC/PFE with unmargined trade MFs, and take `min(initial_EAD,unmargined_EAD)`.
 4. Return capped EAD but original margined RC, PFE, multiplier and add-on details. Return a separate summary MF from record 15 and default results metadata. The cap amount and binding state are not explicit output fields.

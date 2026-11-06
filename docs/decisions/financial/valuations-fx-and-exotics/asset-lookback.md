@@ -1,4 +1,4 @@
-# Lookback extrema, continuous formulas and monitored GBM paths
+# VALUATIONS-FX-AND-EXOTICS-ASSET-LOOKBACK: Lookback extrema, continuous formulas and monitored GBM paths
 
 - Record: `VALUATIONS-FX-AND-EXOTICS-ASSET-LOOKBACK`
 - Decision status: **Draft — observed implementation, adoption pending**.

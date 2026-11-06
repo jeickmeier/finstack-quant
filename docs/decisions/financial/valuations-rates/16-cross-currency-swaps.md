@@ -1,4 +1,4 @@
-# Cross-currency coupons and resetting notionals
+# VALUATIONS-RATES-16-CROSS-CURRENCY-SWAPS: Cross-currency coupons and resetting notionals
 
 - ID: VALUATIONS-RATES-16-CROSS-CURRENCY-SWAPS
 - Decision status: Draft (observed implementation; adoption pending).

@@ -1,4 +1,4 @@
-# Asset range-accrual digital-spread replication, GBM and quanto carry
+# VALUATIONS-FX-AND-EXOTICS-ASSET-RANGE-ACCRUAL: Asset range-accrual digital-spread replication, GBM and quanto carry
 
 - Record: `VALUATIONS-FX-AND-EXOTICS-ASSET-RANGE-ACCRUAL`
 - Decision status: **Draft — observed implementation, adoption pending**.

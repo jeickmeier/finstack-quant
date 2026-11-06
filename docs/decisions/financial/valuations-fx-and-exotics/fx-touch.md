@@ -1,4 +1,4 @@
-# FX one-touch/no-touch probabilities and payout timing
+# VALUATIONS-FX-AND-EXOTICS-FX-TOUCH: FX one-touch/no-touch probabilities and payout timing
 
 - Record: `VALUATIONS-FX-AND-EXOTICS-FX-TOUCH`
 - Decision status: **Draft — observed implementation, adoption pending**.

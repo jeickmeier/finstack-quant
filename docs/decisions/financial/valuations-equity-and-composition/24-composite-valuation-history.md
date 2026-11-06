@@ -1,4 +1,4 @@
-# Composite valuation, nested risk aggregation and financed return history
+# VALUATIONS-EQUITY-AND-COMPOSITION-24: Composite valuation, nested risk aggregation and financed return history
 
 - **Record:** `VALUATIONS-EQUITY-AND-COMPOSITION-24`.
 - **Decision status:** Draft — observed implementation; adoption pending.

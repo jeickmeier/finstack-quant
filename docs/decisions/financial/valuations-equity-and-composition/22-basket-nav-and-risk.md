@@ -1,4 +1,4 @@
-# Basket weighted NAV, daily expense drag and constituent shocks
+# VALUATIONS-EQUITY-AND-COMPOSITION-22: Basket weighted NAV, daily expense drag and constituent shocks
 
 - **Record:** `VALUATIONS-EQUITY-AND-COMPOSITION-22`.
 - **Decision status:** Draft — observed implementation; adoption pending.

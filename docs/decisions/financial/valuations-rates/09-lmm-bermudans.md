@@ -1,4 +1,4 @@
-# Bermudan LMM displacement, terminal numeraire and regression fallback
+# VALUATIONS-RATES-09-LMM-BERMUDANS: Bermudan LMM displacement, terminal numeraire and regression fallback
 
 - ID: VALUATIONS-RATES-09-LMM-BERMUDANS
 - Decision status: Draft (observed implementation; adoption pending).

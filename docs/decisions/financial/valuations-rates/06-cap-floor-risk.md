@@ -1,4 +1,4 @@
-# Cap/floor inverse volatility and risk differentiation
+# VALUATIONS-RATES-06-CAP-FLOOR-RISK: Cap/floor inverse volatility and risk differentiation
 
 - ID: VALUATIONS-RATES-06-CAP-FLOOR-RISK
 - Decision status: Draft (observed implementation; adoption pending).

@@ -11,6 +11,8 @@ accuracy and coverage qualification remain incomplete.
 
 **Audit date:** 2026-11-05
 
+**Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`
+
 ## Decision awaiting adoption
 
 The proposed choice covers the public callable-bond model default, supported
