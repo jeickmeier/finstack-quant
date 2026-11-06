@@ -629,7 +629,8 @@ run = [
 ]
 
 [tasks.wasm-doc]
-description = "Enforce complete WASM and TypeScript IntelliSense documentation"
+description = "Build the WASM web package and enforce complete TypeScript IntelliSense documentation"
+depends = ["wasm-build"]
 run = "npm --prefix finstack-quant-wasm run docs:check"
 
 # ─────────────────────────────────────────────────────────────────
