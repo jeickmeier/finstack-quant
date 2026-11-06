@@ -159,17 +159,65 @@ test('nearest correlation that does not converge is a computation failure', () =
 
 test('COS separates invalid inputs from a degenerate range', () => {
   assert.throws(
-    () => models.bsCosPrice(100, 100, 0.05, 0, 0.2, 1, true, 0),
+    () =>
+      models.bsCosPrice(
+        {
+          spot: 100,
+          strike: 100,
+          rate: 0.05,
+          dividend_yield: 0,
+          time_to_expiry: 1,
+          option_type: 'call',
+          n_terms: 0,
+        },
+        0.2
+      ),
     kind('validation', /num_terms/)
   );
-  assert.throws(() => models.bsCosPrice(100, 100, 0.05, 0, -0.2, 1, true), kind('validation'));
   assert.throws(
-    () => models.bsCosPrice(100, 100, 0.05, 0, 0.2, 0, true),
+    () =>
+      models.bsCosPrice(
+        {
+          spot: 100,
+          strike: 100,
+          rate: 0.05,
+          dividend_yield: 0,
+          time_to_expiry: 1,
+          option_type: 'call',
+        },
+        -0.2
+      ),
+    kind('validation')
+  );
+  assert.throws(
+    () =>
+      models.bsCosPrice(
+        {
+          spot: 100,
+          strike: 100,
+          rate: 0.05,
+          dividend_yield: 0,
+          time_to_expiry: 0,
+          option_type: 'call',
+        },
+        0.2
+      ),
     kind('validation', /expiry must be finite and positive/)
   );
   // A valid but vanishing expiry leaves no spread to truncate: a numerical failure.
   assert.throws(
-    () => models.bsCosPrice(100, 100, 0.05, 0, 0.2, 1e-320, true),
+    () =>
+      models.bsCosPrice(
+        {
+          spot: 100,
+          strike: 100,
+          rate: 0.05,
+          dividend_yield: 0,
+          time_to_expiry: 1e-320,
+          option_type: 'call',
+        },
+        0.2
+      ),
     kind('computation', /degenerate cumulant set/)
   );
 });

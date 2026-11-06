@@ -263,7 +263,7 @@ listed in [`schemas/index.json`](schemas/index.json).
 
 ```bash
 cargo run -p finstack-quant-scenarios --bin gen_scenario_schemas -- --write
-mise run rust-check-schemas
+mise run gen-check
 ```
 
 ## Verification

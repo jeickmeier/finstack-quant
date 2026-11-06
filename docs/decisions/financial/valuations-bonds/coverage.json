@@ -50,7 +50,7 @@
     },
     {
       "id": "VALUATIONS-BONDS-10",
-      "title": "Street, Moosm\u00fcller and Japanese yield pricing and inversion",
+      "title": "Street, Moosmüller and Japanese yield pricing and inversion",
       "path": "10-quoted-yield.md"
     },
     {
@@ -198,7 +198,7 @@
       "records": [
         "VALUATIONS-BONDS-15"
       ],
-      "reason": "Fixed-OAS quote normalization, \u00b125 bp tree-curve duration/convexity and zero-base-value branch.",
+      "reason": "Fixed-OAS quote normalization, ±25 bp tree-curve duration/convexity and zero-base-value branch.",
       "sha256": "21bde67529814f9d57b1cb7042ebee8bb5b9b68ddeac5f79388ddba580d32a5f"
     },
     {
@@ -630,7 +630,7 @@
       "records": [
         "VALUATIONS-BONDS-04"
       ],
-      "reason": "Public model/default resolver, scalar Hull\u2013White inputs, explicit BDT/BK requirements and compounding choices.",
+      "reason": "Public model/default resolver, scalar Hull–White inputs, explicit BDT/BK requirements and compounding choices.",
       "sha256": "2dbe2ce287614d10aa797c04182c2c2b73ea90c49b6c685e5a7cae373f777ed7"
     },
     {
@@ -805,7 +805,7 @@
       "sha256": "f580a58de0eba8797b23b7b08c5ed5149530eb444ad5f7bd354b888636ed400d"
     },
     {
-      "path": "finstack-quant/valuations/fixed-income/src/bond/types/tests_stepup.rs",
+      "path": "finstack-quant/valuations/fixed-income/src/bond/types/tests/stepup.rs",
       "classification": "test",
       "records": [
         "VALUATIONS-BONDS-01"

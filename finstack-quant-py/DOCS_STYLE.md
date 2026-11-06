@@ -115,12 +115,12 @@ binding is an explicit copy-on-write `with_*` method.
 
 | Check | Command |
 |-------|---------|
-| Stub completeness | `mise run python-doc` |
+| Stub completeness | `mise run python-lint` |
 | Stub doctests | `mise run python-test --doctest` |
-| PyO3 placeholder prose (unconverted `///` only) | included in `python-doc` |
+| PyO3 placeholder prose (unconverted `///` only) | included in `python-lint` |
 | Runtime `__doc__` equals the stub | `pytest finstack-quant-py/tests/test_runtime_docs.py` |
 
-`python-doc` rejects fabricated generator boilerplate, tautological
+`python-lint` rejects fabricated generator boilerplate, tautological
 parameter text, and missing `Raises` / “does not raise” notes on every
 public callable (including instance methods, properties, and no-arg
 helpers). `python-test --doctest` executes `>>>` examples against the compiled

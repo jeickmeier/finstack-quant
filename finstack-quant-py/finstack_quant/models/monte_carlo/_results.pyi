@@ -13,7 +13,15 @@ class MoneyEstimate:
     Examples
     --------
     >>> from finstack_quant.models.monte_carlo import EuropeanPricer
-    >>> r = EuropeanPricer(10_000, seed=42).price_gbm(100, 100, 0.05, 0.0, 0.2, 1.0, True)
+    >>> r = EuropeanPricer(10_000, seed=42).price_gbm({
+    ...     "spot": 100,
+    ...     "strike": 100,
+    ...     "rate": 0.05,
+    ...     "dividend_yield": 0.0,
+    ...     "volatility": 0.2,
+    ...     "time_to_expiry": 1.0,
+    ...     "option_type": "call",
+    ... })
     >>> r.num_paths
     10000
     """
@@ -41,7 +49,15 @@ class MoneyEstimate:
         Examples
         --------
         >>> from finstack_quant.models.monte_carlo import EuropeanPricer, MoneyEstimate
-        >>> priced = EuropeanPricer(10_000, seed=42).price_gbm(100, 100, 0.05, 0.0, 0.2, 1.0, True)
+        >>> priced = EuropeanPricer(10_000, seed=42).price_gbm({
+        ...     "spot": 100,
+        ...     "strike": 100,
+        ...     "rate": 0.05,
+        ...     "dividend_yield": 0.0,
+        ...     "volatility": 0.2,
+        ...     "time_to_expiry": 1.0,
+        ...     "option_type": "call",
+        ... })
         >>> MoneyEstimate.from_json(priced.to_json()).num_paths
         10000
         """
@@ -81,7 +97,15 @@ class MoneyEstimate:
         --------
         >>> from finstack_quant.models.monte_carlo import EuropeanPricer
         >>> pricer = EuropeanPricer(1000, seed=42)
-        >>> pricer.price_gbm(100, 100, 0.05, 0.0, 0.2, 1.0, True).mean.amount > 0
+        >>> pricer.price_gbm({
+        ...     "spot": 100,
+        ...     "strike": 100,
+        ...     "rate": 0.05,
+        ...     "dividend_yield": 0.0,
+        ...     "volatility": 0.2,
+        ...     "time_to_expiry": 1.0,
+        ...     "option_type": "call",
+        ... }).mean.amount > 0
         True
         """
         ...
@@ -104,7 +128,15 @@ class MoneyEstimate:
         --------
         >>> from finstack_quant.models.monte_carlo import EuropeanPricer
         >>> pricer = EuropeanPricer(1000, seed=42)
-        >>> pricer.price_gbm(100, 100, 0.05, 0.0, 0.2, 1.0, True).stderr >= 0
+        >>> pricer.price_gbm({
+        ...     "spot": 100,
+        ...     "strike": 100,
+        ...     "rate": 0.05,
+        ...     "dividend_yield": 0.0,
+        ...     "volatility": 0.2,
+        ...     "time_to_expiry": 1.0,
+        ...     "option_type": "call",
+        ... }).stderr >= 0
         True
         """
         ...
@@ -142,7 +174,15 @@ class MoneyEstimate:
         Examples
         --------
         >>> from finstack_quant.models.monte_carlo import EuropeanPricer
-        >>> r = EuropeanPricer(2000, seed=42).price_gbm(100, 100, 0.05, 0.0, 0.2, 1.0, True)
+        >>> r = EuropeanPricer(2000, seed=42).price_gbm({
+        ...     "spot": 100,
+        ...     "strike": 100,
+        ...     "rate": 0.05,
+        ...     "dividend_yield": 0.0,
+        ...     "volatility": 0.2,
+        ...     "time_to_expiry": 1.0,
+        ...     "option_type": "call",
+        ... })
         >>> r.ci_lower.amount <= r.mean.amount
         True
         """
@@ -165,7 +205,15 @@ class MoneyEstimate:
         Examples
         --------
         >>> from finstack_quant.models.monte_carlo import EuropeanPricer
-        >>> r = EuropeanPricer(2000, seed=42).price_gbm(100, 100, 0.05, 0.0, 0.2, 1.0, True)
+        >>> r = EuropeanPricer(2000, seed=42).price_gbm({
+        ...     "spot": 100,
+        ...     "strike": 100,
+        ...     "rate": 0.05,
+        ...     "dividend_yield": 0.0,
+        ...     "volatility": 0.2,
+        ...     "time_to_expiry": 1.0,
+        ...     "option_type": "call",
+        ... })
         >>> r.ci_upper.amount >= r.mean.amount
         True
         """
@@ -191,7 +239,15 @@ class MoneyEstimate:
         Examples
         --------
         >>> from finstack_quant.models.monte_carlo import EuropeanPricer
-        >>> EuropeanPricer(1234, seed=42).price_gbm(100, 100, 0.05, 0.0, 0.2, 1.0, True).num_paths
+        >>> EuropeanPricer(1234, seed=42).price_gbm({
+        ...     "spot": 100,
+        ...     "strike": 100,
+        ...     "rate": 0.05,
+        ...     "dividend_yield": 0.0,
+        ...     "volatility": 0.2,
+        ...     "time_to_expiry": 1.0,
+        ...     "option_type": "call",
+        ... }).num_paths
         1234
         """
         ...
@@ -317,7 +373,15 @@ class MoneyEstimate:
         --------
         >>> from finstack_quant.models.monte_carlo import EuropeanPricer
         >>> pricer = EuropeanPricer(5000, seed=42)
-        >>> pricer.price_gbm(100, 100, 0.05, 0.0, 0.2, 1.0, True).relative_stderr() >= 0
+        >>> pricer.price_gbm({
+        ...     "spot": 100,
+        ...     "strike": 100,
+        ...     "rate": 0.05,
+        ...     "dividend_yield": 0.0,
+        ...     "volatility": 0.2,
+        ...     "time_to_expiry": 1.0,
+        ...     "option_type": "call",
+        ... }).relative_stderr() >= 0
         True
         """
         ...
@@ -624,7 +688,18 @@ class LrmGreeks:
     --------
     >>> from finstack_quant.models.monte_carlo import PathDependentPricer
     >>> pricer = PathDependentPricer(2000, 7, use_parallel=False)
-    >>> greeks = pricer.price_with_lrm_greeks(100, 100, 0.04, 0.01, 0.25, 1.0, True, num_steps=12)
+    >>> greeks = pricer.price_with_lrm_greeks(
+    ...     {
+    ...         "spot": 100,
+    ...         "strike": 100,
+    ...         "rate": 0.04,
+    ...         "dividend_yield": 0.01,
+    ...         "volatility": 0.25,
+    ...         "time_to_expiry": 1.0,
+    ...         "option_type": "call",
+    ...     },
+    ...     num_steps=12,
+    ... )
     >>> (greeks.price.num_paths, greeks.delta.num_paths, greeks.vega.num_paths)
     (2000, 2000, 2000)
     >>> list(greeks.to_dataframe().index)
@@ -655,7 +730,18 @@ class LrmGreeks:
         --------
         >>> from finstack_quant.models.monte_carlo import LrmGreeks, PathDependentPricer
         >>> pricer = PathDependentPricer(2000, 7, use_parallel=False)
-        >>> greeks = pricer.price_with_lrm_greeks(100, 100, 0.04, 0.01, 0.25, 1.0, False, num_steps=12)
+        >>> greeks = pricer.price_with_lrm_greeks(
+        ...     {
+        ...         "spot": 100,
+        ...         "strike": 100,
+        ...         "rate": 0.04,
+        ...         "dividend_yield": 0.01,
+        ...         "volatility": 0.25,
+        ...         "time_to_expiry": 1.0,
+        ...         "option_type": "put",
+        ...     },
+        ...     num_steps=12,
+        ... )
         >>> LrmGreeks.from_json(greeks.to_json()).delta.mean == greeks.delta.mean
         True
         """
@@ -749,7 +835,18 @@ class LrmGreeks:
         --------
         >>> from finstack_quant.models.monte_carlo import PathDependentPricer
         >>> pricer = PathDependentPricer(2000, 7, use_parallel=False)
-        >>> frame = pricer.price_with_lrm_greeks(100, 100, 0.04, 0.01, 0.25, 1.0, True, num_steps=12).to_dataframe()
+        >>> frame = pricer.price_with_lrm_greeks(
+        ...     {
+        ...         "spot": 100,
+        ...         "strike": 100,
+        ...         "rate": 0.04,
+        ...         "dividend_yield": 0.01,
+        ...         "volatility": 0.25,
+        ...         "time_to_expiry": 1.0,
+        ...         "option_type": "call",
+        ...     },
+        ...     num_steps=12,
+        ... ).to_dataframe()
         >>> list(frame.columns)
         ['mean', 'stderr', 'ci_lower', 'ci_upper']
         """

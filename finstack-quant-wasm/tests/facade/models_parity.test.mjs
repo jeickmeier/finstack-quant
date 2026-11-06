@@ -144,6 +144,34 @@ const PATH_SPECS = {
   },
 };
 const GBM = [100.0, 100.0, 0.05, 0.0, 0.2, 1.0];
+/** `GBM` as the `OptionMarketParams` object of the closed-form and Monte Carlo pricers. */
+const gbmMarket = (optionType) => {
+  const [spot, strike, rate, dividendYield, volatility, timeToExpiry] = GBM;
+  return {
+    spot,
+    strike,
+    rate,
+    dividend_yield: dividendYield,
+    volatility,
+    time_to_expiry: timeToExpiry,
+    option_type: optionType,
+  };
+};
+/** `GBM` as the `GbmEuropeanFdSpec` of the finite-difference Greeks. */
+const gbmFdSpec = (optionType, numPaths, seed) => {
+  const [spot, strike, rate, divYield, vol, expiry] = GBM;
+  return {
+    spot,
+    strike,
+    rate,
+    dividend_yield: divYield,
+    volatility: vol,
+    time_to_expiry: expiry,
+    option_type: optionType,
+    num_paths: numPaths,
+    seed,
+  };
+};
 const STATE = {
   hazard_rate: 0.05,
   distance_to_default: null,
@@ -691,35 +719,38 @@ const CASES = {
   'monte_carlo.european': () => {
     const european = new monteCarlo.EuropeanPricer(2000, 42, false);
     return [
-      money(european.priceGbm(...GBM, true)),
-      money(european.priceGbm(...GBM, false, 16, 'EUR')),
+      money(european.priceGbm(gbmMarket('call'))),
+      money(european.priceGbm(gbmMarket('put'), 16, 'EUR')),
     ];
   },
   'monte_carlo.asian': () => {
     const asian = new monteCarlo.PathDependentPricer(2000, 42, false);
-    return [money(asian.priceAsian(...GBM, true, 12)), money(asian.priceAsian(...GBM, false, 12))];
+    return [
+      money(asian.priceAsian(gbmMarket('call'), 12)),
+      money(asian.priceAsian(gbmMarket('put'), 12)),
+    ];
   },
   'monte_carlo.lrm_greeks': () => {
     const asian = new monteCarlo.PathDependentPricer(2000, 42, false);
     return [
-      numericAmounts(asian.priceWithLrmGreeks(...GBM, true, 12)),
-      numericAmounts(asian.priceWithLrmGreeks(...GBM, false, 12, 'EUR')),
+      numericAmounts(asian.priceWithLrmGreeks(gbmMarket('call'), 12)),
+      numericAmounts(asian.priceWithLrmGreeks(gbmMarket('put'), 12, 'EUR')),
     ];
   },
   'monte_carlo.lsmc': () => {
     const lsmc = new monteCarlo.LsmcPricer(2000, 42, false, 20);
     return [
-      money(lsmc.priceAmerican(...GBM, false)),
-      money(lsmc.priceAmerican(...GBM, true, undefined, 10, 'polynomial', 2)),
-      money(lsmc.priceAmericanUnbiased(...GBM, false, 99)),
-      money(lsmc.priceAmericanUnbiased(...GBM, true, 99)),
+      money(lsmc.priceAmerican(gbmMarket('put'))),
+      money(lsmc.priceAmerican(gbmMarket('call'), undefined, 10, 'polynomial', 2)),
+      money(lsmc.priceAmericanUnbiased(gbmMarket('put'), 99)),
+      money(lsmc.priceAmericanUnbiased(gbmMarket('call'), 99)),
       lsmc.basis,
       lsmc.basisDegree,
     ];
   },
   'monte_carlo.finite_diff': () => [
-    monteCarlo.finiteDiffDelta(...GBM, true, 2000, 42).mean,
-    monteCarlo.finiteDiffGamma(...GBM, false, 2000, 42).mean,
+    monteCarlo.finiteDiffDelta(gbmFdSpec('call', 2000, 42)).mean,
+    monteCarlo.finiteDiffGamma(gbmFdSpec('put', 2000, 42)).mean,
   ],
   ...Object.fromEntries(
     Object.entries(PATH_SPECS).map(([name, spec]) => [
@@ -732,7 +763,7 @@ const CASES = {
     monteCarlo.hestonSatisfiesFeller(0.5, 0.04, 0.5),
   ],
   'monte_carlo.relative_stderr': () => {
-    const estimate = new monteCarlo.EuropeanPricer(2000, 42, false).priceGbm(...GBM, true);
+    const estimate = new monteCarlo.EuropeanPricer(2000, 42, false).priceGbm(gbmMarket('call'));
     return [
       monteCarlo.relativeStderr(estimate),
       estimate.stderr / Math.abs(Number(estimate.mean.amount)),
@@ -886,7 +917,17 @@ const CASES = {
     return [smile.forward, smile.timeToExpiry];
   },
   'models.bs_greeks_is_valid': () =>
-    models.bsGreeksIsValid(models.bsGreeks(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, true)),
+    models.bsGreeksIsValid(
+      models.bsGreeks({
+        spot: 100.0,
+        strike: 100.0,
+        rate: 0.05,
+        dividend_yield: 0.0,
+        volatility: 0.2,
+        time_to_expiry: 1.0,
+        option_type: 'call',
+      })
+    ),
 
   // Closed-form, COS and SVI kernels (audit finding F128).
   'closed_form.forward_greeks': () => [
@@ -902,27 +943,132 @@ const CASES = {
       [85.0, 'down'],
     ].flatMap(([barrier, direction]) =>
       ['in', 'out'].map((knock) =>
-        models.barrierOptionPrice(100.0, 100.0, barrier, 0.05, 0.01, 0.2, 1.0, direction, knock)
+        models.barrierOptionPrice(
+          {
+            spot: 100.0,
+            strike: 100.0,
+            rate: 0.05,
+            dividend_yield: 0.01,
+            volatility: 0.2,
+            time_to_expiry: 1.0,
+            option_type: 'call',
+          },
+          barrier,
+          direction,
+          knock
+        )
       )
     ),
   'closed_form.asian': () => [
-    models.asianOptionPrice(...GBM, 12),
-    models.asianOptionPrice(...GBM, 12, 'geometric', false),
-    models.asianOptionPrice(...GBM, 1, 'arithmetic', true),
+    models.asianOptionPrice(gbmMarket('call'), 12),
+    models.asianOptionPrice(gbmMarket('put'), 12, 'geometric'),
+    models.asianOptionPrice(gbmMarket('call'), 1, 'arithmetic'),
   ],
   'closed_form.quanto': () => [
-    models.quantoOptionPrice(100.0, 105.0, 1.5, 0.04, 0.01, 0.02, 0.25, 0.1, -0.3),
-    models.quantoOptionPrice(100.0, 105.0, 1.5, 0.04, 0.01, 0.02, 0.25, 0.1, -0.3, false),
+    models.quantoOptionPrice(
+      {
+        spot: 100.0,
+        strike: 105.0,
+        rate: 0.04,
+        dividend_yield: 0.02,
+        volatility: 0.25,
+        time_to_expiry: 1.5,
+        option_type: 'call',
+      },
+      0.01,
+      0.1,
+      -0.3
+    ),
+    models.quantoOptionPrice(
+      {
+        spot: 100.0,
+        strike: 105.0,
+        rate: 0.04,
+        dividend_yield: 0.02,
+        volatility: 0.25,
+        time_to_expiry: 1.5,
+        option_type: 'put',
+      },
+      0.01,
+      0.1,
+      -0.3
+    ),
   ],
   'fourier.heston': () => [
-    models.hestonPrice(100.0, 100.0, 1.0, 0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04),
-    models.hestonPrice(100.0, 110.0, 1.0, 0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04, false),
+    models.hestonPrice(100.0, 100.0, 1.0, {
+      r: 0.05,
+      q: 0.0,
+      v0: 0.04,
+      kappa: 2.0,
+      theta: 0.04,
+      sigma_v: 0.3,
+      rho: -0.7,
+    }),
+    models.hestonPrice(
+      100.0,
+      110.0,
+      1.0,
+      { r: 0.05, q: 0.0, v0: 0.04, kappa: 2.0, theta: 0.04, sigma_v: 0.3, rho: -0.7 },
+      false
+    ),
   ],
   'fourier.cos': () => [
-    models.vgCosPrice(100.0, 100.0, 0.05, 0.0, 0.2, -0.14, 0.2, 1.0, true),
-    models.vgCosPrice(100.0, 95.0, 0.05, 0.0, 0.2, -0.14, 0.2, 1.0, false, 512),
-    models.mertonJumpCosPrice(100.0, 100.0, 0.05, 0.0, 0.2, -0.1, 0.15, 0.5, 1.0, true),
-    models.mertonJumpCosPrice(100.0, 95.0, 0.05, 0.0, 0.2, -0.1, 0.15, 0.5, 1.0, false, 512),
+    models.vgCosPrice(
+      {
+        spot: 100.0,
+        strike: 100.0,
+        rate: 0.05,
+        dividend_yield: 0.0,
+        time_to_expiry: 1.0,
+        option_type: 'call',
+      },
+      0.2,
+      -0.14,
+      0.2
+    ),
+    models.vgCosPrice(
+      {
+        spot: 100.0,
+        strike: 95.0,
+        rate: 0.05,
+        dividend_yield: 0.0,
+        time_to_expiry: 1.0,
+        option_type: 'put',
+        n_terms: 512,
+      },
+      0.2,
+      -0.14,
+      0.2
+    ),
+    models.mertonJumpCosPrice(
+      {
+        spot: 100.0,
+        strike: 100.0,
+        rate: 0.05,
+        dividend_yield: 0.0,
+        time_to_expiry: 1.0,
+        option_type: 'call',
+      },
+      0.2,
+      -0.1,
+      0.15,
+      0.5
+    ),
+    models.mertonJumpCosPrice(
+      {
+        spot: 100.0,
+        strike: 95.0,
+        rate: 0.05,
+        dividend_yield: 0.0,
+        time_to_expiry: 1.0,
+        option_type: 'put',
+        n_terms: 512,
+      },
+      0.2,
+      -0.1,
+      0.15,
+      0.5
+    ),
   ],
   'volatility.convert_atm': () => [
     volatility.convertAtmVolatility(0.2, 'lognormal', 'normal', 0.03, 2.0),

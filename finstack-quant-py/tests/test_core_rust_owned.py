@@ -16,7 +16,7 @@ from typing import Any
 import pytest
 
 from finstack_quant.core.currency import Currency
-from finstack_quant.core.dates import DayCount, DayCountContext
+from finstack_quant.core.dates import DayCount, DayCountContext, Tenor
 from finstack_quant.core.market_data import (
     DiscountCurve,
     FxDeltaVolSurface,
@@ -175,16 +175,24 @@ def test_realized_variance_defaults_are_rust_owned() -> None:
     assert stats.realized_variance_ohlc(o, h, lo, c) == stats.realized_variance_ohlc(o, h, lo, c, "yang_zhang", 252.0)
 
 
-def test_fx_forward_trade_date_convention_defaults_in_rust_and_normalizes_names() -> None:
-    args = ("F", "EUR", "USD", dt.date(2024, 1, 15), "3M", 1_000_000.0, "USD-OIS", "EUR-OIS")
-    default = FxForward.from_trade_date(*args)
+def test_fx_forward_trade_date_convention_defaults_in_rust() -> None:
+    params = {
+        "id": "F",
+        "base_currency": "EUR",
+        "quote_currency": "USD",
+        "trade_date": dt.date(2024, 1, 15),
+        "tenor": Tenor.parse("3M"),
+        "notional": Money(1_000_000.0, "EUR"),
+        "domestic_discount_curve_id": "USD-OIS",
+        "foreign_discount_curve_id": "EUR-OIS",
+        "end_of_month": False,
+    }
+    default = FxForward.from_trade_date(params)
     assert default.maturity == dt.date(2024, 4, 17)
-    for name in [" MODIFIED_FOLLOWING ", "modified_following"]:
-        assert FxForward.from_trade_date(*args, business_day_convention=name).maturity == default.maturity
-    with pytest.raises(
-        ValueError, match="invalid business_day_convention: Validation error: Unknown business day convention"
-    ):
-        FxForward.from_trade_date(*args, business_day_convention="bogus")
+    explicit = FxForward.from_trade_date({**params, "business_day_convention": "modified_following"})
+    assert explicit.maturity == default.maturity
+    with pytest.raises(ValueError, match="FxForwardTradeDateParams"):
+        FxForward.from_trade_date({**params, "business_day_convention": "bogus"})
 
 
 def test_currency_has_one_alphabetic_string_surface() -> None:

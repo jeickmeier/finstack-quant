@@ -80,11 +80,7 @@ use super::extract::extract_config;
 /// attribution computations run.
 #[pyfunction]
 #[pyo3(signature = (instrument, market, as_of, scenario, method = None, config = None, calendar_id = None))]
-// Arity is fixed by the documented Python keyword signature; grouping into a
-// params struct would change the public API.
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn compute_horizon_return<'py>(
-    py: Python<'py>,
     instrument: &Bound<'py, PyAny>,
     market: &Bound<'py, PyAny>,
     as_of: &Bound<'py, PyAny>,
@@ -93,6 +89,7 @@ pub(crate) fn compute_horizon_return<'py>(
     config: Option<&Bound<'py, PyAny>>,
     calendar_id: Option<&str>,
 ) -> PyResult<PyHorizonResult> {
+    let py = instrument.py();
     use std::sync::Arc;
 
     let boxed = extract_instrument(instrument)?

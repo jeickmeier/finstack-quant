@@ -1677,7 +1677,17 @@ class SaCcrTrade:
     --------
     >>> from finstack_quant.margin import SaCcrTrade
     >>> trade = SaCcrTrade(
-    ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0, False
+    ...     trade_id="t1",
+    ...     asset_class="interest_rate",
+    ...     notional=1_000_000,
+    ...     start_date="2025-01-01",
+    ...     end_date="2030-01-01",
+    ...     underlier="USD-SOFR",
+    ...     hedging_set="rates",
+    ...     direction=1.0,
+    ...     supervisory_delta=1.0,
+    ...     mtm=0.0,
+    ...     is_option=False,
     ... )
     >>> (trade.trade_id, trade.asset_class, trade.is_option)
     ('t1', 'interest_rate', False)
@@ -1685,6 +1695,7 @@ class SaCcrTrade:
 
     def __init__(
         self,
+        *,
         trade_id: str,
         asset_class: str,
         notional: float,
@@ -1701,7 +1712,11 @@ class SaCcrTrade:
         option_maturity_date: datetime.date | str | None = None,
     ) -> None:
         """
-        Create and validate a trade (see the class docstring for each field).
+        Create and validate a trade from keyword-only fields (see the class
+        docstring for each field).
+
+        Rust reads the keywords as the ``SaCcrTrade`` wire struct and rejects
+        an unknown keyword.
 
         Parameters
         ----------
@@ -1744,12 +1759,33 @@ class SaCcrTrade:
         Raises
         ------
         ValueError
-            If a label is unknown, a date string is not ISO 8601, or the
-            trade fails the BCBS 279 coherence checks (zero direction, delta
-            outside ``[-1, 1]``, linear delta not ``±1`` or disagreeing with
-            direction, option delta sign inconsistent with ``option_type``).
+            If a required field is missing, a keyword or label is unknown, a
+            date string is not ISO 8601, or the trade fails the BCBS 279
+            coherence checks (zero direction, delta outside ``[-1, 1]``,
+            linear delta not ``±1`` or disagreeing with direction, option
+            delta sign inconsistent with ``option_type``).
         TypeError
-            If a date is neither a string nor date-like.
+            If a positional argument is passed, or a value is not
+            JSON-encodable.
+
+        Examples
+        --------
+        >>> from finstack_quant.margin import SaCcrTrade
+        >>> trade = SaCcrTrade(
+        ...     trade_id="t1",
+        ...     asset_class="interest_rate",
+        ...     notional=1_000_000.0,
+        ...     start_date="2025-01-01",
+        ...     end_date="2030-01-01",
+        ...     underlier="USD-SOFR",
+        ...     hedging_set="rates",
+        ...     direction=1.0,
+        ...     supervisory_delta=1.0,
+        ...     mtm=0.0,
+        ...     is_option=False,
+        ... )
+        >>> trade.option_type is None
+        True
         """
         ...
 
@@ -1814,7 +1850,17 @@ class SaCcrTrade:
         Examples
         --------
         >>> trade = SaCcrTrade(
-        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0, False
+        ...     trade_id="t1",
+        ...     asset_class="interest_rate",
+        ...     notional=1_000_000,
+        ...     start_date="2025-01-01",
+        ...     end_date="2030-01-01",
+        ...     underlier="USD-SOFR",
+        ...     hedging_set="rates",
+        ...     direction=1.0,
+        ...     supervisory_delta=1.0,
+        ...     mtm=0.0,
+        ...     is_option=False,
         ... )
         >>> [t.trade_id for t in SaCcrTrade.from_dataframe(trade.to_dataframe())]
         ['t1']
@@ -1842,7 +1888,17 @@ class SaCcrTrade:
         Examples
         --------
         >>> trade = SaCcrTrade(
-        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0, False
+        ...     trade_id="t1",
+        ...     asset_class="interest_rate",
+        ...     notional=1_000_000,
+        ...     start_date="2025-01-01",
+        ...     end_date="2030-01-01",
+        ...     underlier="USD-SOFR",
+        ...     hedging_set="rates",
+        ...     direction=1.0,
+        ...     supervisory_delta=1.0,
+        ...     mtm=0.0,
+        ...     is_option=False,
         ... )
         >>> trade.to_dataframe().iloc[0]["end_date"]
         '2030-01-01'
@@ -1991,7 +2047,17 @@ class SaCcrTrade:
         Examples
         --------
         >>> trade = SaCcrTrade(
-        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0, False
+        ...     trade_id="t1",
+        ...     asset_class="interest_rate",
+        ...     notional=1_000_000,
+        ...     start_date="2025-01-01",
+        ...     end_date="2030-01-01",
+        ...     underlier="USD-SOFR",
+        ...     hedging_set="rates",
+        ...     direction=1.0,
+        ...     supervisory_delta=1.0,
+        ...     mtm=0.0,
+        ...     is_option=False,
         ... )
         >>> trade.start_date
         datetime.date(2025, 1, 1)
@@ -2015,7 +2081,17 @@ class SaCcrTrade:
         Examples
         --------
         >>> trade = SaCcrTrade(
-        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0, False
+        ...     trade_id="t1",
+        ...     asset_class="interest_rate",
+        ...     notional=1_000_000,
+        ...     start_date="2025-01-01",
+        ...     end_date="2030-01-01",
+        ...     underlier="USD-SOFR",
+        ...     hedging_set="rates",
+        ...     direction=1.0,
+        ...     supervisory_delta=1.0,
+        ...     mtm=0.0,
+        ...     is_option=False,
         ... )
         >>> trade.end_date
         datetime.date(2030, 1, 1)
@@ -2039,7 +2115,17 @@ class SaCcrTrade:
         Examples
         --------
         >>> trade = SaCcrTrade(
-        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0, False
+        ...     trade_id="t1",
+        ...     asset_class="interest_rate",
+        ...     notional=1_000_000,
+        ...     start_date="2025-01-01",
+        ...     end_date="2030-01-01",
+        ...     underlier="USD-SOFR",
+        ...     hedging_set="rates",
+        ...     direction=1.0,
+        ...     supervisory_delta=1.0,
+        ...     mtm=0.0,
+        ...     is_option=False,
         ... )
         >>> trade.underlier
         'USD-SOFR'
@@ -2063,7 +2149,17 @@ class SaCcrTrade:
         Examples
         --------
         >>> trade = SaCcrTrade(
-        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0, False
+        ...     trade_id="t1",
+        ...     asset_class="interest_rate",
+        ...     notional=1_000_000,
+        ...     start_date="2025-01-01",
+        ...     end_date="2030-01-01",
+        ...     underlier="USD-SOFR",
+        ...     hedging_set="rates",
+        ...     direction=1.0,
+        ...     supervisory_delta=1.0,
+        ...     mtm=0.0,
+        ...     is_option=False,
         ... )
         >>> trade.hedging_set
         'rates'
@@ -2087,7 +2183,17 @@ class SaCcrTrade:
         Examples
         --------
         >>> trade = SaCcrTrade(
-        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0, False
+        ...     trade_id="t1",
+        ...     asset_class="interest_rate",
+        ...     notional=1_000_000,
+        ...     start_date="2025-01-01",
+        ...     end_date="2030-01-01",
+        ...     underlier="USD-SOFR",
+        ...     hedging_set="rates",
+        ...     direction=1.0,
+        ...     supervisory_delta=1.0,
+        ...     mtm=0.0,
+        ...     is_option=False,
         ... )
         >>> trade.direction
         1.0
@@ -2111,7 +2217,17 @@ class SaCcrTrade:
         Examples
         --------
         >>> trade = SaCcrTrade(
-        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0, False
+        ...     trade_id="t1",
+        ...     asset_class="interest_rate",
+        ...     notional=1_000_000,
+        ...     start_date="2025-01-01",
+        ...     end_date="2030-01-01",
+        ...     underlier="USD-SOFR",
+        ...     hedging_set="rates",
+        ...     direction=1.0,
+        ...     supervisory_delta=1.0,
+        ...     mtm=0.0,
+        ...     is_option=False,
         ... )
         >>> trade.supervisory_delta
         1.0
@@ -2135,7 +2251,17 @@ class SaCcrTrade:
         Examples
         --------
         >>> trade = SaCcrTrade(
-        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0, False
+        ...     trade_id="t1",
+        ...     asset_class="interest_rate",
+        ...     notional=1_000_000,
+        ...     start_date="2025-01-01",
+        ...     end_date="2030-01-01",
+        ...     underlier="USD-SOFR",
+        ...     hedging_set="rates",
+        ...     direction=1.0,
+        ...     supervisory_delta=1.0,
+        ...     mtm=0.0,
+        ...     is_option=False,
         ... )
         >>> trade.is_option
         False
@@ -2159,7 +2285,17 @@ class SaCcrTrade:
         Examples
         --------
         >>> trade = SaCcrTrade(
-        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0, False
+        ...     trade_id="t1",
+        ...     asset_class="interest_rate",
+        ...     notional=1_000_000,
+        ...     start_date="2025-01-01",
+        ...     end_date="2030-01-01",
+        ...     underlier="USD-SOFR",
+        ...     hedging_set="rates",
+        ...     direction=1.0,
+        ...     supervisory_delta=1.0,
+        ...     mtm=0.0,
+        ...     is_option=False,
         ... )
         >>> trade.option_type is None
         True
@@ -2634,7 +2770,17 @@ class SaCcrEngine:
         --------
         >>> config = SaCcrNettingSetConfig.unmargined(NettingSetId.bilateral("CPTY", "CSA"), 0.0, "2025-01-01")
         >>> trade = SaCcrTrade(
-        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0, False
+        ...     trade_id="t1",
+        ...     asset_class="interest_rate",
+        ...     notional=1_000_000,
+        ...     start_date="2025-01-01",
+        ...     end_date="2030-01-01",
+        ...     underlier="USD-SOFR",
+        ...     hedging_set="rates",
+        ...     direction=1.0,
+        ...     supervisory_delta=1.0,
+        ...     mtm=0.0,
+        ...     is_option=False,
         ... )
         >>> round(SaCcrEngine().calculate_ead(config, [trade]).ead, 2)
         30982.83
@@ -2719,7 +2865,17 @@ def saccr_ead(
     --------
     >>> from finstack_quant.margin import NettingSetId, SaCcrNettingSetConfig, SaCcrTrade, saccr_ead
     >>> trade = SaCcrTrade(
-    ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0, False
+    ...     trade_id="t1",
+    ...     asset_class="interest_rate",
+    ...     notional=1_000_000,
+    ...     start_date="2025-01-01",
+    ...     end_date="2030-01-01",
+    ...     underlier="USD-SOFR",
+    ...     hedging_set="rates",
+    ...     direction=1.0,
+    ...     supervisory_delta=1.0,
+    ...     mtm=0.0,
+    ...     is_option=False,
     ... )
     >>> config = SaCcrNettingSetConfig.unmargined(NettingSetId.bilateral("CPTY", "CSA"), 0.0, "2025-01-01")
     >>> result = saccr_ead([trade], config)

@@ -30,10 +30,10 @@ fn parse_bump_config(value: Option<&JsValue>) -> Result<Option<BumpSizeConfig>, 
 /// sensitivity-matrix wire object (`base_currency`, `position_ids`,
 /// `factor_ids`, `data` rows).
 /// @param portfolio - Built portfolio whose positions are the matrix rows; its base currency is the reporting currency.
-/// @param factors_json - `FactorDefinition` array (object or JSON text); every factor must map to market data, so credit hierarchy factors need `FactorModel.computeSensitivities`.
+/// @param factorsJson - `FactorDefinition` array (object or JSON text); every factor must map to market data, so credit hierarchy factors need `FactorModel.computeSensitivities`.
 /// @param market - `core.MarketContext` handle bumped per factor, including FX for cross-currency positions.
-/// @param as_of - ISO-8601 valuation date for pricing and spot FX.
-/// @param bump_config_json - Optional `BumpSizeConfig` (object or JSON text); omit for 1 bp / 1 % per factor type.
+/// @param asOf - ISO-8601 valuation date for pricing and spot FX.
+/// @param bumpConfigJson - Optional `BumpSizeConfig` (object or JSON text); omit for 1 bp / 1 % per factor type.
 /// @returns The `SensitivityMatrixJson` object.
 ///
 /// # Errors
@@ -43,12 +43,20 @@ fn parse_bump_config(value: Option<&JsValue>) -> Result<Option<BumpSizeConfig>, 
 /// `FinstackError` if `asOf` is not an ISO date, the factors or bump config do
 /// not match their schema, a factor is a credit hierarchy factor (kind
 /// `validation`), or bumping, repricing or FX conversion fails.
-#[wasm_bindgen(js_name = computeFactorSensitivities)]
+#[wasm_bindgen(js_name = computeFactorSensitivities, unchecked_return_type = "SensitivityMatrixJson")]
 pub fn compute_factor_sensitivities(
     portfolio: &JsPortfolio,
+    #[wasm_bindgen(
+        js_name = "factorsJson",
+        unchecked_param_type = "FactorDefinition[] | string"
+    )]
     factors_json: JsValue,
     market: &JsMarketContext,
-    as_of: JsValue,
+    #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
+    #[wasm_bindgen(
+        js_name = "bumpConfigJson",
+        unchecked_optional_param_type = "BumpSizeConfig | string"
+    )]
     bump_config_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let factors: Vec<FactorDefinition> = from_js_json(&factors_json, "factorsJson")?;
@@ -75,11 +83,11 @@ pub fn compute_factor_sensitivities(
 /// Each profile holds the scale-factor-weighted P&L of every position at each
 /// grid shift, in the portfolio's base currency.
 /// @param portfolio - Built portfolio whose positions are the profile columns; its base currency is the reporting currency.
-/// @param factors_json - `FactorDefinition` array (object or JSON text) to shock, in returned profile order.
+/// @param factorsJson - `FactorDefinition` array (object or JSON text) to shock, in returned profile order.
 /// @param market - `core.MarketContext` handle reused by every scenario.
-/// @param as_of - ISO-8601 valuation date for pricing and spot FX.
-/// @param bump_config_json - Optional `BumpSizeConfig` (object or JSON text); omit for 1 bp / 1 % per factor type.
-/// @param n_points - Odd number of grid points in `3..=1001`; omit for 5 (shifts `[-2, -1, 0, 1, 2]`).
+/// @param asOf - ISO-8601 valuation date for pricing and spot FX.
+/// @param bumpConfigJson - Optional `BumpSizeConfig` (object or JSON text); omit for 1 bp / 1 % per factor type.
+/// @param nPoints - Odd number of grid points in `3..=1001`; omit for 5 (shifts `[-2, -1, 0, 1, 2]`).
 /// @returns The `FactorPnlProfile` array.
 ///
 /// # Errors
@@ -90,14 +98,24 @@ pub fn compute_factor_sensitivities(
 /// factors or bump config do not match their schema, the grid size is invalid
 /// or a factor is a credit hierarchy factor (kind `validation`), or bumping,
 /// repricing or FX conversion fails.
-#[wasm_bindgen(js_name = computePnlProfiles)]
+#[wasm_bindgen(js_name = computePnlProfiles, unchecked_return_type = "FactorPnlProfile[]")]
 pub fn compute_pnl_profiles(
     portfolio: &JsPortfolio,
+    #[wasm_bindgen(
+        js_name = "factorsJson",
+        unchecked_param_type = "FactorDefinition[] | string"
+    )]
     factors_json: JsValue,
     market: &JsMarketContext,
-    as_of: JsValue,
+    #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
+    #[wasm_bindgen(
+        js_name = "bumpConfigJson",
+        unchecked_optional_param_type = "BumpSizeConfig | string"
+    )]
     bump_config_json: Option<JsValue>,
-    n_points: Option<JsValue>,
+    #[wasm_bindgen(js_name = "nPoints", unchecked_optional_param_type = "number")] n_points: Option<
+        JsValue,
+    >,
 ) -> Result<JsValue, JsValue> {
     let factors: Vec<FactorDefinition> = from_js_json(&factors_json, "factorsJson")?;
     let as_of = parse_iso_date(&js_string(&as_of, "asOf")?)?;

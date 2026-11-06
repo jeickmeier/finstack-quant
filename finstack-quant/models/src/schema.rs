@@ -17,7 +17,7 @@ use crate::closed_form::{
 use crate::monte_carlo::simulate::{
     FbmSpec, PathSimulationSpec, PathSummary, ProcessSpec, SchemeSpec,
 };
-use crate::types::{ExerciseStyle, OptionType};
+use crate::types::{ExerciseStyle, OptionMarketParams, OptionType};
 use crate::{
     correlation::CreditExposure, correlation::LatentFactorSpec, correlation::PortfolioLossConfig,
     correlation::PortfolioLossResult, correlation::RecoverySpec,
@@ -40,11 +40,12 @@ use crate::{
     credit::scoring::ZmijewskiInput, fourier::characteristic_function::BlackScholesCf,
     fourier::characteristic_function::MertonJumpCf,
     fourier::characteristic_function::VarianceGammaCf, fourier::cos::CosConfig,
-    liquidity::AlmgrenChrissModel, liquidity::ExecutionTrajectory, liquidity::ImpactEstimate,
-    liquidity::KyleLambdaModel, liquidity::LiquidityTier, liquidity::LvarBangiaScalar,
-    liquidity::TradeParams, monte_carlo::estimate::Estimate, monte_carlo::greeks::lrm::LrmGreeks,
+    fourier::cos::CosMarketParams, liquidity::AlmgrenChrissModel, liquidity::ExecutionTrajectory,
+    liquidity::ImpactEstimate, liquidity::KyleLambdaModel, liquidity::LiquidityTier,
+    liquidity::LvarBangiaScalar, liquidity::TradeParams, monte_carlo::estimate::Estimate,
+    monte_carlo::greeks::gbm_european::GbmEuropeanFdSpec, monte_carlo::greeks::lrm::LrmGreeks,
     monte_carlo::payoff::asian::AveragingMethod, monte_carlo::pricer::basis::BasisKind,
-    monte_carlo::process::brownian::BrownianParams,
+    monte_carlo::pricer::heston::HestonMcSettings, monte_carlo::process::brownian::BrownianParams,
     monte_carlo::process::cheyette_rough::CheyetteRoughVolParams,
     monte_carlo::process::cir::CirParams, monte_carlo::process::gbm::GbmParams,
     monte_carlo::process::lmm::LmmParams, monte_carlo::process::local_vol::LocalVolParams,
@@ -177,6 +178,13 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "COS method configuration."
     ),
     finstack_quant_core::schema_artifact!(
+        CosMarketParams,
+        "models",
+        "cos_market_params",
+        Input,
+        "Option and market inputs of the COS Fourier pricers."
+    ),
+    finstack_quant_core::schema_artifact!(
         CreditExposure,
         "models",
         "credit_exposure",
@@ -289,11 +297,25 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "Undiscounted forward Greeks of a European option on a forward."
     ),
     finstack_quant_core::schema_artifact!(
+        GbmEuropeanFdSpec,
+        "models",
+        "gbm_european_fd_spec",
+        Input,
+        "Inputs of the GBM European Monte Carlo finite-difference Greeks."
+    ),
+    finstack_quant_core::schema_artifact!(
         GbmParams,
         "models",
         "gbm_params",
         Input,
         "Geometric Brownian Motion parameters."
+    ),
+    finstack_quant_core::schema_artifact!(
+        HestonMcSettings,
+        "models",
+        "heston_mc_settings",
+        Input,
+        "Monte Carlo run settings of the Heston European pricer."
     ),
     finstack_quant_core::schema_artifact!(
         HestonParams,
@@ -490,6 +512,13 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "option_calculation_result",
         Output,
         "Price, volatility and Greeks of one closed-form option calculation."
+    ),
+    finstack_quant_core::schema_artifact!(
+        OptionMarketParams,
+        "models",
+        "option_market_params",
+        Input,
+        "Spot, strike, rates, volatility, expiry and payoff direction of an option model call."
     ),
     finstack_quant_core::schema_artifact!(
         OptionType,

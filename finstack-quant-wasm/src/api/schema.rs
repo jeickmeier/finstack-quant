@@ -58,7 +58,7 @@ macro_rules! schema_registry {
         /// shared definitions).
         /// @returns `{ artifacts, schema_index_version }`, with one row per published schema.
         /// @throws Error - Throws with kind `internal` if a schema cannot be rendered (does not occur for a released build).
-        #[wasm_bindgen(js_name = $index_js)]
+        #[wasm_bindgen(js_name = $index_js, unchecked_return_type = "SchemaIndex")]
         pub fn $index() -> Result<JsValue, JsValue> {
             to_js_value(
                 &finstack_quant_core::schema::build_schema_index($registry).map_err(to_js_err)?,
@@ -70,8 +70,13 @@ macro_rules! schema_registry {
         /// @param profile - `"canonical"` (the default) for the validation contract, or `"llm"` for a self-contained projection with cross-document references inlined, intended for structured-output generation.
         /// @returns JSON Schema document.
         /// @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `profile` is unknown, and kind `invalid_type` if either argument is not a string.
-        #[wasm_bindgen(js_name = $get_js)]
-        pub fn $get(selector: JsValue, profile: Option<JsValue>) -> Result<JsValue, JsValue> {
+        #[wasm_bindgen(js_name = $get_js, unchecked_return_type = "Record<string, unknown>")]
+        pub fn $get(
+            #[wasm_bindgen(unchecked_param_type = "string")] selector: JsValue,
+            #[wasm_bindgen(unchecked_optional_param_type = "SchemaProfile")] profile: Option<
+                JsValue,
+            >,
+        ) -> Result<JsValue, JsValue> {
             let selector = js_string(&selector, "selector")?;
             let artifact = finstack_quant_core::schema::find_schema_artifact($registry, &selector)
                 .map_err(to_js_err)?;
@@ -86,8 +91,11 @@ macro_rules! schema_registry {
         /// @param payload - Document to check, as a plain object/array or as JSON text. Pass JSON text for a scalar payload (`'"USD"'`, `'1.5'`).
         /// @returns One `{ pointer, message }` row per failure, where `pointer` is the JSON Pointer of the offending value; empty when the payload is valid.
         /// @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `payload` is JSON text that does not parse, and kind `invalid_type` if `selector` is not a string or `payload` is neither JSON text nor a plain object/array.
-        #[wasm_bindgen(js_name = $validate_js)]
-        pub fn $validate(selector: JsValue, payload: JsValue) -> Result<JsValue, JsValue> {
+        #[wasm_bindgen(js_name = $validate_js, unchecked_return_type = "SchemaValidationFailure[]")]
+        pub fn $validate(
+            #[wasm_bindgen(unchecked_param_type = "string")] selector: JsValue,
+            #[wasm_bindgen(unchecked_param_type = "string | object")] payload: JsValue,
+        ) -> Result<JsValue, JsValue> {
             let selector = js_string(&selector, "selector")?;
             let artifact = finstack_quant_core::schema::find_schema_artifact($registry, &selector)
                 .map_err(to_js_err)?;
@@ -168,7 +176,7 @@ schema_registry!(
 /// domain, then path.
 /// @returns `{ artifacts, schema_index_version }`, with one row per published schema.
 /// @throws Error - Throws with kind `internal` if a schema cannot be rendered (does not occur for a released build).
-#[wasm_bindgen(js_name = schemaIndex)]
+#[wasm_bindgen(js_name = schemaIndex, unchecked_return_type = "SchemaIndex")]
 pub fn schema_index() -> Result<JsValue, JsValue> {
     to_js_value(&finstack_quant::schema::index().map_err(to_js_err)?)
 }
@@ -178,8 +186,11 @@ pub fn schema_index() -> Result<JsValue, JsValue> {
 /// @param profile - `"canonical"` (the default) for the validation contract, or `"llm"` for a self-contained projection with cross-document references inlined, intended for structured-output generation.
 /// @returns JSON Schema document.
 /// @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `profile` is unknown, and kind `invalid_type` if either argument is not a string.
-#[wasm_bindgen(js_name = schemaGet)]
-pub fn schema_get(selector: JsValue, profile: Option<JsValue>) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = schemaGet, unchecked_return_type = "Record<string, unknown>")]
+pub fn schema_get(
+    #[wasm_bindgen(unchecked_param_type = "string")] selector: JsValue,
+    #[wasm_bindgen(unchecked_optional_param_type = "SchemaProfile")] profile: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
     let selector = js_string(&selector, "selector")?;
     render(
         finstack_quant::schema::find(&selector).map_err(to_js_err)?,
@@ -195,8 +206,11 @@ pub fn schema_get(selector: JsValue, profile: Option<JsValue>) -> Result<JsValue
 /// @param payload - Document to check, as a plain object/array or as JSON text. Pass JSON text for a scalar payload (`'"USD"'`, `'1.5'`).
 /// @returns One `{ pointer, message }` row per failure, where `pointer` is the JSON Pointer of the offending value; empty when the payload is valid.
 /// @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `payload` is JSON text that does not parse, and kind `invalid_type` if `selector` is not a string or `payload` is neither JSON text nor a plain object/array.
-#[wasm_bindgen(js_name = schemaValidate)]
-pub fn schema_validate(selector: JsValue, payload: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = schemaValidate, unchecked_return_type = "SchemaValidationFailure[]")]
+pub fn schema_validate(
+    #[wasm_bindgen(unchecked_param_type = "string")] selector: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string | object")] payload: JsValue,
+) -> Result<JsValue, JsValue> {
     let selector = js_string(&selector, "selector")?;
     report(
         finstack_quant::schema::find(&selector).map_err(to_js_err)?,
@@ -224,7 +238,7 @@ pub fn schema_domains() -> Vec<String> {
 /// cross-document `$ref`s of the cashflow contracts.
 /// @returns Object mapping each schema `$id` to its JSON Schema document, in registry order.
 /// @throws Error - Throws with kind `validation` if an embedded schema is malformed (does not occur for a released build).
-#[wasm_bindgen(js_name = cashflowsSchemaResources)]
+#[wasm_bindgen(js_name = cashflowsSchemaResources, unchecked_return_type = "Record<string, Record<string, unknown>>")]
 pub fn cashflows_schema_resources() -> Result<JsValue, JsValue> {
     let resources = finstack_quant_cashflows::schema::resources().map_err(to_js_err)?;
     let documents: IndexMap<&str, &serde_json::Value> = resources

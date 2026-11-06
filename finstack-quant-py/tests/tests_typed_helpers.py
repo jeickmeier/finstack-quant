@@ -65,8 +65,23 @@ def canonical_structured_credit_json(*, calendar_id: str = "nyse") -> str:
 def irs_legs() -> tuple[FixedLegSpec, FloatLegSpec]:
     start = datetime.date(2024, 1, 15)
     end = datetime.date(2029, 1, 15)
-    fixed = FixedLegSpec("USD-OIS", 0.04, Tenor.semi_annual(), DayCount.THIRTY_360, start, end)
-    float_leg = FloatLegSpec("USD-OIS", "USD-SOFR-3M", 0.0, Tenor.quarterly(), DayCount.ACT_360, start, end)
+    fixed = FixedLegSpec(
+        discount_curve_id="USD-OIS",
+        rate="0.04",
+        frequency=Tenor.semi_annual(),
+        day_count=DayCount.THIRTY_360,
+        start=start,
+        end=end,
+    )
+    float_leg = FloatLegSpec(
+        discount_curve_id="USD-OIS",
+        forward_curve_id="USD-SOFR-3M",
+        spread_bp="0",
+        frequency=Tenor.quarterly(),
+        day_count=DayCount.ACT_360,
+        start=start,
+        end=end,
+    )
     return fixed, float_leg
 
 
@@ -88,8 +103,23 @@ def swaption_legs() -> tuple[FixedLegSpec, FloatLegSpec]:
     start = datetime.date(2025, 1, 15)
     end = datetime.date(2030, 1, 15)
     return (
-        FixedLegSpec("USD-OIS", 0.04, Tenor.semi_annual(), DayCount.THIRTY_360, start, end),
-        FloatLegSpec("USD-OIS", "USD-SOFR-3M", 0.0, Tenor.quarterly(), DayCount.ACT_360, start, end),
+        FixedLegSpec(
+            discount_curve_id="USD-OIS",
+            rate="0.04",
+            frequency=Tenor.semi_annual(),
+            day_count=DayCount.THIRTY_360,
+            start=start,
+            end=end,
+        ),
+        FloatLegSpec(
+            discount_curve_id="USD-OIS",
+            forward_curve_id="USD-SOFR-3M",
+            spread_bp="0",
+            frequency=Tenor.quarterly(),
+            day_count=DayCount.ACT_360,
+            start=start,
+            end=end,
+        ),
     )
 
 
@@ -145,12 +175,12 @@ def build_capfloor(
 def cds_legs() -> tuple[PremiumLegSpec, ProtectionLegSpec]:
     return (
         PremiumLegSpec(
-            datetime.date(2024, 3, 20),
-            datetime.date(2029, 6, 20),
-            Tenor.quarterly(),
-            DayCount.ACT_360,
-            100.0,
-            "USD-OIS",
+            start=datetime.date(2024, 3, 20),
+            end=datetime.date(2029, 6, 20),
+            frequency=Tenor.quarterly(),
+            day_count=DayCount.ACT_360,
+            coupon_bp="100",
+            discount_curve_id="USD-OIS",
             roll_rule=RollRule.CDS_IMM,
         ),
         ProtectionLegSpec("ACME-CDS", 0.4, 3),
@@ -218,7 +248,7 @@ def build_fx_option() -> FxOption:
         .quote_currency(Currency("USD"))
         .strike(1.12)
         .option_type("call")
-        .delta_convention("forward", Currency("USD"), "generic_interbank")
+        .delta_convention({"kind": "forward", "premium_currency": "USD", "venue": "generic_interbank"})
         .expiry(datetime.date(2025, 12, 15))
         .notional(Money(1_000_000.0, Currency("EUR")))
         .domestic_discount_curve_id("USD-OIS")
@@ -299,12 +329,12 @@ def structured_credit_pool() -> AssetPool:
     pool = AssetPool("POOL-1", "abs", Currency("USD"))
     return pool.with_rep_lines([
         RepLine(
-            "LINE-1",
-            Money(80_000_000.0, Currency("USD")),
-            0.07,
-            datetime.date(2031, 1, 15),
-            12,
-            DayCount.ACT_360,
+            id="LINE-1",
+            balance=Money(80_000_000.0, Currency("USD")),
+            rate=0.07,
+            maturity=datetime.date(2031, 1, 15),
+            seasoning_months=12,
+            day_count=DayCount.ACT_360,
             asset_type={"type": "first_lien_loan"},
             cpr=0.10,
             cdr=0.02,
@@ -345,11 +375,11 @@ def build_structured_credit() -> StructuredCredit:
     return StructuredCredit.new_standard(
         "abs",
         StandardDealParams(
-            "ABS-1",
-            structured_credit_pool(),
-            structured_credit_tranches(),
-            datetime.date(2024, 1, 15),
-            datetime.date(2031, 1, 15),
-            "USD-SOFR-DISC",
+            id="ABS-1",
+            pool=structured_credit_pool(),
+            tranches=structured_credit_tranches(),
+            closing_date=datetime.date(2024, 1, 15),
+            maturity=datetime.date(2031, 1, 15),
+            discount_curve_id="USD-SOFR-DISC",
         ),
     )

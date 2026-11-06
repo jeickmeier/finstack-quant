@@ -28,7 +28,7 @@ Alternatives include validated smart constructors, price-space risk bumps, permi
 ## Evidence
 
 - Owning implementations: [quote IDs/pillars](../../../../finstack-quant/calibration/src/quotes/ids.rs), [MarketQuote/extraction](../../../../finstack-quant/calibration/src/quotes/market_quote.rs), [rates](../../../../finstack-quant/calibration/src/quotes/rates.rs), [CDS](../../../../finstack-quant/calibration/src/quotes/cds.rs), [tranches](../../../../finstack-quant/calibration/src/quotes/cds_tranche.rs), [inflation](../../../../finstack-quant/calibration/src/quotes/inflation.rs), [volatility](../../../../finstack-quant/calibration/src/quotes/vol.rs), [XCCY](../../../../finstack-quant/calibration/src/quotes/xccy.rs).
-- [Quote-schema tests](../../../../finstack-quant/calibration/tests/calibration/quote_schemas.rs), [market quote serialization](../../../../finstack-quant/calibration/tests/calibration/market_quote.rs), and zero/negative spread/nonstandard-coupon cases in [hazard tests](../../../../finstack-quant/calibration/src/hazard_curve_tests.rs) are located domain/serialization evidence, not price validation.
+- [Quote-schema tests](../../../../finstack-quant/calibration/tests/calibration/quote_schemas.rs), [market quote serialization](../../../../finstack-quant/calibration/tests/calibration/market_quote.rs), and zero/negative spread/nonstandard-coupon cases in [hazard tests](../../../../finstack-quant/calibration/src/tests/hazard_curve.rs) are located domain/serialization evidence, not price validation.
 
 ## Follow-up tracking
 

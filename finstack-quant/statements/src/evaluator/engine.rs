@@ -32,6 +32,20 @@ type PeriodEvaluation = (
 /// Per-path cache of Monte Carlo z-scores, keyed by node then period.
 pub(super) type McZCache = IndexMap<NodeId, IndexMap<PeriodId, f64>>;
 
+/// The period one evaluation pass computes: the model, the period, whether
+/// explicit actual values apply, and the topological node order.
+#[derive(Clone, Copy)]
+pub(crate) struct PeriodEval<'a> {
+    /// Model being evaluated.
+    pub(crate) model: &'a FinancialModelSpec,
+    /// Period being evaluated, one of `model.periods`.
+    pub(crate) period: &'a finstack_quant_core::dates::Period,
+    /// Whether the period reads explicit actual values.
+    pub(crate) is_actual: bool,
+    /// Topologically sorted node order.
+    pub(crate) eval_order: &'a [NodeId],
+}
+
 /// Cached structural analysis from [`Evaluator::prepare`], allowing repeated
 /// evaluations of the same model structure without recompilation.
 pub struct PreparedEvaluation {
@@ -420,17 +434,21 @@ impl Evaluator {
                     (market_ctx, as_of, cs_state.as_mut(), instruments.as_ref())
                 {
                     let (vals, row, warns, period_cs, sources) = self.evaluate_period_dynamic(
-                        model,
-                        period,
-                        period.is_actual,
-                        &prepared.eval_order,
+                        PeriodEval {
+                            model,
+                            period,
+                            is_actual: period.is_actual,
+                            eval_order: &prepared.eval_order,
+                        },
                         &historical,
                         &historical_cs,
-                        market_ctx,
-                        as_of,
-                        insts,
-                        state,
-                        &cs_affected_nodes,
+                        capital_structure_runtime::CapitalStructureRun {
+                            market_ctx,
+                            as_of,
+                            instruments: insts,
+                            state,
+                            affected_nodes: &cs_affected_nodes,
+                        },
                         mc_seed.map(|seed| (seed, &mut mc_z_cache)),
                     )?;
 
@@ -440,10 +458,12 @@ impl Evaluator {
                     (vals, row, warns, sources)
                 } else {
                     self.evaluate_period(
-                        model,
-                        &period.id,
-                        period.is_actual,
-                        &prepared.eval_order,
+                        PeriodEval {
+                            model,
+                            period,
+                            is_actual: period.is_actual,
+                            eval_order: &prepared.eval_order,
+                        },
                         &historical,
                         &historical_cs,
                         mc_seed.map(|seed| (seed, &mut mc_z_cache)),
@@ -879,18 +899,21 @@ impl Evaluator {
     /// This is the shared inner loop used by all period evaluation methods.
     /// It handles where-clause masking, precedence resolution, forecast/formula
     /// dispatch, and storing results in the context.
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn evaluate_nodes_in_order(
         &mut self,
-        model: &FinancialModelSpec,
-        period_id: &PeriodId,
-        is_actual: bool,
-        eval_order: &[NodeId],
+        eval: PeriodEval<'_>,
         context: &mut EvaluationContext,
         seed_offset: Option<u64>,
         node_filter: Option<&HashSet<NodeId>>,
         mut mc_z_cache: Option<&mut McZCache>,
     ) -> Result<()> {
+        let PeriodEval {
+            model,
+            period: eval_period,
+            is_actual,
+            eval_order,
+        } = eval;
+        let period_id = &eval_period.id;
         let visibility_cutoff = self.visibility_cutoff;
         let period = model
             .periods
@@ -940,8 +963,7 @@ impl Evaluator {
                     NodeValueSource::Value(v) => Ok(v),
                     NodeValueSource::Forecast => forecast_eval::evaluate_forecast(
                         node_spec,
-                        model,
-                        period_id,
+                        eval,
                         context,
                         &mut self.forecast_cache,
                         seed_offset,
@@ -977,13 +999,9 @@ impl Evaluator {
     ///
     /// `mc` carries the Monte Carlo seed offset and per-path z-score cache;
     /// `None` is the single-run path.
-    #[allow(clippy::too_many_arguments)]
     fn evaluate_period(
         &mut self,
-        model: &FinancialModelSpec,
-        period_id: &PeriodId,
-        is_actual: bool,
-        eval_order: &[NodeId],
+        eval: PeriodEval<'_>,
         historical: &std::sync::Arc<PeriodHistory>,
         historical_cs: &std::sync::Arc<
             IndexMap<PeriodId, crate::capital_structure::CapitalStructureCashflows>,
@@ -991,7 +1009,7 @@ impl Evaluator {
         mc: Option<(u64, &mut McZCache)>,
     ) -> Result<PeriodEvaluation> {
         let mut context = EvaluationContext::new_with_history(
-            *period_id,
+            eval.period.id,
             std::sync::Arc::clone(historical),
             std::sync::Arc::clone(historical_cs),
         );
@@ -1000,16 +1018,7 @@ impl Evaluator {
             Some((seed_offset, cache)) => (Some(seed_offset), Some(cache)),
             None => (None, None),
         };
-        self.evaluate_nodes_in_order(
-            model,
-            period_id,
-            is_actual,
-            eval_order,
-            &mut context,
-            seed_offset,
-            None,
-            mc_z_cache,
-        )?;
+        self.evaluate_nodes_in_order(eval, &mut context, seed_offset, None, mc_z_cache)?;
 
         let row = context.current_values.clone();
         let sources = context.cell_sources();

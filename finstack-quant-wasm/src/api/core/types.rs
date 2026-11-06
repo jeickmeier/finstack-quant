@@ -54,7 +54,9 @@ impl JsRate {
     /// r.asPercent;  // 5
     /// ```
     #[wasm_bindgen(constructor)]
-    pub fn new(decimal: JsValue) -> Result<JsRate, JsValue> {
+    pub fn new(
+        #[wasm_bindgen(unchecked_param_type = "number")] decimal: JsValue,
+    ) -> Result<JsRate, JsValue> {
         let decimal = js_f64(&decimal, "decimal")?;
         RustRate::from_decimal(decimal)
             .map(|inner| JsRate { inner })
@@ -73,7 +75,9 @@ impl JsRate {
     /// r.asDecimal;  // 0.05
     /// ```
     #[wasm_bindgen(js_name = fromPercent)]
-    pub fn from_percent(percent: JsValue) -> Result<JsRate, JsValue> {
+    pub fn from_percent(
+        #[wasm_bindgen(unchecked_param_type = "number")] percent: JsValue,
+    ) -> Result<JsRate, JsValue> {
         let percent = js_f64(&percent, "percent")?;
         RustRate::from_percent(percent)
             .map(|inner| JsRate { inner })
@@ -99,7 +103,9 @@ impl JsRate {
     /// r.asDecimal;  // 0.025
     /// ```
     #[wasm_bindgen(js_name = fromBp)]
-    pub fn from_bp(bp: JsValue) -> Result<JsRate, JsValue> {
+    pub fn from_bp(
+        #[wasm_bindgen(unchecked_param_type = "number")] bp: JsValue,
+    ) -> Result<JsRate, JsValue> {
         let bp = js_int::<i32>(&bp, "bp")?;
         Ok(JsRate {
             inner: RustRate::from_bp(bp),
@@ -152,13 +158,16 @@ impl JsRate {
     /// @returns The parsed `Rate`.
     /// @throws `TypeError` if `text` is not a string; `FinstackError` (kind
     /// `validation`) if it is not a recognised rate quote.
+    /// @param text - Quote text: a decimal (`"0.05"`), a percent (`"5%"`) or basis points (`"25bp"`, fractional bp allowed).
     ///
     /// @example
     /// ```javascript
     /// core.Rate.parse("12.5bp").asDecimal;  // 0.00125
     /// ```
     #[wasm_bindgen(js_name = parse)]
-    pub fn parse(text: JsValue) -> Result<JsRate, JsValue> {
+    pub fn parse(
+        #[wasm_bindgen(unchecked_param_type = "string")] text: JsValue,
+    ) -> Result<JsRate, JsValue> {
         let text = js_string(&text, "text")?;
         text.parse::<RustRate>()
             .map(|inner| JsRate { inner })
@@ -216,8 +225,11 @@ impl JsRate {
     ///
     /// @returns The parsed `Rate`.
     /// @throws If `json` is malformed or holds an invalid value.
+    /// @param json - Canonical `Rate` JSON text (or the equivalent plain value).
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsRate, JsValue> {
+    pub fn from_json(
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+    ) -> Result<JsRate, JsValue> {
         from_js_json::<RustRate>(&json, "json").map(|inner| JsRate { inner })
     }
 }
@@ -263,7 +275,9 @@ impl JsBps {
     /// points. Sub-bp spreads must use the JSON instrument path (which
     /// preserves fractional values) or a decimal `Rate`.
     #[wasm_bindgen(constructor)]
-    pub fn new(bp: JsValue) -> Result<JsBps, JsValue> {
+    pub fn new(
+        #[wasm_bindgen(unchecked_param_type = "number")] bp: JsValue,
+    ) -> Result<JsBps, JsValue> {
         let bp = js_f64(&bp, "bp")?;
         RustBps::try_new(bp)
             .map(|inner| JsBps { inner })
@@ -354,8 +368,11 @@ impl JsBps {
     ///
     /// @returns The parsed `Bps`.
     /// @throws If `json` is malformed or holds an invalid value.
+    /// @param json - Canonical `Bps` JSON text (or the equivalent plain value).
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsBps, JsValue> {
+    pub fn from_json(
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+    ) -> Result<JsBps, JsValue> {
         from_js_json::<RustBps>(&json, "json").map(|inner| JsBps { inner })
     }
 }
@@ -396,8 +413,11 @@ impl JsCreditRating {
     /// @returns The parsed `CreditRating`.
     /// @throws `TypeError` (kind `invalid_type`) if `name` is not a string;
     /// `FinstackError` (kind `validation`) if it is not a rating.
+    /// @param name - Rating text in S&P/Fitch (`"BBB-"`) or Moody's (`"Baa3"`) spelling; case and spaces are ignored, and `"NR"`, `"Not Rated"` and `"Unrated"` all mean not rated.
     #[wasm_bindgen(constructor)]
-    pub fn new(name: JsValue) -> Result<JsCreditRating, JsValue> {
+    pub fn new(
+        #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
+    ) -> Result<JsCreditRating, JsValue> {
         js_string(&name, "name")?
             .parse()
             .map(Self::from_inner)
@@ -631,8 +651,12 @@ impl JsCreditRating {
     /// weaker, negative when stronger. `NR` sits between `C` and `D`.
     /// @throws `TypeError` if `other` is not a string; `FinstackError` (kind
     /// `validation`) if it is not a rating.
+    /// @param other - Rating text to measure against (S&P/Fitch or Moody's spelling; use `rating.toString()` for a `CreditRating`).
     #[wasm_bindgen(js_name = notchesTo)]
-    pub fn notches_to(&self, other: JsValue) -> Result<i32, JsValue> {
+    pub fn notches_to(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] other: JsValue,
+    ) -> Result<i32, JsValue> {
         let other = js_string(&other, "other")?.parse().map_err(to_js_err)?;
         Ok(self.inner.notches_to(other))
     }
@@ -656,8 +680,11 @@ impl JsCreditRating {
     /// @returns The parsed `CreditRating`.
     /// @throws `TypeError` if `json` is not a string; `FinstackError` (kind
     /// `validation`) if it is not a quoted rating.
+    /// @param json - JSON text holding the quoted S&P/Fitch spelling, such as `"\"BBB-\""`.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsCreditRating, JsValue> {
+    pub fn from_json(
+        #[wasm_bindgen(unchecked_param_type = "string")] json: JsValue,
+    ) -> Result<JsCreditRating, JsValue> {
         from_js_json(&json, "json").map(Self::from_inner)
     }
 
@@ -713,8 +740,12 @@ impl JsAttributes {
     /// * `tag` - Tag text, stored exactly as given.
     ///
     /// @throws `TypeError` if `tag` is not a string.
+    /// @param tag - Tag text, stored exactly as given.
     #[wasm_bindgen(js_name = addTag)]
-    pub fn add_tag(&mut self, tag: JsValue) -> Result<(), JsValue> {
+    pub fn add_tag(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "string")] tag: JsValue,
+    ) -> Result<(), JsValue> {
         self.inner.add_tag(js_string(&tag, "tag")?);
         Ok(())
     }
@@ -727,8 +758,12 @@ impl JsAttributes {
     ///
     /// @returns `true` when the tag is present.
     /// @throws `TypeError` if `tag` is not a string.
+    /// @param tag - Tag text to look for (exact match).
     #[wasm_bindgen(js_name = hasTag)]
-    pub fn has_tag(&self, tag: JsValue) -> Result<bool, JsValue> {
+    pub fn has_tag(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] tag: JsValue,
+    ) -> Result<bool, JsValue> {
         Ok(self.inner.has_tag(&js_string(&tag, "tag")?))
     }
 
@@ -742,8 +777,12 @@ impl JsAttributes {
     /// @returns `true` when the selector matches; `false` for an unrecognised
     /// selector.
     /// @throws `TypeError` if `selector` is not a string.
+    /// @param selector - `"tag:<name>"` matches a tag, `"meta:<key>=<value>"` matches a metadata entry, and `"*"` matches everything.
     #[wasm_bindgen(js_name = matchesSelector)]
-    pub fn matches_selector(&self, selector: JsValue) -> Result<bool, JsValue> {
+    pub fn matches_selector(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] selector: JsValue,
+    ) -> Result<bool, JsValue> {
         Ok(self
             .inner
             .matches_selector(&js_string(&selector, "selector")?))
@@ -757,8 +796,12 @@ impl JsAttributes {
     ///
     /// @returns The stored text, or `undefined` when the key is absent.
     /// @throws `TypeError` if `key` is not a string.
+    /// @param key - Metadata key (exact match).
     #[wasm_bindgen(js_name = getMeta)]
-    pub fn get_meta(&self, key: JsValue) -> Result<Option<String>, JsValue> {
+    pub fn get_meta(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] key: JsValue,
+    ) -> Result<Option<String>, JsValue> {
         Ok(self
             .inner
             .get_meta(&js_string(&key, "key")?)
@@ -774,8 +817,14 @@ impl JsAttributes {
     /// * `value` - Metadata text; convert numbers with `String(value)`.
     ///
     /// @throws `TypeError` if `key` or `value` is not a string.
+    /// @param key - Metadata key to set; an existing entry under it is replaced.
+    /// @param value - Metadata text; convert numbers with `String(value)`.
     #[wasm_bindgen(js_name = setMeta)]
-    pub fn set_meta(&mut self, key: JsValue, value: JsValue) -> Result<(), JsValue> {
+    pub fn set_meta(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "string")] key: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] value: JsValue,
+    ) -> Result<(), JsValue> {
         self.inner
             .set_meta(js_string(&key, "key")?, js_string(&value, "value")?);
         Ok(())
@@ -789,8 +838,12 @@ impl JsAttributes {
     ///
     /// @returns `true` when the key is present.
     /// @throws `TypeError` if `key` is not a string.
+    /// @param key - Metadata key (exact match).
     #[wasm_bindgen(js_name = containsMetaKey)]
-    pub fn contains_meta_key(&self, key: JsValue) -> Result<bool, JsValue> {
+    pub fn contains_meta_key(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] key: JsValue,
+    ) -> Result<bool, JsValue> {
         Ok(self.inner.contains_meta_key(&js_string(&key, "key")?))
     }
 
@@ -805,7 +858,7 @@ impl JsAttributes {
     /// Metadata entries in key order.
     ///
     /// @returns An array of `[key, value]` pairs.
-    #[wasm_bindgen(js_name = items)]
+    #[wasm_bindgen(js_name = items, unchecked_return_type = "[string, string][]")]
     pub fn items(&self) -> js_sys::Array {
         self.inner
             .meta
@@ -836,8 +889,11 @@ impl JsAttributes {
     /// @returns The parsed `Attributes`.
     /// @throws `TypeError` if `json` is not a JSON string or plain object;
     /// `FinstackError` (kind `validation`) if it does not match the schema.
+    /// @param json - Attributes JSON text or plain object with `tags` (array of strings) and `meta` (string-to-string map); unknown fields are rejected.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsAttributes, JsValue> {
+    pub fn from_json(
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+    ) -> Result<JsAttributes, JsValue> {
         from_js_json::<Attributes>(&json, "json").map(|inner| Self { inner })
     }
 }

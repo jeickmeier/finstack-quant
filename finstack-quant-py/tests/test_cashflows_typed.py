@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import pytest
 
+from finstack_quant.core.dates import Tenor
 from finstack_quant.core.money import Money
 
 if TYPE_CHECKING:
@@ -224,7 +225,7 @@ class TestBuilderSpecs:
         assert fixed is not None
         periodic = FeeSpec.periodic_bp(
             base=FeeBase.undrawn(commitment=Money(10_000_000.0, "USD")),
-            bp=50,
+            bp="50",
             frequency=Tenor.quarterly(),
             day_count=DayCount.ACT_360,
             business_day_convention="modified_following",
@@ -241,7 +242,7 @@ class TestBuilderSpecs:
         spec = FloatingRateSpec(
             forward_curve_id="USD-SOFR-3M",
             spread_bp=Decimal("200"),
-            reset_frequency="3M",
+            reset_frequency=Tenor.parse("3M"),
             index_floor_bp=Decimal("0"),
         )
         spec.validate()
@@ -249,7 +250,7 @@ class TestBuilderSpecs:
             FloatingRateSpec(
                 forward_curve_id="USD-SOFR-3M",
                 spread_bp=Decimal("200"),
-                reset_frequency="3M",
+                reset_frequency=Tenor.parse("3M"),
                 index_floor_bp=Decimal("100"),
                 index_cap_bp=Decimal("50"),
             )
@@ -298,7 +299,9 @@ class TestBuilderSpecs:
             .fixed_cf(
                 FixedCouponSpec(
                     rate=Decimal("0.05"),
-                    schedule=ScheduleParams(frequency="3M", day_count=DayCount.ACT_360, calendar_id="weekends_only"),
+                    schedule=ScheduleParams(
+                        frequency=Tenor.parse("3M"), day_count=DayCount.ACT_360, calendar_id="weekends_only"
+                    ),
                 )
             )
             .build(None)
@@ -383,9 +386,11 @@ class TestBuilderSpecs:
                     rate_spec=FloatingRateSpec(
                         forward_curve_id="USD-SOFR-3M",
                         spread_bp=Decimal("150"),
-                        reset_frequency="3M",
+                        reset_frequency=Tenor.parse("3M"),
                     ),
-                    schedule=ScheduleParams(frequency="3M", day_count=DayCount.ACT_360, calendar_id="weekends_only"),
+                    schedule=ScheduleParams(
+                        frequency=Tenor.parse("3M"), day_count=DayCount.ACT_360, calendar_id="weekends_only"
+                    ),
                 )
             )
             .build(market)
@@ -460,7 +465,7 @@ class TestBuilderSpecs:
             rate_spec = FloatingRateSpec(
                 forward_curve_id="USD-SOFR-3M",
                 spread_bp=Decimal("0"),
-                reset_frequency="3M",
+                reset_frequency=Tenor.parse("3M"),
                 index_floor_bp=Decimal("300"),
                 compounding=FloatingLegCompounding.compounded_in_arrears(0),
                 **kwargs,
@@ -473,7 +478,9 @@ class TestBuilderSpecs:
                     FloatingCouponSpec(
                         rate_spec=rate_spec,
                         schedule=ScheduleParams(
-                            frequency="3M", day_count=DayCount.ACT_360, calendar_id="weekends_only"
+                            frequency=Tenor.parse("3M"),
+                            day_count=DayCount.ACT_360,
+                            calendar_id="weekends_only",
                         ),
                     )
                 )
@@ -550,9 +557,11 @@ class TestBuilderSpecs:
                     rate_spec=FloatingRateSpec(
                         forward_curve_id="USD-SOFR-3M",
                         spread_bp=Decimal("150"),
-                        reset_frequency="3M",
+                        reset_frequency=Tenor.parse("3M"),
                     ),
-                    schedule=ScheduleParams(frequency="3M", day_count=DayCount.ACT_360, calendar_id="weekends_only"),
+                    schedule=ScheduleParams(
+                        frequency=Tenor.parse("3M"), day_count=DayCount.ACT_360, calendar_id="weekends_only"
+                    ),
                 )
             )
         )
@@ -683,7 +692,9 @@ class TestCashFlowBuilder:
         )
 
         spec = FloatingCouponSpec(
-            rate_spec=FloatingRateSpec(forward_curve_id="USD-SOFR-3M", spread_bp=Decimal("200"), reset_frequency="3M"),
+            rate_spec=FloatingRateSpec(
+                forward_curve_id="USD-SOFR-3M", spread_bp=Decimal("200"), reset_frequency=Tenor.parse("3M")
+            ),
             schedule=ScheduleParams.quarterly_act360(),
         )
         builder = (
@@ -718,7 +729,9 @@ class TestCashFlowBuilder:
         )
         market = MarketContext().insert(curve)
         spec = FloatingCouponSpec(
-            rate_spec=FloatingRateSpec(forward_curve_id="USD-SOFR-3M", spread_bp=Decimal("0"), reset_frequency="3M"),
+            rate_spec=FloatingRateSpec(
+                forward_curve_id="USD-SOFR-3M", spread_bp=Decimal("0"), reset_frequency=Tenor.parse("3M")
+            ),
             schedule=ScheduleParams.quarterly_act360(),
         )
         schedule = (
@@ -749,7 +762,7 @@ class TestCashFlowBuilder:
             rate_spec=FloatingRateSpec(
                 forward_curve_id="USD-SOFR-3M",
                 spread_bp=Decimal("200"),
-                reset_frequency="3M",
+                reset_frequency=Tenor.parse("3M"),
                 fallback=FloatingRateFallback.SPREAD_ONLY,
             ),
             schedule=ScheduleParams.quarterly_act360(),
@@ -785,7 +798,7 @@ class TestCashFlowBuilder:
             rate_spec=FloatingRateSpec(
                 forward_curve_id="USD-SOFR-3M",
                 spread_bp=Decimal("200"),
-                reset_frequency="3M",
+                reset_frequency=Tenor.parse("3M"),
                 fallback=FloatingRateFallback.SPREAD_ONLY,
             ),
             schedule=ScheduleParams.quarterly_act360(),
@@ -1426,7 +1439,7 @@ class TestTypedTwinsAndWire:
         )
         from finstack_quant.core.dates import DayCount
 
-        params = ScheduleParams("3M", DayCount.ACT_360, "weekends_only")
+        params = ScheduleParams(frequency=Tenor.parse("3M"), day_count=DayCount.ACT_360, calendar_id="weekends_only")
         assert params.business_day_convention is not None
         assert params.stub is not None
         assert params.roll_rule is not None
@@ -1439,7 +1452,13 @@ class TestTypedTwinsAndWire:
             AmortizationSpec.linear_to(Money(0.0, "USD")),
             Notional.par(1.0, "USD"),
             FeeBase.undrawn(Money(10.0, "USD")),
-            FeeSpec.periodic_bp(FeeBase.DRAWN, 25, "3M", DayCount.ACT_360, "weekends_only"),
+            FeeSpec.periodic_bp(
+                base=FeeBase.DRAWN,
+                bp="25",
+                frequency=Tenor.parse("3M"),
+                day_count=DayCount.ACT_360,
+                calendar_id="weekends_only",
+            ),
             PrepaymentModelSpec.psa(1.0),
             RecoveryModelSpec(0.4, 12),
         ]
@@ -1469,7 +1488,13 @@ class TestTypedTwinsAndWire:
         assert sofr.fallback is not None
         assert sofr.gearing_includes_spread is True
         assert Notional.par(5.0, "USD").amort.kind == "none"
-        fee = FeeSpec.periodic_bp(FeeBase.DRAWN, 25, "3M", DayCount.ACT_360, "weekends_only")
+        fee = FeeSpec.periodic_bp(
+            base=FeeBase.DRAWN,
+            bp="25",
+            frequency=Tenor.parse("3M"),
+            day_count=DayCount.ACT_360,
+            calendar_id="weekends_only",
+        )
         assert fee.kind == "periodic_bp"
         assert fee.business_day_convention is not None
         assert fee.stub is not None
@@ -1481,10 +1506,15 @@ class TestTypedTwinsAndWire:
         from finstack_quant.core.dates import DayCount
 
         with pytest.raises(ValueError, match="unknown calendar_id"):
-            ScheduleParams("3M", DayCount.ACT_360, "not-a-calendar")
+            ScheduleParams(frequency=Tenor.parse("3M"), day_count=DayCount.ACT_360, calendar_id="not-a-calendar")
         with pytest.raises(ValueError, match="payment_lag_days"):
-            ScheduleParams("3M", DayCount.ACT_360, "weekends_only", payment_lag_days=-1)
-        params = ScheduleParams("3M", DayCount.ACT_360, "weekends_only")
+            ScheduleParams(
+                frequency=Tenor.parse("3M"),
+                day_count=DayCount.ACT_360,
+                calendar_id="weekends_only",
+                payment_lag_days=-1,
+            )
+        params = ScheduleParams(frequency=Tenor.parse("3M"), day_count=DayCount.ACT_360, calendar_id="weekends_only")
         assert str(FixedCouponSpec("0.05", params).rate) == "0.05"
 
     def test_credit_rate_error_text(self) -> None:
@@ -1588,7 +1618,9 @@ def test_build_as_of_uses_fixings_after_curve_anchor() -> None:
         )
     )
     spec = FloatingCouponSpec(
-        rate_spec=FloatingRateSpec(forward_curve_id="USD-SOFR-3M", spread_bp=Decimal("0"), reset_frequency="3M"),
+        rate_spec=FloatingRateSpec(
+            forward_curve_id="USD-SOFR-3M", spread_bp=Decimal("0"), reset_frequency=Tenor.parse("3M")
+        ),
         schedule=ScheduleParams.quarterly_act360(),
     )
 
@@ -1647,8 +1679,10 @@ def test_floating_rate_constructor_and_json_reject_invalid_fields(fields: dict[s
     from finstack_quant.cashflows.builder import FloatingRateSpec
 
     with pytest.raises(ValueError, match=message):
-        FloatingRateSpec("USD-SOFR", "0", "3M", **fields)
-    payload = json.loads(FloatingRateSpec("USD-SOFR", "0", "3M").to_json())
+        FloatingRateSpec(forward_curve_id="USD-SOFR", spread_bp="0", reset_frequency=Tenor.parse("3M"), **fields)
+    payload = json.loads(
+        FloatingRateSpec(forward_curve_id="USD-SOFR", spread_bp="0", reset_frequency=Tenor.parse("3M")).to_json()
+    )
     payload.update(fields)
     with pytest.raises(ValueError, match=message):
         FloatingRateSpec.from_json(json.dumps(payload))
@@ -1660,9 +1694,9 @@ def test_floating_rate_valid_equal_bounds_preserve_json_and_pickle() -> None:
     from finstack_quant.cashflows.builder import FloatingRateSpec
 
     spec = FloatingRateSpec(
-        "USD-SOFR",
-        "0",
-        "3M",
+        forward_curve_id="USD-SOFR",
+        spread_bp="0",
+        reset_frequency=Tenor.parse("3M"),
         reset_lag_days=0,
         index_floor_bp="50",
         index_cap_bp="50",

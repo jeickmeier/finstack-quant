@@ -9,13 +9,10 @@ use crate::bindings::core::currency::extract_currency;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::py_to_date;
 use crate::bindings::extract::{extract_instrument, extract_market_ref};
-use crate::bindings::module_utils::py_to_json_value;
+use crate::bindings::module_utils::spec_from_py;
 use crate::bindings::pandas_utils::serde_rows_to_dataframe_with_schema;
-use crate::errors::{core_to_py, serde_json_to_py};
-use finstack_quant_attribution::{
-    AttributionConfig, AttributionEnvelope, AttributionInputs, AttributionMethod, AttributionSpec,
-};
-use finstack_quant_core::market_data::context::MarketContextState;
+use crate::errors::core_to_py;
+use finstack_quant_attribution::{AttributionEnvelope, AttributionInputs, AttributionSpec};
 use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 use pyo3::prelude::*;
 
@@ -27,196 +24,16 @@ fn instrument_payload(obj: &Bound<'_, PyAny>) -> PyResult<InstrumentJson> {
         .map_err(core_to_py)
 }
 
-/// Shared optional inputs of [`attribute_pnl`] / [`attribute_pnl_many`].
-struct AttributionOptions<'a, 'py> {
-    config: Option<&'a Bound<'py, PyAny>>,
-    full_cross_attribution: bool,
-    model_params_t0_json: Option<&'a str>,
-    credit_factor_model_json: Option<&'a str>,
-    credit_factor_detail_options: Option<&'a Bound<'py, PyAny>>,
-}
-
-/// Build shared attribution inputs from typed-or-JSON Python values.
-///
-/// Single and batch execution use the same conversion of markets, dates and options.
-fn build_inputs(
-    py: Python<'_>,
-    market_t0: &Bound<'_, PyAny>,
-    market_t1: &Bound<'_, PyAny>,
-    as_of_t0: &Bound<'_, PyAny>,
-    as_of_t1: &Bound<'_, PyAny>,
-    method: &Bound<'_, PyAny>,
-    options: AttributionOptions<'_, '_>,
-) -> PyResult<AttributionInputs> {
-    let market_t0 =
-        MarketContextState::try_from(&*extract_market_ref(py, market_t0)?).map_err(core_to_py)?;
-    let market_t1 =
-        MarketContextState::try_from(&*extract_market_ref(py, market_t1)?).map_err(core_to_py)?;
-    let as_of_t0 = py_to_date(as_of_t0)?;
-    let as_of_t1 = py_to_date(as_of_t1)?;
-    let method: AttributionMethod = serde_json::from_value(py_to_json_value(py, method, "method")?)
-        .map_err(|e| serde_json_to_py(e, "invalid attribution method"))?;
-    let config: Option<AttributionConfig> = options
-        .config
-        .map(|value| {
-            serde_json::from_value(py_to_json_value(py, value, "config")?)
-                .map_err(|e| serde_json_to_py(e, "invalid attribution config"))
-        })
-        .transpose()?;
-    let model_params_t0 = options
-        .model_params_t0_json
-        .map(|json| {
-            serde_json::from_str(json)
-                .map_err(|e| serde_json_to_py(e, "invalid attribution model_params_t0 JSON"))
-        })
-        .transpose()?;
-    let credit_factor_model = options
-        .credit_factor_model_json
-        .map(|json| {
-            serde_json::from_str(json)
-                .map(Box::new)
-                .map_err(|e| serde_json_to_py(e, "invalid attribution credit_factor_model JSON"))
-        })
-        .transpose()?;
-    Ok(AttributionInputs {
-        market_t0,
-        market_t1,
-        as_of_t0,
-        as_of_t1,
-        method,
-        model_params_t0,
-        config,
-        credit_factor_model,
-        credit_factor_detail_options: options
-            .credit_factor_detail_options
-            .map(|value| {
-                serde_json::from_value(py_to_json_value(py, value, "credit_factor_detail_options")?)
-                    .map_err(|e| serde_json_to_py(e, "invalid credit_factor_detail_options"))
-            })
-            .transpose()?
-            .unwrap_or_default(),
-        full_cross_attribution: options.full_cross_attribution,
-    })
-}
-
-/// Run P&L attribution for a single instrument.
-///
-/// This is the main entry point. It accepts the instrument, two market
-/// snapshots, valuation dates, and a method descriptor — typed objects or
-/// their canonical JSON — and returns a typed ``PnlAttribution``. Call
-/// ``.to_json()`` on the result for the canonical JSON form.
-///
-/// Parameters
-/// ----------
-/// instrument : Bond | InterestRateSwap | CreditDefaultSwap | ... | str
-///     Any typed instrument wrapper from ``finstack_quant.valuations`` or a
-///     canonical v1 instrument envelope JSON string
-///     (``{"schema": "finstack_quant.instrument/1", "instrument": {...}}``).
-/// market_t0 : MarketContext | str
-///     Market snapshot at T₀ (typed ``MarketContext`` or its JSON).
-/// market_t1 : MarketContext | str
-///     Market snapshot at T₁ (typed ``MarketContext`` or its JSON).
-/// as_of_t0 : datetime.date | datetime.datetime | pandas.Timestamp | str
-///     Valuation date T₀; strings are ISO 8601 calendar dates
-///     (``YYYY-MM-DD``). A tz-aware timestamp contributes its wall-clock
-///     calendar date.
-/// as_of_t1 : datetime.date | datetime.datetime | pandas.Timestamp | str
-///     Valuation date T₁, in the same forms as ``as_of_t0``; must not
-///     precede ``as_of_t0``.
-/// method : str | dict
-///     Attribution method. One of:
-///
-///     * ``"parallel"``
-///     * ``{"waterfall": [...]}`` with factor tokens in order, drawn from
-///       ``carry``, ``rates_curves``, ``credit_curves``, ``inflation_curves``,
-///       ``correlations``, ``fx``, ``volatility``, ``model_parameters``,
-///       ``market_scalars`` (``default_waterfall_order()`` gives the full
-///       canonical list; the order must start with ``carry``)
-///     * ``"metrics_based"`` (without ``config["metrics"]`` it prices the
-///       default metric menu; when an instrument hazard curve has no
-///       calibration recipe and that menu fails, the quote-space credit
-///       metrics are dropped with a note in ``notes`` and credit-curve P&L
-///       flows to the residual)
-///     * ``{"taylor": {"include_gamma": True, ...}}``
-/// config : dict | str, optional
-///     Attribution config overrides (``tolerance_abs``, ``tolerance_pct``,
-///     ``metrics``, ``strict_validation``, ``rounding_scale``,
-///     ``rate_bump_bp``, ``target_currency``, ``execution_policy``).
-/// full_cross_attribution : bool, default False
-///     When true, the parallel method evaluates every pairwise cross-factor
-///     interaction (full cross matrix) instead of the default seven economic
-///     pairs. More repricings, smaller residual.
-/// model_params_t0_json : str, optional
-///     Serialized opening ``ModelParamsSnapshot``. When omitted, model-
-///     parameter P&L is isolated from the instrument's current snapshot.
-/// credit_factor_model_json : str, optional
-///     Serialized ``CreditFactorModel``. When supplied, credit-factor
-///     hierarchy detail is populated on the result.
-/// credit_factor_detail_options : dict | str, optional
-///     ``CreditFactorDetailOptions`` (``include_per_issuer_adder``,
-///     ``include_per_bucket_breakdown``) for that detail; omitted fields
-///     keep their defaults (per-issuer adder off, per-bucket breakdown on).
-///
-/// Returns
-/// -------
-/// PnlAttribution
-///     Typed attribution result. Use ``.to_json()`` for the wire form and
-///     ``.to_dataframe()`` for a pandas view.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If an input JSON, the method or config cannot be parsed, a date is
-///     malformed, the FX provider cannot supply a coherent market snapshot,
-///     or attribution validation / pricing fails.
-/// KeyError
-///     If a required curve, market item, calendar, or FX leg is missing.
-/// RuntimeError
-///     If calibration or solver convergence fails, or the attribution
-///     engine reports an internal failure (including a contained panic).
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.attribution import attribute_pnl
-/// >>> try:
-/// ...     attribute_pnl("{}", "{}", "{}", "2025-01-15", "2025-01-16", "parallel")
-/// ... except ValueError as exc:
-/// ...     "instrument envelope" in str(exc)
-/// True
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.attribution._entry", "attribute_pnl")]
 #[pyfunction]
-#[pyo3(signature = (instrument, market_t0, market_t1, as_of_t0, as_of_t1, method, config=None, full_cross_attribution=false, model_params_t0_json=None, credit_factor_model_json=None, credit_factor_detail_options=None))]
-#[allow(clippy::too_many_arguments)]
+#[pyo3(signature = (instrument, inputs))]
 pub(crate) fn attribute_pnl(
     py: Python<'_>,
     instrument: &Bound<'_, PyAny>,
-    market_t0: &Bound<'_, PyAny>,
-    market_t1: &Bound<'_, PyAny>,
-    as_of_t0: &Bound<'_, PyAny>,
-    as_of_t1: &Bound<'_, PyAny>,
-    method: &Bound<'_, PyAny>,
-    config: Option<&Bound<'_, PyAny>>,
-    full_cross_attribution: bool,
-    model_params_t0_json: Option<&str>,
-    credit_factor_model_json: Option<&str>,
-    credit_factor_detail_options: Option<&Bound<'_, PyAny>>,
+    inputs: &Bound<'_, PyAny>,
 ) -> PyResult<PyPnlAttribution> {
     let instrument = instrument_payload(instrument)?;
-    let inputs = build_inputs(
-        py,
-        market_t0,
-        market_t1,
-        as_of_t0,
-        as_of_t1,
-        method,
-        AttributionOptions {
-            config,
-            full_cross_attribution,
-            model_params_t0_json,
-            credit_factor_model_json,
-            credit_factor_detail_options,
-        },
-    )?;
-
+    let inputs: AttributionInputs = spec_from_py(py, inputs, "AttributionInputs")?;
     let spec = AttributionSpec { instrument, inputs };
     // `execute` turns a Rust panic into `Error::Internal` so it
     // surfaces as a catchable `RuntimeError` rather than a
@@ -227,105 +44,19 @@ pub(crate) fn attribute_pnl(
     })
 }
 
-/// Run one attribution set-up against many instruments and tabulate the
-/// results.
-///
-/// Every instrument shares the same markets, dates, method and config; the
-/// batch runs in Rust (``attribute_pnl_many``) in input order and stops at
-/// the first failing instrument.
-///
-/// Parameters
-/// ----------
-/// instruments : list[Bond | InterestRateSwap | ... | str]
-///     Typed instrument wrappers or canonical instrument envelope JSON
-///     strings, in the row order wanted.
-/// market_t0 : MarketContext | str
-///     Market snapshot at T₀.
-/// market_t1 : MarketContext | str
-///     Market snapshot at T₁.
-/// as_of_t0 : datetime.date | datetime.datetime | pandas.Timestamp | str
-///     Valuation date T₀.
-/// as_of_t1 : datetime.date | datetime.datetime | pandas.Timestamp | str
-///     Valuation date T₁.
-/// method : str | dict
-///     Attribution method, as for ``attribute_pnl``.
-/// config : dict | str, optional
-///     Attribution config overrides, as for ``attribute_pnl``.
-/// full_cross_attribution : bool, default False
-///     Evaluate every pairwise cross-factor term (parallel method only).
-/// model_params_t0_json : str, optional
-///     Serialized opening ``ModelParamsSnapshot`` applied to every instrument.
-/// credit_factor_model_json : str, optional
-///     Serialized ``CreditFactorModel`` applied to every instrument.
-/// credit_factor_detail_options : dict | str, optional
-///     ``CreditFactorDetailOptions`` for that detail; omitted fields keep
-///     their defaults (per-issuer adder off, per-bucket breakdown on).
-///
-/// Returns
-/// -------
-/// pandas.DataFrame
-///     One row per instrument with the same columns as
-///     ``PnlAttribution.to_dataframe()`` (``instrument_id``, ``method``,
-///     ``t0``, ``t1``, ``currency``, ``total_pnl``, every factor P&L,
-///     ``residual``, ``residual_pct``, ``num_repricings``,
-///     ``result_invalid``). Empty (schema columns present) for an empty
-///     instrument list.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If any input cannot be parsed or an instrument's attribution fails
-///     validation / pricing, the FX provider cannot supply a coherent market
-///     snapshot, or a result mixes currencies across factors.
-/// KeyError
-///     If a required curve, market item, calendar, or FX leg is missing.
-/// RuntimeError
-///     If the engine reports an internal failure for any instrument.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.attribution import attribute_pnl_many
-/// >>> try:
-/// ...     attribute_pnl_many(["{}"], "{}", "{}", "2025-01-15", "2025-01-16", "parallel")
-/// ... except ValueError as exc:
-/// ...     "instrument envelope" in str(exc)
-/// True
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.attribution._entry", "attribute_pnl_many")]
 #[pyfunction]
-#[pyo3(signature = (instruments, market_t0, market_t1, as_of_t0, as_of_t1, method, config=None, full_cross_attribution=false, model_params_t0_json=None, credit_factor_model_json=None, credit_factor_detail_options=None))]
-#[allow(clippy::too_many_arguments)]
+#[pyo3(signature = (inputs, instruments))]
 pub(crate) fn attribute_pnl_many<'py>(
     py: Python<'py>,
+    inputs: &Bound<'py, PyAny>,
     instruments: Vec<Bound<'py, PyAny>>,
-    market_t0: &Bound<'py, PyAny>,
-    market_t1: &Bound<'py, PyAny>,
-    as_of_t0: &Bound<'py, PyAny>,
-    as_of_t1: &Bound<'py, PyAny>,
-    method: &Bound<'py, PyAny>,
-    config: Option<&Bound<'py, PyAny>>,
-    full_cross_attribution: bool,
-    model_params_t0_json: Option<&str>,
-    credit_factor_model_json: Option<&str>,
-    credit_factor_detail_options: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let payloads = instruments
         .iter()
         .map(instrument_payload)
         .collect::<PyResult<Vec<_>>>()?;
-    let inputs = build_inputs(
-        py,
-        market_t0,
-        market_t1,
-        as_of_t0,
-        as_of_t1,
-        method,
-        AttributionOptions {
-            config,
-            full_cross_attribution,
-            model_params_t0_json,
-            credit_factor_model_json,
-            credit_factor_detail_options,
-        },
-    )?;
+    let inputs: AttributionInputs = spec_from_py(py, inputs, "AttributionInputs")?;
     let attributions = py
         .detach(|| finstack_quant_attribution::attribute_pnl_many(&inputs, payloads))
         .map_err(core_to_py)?;
@@ -588,8 +319,8 @@ pub(crate) fn validate_return_contribution_json(spec_json: &str) -> PyResult<Str
 ///     Canonical snake-case factor tokens in the default waterfall order
 ///     (``carry``, ``rates_curves``, ``credit_curves``, ``inflation_curves``,
 ///     ``correlations``, ``fx``, ``volatility``, ``model_parameters``,
-///     ``market_scalars``); pass a prefix or reordering to
-///     ``attribute_pnl(method={"waterfall": [...]})``.
+///     ``market_scalars``); pass a prefix or reordering as the ``method``
+///     key ``{"waterfall": [...]}`` of the ``attribute_pnl`` inputs.
 ///
 /// Examples
 /// --------

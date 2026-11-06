@@ -743,8 +743,16 @@ class LboCheckMappings:
     Examples
     --------
     >>> from finstack_quant.statements_analytics import CreditMapping, LboCheckMappings, ThreeStatementMapping
-    >>> three = ThreeStatementMapping("cash", "re", "ni", ["assets"], ["liabilities"], ["equity"])
-    >>> m = LboCheckMappings(three, CreditMapping("debt", "ebitda", "interest"))
+    >>> three = ThreeStatementMapping(
+    ...     cash_node="cash",
+    ...     retained_earnings_node="re",
+    ...     net_income_node="ni",
+    ...     assets_nodes=["assets"],
+    ...     liabilities_nodes=["liabilities"],
+    ...     equity_nodes=["equity"],
+    ... )
+    >>> credit = CreditMapping(debt_node="debt", ebitda_node="ebitda", interest_expense_node="interest")
+    >>> m = LboCheckMappings(three, credit)
     >>> m.credit.debt_node
     'debt'
     """
@@ -1424,10 +1432,7 @@ def dcf_sensitivity(
 
 def evaluate_dcf(
     model: Any,
-    wacc: float,
-    terminal_value: Any,
-    ufcf_node: str = "ufcf",
-    net_debt_override: float | None = None,
+    inputs: Mapping[str, Any] | str,
     options: Mapping[str, Any] | str | None = None,
     market: Any | None = None,
     as_of: Any | None = None,
@@ -1439,21 +1444,26 @@ def evaluate_dcf(
     model : FinancialModelSpec | str
         A ``FinancialModelSpec`` object or a JSON string; metadata must contain
         a ``"currency"`` key.
-    wacc : float
-        Weighted average cost of capital in decimal form (``0.10`` = 10%).
-    terminal_value : TerminalValueSpec | dict | str
-        Terminal value method (typed, serde dict, or tagged JSON such as
-        ``{"type": "gordon_growth", "stable_growth_rate": 0.02}``).
-    ufcf_node : str
-        Node id containing monetary unlevered free cash flow in model currency.
-        Defaults to the Rust ``DEFAULT_UFCF_NODE`` (``"ufcf"``). Gordon Growth /
-        H-Model terminal cash flow requires a complete contiguous calendar year
-        at the end of the forecast.
-    net_debt_override : float | None
-        Flat net-debt amount in model currency. Without an override, debt and
-        cash must be monetary in model currency and available at a period
-        ending on or before the inclusive valuation date; future balances are
-        rejected.
+    inputs : dict | str
+        The Rust ``DcfInputs`` serde form (the document WASM ``evaluateDcf``
+        takes as ``inputs``), as a dict or JSON text. Unknown keys raise
+        ``ValueError``:
+
+        * ``wacc`` (float, required): weighted average cost of capital in
+          decimal form (``0.10`` = 10%).
+        * ``terminal_value`` (TerminalValueSpec | dict, required): terminal
+          value method, typed or as its tagged serde form such as
+          ``{"type": "gordon_growth", "stable_growth_rate": 0.02}``.
+        * ``ufcf_node`` (str, optional): node id containing monetary unlevered
+          free cash flow in model currency; defaults to the Rust
+          ``DEFAULT_UFCF_NODE`` (``"ufcf"``). Gordon Growth / H-Model terminal
+          cash flow requires a complete contiguous calendar year at the end of
+          the forecast.
+        * ``net_debt_override`` (float | None, optional): flat net-debt amount
+          in model currency. Without an override (the default), debt and cash
+          must be monetary in model currency and available at a period ending
+          on or before the inclusive valuation date; future balances are
+          rejected.
     options : dict | str | None
         The Rust ``DcfOptions`` serde form. Every key is optional and a
         missing one takes its Rust default: ``mid_year_convention``
@@ -1487,11 +1497,11 @@ def evaluate_dcf(
     Raises
     ------
     ValueError
-        If ``market`` is set without ``as_of``, a payload or ``options`` is
-        malformed (an unknown ``options`` key included), ``as_of`` hides an
-        actual that a value node needs, no forecast cash flow ends after
-        ``as_of``, or the model, cash-flow node, exit-multiple node or DCF
-        inputs are invalid.
+        If ``market`` is set without ``as_of``, ``inputs`` misses ``wacc`` or
+        ``terminal_value``, ``inputs`` or ``options`` is malformed (an unknown
+        key included), ``as_of`` hides an actual that a value node needs, no
+        forecast cash flow ends after ``as_of``, or the model, cash-flow node,
+        exit-multiple node or DCF inputs are invalid.
     KeyError
         If ``ufcf_node`` or ``exit_multiple_metric_node`` is missing from the model.
 
@@ -1504,7 +1514,12 @@ def evaluate_dcf(
     >>> _ = b.periods("2025..2026")
     >>> _ = b.value_money("ufcf", [("2025", Money(100.0, "USD")), ("2026", Money(110.0, "USD"))])
     >>> _ = b.with_meta("currency", '"USD"')
-    >>> result = evaluate_dcf(b.build(), 0.10, TerminalValueSpec.gordon_growth(0.02), net_debt_override=0.0)
+    >>> inputs = {
+    ...     "wacc": 0.10,
+    ...     "terminal_value": TerminalValueSpec.gordon_growth(0.02),
+    ...     "net_debt_override": 0.0,
+    ... }
+    >>> result = evaluate_dcf(b.build(), inputs)
     >>> str(result.enterprise_value.currency)
     'USD'
     """
@@ -1578,51 +1593,47 @@ def evaluate_lbo(model: Any, config: Mapping[str, Any] | str) -> LboResult:
 
 def run_corporate_analysis(
     model: Any,
-    wacc: float | None = None,
-    terminal_value: Any | None = None,
-    net_debt_override: float | None = None,
-    cfads_node: str | None = None,
-    interest_coverage_node: str | None = None,
-    check_suite: Any | None = None,
+    options: Mapping[str, Any] | str | None = None,
     market: Any | None = None,
-    as_of: Any | None = None,
-    ltv_value_node: str | None = None,
 ) -> CorporateAnalysis:
     """Run the full corporate analysis pipeline.
 
     Evaluates statements and optionally runs DCF equity valuation plus credit
     context through the Rust ``run_corporate_analysis`` (the same entry point
-    WASM ``runCorporateAnalysis`` calls).
+    and the same ``options`` document WASM ``runCorporateAnalysis`` takes).
 
     Parameters
     ----------
     model : FinancialModelSpec | str
         A ``FinancialModelSpec`` object or a JSON string.
-    wacc : float | None
-        Enables DCF valuation at this decimal discount rate when set.
-    terminal_value : TerminalValueSpec | dict | str | None
-        Terminal value method; required when ``wacc`` is set.
-    net_debt_override : float | None
-        Flat net debt for the equity bridge.
-    cfads_node : str | None
-        CFADS numerator required when the model has capital-structure credit
-        analytics; no EBITDA fallback is applied.
-    interest_coverage_node : str | None
-        Earnings numerator used for interest coverage. ``None`` uses the Rust
-        default, ``"ebitda"``.
-    check_suite : CheckSuiteSpec | dict | str | None
-        Check suite required for DCF or credit analysis; must include
-        ``NonFiniteCheck``.
+    options : dict | str | None
+        The Rust ``CorporateAnalysisOptions`` serde form, as a dict or JSON
+        text. Every key is optional; ``None`` or an omitted key takes the
+        default below, and an unknown key raises ``ValueError``:
+
+        * ``wacc`` (float): enables DCF valuation at this decimal discount
+          rate (``0.10`` = 10%); default no DCF.
+        * ``terminal_value`` (TerminalValueSpec | dict): terminal value
+          method; required when ``wacc`` is set.
+        * ``net_debt_override`` (float): flat net debt in model currency for
+          the equity bridge; default derived from the model.
+        * ``cfads_node`` (str): CFADS numerator required when the model has
+          capital-structure credit analytics; no EBITDA fallback is applied.
+        * ``interest_coverage_node`` (str): earnings numerator used for
+          interest coverage; default ``"ebitda"``.
+        * ``check_suite`` (CheckSuiteSpec | dict): check suite required for
+          DCF or credit analysis; must include ``NonFiniteCheck``.
+        * ``as_of`` (datetime.date | str): valuation date as a date or ISO
+          ``YYYY-MM-DD``; required when ``market`` is set.
+        * ``ltv_value_node`` (str): monetary statement node supplying a
+          per-period LTV denominator in reporting currency; scalar,
+          foreign-currency or non-finite values are rejected. Missing or
+          non-positive values do not supply a denominator. When omitted, a
+          positive DCF enterprise value is broadcast as a constant
+          denominator.
     market : MarketContext | str | None
-        Market context for statement evaluation (not WACC discounting).
-    as_of : datetime.date | str | None
-        Valuation date; required when ``market`` is set.
-    ltv_value_node : str | None
-        Monetary statement node supplying a per-period LTV denominator in
-        reporting currency; scalar, foreign-currency or non-finite values are
-        rejected. Missing or non-positive values do not supply a denominator.
-        When omitted, a positive DCF enterprise value is broadcast as a constant
-        denominator.
+        Market context for statement evaluation and instrument pricing (not
+        WACC discounting); requires ``options["as_of"]``.
 
     Returns
     -------
@@ -1635,7 +1646,8 @@ def run_corporate_analysis(
     ------
     ValueError
         If ``terminal_value`` is missing while ``wacc`` is set, ``market`` is
-        set without ``as_of``, a payload is malformed, or the pipeline fails.
+        set without ``as_of``, ``options`` or a payload is malformed (an
+        unknown key included), or the pipeline fails.
     KeyError
         If a referenced node is missing from the model.
 
@@ -1646,7 +1658,7 @@ def run_corporate_analysis(
     >>> b = ModelBuilder("m")
     >>> _ = b.periods("2024Q1..Q2", None)
     >>> _ = b.value("revenue", [("2024Q1", 1.0), ("2024Q2", 2.0)])
-    >>> run_corporate_analysis(b.build()).statement.node_count
+    >>> run_corporate_analysis(b.build(), {"interest_coverage_node": "revenue"}).statement.node_count
     1
     """
 

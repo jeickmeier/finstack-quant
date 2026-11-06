@@ -16,17 +16,31 @@ use finstack_quant_valuations::instruments::{FixedLegSpec, FloatLegSpec};
 use rust_decimal::Decimal;
 
 /// Inputs for appending a bond with a regional market convention.
-#[derive(Debug)]
+///
+/// The serde form is the host input of `ModelBuilder.add_bond_with_convention`:
+/// every field is required and an unknown field is rejected.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct BondConventionParams {
     /// Capital-structure identifier; market-aware evaluation rejects duplicates.
     pub id: String,
     /// Principal in the tagged currency's major units.
     pub notional: Money,
     /// Typed annual decimal coupon rate, such as 0.03 for 3%.
+    #[cfg_attr(feature = "json-schema", schemars(with = "f64"))]
     pub coupon_rate: Rate,
-    /// Bond issue date, strictly before maturity.
+    /// Bond issue date (ISO `YYYY-MM-DD`), strictly before maturity.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub issue_date: Date,
-    /// Final contractual bond maturity date.
+    /// Final contractual bond maturity date (ISO `YYYY-MM-DD`).
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub maturity_date: Date,
     /// Regional preset controlling coupon frequency, day count, and calendar.
     pub convention: finstack_quant_valuations::instruments::BondConvention,
@@ -35,7 +49,13 @@ pub struct BondConventionParams {
 }
 
 /// Financial terms for appending a pay-fixed, zero-spread interest-rate swap.
-#[derive(Debug)]
+///
+/// The serde form is the host input of `ModelBuilder.add_swap` and
+/// `ModelBuilder.add_swap_with_conventions`: every field is required and an
+/// unknown field is rejected.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct SwapParams {
     /// Capital-structure identifier; market-aware evaluation rejects duplicates.
     pub id: String,
@@ -43,9 +63,17 @@ pub struct SwapParams {
     pub notional: Money,
     /// Finite annual fixed-leg decimal rate, such as 0.04 for 4%.
     pub fixed_rate: f64,
-    /// Effective accrual start date, strictly before maturity.
+    /// Effective accrual start date (ISO `YYYY-MM-DD`), strictly before maturity.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub start_date: Date,
-    /// Final contractual swap maturity date.
+    /// Final contractual swap maturity date (ISO `YYYY-MM-DD`).
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub maturity_date: Date,
     /// Discount-curve lookup identifier used at evaluation.
     pub discount_curve_id: String,
@@ -54,7 +82,14 @@ pub struct SwapParams {
 }
 
 /// Schedule and accrual conventions for a simple-compounding swap.
-#[derive(Debug)]
+///
+/// The serde form is the host input of `ModelBuilder.add_swap_with_conventions`.
+/// Tenors use their wire form `{"count": 6, "unit": "months"}`; day counts and
+/// the business-day convention use their snake_case labels (`"act_360"`,
+/// `"30_360"`, `"modified_following"`). An unknown field is rejected.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct SwapConventions {
     /// Contractual fixed-leg payment cadence.
     pub fixed_frequency: Tenor,
@@ -64,7 +99,10 @@ pub struct SwapConventions {
     pub float_frequency: Tenor,
     /// Floating-leg accrual year-fraction convention.
     pub float_day_count: DayCount,
-    /// Schedule-date rolling rule on the currency's settlement calendar.
+    /// Schedule-date rolling rule on the currency's settlement calendar;
+    /// omitted on the wire it takes the [`BusinessDayConvention`] default,
+    /// Modified Following.
+    #[serde(default)]
     pub business_day_convention: BusinessDayConvention,
 }
 

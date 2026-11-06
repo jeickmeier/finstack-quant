@@ -516,6 +516,10 @@ class LeaseSpec:
     """
     Describe a rich lease schedule for rent-roll generation.
 
+    Every parameter is keyword-only: Rust reads the keywords as the
+    ``LeaseSpec`` serde struct, supplies the defaults and rejects an unknown
+    keyword.
+
     Parameters
     ----------
     node_id : str
@@ -547,7 +551,7 @@ class LeaseSpec:
     Examples
     --------
     >>> from finstack_quant.statements_analytics import LeaseSpec
-    >>> lease = LeaseSpec("lease_a", "2025Q1", 100.0, end="2025Q4")
+    >>> lease = LeaseSpec(node_id="lease_a", start="2025Q1", base_rent=100.0, end="2025Q4")
     >>> (lease.node_id, lease.base_rent, lease.growth_convention.value())
     ('lease_a', 100.0, 'annual_escalator')
 
@@ -555,12 +559,13 @@ class LeaseSpec:
 
     def __init__(
         self,
+        *,
         node_id: str,
         start: str,
         base_rent: float,
         end: str | None = None,
         growth_rate: float = 0.0,
-        growth_convention: LeaseGrowthConvention = ...,
+        growth_convention: LeaseGrowthConvention | str = "annual_escalator",
         rent_steps: list[RentStepSpec] = ...,
         free_rent_periods: int = 0,
         free_rent_windows: list[FreeRentWindowSpec] = ...,
@@ -575,7 +580,7 @@ class LeaseSpec:
         node_id : str
             Statement node receiving the lease's rental-revenue series.
         start : str
-            First included model-period label for the lease term.
+            First included model-period label for the lease term (``"2025Q1"``).
         base_rent : float
             Contractual periodic rent before escalators, concessions, and
             occupancy scaling, in the model's currency units.
@@ -583,15 +588,16 @@ class LeaseSpec:
             Optional final included model period; ``None`` extends through horizon.
         growth_rate : float, default 0.0
             Decimal rent-growth rate interpreted by ``growth_convention``.
-        growth_convention : LeaseGrowthConvention
+        growth_convention : LeaseGrowthConvention or str, default "annual_escalator"
             Whether growth compounds every model period or as an annual
-            step. Default ``AnnualEscalator``; set ``PerPeriod`` explicitly
-            for per-period compounding.
-        rent_steps : list[RentStepSpec]
+            step: a ``LeaseGrowthConvention`` or its serde name
+            (``"per_period"``, ``"annual_escalator"``). Set ``PerPeriod``
+            explicitly for per-period compounding.
+        rent_steps : list[RentStepSpec], default []
             Explicit rent resets applied from each step's start period onward.
         free_rent_periods : int, default 0
             Number of initial included periods with rent set to zero.
-        free_rent_windows : list[FreeRentWindowSpec]
+        free_rent_windows : list[FreeRentWindowSpec], default []
             Additional dated rent-free windows within the base lease term.
         occupancy : float, default 1.0
             Decimal occupancy multiplier applied to scheduled rent.
@@ -601,7 +607,10 @@ class LeaseSpec:
         Raises
         ------
         ValueError
-            If start or end is not a valid model period.
+            If a required field is missing, a keyword is unknown, a value does
+            not have its wire form, or start or end is not a valid model period.
+        TypeError
+            If a positional argument is passed.
 
         """
         ...
@@ -798,7 +807,7 @@ class LeaseSpec:
         Examples
         --------
         >>> from finstack_quant.statements_analytics import LeaseSpec
-        >>> lease = LeaseSpec("lease_a", "2025Q1", 100.0)
+        >>> lease = LeaseSpec(node_id="lease_a", start="2025Q1", base_rent=100.0)
         >>> LeaseSpec.from_json(lease.to_json()).start
         '2025Q1'
 
@@ -1188,10 +1197,14 @@ class PropertyTemplateNodes:
     """
     Name generated node IDs for a property operating-statement template.
 
+    Every parameter is keyword-only and optional: Rust reads the keywords as
+    the ``PropertyTemplateNodes`` serde struct, supplies the defaults and
+    rejects an unknown keyword.
+
     Parameters
     ----------
-    rent_roll : RentRollOutputNodes or None
-        Optional rent-roll output names; ``None`` uses the template defaults.
+    rent_roll : RentRollOutputNodes
+        Rent-roll output names; omitted uses ``RentRollOutputNodes()``.
     other_income_total_node : str
         Node ID aggregating other-income components.
     egi_node : str
@@ -1218,7 +1231,8 @@ class PropertyTemplateNodes:
 
     def __init__(
         self,
-        rent_roll: RentRollOutputNodes | None = None,
+        *,
+        rent_roll: RentRollOutputNodes = ...,
         other_income_total_node: str = "other_income_total",
         egi_node: str = "egi",
         management_fee_node: str = "management_fee",
@@ -1232,8 +1246,8 @@ class PropertyTemplateNodes:
 
         Parameters
         ----------
-        rent_roll : RentRollOutputNodes or None, default None
-            Optional rent-roll output names; ``None`` uses the template defaults.
+        rent_roll : RentRollOutputNodes, default RentRollOutputNodes()
+            Rent-roll output names.
         other_income_total_node : str, default "other_income_total"
             Node ID aggregating other-income components.
         egi_node : str, default "egi"
@@ -1249,9 +1263,12 @@ class PropertyTemplateNodes:
         ncf_node : str, default "ncf"
             Node ID for net cash flow after operating items and capital expenditure.
 
-        Notes
-        -----
-        Construction does not raise; arguments are stored as supplied.
+        Raises
+        ------
+        ValueError
+            If a keyword is unknown or a value does not have its wire form.
+        TypeError
+            If a positional argument is passed.
         """
         ...
 
@@ -1577,7 +1594,7 @@ def add_rent_roll(
     >>> builder = ModelBuilder("template")
     >>> _ = builder.periods("2025Q1..Q2")
     >>> model = builder.build()
-    >>> lease = LeaseSpec("lease_a", "2025Q1", 100.0)
+    >>> lease = LeaseSpec(node_id="lease_a", start="2025Q1", base_rent=100.0)
     >>> add_rent_roll(model, [lease]).has_node("rent_effective")
     True
 
@@ -1630,7 +1647,7 @@ def add_property_operating_statement(
     >>> builder = ModelBuilder("template")
     >>> _ = builder.periods("2025Q1..Q2")
     >>> model = builder.build()
-    >>> lease = LeaseSpec("lease_a", "2025Q1", 100.0)
+    >>> lease = LeaseSpec(node_id="lease_a", start="2025Q1", base_rent=100.0)
     >>> updated = add_property_operating_statement(model, [lease], [], [], [])
     >>> updated.has_node("ncf")
     True

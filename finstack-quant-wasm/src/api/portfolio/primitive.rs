@@ -30,11 +30,11 @@ use wasm_bindgen::prelude::*;
 /// JSON string, and a `FinstackError` if a metric id is not canonical or is
 /// non-additive, primitive definitions conflict across positions, a composite
 /// is invalid, or market data or FX is missing.
-#[wasm_bindgen(js_name = portfolioPrimitiveExposures)]
+#[wasm_bindgen(js_name = portfolioPrimitiveExposures, unchecked_return_type = "PortfolioPrimitiveExposureReport")]
 pub fn primitive_exposures(
     portfolio: &JsPortfolio,
     market: &JsMarketContext,
-    metrics: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string[] | string")] metrics: JsValue,
 ) -> Result<JsValue, JsValue> {
     let metrics: Vec<MetricId> = from_js_json(&metrics, "metrics")?;
     let report = finstack_quant_portfolio::primitive::primitive_exposures(

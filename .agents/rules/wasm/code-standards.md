@@ -44,9 +44,11 @@ finstack-quant-wasm/
 │   │   ├── statements/
 │   │   ├── statements_analytics/
 │   │   └── valuations/
-│   └── utils/            # mod.rs (to_js_value, to_js_err), input.rs, wire.rs, date.rs
+│   ├── utils/            # mod.rs (to_js_value, to_js_err), input.rs, wire.rs, date.rs
+│   └── prelude.d.ts      # host-only TypeScript types, appended to the pkg declarations
+├── macros/               # finstack-quant-wasm-macros: `plain_docs` for macro-forwarded docs
 ├── index.js              # hand-written JS facade (public entrypoint)
-├── index.d.ts            # TypeScript declarations for the facade
+├── index.d.ts            # GENERATED facade declarations (scripts/gen-facade-dts.mjs)
 ├── exports/              # per-crate namespace JS files
 │   ├── core.js
 │   ├── analytics.js
@@ -56,12 +58,12 @@ finstack-quant-wasm/
 ├── facade-surface.json   # checked-in export surface (tests/facade/surface.test.mjs)
 ├── types/                # TypeScript types generated from the Rust JSON Schemas
 ├── pkg/, pkg-node/       # generated wasm-bindgen output (INTERNAL, not public)
-├── scripts/              # doc sync / doc checks / contract-type generation
+├── scripts/              # facade declarations, doc checks, contract-type generation
 ├── package.json          # main: ./index.js, types: ./index.d.ts
 └── tests/
     ├── wasm.rs + wasm_*.rs   # wasm-bindgen-test suites (wasm32)
-    ├── dts_contract.rs, return_shapes.rs, boundary_signatures.rs   # host tests
-    ├── facade/*.test.mjs     # Node test runner, against the built package
+    ├── return_shapes.rs, boundary_signatures.rs   # host tests of the Rust sources
+    ├── facade/*.test.mjs     # Node test runner, against the built package and its declarations
     └── typescript/, scripts/ # tsc declaration checks, doc-tooling tests
 ```
 
@@ -119,6 +121,31 @@ Exported functions never declare `&str`, `String`, `bool`, integer or
 `Vec<String>` parameters: wasm-bindgen's glue for those traps on a wrong type or
 coerces it silently. Declare `JsValue` (`Option<JsValue>` when optional) and
 convert; `tests/boundary_signatures.rs` enforces this.
+
+The attributes give each `JsValue` its TypeScript type, so wasm-bindgen's
+declarations publish no `any` (`tests/facade/typed_declarations.test.mjs`
+enforces it):
+
+```rust
+#[wasm_bindgen(js_name = valuePortfolio, unchecked_return_type = "PortfolioValuation")]
+pub fn value_portfolio(
+    portfolio: &JsPortfolio,
+    market: &JsMarketContext,
+    #[wasm_bindgen(js_name = "strictRisk", unchecked_optional_param_type = "boolean")]
+    strict_risk: Option<JsValue>,
+) -> Result<JsValue, JsValue> { /* ... */ }
+```
+
+- `unchecked_param_type` / `unchecked_optional_param_type` on every `JsValue`
+  parameter, `unchecked_return_type` on every `JsValue` return; type strings
+  name generated schema types as `generated.<crate>.<Type>` or a host type
+  from `src/prelude.d.ts`.
+- `js_name = "camelCase"` on every snake_case parameter, the same name the
+  input helper reports in its error (`"strictRisk: expected a boolean"`).
+- A required parameter cannot follow an optional one; type a middle optional
+  as `T | null | undefined` with `unchecked_param_type`.
+- An optional borrowed handle (`Option<&T>`) is not expressible: declare
+  `&T` with `unchecked_optional_param_type` and default it in the facade.
 
 | Argument                                                                                     | Helper                                                                         |
 | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
@@ -214,10 +241,14 @@ export { analytics } from "./exports/analytics.js";
 
 The facade is a re-export map. JS logic is allowed there only where
 wasm-bindgen cannot express the Rust signature (an optional borrowed handle,
-for example), with a comment saying so. After adding, removing or renaming an
-export, regenerate `facade-surface.json`
-(`UPDATE_FACADE_SURFACE=1 node --test tests/facade/surface.test.mjs`) and
-update `index.d.ts`.
+for example), with a comment saying so, and declares what wasm-bindgen cannot:
+a wrapper function's JSDoc ends in `@facadeType <function type>`; a method added
+to, or widened on, a class prototype gets one JSDoc block ending in
+`@facadeClass Name` and `@member name(params): Return`; a raw method the facade
+replaces is marked `skip_typescript` in Rust. `chain(Class, [...])` methods are
+declared from the call. After any facade or binding change run
+`mise run gen-write`: it regenerates `index.d.ts`
+(`scripts/gen-facade-dts.mjs`) and `facade-surface.json`.
 
 ## Module Initialization
 
@@ -241,11 +272,16 @@ export it.
 
 ## Documentation
 
-Rustdoc above `#[wasm_bindgen]` is the source of the published JSDoc: document
-every parameter (`@param`), return (`@returns`) and thrown kind (`@throws`), then
-run `npm --prefix finstack-quant-wasm run docs:sync`. Every `@example` must be
-a complete program: `mise run wasm-doc` type-checks each one against
-`index.d.ts`, and `tests/docs/doc_examples.test.mjs` (`mise run wasm-test --doctest`) executes it.
+Rustdoc above `#[wasm_bindgen]` is the published JSDoc: wasm-bindgen copies it
+into `pkg/finstack_quant_wasm.d.ts`. Document every parameter by its camelCase
+name (`@param`), the return (`@returns`) and the thrown kinds (`@throws`); give
+each class a runnable `@example` (on the struct or its constructor). A
+namespace's summary and example sit on its `export const` in `exports/**`.
+Doc comments a `macro_rules!` invocation forwards into a generated item reach
+wasm-bindgen as raw strings; put `#[finstack_quant_wasm_macros::plain_docs]`
+before the item's `#[wasm_bindgen]` in the macro body. `mise run wasm-doc`
+checks the declarations' docs and type-checks every `@example`;
+`tests/docs/doc_examples.test.mjs` (`mise run wasm-test --doctest`) executes them.
 
 ## Performance Guidelines
 
@@ -257,7 +293,8 @@ a complete program: `mise run wasm-doc` type-checks each one against
 
 - Facade tests: `finstack-quant-wasm/tests/facade/*.test.mjs` (Node test runner, against the built package).
 - wasm32 binding tests: `wasm_bindgen_test` in `tests/wasm_*.rs`.
-- Host tests of the declarations: `tests/dts_contract.rs`, `tests/return_shapes.rs`, `tests/boundary_signatures.rs`.
+- Declarations: `tests/facade/surface.test.mjs` (declared surface == runtime surface), `tests/facade/return_shapes.test.mjs`, `tests/facade/typed_declarations.test.mjs` (no `any`) and the `tsc` consumer checks in `tests/typescript/` (`npm run test:dts`).
+- Host tests of the Rust sources: `tests/boundary_signatures.rs`, `tests/return_shapes.rs`.
 
 A facade test reads the `.wasm` bytes, because Node cannot fetch a file URL:
 
@@ -285,5 +322,6 @@ test("core namespace exposes Currency", () => {
 - [ ] Type and member names match Rust; any exception is explicitly documented.
 - [ ] Arguments are `JsValue` converted by `utils::input` / `utils::wire`; string-valued wire types use `js_wire`.
 - [ ] Errors go through `to_js_err`; results through `to_js_value`; no `.unwrap()` / `.expect()`.
-- [ ] Facade JS file, `index.d.ts` and `facade-surface.json` updated with new exports.
+- [ ] Every `JsValue` parameter and return carries its `unchecked_*_type`; snake_case parameters carry a camelCase `js_name`.
+- [ ] Facade JS file updated; `mise run gen-write` regenerated `index.d.ts` and `facade-surface.json`.
 - [ ] Gates pass: `mise run rust-lint-crate -- finstack-quant-wasm`, `mise run wasm-test`, `mise run wasm-doc`, `mise run wasm-lint`.

@@ -7,77 +7,91 @@ use wasm_bindgen::prelude::*;
 
 instrument_class!(
     /// Typed wrapper for the Rust `CdsOption` instrument: a European option on a single-name or index CDS, struck on a forward spread or a clean index price. A call is the right to buy protection (payer), a put the right to sell it (receiver); `delta`, `gamma`, `vega`, `theta` and `implied_vol` are metric ids of `price` / `metric`.
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { valuations } from "finstack-quant-wasm";
+    /// await init();
+    /// const option = valuations.instruments.CdsOption.example();
+    /// console.log(option.id, option.optionType, option.strike);
+    /// option.free();
+    /// ```
     JsCdsOption,
     "CdsOption",
     finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOption
 );
 
-instrument_surface!(JsCdsOption, "CdsOption", JsCdsOptionBuilder);
+instrument_surface!(
+    JsCdsOption,
+    "CdsOption",
+    JsCdsOptionBuilder,
+    "generated.valuations.CdsOption"
+);
 
 getters!(JsCdsOption, "CdsOption", |i| {
         /// Canonical model key used when `model="default"` is passed to `price`.
         /// @returns Registered model key of the Bloomberg CDSO quadrature pricer.
-        default_model as defaultModel => text(Instrument::default_model(i)),
+        default_model as defaultModel: "string" => text(Instrument::default_model(i)),
         /// Option strike in its serde form.
         /// @returns `{ spread: "<decimal rate>" }` or `{ clean_price_pct: "<price points>" }`.
-        strike as strike => json(i.strike),
-        /// Option type.
+        strike as strike: "generated.valuations.CdsOption['strike']" => json(i.strike),
+        /// Whether the option is a payer (call) or receiver (put) on CDS protection.
         /// @returns `"call"` (right to buy protection) or `"put"` (right to sell protection).
-        option_type as optionType => json(i.option_type),
+        option_type as optionType: "generated.valuations.CdsOption['option_type']" => json(i.option_type),
         /// Legal option expiry date.
         /// @returns ISO-8601 expiry date.
-        expiry as expiry => date(i.expiry),
+        expiry as expiry: "string" => date(i.expiry),
         /// Maturity of the underlying CDS.
         /// @returns ISO-8601 maturity date.
-        underlying_maturity as underlyingMaturity => date(i.underlying_maturity),
+        underlying_maturity as underlyingMaturity: "string" => date(i.underlying_maturity),
         /// Option notional.
         /// @returns Currency-tagged notional of the underlying CDS.
-        notional as notional => money(i.notional),
+        notional as notional: "Money" => money(i.notional),
         /// Settlement type of the exercise proceeds.
         /// @returns `"cash"` or `"physical"`.
-        settlement as settlement => json(i.settlement),
+        settlement as settlement: "generated.valuations.CdsOption['settlement']" => json(i.settlement),
         /// Explicit exercise proceeds payment date.
         /// @returns The date, or `null` for legal expiry.
-        exercise_settlement_date as exerciseSettlementDate => opt_date(i.exercise_settlement_date),
+        exercise_settlement_date as exerciseSettlementDate: "string | null" => opt_date(i.exercise_settlement_date),
         /// Explicit accrual-effective date of the underlying CDS.
         /// @returns The date, or `null` when `protectionStartConvention` selects it.
-        underlying_start_date as underlyingStartDate => opt_date(i.underlying_start_date),
+        underlying_start_date as underlyingStartDate: "string | null" => opt_date(i.underlying_start_date),
         /// Accrual-start convention of the synthetic underlying CDS.
         /// @returns `"spot"` or `"forward"`.
-        protection_start_convention as protectionStartConvention => json(i.protection_start_convention),
+        protection_start_convention as protectionStartConvention: "NonNullable< generated.valuations.CdsOption['protection_start_convention'] >" => json(i.protection_start_convention),
         /// Whether the option knocks out on default before expiry.
         /// @returns `true` for knock-out options.
-        knockout as knockout => json(i.knockout),
+        knockout as knockout: "boolean" => json(i.knockout),
         /// Recovery rate assumption.
         /// @returns Recovery as a decimal (`0.4` = 40%).
-        recovery_rate as recoveryRate => json(i.recovery_rate),
+        recovery_rate as recoveryRate: "number" => json(i.recovery_rate),
         /// Discount curve identifier.
         /// @returns Discount curve id in the market context.
-        discount_curve_id as discountCurveId => text(i.discount_curve_id),
+        discount_curve_id as discountCurveId: "string" => text(i.discount_curve_id),
         /// Hazard (credit) curve identifier.
         /// @returns Hazard curve id in the market context.
-        credit_curve_id as creditCurveId => text(i.credit_curve_id),
+        credit_curve_id as creditCurveId: "string" => text(i.credit_curve_id),
         /// Volatility surface identifier.
         /// @returns Vol surface id in the market context.
-        vol_surface_id as volSurfaceId => text(i.vol_surface_id),
+        vol_surface_id as volSurfaceId: "string" => text(i.vol_surface_id),
         /// ISDA convention of the underlying CDS (serde name).
         /// @returns `"isda_na"`, `"isda_eu"`, `"isda_as"` or `"custom"`.
-        underlying_convention as underlyingConvention => json(i.underlying_convention),
+        underlying_convention as underlyingConvention: "NonNullable< generated.valuations.CdsOption['underlying_convention'] >" => json(i.underlying_convention),
         /// Whether the underlying is a CDS index.
         /// @returns `true` for an index option, `false` for a single name.
-        underlying_is_index as underlyingIsIndex => json(i.underlying_is_index),
+        underlying_is_index as underlyingIsIndex: "boolean" => json(i.underlying_is_index),
         /// Current index factor `f`.
         /// @returns Surviving fraction of original index notional, in `(0, 1]`.
-        index_factor as indexFactor => json(i.index_factor),
+        index_factor as indexFactor: "number" => json(i.index_factor),
         /// Original index factor `f0` of a clean-price strike.
         /// @returns The factor, or `null` for spread strikes.
-        strike_index_factor as strikeIndexFactor => json(i.strike_index_factor),
+        strike_index_factor as strikeIndexFactor: "number | null" => json(i.strike_index_factor),
         /// Settled cumulative index loss since option inception.
         /// @returns Decimal fraction of original index notional.
-        realized_loss as realizedLoss => json(i.realized_loss),
+        realized_loss as realizedLoss: "number" => json(i.realized_loss),
         /// Running coupon of the underlying CDS in basis points.
         /// @returns The coupon, or `null` when the strike spread is the coupon.
-        coupon_bp as couponBp => json(i.coupon_bp.and_then(|d| rust_decimal::prelude::ToPrimitive::to_f64(&d))),
+        coupon_bp as couponBp: "number | null" => json(i.coupon_bp.and_then(|d| rust_decimal::prelude::ToPrimitive::to_f64(&d))),
 });
 
 common_getters!(JsCdsOption, "CdsOption");
@@ -97,6 +111,28 @@ builder_class!(
     /// `discountCurveId`, `creditCurveId`, `volSurfaceId` and
     /// `underlyingIsIndex`. Every setter returns the builder, so calls chain;
     /// `build()` validates and consumes it.
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { core, valuations } from "finstack-quant-wasm";
+    /// await init();
+    /// const option = valuations.instruments.CdsOption.builder()
+    ///   .id("CDSO-1")
+    ///   .strike({ spread: "0.0125" })
+    ///   .optionType("put")
+    ///   .expiry("2025-06-20")
+    ///   .underlyingMaturity("2030-06-20")
+    ///   .notional(new core.Money(5_000_000, new core.Currency("USD")))
+    ///   .settlement("physical")
+    ///   .recoveryRate(0.4)
+    ///   .discountCurveId("USD-OIS")
+    ///   .creditCurveId("CORP-HAZARD")
+    ///   .volSurfaceId("CDSOPT-VOL")
+    ///   .underlyingIsIndex(false)
+    ///   .build();
+    /// console.log(option.optionType, option.settlement);
+    /// option.free();
+    /// ```
     JsCdsOptionBuilder,
     "CdsOptionBuilder",
     finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOptionBuilder,
@@ -109,102 +145,102 @@ setters!(JsCdsOptionBuilder, "CdsOptionBuilder", {
         /// @param value - Unique identifier for the option.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        id as id => id,
-        /// Set the strike.
+        id as id: "string" => id,
+        /// Set the strike, as a forward spread or a clean price.
         /// @param value - `{ spread: "0.0325" }` (decimal forward spread) or `{ clean_price_pct: "107.0" }` (clean price points), as a plain object or JSON string.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        strike as strike => from_js_json,
+        strike as strike: "generated.valuations.CdsOption['strike'] | string" => from_js_json,
         /// Set the option type.
         /// @param value - `"call"` buys protection at expiry, `"put"` sells it.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        option_type as optionType => js_wire,
+        option_type as optionType: "'call' | 'put'" => js_wire,
         /// Set the option expiry date.
         /// @param value - Legal expiry as an ISO-8601 string; must precede the underlying maturity.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        expiry as expiry => js_date,
+        expiry as expiry: "string" => js_date,
         /// Set the underlying CDS maturity date.
         /// @param value - Maturity of the CDS delivered or cash-settled at exercise, as an ISO-8601 string.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        underlying_maturity as underlyingMaturity => js_date,
+        underlying_maturity as underlyingMaturity: "string" => js_date,
         /// Set the settlement type.
         /// @param value - `"cash"` or `"physical"`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        settlement as settlement => js_wire,
+        settlement as settlement: "generated.valuations.CdsOption['settlement']" => js_wire,
         /// Set the exercise proceeds payment date.
         /// @param value - On or after expiry and before CDS maturity, as an ISO-8601 string; when never set legal expiry is used.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        exercise_settlement_date as exerciseSettlementDate => js_date,
+        exercise_settlement_date as exerciseSettlementDate: "string" => js_date,
         /// Set the underlying CDS accrual-effective date.
         /// @param value - Accrual start for the forward spread and risky annuity, as an ISO-8601 string.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        underlying_start_date as underlyingStartDate => js_date,
+        underlying_start_date as underlyingStartDate: "string" => js_date,
         /// Set the underlying accrual-start convention.
         /// @param value - `"spot"` (default, prior CDS roll) or `"forward"` (option expiry).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        protection_start_convention as protectionStartConvention => js_wire,
+        protection_start_convention as protectionStartConvention: "'spot' | 'forward'" => js_wire,
         /// Set whether the option knocks out on default before expiry.
         /// @param value - `true` for knock-out single-name options; default `false`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if the builder was already consumed by `build()`.
-        knockout as knockout => js_bool,
+        knockout as knockout: "boolean" => js_bool,
         /// Set the recovery rate assumption.
         /// @param value - Recovery as a decimal in `[0, 1]`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if the builder was already consumed by `build()`.
-        recovery_rate as recoveryRate => js_f64,
+        recovery_rate as recoveryRate: "number" => js_f64,
         /// Set the discount curve identifier.
         /// @param value - Discount curve id in the market context.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if the builder was already consumed by `build()`.
-        discount_curve_id as discountCurveId => id,
+        discount_curve_id as discountCurveId: "string" => id,
         /// Set the hazard (credit) curve identifier.
         /// @param value - Hazard curve id in the market context.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if the builder was already consumed by `build()`.
-        credit_curve_id as creditCurveId => id,
+        credit_curve_id as creditCurveId: "string" => id,
         /// Set the volatility surface identifier.
         /// @param value - Vol surface id in the market context.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if the builder was already consumed by `build()`.
-        vol_surface_id as volSurfaceId => id,
+        vol_surface_id as volSurfaceId: "string" => id,
         /// Set the ISDA convention of the underlying CDS.
         /// @param value - `"isda_na"` (default), `"isda_eu"`, `"isda_as"` or `"custom"`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        underlying_convention as underlyingConvention => js_wire,
+        underlying_convention as underlyingConvention: "NonNullable<generated.valuations.CdsOption['underlying_convention']>" => js_wire,
         /// Set whether the underlying is a CDS index.
         /// @param value - `true` for an index option (no knock-out, index factor applies), `false` for a single name.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if the builder was already consumed by `build()`.
-        underlying_is_index as underlyingIsIndex => js_bool,
+        underlying_is_index as underlyingIsIndex: "boolean" => js_bool,
         /// Set the current index factor.
         /// @param value - Surviving fraction of the original index notional, in `(0, 1]`; default `1.0`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if the builder was already consumed by `build()`.
-        index_factor as indexFactor => js_f64,
+        index_factor as indexFactor: "number" => js_f64,
         /// Set the original index factor of a clean-price strike.
         /// @param value - `f0` the clean-price strike is quoted on.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if the builder was already consumed by `build()`.
-        strike_index_factor as strikeIndexFactor => js_f64,
+        strike_index_factor as strikeIndexFactor: "number" => js_f64,
         /// Set the settled cumulative index loss since option inception.
         /// @param value - Decimal fraction of original index notional in `[0, 1]`; default `0.0`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if the builder was already consumed by `build()`.
-        realized_loss as realizedLoss => js_f64,
+        realized_loss as realizedLoss: "number" => js_f64,
         /// Set the running coupon of the underlying CDS.
         /// @param value - Coupon in basis points (`100` for CDX.NA.IG, `500` for CDX.NA.HY); when never set the strike spread is the coupon.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        coupon_bp as couponBp => dec,
+        coupon_bp as couponBp: "number" => dec,
 });
 
 common_setters!(JsCdsOptionBuilder, "CdsOptionBuilder");

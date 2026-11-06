@@ -20,7 +20,7 @@ Release Prep Progress:
 - [ ] Phase 7: Final verification & tagging
 ```
 
-After each phase, run `mise run all-ci` to confirm nothing is broken before proceeding.
+After each phase, run `mise run all` to confirm nothing is broken before proceeding.
 
 ## Phase 1: Dead code audit
 
@@ -109,7 +109,7 @@ rg '@deprecated|deprecated' --type ts -g '!node_modules/'
 
 1. **Verify replacement exists**: The deprecation message should point to a canonical replacement. Confirm the replacement is implemented and tested.
 2. **Find all internal call sites**: Grep for usage across the workspace. Migrate each call site to the replacement.
-3. **Update CHANGELOG.md**: Add the removal to `[Unreleased] > Removed` with migration instructions.
+3. **Update `changelog/unreleased.md`**: Add the removal with migration instructions.
 4. **Update Python/WASM bindings**: If the deprecated Rust API was exposed via bindings, remove the binding too.
 5. **Remove the deprecated code**: Delete the function/struct/method and its tests.
 
@@ -151,7 +151,7 @@ Verify these files are current and accurate:
 | File | Check |
 |------|-------|
 | `README.md` | Badges, install instructions, quick start example, feature list |
-| `CHANGELOG.md` | All changes since last release documented; `[Unreleased]` section populated |
+| `changelog/unreleased.md` | All changes since last release documented |
 | `docs/` | No stale/orphaned docs referencing removed APIs |
 | Crate-level `README.md` | Each crate's README reflects current API |
 
@@ -170,7 +170,7 @@ rg -l 'deprecated_function_name' finstack-quant/examples/ finstack-quant-py/exam
 
 If deprecated APIs were removed (Phase 2), ensure:
 
-- `CHANGELOG.md` contains before/after code snippets
+- `changelog/unreleased.md` contains before/after code snippets
 - Migration is straightforward (no multi-step workarounds)
 - All combinations of old usage patterns are covered
 
@@ -250,7 +250,7 @@ cargo nextest run --workspace -E 'test(quantlib) | test(parity) | test(golden) |
 ### 6a. Version and metadata
 
 - [ ] `workspace.package.version` in root `Cargo.toml` bumped per Phase 4 analysis
-- [ ] `CHANGELOG.md` `[Unreleased]` header renamed to `[X.Y.Z] - YYYY-MM-DD`
+- [ ] `changelog/unreleased.md` renamed to `changelog/X.Y.Z.md` with its `# Finstack Quant X.Y.Z` title and release date, a fresh `changelog/unreleased.md` started, and the row added to `changelog/README.md`
 - [ ] Python package version matches (`pyproject.toml` / `maturin` config)
 - [ ] WASM package version matches (`package.json`)
 - [ ] License headers present where required
@@ -264,8 +264,8 @@ cargo deny check
 # Python security audit (bandit)
 uv run --no-sync bandit -r finstack-quant-py -c pyproject.toml
 
-# Lint all components (no auto-fix — must pass clean)
-mise run all-lint
+# The gate: lint, generated files and tests on every surface (must pass clean)
+mise run all
 ```
 
 ### 6c. Rust toolchain verification
@@ -329,7 +329,7 @@ Verify Python and WASM bindings expose all intended public APIs.
 
 ### 6h. Release notes
 
-Create `RELEASE_NOTES_X.Y.Z.md` following the established template (see `RELEASE_NOTES_0.8.0.md`). Include:
+Write the release notes at the top of `changelog/X.Y.Z.md`, above its `## Itemized changes` section, following the established template (see `changelog/0.8.0.md`). The GitHub Release body is that part. Include:
 
 - Executive summary and "who should upgrade"
 - Breaking changes with migration code snippets
@@ -342,13 +342,13 @@ Create `RELEASE_NOTES_X.Y.Z.md` following the established template (see `RELEASE
 ### 7a. Full test suite
 
 ```bash
-mise run all-test
+mise run all --full
 ```
 
 ### 7b. CI and release gates
 
 ```bash
-mise run all-ci --release
+mise run all --release
 ```
 
 ### 7c. Pre-release checklist
@@ -357,7 +357,7 @@ mise run all-ci --release
 - [ ] CI pipeline passes on the branch
 - [ ] No `#[allow(dead_code)]` or `#[allow(unused)]` suppressions added during cleanup
 - [ ] No new `TODO`/`FIXME` comments introduced
-- [ ] CHANGELOG is complete and reviewed
+- [ ] `changelog/X.Y.Z.md` itemized changes are complete and reviewed
 - [ ] Release notes written and reviewed
 - [ ] Version numbers consistent across all components
 
@@ -369,9 +369,8 @@ git push origin vX.Y.Z
 ```
 
 Pushing the tag runs `.github/workflows/release.yml`. It requires the tag to
-match the `Cargo.toml` and `finstack-quant-wasm/package.json` versions, a
-`## [X.Y.Z]` section in `CHANGELOG.md` and
-`release_notes/RELEASE_NOTES_X.Y.Z.md`; runs the nightly checks, docs, the
+match the `Cargo.toml` and `finstack-quant-wasm/package.json` versions and
+`changelog/X.Y.Z.md` with its `## Itemized changes` section; runs the nightly checks, docs, the
 slow Rust suite, publish checks and semver; then builds the wheels, sdist and
 WASM packages and creates the GitHub release with those notes. Do not run
 `gh release create` by hand.
@@ -379,7 +378,7 @@ WASM packages and creates the GitHub release with those notes. Do not run
 ### 7e. Post-release
 
 - [ ] Save benchmark baseline for the new release: `mise run rust-bench-baseline`
-- [ ] Add new `[Unreleased]` section to `CHANGELOG.md`
+- [ ] `changelog/unreleased.md` exists for the next release
 - [ ] Bump version to next dev pre-release if desired
 
 ## Output format
@@ -406,7 +405,7 @@ After completing the audit, produce a release readiness report:
 - Rust pub API coverage: <percentage>
 - Python stub coverage: <percentage>
 - Examples: all passing / <N> failures
-- CHANGELOG: complete / needs attention
+- Changelog (`changelog/X.Y.Z.md`): complete / needs attention
 - Migration guide: included / not needed
 - Release notes: drafted / not needed
 
@@ -418,11 +417,9 @@ After completing the audit, produce a release readiness report:
 ### Quality gates
 | Check | Status |
 |-------|--------|
-| `mise run all-ci --release` | pass/fail |
-| `mise run all-lint` | pass/fail |
+| `mise run all --release` | pass/fail |
 | `cargo deny check` | pass/fail |
 | `bandit -r finstack-quant-py` | pass/fail |
-| `mise run all-test` | pass/fail |
 | MSRV check | pass/fail |
 | Publish dry-run | pass/fail |
 | Semver checks | pass/fail |

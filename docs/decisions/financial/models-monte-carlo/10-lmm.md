@@ -22,7 +22,7 @@ Drift terms with |1+tau*L|<1e-15 are skipped; nonpositive displaced states are l
 
 ## Evidence
 
-[Process/drift/grid](../../../../finstack-quant/models/src/monte_carlo/process/lmm.rs), [predictor-corrector](../../../../finstack-quant/models/src/monte_carlo/discretization/lmm_predictor_corrector.rs). Located tests cover caplet comparison to displaced Black, fixed-forward freezing, terminal-forward martingale, and endpoint volatility handling. [Non-Markov simulation tests](../../../../finstack-quant/models/src/monte_carlo/simulate/non_markov_tests.rs) include direct moments and production-loop equality. [Brigo–Mercurio](../../../REFERENCES.md#brigo-mercurio-2006-interest-rate-models) and [Andersen–Piterbarg](../../../REFERENCES.md#andersen-piterbarg-interest-rate-modeling) provide model context; the located tests do not establish broad nonterminal option/grid accuracy.
+[Process/drift/grid](../../../../finstack-quant/models/src/monte_carlo/process/lmm.rs), [predictor-corrector](../../../../finstack-quant/models/src/monte_carlo/discretization/lmm_predictor_corrector.rs). Located tests cover caplet comparison to displaced Black, fixed-forward freezing, terminal-forward martingale, and endpoint volatility handling. [Non-Markov simulation tests](../../../../finstack-quant/models/src/monte_carlo/simulate/tests/non_markov.rs) include direct moments and production-loop equality. [Brigo–Mercurio](../../../REFERENCES.md#brigo-mercurio-2006-interest-rate-models) and [Andersen–Piterbarg](../../../REFERENCES.md#andersen-piterbarg-interest-rate-modeling) provide model context; the located tests do not establish broad nonterminal option/grid accuracy.
 
 ## Follow-up tracking
 

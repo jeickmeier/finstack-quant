@@ -56,13 +56,22 @@ pub mod scenarios;
 pub mod sensitivity;
 pub mod valuation;
 
-/// Handle to a built [`finstack_quant_portfolio::Portfolio`] that can be reused
+/// Handle to a built Rust `Portfolio` (positions and books) that can be reused
 /// across WASM calls without re-parsing and rebuilding from the spec.
 ///
 /// `Portfolio::from_spec` parses positions, builds indices, and validates
 /// invariants; for pipelines that call both `valuePortfolio` and
 /// `aggregateFullCashflows` on the same portfolio, holding this handle
 /// avoids paying that cost twice.
+///
+/// @example
+/// ```typescript
+/// import init, { portfolio } from "finstack-quant-wasm";
+/// await init();
+/// const book = portfolio.Portfolio.builder("BOOK", "USD", "2025-01-02").build();
+/// console.log(book.id, book.baseCurrency);
+/// book.free();
+/// ```
 #[wasm_bindgen(js_name = Portfolio)]
 pub struct JsPortfolio {
     pub(crate) inner: finstack_quant_portfolio::Portfolio,
@@ -72,8 +81,8 @@ pub struct JsPortfolio {
 impl JsPortfolio {
     /// Start a fluent portfolio builder (Rust `PortfolioBuilder`).
     /// @param id - Portfolio identifier.
-    /// @param base_currency - ISO-4217 reporting currency used for every base-currency rollup.
-    /// @param as_of - ISO-8601 valuation date.
+    /// @param baseCurrency - ISO-4217 reporting currency used for every base-currency rollup.
+    /// @param asOf - ISO-8601 valuation date.
     /// @returns A `PortfolioBuilder`; chain `.entity(...)` / `.position(...)` / `.tag(...)` and finish with `.build()`.
     ///
     /// # Errors
@@ -82,15 +91,16 @@ impl JsPortfolio {
     /// string, and a `FinstackError` (kind `validation`) if `baseCurrency` is
     /// not an ISO-4217 code or `asOf` is not an ISO date.
     pub fn builder(
-        id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+        #[wasm_bindgen(js_name = "baseCurrency", unchecked_param_type = "string")]
         base_currency: JsValue,
-        as_of: JsValue,
+        #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
     ) -> Result<builder::JsPortfolioBuilder, JsValue> {
         builder::JsPortfolioBuilder::start(&id, &base_currency, &as_of)
     }
 
     /// Build from a JSON-serialised `PortfolioSpec`.
-    /// @param spec_json - Canonical portfolio specification JSON defining positions, quantities, and base currency.
+    /// @param specJson - Canonical portfolio specification JSON defining positions, quantities, and base currency.
     ///
     /// # Errors
     ///
@@ -98,8 +108,12 @@ impl JsPortfolio {
     /// the portfolio schema, a position has an invalid quantity or instrument
     /// specification, or portfolio validation finds duplicate identifiers or an
     /// unknown entity reference.
+    /// @returns A reusable portfolio handle.
     #[wasm_bindgen(js_name = fromSpec)]
-    pub fn from_spec(spec_json: JsValue) -> Result<JsPortfolio, JsValue> {
+    pub fn from_spec(
+        #[wasm_bindgen(js_name = "specJson", unchecked_param_type = "JsonInput")]
+        spec_json: JsValue,
+    ) -> Result<JsPortfolio, JsValue> {
         let spec: finstack_quant_portfolio::PortfolioSpec = from_js_json(&spec_json, "specJson")?;
         let portfolio = finstack_quant_portfolio::Portfolio::from_spec(spec).map_err(to_js_err)?;
         Ok(Self { inner: portfolio })
@@ -135,7 +149,7 @@ impl JsPortfolio {
     ///
     /// Throws a JavaScript exception if the tags cannot be converted to a
     /// JavaScript value.
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, unchecked_return_type = "Record<string, string>")]
     pub fn tags(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner.tags)
     }
@@ -146,7 +160,7 @@ impl JsPortfolio {
     ///
     /// Throws a JavaScript exception if the metadata cannot be converted to a
     /// JavaScript value.
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, unchecked_return_type = "Record<string, unknown>")]
     pub fn meta(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner.meta)
     }
@@ -173,6 +187,7 @@ impl JsPortfolio {
     }
 
     /// Number of positions in the portfolio.
+    /// @returns Non-negative position count.
     #[wasm_bindgen(js_name = numPositions)]
     pub fn num_positions(&self) -> usize {
         self.inner.positions().len()
@@ -186,7 +201,7 @@ impl JsPortfolio {
     ///
     /// Throws a JavaScript exception if the specification cannot be converted
     /// to a JavaScript value.
-    #[wasm_bindgen(js_name = toSpec)]
+    #[wasm_bindgen(js_name = toSpec, unchecked_return_type = "generated.portfolio.PortfolioSpec")]
     pub fn to_spec(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner.to_spec())
     }
@@ -197,6 +212,7 @@ impl JsPortfolio {
     ///
     /// Throws a JavaScript exception if the canonical portfolio specification
     /// cannot be serialized to JSON.
+    /// @returns Canonical JSON string accepted by `Portfolio.fromSpec`.
     #[wasm_bindgen(js_name = toJson)]
     pub fn to_json(&self) -> Result<String, JsValue> {
         let spec = self.inner.to_spec();
@@ -208,14 +224,17 @@ impl JsPortfolio {
 ///
 /// Wire/validator surface: returns the re-serialized canonical JSON **string**,
 /// suitable for storage or re-ingest by `Portfolio.fromSpec`.
-/// @param json_str - Canonical JSON string to validate and re-serialize.
+/// @param jsonStr - Canonical JSON string to validate and re-serialize.
 ///
 /// # Errors
 ///
 /// Throws a JavaScript exception if `jsonStr` is malformed or does not match the
 /// `PortfolioSpec` schema, or if the canonical form cannot be serialized.
+/// @returns Canonical portfolio-specification JSON after validation.
 #[wasm_bindgen(js_name = parsePortfolioSpecJson)]
-pub fn parse_portfolio_spec_json(json_str: JsValue) -> Result<String, JsValue> {
+pub fn parse_portfolio_spec_json(
+    #[wasm_bindgen(js_name = "jsonStr", unchecked_param_type = "JsonInput")] json_str: JsValue,
+) -> Result<String, JsValue> {
     let spec: finstack_quant_portfolio::PortfolioSpec = from_js_json(&json_str, "jsonStr")?;
 
     serde_json::to_string(&spec).map_err(to_js_err)

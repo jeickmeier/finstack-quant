@@ -82,35 +82,40 @@ class ScheduleParams:
 
     def __init__(
         self,
-        frequency: Tenor | str,
-        day_count: DayCount,
+        *,
+        frequency: Tenor,
+        day_count: DayCount | str,
         calendar_id: str,
-        business_day_convention: BusinessDayConvention | str | None = None,
-        stub: StubKind | None = None,
+        business_day_convention: BusinessDayConvention | str = "modified_following",
+        stub: StubKind | str = "short_front",
         end_of_month: bool = False,
         payment_lag_days: int = 0,
         adjust_accrual_dates: bool = False,
-        roll_rule: RollRule | None = None,
+        roll_rule: RollRule | str = "none",
     ) -> None:
         """
-        Construct schedule-generation parameters.
+        Construct schedule-generation parameters from keyword-only fields.
+
+        Rust reads the keywords as the ``ScheduleParams`` wire struct: it
+        supplies the defaults below and rejects an unknown keyword. Each
+        field takes its wire value or the typed wrapper.
 
         Parameters
         ----------
-        frequency : Tenor | str
-            Accrual and payment frequency (e.g. ``"3M"``). IMM and CDS_IMM
+        frequency : Tenor
+            Accrual and payment frequency (e.g. ``Tenor.parse("3M")``). IMM and CDS_IMM
             replace it with quarterly frequency for date generation and accrual.
-        day_count : DayCount
+        day_count : DayCount | str
             Day-count convention for accrual year fractions. ACT_ACT_ISMA
             (ACT/ACT ICMA) supports the CDS_IMM twentieth grid but rejects
             the IMM third-Wednesday grid at schedule construction.
         calendar_id : str
             Holiday calendar id (``"weekends_only"`` for weekend-only
             rolling).
-        business_day_convention : BusinessDayConvention | str, optional
-            Payment-date rolling convention (default Modified Following).
-        stub : StubKind, optional
-            Stub rule (default short-front). CDS_IMM uses short-back
+        business_day_convention : BusinessDayConvention | str
+            Payment-date rolling convention (default ``"modified_following"``).
+        stub : StubKind | str
+            Stub rule (default ``"short_front"``). CDS_IMM uses short-back
             regardless of this input; IMM honours it. For a plain ACT/ACT ICMA grid, short-front
             and long-front anchor regular periods on maturity; other rules
             anchor them on the start date.
@@ -124,8 +129,8 @@ class ScheduleParams:
         adjust_accrual_dates : bool
             Roll accrual boundaries with *business_day_convention*, i.e. swap/ISDA convention
             (default ``False``, bond convention).
-        roll_rule : RollRule, optional
-            IMM/CDS-IMM anchor grid (default none). These modes use quarterly,
+        roll_rule : RollRule | str
+            IMM/CDS-IMM anchor grid (default ``"none"``). These modes use quarterly,
             short-back conventions; see :class:`RollRule` for horizon and
             front-accrual behavior. Grid compatibility is checked when building
             the schedule, after its start and maturity dates are known.
@@ -133,13 +138,22 @@ class ScheduleParams:
         Raises
         ------
         TypeError
-            If *frequency* or *business_day_convention* is neither the
-            documented wrapper type nor a string.
+            If a positional argument is passed, or a value is not
+            JSON-encodable (neither a wire value nor a typed wrapper).
         ValueError
-            If a tenor or business-day convention string is invalid,
-            *calendar_id* is unknown, or *payment_lag_days* is negative.
-        OverflowError
-            If *payment_lag_days* is outside the signed 32-bit integer range.
+            If a required field is missing, a keyword is unknown, a label is
+            invalid, or *payment_lag_days* is negative or outside the signed
+            32-bit range.
+
+        Examples
+        --------
+        >>> from finstack_quant.cashflows.builder import ScheduleParams
+        >>> from finstack_quant.core.dates import DayCount, Tenor
+        >>> params = ScheduleParams(
+        ...     frequency=Tenor.parse("3M"), day_count=DayCount.ACT_360, calendar_id="weekends_only"
+        ... )
+        >>> (str(params.stub), params.payment_lag_days)
+        ('short_front', 0)
         """
         ...
 

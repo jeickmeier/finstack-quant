@@ -3076,10 +3076,9 @@ export interface CreditDerivativeValuationDetails {
  * Captures the FX policy applied at pricing time so downstream audit /
  * reconciliation can trace whether a quoted rate came from a direct
  * market quote or via triangulation through the matrix pivot currency.
- * Mirrors the cross-cutting invariant documented in
- * `.claude/rules/project-description.md` ("FX policy visibility: Applied
- * conversion strategy recorded per layer (e.g., valuations, statements,
- * portfolio)").
+ * Mirrors the "FX policy visibility" invariant in `ARCHITECTURE.md`: the
+ * applied conversion strategy is recorded per layer (valuations, statements,
+ * portfolio).
  *
  * This interface was referenced by `ValuationResult1`'s JSON-Schema
  * via the `definition` "FxValuationDetails".

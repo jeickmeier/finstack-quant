@@ -1,7 +1,7 @@
 //! Regression coverage for valuation acceptance and monetary input contracts.
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::{builder::ModelBuilder, types::AmountOrScalar};
-use finstack_quant_statements_analytics::analysis::goal_seek;
+use finstack_quant_statements_analytics::analysis::{GoalSeekSpec, goal_seek};
 
 #[test]
 fn discontinuous_objective_is_rejected_without_mutation() {
@@ -17,8 +17,19 @@ fn discontinuous_objective_is_rejected_without_mutation() {
             model_builder.build().unwrap()
         };
         let before = serde_json::to_value(&model).unwrap();
-        let error = goal_seek(&model, "target", q, 0.5, "driver", q, true, bounds)
-            .expect_err("no attainable target");
+        let error = goal_seek(
+            &model,
+            &GoalSeekSpec {
+                target_node: "target".to_string(),
+                target_period: q,
+                target_value: 0.5,
+                driver_node: "driver".to_string(),
+                driver_period: q,
+                update_model: true,
+                bounds,
+            },
+        )
+        .expect_err("no attainable target");
         assert!(error.to_string().contains("residual"), "{error}");
         assert_eq!(serde_json::to_value(&model).unwrap(), before);
     }
@@ -220,7 +231,7 @@ fn working_capital_rejects_currency_change_without_metadata() {
 #[test]
 fn growth_terminal_flow_rejects_missing_calendar_quarters() {
     use finstack_quant_core::{currency::Currency, money::Money};
-    use finstack_quant_statements_analytics::analysis::{DcfOptions, evaluate_dcf};
+    use finstack_quant_statements_analytics::analysis::{DcfInputs, DcfOptions, evaluate_dcf};
     use finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec;
     let values: Vec<_> = (2025..=2026)
         .flat_map(|year| {
@@ -244,10 +255,12 @@ fn growth_terminal_flow_rejects_missing_calendar_quarters() {
     };
     let valid = evaluate_dcf(
         &model,
-        0.10,
-        terminal.clone(),
-        "ufcf",
-        Some(0.0),
+        &DcfInputs {
+            wacc: 0.10,
+            terminal_value: terminal.clone(),
+            ufcf_node: "ufcf".to_string(),
+            net_debt_override: Some(0.0),
+        },
         &DcfOptions::default(),
         None,
         None,
@@ -270,10 +283,12 @@ fn growth_terminal_flow_rejects_missing_calendar_quarters() {
     model.validate_semantics().unwrap();
     let error = evaluate_dcf(
         &model,
-        0.10,
-        terminal,
-        "ufcf",
-        Some(0.0),
+        &DcfInputs {
+            wacc: 0.10,
+            terminal_value: terminal,
+            ufcf_node: "ufcf".to_string(),
+            net_debt_override: Some(0.0),
+        },
         &DcfOptions::default(),
         None,
         None,
@@ -285,7 +300,7 @@ fn growth_terminal_flow_rejects_missing_calendar_quarters() {
 #[test]
 fn growth_terminal_flow_rejects_partial_week_at_calendar_year_boundary() {
     use finstack_quant_core::{currency::Currency, money::Money};
-    use finstack_quant_statements_analytics::analysis::{DcfOptions, evaluate_dcf};
+    use finstack_quant_statements_analytics::analysis::{DcfInputs, DcfOptions, evaluate_dcf};
     use finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec;
     let values: Vec<_> = (1..=52)
         .map(|week| {
@@ -304,12 +319,14 @@ fn growth_terminal_flow_rejects_partial_week_at_calendar_year_boundary() {
     };
     let error = evaluate_dcf(
         &model,
-        0.10,
-        TerminalValueSpec::GordonGrowth {
-            stable_growth_rate: 0.02,
+        &DcfInputs {
+            wacc: 0.10,
+            terminal_value: TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: 0.02,
+            },
+            ufcf_node: "ufcf".to_string(),
+            net_debt_override: Some(0.0),
         },
-        "ufcf",
-        Some(0.0),
         &DcfOptions::default(),
         None,
         None,
@@ -321,7 +338,7 @@ fn growth_terminal_flow_rejects_partial_week_at_calendar_year_boundary() {
 #[test]
 fn growth_terminal_flow_rejects_annual_identifier_on_partial_year() {
     use finstack_quant_core::{currency::Currency, dates::Period, money::Money};
-    use finstack_quant_statements_analytics::analysis::{DcfOptions, evaluate_dcf};
+    use finstack_quant_statements_analytics::analysis::{DcfInputs, DcfOptions, evaluate_dcf};
     use finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec;
     let period = PeriodId::annual(2025);
     let model = {
@@ -340,12 +357,14 @@ fn growth_terminal_flow_rejects_annual_identifier_on_partial_year() {
     };
     let error = evaluate_dcf(
         &model,
-        0.10,
-        TerminalValueSpec::GordonGrowth {
-            stable_growth_rate: 0.02,
+        &DcfInputs {
+            wacc: 0.10,
+            terminal_value: TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: 0.02,
+            },
+            ufcf_node: "ufcf".to_string(),
+            net_debt_override: Some(0.0),
         },
-        "ufcf",
-        Some(0.0),
         &DcfOptions::default(),
         None,
         None,
@@ -357,7 +376,7 @@ fn growth_terminal_flow_rejects_annual_identifier_on_partial_year() {
 #[test]
 fn growth_terminal_flow_uses_complete_year_across_annual_stub_identifiers() {
     use finstack_quant_core::{currency::Currency, dates::Period, money::Money};
-    use finstack_quant_statements_analytics::analysis::{DcfOptions, evaluate_dcf};
+    use finstack_quant_statements_analytics::analysis::{DcfInputs, DcfOptions, evaluate_dcf};
     use finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec;
     let actual = PeriodId::annual(2024);
     let forecast = PeriodId::annual(2025);
@@ -391,12 +410,14 @@ fn growth_terminal_flow_uses_complete_year_across_annual_stub_identifiers() {
     };
     let result = evaluate_dcf(
         &model,
-        0.10,
-        TerminalValueSpec::GordonGrowth {
-            stable_growth_rate: 0.02,
+        &DcfInputs {
+            wacc: 0.10,
+            terminal_value: TerminalValueSpec::GordonGrowth {
+                stable_growth_rate: 0.02,
+            },
+            ufcf_node: "ufcf".to_string(),
+            net_debt_override: Some(0.0),
         },
-        "ufcf",
-        Some(0.0),
         &DcfOptions::default(),
         None,
         None,

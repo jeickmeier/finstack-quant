@@ -5,9 +5,8 @@ Use this as the repo-specific release checklist.
 ## Core Gates
 
 - Format: `mise run all-fmt`
-- Lint: `mise run all-lint`
-- Tests: `mise run all-test`
-- CI-equivalent: `mise run all-ci`
+- The gate (lint, generated files, tests; equals CI): `mise run all`
+- Release tier: `mise run all --release`
 - Security/audit: `mise run rust-audit` (cargo deny) plus
   `uv run --no-sync bandit -r finstack-quant-py -c pyproject.toml`
 

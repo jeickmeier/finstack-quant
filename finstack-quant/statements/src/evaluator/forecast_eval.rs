@@ -2,6 +2,7 @@
 
 use crate::error::{Error, Result};
 use crate::evaluator::context::EvaluationContext;
+use crate::evaluator::engine::PeriodEval;
 use crate::forecast;
 use crate::forecast::statistical::{CorrelatedMonteCarloSeries, monte_carlo_correlated_series};
 use crate::types::{FinancialModelSpec, NodeId, NodeSpec};
@@ -15,24 +16,23 @@ use indexmap::IndexMap;
 ///
 /// # Arguments
 /// * `node_spec` - Node metadata containing forecast configuration
-/// * `model` - Financial model definition providing periods
-/// * `period_id` - Forecast period being requested
+/// * `eval` - Model (providing periods) and the forecast period being requested
 /// * `context` - Evaluation context with historical data
 /// * `forecast_cache` - Cache reused across nodes/periods
 /// * `visibility_cutoff` - As-of date hiding explicit values of actual
 ///   observations released after it; hidden actuals are forecast from the
 ///   latest preceding visible observation
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn evaluate_forecast(
     node_spec: &NodeSpec,
-    model: &FinancialModelSpec,
-    period_id: &PeriodId,
+    eval: PeriodEval<'_>,
     context: &EvaluationContext,
     forecast_cache: &mut IndexMap<NodeId, IndexMap<PeriodId, f64>>,
     seed_offset: Option<u64>,
     mc_z_cache: &mut Option<&mut IndexMap<NodeId, IndexMap<PeriodId, f64>>>,
     visibility_cutoff: Option<Date>,
 ) -> Result<f64> {
+    let model = eval.model;
+    let period_id = &eval.period.id;
     if let Some(cached) = forecast_cache.get(node_spec.node_id.as_str())
         && let Some(value) = cached.get(period_id)
     {

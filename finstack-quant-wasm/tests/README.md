@@ -2,10 +2,11 @@
 
 Four independent test layers guard the WASM bindings, because the published
 surface is assembled from four different artifacts: Rust bindings, the
-wasm-pack output in `pkg/` and `pkg-node/`, the hand-written JS facade
-(`../index.js` + `../exports/*.js`), and the hand-written TypeScript
-declarations (`../index.d.ts`). A bug can live in the seam between any two of
-them, and only one layer sees each seam.
+wasm-pack output in `pkg/` and `pkg-node/` (including the TypeScript
+declarations the bindings' attributes and Rustdoc produce), the hand-written JS
+facade (`../index.js` + `../exports/*.js`), and the facade declarations
+generated over them (`../index.d.ts`). A bug can live in the seam between any
+two of them, and only one layer sees each seam.
 
 ## Layout
 
@@ -13,12 +14,11 @@ them, and only one layer sees each seam.
 tests/
   wasm.rs                one integration target linking the suites below
   wasm_*.rs              wasm-bindgen-test modules (run on wasm32 under Node)
-  dts_contract.rs        host test: index.d.ts matches the facade surface
-  return_shapes.rs       host test: declared return shapes, mirror of the Python file
+  return_shapes.rs       host test: serializer and facade-parsing bans in the sources
   boundary_signatures.rs host test: exports take host values as JsValue
-  facade/*.test.mjs      Node tests against the built package via the JS facade
-  typescript/            tsc compile checks of index.d.ts and the generated types
-  scripts/               tests for the JSDoc/TypeScript doc tooling in ../scripts/
+  facade/*.test.mjs      Node tests against the built package and its declarations
+  typescript/            tsc compile checks of the declarations and the generated types
+  scripts/               tests for the doc checker and the exports boundary lint
 ```
 
 ## Layer 1 — `wasm_*.rs` (wasm-bindgen-test, wasm32)
@@ -71,37 +71,22 @@ Run:
 npm --prefix finstack-quant-wasm run test     # wasm-pack test --node (dev profile)
 ```
 
-## Layer 2 — host tests (`dts_contract.rs`, `return_shapes.rs`, `boundary_signatures.rs`)
+## Layer 2 — host tests (`return_shapes.rs`, `boundary_signatures.rs`)
 
-Ordinary `#[test]` functions compiled for the host. They read
-[`../index.d.ts`](../index.d.ts) and the binding sources as text and assert
-properties of the _declaration_, which no runtime test can reach: a `.d.ts` that
-lies about a type is invisible to JS at runtime and fatal at compile time for a
-TypeScript consumer.
+Ordinary `#[test]` functions compiled for the host. They read the binding
+sources and the facade as text, so they need no build.
 
-- **`dts_contract.rs`** pins the declared signatures per namespace —
-  argument lists, full-word parameter names, `Float64Array` returns on the
-  numeric fast paths, structured (not string) valuation results, the
-  `WasmOwned` / `[Symbol.dispose]` handle contract, and that the package
-  documents the hand-written facade rather than the raw wasm-bindgen types. It
-  also reads [`../benchmarks/bench.mjs`](../benchmarks/bench.mjs) so the
-  benchmark script cannot drift from the declared API. The parameter-order
-  check against the `#[wasm_bindgen]` signatures is the Node test
-  `facade/dts_parameter_order.test.mjs`, which reads the built package's raw
-  declarations.
-- **`return_shapes.rs`** pins _shapes_: no binding bypasses the
-  JSON-compatible serializer, only `*Json`-suffixed exports return strings,
-  computation results are structured rather than strings, prose-returning
-  exports are named `*Text`, numeric vector exports declare `Float64Array`, and
-  the facade does no JSON parsing of its own.
-
+- **`return_shapes.rs`** rejects a binding that bypasses the JSON-compatible
+  serializer and a facade file that parses JSON itself.
 - **`boundary_signatures.rs`** parses every `#[wasm_bindgen]` export under
   `src/api` with `syn` and rejects `&str`, `String`, `bool`, integer and `Vec<String>`
   parameters: their generated glue traps the instance or coerces silently
   (`ToInt32`, truthiness). Exports take `JsValue` and convert through
   `src/utils/input.rs`.
 
-`return_shapes.rs` is the deliberate mirror of
+The declared shapes (Json/Text suffixes, structured results, `Float64Array`
+vectors) are checked on the published declarations by
+`facade/return_shapes.test.mjs`, the deliberate mirror of
 [`../../finstack-quant-py/tests/parity/test_return_shapes.py`](../../finstack-quant-py/tests/parity/test_return_shapes.py)
 — same entries, same order — so a cross-language divergence reads as a
 one-screen diff. Keep them edited together.
@@ -109,11 +94,9 @@ one-screen diff. Keep them edited together.
 Run:
 
 ```bash
-# `mise run rust-test` selects both host targets for this crate:
-# dts_contract, and the consolidated `wasm` binary, whose only host-runnable
-# modules are return_shapes and boundary_signatures (the wasm_* modules are
-# wasm32-gated).
-mise run rust-test-integration -- finstack-quant-wasm dts_contract
+# `mise run rust-test` runs the consolidated `wasm` binary, whose only
+# host-runnable modules are return_shapes and boundary_signatures (the wasm_*
+# modules are wasm32-gated).
 mise run rust-test-filter -- finstack-quant-wasm return_shapes --integration wasm
 ```
 
@@ -149,8 +132,9 @@ regressions. `ls facade/` is the full list.
 | `core_rust_owned.test.mjs`                                 | core currency/money/date/curve behaviour owned by Rust; asserts the same values and messages as `finstack-quant-py/tests/test_core_rust_owned.py`                         |
 | `contract_types.test.mjs`                                  | runtime calibration, materialization and valuation outputs type-check against the schema-generated TypeScript types under NodeNext                                        |
 | `statements_parity.test.mjs`                               | `Evaluator`, `ModelBuilder`, `Registry` and the statements free-function twins; goldens shared with `test_statements_wasm_parity.py`                                      |
-| `surface.test.mjs`                                         | the facade export surface equals the checked-in `../facade-surface.json`                                                                                                  |
-| `dts_parameter_order.test.mjs`                             | each `index.d.ts` declaration lists its parameters in the order of the raw wasm-bindgen signature (`pkg/finstack_quant_wasm.d.ts`), read with the TypeScript compiler API |
+| `surface.test.mjs`                                         | the facade export surface equals the checked-in `../facade-surface.json`, and `index.d.ts` (read with the TypeScript checker) declares exactly that surface               |
+| `return_shapes.test.mjs`                                   | declared return shapes: Json/Text suffixes, structured results, `Float64Array` vectors; mirror of `test_return_shapes.py`                                                 |
+| `typed_declarations.test.mjs`                              | the published declarations contain no `any`: every `JsValue` carries an `unchecked_*_type` attribute                                                                      |
 | `statements_analytics_parity.test.mjs`                     | `DependencyTracer`, extensions, templates, ECL, DCF and twins; goldens shared with `test_statements_wasm_parity.py`                                                       |
 
 **These need a build.** All of them except `plain_object_returns.test.mjs` load
@@ -165,9 +149,10 @@ npm --prefix finstack-quant-wasm run build:node    # -> pkg-node/ (node)
 npm --prefix finstack-quant-wasm run test:facade   # node --test tests/facade/**/*.test.mjs
 ```
 
-`docs/doc_examples.test.mjs` executes every runnable `@example` in
-`../index.d.ts` and every `js`/`ts` block in `../README.md` and
-`.agents/rules/wasm/javascript-usage-standards.md` against the web build. It
+`docs/doc_examples.test.mjs` executes every runnable `@example` in the
+published declarations and every `js`/`ts` block in `../README.md`,
+`../../README.md` and `.agents/rules/wasm/javascript-usage-standards.md` against
+the web build. It
 sits outside `facade/` so `mise run wasm-test` stays a fast test run;
 `mise run wasm-test --doctest` (`npm run test:doc-examples`) runs it.
 
@@ -184,12 +169,16 @@ the ban, `return_shapes.rs` asserts it, and this file proves it at runtime.
 
 ## Layer 4 — `typescript/` and `scripts/`
 
-- **`typescript/`** type-checks two small consumer programs against
-  `../index.d.ts` with `tsc -p` and `noEmit`, under two different `lib`
+- **`typescript/`** type-checks small consumer programs against
+  `../index.d.ts` with `tsc -p` and `noEmit`, under different `lib`
   settings: `es2020.ts` / `tsconfig.es2020.json` (ES2020 + DOM) exercises the
   ordinary typed surface, and `esnext-disposable.ts` /
   `tsconfig.esnext-disposable.json` (ES2022 + `ESNext.Disposable`) exercises the
-  `WasmOwned` / `[Symbol.dispose]()` handle contract. Both run under
+  `[Symbol.dispose]()` handle contract, and `tsconfig.libcheck.json` compiles
+  `es2020.ts` with `skipLibCheck: false`, so the package declarations themselves
+  must compile under ES2020. `es2020.ts` also probes, with `@ts-expect-error`,
+  that a pricing result and the facade's `CashFlowBuilder.build` are typed,
+  not `any`. All run under
   `strict: true`. `nodenext.ts` / `tsconfig.nodenext.json` is the consumer view:
   it imports `finstack-quant-wasm` and `finstack-quant-wasm/types` by package
   name under `module`/`moduleResolution` `NodeNext` with `skipLibCheck: false`,
@@ -198,25 +187,23 @@ the ban, `return_shapes.rs` asserts it, and this file proves it at runtime.
   to `any` fails the gate). `facade/contract_types.test.mjs` extends this to
   runtime values: it type-checks real `calibrate`, `dryRun`, canonical-envelope,
   materialization and valuation outputs against the generated types.
-- **`scripts/typescript_docs.test.mjs`** tests the documentation tooling in
-  [`../scripts/`](../scripts) — `sync-facade-jsdoc.mjs`,
-  `complete-facade-jsdoc.mjs`, `check-typescript-docs.mjs` — in both `--write`
-  and `--check` modes, against the committed fixtures in
-  `scripts/fixtures/typescript-docs/` (`raw.d.ts`, `facade.expected.d.ts`,
-  `facade.stale.d.ts`, `checker.valid.d.ts`, `checker.legacy.d.ts`). Fixtures
-  are copied to a temp directory first, so the checks never mutate the
-  repository.
+- **`scripts/typescript_docs.test.mjs`** tests `../scripts/check-typescript-docs.mjs`
+  against the fixtures in `scripts/fixtures/typescript-docs/`
+  (`checker.valid.d.ts`, `checker.legacy.d.ts`) and against temporary
+  declarations it writes.
 
 - **`../scripts/check-typescript-examples.mjs`** type-checks every code sample
-  a consumer can copy — each `@example` in `../index.d.ts` and each `js`/`ts`
-  block in `../README.md` and `.agents/rules/wasm/javascript-usage-standards.md`
-  — with `tsc` under `strict` against `../index.d.ts`. It needs no build.
+  a consumer can copy — each `@example` in the published declarations and each
+  `js`/`ts` block in `../README.md`, `../../README.md` and
+  `.agents/rules/wasm/javascript-usage-standards.md` — with `tsc` under `strict`
+  against `../index.d.ts`. It reads the built declarations.
   `docs/doc_examples.test.mjs` (`mise run wasm-test --doctest`) executes the same
   blocks against the built package. A block with no `import` continues from the standard setup
   (every namespace imported, `await init()` done); a fence tagged `no-run` is
   skipped by both and is reserved for a sample of what not to write.
 
-All three run under `npm run docs:check`, not under `npm run test`:
+`npm run test:dts` also runs in `mise run wasm-test`; all three run under
+`npm run docs:check` (`mise run wasm-doc`):
 
 ```bash
 npm --prefix finstack-quant-wasm run test:dts          # tsc, every tsconfig
@@ -227,20 +214,20 @@ npm --prefix finstack-quant-wasm run docs:check        # all three, plus the doc
 ## Running everything
 
 ```bash
-mise run wasm-test    # wasm-bindgen tests, then web + node builds, then facade tests
+mise run wasm-test    # wasm-bindgen tests, web + node builds, facade and declaration tests
 mise run wasm-doc     # doc checkers, tsc declaration checks, doc-tooling tests
-mise run rust-test    # workspace nextest, including this crate's dts_contract
+mise run rust-test    # workspace nextest, including this crate's host tests
 mise run wasm-lint    # prettier + eslint + the to_js_value serializer check
 ```
 
-`mise run all-lint` includes `wasm-lint` and `wasm-doc`; CI runs `wasm-test`
-and `rust-test` as separate jobs.
+`mise run all` runs `wasm-lint` (through pre-commit), `rust-test` and `wasm-test`;
+CI runs them as separate jobs, and `wasm-doc` in the nightly tier.
 
 ## See also
 
 - [`../README.md`](../README.md) — the WASM package overview
-- [`../index.d.ts`](../index.d.ts) — the published TypeScript contract these
-  tests police
+- [`../index.d.ts`](../index.d.ts) — the generated facade declarations these
+  tests police, over `../pkg/finstack_quant_wasm.d.ts`
 - [`../../.agents/rules/wasm/code-standards.md`](../../.agents/rules/wasm/code-standards.md)
 - [`../../.agents/rules/wasm/javascript-usage-standards.md`](../../.agents/rules/wasm/javascript-usage-standards.md)
 - [`../../finstack-quant-py/tests/parity/`](../../finstack-quant-py/tests/parity) —

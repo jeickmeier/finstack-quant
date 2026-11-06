@@ -9,6 +9,7 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
+use finstack_quant_models::monte_carlo::engine::McPricingInputs;
 use finstack_quant_models::monte_carlo::process::schwartz_smith::SchwartzSmithParams;
 use finstack_quant_models::trees::binomial_tree::BinomialTree;
 use finstack_quant_models::types::OptionMarketParams;
@@ -558,15 +559,15 @@ impl CommoditySpotOption {
         let maturity_step = mc_params.num_steps;
 
         let payoff = European::new(self.option_type, self.strike, 1.0, maturity_step);
-        let estimate = engine.price(
-            &rng,
-            &process,
-            &disc_scheme,
-            &initial_state,
-            &payoff,
-            self.underlying.currency,
-            df,
-        )?;
+        let estimate = engine.price(McPricingInputs {
+            rng: &rng,
+            process: &process,
+            disc: &disc_scheme,
+            initial_state: &initial_state,
+            payoff: &payoff,
+            currency: self.underlying.currency,
+            discount_factor: df,
+        })?;
 
         let scale = self.quantity * self.multiplier;
         Ok((

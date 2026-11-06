@@ -238,7 +238,7 @@ def analytics_cases() -> dict[str, Any]:
         ead=1000.0,
         lgd=0.4,
         eir=0.05,
-        remaining_maturity=3.0,
+        remaining_maturity_years=3.0,
         current_pd=0.03,
         origination_pd=0.02,
     )
@@ -250,10 +250,22 @@ def analytics_cases() -> dict[str, Any]:
     dcf_builder.value_money("ufcf", {"2025": Money(100.0, "USD"), "2026": Money(110.0, "USD")})
     dcf_builder.with_meta("currency", "USD")
     dcf_model = dcf_builder.build()
-    dcf = sa.evaluate_dcf(dcf_model, 0.10, sa.TerminalValueSpec.gordon_growth(0.02), net_debt_override=0.0)
+    dcf = sa.evaluate_dcf(
+        dcf_model,
+        {
+            "wacc": 0.10,
+            "terminal_value": sa.TerminalValueSpec.gordon_growth(0.02),
+            "net_debt_override": 0.0,
+        },
+    )
 
     with pytest.raises(ValueError, match="terminal_value is required"):
-        sa.run_corporate_analysis(MODEL, wacc=0.10)
+        sa.run_corporate_analysis(
+            MODEL,
+            {
+                "wacc": 0.10,
+            },
+        )
 
     samples: list[list[float]] = INPUTS["comps_samples"]
     lbo_model = json.dumps(INPUTS["lbo_model"])

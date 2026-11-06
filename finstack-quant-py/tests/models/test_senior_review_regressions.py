@@ -101,7 +101,15 @@ def test_impact_model_snapshots_reject_invalid_parameters(model_type: type[Any],
 @pytest.mark.parametrize("invalid", [float("nan"), float("inf"), -1.0, 0.0])
 @pytest.mark.parametrize("field", ["daily_volatility", "reference_price"])
 def test_kyle_cost_and_trajectory_reject_invalid_risk_inputs(field: str, invalid: float) -> None:
-    profile = LiquidityProfile("ACME", 100.0, 99.0, 101.0, 1_000_000.0, 100.0, 0.001)
+    profile = LiquidityProfile(
+        instrument_id="ACME",
+        mid=100.0,
+        bid=99.0,
+        ask=101.0,
+        avg_daily_volume=1_000_000.0,
+        avg_trade_size=100.0,
+        spread_volatility=0.001,
+    )
     volatility = invalid if field == "daily_volatility" else 0.02
     reference_price = invalid if field == "reference_price" else None
     params = TradeParams(1000.0, 5.0, volatility, profile, reference_price=reference_price)

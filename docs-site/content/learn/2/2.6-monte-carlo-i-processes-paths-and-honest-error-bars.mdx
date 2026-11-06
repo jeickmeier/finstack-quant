@@ -109,7 +109,18 @@ print(f"Analytical ATM call: {analytical:.8f}")
 counts = [1_000, 5_000, 10_000, 50_000, 100_000]
 print("paths | mean | standard error | realized absolute error | SE * sqrt(N)")
 for n in counts:
-    est = EuropeanPricer(num_paths=n, seed=123).price_gbm(S, K, r, q, vol, T, True, num_steps=1)
+    est = EuropeanPricer(num_paths=n, seed=123).price_gbm(
+        {
+            "spot": S,
+            "strike": K,
+            "rate": r,
+            "dividend_yield": q,
+            "volatility": vol,
+            "time_to_expiry": T,
+            "option_type": "call",
+        },
+        num_steps=1,
+    )
     print(f"{n:6d} | {est.mean.amount:.8f} | {est.stderr:.8f} | "
           f"{abs(est.mean.amount - analytical):.8f} | {est.stderr * math.sqrt(n):.8f}")
 ```
@@ -148,7 +159,18 @@ print(f"Heston params: {heston_params}")
 print(f"Heston Feller (2*kappa*theta >= xi^2): {feller_ok}")
 
 pr = EuropeanPricer(num_paths=25_000, seed=42)
-mc_call = pr.price_gbm(100.0, 100.0, 0.05, 0.0, 0.20, 1.0, True, num_steps=1)
+mc_call = pr.price_gbm(
+    {
+        "spot": 100.0,
+        "strike": 100.0,
+        "rate": 0.05,
+        "dividend_yield": 0.0,
+        "volatility": 0.20,
+        "time_to_expiry": 1.0,
+        "option_type": "call",
+    },
+    num_steps=1,
+)
 bs = bs_price(100.0, 100.0, 0.05, 0.0, 0.20, 1.0, True)
 print(f"EuropeanPricer ATM call: {mc_call.mean.amount:.6f} (stderr={mc_call.stderr:.6f})")
 print(f"Black–Scholes call:      {bs:.6f}")
@@ -211,7 +233,16 @@ The following tuple compares price, SE, interval endpoints and both path counts.
 ```python exec id=mc-parallel-replay role=build
 estimates = [
     EuropeanPricer(num_paths=4096, seed=17, use_parallel=parallel).price_gbm(
-        100.0, 100.0, 0.05, 0.0, 0.20, 1.0, True, num_steps=1
+        {
+            "spot": 100.0,
+            "strike": 100.0,
+            "rate": 0.05,
+            "dividend_yield": 0.0,
+            "volatility": 0.20,
+            "time_to_expiry": 1.0,
+            "option_type": "call",
+        },
+        num_steps=1,
     )
     for parallel in (False, True, False)
 ]
@@ -253,8 +284,15 @@ print("method | estimators | simulated paths | mean | reported SE | manually cal
 results = []
 for antithetic, count, payoffs in [(True, pairs, pair_payoffs), (False, 2 * pairs, plain_payoffs)]:
     estimate = LsmcPricer(count, seed, False, 1, antithetic=antithetic).price_american(
-        100, 100, 0.05, 0, 0.20, 1.0,
-        is_call=False
+        {
+            "spot": 100,
+            "strike": 100,
+            "rate": 0.05,
+            "dividend_yield": 0,
+            "volatility": 0.20,
+            "time_to_expiry": 1.0,
+            "option_type": "put",
+        },
     )
     manual_mean = statistics.mean(payoffs)
     manual_se = statistics.stdev(payoffs) / math.sqrt(count)
@@ -278,31 +316,51 @@ The delta and gamma experiment prices every stencil point on common random numbe
 ```python exec id=mc-crn-greeks role=build
 from finstack_quant.models.monte_carlo import EuropeanPricer, finite_diff_delta, finite_diff_gamma
 
-kw = dict(
-    spot=100.0,
-    strike=100.0,
-    rate=0.05,
-    div_yield=0.0,
-    vol=0.20,
-    expiry=1.0,
-    num_paths=40_000,
-    seed=7,
-    is_call=True,
-)
-d_est = finite_diff_delta(**kw); d, d_se = d_est.mean, d_est.stderr
-g_est = finite_diff_gamma(**kw); g, g_se = g_est.mean, g_est.stderr
+kw = {
+    "spot": 100.0,
+    "strike": 100.0,
+    "rate": 0.05,
+    "dividend_yield": 0.0,
+    "volatility": 0.20,
+    "time_to_expiry": 1.0,
+    "option_type": "call",
+    "num_paths": 40_000,
+    "seed": 7,
+}
+d_est = finite_diff_delta(kw); d, d_se = d_est.mean, d_est.stderr
+g_est = finite_diff_gamma(kw); g, g_se = g_est.mean, g_est.stderr
 # Independence bound: combine the stderrs of separately priced stencil points.
 h = 0.01 * kw["spot"]
 pricer = EuropeanPricer(num_paths=kw["num_paths"], seed=kw["seed"])
 se_up, se_mid, se_dn = (
-    pricer.price_gbm(s, 100.0, 0.05, 0.0, 0.20, 1.0, True).stderr for s in (100.0 + h, 100.0, 100.0 - h)
+    pricer.price_gbm(
+        {
+            "spot": s,
+            "strike": 100.0,
+            "rate": 0.05,
+            "dividend_yield": 0.0,
+            "volatility": 0.20,
+            "time_to_expiry": 1.0,
+            "option_type": "call",
+        },
+    ).stderr for s in (100.0 + h, 100.0, 100.0 - h)
 )
 d_bound = (se_up**2 + se_dn**2) ** 0.5 / (2 * h)
 g_bound = (se_up**2 + 4 * se_mid**2 + se_dn**2) ** 0.5 / h**2
 print(f"delta = {d:.5f}  (paired stderr={d_se:.5f}; independence bound={d_bound:.5f})")
 print(f"gamma = {g:.5f}  (paired stderr={g_se:.5f}; independence bound={g_bound:.5f})")
 from finstack_quant.models import bs_greeks
-exact_delta = bs_greeks(100, 100, 0.05, 0, 0.2, 1, True).delta
+exact_delta = bs_greeks(
+    {
+        "spot": 100,
+        "strike": 100,
+        "rate": 0.05,
+        "dividend_yield": 0,
+        "volatility": 0.2,
+        "time_to_expiry": 1,
+        "option_type": "call",
+    },
+).delta
 print(f"Paired/independent delta SE ratio: {d_se / d_bound:.6f}; analytic delta: {exact_delta:.8f}")
 ```
 {/* /notebook-block */}
@@ -316,34 +374,20 @@ The Heston calculation uses $v_0=\theta=0.04$, $\kappa=2$, $\xi=0.3$ and $\rho=-
 from finstack_quant.models.monte_carlo import price_heston
 
 hc = price_heston(
-    spot=100.0,
-    strike=100.0,
-    rate=0.05,
-    div_yield=0.0,
-    kappa=2.0,
-    theta=0.04,
-    vol_of_vol=0.30,
-    rho=-0.70,
-    v0=0.04,
-    expiry=1.0,
-    num_paths=20_000,
-    seed=42,
-    is_call=True,
+    100.0,
+    100.0,
+    1.0,
+    {"r": 0.05, "q": 0.0, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "sigma_v": 0.30, "rho": -0.70},
+    True,
+    {"num_paths": 20_000, "seed": 42},
 )
 hp = price_heston(
-    spot=100.0,
-    strike=100.0,
-    rate=0.05,
-    div_yield=0.0,
-    kappa=2.0,
-    theta=0.04,
-    vol_of_vol=0.30,
-    rho=-0.70,
-    v0=0.04,
-    expiry=1.0,
-    num_paths=20_000,
-    seed=42,
-    is_call=False,
+    100.0,
+    100.0,
+    1.0,
+    {"r": 0.05, "q": 0.0, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "sigma_v": 0.30, "rho": -0.70},
+    False,
+    {"num_paths": 20_000, "seed": 42},
 )
 print(f"Heston call: {hc.mean} (stderr={hc.stderr:.4f})")
 print(f"Heston put:  {hp.mean} (stderr={hp.stderr:.4f})")
@@ -371,7 +415,16 @@ reference = bs_price(100, 100, 0.05, 0.0, 0.2, 1.0, True)
 scaling = []
 for count in (1024, 4096):
     runs = [EuropeanPricer(count, seed, False).price_gbm(
-        100, 100, 0.05, 0.0, 0.2, 1.0, True, num_steps=1
+        {
+            "spot": 100,
+            "strike": 100,
+            "rate": 0.05,
+            "dividend_yield": 0.0,
+            "volatility": 0.2,
+            "time_to_expiry": 1.0,
+            "option_type": "call",
+        },
+        num_steps=1,
     ) for seed in range(16)]
     average_se = statistics.mean(run.stderr for run in runs)
     rmse = math.sqrt(statistics.mean((run.mean.amount - reference) ** 2 for run in runs))
@@ -401,9 +454,22 @@ from finstack_quant.models.monte_carlo import heston_satisfies_feller, price_hes
 kappa, theta, xi, initial_variance = 1.0, 0.04, 0.7, 0.04
 # A single displayed Euler update can cross zero; the CIR process itself does not.
 euler_variance = initial_variance + kappa * (theta-initial_variance) * 0.25 + xi * initial_variance**0.5 * 0.25**0.5 * -2
-outside_feller = price_heston(spot=100, strike=100, rate=0.05, div_yield=0,
-    kappa=kappa, theta=theta, vol_of_vol=xi, rho=-0.7, v0=initial_variance,
-    expiry=1, num_paths=8192, seed=17, is_call=True)
+outside_feller = price_heston(
+    100,
+    100,
+    1,
+    {
+        "r": 0.05,
+        "q": 0,
+        "v0": initial_variance,
+        "kappa": kappa,
+        "theta": theta,
+        "sigma_v": xi,
+        "rho": -0.7,
+    },
+    True,
+    {"num_paths": 8192, "seed": 17},
+)
 print(f"2*kappa*theta={2*kappa*theta:.3f}; xi^2={xi**2:.3f}; Euler update={euler_variance:.3f}")
 print(f"Native Heston QE call={outside_feller.mean.amount:.6f}; SE={outside_feller.stderr:.6f}")
 ```

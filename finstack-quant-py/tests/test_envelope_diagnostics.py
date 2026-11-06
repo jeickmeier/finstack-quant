@@ -23,7 +23,10 @@ from finstack_quant.calibration import (
 
 def test_shared_quotes_are_explicit_envelope_inputs() -> None:
     quote = RateQuote.deposit("D", "USD-Deposit", "1Y", 0.03)
-    steps = [CalibrationStep.discount(curve, "USD", "2026-05-08", quote_set="shared") for curve in ["A", "B"]]
+    steps = [
+        CalibrationStep.discount(curve, {"currency": "USD", "base_date": "2026-05-08"}, quote_set="shared")
+        for curve in ["A", "B"]
+    ]
     plan = CalibrationPlan(steps, quote_sets={"shared": ["D"]})
     envelope = CalibrationEnvelope(plan, market_data=[quote])
     assert calibrate(envelope).success
@@ -33,7 +36,7 @@ def test_shared_quotes_are_explicit_envelope_inputs() -> None:
 
 def test_removed_inline_quotes_and_plan_execution_are_rejected() -> None:
     with pytest.raises(ValueError, match="quotes"):
-        CalibrationStep.discount("A", "USD", "2026-05-08", quotes=[])
+        CalibrationStep.discount("A", {"currency": "USD", "base_date": "2026-05-08", "quotes": []})
     for operation in (calibrate, dry_run, validate_calibration):
         with pytest.raises((TypeError, CalibrationEnvelopeError)):
             operation(CalibrationPlan([]))
@@ -54,7 +57,7 @@ def _empty_envelope() -> dict:
 
 def test_parametric_step_rejects_removed_separate_discount_option() -> None:
     with pytest.raises(ValueError, match="discount_curve_id"):
-        CalibrationStep.parametric("NS", "2026-05-08", quote_set="rates", discount_curve_id="USD-OIS")
+        CalibrationStep.parametric("NS", {"base_date": "2026-05-08", "discount_curve_id": "USD-OIS"}, quote_set="rates")
 
 
 def test_dry_run_returns_json_report() -> None:
@@ -233,7 +236,7 @@ def _request() -> CalibrationEnvelope:
         RateQuote.deposit("USD-DEP-3M", "USD-SOFR-OIS", "3M", 0.052),
         RateQuote.swap("USD-SWAP-2Y", "USD-SOFR-OIS", "2Y", 0.049),
     ]
-    step = CalibrationStep.discount("USD-OIS", "USD", "2026-05-08")
+    step = CalibrationStep.discount("USD-OIS", {"currency": "USD", "base_date": "2026-05-08"})
     plan = CalibrationPlan([step], quote_sets={"USD-OIS": [quote.id for quote in quotes]})
     return CalibrationEnvelope(plan, market_data=quotes)
 

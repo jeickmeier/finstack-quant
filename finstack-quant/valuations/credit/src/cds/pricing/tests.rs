@@ -28,16 +28,18 @@ fn create_test_cds(
     recovery_rate: f64,
 ) -> CreditDefaultSwap {
     CreditDefaultSwap::new_isda(
-        finstack_quant_core::types::InstrumentId::new(id),
-        Money::from((10000000_i64, Currency::USD)),
-        PayReceive::Pay,
         finstack_quant_valuations_core::market::conventions::CdsConvention::IsdaNa,
         Decimal::try_from(spread_bp).expect("valid spread_bp"),
-        start_date,
-        end_date,
-        recovery_rate,
-        finstack_quant_core::types::CurveId::new("USD-OIS"),
-        finstack_quant_core::types::CurveId::new("TEST-CREDIT"),
+        crate::cds::CdsTradeParams {
+            id: finstack_quant_core::types::InstrumentId::new(id),
+            notional: Money::from((10000000_i64, Currency::USD)),
+            side: PayReceive::Pay,
+            start: start_date,
+            end: end_date,
+            recovery_rate,
+            discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
+            credit_curve_id: finstack_quant_core::types::CurveId::new("TEST-CREDIT"),
+        },
     )
     .expect("test CDS creation should succeed")
 }

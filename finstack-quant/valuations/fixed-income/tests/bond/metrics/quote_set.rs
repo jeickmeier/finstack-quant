@@ -101,15 +101,17 @@ fn callable() -> Bond {
 /// Issued on the valuation date, so no fixing is needed.
 fn frn() -> Bond {
     let mut bond = Bond::floating(
-        "QS-FRN",
-        Money::new(1_000_000.0, Currency::USD).expect("money"),
-        "USD-SOFR-3M",
-        150,
-        AS_OF,
-        date!(2030 - 03 - 15),
-        Tenor::quarterly(),
-        DayCount::Act360,
-        "USD-OIS",
+        finstack_quant_valuations_fixed_income::bond::FloatingBondParams {
+            id: "QS-FRN".into(),
+            notional: Money::new(1_000_000.0, Currency::USD).expect("money"),
+            forward_curve_id: "USD-SOFR-3M".into(),
+            spread_bp: 150.into(),
+            issue_date: AS_OF,
+            maturity: date!(2030 - 03 - 15),
+            frequency: Tenor::quarterly(),
+            day_count: DayCount::Act360,
+            discount_curve_id: "USD-OIS".into(),
+        },
     )
     .expect("frn");
     bond.settlement_convention = None;

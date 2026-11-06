@@ -33,14 +33,16 @@ fn test_cdx_na_ig_standard_conventions() {
 
     let idx = CdsIndex::from_preset(
         &CdsIndexParams::cdx_na_ig(42, 1, 100.0),
-        "CDX.NA.IG.42",
-        Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
-        PayReceive::Pay,
-        start,
-        end,
-        TEST_RECOVERY,
-        "USD-OIS",
-        "HZ-INDEX",
+        finstack_quant_valuations::instruments::credit_derivatives::cds::CdsTradeParams {
+            id: finstack_quant_core::types::InstrumentId::new("CDX.NA.IG.42"),
+            notional: Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
+            side: PayReceive::Pay,
+            start,
+            end,
+            recovery_rate: TEST_RECOVERY,
+            discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
+            credit_curve_id: finstack_quant_core::types::CurveId::new("HZ-INDEX"),
+        },
     )
     .expect("valid test parameters");
 
@@ -58,14 +60,16 @@ fn test_cdx_na_hy_standard_conventions() {
 
     let idx = CdsIndex::from_preset(
         &CdsIndexParams::cdx_na_hy(39, 1, 500.0),
-        "CDX.NA.HY.39",
-        Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
-        PayReceive::Pay,
-        start,
-        end,
-        TEST_RECOVERY,
-        "USD-OIS",
-        "HZ-INDEX",
+        finstack_quant_valuations::instruments::credit_derivatives::cds::CdsTradeParams {
+            id: finstack_quant_core::types::InstrumentId::new("CDX.NA.HY.39"),
+            notional: Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
+            side: PayReceive::Pay,
+            start,
+            end,
+            recovery_rate: TEST_RECOVERY,
+            discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
+            credit_curve_id: finstack_quant_core::types::CurveId::new("HZ-INDEX"),
+        },
     )
     .expect("valid test parameters");
 
@@ -81,14 +85,16 @@ fn test_itraxx_europe_standard_conventions() {
 
     let idx = CdsIndex::from_preset(
         &CdsIndexParams::itraxx_europe(41, 1, 25.0),
-        "iTraxx.Europe.41",
-        Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
-        PayReceive::Pay,
-        start,
-        end,
-        TEST_RECOVERY,
-        "EUR-OIS",
-        "HZ-INDEX",
+        finstack_quant_valuations::instruments::credit_derivatives::cds::CdsTradeParams {
+            id: finstack_quant_core::types::InstrumentId::new("iTraxx.Europe.41"),
+            notional: Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
+            side: PayReceive::Pay,
+            start,
+            end,
+            recovery_rate: TEST_RECOVERY,
+            discount_curve_id: finstack_quant_core::types::CurveId::new("EUR-OIS"),
+            credit_curve_id: finstack_quant_core::types::CurveId::new("HZ-INDEX"),
+        },
     )
     .expect("valid test parameters");
 
@@ -194,14 +200,16 @@ fn test_index_factor_application() {
 
     let idx = CdsIndex::from_preset(
         &CdsIndexParams::cdx_na_ig(42, 1, 100.0),
-        "CDX-SEASONED",
-        Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
-        PayReceive::Pay,
-        start,
-        end,
-        TEST_RECOVERY,
-        "USD-OIS",
-        "HZ-INDEX",
+        finstack_quant_valuations::instruments::credit_derivatives::cds::CdsTradeParams {
+            id: finstack_quant_core::types::InstrumentId::new("CDX-SEASONED"),
+            notional: Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
+            side: PayReceive::Pay,
+            start,
+            end,
+            recovery_rate: TEST_RECOVERY,
+            discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
+            credit_curve_id: finstack_quant_core::types::CurveId::new("HZ-INDEX"),
+        },
     )
     .expect("valid test parameters")
     .with_index_factor(factor);
@@ -283,14 +291,16 @@ fn test_pricing_with_standard_conventions() {
 
     let idx = CdsIndex::from_preset(
         &CdsIndexParams::cdx_na_ig(42, 1, 100.0),
-        "CDX.NA.IG.42",
-        Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
-        PayReceive::Pay,
-        start,
-        end,
-        TEST_RECOVERY,
-        "USD-OIS",
-        "HZ-INDEX",
+        finstack_quant_valuations::instruments::credit_derivatives::cds::CdsTradeParams {
+            id: finstack_quant_core::types::InstrumentId::new("CDX.NA.IG.42"),
+            notional: Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
+            side: PayReceive::Pay,
+            start,
+            end,
+            recovery_rate: TEST_RECOVERY,
+            discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
+            credit_curve_id: finstack_quant_core::types::CurveId::new("HZ-INDEX"),
+        },
     )
     .expect("valid test parameters");
 
@@ -376,14 +386,16 @@ fn test_fixed_coupon_in_premium_leg() {
 
     let idx = CdsIndex::from_preset(
         &CdsIndexParams::cdx_na_ig(42, 1, fixed_coupon),
-        "CDX-COUPON",
-        Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
-        PayReceive::Pay,
-        start,
-        end,
-        TEST_RECOVERY,
-        "USD-OIS",
-        "HZ-INDEX",
+        finstack_quant_valuations::instruments::credit_derivatives::cds::CdsTradeParams {
+            id: finstack_quant_core::types::InstrumentId::new("CDX-COUPON"),
+            notional: Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
+            side: PayReceive::Pay,
+            start,
+            end,
+            recovery_rate: TEST_RECOVERY,
+            discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
+            credit_curve_id: finstack_quant_core::types::CurveId::new("HZ-INDEX"),
+        },
     )
     .expect("valid test parameters");
 

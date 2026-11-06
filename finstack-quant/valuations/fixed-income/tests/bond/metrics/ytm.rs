@@ -91,15 +91,17 @@ fn test_ytm_floating_bond_is_finite_from_price() {
     let market = MarketContext::new().insert(disc).insert(fwd);
 
     let mut bond = Bond::floating(
-        "YTM-FRN",
-        notional,
-        "USD-SOFR-3M",
-        150,
-        as_of,
-        maturity,
-        Tenor::quarterly(),
-        DayCount::Act360,
-        "USD-OIS",
+        finstack_quant_valuations_fixed_income::bond::FloatingBondParams {
+            id: "YTM-FRN".into(),
+            notional,
+            forward_curve_id: "USD-SOFR-3M".into(),
+            spread_bp: 150.into(),
+            issue_date: as_of,
+            maturity,
+            frequency: Tenor::quarterly(),
+            day_count: DayCount::Act360,
+            discount_curve_id: "USD-OIS".into(),
+        },
     )
     .unwrap();
 

@@ -2,7 +2,7 @@
 //!
 //! WASM panel specs, results and operation selectors are plain values (the
 //! `PanelTransformSpec`, `PanelTransformResult`, `TimeSeriesOp`,
-//! `CrossSectionalOp` and `PairwiseOp` types of `index.d.ts`), so the Python
+//! `CrossSectionalOp` and `PairwiseOp` TypeScript types), so the Python
 //! class members are functions taking that value.
 
 use crate::utils::input::{from_js_json, js_string};
@@ -27,8 +27,10 @@ use wasm_bindgen::prelude::*;
 /// (`values`) or duplicate operation names, an unknown `input` column, a
 /// missing partition column, unequal row counts, malformed operation
 /// parameters or an operation that cannot be evaluated.
-#[wasm_bindgen(js_name = transformPanel)]
-pub fn transform_panel(spec: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = transformPanel, unchecked_return_type = "PanelTransformResult")]
+pub fn transform_panel(
+    #[wasm_bindgen(unchecked_param_type = "PanelTransformSpec | string")] spec: JsValue,
+) -> Result<JsValue, JsValue> {
     let spec: PanelTransformSpec = from_js_json(&spec, "spec")?;
     let result = finstack_quant_features::transform_panel(&spec).map_err(to_js_err)?;
     to_js_value(&result)
@@ -47,10 +49,10 @@ pub fn transform_panel(spec: JsValue) -> Result<JsValue, JsValue> {
 /// Throws a `TypeError` for wrongly typed arguments, a `validation` error
 /// when `result` is not a `PanelTransformResult`, and a `not_found` error
 /// when no column is named `name`.
-#[wasm_bindgen(js_name = panelTransformResultGetColumn)]
+#[wasm_bindgen(js_name = panelTransformResultGetColumn, unchecked_return_type = "FeatureValue[]")]
 pub fn panel_transform_result_get_column(
-    result: JsValue,
-    name: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "PanelTransformResult | string")] result: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
 ) -> Result<JsValue, JsValue> {
     let result: PanelTransformResult = from_js_json(&result, "result")?;
     let name = js_string(&name, "name")?;
@@ -72,7 +74,7 @@ pub fn panel_transform_result_get_column(
 /// # Errors
 ///
 /// Throws only if the names cannot be converted to a JavaScript array.
-#[wasm_bindgen(js_name = timeSeriesOpValues)]
+#[wasm_bindgen(js_name = timeSeriesOpValues, unchecked_return_type = "TimeSeriesOp[]")]
 pub fn time_series_op_values() -> Result<JsValue, JsValue> {
     to_js_value(&TimeSeriesOp::names())
 }
@@ -88,8 +90,10 @@ pub fn time_series_op_values() -> Result<JsValue, JsValue> {
 ///
 /// Throws a `TypeError` when `op` is not a string and a `validation` error,
 /// listing the accepted names, when it is not a time-series operation.
-#[wasm_bindgen(js_name = timeSeriesOpParamKeys)]
-pub fn time_series_op_param_keys(op: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = timeSeriesOpParamKeys, unchecked_return_type = "string[]")]
+pub fn time_series_op_param_keys(
+    #[wasm_bindgen(unchecked_param_type = "TimeSeriesOp")] op: JsValue,
+) -> Result<JsValue, JsValue> {
     let op: TimeSeriesOp = js_string(&op, "op")?.parse().map_err(to_js_err)?;
     to_js_value(&op.param_keys())
 }
@@ -102,7 +106,7 @@ pub fn time_series_op_param_keys(op: JsValue) -> Result<JsValue, JsValue> {
 /// # Errors
 ///
 /// Throws only if the names cannot be converted to a JavaScript array.
-#[wasm_bindgen(js_name = crossSectionalOpValues)]
+#[wasm_bindgen(js_name = crossSectionalOpValues, unchecked_return_type = "CrossSectionalOp[]")]
 pub fn cross_sectional_op_values() -> Result<JsValue, JsValue> {
     to_js_value(&CrossSectionalOp::names())
 }
@@ -118,8 +122,10 @@ pub fn cross_sectional_op_values() -> Result<JsValue, JsValue> {
 ///
 /// Throws a `TypeError` when `op` is not a string and a `validation` error,
 /// listing the accepted names, when it is not a cross-sectional operation.
-#[wasm_bindgen(js_name = crossSectionalOpParamKeys)]
-pub fn cross_sectional_op_param_keys(op: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = crossSectionalOpParamKeys, unchecked_return_type = "string[]")]
+pub fn cross_sectional_op_param_keys(
+    #[wasm_bindgen(unchecked_param_type = "CrossSectionalOp")] op: JsValue,
+) -> Result<JsValue, JsValue> {
     let op: CrossSectionalOp = js_string(&op, "op")?.parse().map_err(to_js_err)?;
     to_js_value(&op.param_keys())
 }
@@ -132,7 +138,7 @@ pub fn cross_sectional_op_param_keys(op: JsValue) -> Result<JsValue, JsValue> {
 /// # Errors
 ///
 /// Throws only if the names cannot be converted to a JavaScript array.
-#[wasm_bindgen(js_name = pairwiseOpValues)]
+#[wasm_bindgen(js_name = pairwiseOpValues, unchecked_return_type = "PairwiseOp[]")]
 pub fn pairwise_op_values() -> Result<JsValue, JsValue> {
     to_js_value(&PairwiseOp::names())
 }
@@ -148,8 +154,10 @@ pub fn pairwise_op_values() -> Result<JsValue, JsValue> {
 ///
 /// Throws a `TypeError` when `op` is not a string and a `validation` error,
 /// listing the accepted names, when it is not a pairwise rolling operation.
-#[wasm_bindgen(js_name = pairwiseOpParamKeys)]
-pub fn pairwise_op_param_keys(op: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = pairwiseOpParamKeys, unchecked_return_type = "string[]")]
+pub fn pairwise_op_param_keys(
+    #[wasm_bindgen(unchecked_param_type = "PairwiseOp")] op: JsValue,
+) -> Result<JsValue, JsValue> {
     let op: PairwiseOp = js_string(&op, "op")?.parse().map_err(to_js_err)?;
     to_js_value(&op.param_keys())
 }

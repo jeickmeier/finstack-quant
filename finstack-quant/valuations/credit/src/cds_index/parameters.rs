@@ -7,7 +7,7 @@
 //! side, dates, curves, defaulted constituents, index factor — lives on
 //! the `CdsIndex` instrument itself.
 //!
-//! Use `CdsIndex::from_preset(&preset, ...)` to build an instrument from a
+//! Use `CdsIndex::from_preset(&preset, params)` to build an instrument from a
 //! preset, then chain `with_constituents` and `with_index_factor` to attach
 //! trade state.
 
@@ -17,7 +17,7 @@ use finstack_quant_valuations_core::market::conventions::CdsConvention;
 ///
 /// Captures the index identity (name + series + version), running coupon,
 /// and regional ISDA convention. Pair with the trade-specific arguments
-/// (id, notional, side, dates, recovery, curves) on
+/// (`CdsTradeParams`: id, notional, side, dates, recovery, curves) on
 /// `CdsIndex::from_preset` to obtain a `CdsIndex` instrument.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]

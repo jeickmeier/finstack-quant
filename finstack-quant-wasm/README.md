@@ -29,18 +29,18 @@ this matters.
 
 ## Package layout
 
-| Path                                           | Role                                                                          |
-| ---------------------------------------------- | ----------------------------------------------------------------------------- |
-| [`index.js`](index.js)                         | published entrypoint; default export is the wasm initializer                  |
-| [`index.d.ts`](index.d.ts)                     | hand-maintained TypeScript contract for the facade (the IntelliSense surface) |
-| [`exports/`](exports)                          | one namespace shim per crate domain, re-exporting raw bindgen names           |
-| [`src/api/`](src/api)                          | Rust bindings, one module per crate domain                                    |
-| [`src/utils/`](src/utils)                      | shared error, serialization, and date conversion helpers                      |
-| [`types/generated/`](types/generated)          | TypeScript types generated from the Rust JSON Schemas, one module per crate   |
-| [`tests/`](tests)                              | four test layers — see [`tests/README.md`](tests/README.md)                   |
-| [`benchmarks/bench.mjs`](benchmarks/bench.mjs) | Node micro-benchmarks against the `pkg-node/` build                           |
-| [`scripts/`](scripts)                          | JSDoc / TypeScript documentation checkers and sync tooling                    |
-| `pkg/`, `pkg-node/`                            | gitignored `wasm-pack` output (web and Node targets) — never edit             |
+| Path                                           | Role                                                                        |
+| ---------------------------------------------- | --------------------------------------------------------------------------- |
+| [`index.js`](index.js)                         | published entrypoint; default export is the wasm initializer                |
+| [`index.d.ts`](index.d.ts)                     | generated TypeScript declaration of the facade (the IntelliSense surface)   |
+| [`exports/`](exports)                          | one namespace shim per crate domain, re-exporting raw bindgen names         |
+| [`src/api/`](src/api)                          | Rust bindings, one module per crate domain                                  |
+| [`src/utils/`](src/utils)                      | shared error, serialization, and date conversion helpers                    |
+| [`types/generated/`](types/generated)          | TypeScript types generated from the Rust JSON Schemas, one module per crate |
+| [`tests/`](tests)                              | four test layers — see [`tests/README.md`](tests/README.md)                 |
+| [`benchmarks/bench.mjs`](benchmarks/bench.mjs) | Node micro-benchmarks against the `pkg-node/` build                         |
+| [`scripts/`](scripts)                          | JSDoc / TypeScript documentation checkers and sync tooling                  |
+| `pkg/`, `pkg-node/`                            | gitignored `wasm-pack` output (web and Node targets) — never edit           |
 
 `pkg/finstack_quant_wasm.js` is an internal build artifact, not the public API.
 Its `README.md` and `.d.ts` are wasm-pack copies; treat nothing in `pkg/` or
@@ -70,8 +70,8 @@ Its `README.md` and `.d.ts` are wasm-pack copies; treat nothing in `pkg/` or
 | `valuations`           | nested `instruments`, `fx`, `composite`, `market`, and `schema`; product-specific coupon helpers (the reusable market handle is `core.MarketContext`)                                                                                                                                                                                                                    |
 
 Hover any namespace member in a TypeScript IDE for its arguments, result shape,
-error behavior, and conventions. `index.d.ts` is the authoritative surface; use its
-camelCase parameter names.
+error behavior, and conventions. `index.d.ts` (over `pkg/finstack_quant_wasm.d.ts`)
+is the authoritative surface; use its camelCase parameter names.
 
 ## Quick start
 
@@ -294,11 +294,17 @@ default, so the same seed and path count always reproduce the same estimate.
 
 ## Type declarations
 
-`wasm-bindgen` emits declarations under `pkg/`, but they describe a flat module,
-not the namespaced facade. The published root contract is therefore the
-hand-maintained [`index.d.ts`](index.d.ts), policed by `tests/dts_contract.rs` and
-`tsc` compile checks under two `lib` targets — both wired into `mise` tasks — plus
-the manually-run `tests/return_shapes.rs`.
+The Rust bindings are the one source of the published TypeScript. wasm-bindgen
+writes `pkg/finstack_quant_wasm.d.ts` from them: each `JsValue` parameter and
+return carries its type in an `unchecked_*_type` attribute, each snake_case
+parameter a camelCase `js_name`, and the Rustdoc above the export is its JSDoc.
+[`index.d.ts`](index.d.ts) is generated over that file by
+`scripts/gen-facade-dts.mjs` (`mise run gen-write`): one `*Namespace` interface
+per namespace whose members are `typeof wasm.X`, plus declarations of the
+JavaScript the facade adds. `tests/facade/surface.test.mjs` checks the declared
+surface equals the runtime one, `tests/facade/typed_declarations.test.mjs` that
+no `any` is published, and `npm run test:dts` compiles consumers under four
+`lib`/module settings; `mise run wasm-test` runs all three.
 
 `types/generated/<crate>/` holds the JSON contract types, generated by
 `scripts/generate-contract-types.mjs` from each crate's checked-in JSON Schemas
@@ -331,11 +337,10 @@ Every class generated by `wasm-bindgen` owns WebAssembly heap memory and
 exposes `free()`. Call it when a handle is no longer needed; do not use the
 object afterward. When the JavaScript runtime defines `Symbol.dispose`,
 `wasm-bindgen` also installs `[Symbol.dispose]` as the same function, so
-explicit-resource-management syntax is supported. The base declarations keep
-`free()` strongly typed through `WasmOwned` but intentionally omit the
-conditional computed member so ES2020 consumers do not need TypeScript's
-`esnext.disposable` library. Consumers that enable that library may locally
-augment `WasmOwned` with `Disposable`.
+explicit-resource-management syntax is supported. Each class declares both
+`free()` and `[Symbol.dispose]()`; the package declares `Symbol.dispose` itself
+(as `@types/node` does), so ES2020 consumers compile without TypeScript's
+`esnext.disposable` library.
 
 ## Building
 
@@ -364,13 +369,14 @@ downloading its own.
 ## Verification
 
 ```bash
-mise run wasm-test    # wasm-bindgen tests, then web + node builds, then facade tests
+mise run wasm-test    # wasm-bindgen tests, web + node builds, facade and declaration tests
 mise run wasm-lint    # prettier --check, eslint, and the to_js_value serializer check
-mise run wasm-doc     # JSDoc/TypeScript documentation gates + tsc declaration checks
-mise run rust-test    # workspace nextest, including this crate's dts_contract suite
+mise run wasm-doc     # JSDoc completeness and documented-sample type checks
+mise run rust-test    # workspace nextest, including this crate's host tests
 ```
 
-`mise run all-lint` includes `wasm-lint`, `wasm-doc`, and `gen-check`. The four test
+`mise run all` runs `wasm-lint` (through pre-commit) and `wasm-test`; `wasm-doc` runs in
+the nightly tier, `mise run all --full`. The four test
 layers, what each one catches, and how to run them individually are documented in
 [`tests/README.md`](tests/README.md).
 
@@ -395,9 +401,13 @@ The rules that the gates actually enforce:
   make the `#[wasm_bindgen]` function a thin converter, so native tests can assert on
   the error while JS still receives a structured one.
 - Every JS-facing callable documents each caller-supplied input with a substantive
-  `@param` in the Rust doc comment, placed **before** the `#[wasm_bindgen]`
-  attribute (`mise run wasm-doc`).
-- Add the new name to the matching `exports/*.js` namespace and to `index.d.ts`,
+  `@param` (by its camelCase name) in the Rust doc comment, placed **before** the
+  `#[wasm_bindgen]` attribute (`mise run wasm-doc`).
+- Type every `JsValue` parameter and return with `unchecked_param_type`,
+  `unchecked_optional_param_type` or `unchecked_return_type`, and give a
+  snake_case parameter a camelCase `js_name`.
+- Add the new name to the matching `exports/*.js` namespace, run
+  `mise run gen-write` (it regenerates `index.d.ts` and `facade-surface.json`),
   then extend the relevant suite under `tests/`.
 
 Cross-language parity is a separate contract; see

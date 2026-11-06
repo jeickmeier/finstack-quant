@@ -24,19 +24,21 @@ use time::Month;
 #[test]
 fn standard_swap_tenor_preserves_explicit_end_of_month_policy() {
     let swap = FxSwap::from_trade_date(
-        "EURUSD-SWAP-1M-EOM",
-        Currency::EUR,
-        Currency::USD,
-        Date::from_calendar_date(2024, Month::January, 29).expect("valid date"),
-        Tenor::parse("1M").expect("valid tenor"),
-        Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
-        "USD-OIS",
-        "EUR-OIS",
-        None,
-        None,
-        2,
-        BusinessDayConvention::Unadjusted,
-        true,
+        finstack_quant_valuations_fx::fx_swap::FxSwapTradeDateParams {
+            id: "EURUSD-SWAP-1M-EOM".into(),
+            base_currency: Currency::EUR,
+            quote_currency: Currency::USD,
+            trade_date: Date::from_calendar_date(2024, Month::January, 29).expect("valid date"),
+            far_tenor: Tenor::parse("1M").expect("valid tenor"),
+            notional: Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
+            domestic_discount_curve_id: "USD-OIS".into(),
+            foreign_discount_curve_id: "EUR-OIS".into(),
+            base_calendar_id: None,
+            quote_calendar_id: None,
+            settlement_days: 2,
+            business_day_convention: BusinessDayConvention::Unadjusted,
+            end_of_month: true,
+        },
     )
     .expect("swap should build");
 

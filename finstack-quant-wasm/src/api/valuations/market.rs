@@ -24,6 +24,15 @@ fn registry() -> Result<&'static ConventionRegistry, JsValue> {
 /// The registry holds the embedded rate-index, CDS, swaption, inflation-swap,
 /// interest-rate future and cross-currency conventions that the instrument
 /// constructors resolve by identifier.
+///
+/// @example
+/// ```typescript
+/// import init, { valuations } from "finstack-quant-wasm";
+/// await init();
+/// const registry = new valuations.market.ConventionRegistry();
+/// console.log(registry.requireRateIndex("USD-SOFR-OIS").currency);
+/// registry.free();
+/// ```
 #[wasm_bindgen(js_name = ConventionRegistry)]
 pub struct JsConventionRegistry;
 
@@ -42,19 +51,30 @@ impl JsConventionRegistry {
     /// @param id - Rate index identifier, e.g. `"USD-SOFR-OIS"`.
     /// @returns `RateIndexConventions` plain object: currency, kind, tenor, day count, payment and reset lags, calendar and fixed-leg defaults.
     /// @throws Error - Throws with kind `not_found` if `id` has no registered conventions, and kind `invalid_type` if it is not a string.
-    #[wasm_bindgen(js_name = requireRateIndex)]
-    pub fn require_rate_index(&self, id: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = requireRateIndex, unchecked_return_type = "generated.valuations.RateIndexConventions")]
+    pub fn require_rate_index(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let id = finstack_quant_core::types::IndexId::new(js_string(&id, "id")?);
         to_js_value(registry()?.require_rate_index(&id).map_err(to_js_err)?)
     }
 
     /// CDS conventions for a currency and documentation clause (mirrors Rust `ConventionRegistry::resolve_cds`).
     /// @param currency - ISO-4217 currency code of the contract, e.g. `"USD"`.
-    /// @param doc_clause - Documentation clause: `cr14`, `mr14`, `mm14`, `xr14`, `isda_na`, `isda_eu`, `isda_as`, `isda_au`, or `isda_nz`.
+    /// @param docClause - Documentation clause: `cr14`, `mr14`, `mm14`, `xr14`, `isda_na`, `isda_eu`, `isda_as`, `isda_au`, or `isda_nz`.
     /// @returns `CdsConventionSpec` plain object: convention family, calendar, day count, business-day convention, stub rule, settlement lag and frequency.
     /// @throws Error - Throws with kind `validation` if `currency` or `docClause` is not recognized, kind `not_found` if the pair has no registered conventions, and kind `invalid_type` for a non-string argument.
-    #[wasm_bindgen(js_name = resolveCds)]
-    pub fn resolve_cds(&self, currency: JsValue, doc_clause: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = resolveCds, unchecked_return_type = "generated.valuations.CdsConventionSpec")]
+    pub fn resolve_cds(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+        #[wasm_bindgen(
+            js_name = "docClause",
+            unchecked_param_type = "generated.valuations.CdsDocClause"
+        )]
+        doc_clause: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let key = CdsConventionKey {
             currency: js_currency(&currency, "currency")?,
             doc_clause: js_wire(&doc_clause, "docClause")?,
@@ -66,8 +86,11 @@ impl JsConventionRegistry {
     /// @param currency - ISO-4217 currency code, e.g. `"EUR"`.
     /// @returns The convention family serde name (for example `"isda_eu"`), or `null` when the currency has none.
     /// @throws Error - Throws with kind `validation` if `currency` is not an ISO-4217 code, and kind `invalid_type` if it is not a string.
-    #[wasm_bindgen(js_name = primaryCdsFamily)]
-    pub fn primary_cds_family(&self, currency: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = primaryCdsFamily, unchecked_return_type = "generated.valuations.CdsConventionSpec['family'] | null")]
+    pub fn primary_cds_family(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let currency = js_currency(&currency, "currency")?;
         to_js_value(&registry()?.primary_cds_family(currency))
     }
@@ -76,8 +99,11 @@ impl JsConventionRegistry {
     /// @param id - Swaption convention identifier, e.g. `"USD"`.
     /// @returns `SwaptionConventions` plain object: calendar, settlement lag, business-day convention and the underlying swap's fixed-leg and floating-index conventions.
     /// @throws Error - Throws with kind `not_found` if `id` has no registered conventions, and kind `invalid_type` if it is not a string.
-    #[wasm_bindgen(js_name = requireSwaption)]
-    pub fn require_swaption(&self, id: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = requireSwaption, unchecked_return_type = "generated.valuations.SwaptionConventions")]
+    pub fn require_swaption(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let id = SwaptionConventionId::new(js_string(&id, "id")?);
         to_js_value(registry()?.require_swaption(&id).map_err(to_js_err)?)
     }
@@ -86,8 +112,11 @@ impl JsConventionRegistry {
     /// @param id - Inflation-swap convention identifier, e.g. `"USD-CPI"`.
     /// @returns `InflationSwapConventions` plain object: calendar, settlement lag, business-day convention, day count, inflation lag and interpolation.
     /// @throws Error - Throws with kind `not_found` if `id` has no registered conventions, and kind `invalid_type` if it is not a string.
-    #[wasm_bindgen(js_name = requireInflationSwap)]
-    pub fn require_inflation_swap(&self, id: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = requireInflationSwap, unchecked_return_type = "generated.valuations.InflationSwapConventions")]
+    pub fn require_inflation_swap(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let id = InflationSwapConventionId::new(js_string(&id, "id")?);
         to_js_value(registry()?.require_inflation_swap(&id).map_err(to_js_err)?)
     }
@@ -96,8 +125,11 @@ impl JsConventionRegistry {
     /// @param id - Contract identifier, e.g. `"CME:SR3"`.
     /// @returns `IrFutureConventions` plain object: index, compounding, reference period, calendar, face value, tick size and tick value.
     /// @throws Error - Throws with kind `not_found` if `id` has no registered conventions, and kind `invalid_type` if it is not a string.
-    #[wasm_bindgen(js_name = requireIrFuture)]
-    pub fn require_ir_future(&self, id: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = requireIrFuture, unchecked_return_type = "generated.valuations.IrFutureConventions")]
+    pub fn require_ir_future(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let id = IrFutureContractId::new(js_string(&id, "id")?);
         to_js_value(registry()?.require_ir_future(&id).map_err(to_js_err)?)
     }
@@ -106,8 +138,11 @@ impl JsConventionRegistry {
     /// @param id - Cross-currency convention identifier, e.g. `"EUR/USD-XCCY"`.
     /// @returns `XccyConventions` plain object: currencies, index identifiers, settlement lag, payment frequency, day count, calendars and notional exchange.
     /// @throws Error - Throws with kind `not_found` if `id` has no registered conventions, and kind `invalid_type` if it is not a string.
-    #[wasm_bindgen(js_name = requireXccy)]
-    pub fn require_xccy(&self, id: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = requireXccy, unchecked_return_type = "generated.valuations.XccyConventions")]
+    pub fn require_xccy(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let id = XccyConventionId::new(js_string(&id, "id")?);
         to_js_value(registry()?.require_xccy(&id).map_err(to_js_err)?)
     }
@@ -121,8 +156,11 @@ impl JsConventionRegistry {
 /// @param exchange - Optional exact filter: `"cme"`, `"eurex"`, `"montreal"`, or `"sgx"`.
 /// @returns Product-family coverage rows with instrument routes and official source URLs.
 /// @throws Error - Throws when `exchange` is unsupported, the embedded listed-product sidecar is invalid, or rows cannot be converted to JavaScript.
-#[wasm_bindgen(js_name = listedProductCatalog)]
-pub fn listed_product_catalog(exchange: Option<JsValue>) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = listedProductCatalog, unchecked_return_type = "ListedProductCoverage[]")]
+pub fn listed_product_catalog(
+    #[wasm_bindgen(unchecked_optional_param_type = "'cme' | 'eurex' | 'montreal' | 'sgx' | null")]
+    exchange: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
     let exchange = js_opt_string(exchange.as_ref(), "exchange")?;
     let exchange = exchange
         .as_deref()

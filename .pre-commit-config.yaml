@@ -3,7 +3,11 @@
 # See https://pre-commit.com/hooks.html for more hooks
 
 # Install: pre-commit install
-# Run manually: pre-commit run --all-files
+# Run manually: mise run pre-commit-run (the Lint stage of `mise run all`)
+#
+# The language hooks call the mise tasks, so each tool's flags are written once,
+# in mise.toml: the format hooks run the mutating `*-fmt` tasks, the lint hooks
+# the check-only `*-lint` tasks. Supply-chain audits are `mise run all-audit`.
 
 default_stages: [pre-commit]
 fail_fast: false
@@ -35,29 +39,29 @@ repos:
       - id: detect-private-key
 
   # ============================================
-  # Formatting (all languages)
+  # Formatting (mutating `*-fmt` tasks)
   # ============================================
   - repo: local
     hooks:
       - id: rust-fmt
-        name: Rust format (cargo fmt)
-        entry: cargo fmt --all --
+        name: Rust format (mise run rust-fmt)
+        entry: mise run rust-fmt
         language: system
         types: [rust]
         pass_filenames: false
 
-      - id: ruff-format
-        name: Python format (ruff)
-        entry: uv run --no-sync ruff format .
+      - id: python-fmt
+        name: Python format and auto-fix (mise run python-fmt)
+        entry: mise run python-fmt
         language: system
         types: [python]
         pass_filenames: false
 
-      - id: wasm-format
-        name: WASM format (prettier)
-        entry: npm --prefix finstack-quant-wasm run format:fix
+      - id: wasm-fmt
+        name: WASM format and auto-fix (mise run wasm-fmt)
+        entry: mise run wasm-fmt
         language: system
-        files: ^finstack-quant-wasm/.*\.(ts|tsx|js|jsx|mjs|json|css|md)$
+        files: ^finstack-quant-wasm/.*\.(ts|tsx|js|jsx|mjs|cjs|json|css|md)$
         pass_filenames: false
 
   - repo: https://github.com/igorshubovych/markdownlint-cli
@@ -74,66 +78,57 @@ repos:
         # MD036: emphasis as heading, MD029: ordered list prefix
         # MD032: blanks around lists, MD051: link fragments
         args: [--disable, MD013, MD033, MD041, MD024, MD040, MD036, MD029, MD032, MD051, --]
-        exclude: ^(CHANGELOG\.md|PARITY_AUDIT\.md|book/src/SUMMARY\.md|finstack-quant-wasm/pkg|node_modules|vendor|\.cursor|\.agent|\.zenflow|\.zencoder)
+        exclude: ^(PARITY_AUDIT\.md|book/src/SUMMARY\.md|finstack-quant-wasm/pkg|node_modules|vendor|\.cursor|\.agent|\.zenflow|\.zencoder)
 
   # ============================================
-  # Linting (all languages)
+  # Linting and type checking (check-only `*-lint` tasks)
   # ============================================
   - repo: local
     hooks:
-      - id: rust-clippy
-        name: Rust lint (cargo clippy)
-        # `--workspace` is required: a bare `cargo clippy` checks only
-        # `default-members`, omitting finstack-quant-py / finstack-quant-wasm.
-        # `--all-features` covers the old pre-push `cargo check --all-features`
-        # pass so CI/local lint is one compile, not two.
-        # Lib/bins/tests/examples only — Criterion benches are compiled by
-        # `mise run rust-bench`, not by fmt or lint.
-        # Keep in step with `mise run rust-lint`.
-        # `--keep-going` reports every crate error instead of stopping at the first.
-        # Incremental codegen comes from the dev/test profiles. Do not force
-        # CARGO_INCREMENTAL here: CI sets it to 0 because the build cache does
-        # not restore target/incremental.
-        entry: bash -c 'cargo clippy --workspace --lib --bins --tests --examples --all-features --keep-going -- -D warnings'
+      - id: rust-lint
+        name: Rust lint (mise run rust-lint)
+        entry: mise run rust-lint
         language: system
         types: [rust]
         pass_filenames: false
 
-      - id: ruff-lint
-        name: Python lint (ruff)
-        entry: uv run --no-sync ruff check . --fix --unsafe-fixes
+      - id: rust-loc
+        name: Rust source-file size limit (check_loc.py)
+        entry: uv run --no-sync python scripts/check_loc.py --ci
+        language: system
+        files: (\.rs|scripts/check_loc\.py|scripts/rust_source\.py)$
+        pass_filenames: false
+
+      - id: rust-lint-suppressions
+        name: Rust forbidden lint suppressions (check_lint_suppressions.py)
+        entry: uv run --no-sync python scripts/check_lint_suppressions.py
+        language: system
+        files: (\.rs|scripts/check_lint_suppressions\.py|scripts/rust_source\.py)$
+        pass_filenames: false
+
+      - id: python-lint
+        name: Python lint and binding docs (mise run python-lint)
+        entry: mise run python-lint
+        language: system
+        files: (\.(py|pyi)|^finstack-quant-py/src/.*\.rs)$
+        pass_filenames: false
+
+      - id: python-typecheck
+        name: Python typecheck (mise run python-typecheck)
+        entry: mise run python-typecheck
         language: system
         types: [python]
         pass_filenames: false
 
       - id: wasm-lint
-        name: WASM lint (eslint)
-        entry: npm --prefix finstack-quant-wasm run lint
+        name: WASM lint and boundary (mise run wasm-lint)
+        entry: mise run wasm-lint
         language: system
-        files: ^finstack-quant-wasm/.*\.(ts|tsx|js|jsx|mjs|cjs)$
-        pass_filenames: false
-
-      - id: wasm-boundary
-        name: WASM boundary check (serializer and errors)
-        entry: python3 scripts/check_wasm_boundary.py
-        language: system
-        files: ^(finstack-quant-wasm/src/.*\.rs|scripts/check_wasm_boundary\.py)$
+        files: ^(finstack-quant-wasm/|scripts/check_wasm_boundary\.py$)
         pass_filenames: false
 
   # ============================================
-  # Typechecking (all languages)
-  # ============================================
-  - repo: local
-    hooks:
-      - id: ty
-        name: Python typecheck (ty)
-        entry: uv run --no-sync ty check finstack-quant-py/finstack_quant
-        language: system
-        types: [python]
-        pass_filenames: false
-
-  # ============================================
-  # Security audits (all languages)
+  # Security
   # ============================================
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.24.2
@@ -147,20 +142,4 @@ repos:
       - id: bandit
         name: Python security checks (bandit)
         args: ["-r", "finstack-quant-py/finstack_quant", "-x", "finstack-quant-py/tests"]
-        pass_filenames: false
-
-  - repo: local
-    hooks:
-      - id: cargo-deny
-        name: Rust supply-chain security (cargo deny)
-        entry: cargo deny check
-        language: system
-        files: (Cargo\.toml|Cargo\.lock|deny\.toml)$
-        pass_filenames: false
-
-      - id: osv-scanner
-        name: Supply-chain security (OSV-Scanner)
-        entry: osv-scanner scan --experimental-disable-plugins=transitivedependency/pomxml --lockfile=Cargo.lock --lockfile=uv.lock --lockfile=finstack-quant-wasm/package-lock.json
-        language: system
-        files: ^(Cargo\.lock|uv\.lock|finstack-quant-wasm/package-lock\.json|osv-scanner\.toml)$
         pass_filenames: false

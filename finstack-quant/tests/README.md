@@ -75,7 +75,7 @@ which the workspace gates separately through `mise run rust-test --doctest`. The
 on `finstack_quant::schema` are exercised there.
 
 Schema artifacts themselves are generated from Rust types and checked for drift
-by `mise run rust-check-schemas` (regenerate with `mise run rust-gen-schemas`);
+by `mise run gen-check` (regenerate with `mise run gen-write`);
 `mise run gen-check` wraps both plus an idempotency digest.
 
 ## See also

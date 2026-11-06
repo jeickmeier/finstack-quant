@@ -1,2 +1,33 @@
+# Generated files: `mise run gen-write` writes them and `mise run gen-check`
+# fails when one is stale. `linguist-generated` collapses them in GitHub diffs
+# and excludes them from language statistics; local `git diff` still shows
+# them so a regeneration can be reviewed. `scripts/tests/test_gate_parity.py`
+# checks every root in `scripts/generation_digest.py` is covered here.
 
+# Rust-generated JSON Schemas, reference data and contract fixtures
+finstack-quant/*/schemas/** linguist-generated=true
+finstack-quant/core/src/generated/** linguist-generated=true
+finstack-quant/valuations/tests/instruments/json_examples/** linguist-generated=true
+finstack-quant/valuations/tests/data/registry_snapshot.json linguist-generated=true
+
+# WASM package
+finstack-quant-wasm/index.d.ts linguist-generated=true
+finstack-quant-wasm/facade-surface.json linguist-generated=true
+finstack-quant-wasm/tests/facade/schema_parity.golden.json linguist-generated=true
+finstack-quant-wasm/types/generated/** linguist-generated=true
+finstack-quant-wasm/types/valuation-result.d.ts linguist-generated=true
+finstack-quant-wasm/schemas/host/** linguist-generated=true
+
+# Component registry
+finstack-quant-ui/src/generated/** linguist-generated=true
+finstack-quant-ui/src/contract-provenance.json linguist-generated=true
 finstack-quant-ui/registry.json linguist-generated=true
+finstack-quant-ui/registry/theme/registry.json linguist-generated=true
+finstack-quant-ui/registry/theme/finstack-theme/theme.css linguist-generated=true
+finstack-quant-ui/tests/valuations/instruments/encoding-report.json linguist-generated=true
+
+# Docs site
+docs-site/content/docs/registry/instruments.mdx linguist-generated=true
+docs-site/src/components/registry-gallery/data.json linguist-generated=true
+docs-site/src/components/registry-gallery/inventory.json linguist-generated=true
+docs-site/src/components/registry-gallery/imports.ts linguist-generated=true

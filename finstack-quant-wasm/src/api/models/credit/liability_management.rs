@@ -27,8 +27,11 @@ use wasm_bindgen::prelude::*;
 ///
 /// Throws a JavaScript exception if the offer is malformed, has an unknown
 /// field or structure, or any monetary input is negative or non-finite.
-#[wasm_bindgen(js_name = analyzeExchangeOffer)]
-pub fn analyze_exchange_offer(offer: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = analyzeExchangeOffer, unchecked_return_type = "ExchangeOfferAnalysis")]
+pub fn analyze_exchange_offer(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.ExchangeOffer | string")]
+    offer: JsValue,
+) -> Result<JsValue, JsValue> {
     let offer: lm::ExchangeOffer = from_js_json(&offer, "offer")?;
     to_js_value(&lm::analyze_exchange_offer(&offer).map_err(to_js_err)?)
 }
@@ -49,8 +52,10 @@ pub fn analyze_exchange_offer(offer: JsValue) -> Result<JsValue, JsValue> {
 /// outside the range accepted for the selected LME type: `(0, 1.5]` for
 /// repurchases and tenders, `[0, 0.1]` for amend-and-extend, and `[0, 1]` for
 /// dropdowns.
-#[wasm_bindgen(js_name = analyzeLme)]
-pub fn analyze_lme(terms: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = analyzeLme, unchecked_return_type = "LmeAnalysis")]
+pub fn analyze_lme(
+    #[wasm_bindgen(unchecked_param_type = "generated.models.LmeTerms | string")] terms: JsValue,
+) -> Result<JsValue, JsValue> {
     let terms: lm::LmeTerms = from_js_json(&terms, "terms")?;
     to_js_value(&lm::analyze_lme(&terms).map_err(to_js_err)?)
 }

@@ -128,6 +128,7 @@ pub use types::BondBuilder;
 pub use types::BondSettlementConvention;
 pub use types::CallPut;
 pub use types::CallPutSchedule;
+pub use types::FloatingBondParams;
 pub use types::IssuePrice;
 pub use types::MakeWholeSpec;
 pub use types::ProtectionWindow;

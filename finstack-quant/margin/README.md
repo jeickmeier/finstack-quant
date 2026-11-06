@@ -315,7 +315,7 @@ cargo run -p finstack-quant-margin --bin gen_margin_schema -- --write   # regene
 cargo run -p finstack-quant-margin --bin gen_margin_schema -- --check   # verify
 ```
 
-Both are wired into `mise run rust-gen-schemas` and `mise run rust-check-schemas`.
+Both are wired into `mise run gen-write` and `mise run gen-check`.
 See [`docs/SERDE_STABILITY.md`](../../docs/SERDE_STABILITY.md) and
 [`docs/CONTRACTS.md`](../../docs/CONTRACTS.md).
 
@@ -362,9 +362,8 @@ Integration suites in [`tests/`](tests):
 | `schema_parity.rs` | Checked-in JSON Schema matches the Rust types |
 | `simm_schedule_parity.rs` | Pins published ISDA SIMM v2.6 weights, correlations, and concentration thresholds against `data/margin/simm.v1.json` |
 
-Workspace gates: `mise run rust-test`, `mise run rust-lint`,
-`mise run rust-check-schemas`. Do not run `cargo test` directly — it pulls in doc
-tests the workspace gates run separately.
+The gate is `mise run all`. Do not run `cargo test` directly — it pulls in doc
+tests the gate runs separately.
 
 ## References
 

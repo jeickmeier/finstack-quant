@@ -127,9 +127,7 @@ class EquityOption:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
-        market_history: MarketHistory | dict[str, Any] | str | None = None,
-        explain: bool = False,
+        extras: dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this instrument and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -146,15 +144,19 @@ class EquityOption:
             Model key (``"black76"`` (European) or ``"tree"``).
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
-        metric_pricing_overrides : MetricPricingOverrides | dict[str, Any] | str, optional
-            Metric-time overrides merged into
-            ``instrument.spec.metric_pricing_overrides`` before pricing
-            (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
-        market_history : MarketHistory | dict[str, Any] | str, optional
-            ``MarketHistory`` scenarios required by ``hvar`` /
-            ``expected_shortfall``.
-        explain : bool, default False
-            When ``True``, attach a step trace as ``result.explanation``.
+        extras : dict[str, Any] or str, optional
+            The rarer pricing inputs, as a dict or JSON text in the shape of the
+            Rust ``PriceExtras``; every key is optional and an unknown key raises
+            ``ValueError``. ``metric_pricing_overrides`` (a ``MetricPricingOverrides``
+            or dict) is merged into ``instrument.spec.metric_pricing_overrides``
+            before pricing (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``):
+            only the keys present replace stored controls, ``bump_config`` keys
+            merge into the stored bump configuration and an explicit ``None``
+            clears a control; omitted keeps the instrument's overrides. ``market_history`` (a ``MarketHistory`` or dict)
+            holds the historical scenarios ``hvar`` and ``expected_shortfall``
+            require; omitted prices without history. ``explain`` (bool, default
+            ``False``) attaches a step trace as ``result.explanation`` when
+            ``True``. ``None`` (the default) means no extras.
 
         Returns
         -------
@@ -284,8 +286,8 @@ class EquityOption:
         dict[str, object]
             Bump sizes, theta period and the other metric settings stored on
             the instrument; unset fields are ``None`` or omitted. A
-            ``metric_pricing_overrides`` argument to ``price`` is merged over it
-            per call.
+            ``price(..., extras={"metric_pricing_overrides": ...})`` patch is
+            merged over it per call.
 
         Notes
         -----
@@ -356,18 +358,13 @@ class EquityOption:
         quantity: float,
         currency: Currency | str,
         option_type: str,
-        *,
-        discount_curve_id: str = "USD-OIS",
-        spot_id: str = "EQUITY-SPOT",
-        vol_surface_id: str = "EQUITY-VOL",
-        div_yield_id: str | None = "EQUITY-DIVYIELD",
     ) -> EquityOption:
         """
         Build a cash-settled European call or put (mirrors Rust
-        ``EquityOption::european`` / ``european_with_market_data``).
-        The market-data identifiers default to the same generic ids the Rust
-        constructor uses; pass your own to bind the option to real market
-        objects.
+        ``EquityOption::european``). The option binds to the generic market-data
+        ids ``"USD-OIS"`` (discount), ``"EQUITY-SPOT"`` (spot), ``"EQUITY-VOL"``
+        (volatility surface) and ``"EQUITY-DIVYIELD"`` (continuous dividend
+        yield); use :meth:`EquityOption.builder` to bind other ids.
 
         Parameters
         ----------
@@ -385,14 +382,6 @@ class EquityOption:
             Currency of the strike, premium and present value (e.g. ``"USD"``).
         option_type : str
             ``"call"`` or ``"put"``.
-        discount_curve_id : str, default "USD-OIS"
-            Discount curve identifier.
-        spot_id : str, default "EQUITY-SPOT"
-            Equity spot price identifier.
-        vol_surface_id : str, default "EQUITY-VOL"
-            Volatility surface identifier.
-        div_yield_id : str | None, default "EQUITY-DIVYIELD"
-            Continuous dividend yield identifier; ``None`` for no yield.
 
         Returns
         -------
@@ -409,9 +398,9 @@ class EquityOption:
         Examples
         --------
         >>> from finstack_quant.valuations.instruments import EquityOption
-        >>> opt = EquityOption.european("AAPL-C-200", "AAPL", 200.0, "2025-06-20", 100.0, "USD", "call", spot_id="AAPL")
+        >>> opt = EquityOption.european("AAPL-C-200", "AAPL", 200.0, "2025-06-20", 100.0, "USD", "call")
         >>> (opt.option_type, opt.settlement, opt.spot_id)
-        ('call', 'cash', 'AAPL')
+        ('call', 'cash', 'EQUITY-SPOT')
         """
         ...
     def implied_vol(

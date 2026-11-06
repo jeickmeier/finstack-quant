@@ -334,9 +334,10 @@ targets live under [`benches/`](benches).
 ```bash
 cargo clippy -p finstack-quant-features --lib --bins --tests --examples --all-features -- -D warnings
 cargo nextest run -p finstack-quant-features --lib --test '*'
-cargo nextest run -p finstack-quant-wasm --lib --test dts_contract \
-  -E 'test(features_dts_matches_transform_surface)'
 ```
+
+The WASM signatures of these transforms come from their `#[wasm_bindgen]`
+attributes; `mise run wasm-test` type-checks the published declarations.
 
 Workspace gates (`mise run rust-lint`, `mise run rust-test`, `mise run rust-doc`
 — the last one runs doctests) are what CI enforces. Use `cargo nextest`, not

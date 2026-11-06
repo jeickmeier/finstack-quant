@@ -14,7 +14,7 @@ Use when reviewing runtime or allocation changes in performance-sensitive finsta
 - Rust benchmarks: `mise run rust-bench`
 - Saved baseline comparison: `mise run rust-bench-compare` if configured for the branch
 - Python extension build: `mise run python-build -- --release` for runtime-sensitive Python benchmarks
-- Broad final checks: `mise run all-lint` and relevant targeted tests after code changes
+- Broad final checks: `mise run all` and relevant targeted tests after code changes
 
 ## Review Questions
 

@@ -153,11 +153,11 @@ def test_pool_assets_and_hedge_swaps_accept_a_json_array_string() -> None:
 
 def test_pool_asset_rows_round_trip_through_the_typed_pool() -> None:
     loan = PoolAsset(
-        "L0",
-        {"type": "first_lien_loan"},
-        usd(10_000_000.0),
-        0.08,
-        MATURITY,
+        id="L0",
+        asset_type={"type": "first_lien_loan"},
+        balance=usd(10_000_000.0),
+        rate=0.08,
+        maturity=MATURITY,
         day_count=DayCount.THIRTY_360,
         rating="B",
         industry="Software",
@@ -207,11 +207,11 @@ def test_pool_asset_rows_round_trip_through_the_typed_pool() -> None:
         AssetPool("P", "cmbs", USD).with_assets(42)
     with pytest.raises(ValueError, match="rating"):
         PoolAsset(
-            "X",
-            {"type": "high_yield_bond"},
-            usd(1.0),
-            0.05,
-            MATURITY,
+            id="X",
+            asset_type={"type": "high_yield_bond"},
+            balance=usd(1.0),
+            rate=0.05,
+            maturity=MATURITY,
             day_count=DayCount.ACT_360,
             rating="not-a-rating",
         )
@@ -234,12 +234,12 @@ def test_npl_liquidation_terms_replace_the_default_flag() -> None:
     deal = StructuredCredit.new_standard(
         "rmbs",
         StandardDealParams(
-            "NPL-1",
-            pool,
-            TrancheStructure.from_balances([_tranche("A", 0.0, 100.0, "senior", 100_000_000.0, 0.05)]),
-            CLOSE,
-            MATURITY,
-            "USD-OIS",
+            id="NPL-1",
+            pool=pool,
+            tranches=TrancheStructure.from_balances([_tranche("A", 0.0, 100.0, "senior", 100_000_000.0, 0.05)]),
+            closing_date=CLOSE,
+            maturity=MATURITY,
+            discount_curve_id="USD-OIS",
             calendar_id="nyse",
         ),
     )
@@ -255,12 +255,12 @@ def test_npl_liquidation_terms_replace_the_default_flag() -> None:
         StructuredCredit.new_standard(
             "rmbs",
             StandardDealParams(
-                "NPL-2",
-                AssetPool("P", "rmbs", USD).with_assets([npl]),
-                TrancheStructure.from_balances([_tranche("A", 0.0, 100.0, "senior", 100_000_000.0, 0.05)]),
-                CLOSE,
-                MATURITY,
-                "USD-OIS",
+                id="NPL-2",
+                pool=AssetPool("P", "rmbs", USD).with_assets([npl]),
+                tranches=TrancheStructure.from_balances([_tranche("A", 0.0, 100.0, "senior", 100_000_000.0, 0.05)]),
+                closing_date=CLOSE,
+                maturity=MATURITY,
+                discount_curve_id="USD-OIS",
                 calendar_id="nyse",
             ),
         )
@@ -500,12 +500,12 @@ def test_typed_constructors_accept_the_payment_calendar() -> None:
     deal = StructuredCredit.new_standard(
         "clo",
         StandardDealParams(
-            "CLO-CAL",
-            pool,
-            TrancheStructure([_tranche("A", 0.0, 100.0, "senior", 100_000_000.0, 0.05)]),
-            CLOSE,
-            MATURITY,
-            "USD-OIS",
+            id="CLO-CAL",
+            pool=pool,
+            tranches=TrancheStructure([_tranche("A", 0.0, 100.0, "senior", 100_000_000.0, 0.05)]),
+            closing_date=CLOSE,
+            maturity=MATURITY,
+            discount_curve_id="USD-OIS",
             calendar_id="nyse",
         ),
     )
@@ -633,11 +633,11 @@ def _typed_deal_from_golden(spec: dict) -> StructuredCredit:
     assets = [
         (
             PoolAsset(
-                row["id"],
-                row["asset_type"],
-                _money(row["balance"]),
-                row["rate"],
-                _date(row["maturity"]),
+                id=row["id"],
+                asset_type=row["asset_type"],
+                balance=_money(row["balance"]),
+                rate=row["rate"],
+                maturity=_date(row["maturity"]),
                 day_count=DayCount.from_name(row["day_count"]),
                 spread_bp=row.get("spread_bp"),
                 forward_curve_id=row.get("forward_curve_id"),
@@ -754,11 +754,11 @@ def _diversified_pool() -> AssetPool:
 
     def loan(id_: str, balance: float, rate: float, obligor: str, industry: str, **kwargs: object) -> PoolAsset:
         return PoolAsset(
-            id_,
-            {"type": "first_lien_loan"},
-            usd(balance),
-            rate,
-            MATURITY,
+            id=id_,
+            asset_type={"type": "first_lien_loan"},
+            balance=usd(balance),
+            rate=rate,
+            maturity=MATURITY,
             day_count=DayCount.ACT_360,
             obligor_id=obligor,
             industry=industry,

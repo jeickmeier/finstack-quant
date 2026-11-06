@@ -45,9 +45,12 @@ fn parse_config(
 /// Rejects malformed or schema-incompatible `json_str`, a blank scenario ID,
 /// multiple time-roll operations, invalid operation identifiers or numeric
 /// fields, variant-specific operation violations, or serialization failure.
-/// @param json_str - Scenario specification JSON string to deserialize and validate; the result is returned as a plain object.
-#[wasm_bindgen(js_name = parseScenarioSpec)]
-pub fn parse_scenario_spec(json_str: JsValue) -> Result<JsValue, JsValue> {
+/// @param jsonStr - Scenario specification JSON string to deserialize and validate; the result is returned as a plain object.
+/// @returns Validated structured scenario specification.
+#[wasm_bindgen(js_name = parseScenarioSpec, unchecked_return_type = "ScenarioSpec")]
+pub fn parse_scenario_spec(
+    #[wasm_bindgen(js_name = "jsonStr", unchecked_param_type = "JsonInput")] json_str: JsValue,
+) -> Result<JsValue, JsValue> {
     crate::utils::to_js_value(&scenario_spec(&json_str, "jsonStr")?)
 }
 
@@ -69,8 +72,11 @@ pub fn parse_scenario_spec(json_str: JsValue) -> Result<JsValue, JsValue> {
 /// than one time-roll operation, or failure to convert the composed
 /// specification.
 /// @param specs - ScenarioSpec objects to validate and compose in priority order.
-#[wasm_bindgen(js_name = composeScenarios)]
-pub fn compose_scenarios(specs: JsValue) -> Result<JsValue, JsValue> {
+/// @returns Structured composed scenario specification.
+#[wasm_bindgen(js_name = composeScenarios, unchecked_return_type = "ScenarioSpec")]
+pub fn compose_scenarios(
+    #[wasm_bindgen(unchecked_param_type = "ScenarioSpec[]")] specs: JsValue,
+) -> Result<JsValue, JsValue> {
     let specs: Vec<finstack_quant_scenarios::ScenarioSpec> = from_js_json(&specs, "specs")?;
     let composed = finstack_quant_scenarios::ScenarioSpec::compose(specs).map_err(to_js_err)?;
     crate::utils::to_js_value(&composed)
@@ -88,9 +94,11 @@ pub fn compose_scenarios(specs: JsValue) -> Result<JsValue, JsValue> {
 /// Rejects malformed or schema-incompatible `json_str`, a blank scenario ID,
 /// multiple time-roll operations, invalid operation identifiers or numeric
 /// fields, or variant-specific operation violations.
-/// @param json_str - Scenario specification JSON string to deserialize and validate.
+/// @param jsonStr - Scenario specification JSON string to deserialize and validate.
 #[wasm_bindgen(js_name = validateScenarioSpec)]
-pub fn validate_scenario_spec(json_str: JsValue) -> Result<(), JsValue> {
+pub fn validate_scenario_spec(
+    #[wasm_bindgen(js_name = "jsonStr", unchecked_param_type = "JsonInput")] json_str: JsValue,
+) -> Result<(), JsValue> {
     scenario_spec(&json_str, "jsonStr").map(|_| ())
 }
 
@@ -102,7 +110,8 @@ pub fn validate_scenario_spec(json_str: JsValue) -> Result<(), JsValue> {
 ///
 /// Rejects if the embedded template registry cannot be parsed and validated,
 /// or if its template identifiers cannot be serialized to JavaScript.
-#[wasm_bindgen(js_name = listBuiltinTemplates)]
+/// @returns Built-in scenario template identifiers.
+#[wasm_bindgen(js_name = listBuiltinTemplates, unchecked_return_type = "string[]")]
 pub fn list_builtin_templates() -> Result<JsValue, JsValue> {
     let registry = builtin_registry()?;
     let ids: Vec<String> = registry.list().iter().map(|m| m.id.clone()).collect();
@@ -115,7 +124,8 @@ pub fn list_builtin_templates() -> Result<JsValue, JsValue> {
 ///
 /// Rejects if the embedded template registry cannot be parsed and validated,
 /// or if its metadata cannot be serialized to JSON.
-#[wasm_bindgen(js_name = listBuiltinTemplateMetadata)]
+/// @returns Metadata objects in deterministic registry order.
+#[wasm_bindgen(js_name = listBuiltinTemplateMetadata, unchecked_return_type = "TemplateMetadata[]")]
 pub fn list_builtin_template_metadata() -> Result<JsValue, JsValue> {
     let metadata = builtin_registry()?.list();
     crate::utils::to_js_value(&metadata)
@@ -130,9 +140,12 @@ pub fn list_builtin_template_metadata() -> Result<JsValue, JsValue> {
 /// Rejects a failure to load the embedded registry, an unknown `template_id`,
 /// a template whose resolved scenario fails validation, or failure to serialize
 /// the scenario.
-/// @param template_id - Identifier of a built-in scenario template in the embedded registry.
-#[wasm_bindgen(js_name = buildFromTemplate)]
-pub fn build_from_template(template_id: JsValue) -> Result<JsValue, JsValue> {
+/// @param templateId - Identifier of a built-in scenario template in the embedded registry.
+/// @returns Validated scenario specification from the built-in template.
+#[wasm_bindgen(js_name = buildFromTemplate, unchecked_return_type = "ScenarioSpec")]
+pub fn build_from_template(
+    #[wasm_bindgen(js_name = "templateId", unchecked_param_type = "string")] template_id: JsValue,
+) -> Result<JsValue, JsValue> {
     let template_id: &str = &js_string(&template_id, "templateId")?;
     let spec = builtin_registry()?.build(template_id).map_err(to_js_err)?;
     crate::utils::to_js_value(&spec)
@@ -146,9 +159,12 @@ pub fn build_from_template(template_id: JsValue) -> Result<JsValue, JsValue> {
 ///
 /// Rejects a failure to load the embedded registry, an unknown `template_id`,
 /// or component identifiers that cannot be serialized to JavaScript.
-/// @param template_id - Identifier of a built-in scenario template in the embedded registry.
-#[wasm_bindgen(js_name = listTemplateComponents)]
-pub fn list_template_components(template_id: JsValue) -> Result<JsValue, JsValue> {
+/// @param templateId - Identifier of a built-in scenario template in the embedded registry.
+/// @returns Component identifiers of the selected composite template.
+#[wasm_bindgen(js_name = listTemplateComponents, unchecked_return_type = "string[]")]
+pub fn list_template_components(
+    #[wasm_bindgen(js_name = "templateId", unchecked_param_type = "string")] template_id: JsValue,
+) -> Result<JsValue, JsValue> {
     let template_id: &str = &js_string(&template_id, "templateId")?;
     let ids: Vec<String> = builtin_registry()?
         .component_ids(template_id)
@@ -166,12 +182,13 @@ pub fn list_template_components(template_id: JsValue) -> Result<JsValue, JsValue
 /// Rejects a failure to load the embedded registry, an unknown `template_id`
 /// or `component_id`, a component scenario that fails validation, or failure to
 /// serialize the scenario.
-/// @param template_id - Identifier of a built-in scenario template in the embedded registry.
-/// @param component_id - Identifier of a component within the selected composite template.
-#[wasm_bindgen(js_name = buildTemplateComponent)]
+/// @param templateId - Identifier of a built-in scenario template in the embedded registry.
+/// @param componentId - Identifier of a component within the selected composite template.
+/// @returns Validated structured scenario specification for the selected component.
+#[wasm_bindgen(js_name = buildTemplateComponent, unchecked_return_type = "ScenarioSpec")]
 pub fn build_template_component(
-    template_id: JsValue,
-    component_id: JsValue,
+    #[wasm_bindgen(js_name = "templateId", unchecked_param_type = "string")] template_id: JsValue,
+    #[wasm_bindgen(js_name = "componentId", unchecked_param_type = "string")] component_id: JsValue,
 ) -> Result<JsValue, JsValue> {
     let template_id: &str = &js_string(&template_id, "templateId")?;
     let component_id: &str = &js_string(&component_id, "componentId")?;
@@ -216,19 +233,27 @@ fn extract_instruments(
 /// hierarchy context, statement-model execution failures, failure to encode
 /// the mutated contexts, or failure to serialize the application envelope to
 /// JavaScript.
-/// @param scenario_json - JSON-serialized ScenarioSpec to validate and apply.
-/// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
-/// @param model_json - Optional FinancialModelSpec JSON; omit for market-only scenarios.
-/// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
-/// @param instruments_json - Optional JSON array of canonical instrument envelopes; required for instrument shocks and returned as shocked copies in input order.
-/// @param config_json - Optional FinstackConfig JSON; its rounding policy is stamped into `meta`. Omit for the library default.
-#[wasm_bindgen(js_name = applyScenario)]
+/// @param scenarioJson - JSON-serialized ScenarioSpec to validate and apply.
+/// @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
+/// @param modelJson - Optional FinancialModelSpec JSON; omit for market-only scenarios.
+/// @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+/// @param instrumentsJson - Optional JSON array of canonical instrument envelopes; required for instrument shocks and returned as shocked copies in input order.
+/// @param configJson - Optional FinstackConfig JSON; its rounding policy is stamped into `meta`. Omit for the library default.
+/// @returns Mutated market and optional model after applying the scenario.
+#[wasm_bindgen(js_name = applyScenario, unchecked_return_type = "ApplicationEnvelope")]
 pub fn apply_scenario(
+    #[wasm_bindgen(js_name = "scenarioJson", unchecked_param_type = "JsonInput")]
     scenario_json: JsValue,
+    #[wasm_bindgen(js_name = "marketJson", unchecked_param_type = "JsonInput")]
     market_json: JsValue,
-    as_of: JsValue,
-    model_json: Option<JsValue>,
+    #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
+    #[wasm_bindgen(js_name = "modelJson", unchecked_optional_param_type = "JsonInput")] model_json: Option<JsValue>,
+    #[wasm_bindgen(
+        js_name = "instrumentsJson",
+        unchecked_optional_param_type = "JsonInput"
+    )]
     instruments_json: Option<JsValue>,
+    #[wasm_bindgen(js_name = "configJson", unchecked_optional_param_type = "JsonInput")]
     config_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let spec = scenario_spec(&scenario_json, "scenarioJson")?;
@@ -317,14 +342,26 @@ pub fn apply_scenario(
 /// `calendar_id`; invalid, unsupported, or unresolved scenario operations;
 /// missing market data; pricing or attribution failures; or failure to
 /// serialize the horizon result to JavaScript.
-#[wasm_bindgen(js_name = computeHorizonReturn)]
+/// @param instrumentJson - Canonical `finstack_quant.instrument/1` envelope.
+/// @param marketJson - JSON-serialized `MarketContext`.
+/// @param asOf - Valuation date (ISO 8601).
+/// @param scenarioJson - JSON-serialized `ScenarioSpec`.
+/// @param method - `AttributionMethod` wire value: a unit variant name such as `"parallel"` or `"metrics_based"`, an object such as `{ waterfall: ["carry", "rates_curves"] }` or `{ taylor: {} }`, or the same value as JSON text. Omit for the Rust default (`AttributionMethod::default()`, currently "parallel"). "metrics_based" calculates the canonical registry's applicable subset of default attribution metrics at the opening snapshot; metrics unsupported by the instrument type are omitted, and when a hazard curve of the instrument has no calibration recipe and that menu fails, the quote-space credit metrics are dropped with a note and credit-curve P&L flows to residual; any other failure calculating selected metrics throws.
+/// @param configJson - Optional FinstackConfig JSON for horizon analysis; omit to use defaults.
+/// @param calendarId - Optional built-in holiday calendar (e.g. "nyse", "target") used to business-day adjust `time_roll_forward` targets under `business_days` mode. Omit for a weekends-only calendar; unknown identifiers throw.
+/// @returns The serde `HorizonResult` (`attribution`, `initial_value` and `terminal_value` as exact-decimal Money objects, `horizon_days`, null without a time roll, and `scenario_report`) plus `summary`: the Rust-computed `total_return`, `annualized_return`, `currency` and `factor_contributions` that Python exposes as `HorizonResult` accessors. Rust computes every derived value. Undefined derived values are null here and NaN in Python: total return and factor contributions require positive initial value and matching P&L currency; annualization also requires a positive horizon and total return at or above -100%.
+#[wasm_bindgen(js_name = computeHorizonReturn, unchecked_return_type = "HorizonReport")]
 pub fn compute_horizon_return(
-    instrument_json: JsValue,
+    #[wasm_bindgen(js_name = "instrumentJson", unchecked_param_type = "JsonInput")] instrument_json: JsValue,
+    #[wasm_bindgen(js_name = "marketJson", unchecked_param_type = "JsonInput")]
     market_json: JsValue,
-    as_of: JsValue,
+    #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
+    #[wasm_bindgen(js_name = "scenarioJson", unchecked_param_type = "JsonInput")]
     scenario_json: JsValue,
-    method: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "JsonInput")] method: Option<JsValue>,
+    #[wasm_bindgen(js_name = "configJson", unchecked_optional_param_type = "JsonInput")]
     config_json: Option<JsValue>,
+    #[wasm_bindgen(js_name = "calendarId", unchecked_optional_param_type = "string")]
     calendar_id: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;

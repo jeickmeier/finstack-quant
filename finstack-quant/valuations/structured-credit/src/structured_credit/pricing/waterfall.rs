@@ -3,7 +3,7 @@
 //! This module contains pure functions for executing waterfall distributions.
 //! All type definitions are in `types::waterfall`.
 
-use super::coverage_tests::{TestContext, TestResult};
+use super::coverage::{TestContext, TestResult};
 use crate::structured_credit::types::{
     AfcSpec, AllocationMode, AssetPool, CoverageRules, CoverageTestAction, CoverageTestSpec,
     DiversionRecord, EquityHistory, FundingSource, LiveCollateral, PaymentCalculation,
@@ -218,7 +218,7 @@ pub fn execute_waterfall(
     let allocation_ctx = AllocationContext {
         currency: waterfall.currency,
         tranches,
-        tranche_index,
+        tranche_index: &tranche_index,
         pool_balance: context.pool_balance,
         special_serviced_balance,
         payment_date: context.payment_date,
@@ -253,7 +253,7 @@ pub fn execute_waterfall(
     let senior_fees = senior_fee_accrual(
         waterfall,
         tranches,
-        &allocation_ctx.tranche_index,
+        allocation_ctx.tranche_index,
         SeniorFeeInputs {
             available: context.interest_collections,
             tranche_balances: context.tranche_balances,
@@ -311,10 +311,6 @@ pub fn execute_waterfall(
     // Cash allocated per tier, in execution order.
     let mut tier_allocations = Vec::with_capacity(waterfall.tiers.len());
 
-    // Net all principal paid during the period against the period-start balance
-    // so regular and diverted tiers cannot retire the same notional twice.
-    let mut principal_paid_in_period: FxHashMap<String, Money> = FxHashMap::default();
-
     // Interest a `Reinvest` test retained as principal proceeds this period.
     let mut diverted_to_reinvestment = Money::from((0_i64, waterfall.currency));
     // Principal proceeds spent by `InterestThenPrincipal` tiers.
@@ -367,7 +363,7 @@ pub fn execute_waterfall(
                 CoverageTestAction::PayDownSenior => {
                     // Pay the earliest principal tier in its configured
                     // recipient order. Early principal is booked in
-                    // `principal_paid_in_period` so the principal tier nets
+                    // `allocation_output.principal_paid_in_period` so the principal tier nets
                     // it and cannot double-pay.
                     match diversion_principal_tier {
                         Some(principal_tier) if divertible.amount() > 0.0 => allocate_sequential(
@@ -378,7 +374,6 @@ pub fn execute_waterfall(
                             context.period_start,
                             true,
                             &mut allocation_output,
-                            &mut principal_paid_in_period,
                         )?,
                         _ => Money::from((0_i64, waterfall.currency)),
                     }
@@ -426,7 +421,6 @@ pub fn execute_waterfall(
                 context.period_start,
                 false,
                 &mut allocation_output,
-                &mut principal_paid_in_period,
             )?,
             AllocationMode::ProRata => allocate_pro_rata(
                 &allocation_ctx,
@@ -436,7 +430,6 @@ pub fn execute_waterfall(
                 context.period_start,
                 false,
                 &mut allocation_output,
-                &mut principal_paid_in_period,
             )?,
         };
 
@@ -528,7 +521,7 @@ pub(crate) struct AllocationContext<'a> {
     /// Tranche structure for looking up tranche data
     pub(crate) tranches: &'a TrancheStructure,
     /// O(1) lookup from tranche ID to index
-    pub(crate) tranche_index: FxHashMap<&'a str, usize>,
+    pub(crate) tranche_index: &'a FxHashMap<&'a str, usize>,
     /// Current pool balance
     pub(crate) pool_balance: Money,
     /// Balance of the specially serviced collateral (special servicing fee base).
@@ -564,6 +557,10 @@ pub(crate) struct AllocationOutput {
     pub(crate) equity_paid: Money,
     /// Payment records for audit trail
     pub(crate) payment_records: Vec<PaymentRecord>,
+    /// Principal paid to each tranche (by id) so far this period. Netted
+    /// against the period-start balance so regular and diverted tiers cannot
+    /// retire the same notional twice.
+    pub(crate) principal_paid_in_period: FxHashMap<String, Money>,
 }
 
 impl AllocationOutput {
@@ -572,6 +569,7 @@ impl AllocationOutput {
         Self {
             equity_paid: Money::from((0_i64, currency)),
             payment_records: Vec::with_capacity(estimated_recipients),
+            principal_paid_in_period: FxHashMap::default(),
         }
     }
 
@@ -586,7 +584,6 @@ impl AllocationOutput {
 }
 
 /// Allocate cash sequentially to recipients.
-#[allow(clippy::too_many_arguments)]
 fn allocate_sequential(
     ctx: &AllocationContext,
     tier: &WaterfallTier,
@@ -595,7 +592,6 @@ fn allocate_sequential(
     period_start: Date,
     diverted: bool,
     output: &mut AllocationOutput,
-    principal_paid_in_period: &mut FxHashMap<String, Money>,
 ) -> Result<Money> {
     let currency = ctx.currency;
     let mut tier_total = Money::from((0_i64, currency));
@@ -606,29 +602,19 @@ fn allocate_sequential(
         }
 
         let requested = calculate_payment_amount(
-            currency,
+            ctx,
             &recipient.calculation,
             available,
-            ctx.tranches,
-            &ctx.tranche_index,
-            ctx.tranche_balances,
-            ctx.deferred_interest,
-            ctx.pool_balance,
-            ctx.special_serviced_balance,
             period_start,
-            ctx.payment_date,
-            ctx.accrual_end,
-            ctx.valuation_date,
-            ctx.market,
-            ctx.reserve_balance,
-            principal_paid_in_period,
             diverted,
-            ctx.floating_rate_shift,
-            ctx.equity_history,
-            output.equity_paid,
+            output,
         )?;
-        let requested =
-            cap_residual_at_debt_balance(ctx, recipient, requested, principal_paid_in_period)?;
+        let requested = cap_residual_at_debt_balance(
+            ctx,
+            recipient,
+            requested,
+            &output.principal_paid_in_period,
+        )?;
 
         let paid = if requested.amount() <= available.amount() {
             requested
@@ -636,7 +622,7 @@ fn allocate_sequential(
             available
         };
 
-        record_in_period_principal(ctx, principal_paid_in_period, recipient, paid)?;
+        record_in_period_principal(ctx, &mut output.principal_paid_in_period, recipient, paid)?;
 
         let shortfall = requested
             .checked_sub(paid)
@@ -662,7 +648,6 @@ fn allocate_sequential(
 }
 
 /// Allocate cash pro-rata to recipients using penny-safe allocation.
-#[allow(clippy::too_many_arguments)]
 fn allocate_pro_rata(
     ctx: &AllocationContext,
     tier: &WaterfallTier,
@@ -671,7 +656,6 @@ fn allocate_pro_rata(
     period_start: Date,
     diverted: bool,
     output: &mut AllocationOutput,
-    principal_paid_in_period: &mut FxHashMap<String, Money>,
 ) -> Result<Money> {
     let currency = ctx.currency;
     if recipients.is_empty() {
@@ -683,29 +667,19 @@ fn allocate_pro_rata(
 
     for recipient in recipients {
         let requested = calculate_payment_amount(
-            currency,
+            ctx,
             &recipient.calculation,
             available,
-            ctx.tranches,
-            &ctx.tranche_index,
-            ctx.tranche_balances,
-            ctx.deferred_interest,
-            ctx.pool_balance,
-            ctx.special_serviced_balance,
             period_start,
-            ctx.payment_date,
-            ctx.accrual_end,
-            ctx.valuation_date,
-            ctx.market,
-            ctx.reserve_balance,
-            principal_paid_in_period,
             diverted,
-            ctx.floating_rate_shift,
-            ctx.equity_history,
-            output.equity_paid,
+            output,
         )?;
-        let requested =
-            cap_residual_at_debt_balance(ctx, recipient, requested, principal_paid_in_period)?;
+        let requested = cap_residual_at_debt_balance(
+            ctx,
+            recipient,
+            requested,
+            &output.principal_paid_in_period,
+        )?;
         total_requested = total_requested.checked_add(requested)?;
         recipient_requests.push((recipient, requested));
     }
@@ -751,7 +725,7 @@ fn allocate_pro_rata(
             *requested
         };
 
-        record_in_period_principal(ctx, principal_paid_in_period, recipient, paid)?;
+        record_in_period_principal(ctx, &mut output.principal_paid_in_period, recipient, paid)?;
 
         let shortfall = requested
             .checked_sub(paid)
@@ -1099,7 +1073,25 @@ pub(crate) fn senior_fee_accrual(
     tranche_index: &FxHashMap<&str, usize>,
     inputs: SeniorFeeInputs<'_>,
 ) -> Result<Money> {
-    let empty_in_period: FxHashMap<String, Money> = FxHashMap::default();
+    // Senior fees are measured before any tier pays: no in-period principal
+    // and no equity cash yet.
+    let nothing_paid = AllocationOutput::new(waterfall.currency, 0);
+    let ctx = AllocationContext {
+        currency: waterfall.currency,
+        tranches,
+        tranche_index,
+        pool_balance: inputs.pool_balance,
+        special_serviced_balance: inputs.special_serviced_balance,
+        payment_date: inputs.payment_date,
+        accrual_end: inputs.accrual_end,
+        valuation_date: inputs.valuation_date,
+        market: inputs.market,
+        tranche_balances: inputs.tranche_balances,
+        deferred_interest: inputs.deferred_interest,
+        reserve_balance: inputs.reserve_balance,
+        floating_rate_shift: inputs.floating_rate_shift,
+        equity_history: None,
+    };
     let mut total = Money::from((0_i64, waterfall.currency));
     let first_note_priority = waterfall
         .tiers
@@ -1117,26 +1109,12 @@ pub(crate) fn senior_fee_accrual(
     for tier in fees {
         for recipient in &tier.recipients {
             let amount = calculate_payment_amount(
-                waterfall.currency,
+                &ctx,
                 &recipient.calculation,
                 inputs.available,
-                tranches,
-                tranche_index,
-                inputs.tranche_balances,
-                inputs.deferred_interest,
-                inputs.pool_balance,
-                inputs.special_serviced_balance,
                 inputs.period_start,
-                inputs.payment_date,
-                inputs.accrual_end,
-                inputs.valuation_date,
-                inputs.market,
-                inputs.reserve_balance,
-                &empty_in_period,
                 false,
-                inputs.floating_rate_shift,
-                None,
-                Money::from((0_i64, waterfall.currency)),
+                &nothing_paid,
             )?;
             total = total.checked_add(amount)?;
         }
@@ -1199,29 +1177,36 @@ fn record_in_period_principal(
 }
 
 /// Calculate payment amount for a recipient.
-#[allow(clippy::too_many_arguments)]
+///
+/// `ctx` supplies the period's balances, dates and market; `paid_so_far`
+/// supplies the principal already paid per tranche and the equity cash paid
+/// earlier in this period. `diverted` marks a coverage-cure diversion pass.
 fn calculate_payment_amount(
-    currency: Currency,
+    ctx: &AllocationContext<'_>,
     calculation: &PaymentCalculation,
     available: Money,
-    tranches: &TrancheStructure,
-    tranche_index: &FxHashMap<&str, usize>,
-    tranche_balances: Option<&FxHashMap<String, Money>>,
-    deferred_interest: Option<&FxHashMap<String, Money>>,
-    pool_balance: Money,
-    special_serviced_balance: Money,
     period_start: Date,
-    payment_date: Date,
-    accrual_end: Date,
-    valuation_date: Date,
-    market: &MarketContext,
-    reserve_balance: Money,
-    principal_paid_in_period: &FxHashMap<String, Money>,
     diverted: bool,
-    floating_rate_shift: f64,
-    equity_history: Option<&EquityHistory>,
-    equity_paid_in_period: Money,
+    paid_so_far: &AllocationOutput,
 ) -> Result<Money> {
+    let &AllocationContext {
+        currency,
+        tranches,
+        tranche_index,
+        pool_balance,
+        special_serviced_balance,
+        payment_date,
+        accrual_end,
+        valuation_date,
+        market,
+        tranche_balances,
+        deferred_interest,
+        reserve_balance,
+        floating_rate_shift,
+        equity_history,
+    } = ctx;
+    let principal_paid_in_period = &paid_so_far.principal_paid_in_period;
+    let equity_paid_in_period = paid_so_far.equity_paid;
     let (raw_amount, rounding) = match calculation {
         PaymentCalculation::FixedAmount { amount, rounding } => (amount.amount(), *rounding),
 

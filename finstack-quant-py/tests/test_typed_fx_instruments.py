@@ -95,7 +95,7 @@ class TestFxOptionTyped:
             .quote_currency(Currency("USD"))
             .strike(1.12)
             .option_type("call")
-            .delta_convention("forward", Currency("USD"), "generic_interbank")
+            .delta_convention({"kind": "forward", "premium_currency": "USD", "venue": "generic_interbank"})
             .expiry(datetime.date(2025, 12, 15))
             .notional(Money(1_000_000.0, Currency("EUR")))
             .domestic_discount_curve_id("USD-OIS")
@@ -112,8 +112,19 @@ class TestFxOptionTyped:
             FxOption.builder().option_type("straddle")
 
     def test_delta_convention_wrong_case_is_rejected(self) -> None:
-        with pytest.raises(ValueError, match="invalid delta convention kind"):
-            FxOption.builder().delta_convention("Forward", Currency("USD"), "test")
+        with pytest.raises(ValueError, match="invalid FxDeltaConvention"):
+            FxOption.builder().delta_convention({"kind": "Forward", "premium_currency": "USD", "venue": "test"})
+
+    def test_delta_convention_blank_venue_is_rejected(self) -> None:
+        with pytest.raises(ValueError, match="venue must not be blank"):
+            FxOption.builder().delta_convention({"kind": "forward", "premium_currency": "USD", "venue": "  "})
+
+    def test_delta_convention_getter_round_trips_into_setter(self) -> None:
+        example = FxOption.example()
+        builder = FxOption.builder().delta_convention(example.delta_convention)
+        assert "'venue': 'generic_interbank'" in repr(builder)
+        json_builder = FxOption.builder().delta_convention(json.dumps(example.delta_convention))
+        assert "'kind': 'forward'" in repr(json_builder)
 
     @pytest.mark.parametrize(
         "value",
@@ -128,7 +139,7 @@ class TestFxOptionTyped:
             .quote_currency(Currency("USD"))
             .strike(1.12)
             .option_type("call")
-            .delta_convention(value, Currency("EUR"), "test")
+            .delta_convention({"kind": value, "premium_currency": Currency("EUR"), "venue": "test"})
             .expiry(datetime.date(2025, 12, 15))
             .notional(Money(1_000_000.0, Currency("EUR")))
             .domestic_discount_curve_id("USD-OIS")

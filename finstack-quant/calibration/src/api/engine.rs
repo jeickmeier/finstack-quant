@@ -831,7 +831,7 @@ pub fn calibrate(
 }
 
 #[cfg(test)]
-#[path = "dependency_review_tests.rs"]
+#[path = "tests/engine_dependency_review.rs"]
 mod dependency_review_tests;
 
 #[cfg(test)]

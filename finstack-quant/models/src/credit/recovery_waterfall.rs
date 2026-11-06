@@ -21,6 +21,7 @@ const CONSERVATION_REL_TOLERANCE: f64 = 64.0 * f64::EPSILON;
 /// A claim participating in a recovery waterfall.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct RecoveryClaim {
     /// Stable claim identifier.
     pub id: String,

@@ -244,8 +244,6 @@ fn cashflows_json_bridge_builds_accrues_and_prices_custom_bond() {
         Some(JsValue::from("discounting".to_string())),
         None,
         None,
-        None,
-        None,
     )
     .expect("price custom bond");
     let result_json: String = js_sys::JSON::stringify(&priced)

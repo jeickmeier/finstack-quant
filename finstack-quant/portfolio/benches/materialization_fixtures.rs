@@ -224,28 +224,32 @@ fn schedule_rich_swap(index: usize) -> CmsSwap {
     let start = date!(2025 - 01 - 01);
     let end = date!(2035 - 01 - 01);
     CmsSwap::from_schedule(
-        format!("SWAP-{index:05}"),
-        start,
-        end,
-        Tenor::semi_annual(),
-        Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y tenor"),
-        rust_decimal::Decimal::new((index % 50) as i64, 1),
-        FundingLegSpec::Floating {
-            spread_bp: rust_decimal::Decimal::new((index % 25) as i64, 1),
+        finstack_quant_valuations::instruments::rates::cms_swap::CmsSwapScheduleParams {
+            id: format!("SWAP-{index:05}").into(),
+            start_date: start,
+            maturity: end,
+            cms_frequency: Tenor::semi_annual(),
+            cms_tenor: Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years)
+                .expect("10Y tenor"),
+            cms_spread_bp: rust_decimal::Decimal::new((index % 50) as i64, 1),
+            funding_leg: FundingLegSpec::Floating {
+                spread_bp: rust_decimal::Decimal::new((index % 25) as i64, 1),
+                day_count: DayCount::Act360,
+                forward_curve_id: "USD-SOFR-3M".into(),
+            },
+            notional: Money::new(2_000_000.0 + index as f64, Currency::USD)
+                .expect("valid money fixture"),
             day_count: DayCount::Act360,
+            index_id: IndexId::new("USD-SOFR-OIS"),
+            side: if index % 4 == 1 {
+                PayReceive::Pay
+            } else {
+                PayReceive::Receive
+            },
+            discount_curve_id: "USD-OIS".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
+            vol_surface_id: "USD-SWAPTION-VOL".into(),
         },
-        Money::new(2_000_000.0 + index as f64, Currency::USD).expect("valid money fixture"),
-        DayCount::Act360,
-        IndexId::new("USD-SOFR-OIS"),
-        if index % 4 == 1 {
-            PayReceive::Pay
-        } else {
-            PayReceive::Receive
-        },
-        "USD-OIS",
-        "USD-SOFR-3M",
-        "USD-SWAPTION-VOL",
     )
     .expect("benchmark schedule-rich swap")
 }

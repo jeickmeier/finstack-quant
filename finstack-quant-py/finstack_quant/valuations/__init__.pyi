@@ -521,7 +521,7 @@ class ValuationResult:
         """
         Computation explanation trace, or ``None`` when tracing was not enabled.
 
-        Request it with ``price_instrument(..., explain=True)``. Tabulate the
+        Request it with ``price_instrument(..., extras={"explain": True})``. Tabulate the
         entries with ``pandas.DataFrame(result.explanation["entries"])``.
 
         Returns

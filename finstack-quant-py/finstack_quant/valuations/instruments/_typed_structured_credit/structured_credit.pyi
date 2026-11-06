@@ -97,13 +97,13 @@ class StructuredCredit:
         >>> from finstack_quant.valuations.instruments import StandardDealParams, StructuredCredit
         >>> example = StructuredCredit.example()
         >>> params = StandardDealParams(
-        ...     example.id,
-        ...     example.pool,
-        ...     example.tranches,
-        ...     example.closing_date,
-        ...     example.maturity,
-        ...     example.discount_curve_id,
-        ...     example.calendar_id,
+        ...     id=example.id,
+        ...     pool=example.pool,
+        ...     tranches=example.tranches,
+        ...     closing_date=example.closing_date,
+        ...     maturity=example.maturity,
+        ...     discount_curve_id=example.discount_curve_id,
+        ...     calendar_id=example.calendar_id,
         ... )
         >>> StructuredCredit.new_standard("clo", params).id == example.id
         True
@@ -790,8 +790,8 @@ class StructuredCredit:
         dict[str, object]
             Bump sizes, theta period and the other metric settings stored on
             the instrument; unset fields are ``None`` or omitted. A
-            ``metric_pricing_overrides`` argument to ``price`` is merged over it
-            per call.
+            ``price(..., extras={"metric_pricing_overrides": ...})`` patch is
+            merged over it per call.
 
         Notes
         -----
@@ -1115,9 +1115,7 @@ class StructuredCredit:
         as_of: datetime.date | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
-        market_history: MarketHistory | dict[str, Any] | str | None = None,
-        explain: bool = False,
+        extras: dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this deal and return a typed ``ValuationResult``.
@@ -1138,14 +1136,19 @@ class StructuredCredit:
         metrics : list[str], optional
             Metric identifiers to compute (e.g. ``["wal", "clo_warf"]``);
             omitted means valuation only.
-        metric_pricing_overrides : MetricPricingOverrides | dict | str | None
-            Metric-time overrides merged into
-            ``instrument.spec.metric_pricing_overrides`` before pricing.
-        market_history : MarketHistory | dict | str | None
-            Historical scenarios required by ``hvar`` and
-            ``expected_shortfall``.
-        explain : bool, default False
-            When ``True``, attach a step trace as ``result.explanation``.
+        extras : dict[str, Any] or str, optional
+            The rarer pricing inputs, as a dict or JSON text in the shape of the
+            Rust ``PriceExtras``; every key is optional and an unknown key raises
+            ``ValueError``. ``metric_pricing_overrides`` (a ``MetricPricingOverrides``
+            or dict) is merged into ``instrument.spec.metric_pricing_overrides``
+            before pricing (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``):
+            only the keys present replace stored controls, ``bump_config`` keys
+            merge into the stored bump configuration and an explicit ``None``
+            clears a control; omitted keeps the instrument's overrides. ``market_history`` (a ``MarketHistory`` or dict)
+            holds the historical scenarios ``hvar`` and ``expected_shortfall``
+            require; omitted prices without history. ``explain`` (bool, default
+            ``False``) attaches a step trace as ``result.explanation`` when
+            ``True``. ``None`` (the default) means no extras.
 
         Returns
         -------

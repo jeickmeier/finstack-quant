@@ -169,9 +169,7 @@ class AssetBackedFacility:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
-        market_history: MarketHistory | dict[str, Any] | str | None = None,
-        explain: bool = False,
+        extras: dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price the lender's projected flows (interest, principal and commitment fees) and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -191,14 +189,19 @@ class AssetBackedFacility:
             Metric identifiers to compute alongside the value (for example
             ``"abf_borrowing_base_cushion"``, ``"abf_facility_irr"`` or
             ``"dv01"``).
-        metric_pricing_overrides : MetricPricingOverrides | dict[str, Any] | str, optional
-            Metric-time overrides merged into
-            ``instrument.spec.metric_pricing_overrides`` before pricing.
-        market_history : MarketHistory | dict[str, Any] | str, optional
-            ``MarketHistory`` scenarios required by ``hvar`` /
-            ``expected_shortfall``.
-        explain : bool, default False
-            When ``True``, attach a step trace as ``result.explanation``.
+        extras : dict[str, Any] or str, optional
+            The rarer pricing inputs, as a dict or JSON text in the shape of the
+            Rust ``PriceExtras``; every key is optional and an unknown key raises
+            ``ValueError``. ``metric_pricing_overrides`` (a ``MetricPricingOverrides``
+            or dict) is merged into ``instrument.spec.metric_pricing_overrides``
+            before pricing (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``):
+            only the keys present replace stored controls, ``bump_config`` keys
+            merge into the stored bump configuration and an explicit ``None``
+            clears a control; omitted keeps the instrument's overrides. ``market_history`` (a ``MarketHistory`` or dict)
+            holds the historical scenarios ``hvar`` and ``expected_shortfall``
+            require; omitted prices without history. ``explain`` (bool, default
+            ``False``) attaches a step trace as ``result.explanation`` when
+            ``True``. ``None`` (the default) means no extras.
 
         Returns
         -------
@@ -815,8 +818,8 @@ class AssetBackedFacility:
         dict[str, object]
             Bump sizes, theta period and the other metric settings stored on
             the instrument; unset fields are ``None`` or omitted. A
-            ``metric_pricing_overrides`` argument to ``price`` is merged over it
-            per call.
+            ``price(..., extras={"metric_pricing_overrides": ...})`` patch is
+            merged over it per call.
 
         Notes
         -----
@@ -896,7 +899,7 @@ class AssetBackedFacilityBuilder:
     ...     .collateral(pool)
     ...     .borrowing_base_rules({"advance_rates": [{"asset_class": "*", "rate": 0.75}]})
     ...     .commitment(Money(80_000_000.0, Currency("USD")))
-    ...     .drawn(60_000_000.0, currency="USD")
+    ...     .drawn(Money(60_000_000.0, Currency("USD")))
     ...     .rate(0.055)
     ...     .commitment_fee_bp(50.0)
     ...     .closing_date(datetime.date(2024, 1, 15))
@@ -977,16 +980,14 @@ class AssetBackedFacilityBuilder:
             the builder was already consumed.
         """
         ...
-    def commitment(self, value: Money | float, currency: str | None = None) -> AssetBackedFacilityBuilder:
+    def commitment(self, value: Money) -> AssetBackedFacilityBuilder:
         """
         Set the total commitment.
 
         Parameters
         ----------
-        value : Money | float
-            Commitment; a bare amount is tagged with ``currency``.
-        currency : str, optional
-            ISO-4217 code for a bare amount (ignored for ``Money``).
+        value : Money
+            Total commitment, in the facility currency.
 
         Returns
         -------
@@ -996,23 +997,19 @@ class AssetBackedFacilityBuilder:
         Raises
         ------
         ValueError
-            If a bare amount has no currency or the builder was already
-            consumed.
+            If the builder was already consumed.
         TypeError
-            If ``value`` is neither ``Money`` nor a number.
+            If ``value`` is not a ``finstack_quant.core.money.Money``.
         """
         ...
-    def drawn(self, value: Money | float, currency: str | None = None) -> AssetBackedFacilityBuilder:
+    def drawn(self, value: Money) -> AssetBackedFacilityBuilder:
         """
         Set the amount drawn at closing.
 
         Parameters
         ----------
-        value : Money | float
-            Drawn balance (at most the commitment and below the collateral);
-            a bare amount is tagged with ``currency``.
-        currency : str, optional
-            ISO-4217 code for a bare amount (ignored for ``Money``).
+        value : Money
+            Drawn balance (at most the commitment and below the collateral).
 
         Returns
         -------
@@ -1022,10 +1019,9 @@ class AssetBackedFacilityBuilder:
         Raises
         ------
         ValueError
-            If a bare amount has no currency or the builder was already
-            consumed.
+            If the builder was already consumed.
         TypeError
-            If ``value`` is neither ``Money`` nor a number.
+            If ``value`` is not a ``finstack_quant.core.money.Money``.
         """
         ...
     def rate(self, value: float | Rate | Bps | dict[str, Any] | str) -> AssetBackedFacilityBuilder:

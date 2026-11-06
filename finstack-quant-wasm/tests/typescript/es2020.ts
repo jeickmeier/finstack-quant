@@ -1,10 +1,12 @@
 import {
   analytics,
+  cashflows,
   core,
   features,
   models,
   portfolio,
   scenarios,
+  valuations,
   type AttributionFactor,
   type FactorBrinsonResult,
   type CrossSectionalOp,
@@ -226,3 +228,12 @@ void [
   badCouponDate,
   badCouponStep,
 ];
+
+// Pricing results are typed by the Rust `unchecked_return_type` attributes, not
+// `any`: reading a field the result does not declare is an error.
+declare const priced: ReturnType<typeof valuations.instruments.priceInstrument>;
+// @ts-expect-error `ValuationResult` declares no `notAField`
+void priced.notAField;
+declare const cashflowBuilder: ReturnType<typeof cashflows.CashFlowSchedule.builder>;
+// @ts-expect-error the facade's `build(market?)` takes a `MarketContext`, not a string
+cashflowBuilder.build('USD-OIS');

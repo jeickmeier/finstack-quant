@@ -25,7 +25,9 @@ fn horizon_result(value: &JsValue) -> Result<HorizonResult, JsValue> {
 /// Throws a `TypeError` when `spec` is not an object or JSON string, and a
 /// `validation` error when it is not a valid `ScenarioSpec`.
 #[wasm_bindgen(js_name = scenarioSpecRequiresInstruments)]
-pub fn scenario_spec_requires_instruments(spec: JsValue) -> Result<bool, JsValue> {
+pub fn scenario_spec_requires_instruments(
+    #[wasm_bindgen(unchecked_param_type = "ScenarioSpec | string")] spec: JsValue,
+) -> Result<bool, JsValue> {
     Ok(super::scenario_spec(&spec, "spec")?.requires_instruments())
 }
 
@@ -41,7 +43,9 @@ pub fn scenario_spec_requires_instruments(spec: JsValue) -> Result<bool, JsValue
 /// Throws a `TypeError` when `spec` is not an object or JSON string, and a
 /// `validation` error when it is not a valid `ScenarioSpec`.
 #[wasm_bindgen(js_name = scenarioSpecMutatesInstruments)]
-pub fn scenario_spec_mutates_instruments(spec: JsValue) -> Result<bool, JsValue> {
+pub fn scenario_spec_mutates_instruments(
+    #[wasm_bindgen(unchecked_param_type = "ScenarioSpec | string")] spec: JsValue,
+) -> Result<bool, JsValue> {
     Ok(super::scenario_spec(&spec, "spec")?.mutates_instruments())
 }
 
@@ -59,7 +63,10 @@ pub fn scenario_spec_mutates_instruments(spec: JsValue) -> Result<bool, JsValue>
 /// Throws a `TypeError` when `result` is not an object or JSON string, and a
 /// `validation` error when it is not a `HorizonResult`.
 #[wasm_bindgen(js_name = horizonResultExplainText)]
-pub fn horizon_result_explain(result: JsValue) -> Result<String, JsValue> {
+pub fn horizon_result_explain(
+    #[wasm_bindgen(unchecked_param_type = "HorizonReport | HorizonResult | string")]
+    result: JsValue,
+) -> Result<String, JsValue> {
     Ok(horizon_result(&result)?.to_string())
 }
 
@@ -69,7 +76,7 @@ pub fn horizon_result_explain(result: JsValue) -> Result<String, JsValue> {
 /// `ApplicationReport::effective_as_of`). A time roll rebases the market, so a
 /// re-valuation of the shocked market must use the rolled date.
 /// @param report - `ApplicationReport` returned by `applyScenario`, as an object or JSON.
-/// @param as_of - ISO-8601 valuation date the scenario was applied at, returned unchanged without a roll.
+/// @param asOf - ISO-8601 valuation date the scenario was applied at, returned unchanged without a roll.
 /// @returns ISO-8601 date: the roll's new date, else `asOf`.
 ///
 /// # Errors
@@ -78,8 +85,8 @@ pub fn horizon_result_explain(result: JsValue) -> Result<String, JsValue> {
 /// error when `report` is not an `ApplicationReport` or `asOf` is not an ISO date.
 #[wasm_bindgen(js_name = applicationReportEffectiveAsOf)]
 pub fn application_report_effective_as_of(
-    report: JsValue,
-    as_of: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "ApplicationReport | string")] report: JsValue,
+    #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
 ) -> Result<String, JsValue> {
     let report: finstack_quant_scenarios::ApplicationReport = from_js_json(&report, "report")?;
     let as_of = crate::utils::wire::js_date(&as_of, "asOf")?;
@@ -102,8 +109,9 @@ pub fn application_report_effective_as_of(
 /// when `result` is not a `HorizonResult` or `factor` is not an accepted name.
 #[wasm_bindgen(js_name = horizonResultFactorContribution)]
 pub fn horizon_result_factor_contribution(
+    #[wasm_bindgen(unchecked_param_type = "HorizonReport | HorizonResult | string")]
     result: JsValue,
-    factor: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "AttributionFactor")] factor: JsValue,
 ) -> Result<f64, JsValue> {
     let factor: finstack_quant_attribution::AttributionFactor =
         finstack_quant_core::wire::serde_parse(&js_string(&factor, "factor")?)

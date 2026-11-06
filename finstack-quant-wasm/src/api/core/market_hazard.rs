@@ -130,8 +130,11 @@ impl JsHazardCurve {
     /// (kind `validation`) for an unknown, missing or mistyped key, an
     /// odd-length `knots`/`parSpreads`, a malformed date, an unknown label, a
     /// knot the curve builder rejects, or `recoveryRate` outside `[0, 1]`.
+    /// @param options - HazardCurveOptions object (or its JSON text) with: `id` (curve identifier, the `MarketContext` lookup key); `baseDate` (ISO-8601 `"YYYY-MM-DD"`; knot times are year fractions from it under `dayCount`); `knots` (flat `[t0, lambda0, t1, lambda1, …]` array or typed array, `t` in years, `lambda` a non-negative annual default intensity as a decimal); `recoveryRate` (required recovery on default, decimal in `[0, 1]`); and the optional `dayCount` (default `"act_365f"`), `parSpreads` (flat `[t0, bp0, …]` par CDS quotes in basis points, kept for reporting), `parInterp` (`"linear"` default or `"log_linear"`), `issuer`, `seniority` (`"senior_secured"`, `"senior"`, `"subordinated"`, `"junior"`), `currency` (ISO-4217 code of the protection leg) and `maxHazardRate` (sanity ceiling on any knot, default `10.0`). Omitted options use the Rust builder defaults. Unknown keys are rejected.
     #[wasm_bindgen(constructor)]
-    pub fn new(options: JsValue) -> Result<JsHazardCurve, JsValue> {
+    pub fn new(
+        #[wasm_bindgen(unchecked_param_type = "HazardCurveOptions | string")] options: JsValue,
+    ) -> Result<JsHazardCurve, JsValue> {
         Self::build(from_js_json(&options, "options")?)
     }
 
@@ -147,11 +150,17 @@ impl JsHazardCurve {
     /// @returns Curve with `sp(t) === Math.exp(-hazardRate * t)`.
     /// @throws If `baseDate` is not an ISO date, `hazardRate` is non-finite or
     /// negative, or `recoveryRate` is outside `[0, 1]`.
+    /// @param id - Curve identifier stored on the curve.
+    /// @param baseDate - ISO-8601 valuation date anchoring `t = 0`.
+    /// @param hazardRate - Constant annual default intensity as a decimal (`0.02` is 2%).
+    /// @param recoveryRate - Recovery on default as a decimal fraction in `[0, 1]`.
     #[wasm_bindgen(js_name = flat)]
     pub fn flat(
-        id: JsValue,
-        base_date: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+        #[wasm_bindgen(js_name = "baseDate", unchecked_param_type = "string")] base_date: JsValue,
+        #[wasm_bindgen(js_name = "hazardRate", unchecked_param_type = "number")]
         hazard_rate: JsValue,
+        #[wasm_bindgen(js_name = "recoveryRate", unchecked_param_type = "number")]
         recovery_rate: JsValue,
     ) -> Result<JsHazardCurve, JsValue> {
         let id = js_string(&id, "id")?;
@@ -178,11 +187,16 @@ impl JsHazardCurve {
     /// @returns Piecewise-constant hazard curve reproducing every pillar.
     /// @throws If `points` is empty or odd-length, a probability is outside
     /// `(0, 1]` or increases with time, or `recoveryRate` is outside `[0, 1]`.
+    /// @param id - Curve identifier stored on the curve.
+    /// @param baseDate - ISO-8601 valuation date anchoring `t = 0`.
+    /// @param points - Flat `[t0, s0, t1, s1, …]` array: times in years and survival probabilities in `(0, 1]`, non-increasing in time; a `t = 0` pillar must be `1.0`.
+    /// @param recoveryRate - Recovery on default as a decimal fraction in `[0, 1]`.
     #[wasm_bindgen(js_name = fromSurvivalProbs)]
     pub fn from_survival_probs(
-        id: JsValue,
-        base_date: JsValue,
-        points: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+        #[wasm_bindgen(js_name = "baseDate", unchecked_param_type = "string")] base_date: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray")] points: JsValue,
+        #[wasm_bindgen(js_name = "recoveryRate", unchecked_param_type = "number")]
         recovery_rate: JsValue,
     ) -> Result<JsHazardCurve, JsValue> {
         let id = js_string(&id, "id")?;
@@ -206,8 +220,11 @@ impl JsHazardCurve {
     ///
     /// @returns The validated `HazardCurve`.
     /// @throws If `json` is malformed, has unknown fields, or fails curve validation.
+    /// @param json - Canonical HazardCurve JSON text or plain object, such as `HazardCurve.toJson()` output (for example of the curve that `models.credit.MertonModel.toHazardCurve` returns). Unknown fields are rejected and the curve is re-validated.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsHazardCurve, JsValue> {
+    pub fn from_json(
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+    ) -> Result<JsHazardCurve, JsValue> {
         from_js_json::<RustHazardCurve>(&json, "json").map(Self::from_inner)
     }
 
@@ -231,7 +248,11 @@ impl JsHazardCurve {
     /// @throws `TypeError` if `t` is neither a number nor a string;
     /// `FinstackError` (kind `validation`) for a malformed date or a year
     /// fraction that cannot be computed.
-    pub fn sp(&self, t: JsValue) -> Result<f64, JsValue> {
+    /// @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
+    pub fn sp(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number | string")] t: JsValue,
+    ) -> Result<f64, JsValue> {
         match js_time_point(&t, "t")? {
             TimePoint::Years(t) => Ok(self.inner.sp(t)),
             TimePoint::Date(d) => self.inner.sp_on_date(d).map_err(to_js_err),
@@ -249,8 +270,12 @@ impl JsHazardCurve {
     /// @throws `TypeError` if `t` is neither a number nor a string;
     /// `FinstackError` (kind `validation`) for a malformed date or a year
     /// fraction that cannot be computed.
+    /// @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
     #[wasm_bindgen(js_name = hazardRate)]
-    pub fn hazard_rate(&self, t: JsValue) -> Result<f64, JsValue> {
+    pub fn hazard_rate(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number | string")] t: JsValue,
+    ) -> Result<f64, JsValue> {
         match js_time_point(&t, "t")? {
             TimePoint::Years(t) => Ok(self.inner.hazard_rate(t)),
             TimePoint::Date(d) => self.inner.hazard_rate_on_date(d).map_err(to_js_err),
@@ -265,8 +290,12 @@ impl JsHazardCurve {
     ///
     /// @returns One survival probability per input date, in order.
     /// @throws If a date is not an ISO date or a year fraction cannot be computed.
+    /// @param dates - ISO-8601 target dates; a date on or before `baseDate` yields `1`.
     #[wasm_bindgen(js_name = survivalAtDates)]
-    pub fn survival_at_dates(&self, dates: JsValue) -> Result<Box<[f64]>, JsValue> {
+    pub fn survival_at_dates(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "readonly string[]")] dates: JsValue,
+    ) -> Result<Box<[f64]>, JsValue> {
         let dates = parse_iso_dates(&js_string_seq(&dates, "dates")?)?;
         self.inner
             .survival_at_dates(&dates)
@@ -283,8 +312,14 @@ impl JsHazardCurve {
     ///
     /// @returns Default probability in `[0, 1]`.
     /// @throws If `t2 < t1`.
+    /// @param t1 - Start year fraction from `baseDate`.
+    /// @param t2 - End year fraction; must not precede `t1`.
     #[wasm_bindgen(js_name = defaultProb)]
-    pub fn default_prob(&self, t1: JsValue, t2: JsValue) -> Result<f64, JsValue> {
+    pub fn default_prob(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] t1: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] t2: JsValue,
+    ) -> Result<f64, JsValue> {
         let t1 = js_f64(&t1, "t1")?;
         let t2 = js_f64(&t2, "t2")?;
         self.inner.default_prob(t1, t2).map_err(to_js_err)
@@ -307,8 +342,14 @@ impl JsHazardCurve {
     /// @throws `TypeError` for non-string inputs; `FinstackError` (kind
     /// `validation`) for malformed or reversed dates, or a year fraction that
     /// cannot be computed.
+    /// @param start - ISO-8601 conditioning date (`"YYYY-MM-DD"`), converted with the curve day count; dates before `baseDate` are clamped to time zero.
+    /// @param end - ISO-8601 end date on or after `start`. Equal dates return zero; the final hazard rate extends beyond the last knot.
     #[wasm_bindgen(js_name = conditionalDefaultProb)]
-    pub fn conditional_default_prob(&self, start: JsValue, end: JsValue) -> Result<f64, JsValue> {
+    pub fn conditional_default_prob(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] start: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] end: JsValue,
+    ) -> Result<f64, JsValue> {
         self.inner
             .conditional_default_prob(js_date(&start, "start")?, js_date(&end, "end")?)
             .map_err(to_js_err)
@@ -326,8 +367,14 @@ impl JsHazardCurve {
     ///
     /// @returns Par spread in basis points.
     /// @throws If `method` is not a recognised label.
+    /// @param t - Year fraction from `baseDate`.
+    /// @param method - `"linear"` or `"log_linear"`; omitted uses the curve's `parInterp`.
     #[wasm_bindgen(js_name = cdsQuoteBp)]
-    pub fn cds_quote_bp(&self, t: JsValue, method: Option<JsValue>) -> Result<f64, JsValue> {
+    pub fn cds_quote_bp(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] t: JsValue,
+        #[wasm_bindgen(unchecked_optional_param_type = "string | null")] method: Option<JsValue>,
+    ) -> Result<f64, JsValue> {
         let t = js_f64(&t, "t")?;
         let method = match js_opt_string(method.as_ref(), "method")? {
             Some(label) => parse_label(&label)?,
@@ -344,8 +391,13 @@ impl JsHazardCurve {
     ///
     /// @returns A new `HazardCurve`.
     /// @throws If `recoveryRate` is outside `[0, 1]`.
+    /// @param recoveryRate - New recovery as a decimal fraction in `[0, 1]`.
     #[wasm_bindgen(js_name = withRecoveryRate)]
-    pub fn with_recovery_rate(&self, recovery_rate: JsValue) -> Result<JsHazardCurve, JsValue> {
+    pub fn with_recovery_rate(
+        &self,
+        #[wasm_bindgen(js_name = "recoveryRate", unchecked_param_type = "number")]
+        recovery_rate: JsValue,
+    ) -> Result<JsHazardCurve, JsValue> {
         let recovery_rate = js_f64(&recovery_rate, "recoveryRate")?;
         self.inner
             .with_recovery_rate(recovery_rate)
@@ -423,7 +475,7 @@ impl JsHazardCurve {
     ///
     /// @returns The `HazardCalibrationRecipe` object, or `undefined` for a curve that was built directly rather than produced by a calibration step.
     /// @throws FinstackError - If the recipe cannot be converted to a JavaScript object.
-    #[wasm_bindgen(getter, js_name = hazardCalibration)]
+    #[wasm_bindgen(getter, js_name = hazardCalibration, unchecked_return_type = "HazardCalibrationRecipe | undefined")]
     pub fn hazard_calibration(&self) -> Result<JsValue, JsValue> {
         match self.inner.hazard_calibration() {
             Some(recipe) => crate::utils::to_js_value(recipe),

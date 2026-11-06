@@ -104,7 +104,6 @@ impl SwaptionLsmcPricer {
     ///
     /// Returns an error for no paths, no pricing streams in split-sample mode,
     /// exercise indices outside the grid, or an exercise callback/regression failure.
-    #[allow(clippy::too_many_arguments)]
     pub fn price_bermudan_with_grid<B, E>(
         &self,
         exercise_value: E,
@@ -282,7 +281,6 @@ impl SwaptionLsmcPricer {
     ///
     /// See `lsmc.rs` for the flat-rate discounting approach.
     ///
-    #[allow(clippy::too_many_arguments)]
     fn backward_induction_swaption_grid<B, E>(
         &self,
         paths: &[Vec<f64>],

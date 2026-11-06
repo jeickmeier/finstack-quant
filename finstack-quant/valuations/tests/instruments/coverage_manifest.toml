@@ -2,8 +2,6 @@ schema_version = 1
 
 [[instrument]]
 tag = "bond"
-fixture = "json_examples/bond.json"
-lossless = false
 partial_eq_blocker = "Bond.cashflow_spec: CashflowSpec"
 required_keys = ["id"]
 no_market_dependencies = false
@@ -11,8 +9,6 @@ rationale = "Bond.cashflow_spec: CashflowSpec lacks PartialEq across its coupon 
 
 [[instrument]]
 tag = "convertible_bond"
-fixture = "json_examples/convertible_bond.json"
-lossless = false
 partial_eq_blocker = "ConvertibleBond.conversion: ConversionSpec"
 required_keys = ["id"]
 no_market_dependencies = false
@@ -20,16 +16,12 @@ rationale = "ConvertibleBond.conversion: ConversionSpec lacks PartialEq across c
 
 [[instrument]]
 tag = "inflation_linked_bond"
-fixture = "json_examples/inflation_linked_bond.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted inflation_linked_bond spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "term_loan"
-fixture = "json_examples/term_loan.json"
-lossless = false
 partial_eq_blocker = "TermLoan.rate: RateSpec"
 required_keys = ["id"]
 no_market_dependencies = false
@@ -37,8 +29,6 @@ rationale = "TermLoan.rate: RateSpec lacks PartialEq across fixed, floating, and
 
 [[instrument]]
 tag = "revolving_credit"
-fixture = "json_examples/revolving_credit.json"
-lossless = false
 partial_eq_blocker = "RevolvingCredit.rate: RateSpec"
 required_keys = ["id"]
 no_market_dependencies = false
@@ -46,8 +36,6 @@ rationale = "RevolvingCredit.rate: RateSpec lacks PartialEq across index and fal
 
 [[instrument]]
 tag = "asset_backed_facility"
-fixture = "json_examples/asset_backed_facility.json"
-lossless = false
 partial_eq_blocker = "AssetBackedFacility.collateral: AssetPool"
 required_keys = ["id"]
 no_market_dependencies = false
@@ -55,8 +43,6 @@ rationale = "AssetBackedFacility.collateral: AssetPool lacks PartialEq across in
 
 [[instrument]]
 tag = "bond_future"
-fixture = "json_examples/bond_future.json"
-lossless = false
 partial_eq_blocker = "BondFuture.contract_specs: BondFutureSpecs"
 required_keys = ["id"]
 no_market_dependencies = false
@@ -64,24 +50,18 @@ rationale = "BondFuture.contract_specs: BondFutureSpecs lacks PartialEq across e
 
 [[instrument]]
 tag = "agency_mbs_passthrough"
-fixture = "json_examples/agency_mbs_passthrough.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted agency_mbs_passthrough spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "agency_tba"
-fixture = "json_examples/agency_tba.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted agency_tba spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "agency_cmo"
-fixture = "json_examples/agency_cmo.json"
-lossless = false
 partial_eq_blocker = "AgencyCmo.waterfall: CmoWaterfall"
 required_keys = ["id"]
 no_market_dependencies = false
@@ -89,16 +69,12 @@ rationale = "AgencyCmo.waterfall: CmoWaterfall lacks PartialEq across ordered tr
 
 [[instrument]]
 tag = "dollar_roll"
-fixture = "json_examples/dollar_roll.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted dollar_roll spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "interest_rate_swap"
-fixture = "json_examples/interest_rate_swap.json"
-lossless = false
 partial_eq_blocker = "InterestRateSwap.fixed_leg: FixedLegSpec"
 required_keys = ["id"]
 no_market_dependencies = false
@@ -106,8 +82,6 @@ rationale = "InterestRateSwap.fixed_leg: FixedLegSpec lacks PartialEq across sch
 
 [[instrument]]
 tag = "basis_swap"
-fixture = "json_examples/basis_swap.json"
-lossless = false
 partial_eq_blocker = "BasisSwap.primary_leg: FloatLegSpec"
 required_keys = ["id"]
 no_market_dependencies = false
@@ -115,8 +89,6 @@ rationale = "BasisSwap.primary_leg: FloatLegSpec lacks PartialEq across floating
 
 [[instrument]]
 tag = "xccy_swap"
-fixture = "json_examples/xccy_swap.json"
-lossless = false
 partial_eq_blocker = "XccySwap.leg1: XccySwapLeg"
 required_keys = ["id"]
 no_market_dependencies = false
@@ -124,40 +96,30 @@ rationale = "XccySwap.leg1: XccySwapLeg lacks PartialEq across currency-leg rate
 
 [[instrument]]
 tag = "inflation_swap"
-fixture = "json_examples/inflation_swap.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted inflation_swap spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "yoy_inflation_swap"
-fixture = "json_examples/yoy_inflation_swap.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted yoy_inflation_swap spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "inflation_cap_floor"
-fixture = "json_examples/inflation_cap_floor.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted inflation_cap_floor spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "forward_rate_agreement"
-fixture = "json_examples/forward_rate_agreement.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted forward_rate_agreement spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "swaption"
-fixture = "json_examples/swaption.json"
-lossless = false
 partial_eq_blocker = "Swaption.underlying_fixed_leg: FixedLegSpec"
 required_keys = ["id"]
 no_market_dependencies = false
@@ -165,8 +127,6 @@ rationale = "Swaption.underlying_fixed_leg: FixedLegSpec lacks PartialEq across 
 
 [[instrument]]
 tag = "bermudan_swaption"
-fixture = "json_examples/bermudan_swaption.json"
-lossless = false
 partial_eq_blocker = "BermudanSwaption.exercise_schedule: BermudanSchedule"
 required_keys = ["id"]
 no_market_dependencies = false
@@ -174,24 +134,18 @@ rationale = "BermudanSwaption.exercise_schedule: BermudanSchedule lacks PartialE
 
 [[instrument]]
 tag = "interest_rate_future"
-fixture = "json_examples/interest_rate_future.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted interest_rate_future spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "cap_floor"
-fixture = "json_examples/cap_floor.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted cap_floor spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "cms_swap"
-fixture = "json_examples/cms_swap.json"
-lossless = false
 partial_eq_blocker = "CmsSwap.funding_leg: FundingLeg"
 required_keys = ["id"]
 no_market_dependencies = false
@@ -199,72 +153,54 @@ rationale = "CmsSwap.funding_leg: FundingLeg lacks PartialEq across fixed-or-flo
 
 [[instrument]]
 tag = "cms_option"
-fixture = "json_examples/cms_option.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted cms_option spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "interest_rate_future_option"
-fixture = "json_examples/interest_rate_future_option.json"
-lossless = true
 required_keys = ["id", "terms"]
 no_market_dependencies = false
 rationale = "The complete persisted interest_rate_future_option spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "equity_future_option"
-fixture = "json_examples/equity_future_option.json"
-lossless = true
 required_keys = ["id", "terms"]
 no_market_dependencies = false
 rationale = "The complete persisted equity_future_option spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "volatility_index_future_option"
-fixture = "json_examples/volatility_index_future_option.json"
-lossless = true
 required_keys = ["id", "terms"]
 no_market_dependencies = false
 rationale = "The complete persisted volatility_index_future_option spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "fx_future_option"
-fixture = "json_examples/fx_future_option.json"
-lossless = true
 required_keys = ["id", "terms"]
 no_market_dependencies = false
 rationale = "The complete persisted fx_future_option spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "commodity_future_option"
-fixture = "json_examples/commodity_future_option.json"
-lossless = true
 required_keys = ["id", "terms"]
 no_market_dependencies = false
 rationale = "The complete persisted commodity_future_option spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "deposit"
-fixture = "json_examples/deposit.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted deposit spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "repo"
-fixture = "json_examples/repo.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted repo spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "credit_default_swap"
-fixture = "json_examples/credit_default_swap.json"
-lossless = false
 partial_eq_blocker = "CreditDefaultSwap.premium_leg: PremiumLegSpec"
 required_keys = ["id"]
 no_market_dependencies = false
@@ -272,8 +208,6 @@ rationale = "CreditDefaultSwap.premium_leg: PremiumLegSpec lacks PartialEq acros
 
 [[instrument]]
 tag = "cds_index"
-fixture = "json_examples/cds_index.json"
-lossless = false
 partial_eq_blocker = "CdsIndex.premium_leg: PremiumLegSpec"
 required_keys = ["id"]
 no_market_dependencies = false
@@ -281,192 +215,144 @@ rationale = "CdsIndex.premium_leg: PremiumLegSpec lacks PartialEq across index p
 
 [[instrument]]
 tag = "cds_tranche"
-fixture = "json_examples/cds_tranche.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted cds_tranche spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "cds_option"
-fixture = "json_examples/cds_option.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted cds_option spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "equity"
-fixture = "json_examples/equity.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted equity spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "equity_option"
-fixture = "json_examples/equity_option.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted equity_option spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "asian_option"
-fixture = "json_examples/asian_option.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted asian_option spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "barrier_option"
-fixture = "json_examples/barrier_option.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted barrier_option spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "lookback_option"
-fixture = "json_examples/lookback_option.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted lookback_option spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "variance_swap"
-fixture = "json_examples/variance_swap.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted variance_swap spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "commodity_future"
-fixture = "json_examples/commodity_future.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted commodity_future spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "fx_future"
-fixture = "json_examples/fx_future.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted fx_future spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "equity_future"
-fixture = "json_examples/equity_future.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted equity_future spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "equity_total_return_future"
-fixture = "json_examples/equity_total_return_future.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted equity_total_return_future spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "volatility_index_future"
-fixture = "json_examples/volatility_index_future.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted volatility_index_future spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "fx_spot"
-fixture = "json_examples/fx_spot.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted fx_spot spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "fx_swap"
-fixture = "json_examples/fx_swap.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted fx_swap spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "fx_forward"
-fixture = "json_examples/fx_forward.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted fx_forward spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "ndf"
-fixture = "json_examples/ndf.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted ndf spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "fx_option"
-fixture = "json_examples/fx_option.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted fx_option spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "fx_digital_option"
-fixture = "json_examples/fx_digital_option.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted fx_digital_option spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "fx_touch_option"
-fixture = "json_examples/fx_touch_option.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted fx_touch_option spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "fx_barrier_option"
-fixture = "json_examples/fx_barrier_option.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted fx_barrier_option spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "fx_variance_swap"
-fixture = "json_examples/fx_variance_swap.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted fx_variance_swap spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "quanto_option"
-fixture = "json_examples/quanto_option.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted quanto_option spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "commodity_spot_option"
-fixture = "json_examples/commodity_spot_option.json"
-lossless = false
 partial_eq_blocker = "CommoditySpotOption.underlying: CommodityUnderlyingParams"
 required_keys = ["id"]
 no_market_dependencies = false
@@ -474,8 +360,6 @@ rationale = "CommoditySpotOption.underlying: CommodityUnderlyingParams lacks Par
 
 [[instrument]]
 tag = "commodity_asian_option"
-fixture = "json_examples/commodity_asian_option.json"
-lossless = false
 partial_eq_blocker = "CommodityAsianOption.underlying: CommodityUnderlyingParams"
 required_keys = ["id"]
 no_market_dependencies = false
@@ -483,8 +367,6 @@ rationale = "CommodityAsianOption.underlying: CommodityUnderlyingParams lacks Pa
 
 [[instrument]]
 tag = "commodity_forward"
-fixture = "json_examples/commodity_forward.json"
-lossless = false
 partial_eq_blocker = "CommodityForward.underlying: CommodityUnderlyingParams"
 required_keys = ["id"]
 no_market_dependencies = false
@@ -492,8 +374,6 @@ rationale = "CommodityForward.underlying: CommodityUnderlyingParams lacks Partia
 
 [[instrument]]
 tag = "commodity_swap"
-fixture = "json_examples/commodity_swap.json"
-lossless = false
 partial_eq_blocker = "CommoditySwap.underlying: CommodityUnderlyingParams"
 required_keys = ["id"]
 no_market_dependencies = false
@@ -501,8 +381,6 @@ rationale = "CommoditySwap.underlying: CommodityUnderlyingParams lacks PartialEq
 
 [[instrument]]
 tag = "commodity_swaption"
-fixture = "json_examples/commodity_swaption.json"
-lossless = false
 partial_eq_blocker = "CommoditySwaption.underlying: CommodityUnderlyingParams"
 required_keys = ["id"]
 no_market_dependencies = false
@@ -510,32 +388,24 @@ rationale = "CommoditySwaption.underlying: CommodityUnderlyingParams lacks Parti
 
 [[instrument]]
 tag = "commodity_spread_option"
-fixture = "json_examples/commodity_spread_option.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted commodity_spread_option spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "autocallable"
-fixture = "json_examples/autocallable.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted autocallable spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "cliquet_option"
-fixture = "json_examples/cliquet_option.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted cliquet_option spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "range_accrual"
-fixture = "json_examples/range_accrual.json"
-lossless = false
 partial_eq_blocker = "RangeAccrual.terms: RangeAccrualTerms"
 required_keys = ["id"]
 no_market_dependencies = false
@@ -543,32 +413,24 @@ rationale = "RangeAccrual.terms: RangeAccrualTerms lacks PartialEq across option
 
 [[instrument]]
 tag = "tarn"
-fixture = "json_examples/tarn.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted tarn spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "snowball"
-fixture = "json_examples/snowball.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted snowball spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "cms_spread_option"
-fixture = "json_examples/cms_spread_option.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted cms_spread_option spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "callable_range_accrual"
-fixture = "json_examples/callable_range_accrual.json"
-lossless = false
 partial_eq_blocker = "CallableRangeAccrual.range_accrual: RangeAccrualTerms"
 required_keys = ["id"]
 no_market_dependencies = false
@@ -576,8 +438,6 @@ rationale = "CallableRangeAccrual.range_accrual: RangeAccrualTerms lacks Partial
 
 [[instrument]]
 tag = "trs_equity"
-fixture = "json_examples/trs_equity.json"
-lossless = false
 partial_eq_blocker = "EquityTotalReturnSwap.underlying: EquityUnderlyingParams"
 required_keys = ["id"]
 no_market_dependencies = false
@@ -585,8 +445,6 @@ rationale = "EquityTotalReturnSwap.underlying: EquityUnderlyingParams lacks Part
 
 [[instrument]]
 tag = "trs_fixed_income_index"
-fixture = "json_examples/trs_fixed_income_index.json"
-lossless = false
 partial_eq_blocker = "FiIndexTotalReturnSwap.underlying: IndexUnderlyingParams"
 required_keys = ["id"]
 no_market_dependencies = false
@@ -594,8 +452,6 @@ rationale = "FiIndexTotalReturnSwap.underlying: IndexUnderlyingParams lacks Part
 
 [[instrument]]
 tag = "structured_credit"
-fixture = "json_examples/structured_credit.json"
-lossless = false
 partial_eq_blocker = "StructuredCredit.pool: AssetPool"
 required_keys = ["id"]
 no_market_dependencies = false
@@ -603,8 +459,6 @@ rationale = "StructuredCredit.pool: AssetPool lacks PartialEq across heterogeneo
 
 [[instrument]]
 tag = "basket"
-fixture = "json_examples/basket.json"
-lossless = false
 partial_eq_blocker = "Basket.constituents: Vec<BasketConstituent>"
 required_keys = ["id"]
 no_market_dependencies = false
@@ -612,24 +466,18 @@ rationale = "Basket.constituents: Vec<BasketConstituent> lacks PartialEq because
 
 [[instrument]]
 tag = "private_markets_fund"
-fixture = "json_examples/private_markets_fund.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
 rationale = "The complete persisted private_markets_fund spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "real_estate_asset"
-fixture = "json_examples/real_estate_asset.json"
-lossless = true
 required_keys = ["id"]
 no_market_dependencies = true
 rationale = "Direct-capitalization / DCF valuation runs off the asset's own cap rate and discount rate; no market curve is read."
 
 [[instrument]]
 tag = "levered_real_estate_equity"
-fixture = "json_examples/levered_real_estate_equity.json"
-lossless = false
 partial_eq_blocker = "LeveredRealEstateEquity.financing: Vec<InstrumentJson>"
 required_keys = ["id"]
 no_market_dependencies = true
@@ -637,8 +485,6 @@ rationale = "LeveredRealEstateEquity.financing: Vec<InstrumentJson> lacks Partia
 
 [[instrument]]
 tag = "discounted_cash_flow"
-fixture = "json_examples/discounted_cash_flow.json"
-lossless = false
 partial_eq_blocker = "DiscountedCashFlow.terminal_value: TerminalValueSpec"
 required_keys = ["id"]
 no_market_dependencies = true
@@ -646,8 +492,6 @@ rationale = "DiscountedCashFlow.terminal_value: TerminalValueSpec lacks PartialE
 
 [[instrument]]
 tag = "composite"
-fixture = "json_examples/composite.json"
-lossless = false
 partial_eq_blocker = "CompositeSpec.legs: Vec<CompositeLegSpec>"
 required_keys = ["spec", "state"]
 no_market_dependencies = false

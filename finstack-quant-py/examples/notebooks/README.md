@@ -1,6 +1,6 @@
 # finstack-quant-py notebook examples
 
-93 layered Jupyter notebooks covering the `finstack_quant` Python API, from core
+Layered Jupyter notebooks covering the `finstack_quant` Python API, from core
 types through pricing, analytics, statement modeling, portfolio and scenario
 workflows, advanced quant methods, and reporting. They double as the executable
 regression suite for the Python surface: `mise run python-examples` runs every
@@ -8,7 +8,7 @@ one of them.
 
 ## Prerequisites
 
-- Python 3.12+
+- Python 3.12+ (`pyproject.toml`; `mise.toml` pins the development interpreter)
 - `finstack_quant` built and installed (`mise run python-build` from the
   repository root; add `-- --release` before running the heavier levels)
 - Dev dependencies synced (`mise run python-sync`), which brings in `jupyter`

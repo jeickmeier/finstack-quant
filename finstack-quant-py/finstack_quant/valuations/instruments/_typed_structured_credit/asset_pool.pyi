@@ -93,12 +93,12 @@ class AssetPool:
         >>> from finstack_quant.valuations.instruments import AssetPool, RepLine
         >>> pool = AssetPool("POOL-1", "abs", Currency("USD")).with_rep_lines([
         ...     RepLine(
-        ...         "LINE-1",
-        ...         Money(80_000_000.0, Currency("USD")),
-        ...         0.07,
-        ...         datetime.date(2031, 1, 15),
-        ...         12,
-        ...         DayCount.ACT_360,
+        ...         id="LINE-1",
+        ...         balance=Money(80_000_000.0, Currency("USD")),
+        ...         rate=0.07,
+        ...         maturity=datetime.date(2031, 1, 15),
+        ...         seasoning_months=12,
+        ...         day_count=DayCount.ACT_360,
         ...         asset_type={"type": "first_lien_loan"},
         ...     )
         ... ])
@@ -192,11 +192,10 @@ class AssetPool:
         ...
     def with_reserve(
         self,
-        reserve_account: Money | float,
+        reserve_account: Money,
         reserve_account_rate: float = 0.0,
-        reserve_target: Money | float | None = None,
+        reserve_target: Money | None = None,
         reserve_interest_destination: str | dict[str, Any] | None = None,
-        currency: str | None = None,
     ) -> AssetPool:
         """
         Configure the reserve account, returning a new pool.
@@ -208,12 +207,12 @@ class AssetPool:
 
         Parameters
         ----------
-        reserve_account : Money | float
-            Opening reserve balance; a bare number needs ``currency``.
+        reserve_account : Money
+            Opening reserve balance.
         reserve_account_rate : float, default 0.0
             Annual interest rate earned by the reserve, as a decimal (simple
             ACT/360 on the opening balance each period).
-        reserve_target : Money | float, optional
+        reserve_target : Money, optional
             Balance revolver repayments replenish toward; ``None`` disables
             replenishment.
         reserve_interest_destination : str | dict[str, Any], optional
@@ -221,8 +220,6 @@ class AssetPool:
             (capitalized into the reserve) or
             ``{"kind": "tranche", "tranche_id": "EQ"}`` (paid directly to that
             tranche).
-        currency : str, optional
-            ISO-4217 code applied when a bare number is passed.
 
         Returns
         -------
@@ -232,10 +229,10 @@ class AssetPool:
         Raises
         ------
         ValueError
-            If an amount is not finite, a bare number has no currency, or the
-            destination does not match its serde shape.
+            If the destination does not match its serde shape.
         TypeError
-            If an amount is neither ``Money`` nor a number.
+            If ``reserve_account`` or ``reserve_target`` is not a
+            ``finstack_quant.core.money.Money``.
 
         Examples
         --------
@@ -320,6 +317,9 @@ class AssetPool:
         Set the pool's historical tallies and cash accounts, returning a new
         pool (seasoned-deal inputs).
 
+        The keyword-only arguments are the Rust ``PoolAccounts`` fields; Rust
+        rejects an unknown keyword.
+
         Parameters
         ----------
         cumulative_defaults : Money, optional
@@ -346,9 +346,13 @@ class AssetPool:
         AssetPool
             A new pool with the supplied balances (the original is unchanged).
 
-        Notes
-        -----
-        This method does not raise.
+        Raises
+        ------
+        ValueError
+            If a keyword is not a ``PoolAccounts`` field or a value is not a
+            ``Money`` wire form.
+        TypeError
+            If a positional argument is passed.
 
         Examples
         --------

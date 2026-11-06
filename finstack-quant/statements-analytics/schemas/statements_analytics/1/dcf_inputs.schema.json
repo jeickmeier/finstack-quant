@@ -1,0 +1,119 @@
+{
+  "$defs": {
+    "TerminalValueSpec": {
+      "description": "Terminal value calculation method for DCF.",
+      "oneOf": [
+        {
+          "description": "Gordon Growth Model: TV = FCF_terminal × (1 + g) / (WACC - g)",
+          "properties": {
+            "stable_growth_rate": {
+              "description": "Perpetual stable growth rate as an annual decimal (e.g., 0.02 for\n2%). Must be < WACC.",
+              "format": "double",
+              "type": "number"
+            },
+            "type": {
+              "const": "gordon_growth",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "stable_growth_rate"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Exit Multiple: TV = Terminal_Metric × Multiple",
+          "properties": {
+            "multiple": {
+              "description": "Multiple to apply (e.g., 10.0 for 10x EBITDA)",
+              "format": "double",
+              "type": "number"
+            },
+            "terminal_metric": {
+              "description": "Terminal metric value (e.g., EBITDA)",
+              "format": "double",
+              "type": "number"
+            },
+            "type": {
+              "const": "exit_multiple",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "terminal_metric",
+            "multiple"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "H-Model: linear fade from high growth to stable growth (Damodaran).\n\n```text\nTV = FCF_T × (1+g_s)/(WACC-g_s) + FCF_T × H × (g_h-g_s)/(WACC-g_s)\n```\n\nwhere `H` is the half-life in years of the high-growth fade period.\nThe first term is the standard Gordon Growth stable-state value;\nthe second term captures the present value of excess growth that\nlinearly decays from `high_growth_rate` to `stable_growth_rate`\nover `2 × half_life_years`.",
+          "properties": {
+            "half_life_years": {
+              "description": "Half-life of the growth fade in years (e.g., 5.0).",
+              "format": "double",
+              "type": "number"
+            },
+            "high_growth_rate": {
+              "description": "Initial high growth rate (e.g., 0.15 for 15%).",
+              "format": "double",
+              "type": "number"
+            },
+            "stable_growth_rate": {
+              "description": "Long-run stable growth rate (e.g., 0.03 for 3%). Must be < WACC.",
+              "format": "double",
+              "type": "number"
+            },
+            "type": {
+              "const": "h_model",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "high_growth_rate",
+            "stable_growth_rate",
+            "half_life_years"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_inputs.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Headline DCF assumptions: decimal WACC, terminal value, unlevered free cash flow node and optional net-debt override.",
+  "properties": {
+    "net_debt_override": {
+      "default": null,
+      "description": "Flat net-debt amount in model currency used instead of the\nmodel-derived equity bridge; `None` (the default) derives net debt\nfrom the model's debt and cash.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "terminal_value": {
+      "$ref": "#/$defs/TerminalValueSpec",
+      "description": "Terminal-value convention applied after the explicit forecast period."
+    },
+    "ufcf_node": {
+      "default": "ufcf",
+      "description": "Node id containing monetary unlevered free cash flow for forecast\nperiods (default [`DEFAULT_UFCF_NODE`], `\"ufcf\"`).",
+      "type": "string"
+    },
+    "wacc": {
+      "description": "Weighted average cost of capital as a decimal (`0.10` means `10%`).",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "wacc",
+    "terminal_value"
+  ],
+  "title": "DcfInputs",
+  "type": "object"
+}

@@ -3,7 +3,7 @@
 //! [`pool_report`] is the one call a pool screen makes. Every number comes from
 //! the Rust pool analytics, and every table is ordered here, so a host only
 //! draws. Units are stated on each field and returned at run time by
-//! `finstack_quant_valuations::pricer::pool_report_field_units`.
+//! [`finstack_quant_valuations_core::results::pool_report_field_units`].
 
 use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;

@@ -29,19 +29,19 @@ class InterestRateSwap:
 
     Examples
     --------
+    >>> from finstack_quant.core.money import Money
     >>> from finstack_quant.valuations.instruments import InterestRateSwap
-    >>> swap = InterestRateSwap.from_conventions(
-    ...     "IRS-5Y",
-    ...     10_000_000.0,
-    ...     "pay",
-    ...     0.035,
-    ...     "2025-01-15",
-    ...     "2030-01-15",
-    ...     "USD-SOFR",
-    ...     "USD-OIS",
-    ...     "USD-SOFR",
-    ...     currency="USD",
-    ... )
+    >>> swap = InterestRateSwap.from_conventions({
+    ...     "id": "IRS-5Y",
+    ...     "notional": Money(10_000_000.0, "USD"),
+    ...     "side": "pay",
+    ...     "fixed_rate": 0.035,
+    ...     "start_date": "2025-01-15",
+    ...     "maturity": "2030-01-15",
+    ...     "index_id": "USD-SOFR",
+    ...     "discount_curve_id": "USD-OIS",
+    ...     "forward_curve_id": "USD-SOFR",
+    ... })
     >>> (swap.side, swap.float_leg.reset_lag_days)
     ('pay', 0)
     """
@@ -69,19 +69,7 @@ class InterestRateSwap:
         """
         ...
     @staticmethod
-    def from_conventions(
-        id: str,
-        notional: Money | float,
-        side: Literal["pay", "receive"],
-        fixed_rate: float | Rate,
-        start_date: datetime.date | datetime.datetime | pd.Timestamp | str,
-        maturity: datetime.date | datetime.datetime | pd.Timestamp | str,
-        index_id: str,
-        discount_curve_id: str,
-        forward_curve_id: str,
-        *,
-        currency: str | None = None,
-    ) -> InterestRateSwap:
+    def from_conventions(params: dict[str, Any] | str) -> InterestRateSwap:
         """
         Create a vanilla swap from registered rate-index conventions.
 
@@ -92,27 +80,21 @@ class InterestRateSwap:
 
         Parameters
         ----------
-        id : str
-            Unique instrument identifier.
-        notional : Money | float
-            Notional shared by both legs; a bare number is tagged with ``currency``.
-        side : str
-            ``"pay"`` pays fixed / receives floating; ``"receive"`` the opposite.
-        fixed_rate : float | Rate
-            Fixed coupon as a decimal (``0.03`` = 3%) or a ``Rate``.
-        start_date : datetime.date | datetime.datetime | pd.Timestamp | str
-            Effective date (ISO 8601 strings accepted).
-        maturity : datetime.date | datetime.datetime | pd.Timestamp | str
-            Maturity date.
-        index_id : str
-            Registered rate index (e.g. ``"USD-SOFR"``, ``"USD-SOFR-3M"``,
-            ``"EUR-EURIBOR-6M"``).
-        discount_curve_id : str
-            Discount curve identifier for both legs.
-        forward_curve_id : str
-            Projection curve identifier for the floating leg.
-        currency : str, optional
-            ISO-4217 code applied when ``notional`` is a bare number.
+        params : dict[str, Any] | str
+            ``ConventionSwapParams`` as a dict or JSON text. Every key is
+            required:
+
+            - ``id`` (str): unique instrument identifier.
+            - ``notional`` (Money | dict): notional shared by both legs, a
+              ``Money`` or its wire dict ``{"amount": "1000000", "currency": "USD"}``.
+            - ``side`` (str): ``"pay"`` pays fixed / receives floating;
+              ``"receive"`` the opposite.
+            - ``fixed_rate`` (float): fixed coupon as a decimal (``0.03`` = 3%).
+            - ``start_date`` / ``maturity`` (datetime.date | str): ISO 8601 dates.
+            - ``index_id`` (str): registered rate index (e.g. ``"USD-SOFR"``,
+              ``"USD-SOFR-3M"``, ``"EUR-EURIBOR-6M"``).
+            - ``discount_curve_id`` (str): discount curve for both legs.
+            - ``forward_curve_id`` (str): projection curve of the floating leg.
 
         Returns
         -------
@@ -122,27 +104,24 @@ class InterestRateSwap:
         Raises
         ------
         ValueError
-            If ``side`` is unknown, ``index_id`` is not registered, a bare
-            ``notional`` has no ``currency``, or validation fails.
-        TypeError
-            If ``fixed_rate``/``notional`` has an unsupported type or a date cannot
-            be interpreted.
+            If ``params`` has a missing, unknown or malformed key, ``index_id``
+            is not registered, or validation fails.
 
         Examples
         --------
+        >>> from finstack_quant.core.money import Money
         >>> from finstack_quant.valuations.instruments import InterestRateSwap
-        >>> swap = InterestRateSwap.from_conventions(
-        ...     "IRS-5Y",
-        ...     10_000_000.0,
-        ...     "pay",
-        ...     0.035,
-        ...     "2025-01-15",
-        ...     "2030-01-15",
-        ...     "USD-SOFR",
-        ...     "USD-OIS",
-        ...     "USD-SOFR",
-        ...     currency="USD",
-        ... )
+        >>> swap = InterestRateSwap.from_conventions({
+        ...     "id": "IRS-5Y",
+        ...     "notional": Money(10_000_000.0, "USD"),
+        ...     "side": "pay",
+        ...     "fixed_rate": 0.035,
+        ...     "start_date": "2025-01-15",
+        ...     "maturity": "2030-01-15",
+        ...     "index_id": "USD-SOFR",
+        ...     "discount_curve_id": "USD-OIS",
+        ...     "forward_curve_id": "USD-SOFR",
+        ... })
         >>> (swap.side, swap.float_leg.reset_lag_days)
         ('pay', 0)
         """
@@ -240,9 +219,7 @@ class InterestRateSwap:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
-        market_history: MarketHistory | dict[str, Any] | str | None = None,
-        explain: bool = False,
+        extras: dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this swap and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -259,15 +236,19 @@ class InterestRateSwap:
             Model key (``"discounting"``, ``"hull_white_1f"``, ...).
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
-        metric_pricing_overrides : MetricPricingOverrides | dict[str, Any] | str, optional
-            Metric-time overrides merged into
-            ``instrument.spec.metric_pricing_overrides`` before pricing
-            (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
-        market_history : MarketHistory | dict[str, Any] | str, optional
-            ``MarketHistory`` scenarios required by ``hvar`` /
-            ``expected_shortfall``.
-        explain : bool, default False
-            When ``True``, attach a step trace as ``result.explanation``.
+        extras : dict[str, Any] or str, optional
+            The rarer pricing inputs, as a dict or JSON text in the shape of the
+            Rust ``PriceExtras``; every key is optional and an unknown key raises
+            ``ValueError``. ``metric_pricing_overrides`` (a ``MetricPricingOverrides``
+            or dict) is merged into ``instrument.spec.metric_pricing_overrides``
+            before pricing (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``):
+            only the keys present replace stored controls, ``bump_config`` keys
+            merge into the stored bump configuration and an explicit ``None``
+            clears a control; omitted keeps the instrument's overrides. ``market_history`` (a ``MarketHistory`` or dict)
+            holds the historical scenarios ``hvar`` and ``expected_shortfall``
+            require; omitted prices without history. ``explain`` (bool, default
+            ``False``) attaches a step trace as ``result.explanation`` when
+            ``True``. ``None`` (the default) means no extras.
 
         Returns
         -------
@@ -475,8 +456,8 @@ class InterestRateSwap:
         dict[str, object]
             Bump sizes, theta period and the other metric settings stored on
             the instrument; unset fields are ``None`` or omitted. A
-            ``metric_pricing_overrides`` argument to ``price`` is merged over it
-            per call.
+            ``price(..., extras={"metric_pricing_overrides": ...})`` patch is
+            merged over it per call.
 
         Notes
         -----
@@ -589,29 +570,30 @@ class InterestRateSwapBuilder:
     Examples
     --------
     >>> from finstack_quant.core.dates import DayCount, Tenor
+    >>> from finstack_quant.core.money import Money
     >>> from finstack_quant.valuations.instruments import FixedLegSpec, FloatLegSpec, InterestRateSwap
     >>> fixed = FixedLegSpec(
-    ...     "USD-OIS",
-    ...     0.04,
-    ...     Tenor.semi_annual(),
-    ...     DayCount.THIRTY_360,
-    ...     "2025-01-15",
-    ...     "2030-01-15",
+    ...     discount_curve_id="USD-OIS",
+    ...     rate="0.04",
+    ...     frequency=Tenor.semi_annual(),
+    ...     day_count=DayCount.THIRTY_360,
+    ...     start="2025-01-15",
+    ...     end="2030-01-15",
     ... )
     >>> floating = FloatLegSpec(
-    ...     "USD-OIS",
-    ...     "USD-SOFR-3M",
-    ...     0.0,
-    ...     Tenor.quarterly(),
-    ...     DayCount.ACT_360,
-    ...     "2025-01-15",
-    ...     "2030-01-15",
+    ...     discount_curve_id="USD-OIS",
+    ...     forward_curve_id="USD-SOFR-3M",
+    ...     spread_bp="0",
+    ...     frequency=Tenor.quarterly(),
+    ...     day_count=DayCount.ACT_360,
+    ...     start="2025-01-15",
+    ...     end="2030-01-15",
     ... )
     >>> swap = (
     ...     InterestRateSwap
     ...     .builder()
     ...     .id("IRS-1")
-    ...     .notional(10_000_000.0, currency="USD")
+    ...     .notional(Money(10_000_000.0, "USD"))
     ...     .side("pay")
     ...     .fixed_leg(fixed)
     ...     .float_leg(floating)
@@ -641,16 +623,14 @@ class InterestRateSwapBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def notional(self, value: Money | float, currency: str | None = None) -> InterestRateSwapBuilder:
+    def notional(self, value: Money) -> InterestRateSwapBuilder:
         """
         Set the notional shared by both legs.
 
         Parameters
         ----------
-        value : Money | float
-            Notional shared by both legs; a bare number is tagged with ``currency``.
-        currency : str, optional
-            ISO-4217 code applied when ``value`` is a bare number.
+        value : Money
+            Notional shared by both legs.
 
         Returns
         -------
@@ -660,7 +640,9 @@ class InterestRateSwapBuilder:
         Raises
         ------
         ValueError
-            If the builder was already consumed by ``build()`` or a bare number is given without ``currency``.
+            If the builder was already consumed by ``build()``.
+        TypeError
+            If ``value`` is not a ``finstack_quant.core.money.Money``.
         """
         ...
     def side(self, value: Literal["pay", "receive"]) -> InterestRateSwapBuilder:
@@ -1052,9 +1034,7 @@ class Swaption:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
-        market_history: MarketHistory | dict[str, Any] | str | None = None,
-        explain: bool = False,
+        extras: dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this swaption and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -1071,15 +1051,19 @@ class Swaption:
             Model key (``"black76"``, ``"normal"``, ``"hull_white_1f"``, ...).
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
-        metric_pricing_overrides : MetricPricingOverrides | dict[str, Any] | str, optional
-            Metric-time overrides merged into
-            ``instrument.spec.metric_pricing_overrides`` before pricing
-            (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
-        market_history : MarketHistory | dict[str, Any] | str, optional
-            ``MarketHistory`` scenarios required by ``hvar`` /
-            ``expected_shortfall``.
-        explain : bool, default False
-            When ``True``, attach a step trace as ``result.explanation``.
+        extras : dict[str, Any] or str, optional
+            The rarer pricing inputs, as a dict or JSON text in the shape of the
+            Rust ``PriceExtras``; every key is optional and an unknown key raises
+            ``ValueError``. ``metric_pricing_overrides`` (a ``MetricPricingOverrides``
+            or dict) is merged into ``instrument.spec.metric_pricing_overrides``
+            before pricing (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``):
+            only the keys present replace stored controls, ``bump_config`` keys
+            merge into the stored bump configuration and an explicit ``None``
+            clears a control; omitted keeps the instrument's overrides. ``market_history`` (a ``MarketHistory`` or dict)
+            holds the historical scenarios ``hvar`` and ``expected_shortfall``
+            require; omitted prices without history. ``explain`` (bool, default
+            ``False``) attaches a step trace as ``result.explanation`` when
+            ``True``. ``None`` (the default) means no extras.
 
         Returns
         -------
@@ -1427,8 +1411,8 @@ class Swaption:
         dict[str, object]
             Bump sizes, theta period and the other metric settings stored on
             the instrument; unset fields are ``None`` or omitted. A
-            ``metric_pricing_overrides`` argument to ``price`` is merged over it
-            per call.
+            ``price(..., extras={"metric_pricing_overrides": ...})`` patch is
+            merged over it per call.
 
         Notes
         -----
@@ -1496,30 +1480,31 @@ class SwaptionBuilder:
     Examples
     --------
     >>> from finstack_quant.core.dates import DayCount, Tenor
+    >>> from finstack_quant.core.money import Money
     >>> from finstack_quant.valuations.instruments import FixedLegSpec, FloatLegSpec, Swaption
     >>> fixed = FixedLegSpec(
-    ...     "USD-OIS",
-    ...     0.04,
-    ...     Tenor.semi_annual(),
-    ...     DayCount.THIRTY_360,
-    ...     "2025-01-15",
-    ...     "2030-01-15",
+    ...     discount_curve_id="USD-OIS",
+    ...     rate="0.04",
+    ...     frequency=Tenor.semi_annual(),
+    ...     day_count=DayCount.THIRTY_360,
+    ...     start="2025-01-15",
+    ...     end="2030-01-15",
     ... )
     >>> floating = FloatLegSpec(
-    ...     "USD-OIS",
-    ...     "USD-SOFR-3M",
-    ...     0.0,
-    ...     Tenor.quarterly(),
-    ...     DayCount.ACT_360,
-    ...     "2025-01-15",
-    ...     "2030-01-15",
+    ...     discount_curve_id="USD-OIS",
+    ...     forward_curve_id="USD-SOFR-3M",
+    ...     spread_bp="0",
+    ...     frequency=Tenor.quarterly(),
+    ...     day_count=DayCount.ACT_360,
+    ...     start="2025-01-15",
+    ...     end="2030-01-15",
     ... )
     >>> swaption = (
     ...     Swaption
     ...     .builder()
     ...     .id("SWPT-1")
     ...     .option_type("call")
-    ...     .notional(10_000_000.0, currency="USD")
+    ...     .notional(Money(10_000_000.0, "USD"))
     ...     .expiry("2025-01-13")
     ...     .settlement("cash")
     ...     .cash_settlement_method("collateralized_cash_price")
@@ -1573,16 +1558,14 @@ class SwaptionBuilder:
             If the builder was already consumed by ``build()`` or ``value`` is not a recognized name.
         """
         ...
-    def notional(self, value: Money | float, currency: str | None = None) -> SwaptionBuilder:
+    def notional(self, value: Money) -> SwaptionBuilder:
         """
         Set the notional of the underlying swap.
 
         Parameters
         ----------
-        value : Money | float
-            Notional of the underlying swap; a bare number is tagged with ``currency``.
-        currency : str, optional
-            ISO-4217 code applied when ``value`` is a bare number.
+        value : Money
+            Notional of the underlying swap.
 
         Returns
         -------
@@ -1592,7 +1575,9 @@ class SwaptionBuilder:
         Raises
         ------
         ValueError
-            If the builder was already consumed by ``build()`` or a bare number is given without ``currency``.
+            If the builder was already consumed by ``build()``.
+        TypeError
+            If ``value`` is not a ``finstack_quant.core.money.Money``.
         """
         ...
     def expiry(self, value: datetime.date | datetime.datetime | pd.Timestamp | str) -> SwaptionBuilder:
@@ -2020,9 +2005,7 @@ class CapFloor:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
-        market_history: MarketHistory | dict[str, Any] | str | None = None,
-        explain: bool = False,
+        extras: dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this cap/floor and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -2039,15 +2022,19 @@ class CapFloor:
             Model key (``"black76"``, ``"normal"``, ``"hull_white_1f"``, ...).
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
-        metric_pricing_overrides : MetricPricingOverrides | dict[str, Any] | str, optional
-            Metric-time overrides merged into
-            ``instrument.spec.metric_pricing_overrides`` before pricing
-            (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
-        market_history : MarketHistory | dict[str, Any] | str, optional
-            ``MarketHistory`` scenarios required by ``hvar`` /
-            ``expected_shortfall``.
-        explain : bool, default False
-            When ``True``, attach a step trace as ``result.explanation``.
+        extras : dict[str, Any] or str, optional
+            The rarer pricing inputs, as a dict or JSON text in the shape of the
+            Rust ``PriceExtras``; every key is optional and an unknown key raises
+            ``ValueError``. ``metric_pricing_overrides`` (a ``MetricPricingOverrides``
+            or dict) is merged into ``instrument.spec.metric_pricing_overrides``
+            before pricing (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``):
+            only the keys present replace stored controls, ``bump_config`` keys
+            merge into the stored bump configuration and an explicit ``None``
+            clears a control; omitted keeps the instrument's overrides. ``market_history`` (a ``MarketHistory`` or dict)
+            holds the historical scenarios ``hvar`` and ``expected_shortfall``
+            require; omitted prices without history. ``explain`` (bool, default
+            ``False``) attaches a step trace as ``result.explanation`` when
+            ``True``. ``None`` (the default) means no extras.
 
         Returns
         -------
@@ -2477,8 +2464,8 @@ class CapFloor:
         dict[str, object]
             Bump sizes, theta period and the other metric settings stored on
             the instrument; unset fields are ``None`` or omitted. A
-            ``metric_pricing_overrides`` argument to ``price`` is merged over it
-            per call.
+            ``price(..., extras={"metric_pricing_overrides": ...})`` patch is
+            merged over it per call.
 
         Notes
         -----
@@ -2560,13 +2547,14 @@ class CapFloorBuilder:
     Examples
     --------
     >>> from finstack_quant.core.dates import DayCount, Tenor
+    >>> from finstack_quant.core.money import Money
     >>> from finstack_quant.valuations.instruments import CapFloor
     >>> cap = (
     ...     CapFloor
     ...     .builder()
     ...     .id("CAP-1")
     ...     .rate_option_type("cap")
-    ...     .notional(5_000_000.0, currency="USD")
+    ...     .notional(Money(5_000_000.0, "USD"))
     ...     .strike(0.05)
     ...     .start_date("2024-01-15")
     ...     .maturity("2027-01-15")
@@ -2621,16 +2609,14 @@ class CapFloorBuilder:
             If the builder was already consumed by ``build()`` or ``value`` is not a recognized name.
         """
         ...
-    def notional(self, value: Money | float, currency: str | None = None) -> CapFloorBuilder:
+    def notional(self, value: Money) -> CapFloorBuilder:
         """
         Set the notional amount.
 
         Parameters
         ----------
-        value : Money | float
-            Notional amount; a bare number is tagged with ``currency``.
-        currency : str, optional
-            ISO-4217 code applied when ``value`` is a bare number.
+        value : Money
+            Notional amount.
 
         Returns
         -------
@@ -2640,7 +2626,9 @@ class CapFloorBuilder:
         Raises
         ------
         ValueError
-            If the builder was already consumed by ``build()`` or a bare number is given without ``currency``.
+            If the builder was already consumed by ``build()``.
+        TypeError
+            If ``value`` is not a ``finstack_quant.core.money.Money``.
         """
         ...
     def strike(self, value: float | Rate) -> CapFloorBuilder:
@@ -2686,8 +2674,7 @@ class CapFloorBuilder:
     def premium(
         self,
         payment_date: datetime.date | datetime.datetime | pd.Timestamp | str,
-        amount: Money | float,
-        currency: str | None = None,
+        amount: Money,
     ) -> CapFloorBuilder:
         """
         Set the dated premium paid by the cap/floor holder.
@@ -2697,11 +2684,8 @@ class CapFloorBuilder:
         payment_date : datetime.date | datetime.datetime | pd.Timestamp | str
             Contractual premium payment date. Payments on or before the valuation
             date are treated as settled and excluded from NPV.
-        amount : Money | float
-            Non-negative premium outflow in the notional currency; a bare number is
-            tagged with ``currency``.
-        currency : str, optional
-            ISO-4217 code applied when ``amount`` is a bare number.
+        amount : Money
+            Non-negative premium outflow in the notional currency.
 
         Returns
         -------
@@ -2711,9 +2695,10 @@ class CapFloorBuilder:
         Raises
         ------
         ValueError
-            If ``payment_date`` cannot be interpreted, a bare amount has no
-            ``currency``, or the builder was already consumed. Premium amount and
-            currency validation occurs in ``build``.
+            If ``payment_date`` cannot be interpreted or the builder was already
+            consumed. Premium amount and currency validation occurs in ``build``.
+        TypeError
+            If ``amount`` is not a ``finstack_quant.core.money.Money``.
         """
         ...
     def start_date(self, value: datetime.date | datetime.datetime | pd.Timestamp | str) -> CapFloorBuilder:

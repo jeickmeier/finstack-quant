@@ -554,7 +554,7 @@ quarter_amortization=held_ead*borrower_inputs["loan"]["amortization_per_quarter_
 midpoints=[(float((times[i]+times[i+1])/2),held_ead-i*quarter_amortization) for i in range(20)]
 ead_knots=[(0.,held_ead),*midpoints,(5.,0.)]
 # Explicit teaching policy: forecast covenant weakness prompts a watchlist/SICR review.
-exposure=Exposure("BORROWER-TL",held_ead,lgd,eir,5.,physical_curve[-1][1],physical_curve[-1][1],
+exposure=Exposure(id="BORROWER-TL",ead=held_ead,lgd=lgd,eir=eir,remaining_maturity_years=5.,current_pd=physical_curve[-1][1],origination_pd=physical_curve[-1][1],
     qualitative_flags=QualitativeFlags(watchlist=True),ead_schedule=ead_knots)
 stage=classify_stage(exposure,StagingConfig(pd_delta_absolute=.05,pd_delta_relative=None))
 physical_loss=compute_ecl(exposure,physical_curve,stage=stage.stage,bucket_width_years=.25)
@@ -1169,7 +1169,7 @@ quarter_amortization=held_ead*borrower_inputs["loan"]["amortization_per_quarter_
 midpoints=[(float((times[i]+times[i+1])/2),held_ead-i*quarter_amortization) for i in range(20)]
 ead_knots=[(0.,held_ead),*midpoints,(5.,0.)]
 # Explicit teaching policy: forecast covenant weakness prompts a watchlist/SICR review.
-exposure=Exposure("BORROWER-TL",held_ead,lgd,eir,5.,physical_curve[-1][1],physical_curve[-1][1],
+exposure=Exposure(id="BORROWER-TL",ead=held_ead,lgd=lgd,eir=eir,remaining_maturity_years=5.,current_pd=physical_curve[-1][1],origination_pd=physical_curve[-1][1],
     qualitative_flags=QualitativeFlags(watchlist=True),ead_schedule=ead_knots)
 stage=classify_stage(exposure,StagingConfig(pd_delta_absolute=.05,pd_delta_relative=None))
 physical_loss=compute_ecl(exposure,physical_curve,stage=stage.stage,bucket_width_years=.25)

@@ -48,9 +48,7 @@ it("records full pricing inputs and the supported raw and typed routes", () => {
     "asOf",
     "model",
     "metrics",
-    "metricPricingOverrides",
-    "marketHistory",
-    "explain",
+    "extras",
   ]);
   expect(
     inventory.details
@@ -69,7 +67,7 @@ it("records full pricing inputs and the supported raw and typed routes", () => {
   ).toBe("Float64Array");
   expect(
     inventory.hostDeclarations.map((declaration) => declaration.name),
-  ).toContain("VolCubeConstructor");
+  ).toContain("VolCube");
 });
 it("fails generation when a required source disappears", async () => {
   const changed = new Map(contracts);

@@ -1,0 +1,85 @@
+{
+  "$defs": {
+    "PayReceive": {
+      "description": "Direction for instrument legs (universal for IRS, CDS, variance swaps, etc.)\n\nFor interest rate swaps: Pay = pay fixed/receive floating, Receive = receive fixed/pay floating\nFor credit default swaps: Pay = buy protection (pay premium), Receive = sell protection (receive premium)\nFor variance swaps: Pay = short variance, Receive = long variance",
+      "oneOf": [
+        {
+          "const": "pay",
+          "description": "Pay the primary leg (fixed rate in IRS, protection premium in CDS, short variance)",
+          "type": "string"
+        },
+        {
+          "const": "receive",
+          "description": "Receive the primary leg (fixed rate in IRS, protection premium in CDS, long variance)",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/common/1/cds_trade_params.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Trade terms (id, notional, side, dates, recovery, curves) of a standard-convention CDS index trade.",
+  "examples": [
+    {
+      "credit_curve_id": "CDX.NA.IG.HAZARD",
+      "discount_curve_id": "USD-OIS",
+      "end": "2029-06-20",
+      "id": "CDX-IG-42",
+      "notional": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "recovery_rate": 0.4,
+      "side": "pay",
+      "start": "2024-03-20"
+    }
+  ],
+  "properties": {
+    "credit_curve_id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Hazard (credit) curve identifier for the protection leg."
+    },
+    "discount_curve_id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Discount curve identifier for both legs."
+    },
+    "end": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+      "description": "Scheduled maturity date."
+    },
+    "id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Unique instrument identifier."
+    },
+    "notional": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+      "description": "Contract notional; its currency is the premium and protection currency."
+    },
+    "recovery_rate": {
+      "description": "Assumed recovery as a decimal fraction of par in `[0, 1]` (0.40 = 40%).",
+      "format": "double",
+      "type": "number"
+    },
+    "side": {
+      "$ref": "#/$defs/PayReceive",
+      "description": "Protection direction: `pay` buys protection (pays premium), `receive` sells it."
+    },
+    "start": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+      "description": "Premium accrual start (effective) date."
+    }
+  },
+  "required": [
+    "id",
+    "notional",
+    "side",
+    "start",
+    "end",
+    "recovery_rate",
+    "discount_curve_id",
+    "credit_curve_id"
+  ],
+  "title": "CdsTradeParams",
+  "type": "object"
+}

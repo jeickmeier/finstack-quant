@@ -43,6 +43,21 @@ use finstack_quant_models::rates::hw1f::{build_event_aligned_grid, money_estimat
 
 const EXERCISE_TIME_TOLERANCE: f64 = 1e-10;
 
+/// Underlying swap of an LMM Bermudan swaption.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LmmBermudanSwap {
+    /// Fixed rate K of the underlying swap, as a decimal (0.03 = 3%).
+    pub strike: f64,
+    /// `true` for a payer swaption, `false` for a receiver.
+    pub payer: bool,
+    /// Swap notional in units of `currency`.
+    pub notional: f64,
+    /// Discount factor `P(0, T_N)` to the terminal LMM tenor.
+    pub discount_factor_terminal: f64,
+    /// Currency of the returned estimate.
+    pub currency: Currency,
+}
+
 /// Price a Bermudan swaption using LMM dynamics and LSMC.
 ///
 /// # Arguments
@@ -51,11 +66,8 @@ const EXERCISE_TIME_TOLERANCE: f64 = 1e-10;
 /// * `exercise_times` — Strictly increasing, unique year fractions at which
 ///   the holder may exercise. Every time must be finite and lie strictly
 ///   between zero and the terminal LMM tenor and coincide with a tenor start.
-/// * `strike` — Fixed rate K of the underlying swap.
-/// * `payer` — `true` for payer swaption, `false` for receiver.
-/// * `notional` — Swap notional.
-/// * `discount_factor_terminal` — `P(0, T_N)` for the terminal tenor.
-/// * `currency` — Currency used for the result.
+/// * `swap` — Strike, direction, notional, terminal discount factor and
+///   result currency of the underlying swap (see [`LmmBermudanSwap`]).
 /// * `config` — Monte Carlo configuration. `num_paths` counts independent
 ///   estimators; the simulated path count (`2 × num_paths` with antithetic
 ///   sampling) must not exceed [`MAX_NUM_PATHS`], and the pricer needs at
@@ -75,17 +87,19 @@ const EXERCISE_TIME_TOLERANCE: f64 = 1e-10;
 /// time outside `(0, maturity)`, if the path configuration cannot provide at
 /// least two independent pricing observations, or if the LMM parameters are
 /// inconsistent.
-#[allow(clippy::too_many_arguments)]
 pub fn price_bermudan_lmm(
     params: &LmmParams,
     exercise_times: &[f64],
-    strike: f64,
-    payer: bool,
-    notional: f64,
-    discount_factor_terminal: f64,
-    currency: Currency,
+    swap: &LmmBermudanSwap,
     config: &Hw1fMcConfig,
 ) -> Result<MoneyEstimate> {
+    let &LmmBermudanSwap {
+        strike,
+        payer,
+        notional,
+        discount_factor_terminal,
+        currency,
+    } = swap;
     validate_path_config(config)?;
     let (time_grid, exercise_step_indices) =
         build_exercise_aligned_grid(exercise_times, params, config.min_steps_between_events)?;
@@ -745,11 +759,13 @@ mod tests {
             price_bermudan_lmm(
                 &params,
                 &[1.0],
-                0.03,
-                true,
-                1_000_000.0,
-                0.9,
-                Currency::USD,
+                &LmmBermudanSwap {
+                    strike: 0.03,
+                    payer: true,
+                    notional: 1_000_000.0,
+                    discount_factor_terminal: 0.9,
+                    currency: Currency::USD,
+                },
                 &config,
             ),
             "at least two independent pricing observations",
@@ -763,11 +779,13 @@ mod tests {
             price_bermudan_lmm(
                 &params,
                 &[1.5],
-                0.03,
-                true,
-                1_000_000.0,
-                0.9,
-                Currency::USD,
+                &LmmBermudanSwap {
+                    strike: 0.03,
+                    payer: true,
+                    notional: 1_000_000.0,
+                    discount_factor_terminal: 0.9,
+                    currency: Currency::USD,
+                },
                 &test_config(2, false, false),
             ),
             "must coincide with tenor starts",
@@ -792,11 +810,13 @@ mod tests {
         let result = price_bermudan_lmm(
             &params,
             &exercise_times,
-            strike,
-            true, // payer
-            1_000_000.0,
-            df_terminal,
-            Currency::USD,
+            &LmmBermudanSwap {
+                strike,
+                payer: true,
+                notional: 1_000_000.0,
+                discount_factor_terminal: df_terminal,
+                currency: Currency::USD,
+            },
             &config,
         );
 
@@ -819,11 +839,13 @@ mod tests {
         let estimate = price_bermudan_lmm(
             &params,
             &[1.0, 2.0, 3.0],
-            0.030,
-            true,
-            1_000_000.0,
-            df_terminal,
-            Currency::USD,
+            &LmmBermudanSwap {
+                strike: 0.030,
+                payer: true,
+                notional: 1_000_000.0,
+                discount_factor_terminal: df_terminal,
+                currency: Currency::USD,
+            },
             &crate::swaption::lmm_pricer::lmm_bermudan_mc_config(),
         )
         .expect("default price");
@@ -852,24 +874,28 @@ mod tests {
 
         let european = price_bermudan_lmm(
             &params,
-            &[1.0], // single exercise = European
-            strike,
-            true,
-            1_000_000.0,
-            df_terminal,
-            Currency::USD,
+            &[1.0],
+            &LmmBermudanSwap {
+                strike,
+                payer: true,
+                notional: 1_000_000.0,
+                discount_factor_terminal: df_terminal,
+                currency: Currency::USD,
+            },
             &config,
         )
         .expect("european ok");
 
         let bermudan = price_bermudan_lmm(
             &params,
-            &[1.0, 2.0, 3.0], // three exercise dates
-            strike,
-            true,
-            1_000_000.0,
-            df_terminal,
-            Currency::USD,
+            &[1.0, 2.0, 3.0],
+            &LmmBermudanSwap {
+                strike,
+                payer: true,
+                notional: 1_000_000.0,
+                discount_factor_terminal: df_terminal,
+                currency: Currency::USD,
+            },
             &config,
         )
         .expect("bermudan ok");
@@ -908,22 +934,26 @@ mod tests {
         let in_sample = price_bermudan_lmm(
             &params,
             &exercise_times,
-            strike,
-            true,
-            1_000_000.0,
-            df_terminal,
-            Currency::USD,
+            &LmmBermudanSwap {
+                strike,
+                payer: true,
+                notional: 1_000_000.0,
+                discount_factor_terminal: df_terminal,
+                currency: Currency::USD,
+            },
             &base,
         )
         .expect("in-sample ok");
         let out_sample = price_bermudan_lmm(
             &params,
             &exercise_times,
-            strike,
-            true,
-            1_000_000.0,
-            df_terminal,
-            Currency::USD,
+            &LmmBermudanSwap {
+                strike,
+                payer: true,
+                notional: 1_000_000.0,
+                discount_factor_terminal: df_terminal,
+                currency: Currency::USD,
+            },
             &oos,
         )
         .expect("oos ok");

@@ -150,8 +150,6 @@ test('every field getter agrees with the instrument spec', () => {
 const SPECIAL_SETTERS = {
   premium: (builder, value) => builder.premium(value[0], value[1]),
   upfront: (builder, value) => builder.upfront(value[0], value[1]),
-  deltaConvention: (builder, value) =>
-    builder.deltaConvention(value.kind, new core.Currency(value.premium_currency), value.venue),
   exercise: (builder, value) =>
     builder.exercise(value.date, value.spot, value.settlement_date, value.exercised),
 };
@@ -244,18 +242,17 @@ test('interest-rate swap pricing and ValuationResult functions match Python', ()
   assert.equal(valuations.valuationResultAllCovenantsPassed(result), rates.all_covenants_passed);
   assert.deepEqual(valuations.valuationResultFailedCovenants(result), rates.failed_covenants);
 
-  const usd = new core.Currency('USD');
-  const conventional = instruments.InterestRateSwap.fromConventions(
-    'IRS-CONV',
-    new core.Money(10_000_000, usd),
-    'pay',
-    0.035,
-    '2025-01-15',
-    '2030-01-15',
-    'USD-SOFR',
-    'USD-OIS',
-    'USD-SOFR'
-  );
+  const conventional = instruments.InterestRateSwap.fromConventions({
+    id: 'IRS-CONV',
+    notional: { amount: '10000000', currency: 'USD' },
+    side: 'pay',
+    fixed_rate: 0.035,
+    start_date: '2025-01-15',
+    maturity: '2030-01-15',
+    index_id: 'USD-SOFR',
+    discount_curve_id: 'USD-OIS',
+    forward_curve_id: 'USD-SOFR',
+  });
   assert.equal(conventional.toJson(), rates.from_conventions);
 
   const swaption = instruments.Swaption.example();
@@ -272,23 +269,21 @@ test('interest-rate swap pricing and ValuationResult functions match Python', ()
 
 test('credit instruments match Python', () => {
   const credit = golden.credit;
-  const usd = new core.Currency('USD');
   const cds = instruments.CreditDefaultSwap.example();
   const result = cds.price(credit.market, '2024-06-20', 'hazard_rate');
   close(Number(result.value.amount), credit.cds_price, LOOSE, 'cds price');
   close(cds.parSpread(credit.market, '2024-06-20'), credit.cds_par_spread, LOOSE, 'par spread');
 
-  const index = instruments.CdsIndex.fromPreset(
-    instruments.cdsIndexParamsCdxNaIg(42, 1, 100),
-    'CDX-IG-42',
-    new core.Money(10_000_000, usd),
-    'pay',
-    '2024-03-20',
-    '2029-06-20',
-    0.4,
-    'USD-OIS',
-    'CDX.NA.IG.HAZARD'
-  );
+  const index = instruments.CdsIndex.fromPreset(instruments.cdsIndexParamsCdxNaIg(42, 1, 100), {
+    id: 'CDX-IG-42',
+    notional: { amount: '10000000', currency: 'USD' },
+    side: 'pay',
+    start: '2024-03-20',
+    end: '2029-06-20',
+    recovery_rate: 0.4,
+    discount_curve_id: 'USD-OIS',
+    credit_curve_id: 'CDX.NA.IG.HAZARD',
+  });
   assert.equal(index.toJson(), credit.index);
   close(index.parSpread(credit.market, '2024-06-20'), credit.index_par_spread, LOOSE, 'index par');
   close(index.riskyPv01(credit.market, '2024-06-20'), credit.index_risky_pv01, LOOSE, 'rpv01');

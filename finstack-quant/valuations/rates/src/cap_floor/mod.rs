@@ -96,6 +96,6 @@ pub(crate) mod pricing;
 mod types;
 
 pub use types::{
-    CapFloor, CapFloorBuilder, CapFloorVolType, OvernightCouponConvention,
+    CapFloor, CapFloorBuilder, CapFloorParams, CapFloorVolType, OvernightCouponConvention,
     OvernightSpreadCompounding, RateOptionType,
 };

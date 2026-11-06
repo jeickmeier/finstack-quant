@@ -1,0 +1,122 @@
+{
+  "$defs": {
+    "RateOptionType": {
+      "description": "Type of interest rate option",
+      "oneOf": [
+        {
+          "const": "cap",
+          "description": "Cap (series of caplets)",
+          "type": "string"
+        },
+        {
+          "const": "floor",
+          "description": "Floor (series of floorlets)",
+          "type": "string"
+        },
+        {
+          "const": "caplet",
+          "description": "Caplet (single period cap)",
+          "type": "string"
+        },
+        {
+          "const": "floorlet",
+          "description": "Floorlet (single period floor)",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/common/1/cap_floor_params.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Option type, notional, strike, schedule and curves of a standard cap, floor, caplet or floorlet.",
+  "examples": [
+    {
+      "day_count": "act_360",
+      "discount_curve_id": "USD-OIS",
+      "forward_curve_id": "USD-SOFR-3M",
+      "frequency": {
+        "count": 3,
+        "unit": "months"
+      },
+      "id": "IRCAP-USD-5Y-3PCT",
+      "maturity": "2029-01-03",
+      "notional": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "rate_option_type": "cap",
+      "start_date": "2024-01-03",
+      "strike": 0.03,
+      "vol_surface_id": "USD-CAPFLOOR-VOL"
+    }
+  ],
+  "properties": {
+    "day_count": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+      "description": "Accrual day count of each period."
+    },
+    "discount_curve_id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Discount curve for payments."
+    },
+    "forward_curve_id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Projection curve of the underlying rate index."
+    },
+    "frequency": {
+      "anyOf": [
+        {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Payment frequency generating the period schedule. `None` infers a\nsingle period spanning `[start_date, maturity]` (the caplet/floorlet\nconvention)."
+    },
+    "id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Unique instrument identifier."
+    },
+    "maturity": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+      "description": "Final payment date."
+    },
+    "notional": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+      "description": "Notional; its currency is the payment currency."
+    },
+    "rate_option_type": {
+      "$ref": "#/$defs/RateOptionType",
+      "description": "`cap`, `floor`, `caplet` or `floorlet`."
+    },
+    "start_date": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+      "description": "Accrual start of the first period."
+    },
+    "strike": {
+      "description": "Strike as a decimal rate (0.03 = 3%).",
+      "format": "double",
+      "type": "number"
+    },
+    "vol_surface_id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Cap/floor volatility surface."
+    }
+  },
+  "required": [
+    "id",
+    "rate_option_type",
+    "notional",
+    "strike",
+    "start_date",
+    "maturity",
+    "day_count",
+    "discount_curve_id",
+    "forward_curve_id",
+    "vol_surface_id"
+  ],
+  "title": "CapFloorParams",
+  "type": "object"
+}

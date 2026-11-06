@@ -1,21 +1,26 @@
 {
   "$defs": {
     "QualitativeFlags": {
-      "description": "Qualitative triggers for SICR detection (IFRS 9 B5.5.17) and\n\"unlikely-to-pay\" evidence of default (IFRS 9 B5.5.37).\n\nThese flags represent non-quantitative indicators. SICR flags\n(`watchlist`, `forbearance`, `adverse_conditions`, `custom`) may\ntrigger a Stage 2 classification. The `default_evidence` flags\n(`bankruptcy`, `distressed_modification`, `cross_default`,\n`other_default_evidence`) represent objective evidence of default\nand should trigger Stage 3 independently of the 90-DPD backstop.",
+      "additionalProperties": false,
+      "description": "Qualitative triggers for SICR detection (IFRS 9 B5.5.17) and\n\"unlikely-to-pay\" evidence of default (IFRS 9 B5.5.37).\n\nThese flags represent non-quantitative indicators. SICR flags\n(`watchlist`, `forbearance`, `adverse_conditions`, `custom`) may\ntrigger a Stage 2 classification. The `default_evidence` flags\n(`bankruptcy`, `distressed_modification`, `cross_default`,\n`other_default_evidence`) represent objective evidence of default\nand should trigger Stage 3 independently of the 90-DPD backstop.\n\nEvery field may be omitted from the serde document: an omitted flag is\noff and an omitted list is empty, so `{}` (the [`Default`]) carries no\nflags. Unknown keys are rejected, so a misspelt flag is an error rather\nthan a silently dropped trigger.",
       "properties": {
         "adverse_conditions": {
+          "default": false,
           "description": "Significant adverse change in business or financial conditions.",
           "type": "boolean"
         },
         "bankruptcy": {
+          "default": false,
           "description": "Obligor has filed or is subject to bankruptcy / insolvency\nproceedings. Non-rebuttable Stage 3 trigger.",
           "type": "boolean"
         },
         "cross_default": {
+          "default": false,
           "description": "Cross-default has been triggered on another obligation of the\nsame obligor.",
           "type": "boolean"
         },
         "custom": {
+          "default": [],
           "description": "Custom user-defined SICR flags (e.g., sector-specific triggers).",
           "items": {
             "type": "string"
@@ -23,14 +28,17 @@
           "type": "array"
         },
         "distressed_modification": {
+          "default": false,
           "description": "Distressed restructuring / modification with material NPV loss\nto the lender. IFRS 9 B5.5.37(e) / EBA GL on default.",
           "type": "boolean"
         },
         "forbearance": {
+          "default": false,
           "description": "Forbearance or concession granted. Under IFRS 9 forbearance is\nat minimum a SICR trigger; distressed modifications (deep\nconcessions such as haircut, maturity extension with NPV loss)\nare tracked separately under `distressed_modification` and\ntrigger Stage 3.",
           "type": "boolean"
         },
         "other_default_evidence": {
+          "default": [],
           "description": "Custom user-defined Stage 3 default-evidence flags.",
           "items": {
             "type": "string"
@@ -38,20 +46,11 @@
           "type": "array"
         },
         "watchlist": {
+          "default": false,
           "description": "On internal watchlist.",
           "type": "boolean"
         }
       },
-      "required": [
-        "watchlist",
-        "forbearance",
-        "adverse_conditions",
-        "custom",
-        "bankruptcy",
-        "distressed_modification",
-        "cross_default",
-        "other_default_evidence"
-      ],
       "type": "object"
     },
     "Stage": {
@@ -168,7 +167,17 @@
     },
     "qualitative_flags": {
       "$ref": "#/$defs/QualitativeFlags",
-      "description": "Qualitative flags that can trigger Stage 2 classification."
+      "default": {
+        "adverse_conditions": false,
+        "bankruptcy": false,
+        "cross_default": false,
+        "custom": [],
+        "distressed_modification": false,
+        "forbearance": false,
+        "other_default_evidence": [],
+        "watchlist": false
+      },
+      "description": "Qualitative flags that can trigger Stage 2 classification.\nDefault: no flags ([`QualitativeFlags::default`])."
     },
     "remaining_maturity_years": {
       "description": "Remaining maturity in years from reporting date. For revolving\nfacilities, use behavioural maturity.",
@@ -176,7 +185,8 @@
       "type": "number"
     },
     "segments": {
-      "description": "Segment keys for portfolio aggregation (product type, geography, rating\nbucket, etc.). Empty vec means \"unclassified\".",
+      "default": [],
+      "description": "Segment keys for portfolio aggregation (product type, geography, rating\nbucket, etc.). Empty vec means \"unclassified\". Default empty.",
       "items": {
         "type": "string"
       },
@@ -191,12 +201,10 @@
   },
   "required": [
     "id",
-    "segments",
     "ead",
     "eir",
     "remaining_maturity_years",
-    "lgd",
-    "qualitative_flags"
+    "lgd"
   ],
   "title": "Exposure",
   "type": "object"

@@ -133,6 +133,43 @@ impl BarrierMonitoring {
     }
 }
 
+/// Contract and simulation terms of a [`BarrierOptionPayoff`], consumed by
+/// [`BarrierOptionPayoff::new`].
+#[derive(Debug, Clone)]
+pub struct BarrierOptionParams<'a> {
+    /// Option strike in the same units as the simulated spot.
+    pub strike: f64,
+    /// Knock-in or knock-out level in the same units as spot.
+    pub barrier: f64,
+    /// Up/down and in/out classification of the barrier.
+    pub barrier_type: BarrierType,
+    /// Call or put intrinsic evaluated at expiry when the option is active.
+    pub option_type: OptionType,
+    /// Cash amount paid when the option is inactive (knocked out, or a
+    /// knock-in that never hits). Paid at expiry unless
+    /// [`BarrierOptionPayoff::with_rebate_at_hit`] is chained.
+    pub rebate: Option<f64>,
+    /// Linear payoff scaling applied to the intrinsic or rebate.
+    pub notional: f64,
+    /// Path step index at which the payoff observes `S_T`.
+    pub maturity_step: usize,
+    /// Fallback Black volatility (annualized, decimal) used by the
+    /// Brownian-bridge hit test when the path state has no variance key. For
+    /// deterministic-vol processes (e.g. GBM) it **must equal the simulating
+    /// process's diffusion volatility**: the payoff has no handle on the
+    /// process, so a mismatch is not detectable here and silently biases the
+    /// bridge crossing probability. Under stochastic-vol models (e.g.
+    /// Heston) the path's `sqrt(variance)` is used instead and this value is
+    /// ignored.
+    pub sigma: f64,
+    /// Simulation grid whose step year-fractions size the continuous bridge
+    /// intervals and the at-hit forward-compounding horizon.
+    pub time_grid: &'a TimeGrid,
+    /// Continuous start step or discrete contractual observation steps
+    /// mapped onto `time_grid`.
+    pub monitoring: BarrierMonitoring,
+}
+
 /// Barrier option payoff with bridge correction.
 ///
 /// A generic barrier option (Call or Put) with a barrier that can knock in or out,
@@ -191,41 +228,23 @@ impl BarrierOptionPayoff {
     ///
     /// # Arguments
     ///
-    /// * `strike` - Option strike in the same units as the simulated spot.
-    /// * `barrier` - Knock-in or knock-out level in the same units as spot.
-    /// * `barrier_type` - Up/down and in/out classification of the barrier.
-    /// * `option_type` - Call or put intrinsic evaluated at expiry when the
-    ///   option is active.
-    /// * `rebate` - Cash amount paid when the option is inactive (knocked
-    ///   out, or a knock-in that never hits). Paid at expiry unless
-    ///   [`Self::with_rebate_at_hit`] is chained.
-    /// * `notional` - Linear payoff scaling applied to the intrinsic or rebate.
-    /// * `maturity_step` - Path step index at which the payoff observes `S_T`.
-    /// * `sigma` - Fallback Black volatility (annualized, decimal) used by
-    ///   the Brownian-bridge hit test when the path state has no variance
-    ///   key. For deterministic-vol processes (e.g. GBM) it **must equal the
-    ///   simulating process's diffusion volatility**: the payoff has no
-    ///   handle on the process, so a mismatch is not detectable here and
-    ///   silently biases the bridge crossing probability. Under
-    ///   stochastic-vol models (e.g. Heston) the path's `sqrt(variance)` is
-    ///   used instead and this value is ignored.
-    /// * `time_grid` - Simulation grid whose step year-fractions size the
-    ///   continuous bridge intervals and the at-hit forward-compounding horizon.
-    /// * `monitoring` - Continuous start step or discrete contractual
-    ///   observation steps mapped onto `time_grid`.
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        strike: f64,
-        barrier: f64,
-        barrier_type: BarrierType,
-        option_type: OptionType,
-        rebate: Option<f64>,
-        notional: f64,
-        maturity_step: usize,
-        sigma: f64,
-        time_grid: &TimeGrid,
-        monitoring: BarrierMonitoring,
-    ) -> Self {
+    /// * `params` - Strike, barrier level and type, call/put, optional
+    ///   rebate, notional, maturity step, fallback bridge volatility,
+    ///   simulation grid and monitoring convention; see
+    ///   [`BarrierOptionParams`].
+    pub fn new(params: BarrierOptionParams<'_>) -> Self {
+        let BarrierOptionParams {
+            strike,
+            barrier,
+            barrier_type,
+            option_type,
+            rebate,
+            notional,
+            maturity_step,
+            sigma,
+            time_grid,
+            monitoring,
+        } = params;
         let step_dts: Vec<f64> = time_grid.dts().to_vec();
         let total_time: f64 = step_dts.iter().take(maturity_step).sum();
         let monitoring = monitoring.normalized();
@@ -500,7 +519,6 @@ fn bridge_hit_probability(s_t: f64, s_t_dt: f64, barrier: f64, sigma: f64, dt: f
 /// # Returns
 ///
 /// true if barrier was hit, false otherwise
-#[allow(clippy::too_many_arguments)]
 fn check_barrier_hit(
     s_t: f64,
     s_t_dt: f64,
@@ -547,18 +565,18 @@ mod tests {
 
     fn barrier_hit_at_initial_spot(barrier_type: BarrierType, spot: f64) -> bool {
         let grid = TimeGrid::uniform(1.0, 1).expect("grid should build");
-        let mut payoff = BarrierOptionPayoff::new(
-            100.0,
-            100.0,
+        let mut payoff = BarrierOptionPayoff::new(BarrierOptionParams {
+            strike: 100.0,
+            barrier: 100.0,
             barrier_type,
-            OptionType::Call,
-            None,
-            1.0,
-            1,
-            0.2,
-            &grid,
-            BarrierMonitoring::Continuous { start_step: 0 },
-        );
+            option_type: OptionType::Call,
+            rebate: None,
+            notional: 1.0,
+            maturity_step: 1,
+            sigma: 0.2,
+            time_grid: &grid,
+            monitoring: BarrierMonitoring::Continuous { start_step: 0 },
+        });
         payoff
             .on_event(&mut create_path_state(0, 0.0, spot, 0.5))
             .expect("valid payoff event");
@@ -597,18 +615,18 @@ mod tests {
         let rate = 0.05;
         let rebate = 5.0;
         let grid = TimeGrid::uniform(1.0, 10).expect("grid should build");
-        let mut payoff = BarrierOptionPayoff::new(
-            100.0,
-            120.0,
-            BarrierType::UpAndOut,
-            OptionType::Call,
-            Some(rebate),
-            1.0,
-            10,
-            0.2,
-            &grid,
-            BarrierMonitoring::Continuous { start_step: 0 },
-        )
+        let mut payoff = BarrierOptionPayoff::new(BarrierOptionParams {
+            strike: 100.0,
+            barrier: 120.0,
+            barrier_type: BarrierType::UpAndOut,
+            option_type: OptionType::Call,
+            rebate: Some(rebate),
+            notional: 1.0,
+            maturity_step: 10,
+            sigma: 0.2,
+            time_grid: &grid,
+            monitoring: BarrierMonitoring::Continuous { start_step: 0 },
+        })
         .with_rebate_at_hit(rate);
 
         // Discrete breach at step 4 ⇒ τ = 0.4 on the uniform 0.1 grid.
@@ -630,18 +648,18 @@ mod tests {
         );
 
         // Without at-hit timing the same path pays the flat rebate.
-        let mut payoff_expiry = BarrierOptionPayoff::new(
-            100.0,
-            120.0,
-            BarrierType::UpAndOut,
-            OptionType::Call,
-            Some(rebate),
-            1.0,
-            10,
-            0.2,
-            &grid,
-            BarrierMonitoring::Continuous { start_step: 0 },
-        );
+        let mut payoff_expiry = BarrierOptionPayoff::new(BarrierOptionParams {
+            strike: 100.0,
+            barrier: 120.0,
+            barrier_type: BarrierType::UpAndOut,
+            option_type: OptionType::Call,
+            rebate: Some(rebate),
+            notional: 1.0,
+            maturity_step: 10,
+            sigma: 0.2,
+            time_grid: &grid,
+            monitoring: BarrierMonitoring::Continuous { start_step: 0 },
+        });
         payoff_expiry
             .on_event(&mut create_path_state(0, 0.0, 100.0, 0.5))
             .expect("valid payoff event");
@@ -668,18 +686,18 @@ mod tests {
     fn test_rebate_at_hit_leaves_knock_in_expiry_rebate_unchanged() {
         let rebate = 5.0;
         let grid = TimeGrid::uniform(1.0, 10).expect("grid should build");
-        let mut payoff = BarrierOptionPayoff::new(
-            100.0,
-            120.0,
-            BarrierType::UpAndIn,
-            OptionType::Call,
-            Some(rebate),
-            1.0,
-            10,
-            0.2,
-            &grid,
-            BarrierMonitoring::Continuous { start_step: 0 },
-        )
+        let mut payoff = BarrierOptionPayoff::new(BarrierOptionParams {
+            strike: 100.0,
+            barrier: 120.0,
+            barrier_type: BarrierType::UpAndIn,
+            option_type: OptionType::Call,
+            rebate: Some(rebate),
+            notional: 1.0,
+            maturity_step: 10,
+            sigma: 0.2,
+            time_grid: &grid,
+            monitoring: BarrierMonitoring::Continuous { start_step: 0 },
+        })
         .with_rebate_at_hit(0.05);
 
         payoff
@@ -697,18 +715,18 @@ mod tests {
 
     #[test]
     fn test_barrier_put_payoff() {
-        let mut barrier_put = BarrierOptionPayoff::new(
-            100.0,
-            120.0,
-            BarrierType::UpAndOut,
-            OptionType::Put,
-            None,
-            1.0,
-            10,
-            0.2,
-            &TimeGrid::uniform(1.0, 10).expect("grid should build"),
-            BarrierMonitoring::Continuous { start_step: 0 },
-        );
+        let mut barrier_put = BarrierOptionPayoff::new(BarrierOptionParams {
+            strike: 100.0,
+            barrier: 120.0,
+            barrier_type: BarrierType::UpAndOut,
+            option_type: OptionType::Put,
+            rebate: None,
+            notional: 1.0,
+            maturity_step: 10,
+            sigma: 0.2,
+            time_grid: &TimeGrid::uniform(1.0, 10).expect("grid should build"),
+            monitoring: BarrierMonitoring::Continuous { start_step: 0 },
+        });
 
         // Path that never hits barrier (active)
         for step in 0..=10 {
@@ -727,18 +745,18 @@ mod tests {
     #[test]
     fn test_barrier_rebate() {
         let rebate = 5.0;
-        let mut barrier_call = BarrierOptionPayoff::new(
-            100.0,
-            120.0,
-            BarrierType::UpAndOut,
-            OptionType::Call,
-            Some(rebate),
-            1.0,
-            10,
-            0.2,
-            &TimeGrid::uniform(1.0, 10).expect("grid should build"),
-            BarrierMonitoring::Continuous { start_step: 0 },
-        );
+        let mut barrier_call = BarrierOptionPayoff::new(BarrierOptionParams {
+            strike: 100.0,
+            barrier: 120.0,
+            barrier_type: BarrierType::UpAndOut,
+            option_type: OptionType::Call,
+            rebate: Some(rebate),
+            notional: 1.0,
+            maturity_step: 10,
+            sigma: 0.2,
+            time_grid: &TimeGrid::uniform(1.0, 10).expect("grid should build"),
+            monitoring: BarrierMonitoring::Continuous { start_step: 0 },
+        });
 
         // Hit barrier
         let mut s1 = create_path_state(0, 0.0, 105.0, 0.5);
@@ -761,18 +779,18 @@ mod tests {
         let time_grid = TimeGrid::uniform(1.0, 4).expect("grid should build");
 
         let build = |flat_sigma: f64| {
-            BarrierOptionPayoff::new(
-                100.0,
-                120.0,
-                BarrierType::UpAndOut,
-                OptionType::Call,
-                None,
-                1.0,
-                4,
-                flat_sigma,
-                &time_grid,
-                BarrierMonitoring::Continuous { start_step: 0 },
-            )
+            BarrierOptionPayoff::new(BarrierOptionParams {
+                strike: 100.0,
+                barrier: 120.0,
+                barrier_type: BarrierType::UpAndOut,
+                option_type: OptionType::Call,
+                rebate: None,
+                notional: 1.0,
+                maturity_step: 4,
+                sigma: flat_sigma,
+                time_grid: &time_grid,
+                monitoring: BarrierMonitoring::Continuous { start_step: 0 },
+            })
         };
 
         let mut p_low = build(0.01);
@@ -810,18 +828,18 @@ mod tests {
     #[test]
     fn production_barrier_zero_path_variance_has_no_bridge_crossing() {
         let time_grid = TimeGrid::uniform(1.0, 1).expect("grid");
-        let mut payoff = BarrierOptionPayoff::new(
-            100.0,
-            120.0,
-            BarrierType::UpAndOut,
-            OptionType::Call,
-            None,
-            1.0,
-            1,
-            2.0,
-            &time_grid,
-            BarrierMonitoring::Continuous { start_step: 0 },
-        );
+        let mut payoff = BarrierOptionPayoff::new(BarrierOptionParams {
+            strike: 100.0,
+            barrier: 120.0,
+            barrier_type: BarrierType::UpAndOut,
+            option_type: OptionType::Call,
+            rebate: None,
+            notional: 1.0,
+            maturity_step: 1,
+            sigma: 2.0,
+            time_grid: &time_grid,
+            monitoring: BarrierMonitoring::Continuous { start_step: 0 },
+        });
         for (step, spot) in [(0, 110.0), (1, 115.0)] {
             let mut state = PathState::new(step, step as f64);
             state.set(state_keys::SPOT, spot);
@@ -840,18 +858,18 @@ mod tests {
         let time_grid = TimeGrid::uniform(1.0, 4).expect("grid should build");
 
         let build = |flat_sigma: f64| {
-            BarrierOptionPayoff::new(
-                100.0,
-                120.0,
-                BarrierType::UpAndOut,
-                OptionType::Call,
-                None,
-                1.0,
-                4,
-                flat_sigma,
-                &time_grid,
-                BarrierMonitoring::Continuous { start_step: 0 },
-            )
+            BarrierOptionPayoff::new(BarrierOptionParams {
+                strike: 100.0,
+                barrier: 120.0,
+                barrier_type: BarrierType::UpAndOut,
+                option_type: OptionType::Call,
+                rebate: None,
+                notional: 1.0,
+                maturity_step: 4,
+                sigma: flat_sigma,
+                time_grid: &time_grid,
+                monitoring: BarrierMonitoring::Continuous { start_step: 0 },
+            })
         };
 
         let mut p_low = build(0.01);
@@ -902,16 +920,10 @@ mod tests {
         // probability that a high uniform draw rejects.
         let time_grid = TimeGrid::uniform(1.0, 4).expect("grid should build");
         let mut payoff = BarrierOptionPayoff::new(
-            110.0, // strike (put ITM at terminal spot 95)
-            100.0, // true barrier
-            BarrierType::DownAndOut,
-            OptionType::Put,
-            None,
-            1.0,
-            4,
-            0.2, // sigma — with dt=0.25 the BGK shift is ~5.7%
-            &time_grid,
-            BarrierMonitoring::Continuous { start_step: 0 },
+            BarrierOptionParams { strike: 110.0, barrier: // strike (put ITM at terminal spot 95)
+            100.0, barrier_type: // true barrier
+            BarrierType::DownAndOut, option_type: OptionType::Put, rebate: None, notional: 1.0, maturity_step: 4, sigma: 0.2, time_grid: // sigma — with dt=0.25 the BGK shift is ~5.7%
+            &time_grid, monitoring: BarrierMonitoring::Continuous { start_step: 0 } },
         );
 
         // step 0: spot 105, above barrier (no initial breach).
@@ -949,20 +961,20 @@ mod tests {
     #[test]
     fn discrete_monitoring_ignores_between_observation_crossings() {
         let time_grid = TimeGrid::from_times(vec![0.0, 0.5, 1.0]).expect("grid should build");
-        let mut payoff = BarrierOptionPayoff::new(
-            80.0,
-            100.0,
-            BarrierType::UpAndOut,
-            OptionType::Call,
-            None,
-            1.0,
-            2,
-            0.2,
-            &time_grid,
-            BarrierMonitoring::Discrete {
+        let mut payoff = BarrierOptionPayoff::new(BarrierOptionParams {
+            strike: 80.0,
+            barrier: 100.0,
+            barrier_type: BarrierType::UpAndOut,
+            option_type: OptionType::Call,
+            rebate: None,
+            notional: 1.0,
+            maturity_step: 2,
+            sigma: 0.2,
+            time_grid: &time_grid,
+            monitoring: BarrierMonitoring::Discrete {
                 observation_steps: vec![2],
             },
-        );
+        });
 
         let mut initial = create_path_state(0, 0.0, 90.0, 0.5);
         payoff
@@ -987,18 +999,18 @@ mod tests {
     #[test]
     fn test_barrier_uses_step_dt_for_irregular_grid() {
         let time_grid = TimeGrid::from_times(vec![0.0, 0.2, 1.0]).expect("grid should build");
-        let mut barrier_call = BarrierOptionPayoff::new(
-            80.0,
-            100.0,
-            BarrierType::UpAndOut,
-            OptionType::Call,
-            None,
-            1.0,
-            2,
-            0.2,
-            &time_grid,
-            BarrierMonitoring::Continuous { start_step: 0 },
-        );
+        let mut barrier_call = BarrierOptionPayoff::new(BarrierOptionParams {
+            strike: 80.0,
+            barrier: 100.0,
+            barrier_type: BarrierType::UpAndOut,
+            option_type: OptionType::Call,
+            rebate: None,
+            notional: 1.0,
+            maturity_step: 2,
+            sigma: 0.2,
+            time_grid: &time_grid,
+            monitoring: BarrierMonitoring::Continuous { start_step: 0 },
+        });
 
         let mut s0 = create_path_state(0, 0.0, 90.0, 0.65);
         barrier_call.on_event(&mut s0).expect("valid payoff event");

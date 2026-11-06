@@ -137,8 +137,8 @@ from finstack_quant.core.money import Money
 from finstack_quant.valuations.instruments import FixedLegSpec,FloatLegSpec,InterestRateSwap,price_instrument,instrument_cashflows
 from _shared.analyst_book import build_market
 AS_OF = date(2025, 1, 15)
-fixed=FixedLegSpec('USD-OIS',.045,Tenor.semi_annual(),DayCount.THIRTY_360,'2025-04-15','2028-04-15',calendar_id='weekends_only')
-floating=FloatLegSpec('USD-OIS','USD-SOFR-3M',0,Tenor.quarterly(),DayCount.ACT_360,'2025-04-15','2028-04-15',calendar_id='weekends_only')
+fixed=FixedLegSpec(discount_curve_id='USD-OIS', rate="0.045", frequency=Tenor.semi_annual(), day_count=DayCount.THIRTY_360, start='2025-04-15', end='2028-04-15', calendar_id='weekends_only')
+floating=FloatLegSpec(discount_curve_id='USD-OIS', forward_curve_id='USD-SOFR-3M', spread_bp="0", frequency=Tenor.quarterly(), day_count=DayCount.ACT_360, start='2025-04-15', end='2028-04-15', calendar_id='weekends_only')
 leg_swap=(InterestRateSwap.builder().id('TYPED-IRS').notional(Money(2_000_000,'USD')).side('pay').fixed_leg(fixed).float_leg(floating).build())
 leg_market=build_market('rates');leg_value=price_instrument(leg_swap,leg_market,AS_OF,metrics=['par_rate'])
 leg_flows=json.loads(instrument_cashflows(leg_swap,leg_market,AS_OF,'discounting').to_json())['flows']
@@ -219,8 +219,8 @@ from finstack_quant.core.money import Money
 from finstack_quant.valuations.instruments import Swaption,FixedLegSpec,FloatLegSpec,price_instrument
 from _shared.analyst_book import build_market
 AS_OF = date(2025, 1, 15)
-fixed=FixedLegSpec('USD-OIS',.045,Tenor.semi_annual(),DayCount.THIRTY_360,'2026-01-15','2029-01-15',calendar_id='weekends_only')
-floating=FloatLegSpec('USD-OIS','USD-SOFR-3M',0.,Tenor.quarterly(),DayCount.ACT_360,'2026-01-15','2029-01-15',calendar_id='weekends_only')
+fixed=FixedLegSpec(discount_curve_id='USD-OIS', rate="0.045", frequency=Tenor.semi_annual(), day_count=DayCount.THIRTY_360, start='2026-01-15', end='2029-01-15', calendar_id='weekends_only')
+floating=FloatLegSpec(discount_curve_id='USD-OIS', forward_curve_id='USD-SOFR-3M', spread_bp="0", frequency=Tenor.quarterly(), day_count=DayCount.ACT_360, start='2026-01-15', end='2029-01-15', calendar_id='weekends_only')
 payer=(Swaption.builder().id('TYPED-PAYER-SWAPTION').option_type('call').notional(Money(2_000_000,'USD'))
  .expiry('2026-01-13').settlement('physical').cash_settlement_method('collateralized_cash_price')
  .vol_model('black').vol_surface_id('USD-SWPNVOL').underlying_fixed_leg(fixed).underlying_float_leg(floating).build())

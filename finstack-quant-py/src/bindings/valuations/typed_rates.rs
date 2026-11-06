@@ -72,41 +72,16 @@ instrument_pricing_methods!(
 impl PyInterestRateSwap {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "InterestRateSwap.from_conventions")]
     #[staticmethod]
-    #[pyo3(signature = (id, notional, side, fixed_rate, start_date, maturity, index_id, discount_curve_id, forward_curve_id, *, currency = None))]
-    #[pyo3(
-        text_signature = "(id, notional, side, fixed_rate, start_date, maturity, index_id, discount_curve_id, forward_curve_id, *, currency=None)"
-    )]
-    // PyO3 binding: the argument list mirrors the Python keyword-argument API.
-    #[allow(clippy::too_many_arguments)]
-    fn from_conventions(
-        id: &str,
-        notional: &Bound<'_, PyAny>,
-        side: &str,
-        fixed_rate: &Bound<'_, PyAny>,
-        start_date: &Bound<'_, PyAny>,
-        maturity: &Bound<'_, PyAny>,
-        index_id: &str,
-        discount_curve_id: &str,
-        forward_curve_id: &str,
-        currency: Option<&str>,
-    ) -> PyResult<Self> {
-        let params = finstack_quant_valuations::instruments::rates::irs::ConventionSwapParams {
-            id: InstrumentId::new(id.to_string()),
-            notional: money_from_py(notional, currency, "notional")?,
-            side: enum_from_str(side, "side")?,
-            fixed_rate: extract_rate_decimal(fixed_rate, "fixed_rate")?,
-            start_date: py_to_date(start_date)?,
-            maturity: py_to_date(maturity)?,
-            index_id,
-            discount_curve_id,
-            forward_curve_id,
-        };
-        let inner =
-            finstack_quant_valuations::instruments::rates::irs::InterestRateSwap::from_conventions(
-                params,
-            )
-            .map_err(core_to_py)?;
-        Ok(Self { inner })
+    #[pyo3(text_signature = "(params)")]
+    fn from_conventions(params: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let params = crate::bindings::module_utils::spec_from_py::<
+            finstack_quant_valuations::instruments::rates::irs::ConventionSwapParams,
+        >(params.py(), params, "ConventionSwapParams")?;
+        finstack_quant_valuations::instruments::rates::irs::InterestRateSwap::from_conventions(
+            params,
+        )
+        .map(|inner| Self { inner })
+        .map_err(core_to_py)
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "InterestRateSwap.example")]
@@ -190,14 +165,12 @@ impl PyInterestRateSwapBuilder {
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "InterestRateSwapBuilder.notional")]
-    #[pyo3(signature = (value, currency = None))]
-    #[pyo3(text_signature = "($self, value, currency=None)")]
+    #[pyo3(text_signature = "($self, value)")]
     fn notional<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
-        currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let money = money_from_py(value, currency, "notional")?;
+        let money = money_from_py(value, "notional")?;
         builder_set!(
             slf,
             notional,
@@ -471,14 +444,12 @@ impl PySwaptionBuilder {
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "SwaptionBuilder.notional")]
-    #[pyo3(signature = (value, currency = None))]
-    #[pyo3(text_signature = "($self, value, currency=None)")]
+    #[pyo3(text_signature = "($self, value)")]
     fn notional<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
-        currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let money = money_from_py(value, currency, "notional")?;
+        let money = money_from_py(value, "notional")?;
         builder_set!(slf, notional, money_repr(money), |b: SwaptionBuilder| b
             .notional(money))
     }
@@ -783,14 +754,12 @@ impl PyCapFloorBuilder {
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloorBuilder.notional")]
-    #[pyo3(signature = (value, currency = None))]
-    #[pyo3(text_signature = "($self, value, currency=None)")]
+    #[pyo3(text_signature = "($self, value)")]
     fn notional<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
-        currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let money = money_from_py(value, currency, "notional")?;
+        let money = money_from_py(value, "notional")?;
         builder_set!(slf, notional, money_repr(money), |b: CapFloorBuilder| b
             .notional(money))
     }
@@ -824,16 +793,14 @@ impl PyCapFloorBuilder {
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_rates", "CapFloorBuilder.premium")]
-    #[pyo3(signature = (payment_date, amount, currency = None))]
-    #[pyo3(text_signature = "($self, payment_date, amount, currency=None)")]
+    #[pyo3(text_signature = "($self, payment_date, amount)")]
     fn premium<'py>(
         mut slf: PyRefMut<'py, Self>,
         payment_date: &Bound<'_, PyAny>,
         amount: &Bound<'_, PyAny>,
-        currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let payment_date = py_to_date(payment_date)?;
-        let amount = money_from_py(amount, currency, "amount")?;
+        let amount = money_from_py(amount, "amount")?;
         builder_set!(
             slf,
             premium,

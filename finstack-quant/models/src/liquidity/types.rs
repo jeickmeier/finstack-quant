@@ -80,13 +80,17 @@ pub struct LiquidityProfile {
     /// [`SpreadVolatilityKind::Relative`] (the original Bangia convention).
     pub spread_volatility: f64,
 
-    /// Interpretation of [`Self::spread_volatility`]: relative or absolute.
+    /// Interpretation of [`Self::spread_volatility`]: relative or absolute
+    /// (`relative` when omitted from the wire form).
+    #[serde(default)]
     pub spread_volatility_kind: SpreadVolatilityKind,
 
     /// Observation window in trading days for volume/spread statistics.
     ///
-    /// Defaults to 20 (one calendar month). Used to qualify the
-    /// statistical reliability of ADV and spread estimates.
+    /// Defaults to 20 (one calendar month) when omitted from the wire form.
+    /// Used to qualify the statistical reliability of ADV and spread
+    /// estimates.
+    #[serde(default = "default_observation_days")]
     pub observation_days: u32,
 }
 
@@ -100,8 +104,15 @@ struct LiquidityProfileWire {
     avg_daily_volume: f64,
     avg_trade_size: f64,
     spread_volatility: f64,
+    #[serde(default)]
     spread_volatility_kind: SpreadVolatilityKind,
+    #[serde(default = "default_observation_days")]
     observation_days: u32,
+}
+
+/// Serde default of [`LiquidityProfile::observation_days`].
+fn default_observation_days() -> u32 {
+    LiquidityProfile::DEFAULT_OBSERVATION_DAYS
 }
 
 impl<'de> Deserialize<'de> for LiquidityProfile {

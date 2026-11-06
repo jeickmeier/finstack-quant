@@ -22,7 +22,10 @@ fn parse(result: &JsValue) -> Result<ValuationResult, JsValue> {
 /// @returns The measure value, or `undefined` when the result has no such key.
 /// @throws Error - Throws with kind `validation` if `result` does not match the `ValuationResult` schema, and kind `invalid_type` if `key` is not a string.
 #[wasm_bindgen(js_name = valuationResultGetMetric)]
-pub fn valuation_result_get_metric(result: JsValue, key: JsValue) -> Result<Option<f64>, JsValue> {
+pub fn valuation_result_get_metric(
+    #[wasm_bindgen(unchecked_param_type = "ValuationResult | string")] result: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] key: JsValue,
+) -> Result<Option<f64>, JsValue> {
     Ok(parse(&result)?.metric_str(&js_string(&key, "key")?))
 }
 
@@ -32,8 +35,10 @@ pub fn valuation_result_get_metric(result: JsValue, key: JsValue) -> Result<Opti
 /// @param result - `ValuationResult` object returned by `priceInstrument` (or its canonical JSON); 64-bit fields may be `BigInt`.
 /// @returns Map of metric key to its unit name (for example `"currency_per_bp"`), in measure order.
 /// @throws Error - Throws with kind `validation` if `result` does not match the `ValuationResult` schema.
-#[wasm_bindgen(js_name = valuationResultMetricUnits)]
-pub fn valuation_result_metric_units(result: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = valuationResultMetricUnits, unchecked_return_type = "Record<string, string>")]
+pub fn valuation_result_metric_units(
+    #[wasm_bindgen(unchecked_param_type = "ValuationResult | string")] result: JsValue,
+) -> Result<JsValue, JsValue> {
     let units: IndexMap<String, &'static str> = parse(&result)?
         .metric_units()
         .into_iter()
@@ -49,7 +54,9 @@ pub fn valuation_result_metric_units(result: JsValue) -> Result<JsValue, JsValue
 /// @returns `true` when all covenants passed or the result carries no covenant reports.
 /// @throws Error - Throws with kind `validation` if `result` does not match the `ValuationResult` schema.
 #[wasm_bindgen(js_name = valuationResultAllCovenantsPassed)]
-pub fn valuation_result_all_covenants_passed(result: JsValue) -> Result<bool, JsValue> {
+pub fn valuation_result_all_covenants_passed(
+    #[wasm_bindgen(unchecked_param_type = "ValuationResult | string")] result: JsValue,
+) -> Result<bool, JsValue> {
     Ok(parse(&result)?.all_covenants_passed())
 }
 
@@ -60,7 +67,9 @@ pub fn valuation_result_all_covenants_passed(result: JsValue) -> Result<bool, Js
 /// @returns Covenant identifiers whose report did not pass; empty when none failed.
 /// @throws Error - Throws with kind `validation` if `result` does not match the `ValuationResult` schema.
 #[wasm_bindgen(js_name = valuationResultFailedCovenants)]
-pub fn valuation_result_failed_covenants(result: JsValue) -> Result<Vec<String>, JsValue> {
+pub fn valuation_result_failed_covenants(
+    #[wasm_bindgen(unchecked_param_type = "ValuationResult | string")] result: JsValue,
+) -> Result<Vec<String>, JsValue> {
     Ok(parse(&result)?
         .failed_covenants()
         .into_iter()
@@ -103,7 +112,9 @@ pub(super) fn valuation_result_value(result: &ValuationResult) -> Result<JsValue
 /// `ValuationResult` schema (for example a seed given as a string) or the
 /// canonical result cannot be serialized.
 #[wasm_bindgen(js_name = valuationResultToJson)]
-pub fn valuation_result_to_json(result: JsValue) -> Result<String, JsValue> {
+pub fn valuation_result_to_json(
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] result: JsValue,
+) -> Result<String, JsValue> {
     let result: ValuationResult = from_js_json(&result, "result")?;
     valuation_result_json(result)
 }
@@ -122,8 +133,11 @@ pub fn valuation_result_to_json(result: JsValue) -> Result<String, JsValue> {
 ///
 /// Throws with kind `validation` if `result` does not match the
 /// `ValuationResult` schema or `base` is not a canonically encoded metric key.
-#[wasm_bindgen(js_name = valuationResultMetricSeries)]
-pub fn valuation_result_metric_series(result: JsValue, base: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = valuationResultMetricSeries, unchecked_return_type = "[string[], number][]")]
+pub fn valuation_result_metric_series(
+    #[wasm_bindgen(unchecked_param_type = "ValuationResult | string")] result: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] base: JsValue,
+) -> Result<JsValue, JsValue> {
     let result: ValuationResult = from_js_json(&result, "result")?;
     let base: finstack_quant_valuations::metrics::MetricId =
         js_string(&base, "base")?.parse().map_err(to_js_err)?;

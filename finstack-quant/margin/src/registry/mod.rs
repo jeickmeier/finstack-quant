@@ -381,11 +381,42 @@ pub fn build_registry(overlay: Option<&Value>) -> Result<MarginRegistry> {
     })
 }
 
+/// Version of every margin registry file this crate reads.
+const REGISTRY_FILE_VERSION: u32 = 1;
+
+/// Check a registry file's optional `schema` / `version` envelope.
+///
+/// Overlays may omit both; when present, `schema` must name the file kind and
+/// `version` must be [`REGISTRY_FILE_VERSION`], so a file written for another
+/// format version is rejected instead of being read as this one.
+fn check_envelope(schema: Option<&str>, version: Option<u32>, expected: &str) -> Result<()> {
+    if let Some(schema) = schema
+        && schema != expected
+    {
+        return Err(Error::Validation(format!(
+            "margin registry file has schema {schema:?}, expected {expected:?}"
+        )));
+    }
+    if let Some(version) = version
+        && version != REGISTRY_FILE_VERSION
+    {
+        return Err(Error::Validation(format!(
+            "margin registry file {expected} has version {version}, expected {REGISTRY_FILE_VERSION}"
+        )));
+    }
+    Ok(())
+}
+
 fn parse_schedule_im(value: Option<&Value>) -> Result<FxHashMap<String, ScheduleImSchedule>> {
     let Some(val) = value else {
         return Err(Error::Validation("schedule_im section missing".to_string()));
     };
     let file: wire::ScheduleImFile = serde_json::from_value(val.clone()).map_err(to_validation)?;
+    check_envelope(
+        file.schema.as_deref(),
+        file.version,
+        "finstack_quant.margin.schedule_im.v1",
+    )?;
     let mut map = FxHashMap::default();
     for entry in file.entries {
         let record = entry.record;
@@ -456,6 +487,11 @@ fn parse_collateral_schedules(
     };
     let file: wire::CollateralSchedulesFile =
         serde_json::from_value(val.clone()).map_err(to_validation)?;
+    check_envelope(
+        file.schema.as_deref(),
+        file.version,
+        "finstack_quant.margin.collateral_schedules.v1",
+    )?;
 
     let mut defaults = FxHashMap::default();
     for def in file.asset_class_defaults {
@@ -521,6 +557,11 @@ fn parse_defaults(value: Option<&Value>) -> Result<MarginDefaults> {
         return Err(Error::Validation("defaults section missing".to_string()));
     };
     let file: wire::DefaultsFile = serde_json::from_value(val.clone()).map_err(to_validation)?;
+    check_envelope(
+        file.schema.as_deref(),
+        file.version,
+        "finstack_quant.margin.defaults.v1",
+    )?;
 
     let vm_frequency = parse_margin_tenor(&file.defaults.vm.frequency)?;
     let vm = VmDefaults {
@@ -563,6 +604,11 @@ fn parse_ccp(value: Option<&Value>) -> Result<ParsedCcpRegistry> {
         return Err(Error::Validation("ccp section missing".to_string()));
     };
     let file: wire::CcpFile = serde_json::from_value(val.clone()).map_err(to_validation)?;
+    check_envelope(
+        file.schema.as_deref(),
+        file.version,
+        "finstack_quant.margin.ccp.v1",
+    )?;
     let mut map = FxHashMap::default();
     let mut default_params: Option<CcpParams> = None;
     for entry in file.entries {
@@ -602,6 +648,11 @@ fn parse_simm(value: Option<&Value>) -> Result<FxHashMap<String, SimmParams>> {
         return Err(Error::Validation("simm section missing".to_string()));
     };
     let file: wire::SimmFile = serde_json::from_value(val.clone()).map_err(to_validation)?;
+    check_envelope(
+        file.schema.as_deref(),
+        file.version,
+        "finstack_quant.margin.simm.v1",
+    )?;
     let mut map = FxHashMap::default();
     for entry in file.entries {
         let record = entry.record;
@@ -1794,11 +1845,38 @@ mod tests {
     }
 
     #[test]
+    fn registry_files_reject_a_foreign_schema_or_version() {
+        assert!(check_envelope(None, None, "finstack_quant.margin.ccp.v1").is_ok());
+        assert!(
+            check_envelope(
+                Some("finstack_quant.margin.ccp.v1"),
+                Some(1),
+                "finstack_quant.margin.ccp.v1"
+            )
+            .is_ok()
+        );
+        let schema = check_envelope(
+            Some("finstack_quant.margin.simm.v1"),
+            None,
+            "finstack_quant.margin.ccp.v1",
+        )
+        .expect_err("a SIMM file must not parse as a CCP file");
+        assert!(
+            schema
+                .to_string()
+                .contains("expected \"finstack_quant.margin.ccp.v1\"")
+        );
+        let version = check_envelope(None, Some(2), "finstack_quant.margin.ccp.v1")
+            .expect_err("a version-2 file must be rejected");
+        assert!(version.to_string().contains("version 2"));
+    }
+
+    #[test]
     fn schedule_im_rejects_implausible_default_maturity() {
         // Synthesise a minimal ScheduleImFile with a bogus
         // default_maturity_years = 1000.0 and verify the parser bails.
         let val = serde_json::json!({
-            "schema": "schedule_im.v1",
+            "schema": "finstack_quant.margin.schedule_im.v1",
             "version": 1,
             "entries": [{
                 "ids": ["test"],
@@ -1830,7 +1908,7 @@ mod tests {
         // entirely; the parser must reject because v2.6 requires the
         // explicit table and no fabricated fallback is permitted.
         let val = serde_json::json!({
-            "schema": "simm.v1",
+            "schema": "finstack_quant.margin.simm.v1",
             "version": 1,
             "entries": [{
                 "ids": ["v2_6"],

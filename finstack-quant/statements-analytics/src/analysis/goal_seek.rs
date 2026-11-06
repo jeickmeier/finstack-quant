@@ -10,7 +10,7 @@
 //! use finstack_quant_statements::Result;
 //! use finstack_quant_statements::builder::ModelBuilder;
 //! use finstack_quant_statements::types::{AmountOrScalar, ForecastSpec};
-//! use finstack_quant_statements_analytics::analysis::goal_seek;
+//! use finstack_quant_statements_analytics::analysis::{GoalSeekSpec, goal_seek};
 //! use finstack_quant_core::dates::PeriodId;
 //!
 //! # fn main() -> Result<()> {
@@ -29,16 +29,16 @@
 //!
 //! // Solve for Q4 revenue that achieves 2.0x interest coverage
 //! let target_period = PeriodId::quarter(2025, 4).expect("valid period fixture");
-//! let result = goal_seek(
-//!     &model,
-//!     "interest_coverage",
+//! let spec = GoalSeekSpec {
+//!     target_node: "interest_coverage".to_string(),
 //!     target_period,
-//!     2.0,
-//!     "revenue",
-//!     target_period,
-//!     true,  // Return the model with the solution written in
-//!     None,
-//! )?;
+//!     target_value: 2.0,
+//!     driver_node: "revenue".to_string(),
+//!     driver_period: target_period,
+//!     update_model: true, // Return the model with the solution written in
+//!     bounds: None,
+//! };
+//! let result = goal_seek(&model, &spec)?;
 //!
 //! println!("Revenue needed: ${:.2}", result.solved_value);
 //! assert!(result.model.is_some());
@@ -54,6 +54,37 @@ use finstack_quant_statements::types::{
 };
 use finstack_quant_statements::{Error, Result};
 use std::cell::{Cell, RefCell};
+
+/// What a [`goal_seek`] solve targets and which driver it varies.
+///
+/// The serde form is the host input of `goal_seek`: periods are period
+/// strings such as `"2025Q4"`, `bounds` is an optional `[lower, upper]` array
+/// (default `null`), and every other field is required; an unknown field is
+/// rejected.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct GoalSeekSpec {
+    /// Node identifier of the target metric.
+    pub target_node: String,
+    /// Period in which the target is evaluated.
+    pub target_period: PeriodId,
+    /// Desired value of the target metric, in the target node's units; must
+    /// be finite.
+    pub target_value: f64,
+    /// Node identifier of the driver input the solve varies.
+    pub driver_node: String,
+    /// Period whose driver value the solve varies.
+    pub driver_period: PeriodId,
+    /// When `true`, [`GoalSeekResult::model`] holds a copy of the model with
+    /// the solved driver value written in; when `false` it is `None`.
+    pub update_model: bool,
+    /// Optional `(lower, upper)` bracket, in the driver node's units, that
+    /// constrains the search; both ends must be finite and `lower < upper`.
+    /// `None` (the default) searches outward from the driver's current value.
+    #[serde(default)]
+    pub bounds: Option<(f64, f64)>,
+}
 
 /// Outcome of a [`goal_seek`] solve.
 ///
@@ -160,18 +191,9 @@ impl GoalSeekResult {
 /// # Arguments
 ///
 /// * `model` - Financial model to solve against; left unchanged
-/// * `target_node` - Node identifier for the target metric
-/// * `target_period` - Period in which to evaluate the target
-/// * `target_value` - Desired value for the target metric, in the target
-///   node's units; must be finite
-/// * `driver_node` - Node identifier for the driver input to vary
-/// * `driver_period` - Period in which to vary the driver
-/// * `update_model` - When `true`, [`GoalSeekResult::model`] holds a copy of
-///   `model` with the solved driver value written in; when `false` it is
-///   `None`
-/// * `bounds` - Optional `(lower, upper)` bracket, in the driver node's
-///   units, to constrain the search; both ends must be finite and
-///   `lower < upper`
+/// * `spec` - Target node, period and value, driver node and period, the
+///   `update_model` write-back flag and the optional search `bounds`; see
+///   [`GoalSeekSpec`] for each field's units and constraints
 ///
 /// # Returns
 ///
@@ -198,7 +220,7 @@ impl GoalSeekResult {
 /// use finstack_quant_statements::builder::ModelBuilder;
 /// use finstack_quant_statements::evaluator::Evaluator;
 /// use finstack_quant_statements::types::AmountOrScalar;
-/// use finstack_quant_statements_analytics::analysis::goal_seek;
+/// use finstack_quant_statements_analytics::analysis::{GoalSeekSpec, goal_seek};
 /// use finstack_quant_core::dates::PeriodId;
 ///
 /// # fn main() -> Result<()> {
@@ -220,16 +242,16 @@ impl GoalSeekResult {
 /// // Solve for the revenue that achieves $18,000 of net income. Explicit bounds
 /// // give the root-finder a bracket that is guaranteed to contain the solution.
 /// let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-/// let solved = goal_seek(
-///     &model,
-///     "net_income",
-///     period,
-///     18_000.0,
-///     "revenue",
-///     period,
-///     false,
-///     Some((50_000.0, 200_000.0)),
-/// )?;
+/// let spec = GoalSeekSpec {
+///     target_node: "net_income".to_string(),
+///     target_period: period,
+///     target_value: 18_000.0,
+///     driver_node: "revenue".to_string(),
+///     driver_period: period,
+///     update_model: false,
+///     bounds: Some((50_000.0, 200_000.0)),
+/// };
+/// let solved = goal_seek(&model, &spec)?;
 /// // Expected: 18_000 / 0.15 = 120_000
 /// assert!((solved.solved_value - 120_000.0).abs() < 10.0);
 /// assert!(solved.model.is_none());
@@ -240,17 +262,19 @@ impl GoalSeekResult {
 /// # References
 ///
 /// - Root-finding background: `docs/REFERENCES.md#press-numerical-recipes`
-#[allow(clippy::too_many_arguments)]
-pub fn goal_seek(
-    model: &FinancialModelSpec,
-    target_node: &str,
-    target_period: PeriodId,
-    target_value: f64,
-    driver_node: &str,
-    driver_period: PeriodId,
-    update_model: bool,
-    bounds: Option<(f64, f64)>,
-) -> Result<GoalSeekResult> {
+pub fn goal_seek(model: &FinancialModelSpec, spec: &GoalSeekSpec) -> Result<GoalSeekResult> {
+    let GoalSeekSpec {
+        target_node,
+        target_period,
+        target_value,
+        driver_node,
+        driver_period,
+        update_model,
+        bounds,
+    } = spec;
+    let (target_node, driver_node) = (target_node.as_str(), driver_node.as_str());
+    let (target_period, target_value) = (*target_period, *target_value);
+    let (driver_period, update_model, bounds) = (*driver_period, *update_model, *bounds);
     if !target_value.is_finite() {
         return Err(Error::invalid_input("Goal-seek target must be finite"));
     }

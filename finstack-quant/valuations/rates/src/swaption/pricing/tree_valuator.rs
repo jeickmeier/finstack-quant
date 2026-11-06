@@ -346,19 +346,23 @@ mod tests {
         let swap_end = Date::from_calendar_date(2030, Month::January, 1).expect("Valid date");
         let first_exercise = Date::from_calendar_date(2026, Month::January, 1).expect("Valid date");
 
-        BermudanSwaption::new(
-            "TEST-BERM",
-            OptionType::Call,
-            Money::from((10_000_000_i64, Currency::USD)),
-            0.03,
-            swap_start,
-            swap_end,
-            BermudanSchedule::co_terminal(first_exercise, swap_end, Tenor::semi_annual())
-                .expect("valid Bermudan schedule"),
-            "USD-OIS",
-            "USD-OIS",
-            "USD-VOL",
-        )
+        BermudanSwaption::new(crate::swaption::BermudanSwaptionParams {
+            id: "TEST-BERM".into(),
+            option_type: OptionType::Call,
+            notional: Money::from((10_000_000_i64, Currency::USD)),
+            strike: 0.03,
+            underlying_start_date: swap_start,
+            underlying_maturity: swap_end,
+            exercise_schedule: BermudanSchedule::co_terminal(
+                first_exercise,
+                swap_end,
+                Tenor::semi_annual(),
+            )
+            .expect("valid Bermudan schedule"),
+            discount_curve_id: "USD-OIS".into(),
+            forward_curve_id: "USD-OIS".into(),
+            vol_surface_id: "USD-VOL".into(),
+        })
         .expect("valid Bermudan swaption")
     }
 

@@ -20,7 +20,7 @@ Y compensation targets E[sigma²]=sigma_base² only under the assumed driver lev
 
 ## Evidence
 
-[Process](../../../../finstack-quant/models/src/monte_carlo/process/cheyette_rough.rs), [stepper](../../../../finstack-quant/models/src/monte_carlo/discretization/cheyette_rough.rs); located tests cover interpolation, left-endpoint sigma, variance mean and zero-mean stochastic increments. [Non-Markov tests](../../../../finstack-quant/models/src/monte_carlo/simulate/non_markov_tests.rs) explicitly exclude the short-window case from compensated-mean assertions. [Gatheral–Jaisson–Rosenbaum](../../../REFERENCES.md#gatheral-jaisson-rosenbaum-2018) is rough-volatility context, not a derivation of this Cheyette extension. A direct Cheyette rough-model primary reference, pricing benchmark and adoption rationale are missing.
+[Process](../../../../finstack-quant/models/src/monte_carlo/process/cheyette_rough.rs), [stepper](../../../../finstack-quant/models/src/monte_carlo/discretization/cheyette_rough.rs); located tests cover interpolation, left-endpoint sigma, variance mean and zero-mean stochastic increments. [Non-Markov tests](../../../../finstack-quant/models/src/monte_carlo/simulate/tests/non_markov.rs) explicitly exclude the short-window case from compensated-mean assertions. [Gatheral–Jaisson–Rosenbaum](../../../REFERENCES.md#gatheral-jaisson-rosenbaum-2018) is rough-volatility context, not a derivation of this Cheyette extension. A direct Cheyette rough-model primary reference, pricing benchmark and adoption rationale are missing.
 
 ## Follow-up tracking
 

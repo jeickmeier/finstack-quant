@@ -162,15 +162,15 @@ class TestModelBuilderCapitalStructure:
 
     def test_add_swap_appears_in_model_json(self, usd: Currency) -> None:
         b = statements.ModelBuilder("deal")
-        b.add_swap(
-            id="SWAP-001",
-            notional=Money(5_000_000.0, usd),
-            fixed_rate=0.04,
-            start_date=date(2025, 1, 15),
-            maturity_date=date(2030, 1, 15),
-            discount_curve_id="USD-OIS",
-            forward_curve_id="USD-SOFR-3M",
-        )
+        b.add_swap({
+            "id": "SWAP-001",
+            "notional": Money(5_000_000.0, usd),
+            "fixed_rate": 0.04,
+            "start_date": date(2025, 1, 15),
+            "maturity_date": date(2030, 1, 15),
+            "discount_curve_id": "USD-OIS",
+            "forward_curve_id": "USD-SOFR-3M",
+        })
         b.periods("2025Q1..Q4", None)
         b.value("x", [("2025Q1", 1.0)])
         model = b.build()

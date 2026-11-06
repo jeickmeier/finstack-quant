@@ -69,12 +69,12 @@ def _single_tranche() -> Tranche:
 
 def _single_rep_line() -> RepLine:
     return RepLine(
-        "LINE-1",
-        Money(80_000_000.0, Currency("USD")),
-        0.07,
-        datetime.date(2031, 1, 15),
-        12,
-        DayCount.ACT_360,
+        id="LINE-1",
+        balance=Money(80_000_000.0, Currency("USD")),
+        rate=0.07,
+        maturity=datetime.date(2031, 1, 15),
+        seasoning_months=12,
+        day_count=DayCount.ACT_360,
         asset_type={"type": "first_lien_loan"},
     )
 
@@ -84,7 +84,7 @@ def test_swaption_builder_setters_accept_keyword_value() -> None:
     end = datetime.date(2030, 1, 15)
     fixed = FixedLegSpec(
         discount_curve_id="USD-OIS",
-        rate=0.04,
+        rate="0.04",
         frequency=Tenor.semi_annual(),
         day_count=DayCount.THIRTY_360,
         start=start,
@@ -93,7 +93,7 @@ def test_swaption_builder_setters_accept_keyword_value() -> None:
     float_leg = FloatLegSpec(
         discount_curve_id="USD-OIS",
         forward_curve_id="USD-SOFR-3M",
-        spread_bp=0.0,
+        spread_bp="0",
         frequency=Tenor.quarterly(),
         day_count=DayCount.ACT_360,
         start=start,
@@ -172,9 +172,7 @@ def test_fx_option_builder_setters_accept_keyword_value() -> None:
         .strike(value=1.12)
         .option_type(value="call")
         .delta_convention(
-            kind="forward",
-            premium_currency=Currency("USD"),
-            venue="generic_interbank",
+            value={"kind": "forward", "premium_currency": Currency("USD"), "venue": "generic_interbank"},
         )
         .expiry(value=datetime.date(2025, 12, 15))
         .notional(value=Money(1_000_000.0, Currency("EUR")))
@@ -270,7 +268,7 @@ def test_premium_and_protection_leg_spec_accept_keyword_arguments() -> None:
         end=datetime.date(2029, 6, 20),
         frequency=Tenor.quarterly(),
         day_count=DayCount.ACT_360,
-        coupon_bp=100.0,
+        coupon_bp="100",
         discount_curve_id="USD-OIS",
         stub="short_front",
         business_day_convention="modified_following",

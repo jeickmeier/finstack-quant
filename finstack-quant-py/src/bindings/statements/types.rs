@@ -572,7 +572,7 @@ fn parse_params(
 )]
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct PyNodeType {
-    pub(super) inner: finstack_quant_statements::types::NodeType,
+    pub(crate) inner: finstack_quant_statements::types::NodeType,
 }
 
 #[pymethods]
@@ -739,72 +739,57 @@ wire_methods!(PyNodeSpec, NodeSpec, "NodeSpec");
 
 #[pymethods]
 impl PyNodeSpec {
-    /// Build a node specification.
+    /// Build a node specification from its keyword-only fields.
+    ///
+    /// Rust reads the keywords as one ``NodeSpec`` document: each field takes
+    /// its serde wire form (or a typed object the JSON hook writes as that
+    /// form), Rust supplies the defaults, and an unknown keyword raises.
     ///
     /// Parameters
     /// ----------
     /// node_id : str
     ///     Unique node identifier as referenced from formulas.
-    /// node_type : NodeType
+    /// node_type : NodeType | str
     ///     ``NodeType.value()``, ``NodeType.calculated()`` or
-    ///     ``NodeType.mixed()``; determines which of the other fields may be
-    ///     set (a value node cannot carry a formula, a calculated node cannot
-    ///     carry values or a forecast).
+    ///     ``NodeType.mixed()`` (or ``"value"`` / ``"calculated"`` /
+    ///     ``"mixed"``).
     /// name : str | None
     ///     Optional human-readable label used in reports.
-    /// values : Mapping[str, float | Money] | Sequence[tuple[str, float | Money]] | pd.Series | None
+    /// values : Mapping[str, float | Money] | None
     ///     Explicit per-period values keyed by period id (``"2025Q1"``);
-    ///     ``Money`` cells make the node monetary in that currency, floats
-    ///     make it scalar. Mixing is rejected at model build.
+    ///     ``Money`` cells make the node monetary, floats make it scalar.
+    /// availability_dates : Mapping[str, datetime.date | str]
+    ///     Publication date of each explicit observation. Default ``{}``.
     /// forecast : ForecastSpec | None
     ///     Projection rule for forecast periods (mixed nodes).
     /// formula_text : str | None
     ///     Statements DSL expression (calculated and mixed nodes).
     /// where_text : str | None
     ///     Optional DSL predicate; periods where it is false evaluate to 0.
-    /// tags : list[str] | None
-    ///     Free-form labels for grouping and filtering.
+    /// tags : list[str]
+    ///     Free-form labels for grouping and filtering. Default ``[]``.
+    /// value_type : dict | None
+    ///     Serde ``NodeValueType`` (``{"type": "monetary", "currency": "USD"}``
+    ///     or ``{"type": "scalar"}``); ``None`` infers it from the values.
     /// rollup : str | None
-    ///     How the line rolls up to a coarser frequency: ``"sum"`` (flows),
-    ///     ``"period_end"`` (balances, trailing metrics) or ``"formula"``
-    ///     (ratios). ``None`` sums. A ``RollupSpec`` entry overrides it.
+    ///     ``"sum"``, ``"period_end"`` or ``"formula"``; ``None`` sums.
+    /// meta : Mapping[str, Any]
+    ///     Free-form JSON metadata. Default ``{}``.
     ///
     /// Raises
     /// ------
     /// ValueError
-    ///     If a period id does not parse, a value is neither numeric nor
-    ///     ``Money``, or ``rollup`` is not a recognized method.
+    ///     If a field is missing or has the wrong wire form, a keyword is
+    ///     unknown, a period id does not parse, or ``rollup`` is not a
+    ///     recognized method.
     #[new]
     #[pyo3(
-        signature = (node_id, node_type, name=None, values=None, forecast=None, formula_text=None, where_text=None, tags=None, rollup=None),
-        text_signature = "(node_id, node_type, name=None, values=None, forecast=None, formula_text=None, where_text=None, tags=None, rollup=None)"
+        signature = (**fields),
+        text_signature = "(*, node_id, node_type, name=None, values=None, availability_dates={}, forecast=None, formula_text=None, where_text=None, tags=[], value_type=None, rollup=None, meta={})"
     )]
-    #[allow(clippy::too_many_arguments)]
-    fn new(
-        node_id: &str,
-        node_type: PyRef<'_, PyNodeType>,
-        name: Option<String>,
-        values: Option<&Bound<'_, PyAny>>,
-        forecast: Option<PyRef<'_, PyForecastSpec>>,
-        formula_text: Option<String>,
-        where_text: Option<String>,
-        tags: Option<Vec<String>>,
-        rollup: Option<&str>,
-    ) -> PyResult<Self> {
-        let mut inner = NodeSpec::new(node_id, node_type.inner);
-        inner.name = name;
-        if let Some(values) = values {
-            let pairs = super::extract_value_series(values)?;
-            inner.values = Some(pairs.into_iter().collect());
-        }
-        inner.forecast = forecast.map(|f| f.inner.clone());
-        inner.formula_text = formula_text;
-        inner.where_text = where_text;
-        inner.tags = tags.unwrap_or_default();
-        inner.rollup = rollup
-            .map(finstack_quant_core::wire::serde_parse)
-            .transpose()
-            .map_err(core_to_py)?;
+    fn new(py: Python<'_>, fields: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
+        let inner: NodeSpec =
+            crate::bindings::module_utils::fields_from_py(py, fields, "NodeSpec")?;
         Ok(Self { inner })
     }
 

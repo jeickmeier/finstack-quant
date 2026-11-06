@@ -184,14 +184,16 @@ fn test_single_curve_buy_vs_sell_protection() {
     // Sell protection (receive fixed)
     let idx_sell = CdsIndex::from_preset(
         &standard_cdx_params(),
-        "CDX-SELL",
-        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
-        PayReceive::Receive,
-        start,
-        end,
-        STANDARD_RECOVERY_SENIOR,
-        "USD-OIS",
-        "HZ-INDEX",
+        finstack_quant_valuations::instruments::credit_derivatives::cds::CdsTradeParams {
+            id: finstack_quant_core::types::InstrumentId::new("CDX-SELL"),
+            notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+            side: PayReceive::Receive,
+            start,
+            end,
+            recovery_rate: STANDARD_RECOVERY_SENIOR,
+            discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
+            credit_curve_id: finstack_quant_core::types::CurveId::new("HZ-INDEX"),
+        },
     )
     .expect("valid test parameters");
 

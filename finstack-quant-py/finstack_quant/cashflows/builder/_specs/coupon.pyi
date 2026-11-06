@@ -267,7 +267,10 @@ class FloatingCouponSpec:
     ...     FloatingRateSpec,
     ...     ScheduleParams,
     ... )
-    >>> rate_spec = FloatingRateSpec(forward_curve_id="USD-SOFR-3M", spread_bp=Decimal("200"), reset_frequency="3M")
+    >>> from finstack_quant.core.dates import Tenor
+    >>> rate_spec = FloatingRateSpec(
+    ...     forward_curve_id="USD-SOFR-3M", spread_bp=Decimal("200"), reset_frequency=Tenor.parse("3M")
+    ... )
     >>> spec = FloatingCouponSpec(rate_spec, ScheduleParams.usd_sofr_swap())
     >>> spec.rate_spec.forward_curve_id
     'USD-SOFR-3M'
@@ -500,69 +503,78 @@ class FloatingRateSpec:
     --------
     >>> from decimal import Decimal
     >>> from finstack_quant.cashflows.builder import FloatingRateSpec
-    >>> spec = FloatingRateSpec(forward_curve_id="USD-SOFR-3M", spread_bp=Decimal("200"), reset_frequency="3M")
+    >>> from finstack_quant.core.dates import Tenor
+    >>> spec = FloatingRateSpec(
+    ...     forward_curve_id="USD-SOFR-3M", spread_bp=Decimal("200"), reset_frequency=Tenor.parse("3M")
+    ... )
     >>> spec.forward_curve_id
     'USD-SOFR-3M'
     """
 
     def __init__(
         self,
+        *,
         forward_curve_id: str,
-        spread_bp: Decimal | float,
-        reset_frequency: Tenor | str,
-        gearing: Decimal | float | None = None,
+        spread_bp: Decimal | str,
+        reset_frequency: Tenor,
+        gearing: Decimal | str = "1",
         gearing_includes_spread: bool = True,
-        index_floor_bp: Decimal | float | None = None,
-        all_in_floor_bp: Decimal | float | None = None,
-        all_in_cap_bp: Decimal | float | None = None,
-        index_cap_bp: Decimal | float | None = None,
-        overnight_index_constraints: OvernightIndexConstraintApplication | None = None,
-        index_tenor: Tenor | str | None = None,
+        index_floor_bp: Decimal | str | None = None,
+        all_in_floor_bp: Decimal | str | None = None,
+        all_in_cap_bp: Decimal | str | None = None,
+        index_cap_bp: Decimal | str | None = None,
+        overnight_index_constraints: OvernightIndexConstraintApplication | str = "daily",
+        index_tenor: Tenor | None = None,
         reset_lag_days: int = 2,
         fixing_calendar_id: str | None = None,
-        compounding: FloatingLegCompounding | None = None,
-        overnight_basis: DayCount | None = None,
-        fallback: FloatingRateFallback | None = None,
+        compounding: FloatingLegCompounding | str | dict[str, Any] | None = None,
+        overnight_basis: DayCount | str | None = None,
+        fallback: FloatingRateFallback | str | dict[str, Any] = "error",
     ) -> None:
         """
-        Construct a floating rate specification.
+        Construct a floating rate specification from keyword-only fields.
+
+        Rust reads the keywords as the ``FloatingRateSpec`` wire struct: it
+        supplies the defaults below and rejects an unknown keyword. Decimal
+        quotes take the exact-decimal wire form, a ``decimal.Decimal`` or its
+        string (``"200"``); a ``float`` is rejected.
 
         Parameters
         ----------
         forward_curve_id : str
             Forward curve identifier (e.g. ``"USD-SOFR-3M"``).
-        spread_bp : decimal.Decimal | float
+        spread_bp : decimal.Decimal | str
             Spread/margin over the index in basis points.
-        reset_frequency : Tenor | str
+        reset_frequency : Tenor
             Index reset cadence, for instruments that reset inside a payment
             period. The bare builder does not read it: it observes one term
             fixing per coupon accrual start, with ``reset_lag_days``, and
             overnight coupons use their daily observation schedule. The
             revolving credit facility builds its intra-period reset grid from
             it.
-        gearing : decimal.Decimal | float, optional
-            Leverage multiplier (default ``1``), applied before the all-in
+        gearing : decimal.Decimal | str
+            Leverage multiplier (default ``"1"``), applied before the all-in
             floor and cap; ``gearing_includes_spread`` sets whether it also
             scales the spread. Stored as an exact decimal.
         gearing_includes_spread : bool
             Whether gearing multiplies ``(index + spread)`` (``True``,
             default) or only the index component (``False``).
-        index_floor_bp : decimal.Decimal | float, optional
+        index_floor_bp : decimal.Decimal | str, optional
             Floor applied to the index component, in basis points.
-        all_in_floor_bp : decimal.Decimal | float, optional
+        all_in_floor_bp : decimal.Decimal | str, optional
             Floor applied to the final all-in rate, in basis points.
-        all_in_cap_bp : decimal.Decimal | float, optional
+        all_in_cap_bp : decimal.Decimal | str, optional
             Cap applied to the final all-in rate, in basis points.
-        index_cap_bp : decimal.Decimal | float, optional
+        index_cap_bp : decimal.Decimal | str, optional
             Cap applied to the index component, in basis points.
-        overnight_index_constraints : OvernightIndexConstraintApplication, optional
+        overnight_index_constraints : OvernightIndexConstraintApplication | str
             Where index floors/caps are applied for overnight-compounded
-            coupons (default daily): daily bounds apply per observation;
+            coupons (default ``"daily"``): daily bounds apply per observation;
             period index bounds and all-in bounds apply once to the completed
             coupon. With changing principal, any final annual-rate adjustment
             is allocated uniformly over contractual accrual time, preserving
             raw daily compound increments.
-        index_tenor : Tenor | str, optional
+        index_tenor : Tenor, optional
             Expected term-index tenor. The builder only uses it to warn at
             build when it disagrees with the resolved forward curve's tenor
             by more than 10%; the curve's quoted tenor remains authoritative.
@@ -573,19 +585,21 @@ class FloatingRateSpec:
         fixing_calendar_id : str, optional
             Calendar for the reset lag; defaults to the coupon schedule
             calendar when omitted.
-        compounding : FloatingLegCompounding, optional
-            How each period's fixings combine into the rate. Leave unset to
+        compounding : FloatingLegCompounding | str | dict, optional
+            How each period's fixings combine into the rate (the typed value
+            or its wire form, ``"simple"`` or
+            ``{"compounded_in_arrears": {"lookback_days": 2}}``). Leave unset to
             let a pricing instrument resolve it from the rate-index registry
             (the bare cashflow builder then projects one term forward).
-        overnight_basis : DayCount, optional
+        overnight_basis : DayCount | str, optional
             Day-count basis for the overnight compounding denominator. When
             omitted for an overnight ``compounding`` method, the coupon
             schedule's day count is used if it is Act/360 or Act/365F; any
             other schedule day count makes :meth:`CashFlowBuilder.build` raise
             ``ValueError`` unless an explicit Act/360 or Act/365F basis is
             given. Ignored for non-overnight compounding.
-        fallback : FloatingRateFallback, optional
-            Policy when projecting a coupon fails (default ``ERROR``): a
+        fallback : FloatingRateFallback | str | dict
+            Policy when projecting a coupon fails (default ``"error"``): a
             missing forward curve, an absent fixing series, a reset before
             the curve base date, or a projection day-count error. A non-error
             policy replaces the index for the whole coupon. Gaps in supplied
@@ -595,14 +609,24 @@ class FloatingRateSpec:
         Raises
         ------
         TypeError
-            If a decimal quote is not a ``Decimal``, ``float``, or ``int``,
-            or a tenor is neither a ``Tenor`` nor a string.
+            If a positional argument is passed, or a value is not
+            JSON-encodable (neither a wire value nor a typed wrapper).
         ValueError
-            If a decimal quote is not representable as a finite ``Decimal``,
-            a tenor string is invalid, the reset lag is negative, an index
-            floor exceeds its cap, or an all-in floor exceeds its cap.
-        OverflowError
-            If *reset_lag_days* is outside the signed 32-bit integer range.
+            If a required field is missing, a keyword is unknown, a decimal
+            quote is not an exact-decimal string, the reset lag is negative or
+            outside the signed 32-bit range, an index floor exceeds its cap,
+            or an all-in floor exceeds its cap.
+
+        Examples
+        --------
+        >>> from decimal import Decimal
+        >>> from finstack_quant.cashflows.builder import FloatingRateSpec
+        >>> from finstack_quant.core.dates import Tenor
+        >>> spec = FloatingRateSpec(
+        ...     forward_curve_id="USD-SOFR-3M", spread_bp=Decimal("200"), reset_frequency=Tenor.parse("3M")
+        ... )
+        >>> (spec.gearing, spec.reset_lag_days)
+        (Decimal('1'), 2)
         """
         ...
 

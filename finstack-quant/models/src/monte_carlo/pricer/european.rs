@@ -5,13 +5,14 @@
 //! [`crate::monte_carlo::discretization::exact::ExactGbm`]. Use it when you want a compact
 //! API and do not need custom process / discretization combinations.
 
-use super::super::engine::{McEngine, McEngineConfig};
+use super::super::engine::{McEngine, McEngineConfig, McPricingInputs};
 use super::super::results::MoneyEstimate;
 use super::super::traits::Payoff;
 use crate::monte_carlo::discretization::exact::ExactGbm;
 use crate::monte_carlo::payoff::vanilla::European;
 use crate::monte_carlo::process::gbm::GbmProcess;
 use crate::monte_carlo::rng::philox::PhiloxRng;
+use crate::types::OptionMarketParams;
 use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::time_grid::TimeGrid;
@@ -107,9 +108,10 @@ impl EuropeanPricer {
     ///
     /// * `process` - GBM process supplying the risk-neutral drift and volatility.
     /// * `initial_spot` - Spot level at time `0`.
-    /// * `time_to_maturity` - Maturity in years.
-    /// * `num_steps` - Number of time-grid steps between `0` and maturity.
-    /// * `payoff` - European-style payoff evaluated at `maturity_step = num_steps`.
+    /// * `time_grid` - Simulation grid from `0` to maturity (in years), for
+    ///   example [`TimeGrid::uniform`]`(maturity, num_steps)`.
+    /// * `payoff` - European-style payoff evaluated at
+    ///   `maturity_step = time_grid.num_steps()`.
     /// * `currency` - Currency for the returned estimate.
     /// * `discount_factor` - Present-value multiplier for the payoff horizon.
     ///   Build it with
@@ -122,13 +124,14 @@ impl EuropeanPricer {
     ///
     /// # Errors
     ///
-    /// Returns an error when the uniform time grid is invalid or when the
-    /// underlying engine rejects the runtime configuration.
+    /// Returns an error when the underlying engine rejects the runtime
+    /// configuration.
     ///
     /// # Examples
     ///
     /// ```
     /// use finstack_quant_core::currency::Currency;
+    /// use finstack_quant_core::math::time_grid::TimeGrid;
     /// use finstack_quant_models::monte_carlo::payoff::vanilla::European;
     /// use finstack_quant_models::types::OptionType;
     /// use finstack_quant_models::monte_carlo::pricer::european::EuropeanPricer;
@@ -142,19 +145,18 @@ impl EuropeanPricer {
     /// let payoff = European::new(OptionType::Call, 100.0, 1.0, 252);
     /// let discount_factor = (-0.03_f64).exp();
     ///
+    /// let grid = TimeGrid::uniform(1.0, 252).expect("valid grid");
     /// let result = pricer
-    ///     .price(&process, 100.0, 1.0, 252, &payoff, Currency::USD, discount_factor)
+    ///     .price(&process, 100.0, grid, &payoff, Currency::USD, discount_factor)
     ///     .expect("pricing should succeed");
     ///
     /// assert!(result.mean.amount().is_finite());
     /// ```
-    #[allow(clippy::too_many_arguments)]
     pub fn price<P>(
         &self,
         process: &GbmProcess,
         initial_spot: f64,
-        time_to_maturity: f64,
-        num_steps: usize,
+        time_grid: TimeGrid,
         payoff: &P,
         currency: Currency,
         discount_factor: f64,
@@ -162,7 +164,6 @@ impl EuropeanPricer {
     where
         P: Payoff,
     {
-        let time_grid = TimeGrid::uniform(time_to_maturity, num_steps)?;
         // Serial ≡ parallel by the determinism invariant, so the flag only
         // sets throughput. On wasm32 no thread pool exists, so force serial
         // there regardless of the configured (registry-backed) default.
@@ -177,15 +178,15 @@ impl EuropeanPricer {
         let disc = ExactGbm::new();
         let initial_state = vec![initial_spot];
 
-        engine.price(
-            &rng,
+        engine.price(McPricingInputs {
+            rng: &rng,
             process,
-            &disc,
-            &initial_state,
+            disc: &disc,
+            initial_state: &initial_state,
             payoff,
             currency,
             discount_factor,
-        )
+        })
     }
 
     /// Price a European option under risk-neutral GBM with flat continuous
@@ -197,14 +198,11 @@ impl EuropeanPricer {
     ///
     /// # Arguments
     ///
-    /// * `option_type` - Call or put payoff direction.
-    /// * `spot` - Spot level at time `0`.
-    /// * `strike` - Exercise price in the same units as `spot`.
-    /// * `rate` - Continuously compounded risk-free rate (decimal, annualized).
-    /// * `div_yield` - Continuous dividend yield (decimal, annualized).
-    /// * `vol` - Annualized GBM volatility (decimal).
-    /// * `expiry` - Time to expiry in years; also the uniform-grid horizon.
-    /// * `num_steps` - Number of time-grid steps between `0` and `expiry`;
+    /// * `params` - Call/put direction, spot at time `0`, strike in spot units,
+    ///   continuously compounded decimal annual rate and dividend yield,
+    ///   decimal annual GBM volatility, and time to expiry in years (also the
+    ///   uniform-grid horizon); see [`OptionMarketParams`].
+    /// * `num_steps` - Number of time-grid steps between `0` and expiry;
     ///   `None` uses the registry default `convenience.european_pricer.num_steps`.
     /// * `currency` - Currency stamped on the returned estimate; `None` uses the
     ///   registry default `convenience.default_currency`.
@@ -214,19 +212,21 @@ impl EuropeanPricer {
     /// Returns an error when the embedded registry defaults cannot be loaded,
     /// GBM parameters fail validation, the uniform grid is invalid, or the
     /// underlying engine rejects the run.
-    #[allow(clippy::too_many_arguments)]
     pub fn price_gbm(
         &self,
-        option_type: crate::types::OptionType,
-        spot: f64,
-        strike: f64,
-        rate: f64,
-        div_yield: f64,
-        vol: f64,
-        expiry: f64,
+        params: &OptionMarketParams,
         num_steps: Option<usize>,
         currency: Option<Currency>,
     ) -> Result<MoneyEstimate> {
+        let &OptionMarketParams {
+            option_type,
+            spot,
+            strike,
+            rate,
+            dividend_yield: div_yield,
+            volatility: vol,
+            time_to_expiry: expiry,
+        } = params;
         let currency = crate::monte_carlo::convenience::resolve_currency(currency)?;
         let num_steps = num_steps.unwrap_or(
             crate::monte_carlo::registry::embedded_defaults()?
@@ -239,11 +239,11 @@ impl EuropeanPricer {
             .map(GbmProcess::new)?;
         let discount_factor = (-rate * expiry).exp();
         let payoff = European::new(option_type, strike, 1.0, num_steps);
+        let time_grid = TimeGrid::uniform(expiry, num_steps)?;
         self.price(
             &process,
             spot,
-            expiry,
-            num_steps,
+            time_grid,
             &payoff,
             currency,
             discount_factor,
@@ -258,6 +258,10 @@ mod tests {
     use crate::monte_carlo::process::gbm::GbmParams;
     use crate::types::OptionType;
 
+    fn grid(t_max: f64, num_steps: usize) -> TimeGrid {
+        TimeGrid::uniform(t_max, num_steps).expect("valid grid")
+    }
+
     #[test]
     fn european_pricer_requires_two_independent_estimators() {
         for num_paths in [0, 1] {
@@ -269,7 +273,7 @@ mod tests {
         let gbm = GbmProcess::new(GbmParams::new(0.05, 0.0, 0.2).unwrap());
         let call = European::new(OptionType::Call, 100.0, 1.0, 1);
         let estimate = pricer
-            .price(&gbm, 100.0, 1.0, 1, &call, Currency::USD, 0.95)
+            .price(&gbm, 100.0, grid(1.0, 1), &call, Currency::USD, 0.95)
             .expect("minimum-size estimate");
         assert_eq!(estimate.num_paths, 2);
         assert!(estimate.stderr.is_finite());
@@ -288,7 +292,7 @@ mod tests {
         let call = European::new(OptionType::Call, 100.0, 1.0, 10);
 
         let result = pricer
-            .price(&gbm, 100.0, 1.0, 10, &call, Currency::USD, 0.95)
+            .price(&gbm, 100.0, grid(1.0, 10), &call, Currency::USD, 0.95)
             .expect("should succeed");
 
         assert!(result.mean.amount() > 0.0);
@@ -307,7 +311,7 @@ mod tests {
         let call = European::new(OptionType::Call, 100.0, 1.0, 252);
 
         let result = pricer
-            .price(&gbm, 100.0, 1.0, 252, &call, Currency::USD, 1.0)
+            .price(&gbm, 100.0, grid(1.0, 252), &call, Currency::USD, 1.0)
             .expect("should succeed");
 
         // ATM call with σ=20%, T=1y should have positive value
@@ -325,7 +329,7 @@ mod tests {
         let call = European::new(OptionType::Call, 50.0, 1.0, 100);
 
         let result = pricer
-            .price(&gbm, 100.0, 1.0, 100, &call, Currency::USD, 1.0)
+            .price(&gbm, 100.0, grid(1.0, 100), &call, Currency::USD, 1.0)
             .expect("should succeed");
 
         assert!((result.mean.amount() - 50.0).abs() < 5.0);
@@ -396,13 +400,15 @@ mod tests {
             let option_type = crate::types::OptionType::from(case.is_call);
             let result = pricer
                 .price_gbm(
-                    option_type,
-                    case.spot,
-                    case.strike,
-                    case.rate,
-                    case.div_yield,
-                    case.vol,
-                    case.expiry,
+                    &OptionMarketParams {
+                        option_type,
+                        spot: case.spot,
+                        strike: case.strike,
+                        rate: case.rate,
+                        dividend_yield: case.div_yield,
+                        volatility: case.vol,
+                        time_to_expiry: case.expiry,
+                    },
                     Some(1),
                     Some(Currency::USD),
                 )

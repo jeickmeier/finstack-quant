@@ -11,7 +11,7 @@ use rust_decimal::Decimal;
 
 use super::*;
 use crate::bindings::core::dates::daycount::PyDayCount;
-use crate::bindings::core::dates::tenor::{PyTenor, extract_tenor};
+use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::core::money::decimal_to_py;
 use crate::bindings::date_utils::date_to_py;
 use crate::bindings::repr_support::{enum_repr_from_serde as enum_repr, repr_from_serde};
@@ -350,48 +350,12 @@ impl PyFloatingRateSpec {
     #[doc = pydoc!("finstack_quant.cashflows.builder._specs.coupon", "FloatingRateSpec.__init__")]
     #[new]
     #[pyo3(
-        signature = (forward_curve_id, spread_bp, reset_frequency, gearing=None, gearing_includes_spread=FloatingRateSpec::DEFAULT_GEARING_INCLUDES_SPREAD, index_floor_bp=None, all_in_floor_bp=None, all_in_cap_bp=None, index_cap_bp=None, overnight_index_constraints=None, index_tenor=None, reset_lag_days=FloatingRateSpec::DEFAULT_RESET_LAG_DAYS, fixing_calendar_id=None, compounding=None, overnight_basis=None, fallback=None),
-        text_signature = "(forward_curve_id, spread_bp, reset_frequency, gearing=None, gearing_includes_spread=True, index_floor_bp=None, all_in_floor_bp=None, all_in_cap_bp=None, index_cap_bp=None, overnight_index_constraints=None, index_tenor=None, reset_lag_days=2, fixing_calendar_id=None, compounding=None, overnight_basis=None, fallback=None)"
+        signature = (**fields),
+        text_signature = "(*, forward_curve_id, spread_bp, reset_frequency, gearing='1', gearing_includes_spread=True, index_floor_bp=None, all_in_floor_bp=None, all_in_cap_bp=None, index_cap_bp=None, overnight_index_constraints='daily', index_tenor=None, reset_lag_days=2, fixing_calendar_id=None, compounding=None, overnight_basis=None, fallback='error')"
     )]
-    #[allow(clippy::too_many_arguments)]
-    fn new(
-        forward_curve_id: &str,
-        spread_bp: &Bound<'_, PyAny>,
-        reset_frequency: &Bound<'_, PyAny>,
-        gearing: Option<&Bound<'_, PyAny>>,
-        gearing_includes_spread: bool,
-        index_floor_bp: Option<&Bound<'_, PyAny>>,
-        all_in_floor_bp: Option<&Bound<'_, PyAny>>,
-        all_in_cap_bp: Option<&Bound<'_, PyAny>>,
-        index_cap_bp: Option<&Bound<'_, PyAny>>,
-        overnight_index_constraints: Option<PyRef<'_, PyOvernightIndexConstraintApplication>>,
-        index_tenor: Option<&Bound<'_, PyAny>>,
-        reset_lag_days: i32,
-        fixing_calendar_id: Option<String>,
-        compounding: Option<PyRef<'_, PyFloatingLegCompounding>>,
-        overnight_basis: Option<PyRef<'_, PyDayCount>>,
-        fallback: Option<PyRef<'_, PyFloatingRateFallback>>,
-    ) -> PyResult<Self> {
-        let inner = FloatingRateSpec {
-            forward_curve_id: finstack_quant_core::types::CurveId::from(forward_curve_id),
-            spread_bp: decimal_from_any(spread_bp)?,
-            gearing: gearing.map_or(Ok(FloatingRateSpec::DEFAULT_GEARING), decimal_from_any)?,
-            gearing_includes_spread,
-            index_floor_bp: index_floor_bp.map(decimal_from_any).transpose()?,
-            all_in_floor_bp: all_in_floor_bp.map(decimal_from_any).transpose()?,
-            all_in_cap_bp: all_in_cap_bp.map(decimal_from_any).transpose()?,
-            index_cap_bp: index_cap_bp.map(decimal_from_any).transpose()?,
-            overnight_index_constraints: overnight_index_constraints
-                .map(|c| c.inner)
-                .unwrap_or_default(),
-            reset_frequency: extract_tenor(reset_frequency)?,
-            index_tenor: index_tenor.map(extract_tenor).transpose()?,
-            reset_lag_days,
-            fixing_calendar_id: fixing_calendar_id.map(Into::into),
-            compounding: compounding.map(|m| m.inner),
-            overnight_basis: overnight_basis.map(|d| d.inner),
-            fallback: fallback.map(|f| f.inner.clone()).unwrap_or_default(),
-        };
+    fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
+        let inner: FloatingRateSpec =
+            crate::bindings::module_utils::fields_from_py(py, fields, "FloatingRateSpec")?;
         inner.validate().map_err(core_to_py)?;
         Ok(Self { inner })
     }

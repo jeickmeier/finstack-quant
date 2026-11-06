@@ -31,7 +31,7 @@
 //! - σ_asset is the asset volatility
 //! - σ_fx is the FX rate volatility
 
-use crate::types::OptionType;
+use crate::types::{OptionMarketParams, OptionType};
 use finstack_quant_core::math::special_functions::norm_cdf;
 
 /// Compute the quanto drift adjustment.
@@ -56,16 +56,14 @@ fn quanto_drift_adjustment(correlation: f64, vol_asset: f64, vol_fx: f64) -> f64
 ///
 /// # Arguments
 ///
-/// * `spot` - Current spot price (in foreign currency)
-/// * `strike` - Strike price (in foreign currency)
-/// * `time` - Time to maturity (years)
-/// * `rate_domestic` - Domestic risk-free rate, continuously compounded decimal
+/// * `market` - The foreign asset: `spot` and `strike` in foreign currency,
+///   `rate` = the **domestic** risk-free rate and `dividend_yield` = the
+///   asset's dividend yield in foreign terms (continuously compounded
+///   decimals), `volatility` = the annualized asset volatility (decimal),
+///   `time_to_expiry` in years and the call/put `option_type`.
 /// * `rate_foreign` - Foreign risk-free rate, continuously compounded decimal
-/// * `div_yield` - Dividend yield (in foreign terms), continuously compounded decimal
-/// * `vol_asset` - Annualized asset volatility as a decimal
 /// * `vol_fx` - Annualized FX rate volatility as a decimal
 /// * `correlation` - Correlation between asset and FX rate, normally in `[-1, 1]`
-/// * `option_type` - Call or put payoff convention
 ///
 /// # Returns
 ///
@@ -82,19 +80,21 @@ fn quanto_drift_adjustment(correlation: f64, vol_asset: f64, vol_fx: f64) -> f64
 /// - F_adjusted = S * exp((r_for - q - ρ*σ_S*σ_X) * T)
 /// - d1 = [ln(S/K) + (r_for - q - ρ*σ_S*σ_X + σ_S²/2) * T] / (σ_S√T)
 /// - d2 = d1 - σ_S√T
-#[allow(clippy::too_many_arguments)]
 pub fn quanto_price(
-    spot: f64,
-    strike: f64,
-    time: f64,
-    rate_domestic: f64,
+    market: &OptionMarketParams,
     rate_foreign: f64,
-    div_yield: f64,
-    vol_asset: f64,
     vol_fx: f64,
     correlation: f64,
-    option_type: OptionType,
 ) -> f64 {
+    let &OptionMarketParams {
+        spot,
+        strike,
+        rate: rate_domestic,
+        volatility: vol_asset,
+        time_to_expiry: time,
+        dividend_yield: div_yield,
+        option_type,
+    } = market;
     if !spot.is_finite()
         || !strike.is_finite()
         || !time.is_finite()
@@ -173,16 +173,18 @@ mod tests {
     #[test]
     fn test_quanto_call_positive() {
         let price = quanto_price(
-            100.0,
-            100.0,
-            1.0,
-            0.05,
+            &OptionMarketParams {
+                spot: 100.0,
+                strike: 100.0,
+                rate: 0.05,
+                volatility: 0.2,
+                time_to_expiry: 1.0,
+                dividend_yield: 0.01,
+                option_type: OptionType::Call,
+            },
             0.03,
-            0.01,
-            0.2,
             0.1,
             0.5,
-            OptionType::Call,
         );
         assert!(price > 0.0);
         assert!(price < 100.0);
@@ -191,16 +193,18 @@ mod tests {
     #[test]
     fn test_quanto_put_positive() {
         let price = quanto_price(
-            100.0,
-            100.0,
-            1.0,
-            0.05,
+            &OptionMarketParams {
+                spot: 100.0,
+                strike: 100.0,
+                rate: 0.05,
+                volatility: 0.2,
+                time_to_expiry: 1.0,
+                dividend_yield: 0.01,
+                option_type: OptionType::Put,
+            },
             0.03,
-            0.01,
-            0.2,
             0.1,
             0.5,
-            OptionType::Put,
         );
         assert!(price > 0.0);
         assert!(price < 100.0);
@@ -217,16 +221,18 @@ mod tests {
         let vol = 0.2;
 
         let quanto_call_price = quanto_price(
-            spot,
-            strike,
-            time,
+            &OptionMarketParams {
+                spot,
+                strike,
+                rate,
+                volatility: vol,
+                time_to_expiry: time,
+                dividend_yield: div_yield,
+                option_type: OptionType::Call,
+            },
             rate,
-            rate,
-            div_yield,
-            vol,
             0.1,
             0.0,
-            OptionType::Call,
         );
 
         let sqrt_t = time.sqrt();
@@ -261,28 +267,32 @@ mod tests {
         let correlation = 0.5;
 
         let call = quanto_price(
-            spot,
-            strike,
-            time,
-            r_dom,
+            &OptionMarketParams {
+                spot,
+                strike,
+                rate: r_dom,
+                volatility: vol_asset,
+                time_to_expiry: time,
+                dividend_yield: div_yield,
+                option_type: OptionType::Call,
+            },
             r_for,
-            div_yield,
-            vol_asset,
             vol_fx,
             correlation,
-            OptionType::Call,
         );
         let put = quanto_price(
-            spot,
-            strike,
-            time,
-            r_dom,
+            &OptionMarketParams {
+                spot,
+                strike,
+                rate: r_dom,
+                volatility: vol_asset,
+                time_to_expiry: time,
+                dividend_yield: div_yield,
+                option_type: OptionType::Put,
+            },
             r_for,
-            div_yield,
-            vol_asset,
             vol_fx,
             correlation,
-            OptionType::Put,
         );
 
         let quanto_adj = quanto_drift_adjustment(correlation, vol_asset, vol_fx);
@@ -314,28 +324,32 @@ mod tests {
         let vol_fx = 0.1;
 
         let call_neg_corr = quanto_price(
-            spot,
-            strike,
-            time,
-            r_dom,
+            &OptionMarketParams {
+                spot,
+                strike,
+                rate: r_dom,
+                volatility: vol_asset,
+                time_to_expiry: time,
+                dividend_yield: div_yield,
+                option_type: OptionType::Call,
+            },
             r_for,
-            div_yield,
-            vol_asset,
             vol_fx,
             -0.5,
-            OptionType::Call,
         );
         let call_pos_corr = quanto_price(
-            spot,
-            strike,
-            time,
-            r_dom,
+            &OptionMarketParams {
+                spot,
+                strike,
+                rate: r_dom,
+                volatility: vol_asset,
+                time_to_expiry: time,
+                dividend_yield: div_yield,
+                option_type: OptionType::Call,
+            },
             r_for,
-            div_yield,
-            vol_asset,
             vol_fx,
             0.5,
-            OptionType::Call,
         );
 
         assert!(

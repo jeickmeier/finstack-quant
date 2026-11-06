@@ -24,11 +24,14 @@ fn accrued_money(amount: f64, currency: Currency) -> Result<JsValue, JsValue> {
 /// interest is then negative.
 ///
 /// @param rule - `ExCouponRule` wire object: `days_before_coupon` and an optional `calendar_id` (business days when set, calendar days otherwise).
-/// @param payment_date - ISO-8601 coupon payment date the window is counted back from.
+/// @param paymentDate - ISO-8601 coupon payment date the window is counted back from.
 /// @returns ISO-8601 record date.
 /// @throws If `rule` is not an `ExCouponRule`, `days_before_coupon` exceeds 366, the calendar id cannot be resolved (kind `validation`), or `paymentDate` is not an ISO-8601 string (kind `invalid_type` or `validation`).
-#[wasm_bindgen(js_name = exCouponRuleExDate)]
-pub fn ex_coupon_rule_ex_date(rule: JsValue, payment_date: JsValue) -> Result<String, JsValue> {
+#[wasm_bindgen(js_name = exCouponRuleExDate, unchecked_return_type = "generated.core.DateWire")]
+pub fn ex_coupon_rule_ex_date(
+    #[wasm_bindgen(unchecked_param_type = "generated.cashflows.ExCouponRule")] rule: JsValue,
+    #[wasm_bindgen(js_name = "paymentDate", unchecked_param_type = "string")] payment_date: JsValue,
+) -> Result<String, JsValue> {
     js_wire::<ExCouponRule>(&rule, "rule")?
         .ex_date(js_date(&payment_date, "paymentDate")?)
         .map(date_to_iso)
@@ -42,14 +45,15 @@ pub fn ex_coupon_rule_ex_date(rule: JsValue, payment_date: JsValue) -> Result<St
 /// imminent coupon.
 ///
 /// @param rule - `ExCouponRule` wire object: `days_before_coupon` and an optional `calendar_id` (business days when set, calendar days otherwise).
-/// @param payment_date - ISO-8601 coupon payment date the record date is counted back from.
-/// @param settlement_date - ISO-8601 ownership-transfer (settlement) date; convert a trade date to settlement first.
+/// @param paymentDate - ISO-8601 coupon payment date the record date is counted back from.
+/// @param settlementDate - ISO-8601 ownership-transfer (settlement) date; convert a trade date to settlement first.
 /// @returns `true` strictly after the record date and before the payment date; settlement on the record date keeps the coupon and returns `false`.
 /// @throws If `rule` is not an `ExCouponRule`, `days_before_coupon` exceeds 366, the calendar id cannot be resolved, the record date is out of range (kind `validation`), or a date is not an ISO-8601 string (kind `invalid_type` or `validation`).
 #[wasm_bindgen(js_name = exCouponRuleIsExCoupon)]
 pub fn ex_coupon_rule_is_ex_coupon(
-    rule: JsValue,
-    payment_date: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.cashflows.ExCouponRule")] rule: JsValue,
+    #[wasm_bindgen(js_name = "paymentDate", unchecked_param_type = "string")] payment_date: JsValue,
+    #[wasm_bindgen(js_name = "settlementDate", unchecked_param_type = "string")]
     settlement_date: JsValue,
 ) -> Result<bool, JsValue> {
     js_wire::<ExCouponRule>(&rule, "rule")?
@@ -63,14 +67,15 @@ pub fn ex_coupon_rule_is_ex_coupon(
 /// Accrued interest of a schedule as of a date.
 ///
 /// @param schedule - `CashFlowSchedule` handle.
-/// @param as_of - ISO-8601 accrual snapshot date; interest accrues through accrual end and stays accrued until payment.
+/// @param asOf - ISO-8601 accrual snapshot date; interest accrues through accrual end and stays accrued until payment.
 /// @param config - Optional `AccrualConfig` wire object (`{ method, ex_coupon, include_pik, frequency }`); omitted means linear accrual with the Rust defaults.
 /// @returns `Money` wire object in the schedule currency; negative inside an ex-coupon window.
 /// @throws If the schedule fails validation or mixes coupon currencies, `config` is not an `AccrualConfig`, or a day-count calculation fails (kind `validation`).
-#[wasm_bindgen(js_name = accruedInterestAmount)]
+#[wasm_bindgen(js_name = accruedInterestAmount, unchecked_return_type = "MoneyValue")]
 pub fn accrued_interest_amount(
     schedule: &JsCashFlowSchedule,
-    as_of: JsValue,
+    #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
+    #[wasm_bindgen(unchecked_optional_param_type = "generated.cashflows.AccrualConfig | null")]
     config: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let config = js_opt_wire::<AccrualConfig>(config.as_ref(), "config")?.unwrap_or_default();
@@ -84,6 +89,20 @@ pub fn accrued_interest_amount(
 /// Builds the coupon periods and outstanding path once for a schedule and
 /// accrual configuration; prefer it over `accruedInterestAmount` when accruing
 /// the same schedule on many dates.
+///
+/// @example
+/// ```typescript
+/// import init, { cashflows } from "finstack-quant-wasm";
+/// await init();
+/// const schedule = cashflows.CashFlowSchedule.builder()
+///   .principal({ amount: "1000000", currency: "USD" }, "2025-01-15", "2027-01-15")
+///   .fixedCf({ rate: "0.05", coupon_type: "cash", ...cashflows.scheduleParamsSemiannual30360() })
+///   .build();
+/// const index = cashflows.AccrualIndex.build(schedule);
+/// console.log(index.accruedAt("2025-04-15").amount);
+/// index.free();
+/// schedule.free();
+/// ```
 #[wasm_bindgen(js_name = AccrualIndex)]
 pub struct JsAccrualIndex {
     inner: AccrualIndex,
@@ -101,6 +120,7 @@ impl JsAccrualIndex {
     #[wasm_bindgen]
     pub fn build(
         schedule: &JsCashFlowSchedule,
+        #[wasm_bindgen(unchecked_optional_param_type = "generated.cashflows.AccrualConfig | null")]
         config: Option<JsValue>,
     ) -> Result<JsAccrualIndex, JsValue> {
         let config = js_opt_wire::<AccrualConfig>(config.as_ref(), "config")?.unwrap_or_default();
@@ -112,11 +132,14 @@ impl JsAccrualIndex {
 
     /// Accrued interest as of a date.
     ///
-    /// @param as_of - ISO-8601 accrual snapshot date.
+    /// @param asOf - ISO-8601 accrual snapshot date.
     /// @returns `Money` wire object in the schedule currency; negative inside an ex-coupon window.
     /// @throws If `asOf` is not an ISO-8601 string (kind `invalid_type` or `validation`), a day-count calculation fails, or the ex-coupon calendar cannot be resolved (kind `validation`).
-    #[wasm_bindgen(js_name = accruedAt)]
-    pub fn accrued_at(&self, as_of: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = accruedAt, unchecked_return_type = "MoneyValue")]
+    pub fn accrued_at(
+        &self,
+        #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let amount = self
             .inner
             .accrued_at(js_date(&as_of, "asOf")?)

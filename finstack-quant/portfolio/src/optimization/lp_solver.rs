@@ -512,11 +512,10 @@ fn assemble_and_solve(
 /// This covers the post-solve steps of [`optimize`]: optimal weights,
 /// weight deltas, implied quantities, the objective value, constraint
 /// slacks, and the derived turnover, trade list and binding constraints.
-#[allow(clippy::too_many_arguments)]
+/// `decisions` pairs each decision item with its features, index for index.
 fn reconstruct_result(
     problem: &PortfolioOptimizationProblem,
-    decision_items: &[DecisionItem],
-    decision_features: &[DecisionFeatures],
+    (decision_items, decision_features): (&[DecisionItem], &[DecisionFeatures]),
     current_weights: IndexMap<PositionId, f64>,
     denominators: OptimizationDenominators,
     rows: &LpRows,
@@ -834,8 +833,7 @@ pub fn optimize(
 
     Ok(reconstruct_result(
         problem,
-        &decision_items,
-        &decision_features,
+        (&decision_items, &decision_features),
         current_weights,
         denominators,
         &rows,

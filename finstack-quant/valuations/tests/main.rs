@@ -15,6 +15,8 @@ mod core_framework;
 mod cross_factor_metrics_tests;
 #[path = "default_attribute_consistency.rs"]
 mod default_attribute_consistency;
+#[path = "field_units.rs"]
+mod field_units;
 #[path = "golden.rs"]
 mod golden;
 #[path = "instruments.rs"]

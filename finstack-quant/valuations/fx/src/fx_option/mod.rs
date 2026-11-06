@@ -110,4 +110,6 @@ pub(crate) mod metrics;
 pub(crate) mod pricer;
 mod types;
 
-pub use types::{FxDeltaConvention, FxDeltaConventionKind, FxOption, FxOptionBuilder};
+pub use types::{
+    FxDeltaConvention, FxDeltaConventionKind, FxOption, FxOptionBuilder, FxOptionParams,
+};

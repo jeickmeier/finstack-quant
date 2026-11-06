@@ -63,7 +63,7 @@ prerequisites and duration.
   with `npm --prefix finstack-quant-ui run generate` and never edited by hand.
   Never run `gen-registry` or `gen-theme` alone: they drop the `categories`
   and `meta` that only `gen-metadata` restores.
-- When a change moves a native fixture, run `mise run ui-fixtures` and commit
+- When a change moves a native fixture, run `mise run gen-write` and commit
   the regenerated fixtures in the same commit, with the reason in the message.
 - Iterate with `mise run ui-test -- <file>` and finish with `mise run ui-check`.
   Run `mise run ui-e2e` for a visual change, `mise run ui-install` for a change

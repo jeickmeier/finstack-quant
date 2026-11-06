@@ -33,11 +33,20 @@ use wasm_bindgen::prelude::*;
 /// `factors` does not hold exactly three entries, `lambda` is non-finite or
 /// non-positive, any factor loading is non-finite, or any tenor is non-finite
 /// or negative.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const yields = models.rates.dtsm.nelsonSiegelYields(
+///   0.7308, [0.03, -0.01, 0.005], [1, 5, 10]
+/// );
+/// ```
 #[wasm_bindgen(js_name = nelsonSiegelYields)]
 pub fn nelson_siegel_yields(
-    lambda: JsValue,
-    factors: JsValue,
-    tenors: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] lambda: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] factors: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "NumericArray")] tenors: JsValue,
 ) -> Result<Box<[f64]>, JsValue> {
     let lambda = js_f64(&lambda, "lambda")?;
     let factors = js_f64_seq(&factors, "factors")?;
@@ -55,6 +64,19 @@ pub fn nelson_siegel_yields(
 }
 
 /// A panel of yield observations: one row per date, one column per tenor.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const panel = new models.rates.dtsm.YieldPanel(
+///   [1, 5, 10],
+///   [[0.03, 0.035, 0.04], [0.031, 0.036, 0.04], [0.029, 0.034, 0.041]],
+///   ["2025-01-31", "2025-02-28", "2025-03-31"],
+/// );
+/// console.log(panel.numDates, panel.numTenors, panel.yieldChanges());
+/// panel.free();
+/// ```
 #[wasm_bindgen(js_name = YieldPanel)]
 pub struct JsYieldPanel {
     pub(crate) inner: YieldPanel,
@@ -75,9 +97,9 @@ impl JsYieldPanel {
     /// not match, a value is non-finite, or a date does not parse.
     #[wasm_bindgen(constructor)]
     pub fn new(
-        tenors: JsValue,
-        yields: JsValue,
-        dates: Option<JsValue>,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray")] tenors: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray[]")] yields: JsValue,
+        #[wasm_bindgen(unchecked_optional_param_type = "string[]")] dates: Option<JsValue>,
     ) -> Result<JsYieldPanel, JsValue> {
         let tenors = js_f64_seq(&tenors, "tenors")?;
         let yields = js_f64_matrix(&yields, "yields")?;
@@ -110,7 +132,7 @@ impl JsYieldPanel {
     }
 
     /// Yields as nested rows: one `number[]` per date.
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, unchecked_return_type = "number[][]")]
     pub fn yields(&self) -> Result<JsValue, JsValue> {
         to_js_value(&rows_of(&self.inner.yields))
     }
@@ -133,13 +155,22 @@ impl JsYieldPanel {
     /// # Errors
     ///
     /// Throws a `validation` error if the rows cannot be converted.
-    #[wasm_bindgen(js_name = yieldChanges)]
+    #[wasm_bindgen(js_name = yieldChanges, unchecked_return_type = "number[][]")]
     pub fn yield_changes(&self) -> Result<JsValue, JsValue> {
         to_js_value(&rows_of(&self.inner.yield_changes()))
     }
 }
 
 /// Diebold-Li (2006) dynamic Nelson-Siegel model with VAR(1) factor dynamics.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const model = new models.rates.dtsm.DieboldLi();
+/// console.log(model.lambda, model.factors === undefined);
+/// model.free();
+/// ```
 #[wasm_bindgen(js_name = DieboldLi)]
 pub struct JsDieboldLi {
     pub(crate) inner: DieboldLi,
@@ -156,7 +187,9 @@ impl JsDieboldLi {
     ///
     /// Throws a `validation` error if `lambda` is not positive and finite.
     #[wasm_bindgen(constructor)]
-    pub fn new(lambda: Option<JsValue>) -> Result<JsDieboldLi, JsValue> {
+    pub fn new(
+        #[wasm_bindgen(unchecked_optional_param_type = "number")] lambda: Option<JsValue>,
+    ) -> Result<JsDieboldLi, JsValue> {
         DieboldLi::new(js_opt_f64(lambda.as_ref(), "lambda")?)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
@@ -175,7 +208,10 @@ impl JsDieboldLi {
     }
 
     /// Extracted level, slope and curvature factors as a `FactorTimeSeries` object, or `undefined` before extraction.
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(
+        getter,
+        unchecked_return_type = "generated.models.FactorTimeSeries | undefined"
+    )]
     pub fn factors(&self) -> Result<JsValue, JsValue> {
         match self.inner.factors() {
             Some(factors) => to_js_value(factors),
@@ -184,7 +220,7 @@ impl JsDieboldLi {
     }
 
     /// VAR(1) transition matrix as 3 by 3 nested rows, or `undefined` before `fitVar`.
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, unchecked_return_type = "number[][] | undefined")]
     pub fn phi(&self) -> Result<JsValue, JsValue> {
         match self.inner.phi() {
             Some(phi) => to_js_value(&rows_of(phi)),
@@ -201,7 +237,7 @@ impl JsDieboldLi {
     }
 
     /// VAR(1) innovation covariance as 3 by 3 nested rows, or `undefined` before `fitVar`.
-    #[wasm_bindgen(getter, js_name = qCov)]
+    #[wasm_bindgen(getter, js_name = qCov, unchecked_return_type = "number[][] | undefined")]
     pub fn q_cov(&self) -> Result<JsValue, JsValue> {
         match self.inner.q_cov() {
             Some(q_cov) => to_js_value(&rows_of(q_cov)),
@@ -215,7 +251,7 @@ impl JsDieboldLi {
     /// # Errors
     ///
     /// Throws a `validation` error if the rows cannot be converted.
-    #[wasm_bindgen(js_name = loadingMatrix)]
+    #[wasm_bindgen(js_name = loadingMatrix, unchecked_return_type = "number[][]")]
     pub fn loading_matrix(&self) -> Result<JsValue, JsValue> {
         to_js_value(&rows_of(&self.inner.loading_matrix()))
     }
@@ -276,7 +312,11 @@ impl JsDieboldLi {
     /// # Errors
     ///
     /// Throws a `validation` error if the model is not fitted or `horizon` is zero.
-    pub fn forecast(&self, horizon: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(unchecked_return_type = "generated.models.YieldForecast")]
+    pub fn forecast(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] horizon: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let forecast = self
             .inner
             .forecast(js_uint(&horizon, "horizon")?)
@@ -286,6 +326,19 @@ impl JsDieboldLi {
 }
 
 /// Principal-component analysis of yield-curve changes.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const changes = [
+///   [0.001, 0.0012, 0.0011], [-0.0005, -0.0004, -0.0006], [0.0008, 0.0005, 0.0002],
+///   [-0.001, -0.0007, -0.0003], [0.0002, 0.0004, 0.0007],
+/// ];
+/// const pca = models.rates.dtsm.YieldPca.fitYieldChanges(changes);
+/// console.log(pca.varianceExplained, pca.scenario([1]));
+/// pca.free();
+/// ```
 #[wasm_bindgen(js_name = YieldPca)]
 pub struct JsYieldPca {
     pub(crate) inner: YieldPca,
@@ -310,7 +363,7 @@ impl JsYieldPca {
     }
 
     /// Fit the PCA directly to a matrix of yield changes.
-    /// @param yield_changes - Yield changes as nested rows: one `number[]` per date, one decimal change per tenor.
+    /// @param yieldChanges - Yield changes as nested rows: one `number[]` per date, one decimal change per tenor.
     /// @returns The fitted PCA.
     ///
     /// # Errors
@@ -318,7 +371,10 @@ impl JsYieldPca {
     /// Throws a `validation` error if the rows are ragged or too few, and a
     /// `computation` error if the eigendecomposition fails.
     #[wasm_bindgen(js_name = fitYieldChanges)]
-    pub fn fit_yield_changes(yield_changes: JsValue) -> Result<JsYieldPca, JsValue> {
+    pub fn fit_yield_changes(
+        #[wasm_bindgen(js_name = "yieldChanges", unchecked_param_type = "NumericArray[]")]
+        yield_changes: JsValue,
+    ) -> Result<JsYieldPca, JsValue> {
         YieldPca::fit_yield_changes(js_f64_matrix(&yield_changes, "yieldChanges")?)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
@@ -337,13 +393,13 @@ impl JsYieldPca {
     }
 
     /// Loadings as nested rows: one row per tenor, one column per component.
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, unchecked_return_type = "number[][]")]
     pub fn loadings(&self) -> Result<JsValue, JsValue> {
         to_js_value(&rows_of(self.inner.loadings()))
     }
 
     /// Scores as nested rows: one row per date, one column per component.
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, unchecked_return_type = "number[][]")]
     pub fn scores(&self) -> Result<JsValue, JsValue> {
         to_js_value(&rows_of(self.inner.scores()))
     }
@@ -384,7 +440,10 @@ impl JsYieldPca {
     /// # Errors
     ///
     /// Throws a `validation` error if `k` is not below `numComponents`.
-    pub fn loading(&self, k: JsValue) -> Result<Box<[f64]>, JsValue> {
+    pub fn loading(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] k: JsValue,
+    ) -> Result<Box<[f64]>, JsValue> {
         self.inner
             .loading(js_uint(&k, "k")?)
             .map(|v| v.iter().copied().collect::<Vec<f64>>().into_boxed_slice())
@@ -399,7 +458,10 @@ impl JsYieldPca {
     ///
     /// Throws a `TypeError` if `threshold` is not a number.
     #[wasm_bindgen(js_name = componentsForThreshold)]
-    pub fn components_for_threshold(&self, threshold: JsValue) -> Result<usize, JsValue> {
+    pub fn components_for_threshold(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] threshold: JsValue,
+    ) -> Result<usize, JsValue> {
         Ok(self
             .inner
             .components_for_threshold(js_f64(&threshold, "threshold")?))
@@ -412,7 +474,10 @@ impl JsYieldPca {
     /// # Errors
     ///
     /// Throws a `validation` error if more shocks than components are given.
-    pub fn scenario(&self, shocks: JsValue) -> Result<Box<[f64]>, JsValue> {
+    pub fn scenario(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray")] shocks: JsValue,
+    ) -> Result<Box<[f64]>, JsValue> {
         self.inner
             .scenario(&js_f64_seq(&shocks, "shocks")?)
             .map(Vec::into_boxed_slice)
@@ -420,7 +485,7 @@ impl JsYieldPca {
     }
 
     /// Apply a component-shock scenario to a base yield curve.
-    /// @param base_yields - Base yields per tenor, as decimals; one per tenor.
+    /// @param baseYields - Base yields per tenor, as decimals; one per tenor.
     /// @param shocks - One shock per leading component, in standard deviations of that component's score.
     /// @returns The shocked yields per tenor.
     ///
@@ -430,8 +495,8 @@ impl JsYieldPca {
     #[wasm_bindgen(js_name = applyScenario)]
     pub fn apply_scenario(
         &self,
-        base_yields: JsValue,
-        shocks: JsValue,
+        #[wasm_bindgen(js_name = "baseYields", unchecked_param_type = "NumericArray")] base_yields: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "NumericArray")] shocks: JsValue,
     ) -> Result<Box<[f64]>, JsValue> {
         self.inner
             .apply_scenario(
@@ -443,13 +508,17 @@ impl JsYieldPca {
     }
 
     /// Reconstruct the yield changes from the leading components.
-    /// @param num_components - Number of leading components to keep.
+    /// @param numComponents - Number of leading components to keep.
     /// @returns Nested rows: one row per date, one reconstructed change per tenor.
     ///
     /// # Errors
     ///
     /// Throws a `validation` error if `numComponents` is zero or exceeds the model.
-    pub fn reconstruct(&self, num_components: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(unchecked_return_type = "number[][]")]
+    pub fn reconstruct(
+        &self,
+        #[wasm_bindgen(js_name = "numComponents", unchecked_param_type = "number")] num_components: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let matrix = self
             .inner
             .reconstruct(js_uint(&num_components, "numComponents")?)
@@ -458,13 +527,18 @@ impl JsYieldPca {
     }
 
     /// Reporting view restricted to the leading components.
-    /// @param n_components - Number of leading components to keep.
+    /// @param nComponents - Number of leading components to keep.
     /// @returns The `YieldPcaView` object (`loadings`, `scores`, `eigenvalues`, `explained_variance_ratio`, `cumulative_variance`, `mean_change`, `tenors`).
     ///
     /// # Errors
     ///
     /// Throws a `validation` error if `nComponents` is zero or exceeds the model.
-    pub fn truncated(&self, n_components: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(unchecked_return_type = "generated.models.YieldPcaView")]
+    pub fn truncated(
+        &self,
+        #[wasm_bindgen(js_name = "nComponents", unchecked_param_type = "number")]
+        n_components: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let view = self
             .inner
             .truncated(js_uint(&n_components, "nComponents")?)

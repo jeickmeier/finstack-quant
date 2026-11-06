@@ -76,11 +76,13 @@ accurate.
   specifies exact-parameter guidance and host-specific example coverage.
 - [Python documentation style](../../../finstack-quant-py/DOCS_STYLE.md)
   describes the authoritative stub documentation and its conventions.
-- [Canonical tasks](../../../mise.toml) define `rust-doc`, `python-doc`,
-  `wasm-doc`, and the corresponding doctest checks.
+- [Canonical tasks](../../../mise.toml) define `rust-doc`, `python-lint`
+  (which runs the Python documentation checkers), `wasm-doc`, and the
+  corresponding doctest checks.
 - The [Rust input-documentation checker](../../../scripts/check_public_api_input_docs.py),
   [Python API checker](../../../scripts/check_python_api_input_docs.py), and
-  [WASM API checker](../../../scripts/check_wasm_api_input_docs.py) provide
+  [WASM declaration checker](../../../finstack-quant-wasm/scripts/check-typescript-docs.mjs)
+  (over the declarations wasm-bindgen generates from the Rustdoc) provide
   structural and substantive-description checks.
 - [Runtime documentation tests](../../../finstack-quant-py/tests/test_runtime_docs.py)
   check agreement between Python runtime docstrings and their stub sources.

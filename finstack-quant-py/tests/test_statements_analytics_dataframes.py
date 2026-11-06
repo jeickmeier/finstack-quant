@@ -451,7 +451,16 @@ def test_corkscrew_report_validations_dataframe_keeps_schema_when_empty() -> Non
 
 
 def test_exposure_to_dataframe_is_one_row() -> None:
-    exposure = Exposure("loan-1", 1_000_000.0, 0.4, 0.05, 3.0, 0.02, 0.01, dpd=45)
+    exposure = Exposure(
+        id="loan-1",
+        ead=1_000_000.0,
+        lgd=0.4,
+        eir=0.05,
+        remaining_maturity_years=3.0,
+        current_pd=0.02,
+        origination_pd=0.01,
+        days_past_due=45,
+    )
     df = exposure.to_dataframe()
 
     assert isinstance(df, pd.DataFrame)
@@ -463,10 +472,10 @@ def test_exposure_to_dataframe_is_one_row() -> None:
         "ccf",
         "lgd",
         "eir",
-        "remaining_maturity",
+        "remaining_maturity_years",
         "current_pd",
         "origination_pd",
-        "dpd",
+        "days_past_due",
         "current_rating",
         "origination_rating",
     ]
@@ -476,12 +485,20 @@ def test_exposure_to_dataframe_is_one_row() -> None:
     assert row["undrawn"] == pytest.approx(0.0)
     assert row["ccf"] == pytest.approx(0.75)
     assert row["lgd"] == pytest.approx(0.4)
-    assert row["dpd"] == 45
+    assert row["days_past_due"] == 45
 
 
-def test_exposure_to_dataframe_defaults_dpd_to_zero() -> None:
-    df = Exposure("loan-2", 500_000.0, 0.45, 0.06, 2.0, 0.03, 0.02).to_dataframe()
-    assert df.iloc[0]["dpd"] == 0
+def test_exposure_to_dataframe_defaults_days_past_due_to_zero() -> None:
+    df = Exposure(
+        id="loan-2",
+        ead=500_000.0,
+        lgd=0.45,
+        eir=0.06,
+        remaining_maturity_years=2.0,
+        current_pd=0.03,
+        origination_pd=0.02,
+    ).to_dataframe()
+    assert df.iloc[0]["days_past_due"] == 0
 
 
 # Real-estate template specs
@@ -508,9 +525,9 @@ def test_renewal_spec_to_dataframe() -> None:
 
 def test_lease_spec_to_dataframe_summarises_nested_collections() -> None:
     lease = LeaseSpec(
-        "tenant_c",
-        "2025Q1",
-        30_000.0,
+        node_id="tenant_c",
+        start="2025Q1",
+        base_rent=30_000.0,
         end="2026Q4",
         growth_rate=0.02,
         renewal=RenewalSpec(4, 0.6),
