@@ -85,19 +85,19 @@ flag "--release" help="Also run the nightly tier and the release gates (publish 
 # regenerates. After touching a generator or a wire type, run
 # `mise run gen-write` first.
 #
-# The cargo stages run one after another, not as `{ tasks = [...] }`: they
-# share one target directory, so Cargo's build lock serializes them anyway and
-# parallel stages only queue invisibly behind it. gen-check's `nextest --no-run`
-# is the first full test build; rust-test reuses it. wasm-test builds the dev
-# web and Node packages ui-check imports. ui-check (the longest stage) and
-# all-audit take no Cargo lock, so python-test, the last Cargo build, runs
-# beside them.
+# wasm-test runs first: it builds the dev web and Node packages ui-check
+# imports, and it rewrites them, so it cannot overlap ui-check. rust-build-tests
+# then compiles every test binary and generator, so the stages after it only
+# run them. ui-check (the longest stage) overlaps only gen-check and
+# all-audit, which are light: beside the core-saturating rust-test or
+# python-test its tests outrun their time budgets. Those two run alone after.
 run = [
   { task = "pre-commit-run" },
-  { task = "gen-check" },
-  { task = "rust-test" },
   { task = "wasm-test" },
-  { tasks = ["python-test", "ui-check", "all-audit"] },
+  { task = "rust-build-tests" },
+  { tasks = ["gen-check", "ui-check", "all-audit"] },
+  { task = "rust-test" },
+  { task = "python-test" },
   '''
   if [ "${usage_full:-false}" = "true" ] || [ "${usage_release:-false}" = "true" ]; then
     mise run all-doc
@@ -168,6 +168,15 @@ run = "cargo build --workspace --exclude finstack-quant-py --exclude finstack-qu
 [tasks.rust-build-prod]
 description = "Release build of the Rust library crates"
 run = "cargo build --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --release"
+
+[tasks.rust-build-tests]
+# A build-order stage of `mise run all`: gen-check and rust-test reuse it.
+description = "Build every workspace test binary, gen_* generator and the generate_contracts example without running them"
+hide = true
+run = [
+  "cargo nextest run --workspace --exclude finstack-quant-py --lib --test '*' --no-run",
+  "cargo build --workspace --exclude finstack-quant-py --example generate_contracts",
+]
 
 [tasks.rust-test]
 description = "Run the workspace Rust tests with nextest (use rust-test-crate while iterating)"
