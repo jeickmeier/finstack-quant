@@ -62,7 +62,9 @@ def _source_files() -> set[str]:
 def _orphan_documents(scope: Path, record_paths: set[str]) -> list[str]:
     """List scope documents that are not a record, an ADR, or linked from the scope."""
     linked: set[str] = set()
-    for name in {"README.md", *record_paths}:
+    roots = {"README.md", *record_paths}
+    roots.update(document.name for document in scope.glob("*.md") if ADR_NAME.match(document.name))
+    for name in roots:
         document = scope / name
         if document.is_file():
             linked.update(Path(link).name for link in MARKDOWN_LINK.findall(document.read_text()) if "/" not in link)
