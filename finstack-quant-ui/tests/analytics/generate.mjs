@@ -8,12 +8,14 @@ for (let day = Date.UTC(2023, 0, 2); dates.length < 756; day += 86_400_000) {
   if (weekday !== 0 && weekday !== 6)
     dates.push(new Date(day).toISOString().slice(0, 10));
 }
+// Stabilize generated requests across JS engines' last-bit Math.sin/cos differences.
+const round = (value) => Math.round(value * 1e12) / 1e12;
 // The Rust PerformancePanel wire value every report case is built from.
 const panel = {
   dates,
   series: [
-    dates.map((_, i) => 0.0008 + 0.012 * Math.sin(i / 30)),
-    dates.map((_, i) => 0.0004 + 0.008 * Math.sin(i / 45)),
+    dates.map((_, i) => round(0.0008 + 0.012 * Math.sin(i / 30))),
+    dates.map((_, i) => round(0.0004 + 0.008 * Math.sin(i / 45))),
   ],
   kind: "returns",
   ticker_names: ["Global Macro Composite", "Benchmark"],
@@ -208,8 +210,8 @@ const benchmarkRequest = {
   factors: {
     names: ["Market", "Carry"],
     returns: [
-      dates.map((_, i) => 0.0003 + 0.007 * Math.sin(i / 40)),
-      dates.map((_, i) => 0.0001 + 0.003 * Math.cos(i / 25)),
+      dates.map((_, i) => round(0.0003 + 0.007 * Math.sin(i / 40))),
+      dates.map((_, i) => round(0.0001 + 0.003 * Math.cos(i / 25))),
     ],
   },
 };
