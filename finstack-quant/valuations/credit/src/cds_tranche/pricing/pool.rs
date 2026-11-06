@@ -3,7 +3,9 @@ use super::heterogeneous::PreparedHeterogeneousPool;
 use super::pricer::{CdsTranchePricer, HOMOGENEITY_TOLERANCE, PoolExposure};
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::term_structures::CreditIndexData;
+use finstack_quant_core::math::distributions::BinomialPmf;
 use finstack_quant_core::{Error, Result};
+use std::sync::{Arc, OnceLock};
 
 pub(super) struct PreparedPool {
     kind: PoolKind,
@@ -21,13 +23,14 @@ impl PreparedPool {
         pricer: &CdsTranchePricer,
         index_data: &CreditIndexData,
         maturity: Date,
+        binomial: &mut Option<Arc<PreparedBinomial>>,
     ) -> Result<Self> {
         if !index_data.has_issuer_curves() {
             let t = pricer.years_from_base(index_data, maturity)?;
             return Ok(Self {
                 kind: PoolKind::Homogeneous(HomogeneousPool::new(
                     pricer,
-                    usize::from(index_data.num_constituents()),
+                    shared_binomial(usize::from(index_data.num_constituents()), binomial),
                     pricer.get_default_probability(index_data, t)?,
                     index_data.recovery_rate(),
                 )),
@@ -84,7 +87,7 @@ impl PreparedPool {
             return Ok(Self {
                 kind: PoolKind::Homogeneous(HomogeneousPool::new(
                     pricer,
-                    count,
+                    shared_binomial(count, binomial),
                     probabilities[0],
                     recoveries[0],
                 )),
@@ -137,7 +140,7 @@ impl PreparedPool {
 }
 
 pub(super) struct HomogeneousPool {
-    count: usize,
+    binomial: Arc<PreparedBinomial>,
     default_prob: f64,
     recovery: f64,
     threshold: f64,
@@ -145,12 +148,12 @@ pub(super) struct HomogeneousPool {
 impl HomogeneousPool {
     pub(super) fn new(
         pricer: &CdsTranchePricer,
-        count: usize,
+        binomial: Arc<PreparedBinomial>,
         default_prob: f64,
         recovery: f64,
     ) -> Self {
         Self {
-            count,
+            binomial,
             default_prob,
             recovery,
             threshold: pricer.default_threshold_for_copula(default_prob),
@@ -181,15 +184,20 @@ impl HomogeneousPool {
             PoolExposure::Loss => 1.0 - self.recovery,
             PoolExposure::Recovery => self.recovery,
         };
-        if let Some(expected) =
-            pricer.gaussian_cap_identity(cap, self.count, self.default_prob, exposure, correlation)
-        {
+        if let Some(expected) = pricer.gaussian_cap_identity(
+            cap,
+            self.binomial.count,
+            self.default_prob,
+            exposure,
+            correlation,
+        ) {
             return Ok(expected);
         }
+        let binomial = self.binomial.get();
         let conditional_p = self.conditional_pd(pricer, correlation);
         pricer.integrate_factors(&|factors| {
             pricer.conditional_equity_tranche_capped(
-                self.count,
+                binomial,
                 cap,
                 conditional_p(factors),
                 exposure,
@@ -205,14 +213,14 @@ impl HomogeneousPool {
     ) -> Result<(f64, f64)> {
         let loss = pricer.gaussian_cap_identity(
             loss_cap,
-            self.count,
+            self.binomial.count,
             self.default_prob,
             1.0 - self.recovery,
             correlation,
         );
         let recovery = pricer.gaussian_cap_identity(
             recovery_cap,
-            self.count,
+            self.binomial.count,
             self.default_prob,
             self.recovery,
             correlation,
@@ -221,11 +229,12 @@ impl HomogeneousPool {
         match (loss, recovery) {
             (Some(loss), Some(recovery)) => return Ok((loss, recovery)),
             (Some(loss), None) => {
+                let binomial = self.binomial.get();
                 return Ok((
                     loss,
                     pricer.integrate_factors(&|factors| {
                         pricer.conditional_equity_tranche_capped(
-                            self.count,
+                            binomial,
                             recovery_cap,
                             conditional_p(factors),
                             self.recovery,
@@ -234,10 +243,11 @@ impl HomogeneousPool {
                 ));
             }
             (None, Some(recovery)) => {
+                let binomial = self.binomial.get();
                 return Ok((
                     pricer.integrate_factors(&|factors| {
                         pricer.conditional_equity_tranche_capped(
-                            self.count,
+                            binomial,
                             loss_cap,
                             conditional_p(factors),
                             1.0 - self.recovery,
@@ -248,9 +258,10 @@ impl HomogeneousPool {
             }
             (None, None) => {}
         }
+        let binomial = self.binomial.get();
         pricer.integrate_factors_pair(&|factors| {
             pricer.conditional_equity_tranche_pair(
-                self.count,
+                binomial,
                 loss_cap,
                 recovery_cap,
                 conditional_p(factors),
@@ -258,5 +269,34 @@ impl HomogeneousPool {
                 self.recovery,
             )
         })
+    }
+}
+
+// Preparation-local sharing only: coupon dates for one immutable index have
+// the same active-name count. Keep at most one coefficient vector here.
+fn shared_binomial(n: usize, cached: &mut Option<Arc<PreparedBinomial>>) -> Arc<PreparedBinomial> {
+    match cached {
+        Some(pmf) if pmf.count == n => Arc::clone(pmf),
+        _ => {
+            let pmf = Arc::new(PreparedBinomial::new(n));
+            *cached = Some(Arc::clone(&pmf));
+            pmf
+        }
+    }
+}
+
+pub(super) struct PreparedBinomial {
+    count: usize,
+    pmf: OnceLock<BinomialPmf>,
+}
+impl PreparedBinomial {
+    pub(super) fn new(count: usize) -> Self {
+        Self {
+            count,
+            pmf: OnceLock::new(),
+        }
+    }
+    fn get(&self) -> &BinomialPmf {
+        self.pmf.get_or_init(|| BinomialPmf::new(self.count))
     }
 }

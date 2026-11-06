@@ -1,0 +1,17 @@
+{
+  "starting_revision": "c5b1f11197",
+  "settings": {
+    "samples": 10,
+    "warmup_seconds": 1,
+    "measurement_seconds": 10,
+    "resamples": 10000
+  },
+  "control_repeat": {
+    "samples": 20,
+    "warmup_seconds": 3,
+    "measurement_seconds": 20
+  },
+  "numerical_reports": "Exact parsed JSON equality with BC4",
+  "fixed_price": "Bitwise equality with BC1",
+  "memory": "8*N coefficient bytes lazily allocated once per homogeneous prepared quote; shared Arc across dates"
+}

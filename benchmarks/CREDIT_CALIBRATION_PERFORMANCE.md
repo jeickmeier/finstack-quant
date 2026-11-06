@@ -142,7 +142,7 @@ reference, 15 base-correlation tests, 91 umbrella tranche tests, and the scoped
 public-input documentation check passed. One nextest process-leak report cleared
 on a focused rerun. No independent references or tolerances changed.
 
-Execution status: S0 and BC1–BC4 complete; BC5 in progress. Later slices remain
+Execution status: S0 and BC1–BC5 complete; BC6 rejected after workload review; H1 in progress. Remaining slices are
 pending. The fixed implementation plan is unchanged.
 
 ## BC3: bounded raw attachment reuse
@@ -262,3 +262,61 @@ changed only its iteration count from 64 to 13; financial reference values
 and tolerances were preserved. Generated UI/gallery residual digits and work
 counts were regenerated together with the solver change. BC4 adds no
 persistent pricing-cache memory.
+
+## BC5: prepared binomial log coefficients
+
+The core PMF now shares one recurrence implementation between one-off and
+prepared callers. Preparation stores the unchanged `ln(N-k) - ln(k+1)`
+expressions; conditional probabilities, normalization and accumulation order
+are unchanged. A preparation-local Arc shares one lazy coefficient vector
+across coupon dates. Fully analytic prices never initialize it. There is no
+global pool-size cache.
+
+| Workload (mean ms) | S0 quiet | BC4 | BC5 |
+| --- | ---: | ---: | ---: |
+| Base correlation: isolated | 8239.613 | 535.936 | 286.340 |
+| Base correlation: full plan | 8315.811 | 576.218 | 328.290 |
+| Hazard: isolated control | — | 36.146 | 36.005 |
+| Hazard: full-plan control | — | 43.916 | 43.422 |
+| Reused prepared 3–7% price | — | — | 6.193 |
+| Student-t 3–7% price | — | 11.907 | 5.737 |
+
+Isolated base calibration improves 46.6% over BC4; the full plan improves
+43.0%, reaching 25.33 times the S0 throughput (96.05% lower latency).
+Both complete calibration reports are exactly equal to BC4, including all
+knots, residuals and 31/344 base/hazard solver calls. Fixed-correlation
+snapshots remain bitwise equal to BC1. Numerical budgets are unchanged.
+
+For N=125, p=0.2 the PMF mean falls from 645.72 ns to 264.56 ns after
+preparation; preparation plus one fill costs 726.17 ns, so reuse is required.
+N=25 and N=1000 and both extreme-tail cases show comparable reductions.
+The one-off fully analytic high-detachment price remains 7.874 microseconds
+(less than 1% change). Preparing a tranche costs 4.779 microseconds.
+The initial heterogeneous control was 446.028 ms; adjacent retained BC4/BC5
+executables measured 441.19/423.16 ms with longer 20-sample runs, resolving
+the initial apparent slowdown. No heterogeneous algorithm changed.
+
+Coefficient storage is 8 × N bytes per prepared homogeneous quote, plus one
+Arc/OnceLock allocation and one Arc per prepared date. The N=125 vector is
+1,000 bytes; it is allocated only when integration is actually needed.
+The existing thread-local PMF output buffer remains reused.
+
+Validation: scoped core, credit and calibration lint; 10 binomial tests,
+90 tranche tests with bitwise snapshots, 16 base-calibration/off-grid tests,
+91 umbrella tranche tests and core public-input documentation passed.
+A process-leak sentinel failed once during a multi-process test run and passed
+on its focused repeat. The full credit/pricing targets and new PMF target ran.
+No numerical fixtures changed. Raw samples/reports are in `bc5`, with adjacent
+controls in `bc4-hetero-before-bc5` and `bc5-hetero-repeat`.
+
+## BC6: paired Gaussian quadrature rejected
+
+After BC1 the production homogeneous path uses complementary caps K and 1-K
+against exposures 1-R and R. Both caps cannot bind in exact arithmetic:
+K < 1-R and 1-K < R contradict each other. Floating-point percent conversion
+can create an ULP-scale seam (so this is not claimed to be strictly
+unreachable), but no representative both-binding workload remains.
+Heterogeneous issuer pools retain their separate integration rules and
+non-Gaussian redesign is outside this slice. Adding a second adaptive Simpson
+implementation therefore fails the plan's incremental-benefit requirement.
+No paired-quadrature production code was added; all existing budgets remain.

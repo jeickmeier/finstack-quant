@@ -3,6 +3,8 @@
 
 #[cfg(test)]
 use super::pool::HomogeneousPool;
+#[cfg(test)]
+use super::pool::PreparedBinomial;
 use super::pool::PreparedPool;
 use super::pricer::{
     CdsTranchePricer, ElWdPoint, INTEGRATION_TOLERANCE, PROBABILITY_CLIP, PoolExposure,
@@ -304,12 +306,13 @@ impl CdsTranchePricer {
         dates: &[Date],
     ) -> Result<PreparedExpectedLoss> {
         let inv = self.el_invariants(tranche, index_data)?;
+        let mut binomial = None;
         let pools = if inv.eff_detach <= inv.eff_attach || inv.orig_width <= 1e-9 {
             Vec::new()
         } else {
             dates
                 .iter()
-                .map(|&date| PreparedPool::new(self, index_data, date))
+                .map(|&date| PreparedPool::new(self, index_data, date, &mut binomial))
                 .collect::<Result<Vec<_>>>()?
         };
         Ok(PreparedExpectedLoss {
@@ -348,7 +351,7 @@ impl CdsTranchePricer {
         maturity: Date,
         exposure: PoolExposure,
     ) -> Result<f64> {
-        PreparedPool::new(self, index_data, maturity)?.capped(
+        PreparedPool::new(self, index_data, maturity, &mut None)?.capped(
             self,
             cap_pct / 100.0,
             self.smooth_correlation_boundary(correlation),
@@ -398,12 +401,13 @@ impl CdsTranchePricer {
         correlation: f64,
         exposure: PoolExposure,
     ) -> Result<f64> {
-        HomogeneousPool::new(self, count, default_prob, base_recovery).capped(
+        HomogeneousPool::new(
             self,
-            cap,
-            correlation,
-            exposure,
+            Arc::new(PreparedBinomial::new(count)),
+            default_prob,
+            base_recovery,
         )
+        .capped(self, cap, correlation, exposure)
     }
     #[cfg(test)]
     fn homogeneous_capped_pair(
@@ -415,12 +419,13 @@ impl CdsTranchePricer {
         base_recovery: f64,
         correlation: f64,
     ) -> Result<(f64, f64)> {
-        HomogeneousPool::new(self, count, default_prob, base_recovery).pair(
+        HomogeneousPool::new(
             self,
-            loss_cap,
-            recovery_cap,
-            correlation,
+            Arc::new(PreparedBinomial::new(count)),
+            default_prob,
+            base_recovery,
         )
+        .pair(self, loss_cap, recovery_cap, correlation)
     }
 }
 

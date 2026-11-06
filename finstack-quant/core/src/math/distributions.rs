@@ -151,6 +151,65 @@ pub fn binomial_pmf_all(n: usize, p: f64) -> crate::Result<Vec<f64>> {
 /// Returns [`crate::Error::Validation`] when `p` is NaN. The output buffer is
 /// left unchanged when validation fails.
 pub fn binomial_pmf_all_into(out: &mut Vec<f64>, n: usize, p: f64) -> crate::Result<()> {
+    fill_binomial_pmf(out, n, p, |k| ((n - k) as f64).ln() - ((k + 1) as f64).ln())
+}
+
+/// Prepared log-recurrence coefficients for repeated binomial probabilities.
+///
+/// Retains `n` f64 coefficients (8 × n bytes). Only the success probability
+/// changes between evaluations; normalization and probability clipping match
+/// [`binomial_pmf_all_into`]. This is an immutable numerical workspace.
+#[derive(Debug, Clone)]
+pub struct BinomialPmf {
+    log_steps: Vec<f64>,
+}
+
+impl BinomialPmf {
+    /// Prepare the log-binomial steps for a fixed number of trials.
+    ///
+    /// # Arguments
+    /// * `n` - Number of independent Bernoulli trials, including zero. The
+    ///   count must fit the caller's memory budget; preparation allocates n
+    ///   coefficients and subsequent output requires n + 1 probabilities.
+    ///
+    /// # Returns
+    /// Reusable coefficients independent of the success probability.
+    pub fn new(n: usize) -> Self {
+        Self {
+            log_steps: (0..n)
+                .map(|k| ((n - k) as f64).ln() - ((k + 1) as f64).ln())
+                .collect(),
+        }
+    }
+
+    /// Number of independent Bernoulli trials represented by this workspace.
+    pub fn get_count(&self) -> usize {
+        self.log_steps.len()
+    }
+
+    /// Fill a reusable output buffer using the prepared log recurrence.
+    ///
+    /// # Arguments
+    /// * `out` - Output buffer cleared and resized to n + 1, holding
+    ///   probabilities of zero through n successes in that order. Existing
+    ///   capacity is reused. NaN probability errors leave it unchanged.
+    /// * `p` - Per-trial success probability as a unit fraction. Values at or
+    ///   below zero (including negative infinity) produce zero successes;
+    ///   values at or above one (including positive infinity) produce n.
+    ///
+    /// # Errors
+    /// Returns [`crate::Error::Validation`] when `p` is NaN.
+    pub fn fill(&self, out: &mut Vec<f64>, p: f64) -> crate::Result<()> {
+        fill_binomial_pmf(out, self.get_count(), p, |k| self.log_steps[k])
+    }
+}
+
+fn fill_binomial_pmf(
+    out: &mut Vec<f64>,
+    n: usize,
+    p: f64,
+    log_step: impl Fn(usize) -> f64,
+) -> crate::Result<()> {
     if p.is_nan() {
         return Err(crate::Error::Validation(
             "binomial_pmf_all: success probability p must not be NaN".to_string(),
@@ -172,7 +231,7 @@ pub fn binomial_pmf_all_into(out: &mut Vec<f64>, n: usize, p: f64) -> crate::Res
     let mut log_prob = n as f64 * (1.0 - p).ln();
     out[0] = log_prob.exp();
     for k in 0..n {
-        log_prob += ((n - k) as f64).ln() - ((k + 1) as f64).ln() + log_ratio;
+        log_prob += log_step(k) + log_ratio;
         out[k + 1] = log_prob.exp();
     }
     // Keep the full distribution normalized when log-recursion rounding accumulates.
@@ -1060,4 +1119,48 @@ mod tests {
     }
 
     // Student's t Distribution Tests
+    #[test]
+    fn prepared_binomial_is_bitwise_identical_over_tails_and_large_pools() {
+        for n in [0, 1, 2, 25, 125, 1024, 10_000] {
+            let prepared = BinomialPmf::new(n);
+            assert_eq!(prepared.get_count(), n);
+            let mut actual = Vec::new();
+            for p in [
+                f64::NEG_INFINITY,
+                -1.0,
+                0.0,
+                1e-10,
+                0.01,
+                0.2,
+                0.5,
+                0.99,
+                1.0 - 1e-10,
+                1.0,
+                2.0,
+                f64::INFINITY,
+            ] {
+                let expected = binomial_pmf_all(n, p).expect("ordinary PMF");
+                prepared.fill(&mut actual, p).expect("prepared PMF");
+                assert_eq!(
+                    actual.iter().map(|x| x.to_bits()).collect::<Vec<_>>(),
+                    expected.iter().map(|x| x.to_bits()).collect::<Vec<_>>(),
+                    "n={n}, p={p}"
+                );
+                assert!((actual.iter().sum::<f64>() - 1.0).abs() <= 1e-10);
+                let mean: f64 = actual
+                    .iter()
+                    .enumerate()
+                    .map(|(k, probability)| k as f64 * probability)
+                    .sum();
+                let expected_mean = n as f64 * p.clamp(0.0, 1.0);
+                assert!((mean - expected_mean).abs() <= 1e-8 * expected_mean.max(1.0));
+            }
+            let old = actual.clone();
+            assert!(prepared.fill(&mut actual, f64::NAN).is_err());
+            assert_eq!(
+                actual, old,
+                "invalid p leaves the reusable buffer unchanged"
+            );
+        }
+    }
 }
