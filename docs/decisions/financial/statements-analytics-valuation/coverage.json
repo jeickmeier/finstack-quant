@@ -1,0 +1,398 @@
+{
+  "scope": "statements-analytics-valuation",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "STATEMENTS-ANALYTICS-VALUATION-01",
+      "title": "Statement cashflows, terminal metric and corporate DCF bridge",
+      "path": "01-corporate-dcf.md"
+    },
+    {
+      "id": "STATEMENTS-ANALYTICS-VALUATION-02",
+      "title": "Cached-statement DCF parameter sensitivities",
+      "path": "02-dcf-sensitivity.md"
+    },
+    {
+      "id": "STATEMENTS-ANALYTICS-VALUATION-03",
+      "title": "LBO entry funding bridge and exit equity multiple",
+      "path": "03-lbo.md"
+    },
+    {
+      "id": "STATEMENTS-ANALYTICS-VALUATION-04",
+      "title": "Corporate-analysis gating, monetary reconciliation and credit reports",
+      "path": "04-analysis-reports-units.md"
+    },
+    {
+      "id": "STATEMENTS-ANALYTICS-VALUATION-05",
+      "title": "Comparable-company population, multiples and descriptive statistics",
+      "path": "05-comps-population-statistics.md"
+    },
+    {
+      "id": "STATEMENTS-ANALYTICS-VALUATION-06",
+      "title": "Comparable-company signals, regression residual scores and report exclusions",
+      "path": "06-comps-scoring.md"
+    },
+    {
+      "id": "STATEMENTS-ANALYTICS-VALUATION-07",
+      "title": "Prepared-statement scalar goal seek and residual acceptance",
+      "path": "07-goal-seek.md"
+    },
+    {
+      "id": "STATEMENTS-ANALYTICS-VALUATION-08",
+      "title": "Forecast-error metrics and near-zero exclusion",
+      "path": "08-forecast-errors.md"
+    },
+    {
+      "id": "STATEMENTS-ANALYTICS-VALUATION-09",
+      "title": "Statement scenario inheritance, overrides and comparison tables",
+      "path": "09-scenario-inheritance.md"
+    },
+    {
+      "id": "STATEMENTS-ANALYTICS-VALUATION-10",
+      "title": "Statement parameter grids and tornado aggregation",
+      "path": "10-sensitivity-grids.md"
+    },
+    {
+      "id": "STATEMENTS-ANALYTICS-VALUATION-11",
+      "title": "Statement variance ratios and additive driver bridges",
+      "path": "11-variance-bridges.md"
+    },
+    {
+      "id": "STATEMENTS-ANALYTICS-VALUATION-12",
+      "title": "Dependency traversal and provenance-aware formula explanations",
+      "path": "12-dependency-explanations.md"
+    },
+    {
+      "id": "STATEMENTS-ANALYTICS-VALUATION-13",
+      "title": "Balance roll-forward and balance-sheet articulation checks",
+      "path": "13-corkscrew.md"
+    },
+    {
+      "id": "STATEMENTS-ANALYTICS-VALUATION-14",
+      "title": "Configurable credit-scorecard thresholds and partial-evidence aggregation",
+      "path": "14-credit-scorecards.md"
+    },
+    {
+      "id": "STATEMENTS-ANALYTICS-VALUATION-15",
+      "title": "Roll-forward formulas and vintage convolution templates",
+      "path": "15-recurrence-templates.md"
+    },
+    {
+      "id": "STATEMENTS-ANALYTICS-VALUATION-16",
+      "title": "Lease rent-roll projection, renewal attribution and property cashflow templates",
+      "path": "16-real-estate-templates.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/backtesting.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-VALUATION-08"
+      ],
+      "reason": "Validates aligned finite forecasts, computes MAE/RMSE and near-zero-filtered percentage errors, records effective MAPE count and explicit wire behavior.",
+      "sha256": "8874e5dd7caa7fb55da0ca5715ec67ef9a001a5aa679a1a3e06648a7f4e89b4b"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/comps/mod.rs",
+      "classification": "support",
+      "records": [
+        "STATEMENTS-ANALYTICS-VALUATION-05",
+        "STATEMENTS-ANALYTICS-VALUATION-06"
+      ],
+      "reason": "Reexports comparable-company types, ratios, statistics and scoring/report APIs without calculation or financially material dispatch.",
+      "sha256": "7ac1ad59d1a2aad078255fe3504cc046ca570c67662823bcafdbe70d563a6ae1"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/comps/multiples.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-VALUATION-05"
+      ],
+      "reason": "Selects 11 numerator/denominator definitions, finite/positive-denominator admissibility and peer omission semantics.",
+      "sha256": "d2a89927338c2be9e9a7f3b5c4af34c4bb9fbc9308c32c126db504ff398a581f"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/comps/peer_set.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-VALUATION-05"
+      ],
+      "reason": "Builds direct/filtered peer populations, applies exact metadata/cap bounds, selects subject exclusion and preserves duplicate inputs.",
+      "sha256": "d0eae10832aab66ac754744ab029784881e489b1e8bbd9eaace20562c264164d"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/comps/report.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-VALUATION-06"
+      ],
+      "reason": "Constructs subject/peer multiple statistics, regression/dimension report rows and optional composite with explicit exclusions.",
+      "sha256": "934afd124c8dbe0434b218711b384822f9f7903b29928cbbcc8dbca9cdf60f2a"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/comps/scoring.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-VALUATION-06"
+      ],
+      "reason": "Selects metric extractors/directions, pairwise regression populations, raw and residual z signals, scaled weights and regression-only confidence.",
+      "sha256": "24ebaf14fa8d7c686f6099351e0569facf98a93a97963c87498e09a45d34b38c"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/comps/stats.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-VALUATION-05",
+        "STATEMENTS-ANALYTICS-VALUATION-06"
+      ],
+      "reason": "Finite filtering, compensated mean, sample dispersion, R7 quartiles, tie-full percentile and OLS/residual/R-squared calculations with numerical guards.",
+      "sha256": "afcdad005bc80fdd836b12fed895873145be8be1254a2385b7bf796dfb8abe4b"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/comps/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-VALUATION-05",
+        "STATEMENTS-ANALYTICS-VALUATION-06"
+      ],
+      "reason": "Defines period labels, optional metric units/named-custom lookup precedence and multiple variants; period labels do not normalize data.",
+      "sha256": "33ed6613e02e8e9b654fb50c8c21702d09560ad019a14e9f0ad3a9380f142a9c"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/goal_seek.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-VALUATION-07"
+      ],
+      "reason": "Prepares repeated statement evaluation, mutates one typed driver cell, selects Brent bounds/fallback, verifies residual and reconstructs optional validated result model.",
+      "sha256": "33ee743e645917b3beb289bd5e909c9433359b02b4cacb2d1c202d1bc44d3095"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/introspection.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-VALUATION-12"
+      ],
+      "reason": "Traverses graph dependencies/cycles, renders trees and creates source-aware additive or reference-list explanations with missing-component/nonfinite semantics.",
+      "sha256": "29e4f3e3544dab7c767aa6d6c60054f5e759d6796b1ef7fe751a1bd197a7d453"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/mod.rs",
+      "classification": "support",
+      "records": [
+        "STATEMENTS-ANALYTICS-VALUATION-01",
+        "STATEMENTS-ANALYTICS-VALUATION-04",
+        "STATEMENTS-ANALYTICS-VALUATION-05",
+        "STATEMENTS-ANALYTICS-VALUATION-07",
+        "STATEMENTS-ANALYTICS-VALUATION-08",
+        "STATEMENTS-ANALYTICS-VALUATION-09",
+        "STATEMENTS-ANALYTICS-VALUATION-12"
+      ],
+      "reason": "Declares analysis modules and reexports public APIs; no local financial calculation or model-choice dispatch.",
+      "sha256": "409e991b0e0e655e9fa1ca9ea839df21124f6f7db5c257aeaeb06a244cf609a3"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/reports.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-VALUATION-04"
+      ],
+      "reason": "Constructs P&L tables, complete-LTM leverage/coverage and credit assessments, choosing missing/finite/type handling and text display units.",
+      "sha256": "5e087695f5228bb96cfe7d9084b6a5c590e7e4f1037bf50f21c053121e8caa17"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/scenarios/mod.rs",
+      "classification": "support",
+      "records": [
+        "STATEMENTS-ANALYTICS-VALUATION-09",
+        "STATEMENTS-ANALYTICS-VALUATION-10",
+        "STATEMENTS-ANALYTICS-VALUATION-11"
+      ],
+      "reason": "Reexports scenario, sensitivity and variance types/functions; no local algorithm or material defaults.",
+      "sha256": "c9f6fd64a4f7eac8f7814cd317d817fd7143f7f35d395595c233d45d7c38feac"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/scenarios/scenario_set.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-VALUATION-09",
+        "STATEMENTS-ANALYTICS-VALUATION-11"
+      ],
+      "reason": "Resolves ancestry/cycles, merges separate override maps, applies typed forecast changes and evaluates results; chooses comparison baseline/periods/relative change.",
+      "sha256": "ba103de4adbfa51249f5f628cd612774e49e3c3b0320ecf8378c0c92e00ddbfe"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/scenarios/sensitivity.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-VALUATION-10"
+      ],
+      "reason": "Validates grid cardinality/work, executes prepared diagonal/Cartesian/tornado scenarios and constructs finite endpoint-based tornado entries.",
+      "sha256": "fab77ed7afb02d6cb7b92c18316eb69e6341a0e74c80689d4b45aac5556ffebd"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/scenarios/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-VALUATION-09",
+        "STATEMENTS-ANALYTICS-VALUATION-10"
+      ],
+      "reason": "Defines scenario mode/default metadata and parameter constructors, including percentage perturbation from declared base values and result baseline fields.",
+      "sha256": "21a7a5608f66eb7a60d837b07a397fcdbc4cf4c2538aa534167126b6b915c593"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/scenarios/variance.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-VALUATION-11"
+      ],
+      "reason": "Checks metadata compatibility and missing cells, calculates signed-base variance ratios and additive driver bridge residuals.",
+      "sha256": "3c7474a926ebd0885d5bd7edd2eab4f493868976af18b99126ded7195145e4ce"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/units.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-VALUATION-04"
+      ],
+      "reason": "Reconciles declared value type, typed money currency and rounded numeric projections; applies finite ratio and expected-currency checks.",
+      "sha256": "d63b2ddc1267f98111a8d2c95cec08a2e2f2475370f2121404ece8ea14a2c8d4"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/valuation/corporate.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-VALUATION-01",
+        "STATEMENTS-ANALYTICS-VALUATION-02"
+      ],
+      "reason": "Computes WACC, extracts dated typed statement cashflows and complete-year terminal metrics, chooses equity bridge, delegates DCF and computes cached parameter sensitivities.",
+      "sha256": "068134742ce3dd91cd90fed930dcab5a4de91535dd74bd411f77183fa17a9a45"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/valuation/lbo.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-VALUATION-03"
+      ],
+      "reason": "Validates transaction/metric domains, calculates entry uses and residual equity, exit equity MOIC and optional nonblocking check reports.",
+      "sha256": "6c9193c6c203542ef95657f1ba5cb1194443b7a3f65754082f3173bef31267ad"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/valuation/mod.rs",
+      "classification": "support",
+      "records": [
+        "STATEMENTS-ANALYTICS-VALUATION-01",
+        "STATEMENTS-ANALYTICS-VALUATION-02",
+        "STATEMENTS-ANALYTICS-VALUATION-03",
+        "STATEMENTS-ANALYTICS-VALUATION-04"
+      ],
+      "reason": "Declares corporate/LBO/orchestrator modules and reexports their APIs, without calculating financial outputs.",
+      "sha256": "4f8ec608be4621dfa4c24161fbdb4e5956e750e597ee7aeb47ea5bd70efc5710"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/analysis/valuation/orchestrator.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-VALUATION-04"
+      ],
+      "reason": "Selects statement-only versus checked DCF/capital-structure evaluation, enforces required check IDs, resolves optional arguments and selects scalar/node LTV reference paths.",
+      "sha256": "8c3dad3e3fdd64fe0d84a375b3c178292fe9ce9fc2960c874d406c1fca6c2c25"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/bin/gen_schemas.rs",
+      "classification": "support",
+      "records": [
+        "STATEMENTS-ANALYTICS-VALUATION-04"
+      ],
+      "reason": "Parses schema-generation CLI arguments and delegates artifact writing/index construction to core; no financial calculation.",
+      "sha256": "5cfd3856c41a3d5890e127e8e1894f00da467e04b71b1a01728bd8f635480f52"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/extensions/corkscrew/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-VALUATION-13"
+      ],
+      "reason": "Validates balance roll-forward movements and every-period articulation, selecting absolute tolerance and strict/lenient diagnostics/status behavior.",
+      "sha256": "541e9fe175fb8f3304f78f28c1be7721adc4ccfc7ab637db839ed160f2241a7e"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/extensions/mod.rs",
+      "classification": "support",
+      "records": [
+        "STATEMENTS-ANALYTICS-VALUATION-13",
+        "STATEMENTS-ANALYTICS-VALUATION-14"
+      ],
+      "reason": "Declares and reexports corkscrew and scorecard extensions without calculation or selection policy.",
+      "sha256": "c06ffd065916bc1b8266f3846ee21b2df1368d385222040ca10ae591ddd784a2"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/extensions/scorecards/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-VALUATION-14"
+      ],
+      "reason": "Chooses target/scale, validates weights, evaluates formulas, resolves inclusive rating thresholds, renormalizes available evidence and assigns rating/minimum/status.",
+      "sha256": "92d3e10d94beff9674b57ac1bc19f9e62c5b040f5f69e11e5362c54b10706fdf"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/lib.rs",
+      "classification": "support",
+      "records": [
+        "STATEMENTS-ANALYTICS-VALUATION-04"
+      ],
+      "reason": "Crate lint policy, feature-gated schema module and module exports/doctest include; no local financial algorithm.",
+      "sha256": "600615b05c64fd59ac6d7eae4f8875831c3023e3909a09302e0c3e5445120b93"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/schema.rs",
+      "classification": "support",
+      "records": [
+        "STATEMENTS-ANALYTICS-VALUATION-04",
+        "STATEMENTS-ANALYTICS-VALUATION-08",
+        "STATEMENTS-ANALYTICS-VALUATION-12",
+        "STATEMENTS-ANALYTICS-VALUATION-14"
+      ],
+      "reason": "Registers schema artifacts and delegates shared-definition externalization; no independent financial validation or calculation, with wire behavior owned by source types.",
+      "sha256": "eba91d4dd094b941854b98b8acce3e722753d8f17f891017f42a2402f48f9ef7"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/templates/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-VALUATION-15"
+      ],
+      "reason": "Formats floating coefficients with shortest-roundtrip precision and decimal DSL disambiguation used by projection formula templates.",
+      "sha256": "e7ee3ab8ee3f1253b5d21565f3b77e940c3b76a2e50b55adc17724b525763bf5"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/templates/real_estate/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-VALUATION-16"
+      ],
+      "reason": "Validates lease inputs, projects period-indexed escalation/steps/free rent/renewal, decomposes vacancy and builds scalar property EGI/NOI/NCF formulas.",
+      "sha256": "7174d98c5564ce8af8634d6f80a9ae066f3ad729f83d6a7fe7d02aa295bbe98c"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/templates/roll_forward/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-VALUATION-15"
+      ],
+      "reason": "Builds coalesced opening/lagged ending balances and signed movement formulas with default zero opening.",
+      "sha256": "1293a9bb4a24c8bb0b09db244e238dfba4fb2f04ebb75aede796074bf2d8c062"
+    },
+    {
+      "path": "finstack-quant/statements-analytics/src/templates/vintage/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-ANALYTICS-VALUATION-15"
+      ],
+      "reason": "Builds lagged volume convolution, skips tiny absolute coefficients and substitutes zero missing history/empty curves.",
+      "sha256": "5c40336c8ed0edaaf2c80f90732741de60f1273d7538fd2e0405bc90986f7fc1"
+    }
+  ]
+}

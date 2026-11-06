@@ -23,6 +23,13 @@ tolerances. Cross-target bit identity is promised only where demonstrated.
 Result keys, ordering, error categories, and the identity of a failing input
 remain consistent across hosts, with the agreed host representations.
 
+[ADR 0042](0042-numerical-accumulation-and-comparisons.md) defines the
+detailed floating-point accumulation and comparison rules, including
+`f64::to_bits()` checks for bit-identity claims.
+[ADR 0043](0043-deterministic-ordering-and-monte-carlo-execution.md) defines
+the concrete ordering, RNG, partitioning, merge-tree, and baseline-recording
+requirements supporting these tiers.
+
 ## Rationale
 
 Random streams, execution order, and floating-point reduction order can change
@@ -54,15 +61,15 @@ thread-count independence are distinct guarantees with different evidence.
 
 ## Implementation notes and references
 
-[INVARIANTS.md](../../../INVARIANTS.md), section 2, already describes these
-tiers, per-target qualifications, explicit seeds, and the prerequisites for
-the main Monte Carlo engine's serial/parallel bit identity. The
+[INVARIANTS.md](../../../INVARIANTS.md), section 2, retains per-target
+qualifications, explicit seeds, ordering and reduction rules, and the
+prerequisites for the main Monte Carlo engine's serial/parallel bit identity. The
 [Monte Carlo tests](../../../finstack-quant/models/src/monte_carlo/engine/tests.rs)
 provide relevant execution checks; their presence does not establish every
 cross-target or API-wide promise.
 
-The [models README](../../../finstack-quant/models/README.md) still makes a
-blanket native/WASM bit-identity claim. Replace that guidance with the precise
-target and execution guarantees supported by evidence. This accepted ADR
-resolves the intended policy; the documentation reconciliation and any missing
-verification remain pending.
+Guidance reconciliation is tracked in
+[FOLLOW_UPS.md](../FOLLOW_UPS.md#reconciliation-items), with implementation
+and verification coverage in its
+[implementation register](../FOLLOW_UPS.md#implementation-and-lifecycle-follow-up).
+Acceptance records the policy without certifying those checks.

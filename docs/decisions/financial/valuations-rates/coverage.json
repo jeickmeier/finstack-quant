@@ -1,0 +1,1052 @@
+{
+  "scope": "valuations-rates",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "VALUATIONS-RATES-01-DEPOSITS",
+      "title": "Deposit cashflows and quote/discount inversion",
+      "path": "01-deposits.md"
+    },
+    {
+      "id": "VALUATIONS-RATES-02-FRA",
+      "title": "FRA historical fixings, early settlement and quote risk",
+      "path": "02-fra.md"
+    },
+    {
+      "id": "VALUATIONS-RATES-03-INTEREST-RATE-SWAPS",
+      "title": "IRS cashflow projection, convention resolution and sensitivity bases",
+      "path": "03-interest-rate-swaps.md"
+    },
+    {
+      "id": "VALUATIONS-RATES-04-BASIS-SWAPS",
+      "title": "Basis swap floating legs and absolute par spread",
+      "path": "04-basis-swaps.md"
+    },
+    {
+      "id": "VALUATIONS-RATES-05-CAP-FLOOR-PRICING",
+      "title": "Cap/floor projection, volatility conventions and Hull\u2013White approximation",
+      "path": "05-cap-floor-pricing.md"
+    },
+    {
+      "id": "VALUATIONS-RATES-06-CAP-FLOOR-RISK",
+      "title": "Cap/floor inverse volatility and risk differentiation",
+      "path": "06-cap-floor-risk.md"
+    },
+    {
+      "id": "VALUATIONS-RATES-07-EUROPEAN-SWAPTIONS",
+      "title": "European swaption forwards, settlement annuities and quote Greeks",
+      "path": "07-european-swaptions.md"
+    },
+    {
+      "id": "VALUATIONS-RATES-08-HULL-WHITE-SWAPTIONS",
+      "title": "Hull\u2013White swaption exercise, tree reuse and regression policy",
+      "path": "08-hull-white-swaptions.md"
+    },
+    {
+      "id": "VALUATIONS-RATES-09-LMM-BERMUDANS",
+      "title": "Bermudan LMM displacement, terminal numeraire and regression fallback",
+      "path": "09-lmm-bermudans.md"
+    },
+    {
+      "id": "VALUATIONS-RATES-10-RATE-FUTURES",
+      "title": "Rate futures projection, convexity and option rate risk",
+      "path": "10-rate-futures.md"
+    },
+    {
+      "id": "VALUATIONS-RATES-11-CMS-CONVEXITY",
+      "title": "CMS reference swaps, convexity approximation and local risk",
+      "path": "11-cms-convexity.md"
+    },
+    {
+      "id": "VALUATIONS-RATES-12-CMS-REPLICATION",
+      "title": "Normalized smile replication for CMS options and swaps",
+      "path": "12-cms-replication.md"
+    },
+    {
+      "id": "VALUATIONS-RATES-13-INFLATION-SWAPS",
+      "title": "Inflation swap CPI ratios and accrual conventions",
+      "path": "13-inflation-swaps.md"
+    },
+    {
+      "id": "VALUATIONS-RATES-14-INFLATION-OPTIONS",
+      "title": "Inflation option forward proxy and information expiry",
+      "path": "14-inflation-options.md"
+    },
+    {
+      "id": "VALUATIONS-RATES-15-REPO",
+      "title": "Repo lending cashflows, collateral and margin proxies",
+      "path": "15-repo.md"
+    },
+    {
+      "id": "VALUATIONS-RATES-16-CROSS-CURRENCY-SWAPS",
+      "title": "Cross-currency coupons and resetting notionals",
+      "path": "16-cross-currency-swaps.md"
+    },
+    {
+      "id": "VALUATIONS-RATES-17-CMS-SPREAD",
+      "title": "CMS spread conditional lognormal integration",
+      "path": "17-cms-spread.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/valuations/rates/src/basis_swap/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-04-BASIS-SWAPS"
+      ],
+      "reason": "Absolute/incremental primary-leg par spread, leg PV/annuity outputs, notional/annuity inversion guards and per-curve/key-rate risk selection.",
+      "sha256": "9063458a0e67ff1054d2f7165405f2ceb5faaefdae6556ee90233b1a725ef096"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/basis_swap/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-RATES-04-BASIS-SWAPS"
+      ],
+      "reason": "Module wiring and public reexports for basis_swap; calculations/defaults live in the separately mapped implementation files.",
+      "sha256": "60008ea8e4526f014690bf464c4db3f520d306e530fb8921a34a3db7e7771dee"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/basis_swap/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-04-BASIS-SWAPS"
+      ],
+      "reason": "Validated distinct/same-curve opt-in legs, term/overnight projection, leg accrual annuity, signed discounted cashflows and curve/fixing dependencies.",
+      "sha256": "a439155aec7e04eeaabf10235f22f951f86921801b7de3db3a567cd0b083d197"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/cap_floor/hw_pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-05-CAP-FLOOR-PRICING",
+        "VALUATIONS-RATES-06-CAP-FLOOR-RISK"
+      ],
+      "reason": "Scalar/piecewise HW parameter precedence, term-caplet model inputs, overnight Gaussian covariance linearization and normal moment matching, premium handling and inline invariant tests.",
+      "sha256": "85a657245e3c3ec87a015284587596210049fadbd463b6eb4cecf971760fc1c0"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/cap_floor/metrics/common.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-06-CAP-FLOOR-RISK"
+      ],
+      "reason": "Resolve common optionlet inputs, quote convention, fixedness, discount weighting and compound-coupon chain-rule state for analytic metric aggregation.",
+      "sha256": "75ee3856795aa2c59b163eb7d70faaa0aa16f994690df33f13a17197264d3b4b"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/cap_floor/metrics/dv01.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-06-CAP-FLOOR-RISK"
+      ],
+      "reason": "Calibration quote-replay eligibility, discount-only OIS selection, central replay and combined direct-curve fallback.",
+      "sha256": "c21e2817fdcf2efc0e4b0dd34299bf96af7d5f7423f73e07ed8fb858f70a9d63"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/cap_floor/metrics/implied_vol.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-06-CAP-FLOOR-RISK"
+      ],
+      "reason": "Single-optionlet premium inversion with convention-specific Brent brackets/tolerance, fixed-option zero and objective error conversion.",
+      "sha256": "3f8512180fe75d1e9b13cc301a8d85c1541d5e6bfd15905db4c5bf7bc4f1af69"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/cap_floor/metrics/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-06-CAP-FLOOR-RISK"
+      ],
+      "reason": "Analytic delta/gamma chain rule, HW repricing substitution, forward-only PV01 and registered risk variants.",
+      "sha256": "e5fd95d0e3cc089196833ac6a42ac64ee3bba64ae6f74716e3384443b4ab80e4"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/cap_floor/metrics/theta.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-06-CAP-FLOOR-RISK"
+      ],
+      "reason": "Date-roll theta bounded by next unfixed reset or final payment and unchanged-market repricing.",
+      "sha256": "7f349534209d00e9016823f7f3add150e3aeec297c40c01e47aab4dc11dfd95e"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/cap_floor/metrics/vega.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-06-CAP-FLOOR-RISK"
+      ],
+      "reason": "Analytic quote vega, HW normal-surface bump/reprice and separate scalar/schedule HW sigma vega with one-sided boundary policy.",
+      "sha256": "38785a4487ec7c2643dc1f79cd71b5ffc3db208b322054154333f1e95cdfb1e3"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/cap_floor/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-RATES-05-CAP-FLOOR-PRICING",
+        "VALUATIONS-RATES-06-CAP-FLOOR-RISK"
+      ],
+      "reason": "Module wiring and public reexports for cap_floor; calculations/defaults live in the separately mapped implementation files.",
+      "sha256": "b02dde126190a5120efb0d7f218a632b6c7f9e486fcedde424cb8abe674166f9"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/cap_floor/pricing/black.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-05-CAP-FLOOR-PRICING",
+        "VALUATIONS-RATES-06-CAP-FLOOR-RISK"
+      ],
+      "reason": "Black optionlet price/domain validation, intrinsic edge behavior and delta wrapper with monetary/accrual/discount scaling.",
+      "sha256": "09093c59f70a4f1c11466b3ec6d9900862ec3301ffa44573f488905da59e5e25"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/cap_floor/pricing/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-RATES-05-CAP-FLOOR-PRICING"
+      ],
+      "reason": "Pricing module wiring and plain optionlet input value structure; calculation is in separately mapped kernels.",
+      "sha256": "9d60e0a8bf208657087883a04bc2e56fecc38c5c9794fe840630e70e4e8e2c70"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/cap_floor/pricing/normal.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-05-CAP-FLOOR-PRICING",
+        "VALUATIONS-RATES-06-CAP-FLOOR-RISK"
+      ],
+      "reason": "Bachelier optionlet price and delta with low-vol intrinsic branch and product cashflow scaling.",
+      "sha256": "b0bcafb5aae81f566afaad1232070ae372c54aebf4f72a074a5398e73077209c"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/cap_floor/pricing/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-05-CAP-FLOOR-PRICING"
+      ],
+      "reason": "Term/overnight optionlet iteration, volatility convention dispatch/clamping, expiry/payment filtering, fixed intrinsic route and holder-premium subtraction; runtime adapters continue after inline tests.",
+      "sha256": "fa989aa591c503434670d7794b7eca911696cac5e9ca6aca054cd46246fd11e9"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/cap_floor/pricing/projection.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-05-CAP-FLOOR-PRICING",
+        "VALUATIONS-RATES-06-CAP-FLOOR-RISK"
+      ],
+      "reason": "Historical versus projected term coupons, same-ID overnight curve selection, daily observation exposures and first/second parallel-forward derivatives.",
+      "sha256": "dbaee8045474660e965b4f357b47ca36306f0a12ba90f08f1fc8e8ce98cad0cc"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/cap_floor/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-05-CAP-FLOOR-PRICING",
+        "VALUATIONS-RATES-06-CAP-FLOOR-RISK"
+      ],
+      "reason": "Cap/floor option domain, schedule/calendar/fixing/payment conventions, overnight coupon settings, quote-model defaults, premium handling, dependency reporting and public valuation inputs.",
+      "sha256": "6b3c5e6eff9492801e8fed64f73a4868b4056fe3f6d312b6919e741c7c66a3e8"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/cms_common.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-11-CMS-CONVEXITY",
+        "VALUATIONS-RATES-12-CMS-REPLICATION",
+        "VALUATIONS-RATES-17-CMS-SPREAD"
+      ],
+      "reason": "CMS reference-swap specification/conventions, reference schedules, annuity-weight derivatives, convexity-baseline metric and exact historical fixing resolution; inline tests are interleaved with runtime helpers.",
+      "sha256": "48a81d2af1819ce8abaf2dbbf3a78c26bec5a12887b6119dfb238a1d9da16bb2"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/cms_option/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-11-CMS-CONVEXITY",
+        "VALUATIONS-RATES-12-CMS-REPLICATION"
+      ],
+      "reason": "Finite-difference CMS local-forward Greeks, surface vega, convexity-value baseline difference and generic curve-risk selection.",
+      "sha256": "d408e226f56808b417e50161871b952cbd54ca213006bda939c26d685ee901ba"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/cms_option/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-RATES-11-CMS-CONVEXITY",
+        "VALUATIONS-RATES-12-CMS-REPLICATION"
+      ],
+      "reason": "Module wiring and public reexports for cms_option; calculations/defaults live in the separately mapped implementation files.",
+      "sha256": "270a20d1b4ebfbfeec415aa923429024675feeb4741f38813d93b7fe4b56b05e"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/cms_option/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-11-CMS-CONVEXITY"
+      ],
+      "reason": "Adjusted-forward Black CMS option using annuity-weight convexity kernel and fixed-fixing intrinsic route.",
+      "sha256": "5377a91a0a25b671441dd52616ee8f9eb2116f5b30b5304b85ef760226c0f346"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/cms_option/replication_pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-12-CMS-REPLICATION"
+      ],
+      "reason": "Adaptive strike integration of normalized inverse-annuity-weighted smile claims, integration bounds/error controls and separate expectation/payoff normalization.",
+      "sha256": "63708ef37258ec12625f191600eee71dd33b26264959516d35052b212dbaaa6b"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/cms_option/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-11-CMS-CONVEXITY",
+        "VALUATIONS-RATES-12-CMS-REPLICATION"
+      ],
+      "reason": "CMS option fixing/reference-swap defaults, domain validation, convexity/replication selection, quote inputs and dependency state.",
+      "sha256": "36ccef2e6e6eed708ddc0723597c7f485ce2dfd235249df17ce364d77d5e282d"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/cms_spread_option/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-17-CMS-SPREAD"
+      ],
+      "reason": "Registers combined parallel and triangular key-rate DV01 for the CMS spread option; no local vega/correlation-risk calculator.",
+      "sha256": "77cbcf96de043fbffd60dab9b738d6e3d68c1f8ab1e29bc2748894a115d697cd"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/cms_spread_option/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-RATES-17-CMS-SPREAD"
+      ],
+      "reason": "Module wiring and public reexports for cms_spread_option; calculations/defaults live in the separately mapped implementation files.",
+      "sha256": "df33562a7f904cf7640afd31a75d361e29e47b46d7d373bbd2403b7131054c00"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/cms_spread_option/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-17-CMS-SPREAD"
+      ],
+      "reason": "Two adjusted CMS marginals, fixed20-node Gauss-Hermite conditional-lognormal spread payoff, correlation endpoints and deterministic/degenerate branches.",
+      "sha256": "b8f03963ae5e45a0f761cda2ba8807af689eb60616c965d3fbaf095d5666207f"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/cms_spread_option/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-17-CMS-SPREAD"
+      ],
+      "reason": "Two reference-swap definitions, historical fixing keys, bounded correlation and option-domain validation/dependencies.",
+      "sha256": "22cb454540bc6a229394f0a2682782beaac4603e88c7b2774c22e896c6725b4e"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/cms_swap/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-11-CMS-CONVEXITY",
+        "VALUATIONS-RATES-12-CMS-REPLICATION"
+      ],
+      "reason": "Generic combined/key-rate curve-risk registration and convexity premium relative to the zero-convexity Black baseline.",
+      "sha256": "25ebf6b1d46c12ce4bcedca710c53eb4eb22cc5db59a2c27f4cf0d92ad219967"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/cms_swap/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-RATES-11-CMS-CONVEXITY",
+        "VALUATIONS-RATES-12-CMS-REPLICATION"
+      ],
+      "reason": "Module wiring and public reexports for cms_swap; calculations/defaults live in the separately mapped implementation files.",
+      "sha256": "5c5401ecd1e97f97a09c26f8225b04ab318ac69f4c4109abd7fc6ce9b1f44e1f"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/cms_swap/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-11-CMS-CONVEXITY",
+        "VALUATIONS-RATES-12-CMS-REPLICATION"
+      ],
+      "reason": "Period CMS forward/convexity or replication expected coupon, embedded cap/floor corrections, funding PV and signed summed net value; runtime follows tests.",
+      "sha256": "71457777520c6800600a53251ca578292cd027c1214c7b5e9f1f649f4f59a68a"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/cms_swap/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-11-CMS-CONVEXITY",
+        "VALUATIONS-RATES-12-CMS-REPLICATION"
+      ],
+      "reason": "CMS/fixed-or-floating funding schedules, payment/fixing conventions, clipped coupon feature, funding period construction, dependency declaration and projection inputs.",
+      "sha256": "c9fac92486eb946d5820ffe9661114f2da036103f4510191b20a3b0ea1343bc0"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/deposit/metrics/df.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-01-DEPOSITS"
+      ],
+      "reason": "Discount-factor metrics resolve first declared discount dependency and valuation-relative adjusted start/end factors.",
+      "sha256": "5c76ff57929639e19a3bcedc7339ebc3359dd69e0d514b93a02469ce5319cef5"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/deposit/metrics/df_end_from_quote.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-01-DEPOSITS"
+      ],
+      "reason": "Quote inversion D_end=D_start/(1+r*alpha) with positive denominator and input metric dependencies.",
+      "sha256": "519b5667a852d6df7527733887be68517e5502462f3189345f2b6efae8bc687f"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/deposit/metrics/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-01-DEPOSITS"
+      ],
+      "reason": "Metric dispatch, contractual quote output and adjusted-date year fraction; selects generic curve risk.",
+      "sha256": "592378aae0d54c11e1d62cf02a9487d6069f12a9612404b556038b31b99e9d8c"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/deposit/metrics/par_rate.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-01-DEPOSITS"
+      ],
+      "reason": "Simple deposit par rate from start/end discount ratio with accrual and terminal-DF guards.",
+      "sha256": "bb36a0970c473035d9958b75476ad3db977663e703e6dfbc12cd97ed1c98c431"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/deposit/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-RATES-01-DEPOSITS"
+      ],
+      "reason": "Module wiring and public reexports for deposit; calculations/defaults live in the separately mapped implementation files.",
+      "sha256": "b0841ba62e44d3b6ccecc12ec83b395d5692b54eb513c6eb5390bba3d2f198ba"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/deposit/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-01-DEPOSITS"
+      ],
+      "reason": "Optional-quote deposit contract, calendar-adjusted endpoint dates, simple-interest principal/coupon cashflows and schedule-PV valuation.",
+      "sha256": "d7669312fbe883875f1fce22a9b22f9791b1dd7eca58f12c27d653970452c010"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/family.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-01-DEPOSITS",
+        "VALUATIONS-RATES-02-FRA",
+        "VALUATIONS-RATES-03-INTEREST-RATE-SWAPS",
+        "VALUATIONS-RATES-04-BASIS-SWAPS",
+        "VALUATIONS-RATES-05-CAP-FLOOR-PRICING",
+        "VALUATIONS-RATES-06-CAP-FLOOR-RISK",
+        "VALUATIONS-RATES-07-EUROPEAN-SWAPTIONS",
+        "VALUATIONS-RATES-08-HULL-WHITE-SWAPTIONS",
+        "VALUATIONS-RATES-09-LMM-BERMUDANS",
+        "VALUATIONS-RATES-10-RATE-FUTURES",
+        "VALUATIONS-RATES-11-CMS-CONVEXITY",
+        "VALUATIONS-RATES-12-CMS-REPLICATION",
+        "VALUATIONS-RATES-13-INFLATION-SWAPS",
+        "VALUATIONS-RATES-14-INFLATION-OPTIONS",
+        "VALUATIONS-RATES-15-REPO",
+        "VALUATIONS-RATES-16-CROSS-CURRENCY-SWAPS",
+        "VALUATIONS-RATES-17-CMS-SPREAD"
+      ],
+      "reason": "Material model registration: deterministic, Black/Normal/HW, tree/LSMC/LMM and CMS replication dispatch plus all product metric families.",
+      "sha256": "cbb2fa90b1a648f159e491dbdbc0757116549a0f665658c60153a10acdde6f8c"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/forward_swap_rate.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-11-CMS-CONVEXITY",
+        "VALUATIONS-RATES-12-CMS-REPLICATION",
+        "VALUATIONS-RATES-17-CMS-SPREAD"
+      ],
+      "reason": "Build fixed/float reference schedules, discount annuity, select equal-ID discount ratios versus explicit forward curve, enforce tenor and divide floating PV by annuity.",
+      "sha256": "f3bf076568f02b9379f42302638840f0283c0a86facee1ffda30e6d5f7084ddd"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/fra/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-02-FRA"
+      ],
+      "reason": "Par/forward rate outputs, forward-only PV01, recipe eligibility for central quote-replay DV01 and direct curve-bump fallback.",
+      "sha256": "213dd53416e313c1caa9d862ad466212c0abc90b53a52bcebe633b2eec152017"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/fra/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-RATES-02-FRA"
+      ],
+      "reason": "Module wiring and public reexports for fra; calculations/defaults live in the separately mapped implementation files.",
+      "sha256": "ef4728e6bf3f71113ca4f09e26e6b73aae03b2710b90a717f1b91aca0f5e2517"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/fra/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-02-FRA"
+      ],
+      "reason": "Fixing date/calendar resolution, explicit versus historical/projected rate precedence, early-settlement denominator and lifecycle cutoff, signed cashflow and dependency contract.",
+      "sha256": "74079c86376cac97f6035f8cc2f9aa1d94dbadf8b70eede51b9690315d20bdf5"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/inflation_cap_floor/metrics/inflation01.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-14-INFLATION-OPTIONS"
+      ],
+      "reason": "Active-pricer inflation01 via shared central inflation-curve bump and explicit 1bp units.",
+      "sha256": "3915779a7aa2452d9545c00e5b870dce38e476077ff0521652c2c04a62892335"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/inflation_cap_floor/metrics/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-14-INFLATION-OPTIONS"
+      ],
+      "reason": "Central surface vega per volatility point, inflation and nominal curve-risk metric registration.",
+      "sha256": "4ffa039290f73986e7f21c515a7c132cb4184169639fae295968af2a5488be0b"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/inflation_cap_floor/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-RATES-14-INFLATION-OPTIONS"
+      ],
+      "reason": "Module wiring and public reexports for inflation_cap_floor; calculations/defaults live in the separately mapped implementation files.",
+      "sha256": "204ec0b1126b7094356931d9bed1d30252e092b0bb8d028844a03aa6d5299bb7"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/inflation_cap_floor/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-14-INFLATION-OPTIONS"
+      ],
+      "reason": "Explicit Black76 versus Normal inflation-option model adapter and requested-convention dispatch.",
+      "sha256": "a81dcf4dfb41fd6adffcaa3f39da518c24d46745462bb2cb782fd3e54f691d6d"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/inflation_cap_floor/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-14-INFLATION-OPTIONS"
+      ],
+      "reason": "CPI-reference knownness, reference/publication expiry, deterministic annualized-ratio forward, normal/lognormal quote resolution and discounted optionlet sum.",
+      "sha256": "d1c4d5a4c4267b497ad8767cf106ee5d9341b4c2665e1a46f26da065f3589bcd"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/inflation_fd.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-13-INFLATION-SWAPS",
+        "VALUATIONS-RATES-14-INFLATION-OPTIONS"
+      ],
+      "reason": "Central inflation01 and second-difference inflation convexity with explicit curve percentage-point conversion, active-repricer selection and inline tests.",
+      "sha256": "b6e44971fc27c054eab69840a013bb5bf6ba0982fe29a0aec8f9a6f9509fb30d"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/inflation_swap/metrics/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-13-INFLATION-SWAPS"
+      ],
+      "reason": "ZC/YoY inflation01, ZC convexity and nominal-curve risk selection plus fixed/inflation leg PV and par-rate outputs; inline test modules interleave declarations.",
+      "sha256": "a31581071794f44fd6fa498927104158c539b3cefacbddf38e1cb47d6b723b47"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/inflation_swap/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-RATES-13-INFLATION-SWAPS"
+      ],
+      "reason": "Module wiring and public reexports for inflation_swap; calculations/defaults live in the separately mapped implementation files.",
+      "sha256": "c32eb3bb9429f5f98ae959919f52ebc209a706dfb45e9cac6333340d44f8e2d8"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/inflation_swap/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-13-INFLATION-SWAPS"
+      ],
+      "reason": "Publication-aware CPI references, zero-coupon compounded fixed growth/OneOne year fractions, YoY ratio coupons, par rates, discount and payment filtering.",
+      "sha256": "43102978ec652827a04df052e7d7f6f617ec1557ef07f8d9ab77ae867e3c21dd"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/ir_future/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-10-RATE-FUTURES"
+      ],
+      "reason": "Quoted-value versus model-repriced curve-risk selection, model price/implied forward/convexity outputs and generic listed metric dispatch.",
+      "sha256": "69ff91a85421d1a25a4f77867fbaf8f2131be1020d542cd72c467e2f20f6f709"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/ir_future/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-RATES-10-RATE-FUTURES"
+      ],
+      "reason": "Module wiring and public reexports for ir_future; calculations/defaults live in the separately mapped implementation files.",
+      "sha256": "e93db9aae3ba379841903237e7c8c4ac5501063587c32310653d5d8a3d5a18c4"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/ir_future/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-10-RATE-FUTURES"
+      ],
+      "reason": "Term/daily average/compounded reference rate, history-sensitive forward sensitivity, explicit/Normal-surface/HW Gaussian convexity and listed price/mark integration.",
+      "sha256": "307ae07bccada3bb404b7cc9bbfdb32f497a894c107a9bebdb39812c61dffd49"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/ir_future_option/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-10-RATE-FUTURES"
+      ],
+      "reason": "Listed future-option common metric registration with the IR-specific rate-DV01 calculation.",
+      "sha256": "265345a822966e2e5571288c09051d74dd2adf9b2766fd85a8e58f5b05340678"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/ir_future_option/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-RATES-10-RATE-FUTURES"
+      ],
+      "reason": "Module wiring and public reexports for ir_future_option; calculations/defaults live in the separately mapped implementation files.",
+      "sha256": "675be9d36ef7f3991e82b1775bcd26edd17b897fcb5be178ffbcd87834a36981"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/ir_future_option/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-10-RATE-FUTURES"
+      ],
+      "reason": "IR-future option validation and shared future-option delegation; mandatory underlying price-per-bp conversion plus premium-discount correction for rate DV01.",
+      "sha256": "9750a4a9c4772fe3d07adeaccafbba5525c509c906879f7900dd1b2a9c4c19f8"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/irs/cashflow.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-03-INTEREST-RATE-SWAPS"
+      ],
+      "reason": "CouponSpec selection, irregular ICMA reference periods, term reset/fixing schedules, compounded observation shift/lockout bounds, cashflow metadata/signing and discounted fixed annuity; runtime continues after inline tests.",
+      "sha256": "594576dd837bafe77308792afd8dca8adf7a0e1911bb2897cd41e123f803fc63"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/irs/marginable.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-03-INTEREST-RATE-SWAPS"
+      ],
+      "reason": "Margin sensitivity resolution from market curve-risk buckets, failure behavior and automatic time/notional proxy with tenor concentration; VM value and netting identity.",
+      "sha256": "26b9a3413c71b3cc43e33c81e53080e9d551e97866967c2a5edb2b1f40007c57"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/irs/metrics/annuity.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-03-INTEREST-RATE-SWAPS"
+      ],
+      "reason": "Resolved fixed schedule annuity discounted on unpaid coupons with valuation-date semantics.",
+      "sha256": "2e432444d1145863cc10e2d38c5706bb90dccc705c599c765691a9ab0eb22819"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/irs/metrics/dv01.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-03-INTEREST-RATE-SWAPS"
+      ],
+      "reason": "Calibration-recipe replay eligibility and bump/rebuild paths, single-curve OIS special case and combined direct-curve fallback.",
+      "sha256": "23fe4a9fc3ac2523302b17f5526eb7b9d248fe03f95ddd9ecd376769ae9e5ae0"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/irs/metrics/ir_convexity.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-03-INTEREST-RATE-SWAPS"
+      ],
+      "reason": "Parallel second derivative and discount/forward mixed cross-gamma finite differences with model-aware repricing.",
+      "sha256": "e1ea45cdd9969a857dec3070139b52ae878aa9e27c926408a553ef03b04f9e79"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/irs/metrics/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-03-INTEREST-RATE-SWAPS"
+      ],
+      "reason": "Par rate from floating PV/notional/annuity, leg PV calculators and parallel/per-curve/key-rate/convexity metric dispatch.",
+      "sha256": "68a03bd4bdd5c68b5d7423f4b02dd79599560f1056d35c6bac2504392796dc76"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/irs/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-RATES-03-INTEREST-RATE-SWAPS"
+      ],
+      "reason": "Module wiring and public reexports for irs; calculations/defaults live in the separately mapped implementation files.",
+      "sha256": "940d523cb71090594d4ec6320b5d184775435857812f0a80f5aaccec93378af8"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/irs/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-03-INTEREST-RATE-SWAPS"
+      ],
+      "reason": "Single-curve OIS eligibility and deterministic fixed/float leg PV with future-payment filtering and signed total calculation.",
+      "sha256": "38ed8fd9f170d97fb0dbdcd2f9f3df88baca42cf2869e6e9436af15b08f57af9"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/irs/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-03-INTEREST-RATE-SWAPS"
+      ],
+      "reason": "Fixed/float sentinel and EOM resolution, leg compatibility validation, IRS constructors/market conventions, projection accessors and dependency reporting.",
+      "sha256": "d3c56182c9381b303c9677fa76246101cb52f33b5677ca44e9e56f8702b5601f"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/lib.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Crate lint policy, module exports and README doctest wiring; no runtime financial calculation.",
+      "sha256": "5e0af3c682bf987ffe8eb1f42242e6abb73d5ba9a6bddb04058ada6167fc252b"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/rate_validation.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-02-FRA",
+        "VALUATIONS-RATES-03-INTEREST-RATE-SWAPS",
+        "VALUATIONS-RATES-04-BASIS-SWAPS",
+        "VALUATIONS-RATES-05-CAP-FLOOR-PRICING",
+        "VALUATIONS-RATES-07-EUROPEAN-SWAPTIONS"
+      ],
+      "reason": "Finite/rate-magnitude guards, unit-aware messages and warning-range predicate used by product domain validation.",
+      "sha256": "f838623e80f4bd63f349bcab2d89ff86f2441e9101810f958529a14a17370710"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/repo/marginable.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-15-REPO"
+      ],
+      "reason": "Bilateral margin identity, duration/notional IR delta proxy assigned to3M/6M and variation-margin PV.",
+      "sha256": "517081573e3316bc325e5ae2afc8fe2efe04fcfb98c70098bf33f83549cbf5b9"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/repo/metrics/accrued_interest.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-15-REPO"
+      ],
+      "reason": "Clamped simple-interest accrual over adjusted repo interval using effective special rate.",
+      "sha256": "4fe69a0083bd62ce09965a05578e57eb26e35016fe149af8b84bc60940d03d2e"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/repo/metrics/implied_collateral_return.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-15-REPO"
+      ],
+      "reason": "Annualized excess collateral ratio, currency-erasing amount comparison and nonpositive-time/required-value zero policy.",
+      "sha256": "29c2f8991a16bcad1773fc72b8029c0d3d6c3d90aa6319fed781bea4a8b5d20e"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/repo/metrics/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-15-REPO"
+      ],
+      "reason": "Collateral amount/required amount/coverage, contractual rate funding-risk bump, effective rate, interest/time metrics and generic curve DV01; runtime follows test module declaration.",
+      "sha256": "012afc3e775fec0443eacaa9c60f511d66f9383495a7739a99bde30c0a7997bc"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/repo/metrics/tests.rs",
+      "classification": "test",
+      "records": [
+        "VALUATIONS-RATES-15-REPO"
+      ],
+      "reason": "Dedicated unit-test cases for metric registration, accrued interest and collateral-return behavior; no production calculation.",
+      "sha256": "2455c4f134900551bbcbda84952dceea57dae0d4bb67f2353907723696159136"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/repo/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-RATES-15-REPO"
+      ],
+      "reason": "Module wiring and public reexports for repo; calculations/defaults live in the separately mapped implementation files.",
+      "sha256": "fb548d99373ea3245aaccd47783a1c6bafe350a7778afd6a5243176e2e1f1d61"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/repo/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-15-REPO"
+      ],
+      "reason": "Cash-lender repo cashflows, general/special effective rate, calendar-adjusted dates, simple interest, haircut/collateral market value and open/overnight effective maturity.",
+      "sha256": "58fb4aeb5f38d816e531e2fb4e8ac5905bf89f6ec90daad0a252f01d146bc443"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/swaption/bermudan.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-08-HULL-WHITE-SWAPTIONS"
+      ],
+      "reason": "Prepared-tree snapshot/reuse checks, tree/LSMC selection/config defaults, event-grid theta calibration, exercise-today PV maximum, cached-grid risk repricing and diagnostics.",
+      "sha256": "180e1ff8bef4753041b0082d3b6488c4f5c2cd72ad8c785507f2ecab58a62f71"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/swaption/hw_pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-08-HULL-WHITE-SWAPTIONS"
+      ],
+      "reason": "European single-curve HW tree setup, scalar-parameter resolution, mandatory expiry and cashflow-based exercise in backward induction.",
+      "sha256": "e2ca7f5510627ad07c553791789fa5337405b570f064e9b3be9bc1c546a53e54"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/swaption/lmm_pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-09-LMM-BERMUDANS"
+      ],
+      "reason": "Strict single-curve physical matching-schedule gate, explicit base-vol requirement, curve-derived forwards, 1% shifted-rate floor, constant two-factor loading shape and LMM dispatch defaults.",
+      "sha256": "5f11c1899c7f097ee0a298c217ca4ed0097ae5aa46a89453006fc2bb71598b4c"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/swaption/metrics/bermudan_greeks.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-08-HULL-WHITE-SWAPTIONS",
+        "VALUATIONS-RATES-09-LMM-BERMUDANS"
+      ],
+      "reason": "Discount-curve delta, 10bp gamma, HW sigma finite differences and conditional expected exercise time from tree probabilities.",
+      "sha256": "d0122b0ccfc2e70f82a57146d0fe81ef14f7c4662a45f584d962a22f28796212"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/swaption/metrics/delta.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-07-EUROPEAN-SWAPTIONS",
+        "VALUATIONS-RATES-08-HULL-WHITE-SWAPTIONS"
+      ],
+      "reason": "European fixed-annuity quote delta or HW full-repricing rate Greek dispatch.",
+      "sha256": "9271fdd9275b5cb3a01ae9b96c679788f5d09de6c7e42a771d7c26b6c22de882"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/swaption/metrics/gamma.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-07-EUROPEAN-SWAPTIONS",
+        "VALUATIONS-RATES-08-HULL-WHITE-SWAPTIONS"
+      ],
+      "reason": "European fixed-annuity quote gamma or HW full-repricing rate Greek dispatch.",
+      "sha256": "d2645e1de5ac106881e4f6ca0cc6d6ff7527386ae81f08fcb5a7e7a7be2d01e3"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/swaption/metrics/implied_vol.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-07-EUROPEAN-SWAPTIONS"
+      ],
+      "reason": "Quoted-premium inverse volatility API with terminal short circuit, delegated Brent solve and residual guard.",
+      "sha256": "651905b334b53b68091128570e4f9ba8434e8d41b73b6f07eac299dadfe206c6"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/swaption/metrics/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-07-EUROPEAN-SWAPTIONS",
+        "VALUATIONS-RATES-08-HULL-WHITE-SWAPTIONS",
+        "VALUATIONS-RATES-09-LMM-BERMUDANS"
+      ],
+      "reason": "European quote/curve/model-sigma metrics and Bermudan delta/gamma/HW sigma/expected-time registration; model-specific publication limits.",
+      "sha256": "84fff9732483625e7226a7b565db1f3bbd255976de2e0b150dd080a871cd4a5d"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/swaption/metrics/vega.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-07-EUROPEAN-SWAPTIONS",
+        "VALUATIONS-RATES-08-HULL-WHITE-SWAPTIONS"
+      ],
+      "reason": "European quote vega, explicit rejection of HW quote-vega and separate central HW sigma sensitivity with bounded bump.",
+      "sha256": "7fd884df3eac8fb97fd119affebfcfe9ed218d05a1219d5e01d1038455441020"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/swaption/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-07-EUROPEAN-SWAPTIONS"
+      ],
+      "reason": "Exports plus financially material contractual tenor helper: positive calendar-month difference divided by12, disregarding day-of-month.",
+      "sha256": "92cfe4602c6fbf2410ddc9e78d09a8931d779bae9caaf512548842151c86345b"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/swaption/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-07-EUROPEAN-SWAPTIONS"
+      ],
+      "reason": "Black versus Normal explicit model compatibility and registry adapters to European raw pricing.",
+      "sha256": "492996897b25463e29af8ec1d13435d830878ab5f9564cb5da88a33b51356d7b"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/swaption/pricing/hw_cashflows.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-08-HULL-WHITE-SWAPTIONS"
+      ],
+      "reason": "Remaining fixed/floating cashflow projection at exercise with clipped accrual, delayed-coupon adjustment, settlement annuity choices and deterministic exercise-today comparison.",
+      "sha256": "98aaab6ca11b2c95c228f6be12dd67bbd2912d50e944afdad6c2b1cccf269de6"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/swaption/pricing/lmm_bermudan.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-09-LMM-BERMUDANS"
+      ],
+      "reason": "Predictor-corrector forward paths, exercise/event grid validation, terminal-bond deflation, rate/annuity regression basis and low-ITM realized-future fallback.",
+      "sha256": "478e2899a8afb165b8d3e9783ce1ae7c6b419559e5975c315675bf5a5e8522dc"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/swaption/pricing/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-RATES-08-HULL-WHITE-SWAPTIONS",
+        "VALUATIONS-RATES-09-LMM-BERMUDANS"
+      ],
+      "reason": "Module/test wiring and tree-valuator reexport; no numerical or financial selection logic.",
+      "sha256": "faa8395bda24593e3fd9fa673ffbcf2b4a93723a14b141ab266f9f56ab34dfeb"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/swaption/pricing/monte_carlo_lsmc.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-08-HULL-WHITE-SWAPTIONS"
+      ],
+      "reason": "Exact rate-step Philox/antithetic paths, trapezoidal bank accounts, ITM continuation regression and insufficient-sample skip-exercise policy.",
+      "sha256": "fa6354cfa6eb5b9b1dc11ca4b19396acf614a6b124e8281bdddf319094ef9ff9"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/swaption/pricing/numeraire_tests.rs",
+      "classification": "test",
+      "records": [
+        "VALUATIONS-RATES-08-HULL-WHITE-SWAPTIONS",
+        "VALUATIONS-RATES-09-LMM-BERMUDANS"
+      ],
+      "reason": "Dedicated reference-estimator and invariant tests for HW bank-account/LMM terminal-measure discounting; no production path.",
+      "sha256": "d21c4d477f138d51103d7bd1119ba5094639adacbf44c03db1ce2cb8d9e75d91"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/swaption/pricing/swap_rate_utils.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-08-HULL-WHITE-SWAPTIONS"
+      ],
+      "reason": "Affine HW conditional bond reconstruction exp(lnA-B*r) with finite short-rate/positive-price validation.",
+      "sha256": "d18b3a036910d11ee9d2653805463ea9e6d337da36ecf8f4c9612b8e30283a74"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/swaption/pricing/tree_valuator.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-08-HULL-WHITE-SWAPTIONS"
+      ],
+      "reason": "Tree max-exercise backward induction, mandatory-date mapping, NonCoTerminal rejection and forward survival-mass exercise probabilities.",
+      "sha256": "669540a9e175f51ac0b3f05868eb14b319676f6fba68994a3f0c29399e6324ab"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/swaption/types/bermudan.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-08-HULL-WHITE-SWAPTIONS",
+        "VALUATIONS-RATES-09-LMM-BERMUDANS"
+      ],
+      "reason": "Bermudan contract/exercise validation, default HW model, remaining cashflow horizon, live exercise times, common-maturity underlier conversion and market dependencies.",
+      "sha256": "be60f62a582d000b6e709e99499899f7e82c5007b9841d227cf329b2c107eb1d"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/swaption/types/definitions.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-07-EUROPEAN-SWAPTIONS",
+        "VALUATIONS-RATES-08-HULL-WHITE-SWAPTIONS",
+        "VALUATIONS-RATES-09-LMM-BERMUDANS"
+      ],
+      "reason": "Cash-settlement defaults, Bermudan exercise-date sorting/construction, strict lockout cutoff and future-only exercise-time selection.",
+      "sha256": "ef26826ee5857da7d39fd69d4529af594283c33cfabbb18a40728fa2c8c67094"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/swaption/types/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-RATES-07-EUROPEAN-SWAPTIONS",
+        "VALUATIONS-RATES-08-HULL-WHITE-SWAPTIONS",
+        "VALUATIONS-RATES-09-LMM-BERMUDANS"
+      ],
+      "reason": "Type-module wiring and public exports only.",
+      "sha256": "42d03d7b282585af0a4159a4626f40bf9946b785cbd81fee3831795adeeed44e"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/swaption/types/swaption.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-07-EUROPEAN-SWAPTIONS"
+      ],
+      "reason": "European contract validation/default underlier, par forward/annuity variants, cash settlement multipliers, SABR/override/surface quote selection, expiry intrinsic and post-expiry zero, quote Greeks and inverse solve.",
+      "sha256": "6ca89cab5c35b3833cbec74315fa261f95c15bad725368496135622dcf5af66b"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/xccy_swap/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-16-CROSS-CURRENCY-SWAPS"
+      ],
+      "reason": "FX01, combined/per-curve/key-rate interest risk and FX/IR mixed-gamma metric dispatch.",
+      "sha256": "d17573a5e380ca217cd9986b740061f08affa6e2bc7ad7b814968850908a94d4"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/xccy_swap/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-RATES-16-CROSS-CURRENCY-SWAPS"
+      ],
+      "reason": "Module wiring and public reexports for xccy_swap; calculations/defaults live in the separately mapped implementation files.",
+      "sha256": "e129a2b05cd996906f4a086c0cf4d22d1444f501029885b1a93d042fead8a90c"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/xccy_swap/pricing_mtm.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-16-CROSS-CURRENCY-SWAPS"
+      ],
+      "reason": "CIP future FX resets, exact historical reset requirements, supplied-notional today/settled branches, principal rebalancing/terminal exchange and native-PV aggregation.",
+      "sha256": "849caaec9f666e051295befd4c515e97c95db3bfb2b6c1884f55566cdcbd23e6"
+    },
+    {
+      "path": "finstack-quant/valuations/rates/src/xccy_swap/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-RATES-16-CROSS-CURRENCY-SWAPS"
+      ],
+      "reason": "Native-currency floating coupon projection and signs, cashflow schedule, principal exchanges, calendar/fixing validation and spot-converted discounted leg PV.",
+      "sha256": "9da7fea2a293d007bf603f37cb72f949135a6c651d07dcd8663f98bb7c9d1447"
+    }
+  ]
+}

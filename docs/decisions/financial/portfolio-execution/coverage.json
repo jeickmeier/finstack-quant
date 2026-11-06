@@ -1,0 +1,482 @@
+{
+  "scope": "portfolio-execution",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "PORTFOLIO-EXECUTION-001",
+      "title": "Holding identity, signed sizing and validation boundaries",
+      "path": "01-position-sizing-and-validation.md"
+    },
+    {
+      "id": "PORTFOLIO-EXECUTION-002",
+      "title": "Book graph validation and monetary rollups",
+      "path": "02-book-hierarchy-and-rollups.md"
+    },
+    {
+      "id": "PORTFOLIO-EXECUTION-003",
+      "title": "Metric applicability, canonical pricing and best-effort fallback",
+      "path": "03-valuation-profiles-and-failures.md"
+    },
+    {
+      "id": "PORTFOLIO-EXECUTION-004",
+      "title": "Request identities, deterministic execution and valuation reduction",
+      "path": "04-execution-order-and-reduction.md"
+    },
+    {
+      "id": "PORTFOLIO-EXECUTION-005",
+      "title": "Dependency invalidation and selective valuation reuse",
+      "path": "05-dependencies-and-selective-reuse.md"
+    },
+    {
+      "id": "PORTFOLIO-EXECUTION-006",
+      "title": "Content-addressed portfolio materialization and load validation",
+      "path": "06-materialization-validation.md"
+    },
+    {
+      "id": "PORTFOLIO-EXECUTION-007",
+      "title": "Bounded artifact decode cache and diagnostic timing",
+      "path": "07-artifact-cache-and-load-reporting.md"
+    },
+    {
+      "id": "PORTFOLIO-EXECUTION-008",
+      "title": "Spot NAV conversion and covered-interest cashflow conversion",
+      "path": "08-spot-and-forward-fx.md"
+    },
+    {
+      "id": "PORTFOLIO-EXECUTION-009",
+      "title": "Rich cashflow extraction, partial results and date/currency netting",
+      "path": "09-cashflow-ladders.md"
+    },
+    {
+      "id": "PORTFOLIO-EXECUTION-010",
+      "title": "Additive risk aggregation, omissions and tabular projection",
+      "path": "10-metric-aggregation-and-reporting.md"
+    },
+    {
+      "id": "PORTFOLIO-EXECUTION-011",
+      "title": "Composite look-through and net/gross primitive exposures",
+      "path": "11-primitive-exposures.md"
+    },
+    {
+      "id": "PORTFOLIO-EXECUTION-012",
+      "title": "Factor units, market shocks and dependency routing",
+      "path": "12-factor-shocks-and-routing.md"
+    },
+    {
+      "id": "PORTFOLIO-EXECUTION-013",
+      "title": "Central factor deltas and full-repricing P&L grids",
+      "path": "13-factor-deltas-and-pnl-profiles.md"
+    },
+    {
+      "id": "PORTFOLIO-EXECUTION-014",
+      "title": "Scenario state isolation, selective invalidation and P&L batches",
+      "path": "14-scenario-application-and-pnl.md"
+    },
+    {
+      "id": "PORTFOLIO-EXECUTION-015",
+      "title": "Snapshot replay, surviving-date P&L and MTM drawdown",
+      "path": "15-replay-mtm-and-drawdown.md"
+    },
+    {
+      "id": "PORTFOLIO-EXECUTION-016",
+      "title": "Margin membership, sensitivity netting and initial-margin dispatch",
+      "path": "16-margin-netting-and-initial-margin.md"
+    },
+    {
+      "id": "PORTFOLIO-EXECUTION-017",
+      "title": "VM perspective, CSA collateral terms and margin result validation",
+      "path": "17-margin-collateral-and-wire.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/portfolio/src/bin/gen_schemas.rs",
+      "classification": "support",
+      "records": [
+        "PORTFOLIO-EXECUTION-006"
+      ],
+      "reason": "CLI delegates schema rendering to the shared core generator and portfolio artifact registry; no new financial algorithm.",
+      "sha256": "30798675198355a82c8c6216c39af038ebb36db70977bf7d9293da286a34eb6b"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/book.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-EXECUTION-002"
+      ],
+      "reason": "Book identity, reciprocal membership, graph-cycle and bounded-depth validation plus deduplicating membership helpers.",
+      "sha256": "946d432039f3741fb41f7bb215de05580ab9010effe28431627ab3a083752ca2"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/builder.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-EXECUTION-001",
+        "PORTFOLIO-EXECUTION-002"
+      ],
+      "reason": "Required date/currency, reserved entity inference, ID replacement and book-membership completion before structural validation.",
+      "sha256": "fba3bfd343589037a85fccc3f1c6ea0431906c7e7411764fdaf12d3fc20fc6ee"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/cashflows.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-EXECUTION-009"
+      ],
+      "reason": "Position schedule extraction, signed scaling, complete-versus-partial failures, rich date/currency/kind aggregation and CIP collapse.",
+      "sha256": "362b8c692e41c63d86bdafa6007075fedc8c434a2bf35db3f5ba83742bb09d1b"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/dataframe.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-EXECUTION-010"
+      ],
+      "reason": "Ordered projection of valuation and metric state into typed tables, including retained/omitted flags and currency-label semantics.",
+      "sha256": "6c3dfbf405dae86b611cf72595cc168b1694418097b5d94e61d22900538fa8c1"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/dependencies.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-EXECUTION-005",
+        "PORTFOLIO-EXECUTION-012"
+      ],
+      "reason": "Market-key flattening, failed-introspection invalidation, current-market credit-index expansion and conservative FX routing.",
+      "sha256": "4ad64ee1720f97c3336a0e22dd7a7fa88b095a9cde4fa5579a8501c5f35a2bfd"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/error.rs",
+      "classification": "support",
+      "records": [
+        "PORTFOLIO-EXECUTION-003",
+        "PORTFOLIO-EXECUTION-006"
+      ],
+      "reason": "Structured error/context construction and explicit kind/code mapping; no economic fallback calculation is implemented here.",
+      "sha256": "9dd300db84a783fe35576f8c2c86157bf71371205c9ad2f5b50a03e1e41b75d6"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/evaluation/executor.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-EXECUTION-003",
+        "PORTFOLIO-EXECUTION-004",
+        "PORTFOLIO-EXECUTION-005"
+      ],
+      "reason": "Canonical position pricing and failure policy, exact applicability, selective/raw reuse, scheduling thresholds and compensated NAV reduction.",
+      "sha256": "dfe27c8ab9d8c520cff2fed28fe17bc8594f7485c57359475563970bb88329cd"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/evaluation/mod.rs",
+      "classification": "support",
+      "records": [
+        "PORTFOLIO-EXECUTION-004"
+      ],
+      "reason": "Private executor/state/planner module boundary and re-exports only.",
+      "sha256": "eb2c3567a3719cd3150bacbb755775e4c3a79347a1727a8a04fef3bc181adf3e"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/evaluation/plan.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-EXECUTION-003",
+        "PORTFOLIO-EXECUTION-004",
+        "PORTFOLIO-EXECUTION-005"
+      ],
+      "reason": "Exact metric/risk profile normalization, state/job IDs, deduplication, selective admission and single-axis state scheduling.",
+      "sha256": "bc18aacd4944f236cb0d0d28e1ae7e4f0392b4ca657cff601e89ab89675eb8dd"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/evaluation/state.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-EXECUTION-004"
+      ],
+      "reason": "Immutable borrowed/owned state preparation creates fresh calibration-backed options with caller configuration per market state.",
+      "sha256": "972abd3e147956e7f351b9b1d65824b1237d801c573acaebd4bb35efe18db15b"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/fx.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-EXECUTION-008",
+        "PORTFOLIO-EXECUTION-013"
+      ],
+      "reason": "Same-currency/spot conversion, CIP interval-DF forward conversion, curve lookup fallback and raw factor endpoint currency conversion.",
+      "sha256": "e292a71f9862789d3ee1a27ea9532cf6613875fd2f3b98b4acbb8ad675b8ae48"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/grouping.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-EXECUTION-002"
+      ],
+      "reason": "Memoized child/direct Money rollup with missing-position, cycle, depth and currency failures.",
+      "sha256": "114752b842e996e66c70f9e1247a640ecea18899c1db55488ad3e388a86090c3"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/lib.rs",
+      "classification": "support",
+      "records": [
+        "PORTFOLIO-EXECUTION-004"
+      ],
+      "reason": "Public/private module and re-export graph, lint declarations and doctest inclusion; no pricing kernel.",
+      "sha256": "9484740d86b587d3d10b5e80e19e5830a7d67df6236761f086f8a8cfc229816a"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/margin/aggregator.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-EXECUTION-016",
+        "PORTFOLIO-EXECUTION-017"
+      ],
+      "reason": "Netting membership and spec consistency, sensitivity rebasing, method dispatch, partial failures, VM/IM collateral and MPOR scaling.",
+      "sha256": "0e8256adeedd092bf364c4096b4210986cbd584f65cc88f5fcadd16feb06c80c"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/margin/mod.rs",
+      "classification": "support",
+      "records": [
+        "PORTFOLIO-EXECUTION-016",
+        "PORTFOLIO-EXECUTION-017"
+      ],
+      "reason": "Margin module facade/re-exports; formulas reside in aggregator and delegated margin owners.",
+      "sha256": "f221adcef3bc9f673cc7604fb9585839168910b5c24a059cb911cf698ad6f528"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/margin/netting_set.rs",
+      "classification": "support",
+      "records": [
+        "PORTFOLIO-EXECUTION-016"
+      ],
+      "reason": "Internal netting-set holder initialized with empty positions and no specification; membership/method logic is in aggregator.",
+      "sha256": "90ad4824792f502d39bac0621aaf5e62d295cdbee17616789388f8e33b931f52"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/margin/results.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-EXECUTION-016",
+        "PORTFOLIO-EXECUTION-017"
+      ],
+      "reason": "Per-set positive-VM outflow total, portfolio accumulation, sorted presentation and first-message degradation deduplication.",
+      "sha256": "a6ff0528af9c3fb03a412df92551ddded9a91e859b2064440b90247f6c21b12e"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/margin/wire.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-EXECUTION-017"
+      ],
+      "reason": "Canonical result ordering, currency/closure/count checks, duplicate-netting rejection and conditional CSA-account reconciliation.",
+      "sha256": "d573776012b4532671adeb76f1e9ac179643e52aea85bc54041681cbd4791f71"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/materialization/cache.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-EXECUTION-007"
+      ],
+      "reason": "Content/version-keyed locked decode, encoded-byte/count LRU eviction, single decode under concurrency and lock-poison recovery.",
+      "sha256": "4a3862bb258e513c9e069afcf1c29ab1bb181ac10c7557057f05cdf538b5af3d"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/materialization/envelope.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-EXECUTION-006"
+      ],
+      "reason": "Strict current envelope schema and percentage/nonpercentage wire conversion with quantity validation and nullable notional units.",
+      "sha256": "9ca6d2dbb28691944b726a9736d2afa5380d8d97e664ace9cc1506632f2aeb9c"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/materialization/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-EXECUTION-006",
+        "PORTFOLIO-EXECUTION-007"
+      ],
+      "reason": "Load limits, canonical hashes, reference/dependency/identity validation, content-deduplicated export and ordered construction.",
+      "sha256": "db0b4cb68d0e0592959fc77c02140a37e02b0f6659a75421c80208a0a05259e8"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/materialization/report.rs",
+      "classification": "support",
+      "records": [
+        "PORTFOLIO-EXECUTION-007"
+      ],
+      "reason": "Diagnostic count/timing payloads and optional native/WASM clock measurements; no financial calculation or load-admission policy.",
+      "sha256": "79344a83baf5603d3c7b3edb26f90f449efd444849a96a1f3d86e63122ec2981"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-EXECUTION-010"
+      ],
+      "reason": "Additive scaling/FX fallback, nonfinite omission, compensated entity/portfolio aggregation and exact qualified metric selection.",
+      "sha256": "f711e4aebcfbdf87110f5bc8d5bd2f8dd77cdb7a34132a0e02277771725123de"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/portfolio.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-EXECUTION-001",
+        "PORTFOLIO-EXECUTION-002",
+        "PORTFOLIO-EXECUTION-005"
+      ],
+      "reason": "Native structure validation, indexed append/replacement, process-local mutation identity and specification reconstruction.",
+      "sha256": "831413909c1a969baa414d702741d75aee0e2c9b6055ffe0efedabe420b1c1c6"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/position.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-EXECUTION-001"
+      ],
+      "reason": "Signed multiplier/percentage sizing, finite/range domain, notional-currency warning and instrument-spec reconstruction.",
+      "sha256": "ac1325199307599b26ca0cfdc4c45d7ce0d818d3fff773a66aff2273a8429385"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/primitive.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-EXECUTION-011"
+      ],
+      "reason": "Composite/direct look-through, canonical definition conflict detection, signed FX sizing and net/gross reductions.",
+      "sha256": "571d642012df5c98d184c4fa2e577193531f0d28f00ba38ba4c9295a8ec353e0"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/replay.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-EXECUTION-015"
+      ],
+      "reason": "Timeline admissibility, mode/profile dispatch, failed-snapshot filtering, strict endpoint reuse and MTM/drawdown summaries.",
+      "sha256": "932fee2c816852e30b6f2515f3446a0cefc47f7291e863aa38f66b1fc9a601aa"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/results.rs",
+      "classification": "support",
+      "records": [
+        "PORTFOLIO-EXECUTION-010"
+      ],
+      "reason": "Result envelope assembles supplied valuation/metrics and stamps schema/config/timestamp/FX metadata without recalculating totals.",
+      "sha256": "a9ddd3ac2d37452fa3e343e811249ad2908a49e8a6a5b92462d957b14cabb395"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/scenarios.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-EXECUTION-014"
+      ],
+      "reason": "Scenario cloning/replacement and effective-date propagation, manifest-based reuse, bounded state waves and endpoint P&L/error ordering.",
+      "sha256": "d39016d58b2d0ed3fbfb35e343b6bda432cfdd25578778624b5d6626d88b8928"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/schema/examples.rs",
+      "classification": "support",
+      "records": [
+        "PORTFOLIO-EXECUTION-006"
+      ],
+      "reason": "Typed schema examples and fixture construction call existing public algorithms or serialize illustrative values; no new methodology.",
+      "sha256": "517bd817ee71af595733a86abc6e317224ed609d71ae642ac22f0f336c0b2a38"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/schema.rs",
+      "classification": "support",
+      "records": [
+        "PORTFOLIO-EXECUTION-006"
+      ],
+      "reason": "Schema artifact registration, external-definition delegation and example construction; underlying validators/algorithms have owning records.",
+      "sha256": "125b11a64be9fada7e88fb230c65f6a100cd68c8c7b5938c892eacd42c59aa56"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/sensitivity/compute.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-EXECUTION-012",
+        "PORTFOLIO-EXECUTION-013"
+      ],
+      "reason": "Portfolio row/scale construction, default bump/grid selection and rejection of assignment-driven credit factors on free-function paths.",
+      "sha256": "1624a4c265364d4098bd9edb3b241c8b63d7d3b7dd9bd3f16d62976ab159cc5d"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/sensitivity/delta_engine.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-EXECUTION-012",
+        "PORTFOLIO-EXECUTION-013"
+      ],
+      "reason": "Mapping-specific bump construction, finite weight/PV checks, central differences and ordered factor columns.",
+      "sha256": "035e50736f43000eaa2bb388640f29d4b7a429349ce903b8a77089c67d99372d"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/sensitivity/json.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-EXECUTION-013"
+      ],
+      "reason": "Reporting-currency-tagged matrix row encoding and reconstruction delegated to factor-axis validation; grid default is five.",
+      "sha256": "a683f195e024d766feb1459ee7d3b43245afb1b216027fef79ac401c8b21ef90"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/sensitivity/mod.rs",
+      "classification": "support",
+      "records": [
+        "PORTFOLIO-EXECUTION-012",
+        "PORTFOLIO-EXECUTION-013"
+      ],
+      "reason": "Sensitivity module/re-export boundary only.",
+      "sha256": "f566954a218fb7c37a7f786d1f27f6fb8485bc4e9603bf45e16f46e83591847a"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/sensitivity/repricing_engine.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-EXECUTION-013"
+      ],
+      "reason": "Odd bounded symmetric grid, base/shocked PV profiles, zero center, selective routing and validated profile wire shape.",
+      "sha256": "e85d47770955bab0cc29fcfe33e6476675fbb3fd510de0c0d1985230b0890092"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/sensitivity/traits.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-EXECUTION-012",
+        "PORTFOLIO-EXECUTION-013"
+      ],
+      "reason": "Actual-storage factor-key resolution, conservative dependency intersection, bump units/width and engine financial contract.",
+      "sha256": "4326c69a93bcd6c2c420200fc8f51a815dcee1af31bb9afaef5599bc3953fd4f"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/test_utils.rs",
+      "classification": "test",
+      "records": [
+        "PORTFOLIO-EXECUTION-004"
+      ],
+      "reason": "Test-only deterministic discount-curve fixture builders, mounted under cfg(test); no production pricing definitions.",
+      "sha256": "f95038a0fb5bd628e8319486046a59a04c602a52c12b81103cb6c3ba4d984442"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-EXECUTION-001"
+      ],
+      "reason": "Entity defaults/IDs and attribute comparison semantics including tolerant numeric equality, exact text and mismatch policy.",
+      "sha256": "90de53f0318bc5d307a49348aa13bd77d60c35da49cd3cb3ac67cbf89f4a9e97"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/valuation.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-EXECUTION-003",
+        "PORTFOLIO-EXECUTION-005"
+      ],
+      "reason": "Public valuation options/default menus, exact name resolution, effective-date entrypoints and selective change manifest routing.",
+      "sha256": "6c69d6f8c22164eff7bd50a8b5ef0a421540f9936c34500b66e9e965c5e0d9ea"
+    }
+  ]
+}

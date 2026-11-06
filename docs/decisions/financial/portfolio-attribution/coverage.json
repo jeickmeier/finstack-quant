@@ -1,0 +1,317 @@
+{
+  "scope": "portfolio-attribution",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "PORTFOLIO-ATTRIBUTION-001",
+      "title": "Equal, fixed and inverse-volatility strategy weights",
+      "path": "01-allocation-weights.md"
+    },
+    {
+      "id": "PORTFOLIO-ATTRIBUTION-002",
+      "title": "Long-only covariance risk-budget iteration",
+      "path": "02-risk-budget-solver.md"
+    },
+    {
+      "id": "PORTFOLIO-ATTRIBUTION-003",
+      "title": "Decimal largest-remainder capital apportionment",
+      "path": "03-capital-apportionment.md"
+    },
+    {
+      "id": "PORTFOLIO-ATTRIBUTION-004",
+      "title": "Modified Dietz, geometric linking and money-weighted return",
+      "path": "04-performance-returns.md"
+    },
+    {
+      "id": "PORTFOLIO-ATTRIBUTION-005",
+      "title": "Single-period Brinson\u2013Fachler attribution",
+      "path": "05-brinson-fachler.md"
+    },
+    {
+      "id": "PORTFOLIO-ATTRIBUTION-006",
+      "title": "Continuous-factor Brinson attribution with benchmark completeness",
+      "path": "06-continuous-factor-brinson.md"
+    },
+    {
+      "id": "PORTFOLIO-ATTRIBUTION-007",
+      "title": "Campisi fixed-income carry, rates, spread and selection attribution",
+      "path": "07-fixed-income-campisi.md"
+    },
+    {
+      "id": "PORTFOLIO-ATTRIBUTION-008",
+      "title": "Portfolio P&L endpoint preparation, primitive reduction and aggregation",
+      "path": "08-portfolio-pnl-endpoints.md"
+    },
+    {
+      "id": "PORTFOLIO-ATTRIBUTION-009",
+      "title": "Duration-cell base returns and credit excess-return aggregation",
+      "path": "09-duration-cell-excess-returns.md"
+    },
+    {
+      "id": "PORTFOLIO-ATTRIBUTION-010",
+      "title": "Optimization weights, valuation features and trade universe",
+      "path": "10-optimization-decision-space.md"
+    },
+    {
+      "id": "PORTFOLIO-ATTRIBUTION-011",
+      "title": "Linear metric objectives, average constraints and turnover",
+      "path": "11-linear-program-formulation.md"
+    },
+    {
+      "id": "PORTFOLIO-ATTRIBUTION-012",
+      "title": "Factor assignment and assignment-driven credit exposures",
+      "path": "12-factor-assignment-and-credit-exposures.md"
+    },
+    {
+      "id": "PORTFOLIO-ATTRIBUTION-013",
+      "title": "Issuer-netted credit residual risk and hierarchy reporting",
+      "path": "13-credit-residual-risk-and-reporting.md"
+    },
+    {
+      "id": "PORTFOLIO-ATTRIBUTION-014",
+      "title": "Factor stress repricing and proportional position what-if",
+      "path": "14-factor-stress-and-position-what-if.md"
+    },
+    {
+      "id": "PORTFOLIO-ATTRIBUTION-015",
+      "title": "Duration-cell and sector hierarchical return attribution",
+      "path": "15-hierarchical-grid-attribution.md"
+    },
+    {
+      "id": "PORTFOLIO-ATTRIBUTION-016",
+      "title": "Optimization reconstruction, diagnostics and portfolio rebalance",
+      "path": "16-optimization-results-and-rebalance.md"
+    },
+    {
+      "id": "PORTFOLIO-ATTRIBUTION-017",
+      "title": "Carino linking and supplied-attribution validation",
+      "path": "17-carino-linking-and-reconciliation.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/portfolio/src/allocation.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-ATTRIBUTION-001",
+        "PORTFOLIO-ATTRIBUTION-002",
+        "PORTFOLIO-ATTRIBUTION-003"
+      ],
+      "reason": "Equal/fixed/inverse-volatility selection, covariance risk-budget iteration, input checks and Decimal capital apportionment.",
+      "sha256": "ac89958792ba974f0cfaf39ba0a7eb49ade92308c58db551abfd80416a3e56ba"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/attribution.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-ATTRIBUTION-008"
+      ],
+      "reason": "Prepared endpoint profiles/stamps, frozen-composite primitive reduction, position scale, currency aggregation and reporting reconciliation.",
+      "sha256": "39fc9dd40c0e8eb16df02164016f0a79773bd51e97b60d4a318fe89ee3d628c5"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/brinson.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-ATTRIBUTION-005",
+        "PORTFOLIO-ATTRIBUTION-017"
+      ],
+      "reason": "Centered Brinson sector effects, Carino linking/coefficient, supplied-row reconciliation and shared signed-weight guards.",
+      "sha256": "23d762e0e37713cad9830af17a9e1a57be81b036c8da5f244aaf80c0991758b4"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/excess_return.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-ATTRIBUTION-009"
+      ],
+      "reason": "Reference duration-cell construction, empty-cell filling, curve holding-return alternative, duration lookup and weighted excess aggregation.",
+      "sha256": "ce5acc883c2b8d7d909340606ef3dbf818b8be53e08d31fe5932bf8e6f59f8b4"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/factor_brinson.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-ATTRIBUTION-006"
+      ],
+      "reason": "Continuous factor allocation/residual selection, benchmark completeness condition and ordered contribution reports.",
+      "sha256": "0e3245b58d05f9d00a48c14f4ed47a36a4b2c49fbfd3494ad201a436e2ea4724"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/factor_model/assignment.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-ATTRIBUTION-012"
+      ],
+      "reason": "Per-dependency matcher expansion, multiple beta mappings, unmatched rows and matcher error propagation.",
+      "sha256": "dbf0f44e0bdb4f3607240fba7487b4514bde71c7ecdefd901ff830350ac6e200"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/factor_model/credit_vol_report.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-ATTRIBUTION-013"
+      ],
+      "reason": "Generic/level/bucket risk grouping and proportional conversion of issuer residual variance to position risk contributions.",
+      "sha256": "f33533dce74a282afbfad8b8528c351649107beef419cd81ca8359362afd170e"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/factor_model/dependencies.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-ATTRIBUTION-012"
+      ],
+      "reason": "Financial dependency conversion and credit-index expansion into hazard/base-correlation factors.",
+      "sha256": "16f7f0dae43ebeb558d60ef910dae3192a44df4fbf6dd9e5fdd48cad4176decb"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/factor_model/mod.rs",
+      "classification": "support",
+      "records": [
+        "PORTFOLIO-ATTRIBUTION-012",
+        "PORTFOLIO-ATTRIBUTION-013",
+        "PORTFOLIO-ATTRIBUTION-014"
+      ],
+      "reason": "Module wiring and public type reexports only; no calculation or financial default.",
+      "sha256": "467bf77536710affdacb159c55587107e46ddaebebdf126d75e99797356a486b"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/factor_model/model.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-ATTRIBUTION-012",
+        "PORTFOLIO-ATTRIBUTION-013",
+        "PORTFOLIO-ATTRIBUTION-014"
+      ],
+      "reason": "Validated factor-engine construction, assignment-driven beta-weighted quote CS01, issuer-netted residual risk and sequential credit stress routing.",
+      "sha256": "63ce7db82265d21c7ae25c939e5350ad17c93afc9199cd39d8ced9a1ecad9639"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/factor_model/whatif.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-ATTRIBUTION-014"
+      ],
+      "reason": "Selective exact-stress repricing, FX full-book fallback, proportional resize/remove risk scenarios and contribution differences.",
+      "sha256": "ed937ec697a9d7fc2a5c6177bccf97178597ef723b4bcdde24fea668c4a1d109"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/fi_attribution.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-ATTRIBUTION-007",
+        "PORTFOLIO-ATTRIBUTION-017"
+      ],
+      "reason": "First-order carry/rate/spread residual decomposition, sector aggregation/absent-benchmark fallback and linked effects.",
+      "sha256": "bb278576c3391dc2f76bdcdac968dd99bca8d106ba956fd12590f5fc408de02e"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/grid_attribution.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-ATTRIBUTION-015",
+        "PORTFOLIO-ATTRIBUTION-017"
+      ],
+      "reason": "Hierarchical cell/sector/selection attribution, missing-grid fallbacks and aggregate-only Carino linking.",
+      "sha256": "51da32d6fe9ad5063d1503944058dce6db53a8e5a838c782dc382ef32f20b328"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/optimization/constraints.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-ATTRIBUTION-011"
+      ],
+      "reason": "Inequality parsing, finite domain validation and indicator exposure-bound construction.",
+      "sha256": "4e88b3238c567178af0852598eefe44d5446e633e6b97e4edbb76fde5f495a44"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/optimization/decision.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-ATTRIBUTION-010",
+        "PORTFOLIO-ATTRIBUTION-016"
+      ],
+      "reason": "Current/candidate valuation features, gross normalization, held/missing policy, zero-PV gates, signed bounds and quantity-unit inputs.",
+      "sha256": "68cf55255a4eb83ebb83a5d02d8c5dd1a5bf6291a3413a6e646c3f62030524df"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/optimization/lp_solver.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-ATTRIBUTION-010",
+        "PORTFOLIO-ATTRIBUTION-011",
+        "PORTFOLIO-ATTRIBUTION-016"
+      ],
+      "reason": "Metric request selection, LP/average/turnover lowering, microlp dispatch, denominator rejection and quantity/slack reconstruction.",
+      "sha256": "d248febc959de974f42d9a43a00b5ec3ae3986b2057e77ec5ae5a7fd285d33e4"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/optimization/mod.rs",
+      "classification": "support",
+      "records": [
+        "PORTFOLIO-ATTRIBUTION-010",
+        "PORTFOLIO-ATTRIBUTION-011",
+        "PORTFOLIO-ATTRIBUTION-016"
+      ],
+      "reason": "Module wiring and public reexports only.",
+      "sha256": "cc6caf12332f0b66eb0930baf4af5920070fe4c3af0967228b26bc1fd7e9822a"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/optimization/problem.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-ATTRIBUTION-010"
+      ],
+      "reason": "Problem defaults and trade-universe/candidate selection configuration.",
+      "sha256": "6bcac420a28232035f87e6b32e06e2b65a7246405b828dc5f438986e1c797c53"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/optimization/result.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-ATTRIBUTION-016"
+      ],
+      "reason": "Solver status semantics, tolerance-based trades/binding constraints, quantity application and explicit nonfinite slack wire format after test module.",
+      "sha256": "fb572cd12ef4949acd35fd5493856194a9b4aa7e77cc137cd7aa969af493f476"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/optimization/spec.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-ATTRIBUTION-010",
+        "PORTFOLIO-ATTRIBUTION-016"
+      ],
+      "reason": "Serializable financial defaults, exact problem construction and universe-ID checks before rebalance.",
+      "sha256": "2dfd4ad9aed4819a7803dc2e84a0947eba21656c42298313373c77f9e0b5c4d1"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/optimization/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-ATTRIBUTION-010",
+        "PORTFOLIO-ATTRIBUTION-011"
+      ],
+      "reason": "Weight definitions, standard-metric deserialization, scalar coefficient resolution, missing policy and numerical thresholds.",
+      "sha256": "2dbf09cc796313618f93ed3970da1ceadaa5a5c7e25fc35ddb8d03d58ffe3120"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/optimization/universe.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-ATTRIBUTION-010"
+      ],
+      "reason": "Recursive position filters, candidate bounds/defaults, optional short expansion and trade-universe configuration.",
+      "sha256": "533b8cd8792c2b64edce259107987cebad1b865e27faca88786b2def0560afca"
+    },
+    {
+      "path": "finstack-quant/portfolio/src/performance.rs",
+      "classification": "algorithm",
+      "records": [
+        "PORTFOLIO-ATTRIBUTION-004"
+      ],
+      "reason": "Modified Dietz, controlled geometric annualization and Act365F investor-sign XIRR delegation.",
+      "sha256": "8e08094aaec8556295d11cfd6b62b6c1609815c66bf466f3234ec0b3018c4b70"
+    }
+  ]
+}

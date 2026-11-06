@@ -249,7 +249,7 @@ pub enum ParseError { BadIso(String), BadDate(String), BadNumber(String) }
 pub enum ValidationError { EmptyInput, NegativeRate, MismatchedLengths }
 ```
 
-If both types are mapped the same way in bindings (both become `ValueError` in Python, both become `JsValue::from_str` in WASM), there's no caller that distinguishes them — they can be one type.
+If both types are mapped the same way in bindings (both become `ValueError` in Python, both map to the `"validation"` category via `crate::utils::to_js_err` in WASM), there's no caller that distinguishes them — they can be one type.
 
 *After:*
 ```rust

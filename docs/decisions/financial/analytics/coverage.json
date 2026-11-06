@@ -1,0 +1,303 @@
+{
+  "scope": "analytics",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "ANALYTICS-001",
+      "title": "Performance panels, observation spans, defaults and wire contracts",
+      "path": "01-panels-windows-and-wire.md"
+    },
+    {
+      "id": "ANALYTICS-002",
+      "title": "Compounded wealth, relative wealth, cash conversion and dated CAGR",
+      "path": "02-wealth-and-annualization.md"
+    },
+    {
+      "id": "ANALYTICS-003",
+      "title": "Calendar grouping, lookback returns and win/loss statistics",
+      "path": "03-periods-lookbacks-and-win-loss.md"
+    },
+    {
+      "id": "ANALYTICS-004",
+      "title": "Sample volatility, downside risk and return-based reward ratios",
+      "path": "04-return-risk-ratios.md"
+    },
+    {
+      "id": "ANALYTICS-005",
+      "title": "Log-wealth drawdowns, episode segmentation and path measures",
+      "path": "05-drawdown-paths-and-episodes.md"
+    },
+    {
+      "id": "ANALYTICS-006",
+      "title": "Calmar, Martin, Sterling, Burke, Pain and conditional drawdown risk",
+      "path": "06-drawdown-reward-and-cdar.md"
+    },
+    {
+      "id": "ANALYTICS-007",
+      "title": "Historical return VaR, exact-tail expected shortfall and tail ratio",
+      "path": "07-historical-tail-risk.md"
+    },
+    {
+      "id": "ANALYTICS-008",
+      "title": "Fourth moments, Gaussian and Cornish\u2013Fisher horizon quantiles",
+      "path": "08-moments-gaussian-and-cornish-fisher.md"
+    },
+    {
+      "id": "ANALYTICS-009",
+      "title": "Rolling return, volatility, Sharpe and Sortino kernels with numerical rebuilds",
+      "path": "09-rolling-return-risk.md"
+    },
+    {
+      "id": "ANALYTICS-010",
+      "title": "Single-factor beta, Jensen alpha, fit statistics and beta uncertainty",
+      "path": "10-benchmark-regression.md"
+    },
+    {
+      "id": "ANALYTICS-011",
+      "title": "Tracking error, capture, batting average, Treynor and M-squared",
+      "path": "11-benchmark-relative-metrics.md"
+    },
+    {
+      "id": "ANALYTICS-012",
+      "title": "Sliding-window alpha and beta with recentered compensated sums",
+      "path": "12-rolling-regression.md"
+    },
+    {
+      "id": "ANALYTICS-013",
+      "title": "Multifactor OLS, return-kind conversion and residual risk",
+      "path": "13-multifactor-regression.md"
+    },
+    {
+      "id": "ANALYTICS-014",
+      "title": "Normalized SVD least squares and single-equality factor-return correction",
+      "path": "14-svd-and-constrained-regression.md"
+    },
+    {
+      "id": "ANALYTICS-015",
+      "title": "Complete-case or pairwise correlation and automatic matrix repair",
+      "path": "15-correlation-alignment-and-repair.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/analytics/src/aggregation.rs",
+      "classification": "algorithm",
+      "records": [
+        "ANALYTICS-003"
+      ],
+      "reason": "Compounded calendar/fiscal bucket construction, signed win/loss streaks, compensated gains/losses, payoff/profit/CPC and decisive-period Kelly calculations with nonfinite result fields.",
+      "sha256": "36535940d1a74e049ec6022ad64a894283f0d353f9c34225b758d8d6017bbf29"
+    },
+    {
+      "path": "finstack-quant/analytics/src/benchmark.rs",
+      "classification": "algorithm",
+      "records": [
+        "ANALYTICS-010",
+        "ANALYTICS-011",
+        "ANALYTICS-012"
+      ],
+      "reason": "Online beta/Jensen/fit/Student-t uncertainty, active-return/capture/Treynor/M-squared formulas, compensated sliding OLS recovery and materially different result-wire adapters.",
+      "sha256": "c1be9e699f0c9d4793ab76e22e2c81a1719c1468afd8b47630b19f2e6281de7e"
+    },
+    {
+      "path": "finstack-quant/analytics/src/bin/gen_schemas.rs",
+      "classification": "support",
+      "records": [
+        "ANALYTICS-001"
+      ],
+      "reason": "CLI invokes shared schema generator on explicit analytics registry; no estimator, financial default or numerical model is selected.",
+      "sha256": "da6944e5f7595b113ba603d0c82cd7bc6b3305550fbd028e65ab91a6eb8b61e4"
+    },
+    {
+      "path": "finstack-quant/analytics/src/defaults.rs",
+      "classification": "algorithm",
+      "records": [
+        "ANALYTICS-001",
+        "ANALYTICS-002",
+        "ANALYTICS-003",
+        "ANALYTICS-006",
+        "ANALYTICS-007",
+        "ANALYTICS-009"
+      ],
+      "reason": "Financially material exported frequency, annual cash, per-period MAR, aggregation, rolling-window, confidence, episode-count and annualization defaults.",
+      "sha256": "8a8a8c8ed0a1a9aa94b7d47a2a0c478e2f5a91e5b83a67cac6ca0e247a98dfa1"
+    },
+    {
+      "path": "finstack-quant/analytics/src/drawdown.rs",
+      "classification": "algorithm",
+      "records": [
+        "ANALYTICS-002",
+        "ANALYTICS-005",
+        "ANALYTICS-006"
+      ],
+      "reason": "Log-wealth peak path, threshold episode/recovery segmentation, date durations, worst-episode order, path indices and drawdown reward ratios.",
+      "sha256": "3e2ba438933ae22305699b6fb8fe4b5fbc6733cb605e1a6dec5b44c9e66b724c"
+    },
+    {
+      "path": "finstack-quant/analytics/src/lib.rs",
+      "classification": "support",
+      "records": [
+        "ANALYTICS-001"
+      ],
+      "reason": "Crate module/feature declarations and public re-exports; no separate runtime estimator beyond the owned implementations.",
+      "sha256": "b1bded86f5b096655982a98e8288bf9a80a6ebc0df60ee1154f40baf70d57756"
+    },
+    {
+      "path": "finstack-quant/analytics/src/multi_factor.rs",
+      "classification": "algorithm",
+      "records": [
+        "ANALYTICS-013",
+        "ANALYTICS-014"
+      ],
+      "reason": "Excess/total response selection, ignored-cash rejection, factor dimensions/finite checks, intercept SVD regression, response-scaled goodness of fit and residual-risk output validation.",
+      "sha256": "61562f859655189c96c079c575efeb305b8a73899f62b0a389db86821a71aadc"
+    },
+    {
+      "path": "finstack-quant/analytics/src/performance/aggregation.rs",
+      "classification": "algorithm",
+      "records": [
+        "ANALYTICS-002",
+        "ANALYTICS-003",
+        "ANALYTICS-005",
+        "ANALYTICS-015"
+      ],
+      "reason": "Public active-span aggregation, geometric relative wealth, excess-cash alignment, fiscal lookbacks, period grouping, benchmark drawdown difference and automatic correlation repair selection.",
+      "sha256": "46edf62b89ede7add6e0e80f123fb3dacb8ef8ab5f54c387d75806c0983ee063"
+    },
+    {
+      "path": "finstack-quant/analytics/src/performance/benchmark.rs",
+      "classification": "algorithm",
+      "records": [
+        "ANALYTICS-010",
+        "ANALYTICS-011",
+        "ANALYTICS-012",
+        "ANALYTICS-013"
+      ],
+      "reason": "Public pair-overlap regression/capture/relative-risk dispatch, minimum sample guards, rolling ticker/window validation and exact factor-slice caller contract.",
+      "sha256": "98b3b43346659ca376394609046a5273b9984071798cba0b4dece91bd22cb1a8"
+    },
+    {
+      "path": "finstack-quant/analytics/src/performance/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "ANALYTICS-001",
+        "ANALYTICS-002",
+        "ANALYTICS-005",
+        "ANALYTICS-015"
+      ],
+      "reason": "Input domain and contiguous missing spans, price conversion, synthetic initial dates, default benchmark/frequency, active windows, intersections, cache rebuilds and parameter validation.",
+      "sha256": "dcd86d296ec1cb8f59920afa7938cd7d6c38ebb557a15a7cd497762d355dba71"
+    },
+    {
+      "path": "finstack-quant/analytics/src/performance/panel.rs",
+      "classification": "algorithm",
+      "records": [
+        "ANALYTICS-001"
+      ],
+      "reason": "Price-versus-return panel contract and nonfinite-to-null/null-to-NaN input conversion that changes the distinction between missing and infinite values.",
+      "sha256": "367d7a1ebde947bdd3a9e17dc4626758dd4ee7e7f3ded2364ada732ce290ea42"
+    },
+    {
+      "path": "finstack-quant/analytics/src/performance/rolling.rs",
+      "classification": "algorithm",
+      "records": [
+        "ANALYTICS-009"
+      ],
+      "reason": "Public rolling method selection, ticker/window rejection, active per-ticker dates and frequency/MAR/cash propagation into numerical kernels.",
+      "sha256": "8ec3dc3dcb6d8687dbfe21ae29c78be9341aaae29f88ff58235c5bc457730a37"
+    },
+    {
+      "path": "finstack-quant/analytics/src/performance/scalar.rs",
+      "classification": "algorithm",
+      "records": [
+        "ANALYTICS-001",
+        "ANALYTICS-002",
+        "ANALYTICS-004",
+        "ANALYTICS-005",
+        "ANALYTICS-006",
+        "ANALYTICS-007",
+        "ANALYTICS-008"
+      ],
+      "reason": "Public scalar metric guards/composition, dated-CAGR defaults, cashless Martin/worst-n Burke, confidence validation, historical summary selection and table assembly.",
+      "sha256": "7062a757b0d8f9c0d1eb6ff41b7cd6d3ee413892e251b9658d75ad23df1f7043"
+    },
+    {
+      "path": "finstack-quant/analytics/src/performance/serialization.rs",
+      "classification": "algorithm",
+      "records": [
+        "ANALYTICS-001",
+        "ANALYTICS-005"
+      ],
+      "reason": "Restored-state benchmark/window/spans validation through assembly, saved-window application and recomputation of financial drawdown caches.",
+      "sha256": "5befded2bbf4de1a98711e7c035545ef40dc75307877454d2389c8066f5c65eb"
+    },
+    {
+      "path": "finstack-quant/analytics/src/regression.rs",
+      "classification": "algorithm",
+      "records": [
+        "ANALYTICS-013",
+        "ANALYTICS-014"
+      ],
+      "reason": "Column-normalized full-rank SVD, finite unscaling and holdings-normalized equality correction with explicit rank/satisfaction/degeneracy tolerances and failure paths.",
+      "sha256": "b4f480d80b44df637caa03a514b092928f5e961e9065a17bdc1bbd3cba6ae4da"
+    },
+    {
+      "path": "finstack-quant/analytics/src/returns.rs",
+      "classification": "algorithm",
+      "records": [
+        "ANALYTICS-002"
+      ],
+      "reason": "Positive price-ratio conversion, effective cash conversion, aligned excess returns, compensated log wealth and finite-wipeout floor semantics.",
+      "sha256": "ee6d7cf344b06953de3d4ab4515819a3f79a2b0c9bbbf263ad9e828ae52e32bf"
+    },
+    {
+      "path": "finstack-quant/analytics/src/risk_metrics/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "ANALYTICS-004"
+      ],
+      "reason": "Nonfinite-first ratio and annualized ratio policies including signed infinities/zero for finite zero denominators, plus risk re-exports.",
+      "sha256": "39855047138f1fb51e5a0647b0535e76f6ba552a8c82b0cce20dbc1fcd7609ce"
+    },
+    {
+      "path": "finstack-quant/analytics/src/risk_metrics/return_based.rs",
+      "classification": "algorithm",
+      "records": [
+        "ANALYTICS-002",
+        "ANALYTICS-004",
+        "ANALYTICS-008"
+      ],
+      "reason": "Dated CAGR basis and parsing, calendar propagation, arithmetic/sample risk, downside partial moments, reward ratios and annual-horizon modified CF Sharpe.",
+      "sha256": "d70ed06bfdcf2e0b4d4bb2a5949b6d48abb86cddd6df0660afec8fe89deab758"
+    },
+    {
+      "path": "finstack-quant/analytics/src/risk_metrics/rolling.rs",
+      "classification": "algorithm",
+      "records": [
+        "ANALYTICS-009"
+      ],
+      "reason": "Sliding log/mean-M2/downside kernels, compensation/rebuild/clamp constants, singleton outputs and explicit dated-series nonfinite wire behavior.",
+      "sha256": "9bd51a209bddb190aac6fae306b43a1e706a7aa5c939c88c02640ee87e8e903b"
+    },
+    {
+      "path": "finstack-quant/analytics/src/risk_metrics/tail_risk.rs",
+      "classification": "algorithm",
+      "records": [
+        "ANALYTICS-007",
+        "ANALYTICS-008"
+      ],
+      "reason": "R-7 historical quantile dispatch, exact fractional tail ES, tail ratio, online adjusted fourth moments, Gaussian/CF horizon scaling and warning-only Gaussian fallback.",
+      "sha256": "064a2bb7028be88ed40b717d0115fd31e638c3f925739731d88b576ffea58f95"
+    },
+    {
+      "path": "finstack-quant/analytics/src/schema.rs",
+      "classification": "support",
+      "records": [
+        "ANALYTICS-001"
+      ],
+      "reason": "Explicit analytics root schema artifact registry and output descriptions; estimator/default/validation behavior is owned by the listed runtime types.",
+      "sha256": "9157de134811ebdde363962047819a43df31263ec7dcc8d1f113c120bb8b2545"
+    }
+  ]
+}

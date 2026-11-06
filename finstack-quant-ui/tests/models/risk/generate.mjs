@@ -20,14 +20,17 @@ function assertFinite(value, path) {
 // same targets with Rust's default threshold.
 const positionIds = ["Equity", "Credit", "Rates"];
 const targets = [0.5, 0.3, 0.2];
+// Six decimal places, same as the correlation panels: a Node patch's
+// Math.sin would otherwise move the historical scenario request.
+const round = (value) => Math.round(value * 1e6) / 1e6;
 function scenarioPnls(n = 250) {
   const equity = [],
     credit = [],
     rates = [];
   for (let i = 0; i < n; i++) {
-    equity.push(0.02 * Math.sin(i / 7) - 0.001);
-    credit.push(i < 6 ? -0.08 : 0.004 * Math.cos(i / 5) + 0.001);
-    rates.push(0.005 * Math.cos(i / 11));
+    equity.push(round(0.02 * Math.sin(i / 7) - 0.001));
+    credit.push(i < 6 ? -0.08 : round(0.004 * Math.cos(i / 5) + 0.001));
+    rates.push(round(0.005 * Math.cos(i / 11)));
   }
   return [equity, credit, rates];
 }

@@ -1,0 +1,633 @@
+{
+  "scope": "core-conventions",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "CORE-CONVENTIONS-001",
+      "title": "Actual-day accrual, year partitioning and business-day bases",
+      "path": "001-actual-day-counts.md"
+    },
+    {
+      "id": "CORE-CONVENTIONS-002",
+      "title": "Coupon reference periods for ACT/ACT ICMA and ACT/365L",
+      "path": "002-coupon-context-day-counts.md"
+    },
+    {
+      "id": "CORE-CONVENTIONS-003",
+      "title": "Synthetic 30/360 day counts and termination-date exceptions",
+      "path": "003-thirty360.md"
+    },
+    {
+      "id": "CORE-CONVENTIONS-004",
+      "title": "Holiday materialization, cache equivalence and date-table horizons",
+      "path": "004-holiday-engine.md"
+    },
+    {
+      "id": "CORE-CONVENTIONS-005",
+      "title": "Jurisdiction-specific substitutions and maintained holiday selections",
+      "path": "005-jurisdiction-calendars.md"
+    },
+    {
+      "id": "CORE-CONVENTIONS-006",
+      "title": "Business-day rolling, joint calendars and bounded stepping",
+      "path": "006-business-day-adjustments.md"
+    },
+    {
+      "id": "CORE-CONVENTIONS-007",
+      "title": "Calendar tenor arithmetic and approximate frequency conversions",
+      "path": "007-tenor-date-arithmetic.md"
+    },
+    {
+      "id": "CORE-CONVENTIONS-008",
+      "title": "Anchored coupon grids, stubs, payment/fixing lags and failure policy",
+      "path": "008-schedule-generation.md"
+    },
+    {
+      "id": "CORE-CONVENTIONS-009",
+      "title": "IMM, CDS quarterly/semiannual rolls and option expiry anchors",
+      "path": "009-contractual-roll-dates.md"
+    },
+    {
+      "id": "CORE-CONVENTIONS-010",
+      "title": "Published TBA settlement dates and explicitly estimated projections",
+      "path": "010-sifma-settlement.md"
+    },
+    {
+      "id": "CORE-CONVENTIONS-011",
+      "title": "FX market orientation, pip sizes, spot lag and forward maturity dates",
+      "path": "011-fx-date-and-quote-conventions.md"
+    },
+    {
+      "id": "CORE-CONVENTIONS-012",
+      "title": "Decimal monetary arithmetic, explicit boundary rounding and currency scales",
+      "path": "012-money-decimal-precision.md"
+    },
+    {
+      "id": "CORE-CONVENTIONS-013",
+      "title": "FX source authority, single-pivot conversion, state and relative shocks",
+      "path": "013-fx-resolution-and-shocks.md"
+    },
+    {
+      "id": "CORE-CONVENTIONS-014",
+      "title": "Gregorian/fiscal period boundaries, annualization factors and LTM windows",
+      "path": "014-fiscal-periods-ltm.md"
+    },
+    {
+      "id": "CORE-CONVENTIONS-015",
+      "title": "Cash settlement, principal balance events and accrual metadata",
+      "path": "015-cashflow-semantics.md"
+    },
+    {
+      "id": "CORE-CONVENTIONS-016",
+      "title": "Continuous flat discounting and valuation-date-normalized cashflow NPV",
+      "path": "016-discounting.md"
+    },
+    {
+      "id": "CORE-CONVENTIONS-017",
+      "title": "Unique-return IRR/XIRR with log-growth Brent solving",
+      "path": "017-irr.md"
+    },
+    {
+      "id": "CORE-CONVENTIONS-018",
+      "title": "Decimal rates, percent/basis-point scaling and integer spread arithmetic",
+      "path": "018-rate-units.md"
+    },
+    {
+      "id": "CORE-CONVENTIONS-019",
+      "title": "Ordinal credit ratings and configurable scorecard scale data",
+      "path": "019-credit-ratings.md"
+    },
+    {
+      "id": "CORE-CONVENTIONS-020",
+      "title": "Shared barrier direction, activation and payout-timing defaults",
+      "path": "020-barrier-classification.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/core/build.rs",
+      "classification": "support",
+      "records": [
+        "CORE-CONVENTIONS-004"
+      ],
+      "reason": "Build entry tracks calendar JSON/generator changes and invokes the inspected generator; no additional financial selection in this wrapper.",
+      "sha256": "3671681dcd610f6786612463d807b6cc727e0bb9f9508a2597a04ed4467b3c30"
+    },
+    {
+      "path": "finstack-quant/core/build/generate_calendars.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-004",
+        "CORE-CONVENTIONS-005"
+      ],
+      "reason": "Parses financial holiday definitions, applies missing-field defaults/effective wrappers, emits ordered calendars and case-insensitive registry; inspected entire generator.",
+      "sha256": "d6a2924f376833e2ebb02da7b35bb2037e77aa0c0e3ae0e09049b31e7b23060b"
+    },
+    {
+      "path": "finstack-quant/core/src/cashflow/discounting.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-016"
+      ],
+      "reason": "Continuous flat DF, curve-base normalization, strictly future-flow inclusion, currency validation and Decimal versus compensated-float NPV.",
+      "sha256": "5416ac6dbce05d9f50cc719ff2b79da66ec2a83030a2fc8b2332e0fd73d21fbf"
+    },
+    {
+      "path": "finstack-quant/core/src/cashflow/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Module declarations and public reexports only; inspected module documentation and export block.",
+      "sha256": "e7ea9b0af2f0450e4f83f1fdfb0e0cefcfe96d0089490f78cd6f01c93dc1afb9"
+    },
+    {
+      "path": "finstack-quant/core/src/cashflow/primitives.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-015"
+      ],
+      "reason": "Financial cash/principal classification, explicit balance-event timing and accrual/rate/principal-currency validation.",
+      "sha256": "583fe06c7bd2cf255f502cbe61b1011f43366a781341eed65db522b0fc748fc4"
+    },
+    {
+      "path": "finstack-quant/core/src/cashflow/xirr.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-017"
+      ],
+      "reason": "Periodic/daily-time preparation, compensated equal-time netting, sign-change eligibility, scaled log-growth objective and bounded Brent root acceptance.",
+      "sha256": "ab5259a06a2432802758ab5f99ca4e18ad9bc87b189db251470fdd2931f1f299"
+    },
+    {
+      "path": "finstack-quant/core/src/currency.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-012"
+      ],
+      "reason": "Currency parsing/numeric identity and generated metadata inclusion determine monetary currency domain and scale selection.",
+      "sha256": "9f60039293ff51e8dacfd94d5394f6ec61e406dc9861dbc02941cf1f77fe90a4"
+    },
+    {
+      "path": "finstack-quant/core/src/dates/calendar/algo.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-004",
+        "CORE-CONVENTIONS-009"
+      ],
+      "reason": "Gregorian Easter computus, positive/negative nth-weekday arithmetic and lunar/equinox generated-table inclusion.",
+      "sha256": "2824ec300e3c21ea3f476eb3b234707756deeadbe2d9dd6f62074b4211f98f9a"
+    },
+    {
+      "path": "finstack-quant/core/src/dates/calendar/business_days.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-006"
+      ],
+      "reason": "Business-day counting/rolling including Nearest tie choice, bounded search, explicit weekends-only fallback and joint-calendar lookup.",
+      "sha256": "e8f7c8e25047935e307f5ab6dd7fb4f07f2399176fb0499d1cd9acd7a0e633d9"
+    },
+    {
+      "path": "finstack-quant/core/src/dates/calendar/composite.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-006"
+      ],
+      "reason": "Closure union/business-day intersection, empty-composite weekends and canonical composite identity.",
+      "sha256": "112ab8b2f87d360e80ce976db56016aaea088c1321700f4b9ba3dde801a828b9"
+    },
+    {
+      "path": "finstack-quant/core/src/dates/calendar/jurisdictions.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-005"
+      ],
+      "reason": "Hong Kong collision/substitution/historical rules and Japanese national/citizens/substitute/era/Olympic holiday generation.",
+      "sha256": "beda62202de7afb659e0d6450c82bc107ff3e7d1dbf01ab0e492f2165c529d30"
+    },
+    {
+      "path": "finstack-quant/core/src/dates/calendar/mod.rs",
+      "classification": "support",
+      "records": [
+        "CORE-CONVENTIONS-004"
+      ],
+      "reason": "Calendar submodules and OUT_DIR generated-registry inclusion; weekends-only constant and test wiring add no distinct algorithm.",
+      "sha256": "210425a5a0b5766694ae40af91f2679eaaf59c33aa442e76df05dbd25e15ec84"
+    },
+    {
+      "path": "finstack-quant/core/src/dates/calendar/rule.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-004",
+        "CORE-CONVENTIONS-005"
+      ],
+      "reason": "Observed fixed rules, effective-year gating, neighboring-year materialization, spans, China bridge and jurisdiction/table dispatch.",
+      "sha256": "3249a98cc852023ab688ea7442956566c6b9ee37e40389f6ba32f8a3e675469b"
+    },
+    {
+      "path": "finstack-quant/core/src/dates/calendar/rule_coverage_tests.rs",
+      "classification": "test",
+      "records": [
+        "CORE-CONVENTIONS-004",
+        "CORE-CONVENTIONS-005"
+      ],
+      "reason": "Dedicated rule/festival boundary and materialization tests, including spans, observations and absent out-of-range table dates; no production implementation.",
+      "sha256": "e500badd2f4234aea45fda8a1a4448579fdc6ca76ecd9a8c607be6f6ab38ca77"
+    },
+    {
+      "path": "finstack-quant/core/src/dates/calendar/rule_tests.rs",
+      "classification": "test",
+      "records": [
+        "CORE-CONVENTIONS-004",
+        "CORE-CONVENTIONS-005"
+      ],
+      "reason": "Dedicated rule tests including independent stored Japan dates and prior-implementation calendar digest; no production implementation.",
+      "sha256": "82936aa398c4364e827483da35f14926672a38db605b4b6edb749dafea9fe82a"
+    },
+    {
+      "path": "finstack-quant/core/src/dates/calendar/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-004",
+        "CORE-CONVENTIONS-006"
+      ],
+      "reason": "Calendar business predicate, ignore_weekends holiday-label semantics and out-of-cache-range fallback selection.",
+      "sha256": "4a903f8d276ae41fbd280a89e402aa3bd5cc222876d3ee854fe85809054dde50"
+    },
+    {
+      "path": "finstack-quant/core/src/dates/calendar/year_cache.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-004",
+        "CORE-CONVENTIONS-006"
+      ],
+      "reason": "Holiday bit materialization, prefix-count intervals and daily-scan fallback outside 1970\u20132150, with rule-identity cache key.",
+      "sha256": "0a39d0b369029285802915701615b27c1296aacdb1a2166cabb6c17ff1cfacd1"
+    },
+    {
+      "path": "finstack-quant/core/src/dates/date_extensions.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-006",
+        "CORE-CONVENTIONS-007",
+        "CORE-CONVENTIONS-014"
+      ],
+      "reason": "Calendar month clamp, calendar/business/weekday stepping, EOM complete-month count and fiscal-year label calculation.",
+      "sha256": "276afb94aed0f42f1be197693210c9d01588daf1db6e436d816fd959da8fff63"
+    },
+    {
+      "path": "finstack-quant/core/src/dates/daycount/act_act.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-001",
+        "CORE-CONVENTIONS-002"
+      ],
+      "reason": "ISDA year splitting, AFB backwards whole years/residual and ICMA regular/reference quasi-coupon grids.",
+      "sha256": "3904662d92b9c43883024150e1e1ad3700d916b3c32cacac9a5f4154f500011a"
+    },
+    {
+      "path": "finstack-quant/core/src/dates/daycount/context.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-001",
+        "CORE-CONVENTIONS-002",
+        "CORE-CONVENTIONS-003"
+      ],
+      "reason": "Material context defaults, positive business-day basis and coupon-order validation, calendar reconstruction and termination-date flag.",
+      "sha256": "c28f73c77429d64a912c2598b26c774bad9e022bd4ee6a0b014dc08ddcbbe283"
+    },
+    {
+      "path": "finstack-quant/core/src/dates/daycount/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-001",
+        "CORE-CONVENTIONS-002",
+        "CORE-CONVENTIONS-003"
+      ],
+      "reason": "Actual/synthetic convention dispatch, zero/reversed/signed interval semantics and canonical label selection.",
+      "sha256": "e6db8897cd7e92b74bfed83885cf278a8cde6d03dfa2190d506366ba6c180b46"
+    },
+    {
+      "path": "finstack-quant/core/src/dates/daycount/other.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-001",
+        "CORE-CONVENTIONS-002"
+      ],
+      "reason": "ACT365L enclosing-coupon leap denominator, NL365 endpoint leap-day subtraction and Bus252 calendar/basis requirements.",
+      "sha256": "f3129955387a92eb05f6eb1cc9af0978c18f50c73f912bb95a10ed67703615b1"
+    },
+    {
+      "path": "finstack-quant/core/src/dates/daycount/thirty360.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-003"
+      ],
+      "reason": "US SIA, ISDA bond-basis, European, Italian and 30E360 ISDA raw day-count adjustments including termination exception.",
+      "sha256": "ebee5ee5e07105aa7c769ad27ea5ea4d2fc1914982eeab0c8acb803ec6ca3c4b"
+    },
+    {
+      "path": "finstack-quant/core/src/dates/fx.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-011"
+      ],
+      "reason": "Pair/currency spot lags, intermediate USD-day rules, final joint settlement, requested-lag overrides and FX tenor EOM selection.",
+      "sha256": "ac2835c064a60d8cea0b5375bcd9dc6967d02a093b3e91bb8625798915a51956"
+    },
+    {
+      "path": "finstack-quant/core/src/dates/imm.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-009",
+        "CORE-CONVENTIONS-010"
+      ],
+      "reason": "Inclusive/exclusive IMM/CDS/option rolls, published class settlement lookup, class heuristic and explicit business-day-index estimate.",
+      "sha256": "5232f6d3a7f80c4c691958288ebe0591777138bf508acc48d1c3d4d54104fdd7"
+    },
+    {
+      "path": "finstack-quant/core/src/dates/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-007"
+      ],
+      "reason": "365-day approximate-year constant, date validation, ISO parsing and epoch conversion plus reexports; material shared time constant prevents support-only classification.",
+      "sha256": "01c7bc98cc7e4ae078889e81b5a94c862faeabe08c7a2dc16a29f9b0962147cd"
+    },
+    {
+      "path": "finstack-quant/core/src/dates/periods/calendar.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-014"
+      ],
+      "reason": "Gregorian/ISO/fiscal half-open bounds, clamped monthly grids, partial fiscal week, actual/forecast flags and bounded range generation.",
+      "sha256": "b3184a33a66b33f4f7adb12b1e3768c5724619e1f97249d4bf8f77b6cc7e7015"
+    },
+    {
+      "path": "finstack-quant/core/src/dates/periods/ltm.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-014"
+      ],
+      "reason": "Fixed-count non-daily LTM slots versus twelve-month daily grid selection and leading-coverage missingness.",
+      "sha256": "038a5fd005abb50c3f8466a5138bd3480e0f5fdcf3947a9e66c9c9160189a292"
+    },
+    {
+      "path": "finstack-quant/core/src/dates/periods/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-014"
+      ],
+      "reason": "252/52 annualization factors, date-to-period mapping, fiscal config/label defaults, period shifting and mixed-kind ordering.",
+      "sha256": "1748d0644cf408f72dcbcb401951ae6b5efc1cccae1142376480273ccc73b5b1"
+    },
+    {
+      "path": "finstack-quant/core/src/dates/periods/parse.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-014"
+      ],
+      "reason": "Period grammar, range/calendar matching, dynamic Gregorian year capacities and fiscal/Gregorian index stepping.",
+      "sha256": "24efd4d806bb5d681b0fa0a12cf80859ad2660d35798ceaa0da778fd5c735132"
+    },
+    {
+      "path": "finstack-quant/core/src/dates/periods/tests.rs",
+      "classification": "test",
+      "records": [
+        "CORE-CONVENTIONS-014"
+      ],
+      "reason": "Dedicated ISO/fiscal boundary, actual-cutoff, stepping, clamping and range-cap tests; no production implementation.",
+      "sha256": "04fde45f16ae7b57f19d68dafa073f1ac6841a029d0b7148d75d9c8a8d9f9cd8"
+    },
+    {
+      "path": "finstack-quant/core/src/dates/schedule/builder.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-008"
+      ],
+      "reason": "Mode dispatch, CDS preceding-roll accrual, error policy, deduplication and adjustment-before-payment-lag/fixing-T-minus ordering.",
+      "sha256": "b7b66e3ee0b9eb6b1032ebf387ff02c69ab99bb4b2d4df16f94e57a75efd395b"
+    },
+    {
+      "path": "finstack-quant/core/src/dates/schedule/generation.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-008"
+      ],
+      "reason": "Original-anchor grids, five stub policies, EOM/third-Wednesday rolling, quarterly IMM validation and generation-size limits.",
+      "sha256": "34306fefffa1016a29bef5a219f2af0951118b5fce3ab9e28829de330d864420"
+    },
+    {
+      "path": "finstack-quant/core/src/dates/schedule/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-008"
+      ],
+      "reason": "Financial stub/error policy defaults and distinct accrual/payment/fixing/warning series contracts; not only reexports.",
+      "sha256": "d946be03ae6e313fcd330c0ca8c3f8262580599da812a6b79eaa88ed41c3caa9"
+    },
+    {
+      "path": "finstack-quant/core/src/dates/schedule/spec.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-008"
+      ],
+      "reason": "Monthly/no-stub/strict defaults, mode setters, date-order validation and lag/adjustment configuration affecting generated payments.",
+      "sha256": "0df5b71f9dd71fed09c843c5221113ec0003b26e2f1b0c8552c247d7da6f95b6"
+    },
+    {
+      "path": "finstack-quant/core/src/dates/tenor.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-002",
+        "CORE-CONVENTIONS-007"
+      ],
+      "reason": "Positive bounded D/W/M/Y domain, month/day/year approximations, compounding/payments frequency, date addition and day-count-context bridge.",
+      "sha256": "013ae1f1d4d304e8aacb73d1ede2697a1919ba018729b915e3718ae306daf978"
+    },
+    {
+      "path": "finstack-quant/core/src/decimal.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-012"
+      ],
+      "reason": "Exact decimal/scientific text parsing, scale/magnitude checks and finite f64-to-Decimal conversion.",
+      "sha256": "8ea584f12a87fb29042ea71257f236f332bc8d1e436d88e855f946200e9229df"
+    },
+    {
+      "path": "finstack-quant/core/src/generated/cny_generated.rs",
+      "classification": "generated",
+      "records": [
+        "CORE-CONVENTIONS-004",
+        "CORE-CONVENTIONS-005"
+      ],
+      "reason": "Actual generated CNY table and shared checked table-date lookup; full generated-source consistency checked against maintained CSV.",
+      "sha256": "5ae5fa1811f0c9d5981726c4c62b912ac75d6bd1c49e71caf709b58fe4d35d93"
+    },
+    {
+      "path": "finstack-quant/core/src/generated/currency_generated.rs",
+      "classification": "generated",
+      "records": [
+        "CORE-CONVENTIONS-012"
+      ],
+      "reason": "Actual generated 159-currency enum, numeric/code maps and minor-unit scale groups; full generator/CSV consistency checked.",
+      "sha256": "a2a4f70b521134703bbe16cb93ff9c2762514d6ca78fad1f9a6254850e7180ff"
+    },
+    {
+      "path": "finstack-quant/core/src/generated/festivals_generated.rs",
+      "classification": "generated",
+      "records": [
+        "CORE-CONVENTIONS-004",
+        "CORE-CONVENTIONS-005"
+      ],
+      "reason": "Actual generated seven festival/equinox tables and bounded lookup wrappers; all generated tables checked against maintained CSVs.",
+      "sha256": "0eba3d1340253c299088faaab395bddbab8387a870844cebe646ae209606abda"
+    },
+    {
+      "path": "finstack-quant/core/src/generated/sifma_settlements_generated.rs",
+      "classification": "generated",
+      "records": [
+        "CORE-CONVENTIONS-010"
+      ],
+      "reason": "Actual generated published class-date table: Class A 2025, A/B/C/D 2026\u20132027; all rows inspected and source consistency checked.",
+      "sha256": "09a1d4ef470720a57a2ec0f6e2b3e6a593e8681cbb124072d43ea181d3391f6e"
+    },
+    {
+      "path": "finstack-quant/core/src/money/fx/conventions.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-011"
+      ],
+      "reason": "Market pair ranking/tie break, direct/indirect USD labels, pip heuristic, standard settlement attachment and reciprocal checks.",
+      "sha256": "cd9e841e32abdf18488220447bc7867b6861cc3d92308b498dc38ed9ed246d84"
+    },
+    {
+      "path": "finstack-quant/core/src/money/fx/matrix.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-013"
+      ],
+      "reason": "Authority precedence, one-pivot cross rates, versioned LRU, state capture/load, relative pair/cross shocks and scope-preserving snapshots.",
+      "sha256": "7b527ec8f44c40f363df252b8902d318bff31e88ca2eea3d59deb5865974a045"
+    },
+    {
+      "path": "finstack-quant/core/src/money/fx/mod.rs",
+      "classification": "support",
+      "records": [
+        "CORE-CONVENTIONS-013"
+      ],
+      "reason": "Reexports and inline tests only after module documentation; rate methods are owned by the linked implementation files.",
+      "sha256": "66a68bb7ce9f2ef5c759fbb1077f2cdf24b6316afdefdb533d484b79385cf588"
+    },
+    {
+      "path": "finstack-quant/core/src/money/fx/provider.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-013"
+      ],
+      "reason": "Directional direct-before-inverse lookup and finite/positive reciprocal/rate validation, plus date/policy/revision provider contract.",
+      "sha256": "9a6d833320aed2806d5e514c60f0b57d61f214b63db6518009b52e465dfd3af8"
+    },
+    {
+      "path": "finstack-quant/core/src/money/fx/providers.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-013"
+      ],
+      "reason": "Simple provider scoped/global order and relative bumped-provider forward/inverse/snapshot behavior.",
+      "sha256": "a3dfc9e3275950abff9531cb87f21affc7d4f5b1f28e642f474f9f2028ceb347"
+    },
+    {
+      "path": "finstack-quant/core/src/money/fx/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-013"
+      ],
+      "reason": "CashflowDate policy default, USD triangulation enabled/256-cache defaults, scoped query/state roles and serialization rate validation.",
+      "sha256": "45a2ffc4ccb7476ec6ba81d6de0b48133d53f259a88534cee54e22dd4fb71064"
+    },
+    {
+      "path": "finstack-quant/core/src/money/mod.rs",
+      "classification": "support",
+      "records": [
+        "CORE-CONVENTIONS-012"
+      ],
+      "reason": "Submodule/reexport plumbing with no additional financial implementation.",
+      "sha256": "ad03537cce7215404fc8c8cecafd880546762fec808288fb9c21f0c099f627f5"
+    },
+    {
+      "path": "finstack-quant/core/src/money/rounding.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-012"
+      ],
+      "reason": "Checked Decimal scalar arithmetic and exact mapping of five rounding policies; production round_decimal after cfg(test) helper inspected.",
+      "sha256": "86c9c239fb3c155e6544e6fec60af8a8aa586b6275cea043d16ca5bc28db9e9f"
+    },
+    {
+      "path": "finstack-quant/core/src/money/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-012"
+      ],
+      "reason": "Money construction/config rounding, same-currency arithmetic, float presentation, formatting, explicit FX rate conversion and overflow policy.",
+      "sha256": "f5c7f38c4ab9d3fa9f48b2dfecf97c10ffac5ed4c7a9e28b966a444648824b78"
+    },
+    {
+      "path": "finstack-quant/core/src/rating_scales.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-019"
+      ],
+      "reason": "Validated ordered score thresholds, embedded/config registry selection and unknown-scale error/silent/warning fallback policy.",
+      "sha256": "d4d7f9a79d641e1f68bc6b943ffb999ea63e79299546823c073edd842952d493"
+    },
+    {
+      "path": "finstack-quant/core/src/types/attributes.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "String tag/meta container and exact wildcard/tag/meta-equality selector; no economic default, valuation or classification algorithm.",
+      "sha256": "e063664fc5a588baef0c0f4a7bde593ac33ac2028a1bc127f12b6633ecce55a8"
+    },
+    {
+      "path": "finstack-quant/core/src/types/barrier.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-020"
+      ],
+      "reason": "Financial default UpAndOut/AtHit and knock-in/out/up/down dispatch predicates; pricing remains in consumers.",
+      "sha256": "014c35cdd34f32641be18aa92d8420d9fd52b78f1a2cc5acd8f5e6d1b4f10b62"
+    },
+    {
+      "path": "finstack-quant/core/src/types/id.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Typed Arc-string IDs, exact equality/hash/order and marker aliases only; no market lookup default or financial transformation.",
+      "sha256": "e41d3c1af14419b6577c833a2d9d5341eb6f9302f5bb39d31b9274c7eacb0dd8"
+    },
+    {
+      "path": "finstack-quant/core/src/types/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Module declarations/reexports only.",
+      "sha256": "994fd24a2002c6095e6d208f0d9aa1b37c6a0185ab367dc0d28d8e399c737854"
+    },
+    {
+      "path": "finstack-quant/core/src/types/rates.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-018"
+      ],
+      "reason": "Rate/Bps units, Decimal-assisted scaling with float fallback, finite result checks and lossy integer-bp round/division behavior.",
+      "sha256": "f94ae9380a57d8380c0a878d89a8aa7ed5aa6da9615f7be4db6b49f223db2700"
+    },
+    {
+      "path": "finstack-quant/core/src/types/ratings.rs",
+      "classification": "algorithm",
+      "records": [
+        "CORE-CONVENTIONS-019"
+      ],
+      "reason": "Generic grade ordinal order including NR, grade buckets, notches, agency-name mapping and permissive rating parser.",
+      "sha256": "5067caad3aebae9e4d243cf182c51b96553dd1536aa9fa49296531e22d70e7ba"
+    }
+  ]
+}

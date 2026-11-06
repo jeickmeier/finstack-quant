@@ -1,0 +1,1011 @@
+{
+  "scope": "valuations-equity-and-composition",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "VALUATIONS-EQUITY-AND-COMPOSITION-01",
+      "title": "Instrument contracts, model dispatch and metric interpretation",
+      "path": "01-contract-dispatch.md"
+    },
+    {
+      "id": "VALUATIONS-EQUITY-AND-COMPOSITION-02",
+      "title": "Cash equity valuation and dividend-adjusted carry",
+      "path": "02-spot-and-carry.md"
+    },
+    {
+      "id": "VALUATIONS-EQUITY-AND-COMPOSITION-03",
+      "title": "Equity futures carry, quanto adjustment and risk",
+      "path": "03-equity-future.md"
+    },
+    {
+      "id": "VALUATIONS-EQUITY-AND-COMPOSITION-04",
+      "title": "Equity total-return futures projection",
+      "path": "04-total-return-future.md"
+    },
+    {
+      "id": "VALUATIONS-EQUITY-AND-COMPOSITION-05",
+      "title": "Volatility-index futures and listed equity-option adapters",
+      "path": "05-vol-index-and-listed-options.md"
+    },
+    {
+      "id": "VALUATIONS-EQUITY-AND-COMPOSITION-06",
+      "title": "Equity option exercise, expiry and settlement state",
+      "path": "06-option-lifecycle.md"
+    },
+    {
+      "id": "VALUATIONS-EQUITY-AND-COMPOSITION-07",
+      "title": "Black equity pricing, discrete dividends and exercise-tree Greeks",
+      "path": "07-black-tree-and-direct-greeks.md"
+    },
+    {
+      "id": "VALUATIONS-EQUITY-AND-COMPOSITION-08",
+      "title": "Selected-model Greeks, higher derivatives, Dividend01 and implied volatility",
+      "path": "08-selected-risk-and-implied-vol.md"
+    },
+    {
+      "id": "VALUATIONS-EQUITY-AND-COMPOSITION-09",
+      "title": "Equity Black\u2013Scholes and Heston PDE adapters",
+      "path": "09-equity-pde.md"
+    },
+    {
+      "id": "VALUATIONS-EQUITY-AND-COMPOSITION-10",
+      "title": "Equity Heston Fourier and Monte Carlo adapters",
+      "path": "10-heston-adapters.md"
+    },
+    {
+      "id": "VALUATIONS-EQUITY-AND-COMPOSITION-11",
+      "title": "Equity rough Heston and rough Bergomi adapters",
+      "path": "11-rough-volatility-adapters.md"
+    },
+    {
+      "id": "VALUATIONS-EQUITY-AND-COMPOSITION-12",
+      "title": "ATM term-GBM, observation grids and pinned spot risk",
+      "path": "12-path-gbm.md"
+    },
+    {
+      "id": "VALUATIONS-EQUITY-AND-COMPOSITION-13",
+      "title": "Autocallable seasoning, coupon memory and redemption",
+      "path": "13-autocallable.md"
+    },
+    {
+      "id": "VALUATIONS-EQUITY-AND-COMPOSITION-14",
+      "title": "Cliquet locked returns, reset anchoring and settlement",
+      "path": "14-cliquet.md"
+    },
+    {
+      "id": "VALUATIONS-EQUITY-AND-COMPOSITION-15",
+      "title": "Equity variance swap replication, seasoning and variance risk",
+      "path": "15-variance-swap.md"
+    },
+    {
+      "id": "VALUATIONS-EQUITY-AND-COMPOSITION-16",
+      "title": "Equity total-return swap projection, dividends and margin exposure",
+      "path": "16-equity-trs.md"
+    },
+    {
+      "id": "VALUATIONS-EQUITY-AND-COMPOSITION-17",
+      "title": "Corporate DCF terminal value, equity bridge and dilution",
+      "path": "17-corporate-dcf.md"
+    },
+    {
+      "id": "VALUATIONS-EQUITY-AND-COMPOSITION-18",
+      "title": "Private-fund dated hurdles, catch-up, promote and clawback",
+      "path": "18-private-fund-waterfall.md"
+    },
+    {
+      "id": "VALUATIONS-EQUITY-AND-COMPOSITION-19",
+      "title": "Private-fund residual valuation, LP performance and parameter shocks",
+      "path": "19-private-fund-valuation.md"
+    },
+    {
+      "id": "VALUATIONS-EQUITY-AND-COMPOSITION-20",
+      "title": "Property appraisal, DCF, capitalization and unlevered returns",
+      "path": "20-property-valuation.md"
+    },
+    {
+      "id": "VALUATIONS-EQUITY-AND-COMPOSITION-21",
+      "title": "Levered property equity, debt payoff, coverage and financing risk",
+      "path": "21-levered-property.md"
+    },
+    {
+      "id": "VALUATIONS-EQUITY-AND-COMPOSITION-22",
+      "title": "Basket weighted NAV, daily expense drag and constituent shocks",
+      "path": "22-basket-nav-and-risk.md"
+    },
+    {
+      "id": "VALUATIONS-EQUITY-AND-COMPOSITION-23",
+      "title": "Composite fixed, notional, metric, volatility and expression sizing",
+      "path": "23-composite-sizing.md"
+    },
+    {
+      "id": "VALUATIONS-EQUITY-AND-COMPOSITION-24",
+      "title": "Composite valuation, nested risk aggregation and financed return history",
+      "path": "24-composite-valuation-history.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/valuations/equity/src/autocallable/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-13"
+      ],
+      "reason": "Product metric formulas, risk delegation and calculation registration for autocallable seasoning, coupon memory and redemption.",
+      "sha256": "1a49808c1e7e348651e22c60460220ed5a0d66f0c941fb6279c86c2fa2278b52"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/autocallable/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-13"
+      ],
+      "reason": "Module declarations and public re-exports for autocallable seasoning, coupon memory and redemption; no additional financial calculation or dispatch.",
+      "sha256": "ee82868ac2a717504b40191e1b58b92ff218b69199859a6e9a695d3018a0bfcb"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/autocallable/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-13"
+      ],
+      "reason": "Valuation/projection stages and method-specific branch dispatch for autocallable seasoning, coupon memory and redemption.",
+      "sha256": "a053c36b2f25aa8aab99ff527f49ccd621e64435ce9cb3ba3f1422888ef109af"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/autocallable/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-13"
+      ],
+      "reason": "Contract validation, lifecycle and native value/input methods for autocallable seasoning, coupon memory and redemption.",
+      "sha256": "54caf4dafd4f6bce724db12ab0f1da37296b4a38068f2f9497f10752791ad0ff"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/cliquet_option/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-14"
+      ],
+      "reason": "Product metric formulas, risk delegation and calculation registration for cliquet locked returns, reset anchoring and settlement.",
+      "sha256": "eab8877519e23bbb7391dd316dc850f52115d583caa5b211814712066daa1b8f"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/cliquet_option/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-14"
+      ],
+      "reason": "Module declarations and public re-exports for cliquet locked returns, reset anchoring and settlement; no additional financial calculation or dispatch.",
+      "sha256": "8518d9781c30f97c636230afd116fb3cc0b2991e1aacf38950445bdd8b49040f"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/cliquet_option/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-14"
+      ],
+      "reason": "Valuation/projection stages and method-specific branch dispatch for cliquet locked returns, reset anchoring and settlement.",
+      "sha256": "63eb4e2904788ccb2b0b1d493348c455e11a1d440be465193cf56dd9914c3d7c"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/cliquet_option/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-14"
+      ],
+      "reason": "Contract validation, lifecycle and native value/input methods for cliquet locked returns, reset anchoring and settlement.",
+      "sha256": "9aade0707bd0c5fe12d5e8e625a6f61131acc7157114e681ae594a0adc758618"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/dcf_equity/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-17"
+      ],
+      "reason": "Product metric formulas, risk delegation and calculation registration for corporate dcf terminal value, equity bridge and dilution.",
+      "sha256": "5665e822287f4f2acb6088ca59210d727e6bf5d37dd51f40693fb924e9d5722f"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/dcf_equity/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-17"
+      ],
+      "reason": "Module declarations and public re-exports for corporate dcf terminal value, equity bridge and dilution; no additional financial calculation or dispatch.",
+      "sha256": "c6019fcd928c5c2530fb8e7cbcff1d8e4fb739a8599e16572698df0a8ec705d8"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/dcf_equity/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-17"
+      ],
+      "reason": "Valuation/projection stages and method-specific branch dispatch for corporate dcf terminal value, equity bridge and dilution.",
+      "sha256": "631e932036e1d5986ee252a6902ffd01db6c81b6d3c0f9b8402a78bfcc163266"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/dcf_equity/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-17"
+      ],
+      "reason": "Contract validation, lifecycle and native value/input methods for corporate dcf terminal value, equity bridge and dilution.",
+      "sha256": "f042413875add53d07bcd31c8ca45d954537b98f87441455b39361f2d4254f56"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/dividend01.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-08"
+      ],
+      "reason": "Continuous dividend-yield finite-difference risk with lower-side zero bound and native Instrument.value repricing.",
+      "sha256": "a557dbf574e8213024171f319fe563b65dade26ca5f4a0591be5b96e4fbe141c"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/equity_future/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-03"
+      ],
+      "reason": "Product metric formulas, risk delegation and calculation registration for equity futures carry, quanto adjustment and risk.",
+      "sha256": "11b4c7c5642e288776cad3a3ad9b0c822e7bb79c5708df901325ed0bfecb059e"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/equity_future/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-03"
+      ],
+      "reason": "Module declarations and public re-exports for equity futures carry, quanto adjustment and risk; no additional financial calculation or dispatch.",
+      "sha256": "1d290483fae2b7c4145cbd45bfa29b6a251d4387f12a51205e6104e6073e3c18"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/equity_future/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-03"
+      ],
+      "reason": "Contract validation, lifecycle and native value/input methods for equity futures carry, quanto adjustment and risk.",
+      "sha256": "38dad5d54d0584c3793e2b37405395b517125edc7b137e42c75030b4900e5ad0"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/equity_future_option.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-05"
+      ],
+      "reason": "Instantiates the shared listed-future option contract, validation, model dispatch and example conventions for equity futures options.",
+      "sha256": "c7b78d39ae91e4a2e09c294437fec44e6d2a0f8d5ccc3d7151e2e74c52c1805e"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/equity_option/heston_mc_pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-10"
+      ],
+      "reason": "Heston QE Monte Carlo adapter, path/time budget, Philox stream, signed payoff and stderr reporting.",
+      "sha256": "3dc688cf944d0c976f86a9c6727f6e7d12cfcd5615d922ffedf489e17f378031"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/equity_option/metrics/dividend_risk.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-08"
+      ],
+      "reason": "Discrete-cash-dividend equivalent-yield shocks and selected-context repricing, contrasted with the continuous-yield path.",
+      "sha256": "87b104b7d001a72e11667241aba2f29380d24f58206b46815b10381421f8ca82"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/equity_option/metrics/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-08"
+      ],
+      "reason": "Registers selected-model Greek calculators, vanna/volga implementations and native quote-equivalent implied-volatility metric.",
+      "sha256": "170323d4fb04c638640776ad859280d5b438a9fef3c8577ff83d8e0def617887"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/equity_option/metrics/selected_model.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-08"
+      ],
+      "reason": "Preserves selected model for repriced Greeks and applies lifecycle/near-expiry theta branches.",
+      "sha256": "7b4b4b94eaccf3f3afff7953fd2154025dc30093ed7475b0fab646d4302ecd35"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/equity_option/metrics/spot_greek_decay.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-08"
+      ],
+      "reason": "Charm, color and speed stencils with time/spot boundary and adaptive-bump conventions.",
+      "sha256": "d3c1299460bff7fe25e3bc829869b57d90670c022410a09e11bc05382c93719f"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/equity_option/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-06"
+      ],
+      "reason": "Module declarations and public re-exports for equity option exercise, expiry and settlement state; no additional financial calculation or dispatch.",
+      "sha256": "2bcf1945fcae19fcb19c41315a8d13ab0e81c2299b7acb09a32ab4932367720c"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/equity_option/parameters.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-06"
+      ],
+      "reason": "Equity-option parameter/market structures consumed by model input collection; controls economic/time and market-field interpretation.",
+      "sha256": "9e40482a30e67de47b75379d207228f242c1bc84851d40ff528b8aac6c93b1fe"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/equity_option/pde2d_pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-09"
+      ],
+      "reason": "Two-dimensional Heston ADI adapter, variance/spot grid heuristics and European arbitrage-bound validation.",
+      "sha256": "2cf4e275b4364b622a1694c1db298e2e21966336e07e41496b3d80964a44925c"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/equity_option/pde_pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-09"
+      ],
+      "reason": "One-dimensional Black Crank-Nicolson adapter with fixed grid/domain heuristics and American exercise route.",
+      "sha256": "318488bd997ffaede99c29a85057ed2660b311c33ef38e562de3b49ab257e90f"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/equity_option/pricing/black.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-07"
+      ],
+      "reason": "European spot-Black formula and analytical Greeks, LR exercise-tree route and product-specific finite-difference Greek stencils.",
+      "sha256": "c7a79c10318549d19eebf8711ae1d2e05ecf4c34048b85d06623e7983b3b607e"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/equity_option/pricing/inputs.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-06",
+        "VALUATIONS-EQUITY-AND-COMPOSITION-07"
+      ],
+      "reason": "Resolves pricing/lifecycle inputs, discount and dividend curves, volatility overrides/surfaces and cash-dividend escrow.",
+      "sha256": "f08d5a543301334fec2b17581787bfe18292c166abf63c250ce1f20887729e70"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/equity_option/pricing/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-10"
+      ],
+      "reason": "Native/alternative pricing adapters, lifecycle payoff values/Greeks and Heston Fourier delegation.",
+      "sha256": "30d69f46d83805e36be8860a534185266139a5e2f032a5d6ad46f7ec2d52fff7"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/equity_option/rough_bergomi_mc_pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-11"
+      ],
+      "reason": "ATM-forward variance-strip construction and serial Volterra-driven rough-Bergomi simulation adapter.",
+      "sha256": "790d203bfefd4ff6ba6a1209ab80d186dfe102690d1c97d171f1b39bbe0a62c3"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/equity_option/rough_heston_fourier_pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-11"
+      ],
+      "reason": "European rough-Heston transform adapter with lifecycle and unsupported-feature gates.",
+      "sha256": "e26bf5c5f93fefa8a1036a1245e94c4b028553052f7cf9599cb9ecb5ed679f49"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/equity_option/rough_heston_market.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-11"
+      ],
+      "reason": "Strict rough-Heston parameter scalar lookup and unit/domain requirements.",
+      "sha256": "f8dec2714d02f64338d4982b1544578c50e0d0a81e5e7d3e4b7fed647566f835"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/equity_option/rough_heston_mc_pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-11"
+      ],
+      "reason": "European rough-Heston hybrid Monte Carlo adapter, uniform grid and mean/stderr handling.",
+      "sha256": "49e4b0b8635450cc896c31bc554215fb415cd87b22e3c0640d9a84f2c0587490"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/equity_option/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-06",
+        "VALUATIONS-EQUITY-AND-COMPOSITION-07",
+        "VALUATIONS-EQUITY-AND-COMPOSITION-08"
+      ],
+      "reason": "Contract validation, lifecycle and native value/input methods for equity option exercise, expiry and settlement state; black equity pricing, discrete dividends and exercise-tree greeks; selected-model greeks, higher derivatives, dividend01 and implied volatility.",
+      "sha256": "51baadc111952c072980a8b494edf0b67b78ea5d2925d39722abebe555413117"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/equity_total_return_future/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-04"
+      ],
+      "reason": "Product metric formulas, risk delegation and calculation registration for equity total-return futures projection.",
+      "sha256": "61ace05ce49874fd574500ab639eee12721f7f67711f7b0efd8bb7a8b02d8385"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/equity_total_return_future/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-04"
+      ],
+      "reason": "Module declarations and public re-exports for equity total-return futures projection; no additional financial calculation or dispatch.",
+      "sha256": "6912ce3540c8069dce833d6cb2b9d855e97854ec6b309ca6dcbddf74a92a0527"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/equity_total_return_future/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-04"
+      ],
+      "reason": "Contract validation, lifecycle and native value/input methods for equity total-return futures projection.",
+      "sha256": "e6192362296dd12bc31ca4bb003a186c9146dd1f1c7b2101190b3f0c97516683"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/equity_trs/marginable.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-16"
+      ],
+      "reason": "Margin exposure mapping and proxy sensitivity convention for equity total-return swap projection, dividends and margin exposure.",
+      "sha256": "9cc9eae49ae09c0c2f247b27af3297ddaefb934f3d94f599abde9eea78b1c974"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/equity_trs/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-16"
+      ],
+      "reason": "Product metric formulas, risk delegation and calculation registration for equity total-return swap projection, dividends and margin exposure.",
+      "sha256": "d1842d4c3425af2d080d2f3b647c53e964baf39a87b6828b208a3a4dc73ba7f9"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/equity_trs/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-16"
+      ],
+      "reason": "Module declarations and public re-exports for equity total-return swap projection, dividends and margin exposure; no additional financial calculation or dispatch.",
+      "sha256": "659b827217f6de5ea75173c4123c618cbfb38c4fe383a8430d6fdfabf7304931"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/equity_trs/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-16"
+      ],
+      "reason": "Valuation/projection stages and method-specific branch dispatch for equity total-return swap projection, dividends and margin exposure.",
+      "sha256": "fad9b2234b92ab17210ec69fcb8eac45a008af5745a639350c74980533d3b310"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/equity_trs/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-16"
+      ],
+      "reason": "Contract validation, lifecycle and native value/input methods for equity total-return swap projection, dividends and margin exposure.",
+      "sha256": "2e2362c328df641ffbeee1681ffe78c00d8001c185250236c11b5cc18ece88a5"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/family.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-01"
+      ],
+      "reason": "Registers concrete equity pricers and metric calculators; determines the availability of Black, Heston, rough-volatility, PDE, path-GBM and DCF engines.",
+      "sha256": "87ab16f82a72d6e98492e17a3ea45cf3c5e2b310a746daf67a16b4ed324af639"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/lib.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-01",
+        "VALUATIONS-EQUITY-AND-COMPOSITION-12"
+      ],
+      "reason": "Defines the sole AtmTermGbm path-model choice and declares spot/discount/volatility/dividend market dependencies used by equity risk and pricing.",
+      "sha256": "b1ec4f20723be0a44b232311bbfb8695d172bf4e33cc52cf45e4a3a8b100478f"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/past_fixings.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-12"
+      ],
+      "reason": "Validates positive finite recorded fixings and exact-date first-match lookup for seasoned path-dependent contracts.",
+      "sha256": "8a2c48e7ac21b647da38c6db8873d2ffd9f63c3e39243dfe14654124e09f9e7f"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/pe_fund/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-19"
+      ],
+      "reason": "Product metric formulas, risk delegation and calculation registration for private-fund residual valuation, lp performance and parameter shocks.",
+      "sha256": "9af8bf62a0961df7356f0d7500d4ab99edf1bc81c33f2df0a843a6b5515b35c3"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/pe_fund/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-18"
+      ],
+      "reason": "Module declarations and public re-exports for private-fund dated hurdles, catch-up, promote and clawback; no additional financial calculation or dispatch.",
+      "sha256": "59e39aeb51065c061fc754323d2c48f8b45e8615d6d2f2ca2747b9d2ea323693"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/pe_fund/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-19"
+      ],
+      "reason": "Contract validation, lifecycle and native value/input methods for private-fund residual valuation, lp performance and parameter shocks.",
+      "sha256": "f805d03c93e222d61bdeb0ded11e9e38ff9c273cf18e7c42f36a654ac7af76c9"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/pe_fund/waterfall.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-18"
+      ],
+      "reason": "Chronological European/American LP/GP allocation, dated hurdle balances, full/partial catch-up, promote tiers, holdback and clawback replay.",
+      "sha256": "321d36b97fa6fc979b862eb5b29eebc444efad863158aa5620e00d91d0911fe9"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/piecewise_gbm.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-12"
+      ],
+      "reason": "Bootstraps interval rate/forward-variance GBM parameters and simulation configuration from ATM checkpoints, with negative-forward-variance rejection.",
+      "sha256": "87bd35fe6b16d15e34dca2553cdc127d7569efe85f12c5e105e2b19d0c0768eb"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/spot/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-02"
+      ],
+      "reason": "Product metric formulas, risk delegation and calculation registration for cash equity valuation and dividend-adjusted carry.",
+      "sha256": "c642ef7820edfc6a897eff04c4597370a8b9b5685f107ad8ac40ec2dbc1c4c44"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/spot/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-02"
+      ],
+      "reason": "Module declarations and public re-exports for cash equity valuation and dividend-adjusted carry; no additional financial calculation or dispatch.",
+      "sha256": "d6386140c6456152abb23f784b9402898fa5c95b2d7b477f158f30590bcf57d1"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/spot/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-02"
+      ],
+      "reason": "Contract validation, lifecycle and native value/input methods for cash equity valuation and dividend-adjusted carry.",
+      "sha256": "48a6aa35358646bbc02d914e2a86eb18bd84c16028854a943b470d3da4f9fbc7"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/spot_pinned.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-12"
+      ],
+      "reason": "Pins omitted contractual initial levels or same-day cliquet reset levels before spot delta/gamma/vanna scenarios.",
+      "sha256": "965796f3ae5e292417c6ab97de3d0b28e4916722edf2f969e2707509733079c2"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/variance_swap/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-15"
+      ],
+      "reason": "Product metric formulas, risk delegation and calculation registration for equity variance swap replication, seasoning and variance risk.",
+      "sha256": "5f877ae2f887c1fb85546ee3eb1cb66a6d9bb492c763a730c2cd46226d0ab100"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/variance_swap/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-15"
+      ],
+      "reason": "Module declarations and public re-exports for equity variance swap replication, seasoning and variance risk; no additional financial calculation or dispatch.",
+      "sha256": "52c62afb01eb1fb97a8461171dc709ef4fce66f6151c1c49cc1d298ab2953100"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/variance_swap/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-15"
+      ],
+      "reason": "Valuation/projection stages and method-specific branch dispatch for equity variance swap replication, seasoning and variance risk.",
+      "sha256": "0f7f535c64f15f696d1792670c5821a4d412ad314d2792465025aa123cfdc4fb"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/variance_swap/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-15"
+      ],
+      "reason": "Contract validation, lifecycle and native value/input methods for equity variance swap replication, seasoning and variance risk.",
+      "sha256": "b5e98b2ca8edc1633d283d24c21b4d3e4815b5ac4fb83f89deab8e4b5397414f"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/vol_index_future/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-05"
+      ],
+      "reason": "Product metric formulas, risk delegation and calculation registration for volatility-index futures and listed equity-option adapters.",
+      "sha256": "3c51cd3dafa9c39670770d1936281376f653128d281db736fc5694e67c5f4dc1"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/vol_index_future/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-05"
+      ],
+      "reason": "Module declarations and public re-exports for volatility-index futures and listed equity-option adapters; no additional financial calculation or dispatch.",
+      "sha256": "e24051cd371e20beb4cbe09d86cf27241a078d601ca8e3bc25368c2b9cd7efc0"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/vol_index_future/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-05"
+      ],
+      "reason": "Contract validation, lifecycle and native value/input methods for volatility-index futures and listed equity-option adapters.",
+      "sha256": "882160ee30f595c264122159c04b0ad5024c054ae3f2d7e4173c5c584e8cf262"
+    },
+    {
+      "path": "finstack-quant/valuations/equity/src/vol_index_future_option.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-05"
+      ],
+      "reason": "Instantiates the shared listed-future option contract and vol-index example conventions, including futures-style premium and delivery into a future.",
+      "sha256": "a641c3a12b75d898de2f60a12af53489bdcaa638830c40c5b494ffc50d7268f8"
+    },
+    {
+      "path": "finstack-quant/valuations/src/bin/gen_schemas.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-01"
+      ],
+      "reason": "Schema/fixture generation orchestration; enforces one canonical fixture per instrument and deterministic output, delegating all financial calculations to instrument owners.",
+      "sha256": "4305f487955e5755f746981c1bffd6a502e3e45d40409ed04466630169bdb1ce"
+    },
+    {
+      "path": "finstack-quant/valuations/src/instruments/composite/history.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-24"
+      ],
+      "reason": "Endpoint cashflow/P&L history, fixed-capital return index and close-effective rebalance financing reset.",
+      "sha256": "acca7d6a46d75a6eb45a3b46096b50c3649a9ee037aeb548358bed0f4689c362"
+    },
+    {
+      "path": "finstack-quant/valuations/src/instruments/composite/instrument.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-23",
+        "VALUATIONS-EQUITY-AND-COMPOSITION-24"
+      ],
+      "reason": "Held-quantity composite PV, additive risk filtering/cache/default propagation and primitive execution quantity deltas.",
+      "sha256": "448cc229bbcb836a878fb724a9588701fe8eaaae8b5566313d961bda49a24946"
+    },
+    {
+      "path": "finstack-quant/valuations/src/instruments/composite/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-23"
+      ],
+      "reason": "Composite module declarations, test-module wiring and re-exports for sizing/history/reporting; algorithm bodies are in the mapped sibling modules.",
+      "sha256": "c5a5b87e976f760c9a1f19277ca804a37a8e5bbf16e4798853c3bc3642b61b1a"
+    },
+    {
+      "path": "finstack-quant/valuations/src/instruments/composite/reporting.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-24"
+      ],
+      "reason": "Nested quantity/default flattening, definition conflict checks and net/gross primitive exposure aggregation.",
+      "sha256": "1c5b261f808aa1440834a8c05a66596bb1a7e7df2512c9fb4cee64b3f8ad41ed"
+    },
+    {
+      "path": "finstack-quant/valuations/src/instruments/composite/spec.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-23"
+      ],
+      "reason": "Validates composite trees and computes fixed, notional, metric, volatility or expression quantities at initialization/rebalance.",
+      "sha256": "aef8c7b84b7be616bfd953a76e335708320ce25970273fc91b62b5d288840835"
+    },
+    {
+      "path": "finstack-quant/valuations/src/instruments/composite/spec_support.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-23",
+        "VALUATIONS-EQUITY-AND-COMPOSITION-24"
+      ],
+      "reason": "Rebalance cadence, score normalization, FX conversion and dated unit-total-P&L volatility inputs.",
+      "sha256": "56eab46326131431a47ff5ae5e929ebe4a9cdf4a52d86bf0ea9b2ee25784a483"
+    },
+    {
+      "path": "finstack-quant/valuations/src/instruments/composite/tests.rs",
+      "classification": "test",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-23",
+        "VALUATIONS-EQUITY-AND-COMPOSITION-24"
+      ],
+      "reason": "Dedicated composite behavioral tests: sizing formulas, nested exposure accounting, FX, execution identity and override/state invariants.",
+      "sha256": "c8511ef5799dcb98fa41ca40392105a9560c6998957368193327733ae030a568"
+    },
+    {
+      "path": "finstack-quant/valuations/src/instruments/equity/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-01"
+      ],
+      "reason": "Re-exports the equity family and mounts property instruments without an additional financial formula.",
+      "sha256": "fc888226180b75b2b0ee19ce8272546669e4b5c46c831cb4f7b018a0bbff9901"
+    },
+    {
+      "path": "finstack-quant/valuations/src/instruments/equity/real_estate/levered.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-21"
+      ],
+      "reason": "Supported financing union, property/financing invariant checks and levered-equity cashflow delegation.",
+      "sha256": "18ea9c021609e169a3e750fb2d1108b732091ac78c675a47c74b62b1a2af7e3b"
+    },
+    {
+      "path": "finstack-quant/valuations/src/instruments/equity/real_estate/levered_pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-21"
+      ],
+      "reason": "Property-minus-debt PV, equity cashflows and pre-exit outstanding-principal payoff.",
+      "sha256": "a5ce40366ff68c19d95c5cc34bdeed5a23a020da43ac22231add319a1948455b"
+    },
+    {
+      "path": "finstack-quant/valuations/src/instruments/equity/real_estate/metrics/cap_rates.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-20"
+      ],
+      "reason": "Going-in NOI/price cap rate and supplied terminal cap-rate reporting.",
+      "sha256": "6cad1a26432fb94aec554859b795e3dead27b6b1c2ba19d87783eeb59a20c8ed"
+    },
+    {
+      "path": "finstack-quant/valuations/src/instruments/equity/real_estate/metrics/levered.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-21"
+      ],
+      "reason": "Levered IRR/multiple, market-value/origination LTV, interval DSCR and exit payoff metrics.",
+      "sha256": "7b2325810f1946331a07824fe77a0f96bd59cccee2e5ca7343e7d31311c7e8a8"
+    },
+    {
+      "path": "finstack-quant/valuations/src/instruments/equity/real_estate/metrics/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-20",
+        "VALUATIONS-EQUITY-AND-COMPOSITION-21"
+      ],
+      "reason": "Property/levered-property metric selection, scalar discount-component bump adapters and net-flow MOIC.",
+      "sha256": "d09d60aa2e4599ca3851dd275a721b784e8e95af8fcd8ab126671ee8d6d86562"
+    },
+    {
+      "path": "finstack-quant/valuations/src/instruments/equity/real_estate/metrics/returns.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-20"
+      ],
+      "reason": "Unlevered purchase/operations/sale cashflow series, XIRR, MOIC and first-period cash-on-cash.",
+      "sha256": "3fe320924492f633779419bfd01022e99c675e0af10e09633d7a3cebab447738"
+    },
+    {
+      "path": "finstack-quant/valuations/src/instruments/equity/real_estate/metrics/sensitivities.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-20",
+        "VALUATIONS-EQUITY-AND-COMPOSITION-21"
+      ],
+      "reason": "Central cap-rate shocks, method-specific applicability gates and currency-per-bp normalization.",
+      "sha256": "8d5a59ca150a8656dc56a9d9c51245963e31613e6162fa23496c35a40a050f92"
+    },
+    {
+      "path": "finstack-quant/valuations/src/instruments/equity/real_estate/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-20"
+      ],
+      "reason": "Property/levered-property module declarations and public type re-exports only.",
+      "sha256": "fcfabd7c084cc670c32db9f008ff220bf64b4616e4e3ca4ab34fe940fc78c2c1"
+    },
+    {
+      "path": "finstack-quant/valuations/src/instruments/equity/real_estate/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-20"
+      ],
+      "reason": "Appraisal precedence, scalar DCF/direct capitalization, flow truncation, transaction costs and terminal-sale formula.",
+      "sha256": "4e7cc3e726b7784d8a630ea42b57516297f64a9d128bcc5b2740793c73fefe44"
+    },
+    {
+      "path": "finstack-quant/valuations/src/instruments/equity/real_estate/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-20"
+      ],
+      "reason": "Property cashflow/rate/cost domains, method requirements and projected cashflow export.",
+      "sha256": "196437609ac498341cf43ba1c3dea375cc3c1a054222a0f7846f3e3f6a78524c"
+    },
+    {
+      "path": "finstack-quant/valuations/src/instruments/exotics/basket/metrics/constituent_delta.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-22"
+      ],
+      "reason": "One-percent constituent quote-value P&L, synthetic embedded-instrument mark substitution and shared price-ID shocks.",
+      "sha256": "61597976ab968d57a5ddbfd623d74e7cf2879c134623d73c8a10ef9392fe8e4b"
+    },
+    {
+      "path": "finstack-quant/valuations/src/instruments/exotics/basket/metrics/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-22"
+      ],
+      "reason": "Basket metric registration and reported constituent-count/expense fields.",
+      "sha256": "66888a058f98bfdc07ae9d588267078cafdc62cad88ae8a5a90d3fbe88f81b75"
+    },
+    {
+      "path": "finstack-quant/valuations/src/instruments/exotics/basket/metrics/weight_risk.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-22"
+      ],
+      "reason": "One-bp financed weight reallocation preserving the original net budget and rejecting unit holdings.",
+      "sha256": "7c1b54f5580609b9619298f801a84320cd6a73cee9b7e017e8159de6878942e3"
+    },
+    {
+      "path": "finstack-quant/valuations/src/instruments/exotics/basket/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-22"
+      ],
+      "reason": "Basket module declarations and type re-exports only.",
+      "sha256": "ca128d61549e976ee367bbe28bf7783713cca4b080d86a6824101ba84bf27e15"
+    },
+    {
+      "path": "finstack-quant/valuations/src/instruments/exotics/basket/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-22"
+      ],
+      "reason": "Constituent value/price lookup, FX conversion, units-versus-weights NAV and one-day expense drag.",
+      "sha256": "08f311b593468b9fecf9b1eddb15039d43743e4bb4507dbd110c5d3dc5c0e068"
+    },
+    {
+      "path": "finstack-quant/valuations/src/instruments/exotics/basket/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-22"
+      ],
+      "reason": "Basket scaling, signed weight/unit domain, FX/day-basis defaults, market dependencies and placeholder cashflow contract.",
+      "sha256": "a04925e97c158333e8e8a2ce5fc3233bcc9c2e9a770a26f98e33f72e40158186"
+    },
+    {
+      "path": "finstack-quant/valuations/src/instruments/exotics/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-01"
+      ],
+      "reason": "Re-exports exotics-family instruments and mounts the umbrella basket module.",
+      "sha256": "ad6553868559cee1e531fac42aac04ed323f3c77e5c78a09de232f739531c9a3"
+    },
+    {
+      "path": "finstack-quant/valuations/src/instruments/fixed_income/bond_json.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-01"
+      ],
+      "reason": "Builds bonds from validated JSON cashflow schedules with explicit curve, currency and clean-price conventions.",
+      "sha256": "5141cc4a4088d15ea3299e3025a550b16f0f829f0bd1f6ef938e5de56d4ad8ef"
+    },
+    {
+      "path": "finstack-quant/valuations/src/instruments/fixed_income/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-01"
+      ],
+      "reason": "Re-exports fixed-income and structured-credit families and the bond JSON adapter; no additional financial calculation.",
+      "sha256": "86d14cb3b97f812494f21a2f585f2c2c2500f5854214be702925df1870066bc6"
+    },
+    {
+      "path": "finstack-quant/valuations/src/instruments/json_loader.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-01"
+      ],
+      "reason": "Closed tagged instrument registry, validated envelope/spec loading, strict type lookup and instrument conversion.",
+      "sha256": "8faed5549cae0f4582687ec445db1ba5642f3218294e5ffd81aefd09dbd0314e"
+    },
+    {
+      "path": "finstack-quant/valuations/src/instruments/mod.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-01"
+      ],
+      "reason": "Umbrella domain assembly/re-exports and JSON/composite module wiring.",
+      "sha256": "0719ad98b66571d0de5fdc90d2d4423495bf9812463a31cd2a77927cfc4229fa"
+    },
+    {
+      "path": "finstack-quant/valuations/src/lib.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-01"
+      ],
+      "reason": "Crate-level safety/lint policy, framework re-exports and public module assembly; no financial calculation.",
+      "sha256": "e841d28f2822cfb7795cff4cec24aedb940f63301d41f0df8d447aeb37b07b03"
+    },
+    {
+      "path": "finstack-quant/valuations/src/pricer/json.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-01"
+      ],
+      "reason": "Typed JSON pricing/model selection, metric-override merging, metadata units and validation/error routing.",
+      "sha256": "d9cb005b4d8528807f2c283d629a30df7729ba25c15f9379c1bcd8a087e8b8a3"
+    },
+    {
+      "path": "finstack-quant/valuations/src/pricer/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-01"
+      ],
+      "reason": "Builds the merged STANDARD family and registers native umbrella basket/composite/property behavior alongside family pricers.",
+      "sha256": "bccc17d5f187db3f8a7676da021af00277a100736c7e530069511bb4d65a452f"
+    },
+    {
+      "path": "finstack-quant/valuations/src/schema/examples.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-01"
+      ],
+      "reason": "Schema examples and demonstration inputs/results, including delegated calculation examples; not independent financial implementations or accuracy benchmarks.",
+      "sha256": "dd3e18f9c148a1849c8d6e4782af12111f6127c72756de0c4f25b7596be6d94e"
+    },
+    {
+      "path": "finstack-quant/valuations/src/schema.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-EQUITY-AND-COMPOSITION-01"
+      ],
+      "reason": "Schema registry/artifact generation, cached compiled schema validators and schema examples; shape validation is separate from runtime pricing invariants.",
+      "sha256": "c321e5499b847dd82bf6f2822204389f0027a1073a71c321849b42a42dcf0001"
+    }
+  ]
+}

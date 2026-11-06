@@ -1,0 +1,253 @@
+{
+  "scope": "features",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "FEATURES-001",
+      "title": "Panel ordering, timestamp keys and partition membership",
+      "path": "01-ordering-keys-and-partitions.md"
+    },
+    {
+      "id": "FEATURES-002",
+      "title": "Operation selection, strict parameters, missing values and failure policies",
+      "path": "02-parameters-missing-and-failure.md"
+    },
+    {
+      "id": "FEATURES-003",
+      "title": "Sequential panel pipelines and typed/JSON result contracts",
+      "path": "03-pipeline-and-wire-contract.md"
+    },
+    {
+      "id": "FEATURES-004",
+      "title": "Shared scaled statistics and Type-7 interpolation",
+      "path": "04-scaled-statistics-and-quantiles.md"
+    },
+    {
+      "id": "FEATURES-005",
+      "title": "Finite-observation returns, log returns, differences and lags",
+      "path": "05-finite-observation-returns-and-lags.md"
+    },
+    {
+      "id": "FEATURES-006",
+      "title": "Trailing-row aggregates and current-value sample z-scores",
+      "path": "06-rolling-aggregates.md"
+    },
+    {
+      "id": "FEATURES-007",
+      "title": "Rolling ranks, Type-7 quantiles and quantile winsorization",
+      "path": "07-rolling-order-statistics.md"
+    },
+    {
+      "id": "FEATURES-008",
+      "title": "Finite-sample rolling skewness and excess kurtosis",
+      "path": "08-rolling-shape-moments.md"
+    },
+    {
+      "id": "FEATURES-009",
+      "title": "Rolling linear trend against row positions",
+      "path": "09-rolling-row-trend.md"
+    },
+    {
+      "id": "FEATURES-010",
+      "title": "Unannualized rolling period Sharpe feature",
+      "path": "10-rolling-period-sharpe.md"
+    },
+    {
+      "id": "FEATURES-011",
+      "title": "Running-peak drawdown on positive levels",
+      "path": "11-positive-level-drawdown.md"
+    },
+    {
+      "id": "FEATURES-012",
+      "title": "Current-row exponential-decay weight in a trailing row window",
+      "path": "12-exponential-current-row-weight.md"
+    },
+    {
+      "id": "FEATURES-013",
+      "title": "Pandas-span EWMA mean, biased centered volatility and scores",
+      "path": "13-ewma-mean-volatility-and-scores.md"
+    },
+    {
+      "id": "FEATURES-014",
+      "title": "Cross-sectional centering, population and robust standardization",
+      "path": "14-cross-sectional-standardization.md"
+    },
+    {
+      "id": "FEATURES-015",
+      "title": "Cross-sectional tie ranks, quantile buckets and normal scores",
+      "path": "15-cross-sectional-ranks-and-normal-scores.md"
+    },
+    {
+      "id": "FEATURES-016",
+      "title": "Absolute, sigma and Type-7 cross-sectional clipping",
+      "path": "16-cross-sectional-clipping.md"
+    },
+    {
+      "id": "FEATURES-017",
+      "title": "Centered unit-gross, rank and inverse-risk signal weights",
+      "path": "17-signal-to-weights.md"
+    },
+    {
+      "id": "FEATURES-018",
+      "title": "Sign-preserving capped neutral weights by proportional redistribution",
+      "path": "18-capped-neutral-weights.md"
+    },
+    {
+      "id": "FEATURES-019",
+      "title": "Complete-pair rolling covariance, correlation and beta",
+      "path": "19-pairwise-rolling-statistics.md"
+    },
+    {
+      "id": "FEATURES-020",
+      "title": "Scaled full-rank SVD neutralization and standardized residuals",
+      "path": "20-scaled-svd-neutralization.md"
+    },
+    {
+      "id": "FEATURES-021",
+      "title": "Inclusive rolling OLS current-row residuals",
+      "path": "21-rolling-regression-residuals.md"
+    },
+    {
+      "id": "FEATURES-022",
+      "title": "Inclusive trailing median and MAD Hampel replacement",
+      "path": "22-hampel-filter.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/features/src/bin/gen_schemas.rs",
+      "classification": "support",
+      "records": [
+        "FEATURES-003"
+      ],
+      "reason": "CLI delegates checked-in schema emission to the core schema generator; no runtime financial algorithm.",
+      "sha256": "03efec386607a31313a5af1960746212a66c682bfffd1d57bd1c295c6402ad9d"
+    },
+    {
+      "path": "finstack-quant/features/src/cross_sectional.rs",
+      "classification": "algorithm",
+      "records": [
+        "FEATURES-002",
+        "FEATURES-004",
+        "FEATURES-014",
+        "FEATURES-015",
+        "FEATURES-016",
+        "FEATURES-017",
+        "FEATURES-018"
+      ],
+      "reason": "Strict selector/parameter resolution and finite partition normalization, rankings, quantiles, clipping, masks and capped/uncapped allocation.",
+      "sha256": "0e8b60138b19b237c8cd07145daecec7a7d5d800dc5dcf853456cc214873facd"
+    },
+    {
+      "path": "finstack-quant/features/src/index.rs",
+      "classification": "algorithm",
+      "records": [
+        "FEATURES-001"
+      ],
+      "reason": "Deterministic entity/order/input-index ordering, inclusive trailing-row membership and exact key/tuple partitions determine sample populations.",
+      "sha256": "d6136859ef5dc6abd4e502610a39b99e8e32cec723611d4f6db856aa7ff074f9"
+    },
+    {
+      "path": "finstack-quant/features/src/keys.rs",
+      "classification": "algorithm",
+      "records": [
+        "FEATURES-001"
+      ],
+      "reason": "Timestamp wall-time and UTC formatting determines lexical temporal ordering, including precision and year-domain limitations.",
+      "sha256": "cfbcaca5125cfad48f6f5857bc025c4647b083b3f35fc713889ea4419daae348"
+    },
+    {
+      "path": "finstack-quant/features/src/lib.rs",
+      "classification": "support",
+      "records": [
+        "FEATURES-001",
+        "FEATURES-002",
+        "FEATURES-003"
+      ],
+      "reason": "Crate conventions, module wiring/re-exports and doctest inclusion; no additional runtime estimator.",
+      "sha256": "5e8dd8a07eaeb2b5f7cd16d066e8585fde8979d3e98579a5a8cf62dcc75165a3"
+    },
+    {
+      "path": "finstack-quant/features/src/multi.rs",
+      "classification": "algorithm",
+      "records": [
+        "FEATURES-001",
+        "FEATURES-002",
+        "FEATURES-017",
+        "FEATURES-018",
+        "FEATURES-019",
+        "FEATURES-020",
+        "FEATURES-021"
+      ],
+      "reason": "Tuple grouping; complete-pair rolling statistics; centered/scaled SVD residuals, rank/no-fit policies and inverse-risk/rank/residual compositions.",
+      "sha256": "f296e9eb9e3400acb01bd80637986a6f41bb3270f567d861e02931ad1a0616c3"
+    },
+    {
+      "path": "finstack-quant/features/src/panel.rs",
+      "classification": "algorithm",
+      "records": [
+        "FEATURES-002",
+        "FEATURES-003"
+      ],
+      "reason": "Sequential input routing, name/dependency checks, operation family dispatch and typed/JSON construction/result invariants.",
+      "sha256": "b3579888cb46ac646724307d9ad78c2b39482a24bc8607794c111d7daee5cd41"
+    },
+    {
+      "path": "finstack-quant/features/src/schema.rs",
+      "classification": "support",
+      "records": [
+        "FEATURES-003"
+      ],
+      "reason": "Five schema registry entries and schema rendering test describe wire shapes; do not enforce numerical semantics.",
+      "sha256": "d49bd1eb79a127fee732525a314992d99faf2f7270bf9a4e733ec1cecd9b6271"
+    },
+    {
+      "path": "finstack-quant/features/src/timeseries.rs",
+      "classification": "algorithm",
+      "records": [
+        "FEATURES-002",
+        "FEATURES-004",
+        "FEATURES-005",
+        "FEATURES-006",
+        "FEATURES-007",
+        "FEATURES-008",
+        "FEATURES-009",
+        "FEATURES-010",
+        "FEATURES-011",
+        "FEATURES-012",
+        "FEATURES-013",
+        "FEATURES-022"
+      ],
+      "reason": "Time-series enum and strict parameter/default preparation, finite-observation lags, inclusive rolling dispatch/counts and shared EWMA state recursion.",
+      "sha256": "364faf53624d074045eb4a197ebed2453e842bbdcbe7065aa289cecde9571c1f"
+    },
+    {
+      "path": "finstack-quant/features/src/timeseries/advanced.rs",
+      "classification": "algorithm",
+      "records": [
+        "FEATURES-007",
+        "FEATURES-008",
+        "FEATURES-009",
+        "FEATURES-010",
+        "FEATURES-011",
+        "FEATURES-012",
+        "FEATURES-022"
+      ],
+      "reason": "Running-peak drawdown, finite-age exponential normalization, ranks, G1/G2 moments, row-position OLS slope, period Sharpe and MAD Hampel replacement.",
+      "sha256": "53ae94b3065e057ebde27fa34559d0182399591c5ca580ba2f9f9fb1cab0b522"
+    },
+    {
+      "path": "finstack-quant/features/src/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "FEATURES-002",
+        "FEATURES-004",
+        "FEATURES-014",
+        "FEATURES-022"
+      ],
+      "reason": "Missing/nonfinite/signed-zero policy, strict scalar/window/shape/output checks, scaled compensated moments, Type-7 quantiles and normal-consistency constants.",
+      "sha256": "d2b8a9e0f65718e94607782123a100e3d20f73f199931d510c56ef4777d37013"
+    }
+  ]
+}

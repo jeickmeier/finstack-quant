@@ -56,5 +56,5 @@ changes and validation evidence. This ADR defines the authorization boundary;
 it does not imply that a machine-verifiable authorization mechanism exists.
 
 Related: [development compatibility](0004-development-compatibility.md),
-[financial defaults](../financial/0008-financial-defaults-and-cagr.md),
+[financial defaults](../financial/conventions/0008-financial-defaults-and-cagr.md),
 [independent contract protection](0016-independent-contract-protection.md).

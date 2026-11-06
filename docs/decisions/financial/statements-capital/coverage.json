@@ -1,0 +1,256 @@
+{
+  "scope": "statements-capital",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "STATEMENTS-CAPITAL-001",
+      "title": "Instrument construction and supported capital-structure domains",
+      "path": "01-instrument-construction.md"
+    },
+    {
+      "id": "STATEMENTS-CAPITAL-002",
+      "title": "Debt and hedge cashflow classification and period boundaries",
+      "path": "02-cashflow-classification.md"
+    },
+    {
+      "id": "STATEMENTS-CAPITAL-003",
+      "title": "Funding face, residual scaling and closing debt/accrual",
+      "path": "03-funding-and-balances.md"
+    },
+    {
+      "id": "STATEMENTS-CAPITAL-004",
+      "title": "Dated principal claims, settlement arrears and advance reserves",
+      "path": "04-dated-principal.md"
+    },
+    {
+      "id": "STATEMENTS-CAPITAL-005",
+      "title": "Residual coupon rebuilding after dated balance changes",
+      "path": "05-residual-coupons.md"
+    },
+    {
+      "id": "STATEMENTS-CAPITAL-006",
+      "title": "Priority cash allocation, seniority and conservation controls",
+      "path": "06-priority-allocation.md"
+    },
+    {
+      "id": "STATEMENTS-CAPITAL-007",
+      "title": "Independent prepayment buckets and excess-cash-flow sweep",
+      "path": "07-prepayments-and-ecf.md"
+    },
+    {
+      "id": "STATEMENTS-CAPITAL-008",
+      "title": "PIK toggles, hysteresis, carried claims and period state",
+      "path": "08-pik-and-carry-state.md"
+    },
+    {
+      "id": "STATEMENTS-CAPITAL-009",
+      "title": "Cashflow reporting, accumulation and FX boundary",
+      "path": "09-reporting-and-fx.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/statements/src/capital_structure/builder.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CAPITAL-001",
+        "STATEMENTS-CAPITAL-009"
+      ],
+      "reason": "Financially material construction defaults, typed append behavior and reporting/waterfall setters.",
+      "sha256": "6a39297bad6f1d67fc6e3d212fd8015134e1e39fae010ff56ad9861dc3817b30"
+    },
+    {
+      "path": "finstack-quant/statements/src/capital_structure/cashflows.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CAPITAL-009"
+      ],
+      "reason": "Gross/net component arithmetic, currency checks, optional aggregation, lookup/merge/order and table semantics.",
+      "sha256": "d02e9eb89e13d24eb51f4174cea6c65f50c6cbf5021884a3e1a22de7c3427715"
+    },
+    {
+      "path": "finstack-quant/statements/src/capital_structure/integration.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CAPITAL-001",
+        "STATEMENTS-CAPITAL-009"
+      ],
+      "reason": "Canonical instrument conversion and dated/policy-selected reporting FX conversion.",
+      "sha256": "3d61e102355c6dc86eac1aa1ce778f521fc650e4c98cab0d3a3560eddf6664d1"
+    },
+    {
+      "path": "finstack-quant/statements/src/capital_structure/mod.rs",
+      "classification": "support",
+      "records": [
+        "STATEMENTS-CAPITAL-001",
+        "STATEMENTS-CAPITAL-009"
+      ],
+      "reason": "Curated module/reexport facade and documented period-end integration contract; no runtime calculation.",
+      "sha256": "f48e8f486823744b355f34208b6db3b9215bb64ec53188605c508164c3118688"
+    },
+    {
+      "path": "finstack-quant/statements/src/capital_structure/period_flows.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CAPITAL-001",
+        "STATEMENTS-CAPITAL-002",
+        "STATEMENTS-CAPITAL-003",
+        "STATEMENTS-CAPITAL-004"
+      ],
+      "reason": "Instrument-kind and schedule dispatch, signed cash classification, funding face, scaling, period balances/accrual and dated claim extraction.",
+      "sha256": "34780cd2c9287e2feed5472857c80ccd0afd2002a0396ed3ed792b0976bd37a9"
+    },
+    {
+      "path": "finstack-quant/statements/src/capital_structure/principal.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CAPITAL-004"
+      ],
+      "reason": "Economic/settlement principal capacity, dated arrears/advance reserves, payment caps and aggregate fallback.",
+      "sha256": "f5264bdd6dc964def23bf874a616cfaf23e2338c896cc2358cd00c249cb74f4b"
+    },
+    {
+      "path": "finstack-quant/statements/src/capital_structure/residual_schedule.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CAPITAL-005"
+      ],
+      "reason": "Dated residual coupon segmentation/rate inference, PIK principal propagation and reserved repayment caps.",
+      "sha256": "ded66ea65a766f12d34317841c0ebb19654cd3c3580959a035754405d1384818"
+    },
+    {
+      "path": "finstack-quant/statements/src/capital_structure/state.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CAPITAL-003",
+        "STATEMENTS-CAPITAL-004",
+        "STATEMENTS-CAPITAL-005",
+        "STATEMENTS-CAPITAL-008"
+      ],
+      "reason": "Stateful funding/balance defaults, principal staging, residual rebuilding and period advancement.",
+      "sha256": "72c205b85a96be942a3f98ba8601d017aa3a2620756b91f758246a027fd6da02"
+    },
+    {
+      "path": "finstack-quant/statements/src/capital_structure/tests/finance_residual_regressions.rs",
+      "classification": "test",
+      "records": [
+        "STATEMENTS-CAPITAL-004",
+        "STATEMENTS-CAPITAL-005",
+        "STATEMENTS-CAPITAL-008"
+      ],
+      "reason": "Dedicated residual date, split-coupon, advance and PIK regression fixtures.",
+      "sha256": "7c00594fd5635f364740f5e4951600e0c35bc7cc9f8997aa5bdf6c0bb78a265a"
+    },
+    {
+      "path": "finstack-quant/statements/src/capital_structure/tests/finance_waterfall_regressions.rs",
+      "classification": "test",
+      "records": [
+        "STATEMENTS-CAPITAL-004",
+        "STATEMENTS-CAPITAL-006",
+        "STATEMENTS-CAPITAL-007",
+        "STATEMENTS-CAPITAL-008"
+      ],
+      "reason": "Dedicated priority, ECF, arrears, economic/settlement and PIK regression fixtures.",
+      "sha256": "72819030da113bfb6d92c14ac675df828c08441d659781fb116ed5dbbf5ccbe1"
+    },
+    {
+      "path": "finstack-quant/statements/src/capital_structure/tests/mod.rs",
+      "classification": "test",
+      "records": [
+        "STATEMENTS-CAPITAL-001",
+        "STATEMENTS-CAPITAL-002",
+        "STATEMENTS-CAPITAL-003",
+        "STATEMENTS-CAPITAL-009"
+      ],
+      "reason": "Dedicated test module, fixtures and construction/reporting/integration evidence.",
+      "sha256": "e2eac3d32aaeda7cdc935fd93a1d2e9da185c465baf8a7166f2a9bfc62d3ead4"
+    },
+    {
+      "path": "finstack-quant/statements/src/capital_structure/tests/senior_review_capital.rs",
+      "classification": "test",
+      "records": [
+        "STATEMENTS-CAPITAL-001",
+        "STATEMENTS-CAPITAL-002",
+        "STATEMENTS-CAPITAL-003",
+        "STATEMENTS-CAPITAL-007",
+        "STATEMENTS-CAPITAL-008"
+      ],
+      "reason": "Dedicated declared-kind, placeholder, PIK-domain, issuance/OID and prepayment regression fixtures.",
+      "sha256": "bffad525b91991a300906c4269a00da794f0d793c7c93368748ec20557578b55"
+    },
+    {
+      "path": "finstack-quant/statements/src/capital_structure/tests/waterfall_integration.rs",
+      "classification": "test",
+      "records": [
+        "STATEMENTS-CAPITAL-003",
+        "STATEMENTS-CAPITAL-006",
+        "STATEMENTS-CAPITAL-007",
+        "STATEMENTS-CAPITAL-008",
+        "STATEMENTS-CAPITAL-009"
+      ],
+      "reason": "Dedicated model/waterfall integration fixtures and expected reporting behavior.",
+      "sha256": "1c26e3269e57c3afef5e9e743b543bff3909c91c4a6144d73ade7d5194e439b1"
+    },
+    {
+      "path": "finstack-quant/statements/src/capital_structure/waterfall/cash_distribution.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CAPITAL-006",
+        "STATEMENTS-CAPITAL-007"
+      ],
+      "reason": "Class-ranked pro-rata allocation, claim neutralization, shared cash caps and principal prepayment allocation.",
+      "sha256": "ffb1b0d61de0c0a51a9f5153dccfec416279321d96c60645f309e6040353009d"
+    },
+    {
+      "path": "finstack-quant/statements/src/capital_structure/waterfall/excess_cash_flow.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CAPITAL-007"
+      ],
+      "reason": "ECF deductions based on earlier cash paid, optional-input defaults and sweep sizing.",
+      "sha256": "3f2ffd41c7c060deabe370c9afe6b3a37ea7332282745268facce89c7873937e"
+    },
+    {
+      "path": "finstack-quant/statements/src/capital_structure/waterfall/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CAPITAL-004",
+        "STATEMENTS-CAPITAL-006",
+        "STATEMENTS-CAPITAL-007",
+        "STATEMENTS-CAPITAL-008"
+      ],
+      "reason": "Transactional orchestrator, finite expression evaluation, priority order, carry/PIK staging, close and residual equity.",
+      "sha256": "c4821f64f00943cd6a9a613111d614f8c52adf8396ba49eeb2a75d3fc7d33759"
+    },
+    {
+      "path": "finstack-quant/statements/src/capital_structure/waterfall/payment_in_kind.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CAPITAL-008"
+      ],
+      "reason": "Threshold selection, explicit target scoping and minimum-period PIK hysteresis.",
+      "sha256": "a05340d3123ec838509471d986371f0db533a0cdb9ec81424275a2fa544b75ea"
+    },
+    {
+      "path": "finstack-quant/statements/src/capital_structure/waterfall/payment_stack.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CAPITAL-006"
+      ],
+      "reason": "Financially material single-currency and internal field-currency validation before allocation.",
+      "sha256": "4aa50b4a032714ba84d4c4e0b3c19e280cf5df580f8be2d704e03028a7d77a26"
+    },
+    {
+      "path": "finstack-quant/statements/src/capital_structure/waterfall_spec.rs",
+      "classification": "algorithm",
+      "records": [
+        "STATEMENTS-CAPITAL-006",
+        "STATEMENTS-CAPITAL-007",
+        "STATEMENTS-CAPITAL-008"
+      ],
+      "reason": "Default priority stack and cash node, prepayment/classes/ECF/PIK validation and debt-service expression guard.",
+      "sha256": "6fd4f247aa44445d6b583d4b3420514f264d92d62a6e71be8e6d845e947c4d17"
+    }
+  ]
+}

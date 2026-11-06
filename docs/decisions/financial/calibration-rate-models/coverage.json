@@ -1,0 +1,176 @@
+{
+  "scope": "calibration-rate-models",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "CALIBRATION-RATE-MODELS-001",
+      "title": "Direct curve adapters, quote domains and calibration entry selection",
+      "path": "01-curve-entry-and-quote-domains.md"
+    },
+    {
+      "id": "CALIBRATION-RATE-MODELS-002",
+      "title": "Scheduled cap/floor market prices, HW repricing and implied-normal inversion",
+      "path": "02-cap-schedules-and-quote-inversion.md"
+    },
+    {
+      "id": "CALIBRATION-RATE-MODELS-003",
+      "title": "ATM swaption schedules, market targets and exact quote reconstruction",
+      "path": "03-atm-swaption-quotes.md"
+    },
+    {
+      "id": "CALIBRATION-RATE-MODELS-004",
+      "title": "Synthetic swaption Jamshidian decomposition and safeguarded exercise root",
+      "path": "04-jamshidian-decomposition.md"
+    },
+    {
+      "id": "CALIBRATION-RATE-MODELS-005",
+      "title": "Contractual swaption payoff under the Gaussian exercise-date measure",
+      "path": "05-contractual-gaussian-integration.md"
+    },
+    {
+      "id": "CALIBRATION-RATE-MODELS-006",
+      "title": "Bounded two-parameter HW fitting, multistart seeds and quote-fit acceptance",
+      "path": "06-two-parameter-fit.md"
+    },
+    {
+      "id": "CALIBRATION-RATE-MODELS-007",
+      "title": "Fixed-\u03ba cap/floor price least squares by segmented golden-section search",
+      "path": "07-fixed-kappa-cap-fit.md"
+    },
+    {
+      "id": "CALIBRATION-RATE-MODELS-008",
+      "title": "Sequential cap/floor bootstrap on live-fixing volatility intervals",
+      "path": "08-piecewise-sigma-bootstrap.md"
+    },
+    {
+      "id": "CALIBRATION-RATE-MODELS-009",
+      "title": "LMM loading scale from frozen basket weights and displaced ATM premium inversion",
+      "path": "09-lmm-rebonato-calibration.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/calibration/src/hull_white/cap_floor.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-RATE-MODELS-002",
+        "CALIBRATION-RATE-MODELS-006",
+        "CALIBRATION-RATE-MODELS-007",
+        "CALIBRATION-RATE-MODELS-008"
+      ],
+      "reason": "Scalar cap branch selection, quote validation, SSE/golden search, report diagnostics and sequential last-fixing sigma bootstrap.",
+      "sha256": "e14686323369e996e01eaadda5d2c0f17af5dc524204630b72ac9aa735526f98"
+    },
+    {
+      "path": "finstack-quant/calibration/src/hull_white/cap_schedule.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-RATE-MODELS-002"
+      ],
+      "reason": "Synthetic coupon generation, schedule alignment and financially material fixing/accrual/payment validation.",
+      "sha256": "1beb775a8e7ab4b49ce645ad0dd54df85dff1a0777cb32415dea4cb814ebdd10"
+    },
+    {
+      "path": "finstack-quant/calibration/src/hull_white/cap_schedule_tests.rs",
+      "classification": "test",
+      "records": [
+        "CALIBRATION-RATE-MODELS-002",
+        "CALIBRATION-RATE-MODELS-007",
+        "CALIBRATION-RATE-MODELS-008"
+      ],
+      "reason": "Dedicated schedule, accrual/payment/fixing, sorting, early-payment and production-kernel repricing tests.",
+      "sha256": "b78135418f86dea8393ca42e6289d459446169bbcfc5a336df4f44036fd3ebaf"
+    },
+    {
+      "path": "finstack-quant/calibration/src/hull_white/contractual_swaption.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-RATE-MODELS-005"
+      ],
+      "reason": "Signed Gaussian cashflow construction, delayed-coupon adjustment, deterministic branch, analytic tail bound and adaptive integration.",
+      "sha256": "400b6334da70c569a6ada34639ab9af31daba4553ae717f2868c10eb13d0c1e6"
+    },
+    {
+      "path": "finstack-quant/calibration/src/hull_white/curves.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-RATE-MODELS-001"
+      ],
+      "reason": "Direct curve normalization, model-clock adaptation, missing-projection default and synthetic schedule entry selection.",
+      "sha256": "46564ba37f1f46d20f63101c2c57f634249b9ba2dfb1f64f6be4239fede2dbde"
+    },
+    {
+      "path": "finstack-quant/calibration/src/hull_white/mod.rs",
+      "classification": "support",
+      "records": [
+        "CALIBRATION-RATE-MODELS-001"
+      ],
+      "reason": "Module declarations, imports and explicit reexports; test-only exports are gated and no numerical dispatch executes here.",
+      "sha256": "323053eab6b95acccefbcfc347d978bb0eef7f12740905603c066a0fba93d68a"
+    },
+    {
+      "path": "finstack-quant/calibration/src/hull_white/pricing.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-RATE-MODELS-002"
+      ],
+      "reason": "Bachelier cap market prices/vegas, simple forwards, scheduled HW summation, cap quote inversion and synthetic periods.",
+      "sha256": "292df4496540a81c430116c61b3d2ca824d2bb1abbf9a98a2575bf9babd038b8"
+    },
+    {
+      "path": "finstack-quant/calibration/src/hull_white/quotes.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-RATE-MODELS-001",
+        "CALIBRATION-RATE-MODELS-003"
+      ],
+      "reason": "Validated quote deserialization, ATM/Normal-only domain, schedule financial contracts and frequency/config defaults.",
+      "sha256": "e8b216016dfcdb9602b0beee6fd2387bf4ce354ac5492aa78692c1a17267d26b"
+    },
+    {
+      "path": "finstack-quant/calibration/src/hull_white/swaption.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-RATE-MODELS-003",
+        "CALIBRATION-RATE-MODELS-004",
+        "CALIBRATION-RATE-MODELS-006"
+      ],
+      "reason": "ATM market preparation, schedule validation, forward/annuity fallbacks, seeds, exact quote inversion, synthetic cashflows and safeguarded Jamshidian kernel after test-only wrapper.",
+      "sha256": "5bd0865d28b8f724f7e702758f7e707fce340076fa9a585631851a23c13243ee"
+    },
+    {
+      "path": "finstack-quant/calibration/src/hull_white/targets.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-RATE-MODELS-006"
+      ],
+      "reason": "Vega admission, log-parameter targets, price residuals, hard-coded bounds/restarts/solver config, final quote-report transformation and prepared-payoff selection.",
+      "sha256": "655ed7b493ca3c2d71f6e3bd275a4400d887145693cc4915e9d8aacd481656c4"
+    },
+    {
+      "path": "finstack-quant/calibration/src/hull_white/tests.rs",
+      "classification": "test",
+      "records": [
+        "CALIBRATION-RATE-MODELS-001",
+        "CALIBRATION-RATE-MODELS-002",
+        "CALIBRATION-RATE-MODELS-003",
+        "CALIBRATION-RATE-MODELS-004",
+        "CALIBRATION-RATE-MODELS-006",
+        "CALIBRATION-RATE-MODELS-007",
+        "CALIBRATION-RATE-MODELS-008"
+      ],
+      "reason": "Dedicated scalar/piecewise fitting, parameter/domain, quote error, formula/parity, recovery and fallback regressions.",
+      "sha256": "e1db1b56bb0d47bbae4db4152f21b6ec9015f109e525e062c460551455ad6c42"
+    },
+    {
+      "path": "finstack-quant/calibration/src/lmm.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-RATE-MODELS-009"
+      ],
+      "reason": "Rebonato basket/shape factors, displaced premium inversion, earliest-live-slice/surface selection and explicit typed/JSON calibration helpers.",
+      "sha256": "87bd1f4de50ea2c6a60cfaa0bd4347787ff7febafdd41018f13c7831b3b3292e"
+    }
+  ]
+}

@@ -1,0 +1,426 @@
+{
+  "scope": "margin-regulatory-xva",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "MARGIN-REGULATORY-XVA-001",
+      "title": "FRTB sensitivity units, factor identity, wire reconstruction and provenance",
+      "path": "01-frtb-inputs-and-wire.md"
+    },
+    {
+      "id": "MARGIN-REGULATORY-XVA-002",
+      "title": "FRTB correlation scenarios, quadratic aggregation and binding-total selection",
+      "path": "02-frtb-scenarios-and-aggregation.md"
+    },
+    {
+      "id": "MARGIN-REGULATORY-XVA-003",
+      "title": "GIRR tenor, inflation and cross-currency-basis delta aggregation",
+      "path": "03-frtb-girr-delta.md"
+    },
+    {
+      "id": "MARGIN-REGULATORY-XVA-004",
+      "title": "CSR non-sec, CTP and non-CTP delta weights and correlation structure",
+      "path": "04-frtb-credit-delta.md"
+    },
+    {
+      "id": "MARGIN-REGULATORY-XVA-005",
+      "title": "Equity spot and repo delta aggregation",
+      "path": "05-frtb-equity-delta.md"
+    },
+    {
+      "id": "MARGIN-REGULATORY-XVA-006",
+      "title": "Commodity name, tenor and delivery-location delta aggregation",
+      "path": "06-frtb-commodity-delta.md"
+    },
+    {
+      "id": "MARGIN-REGULATORY-XVA-007",
+      "title": "FX delta equicorrelation norm",
+      "path": "07-frtb-fx-delta.md"
+    },
+    {
+      "id": "MARGIN-REGULATORY-XVA-008",
+      "title": "GIRR vega on option-expiry and underlying-tenor axes",
+      "path": "08-frtb-girr-vega.md"
+    },
+    {
+      "id": "MARGIN-REGULATORY-XVA-009",
+      "title": "CSR, equity and commodity volatility-scaled vega aggregation",
+      "path": "09-frtb-bucketed-vega.md"
+    },
+    {
+      "id": "MARGIN-REGULATORY-XVA-010",
+      "title": "FX vega pair and maturity correlations",
+      "path": "10-frtb-fx-vega.md"
+    },
+    {
+      "id": "MARGIN-REGULATORY-XVA-011",
+      "title": "Loss-positive curvature, squared correlations and directional selection",
+      "path": "11-frtb-curvature.md"
+    },
+    {
+      "id": "MARGIN-REGULATORY-XVA-012",
+      "title": "Non-securitisation JTD, seniority-constrained netting and hedge benefit",
+      "path": "12-frtb-default-risk.md"
+    },
+    {
+      "id": "MARGIN-REGULATORY-XVA-013",
+      "title": "Gross-notional residual-risk add-on",
+      "path": "13-frtb-residual-risk.md"
+    },
+    {
+      "id": "MARGIN-REGULATORY-XVA-014",
+      "title": "SA-CCR trade domain, caller-supplied deltas and netting-set validation",
+      "path": "14-saccr-inputs-and-supervisory-delta.md"
+    },
+    {
+      "id": "MARGIN-REGULATORY-XVA-015",
+      "title": "SA-CCR per-trade maturity factors and supervisory duration",
+      "path": "15-saccr-maturity-and-duration.md"
+    },
+    {
+      "id": "MARGIN-REGULATORY-XVA-016",
+      "title": "SA-CCR interest-rate maturity buckets and hedging-set add-ons",
+      "path": "16-saccr-ir-addon.md"
+    },
+    {
+      "id": "MARGIN-REGULATORY-XVA-017",
+      "title": "SA-CCR credit, equity, commodity and FX effective-notional aggregation",
+      "path": "17-saccr-non-ir-addons.md"
+    },
+    {
+      "id": "MARGIN-REGULATORY-XVA-018",
+      "title": "SA-CCR collateral treatment, PFE multiplier and capped margined EAD",
+      "path": "18-saccr-rc-pfe-ead.md"
+    },
+    {
+      "id": "MARGIN-REGULATORY-XVA-019",
+      "title": "XVA exposure-domain checks, opening interval and effective-EPE diagnostics",
+      "path": "19-xva-profile-and-epe.md"
+    },
+    {
+      "id": "MARGIN-REGULATORY-XVA-020",
+      "title": "Unilateral and bilateral CVA/DVA bucket quadrature",
+      "path": "20-xva-credit-adjustments.md"
+    },
+    {
+      "id": "MARGIN-REGULATORY-XVA-021",
+      "title": "Asymmetric FVA, bilateral activation and total-XVA sign contract",
+      "path": "21-xva-funding-and-composition.md"
+    },
+    {
+      "id": "MARGIN-REGULATORY-XVA-022",
+      "title": "One-time SIMM calculation and deterministic IM decay",
+      "path": "22-simm-deterministic-im-profile.md"
+    },
+    {
+      "id": "MARGIN-REGULATORY-XVA-023",
+      "title": "MVA spread interpolation, survival weighting and average IM",
+      "path": "23-mva-spread-and-quadrature.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/margin/src/regulatory/frtb/aggregation.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-REGULATORY-XVA-002",
+        "MARGIN-REGULATORY-XVA-011"
+      ],
+      "reason": "Scenario transforms, intra/inter-bucket quadratic norms, conditional S capping, curvature sign-aware aggregation.",
+      "sha256": "ab23e1d76a7bcbd2156729f13c62bdad51d3c7fa01024a73772da922c564bc3e"
+    },
+    {
+      "path": "finstack-quant/margin/src/regulatory/frtb/curvature.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-REGULATORY-XVA-011"
+      ],
+      "reason": "All class curvature dispatch, loss-positive side selection, squared/scenario correlations, raw S and other-bucket rules.",
+      "sha256": "5b12366c0f869b6ded8a438153bd5112eb9fedb0254d28dd72c9b8d9921f86ba"
+    },
+    {
+      "path": "finstack-quant/margin/src/regulatory/frtb/delta.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-REGULATORY-XVA-003",
+        "MARGIN-REGULATORY-XVA-004",
+        "MARGIN-REGULATORY-XVA-005",
+        "MARGIN-REGULATORY-XVA-006",
+        "MARGIN-REGULATORY-XVA-007"
+      ],
+      "reason": "GIRR, three CSR variants, equity spot/repo, commodity and FX delta weighting/grouping/correlations.",
+      "sha256": "2b052e426dbd7952f7cd91f707d773f73e778b7ffbe36721e4db04d7ecea77c8"
+    },
+    {
+      "path": "finstack-quant/margin/src/regulatory/frtb/drc.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-REGULATORY-XVA-012"
+      ],
+      "reason": "JTD/LGD/PnL/maturity transformation, seniority-constrained issuer offsets, ratings and sector hedge benefit.",
+      "sha256": "4a5d2888bf412d769da66f997455604954511c1ab6b047a9a3f9e70237ab3a8f"
+    },
+    {
+      "path": "finstack-quant/margin/src/regulatory/frtb/engine.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-REGULATORY-XVA-002",
+        "MARGIN-REGULATORY-XVA-012",
+        "MARGIN-REGULATORY-XVA-013"
+      ],
+      "reason": "Input validation, risk-class/scenario selection, binding SBA total, DRC/RRAO composition and result fields.",
+      "sha256": "163311c75d79ce6fe7a4ec4a37ace147142fde5e60f62077369f1d0416016643"
+    },
+    {
+      "path": "finstack-quant/margin/src/regulatory/frtb/mod.rs",
+      "classification": "support",
+      "records": [
+        "MARGIN-REGULATORY-XVA-001"
+      ],
+      "reason": "Module exports and scope/provenance narrative; no numerical runtime body.",
+      "sha256": "157cbfbd9c2b53a3b7d27f01f453e55996659bc3f6c10ea3a65de1ce2fadabc1"
+    },
+    {
+      "path": "finstack-quant/margin/src/regulatory/frtb/params/commodity.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-REGULATORY-XVA-006",
+        "MARGIN-REGULATORY-XVA-009",
+        "MARGIN-REGULATORY-XVA-011"
+      ],
+      "reason": "Commodity bucket delta weights and intra/inter-bucket parameters used across delta, vega and curvature.",
+      "sha256": "b4edde9b9b4a593d41b41cd9376c34659396ea63b0101a72fa2d167aa3fb9513"
+    },
+    {
+      "path": "finstack-quant/margin/src/regulatory/frtb/params/correlation_scenarios.rs",
+      "classification": "support",
+      "records": [
+        "MARGIN-REGULATORY-XVA-002",
+        "MARGIN-REGULATORY-XVA-011"
+      ],
+      "reason": "Documentation-only correlation-scenario narrative, including statements discrepant from runtime.",
+      "sha256": "4074799f3db4ea65c5c61f5c7edbd9020e89ba1f01e17268b6e1fa97136a877a"
+    },
+    {
+      "path": "finstack-quant/margin/src/regulatory/frtb/params/csr.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-REGULATORY-XVA-004",
+        "MARGIN-REGULATORY-XVA-009"
+      ],
+      "reason": "Credit spread risk factor weights, issuer/basis/tenor correlations and securitisation bucket variants.",
+      "sha256": "ae4628a93c0ed35f3ed337919d23ce9f1e38edaa3d05b00fca4ca15e084331ad"
+    },
+    {
+      "path": "finstack-quant/margin/src/regulatory/frtb/params/equity.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-REGULATORY-XVA-005",
+        "MARGIN-REGULATORY-XVA-009",
+        "MARGIN-REGULATORY-XVA-011"
+      ],
+      "reason": "Equity spot/repo weights and bucket correlations, reserved buckets, vega and curvature parameter reuse.",
+      "sha256": "15e7a9f28494c7c869f17aa4758f956524c472341dc3fc922d0d4117ace689dc"
+    },
+    {
+      "path": "finstack-quant/margin/src/regulatory/frtb/params/fx.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-REGULATORY-XVA-007",
+        "MARGIN-REGULATORY-XVA-010",
+        "MARGIN-REGULATORY-XVA-011"
+      ],
+      "reason": "FX delta weight, vega weight and pair correlation reused by curvature.",
+      "sha256": "dd428e54fda1a868d7a2e3c84531be86adbff8dda83128a1aae039e3125962bc"
+    },
+    {
+      "path": "finstack-quant/margin/src/regulatory/frtb/params/girr.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-REGULATORY-XVA-003",
+        "MARGIN-REGULATORY-XVA-008"
+      ],
+      "reason": "GIRR exact tenor lookup, risk weights, tenor/currency correlations and vega weight.",
+      "sha256": "41809c34010a19265371548f899d579aea6726a6ffca66883da22a42a75c1b17"
+    },
+    {
+      "path": "finstack-quant/margin/src/regulatory/frtb/params/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-REGULATORY-XVA-001",
+        "MARGIN-REGULATORY-XVA-004",
+        "MARGIN-REGULATORY-XVA-005",
+        "MARGIN-REGULATORY-XVA-006",
+        "MARGIN-REGULATORY-XVA-009",
+        "MARGIN-REGULATORY-XVA-011"
+      ],
+      "reason": "Shared class/bucket parameter dispatch, vega liquidity-horizon constants and unknown-bucket NaN behavior.",
+      "sha256": "b6ad6cba2522c0ff721577612a36e561a191c162d3a4a8666fb0b85161b351f9"
+    },
+    {
+      "path": "finstack-quant/margin/src/regulatory/frtb/rrao.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-REGULATORY-XVA-013"
+      ],
+      "reason": "Residual-risk gross-notional fold with exotic/other flags and empty positive-zero result.",
+      "sha256": "6cd356faf76fcb3e4d60f332b4a74705dd98f24f36b20561f24220823761627a"
+    },
+    {
+      "path": "finstack-quant/margin/src/regulatory/frtb/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-REGULATORY-XVA-001",
+        "MARGIN-REGULATORY-XVA-002",
+        "MARGIN-REGULATORY-XVA-012",
+        "MARGIN-REGULATORY-XVA-013"
+      ],
+      "reason": "Mutable sensitivity accumulation, key/unit contracts, financially material validation, DRC domain and result structures.",
+      "sha256": "0ef6e03564da5b93d1c2395b274a4082639e423279fa1e14e4eb5954283a5a22"
+    },
+    {
+      "path": "finstack-quant/margin/src/regulatory/frtb/vega.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-REGULATORY-XVA-008",
+        "MARGIN-REGULATORY-XVA-009",
+        "MARGIN-REGULATORY-XVA-010"
+      ],
+      "reason": "GIRR dual-maturity, class name/expiry and FX pair/expiry vega kernels and bucket exceptions.",
+      "sha256": "98eab8435bec2b860d2d8d4e245cff83a16851d69a11b567a70958ebfe92408a"
+    },
+    {
+      "path": "finstack-quant/margin/src/regulatory/frtb/wire.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-REGULATORY-XVA-001"
+      ],
+      "reason": "Sorted factor serialization and last-duplicate-wins JSON map reconstruction versus mutator netting.",
+      "sha256": "e7ed48f9c376461de8e99703f7514e2a91461cb63d988d77e9b6c913702f2b65"
+    },
+    {
+      "path": "finstack-quant/margin/src/regulatory/mod.rs",
+      "classification": "support",
+      "records": [
+        "MARGIN-REGULATORY-XVA-001",
+        "MARGIN-REGULATORY-XVA-014",
+        "MARGIN-REGULATORY-XVA-019"
+      ],
+      "reason": "Regulatory namespace exports and integration narrative; no calculation.",
+      "sha256": "5dd2639c341455dfadf8e1557e5dba2caa22b304b9845b4ca0a1477255546dc2"
+    },
+    {
+      "path": "finstack-quant/margin/src/regulatory/sa_ccr/add_on.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-REGULATORY-XVA-015",
+        "MARGIN-REGULATORY-XVA-016",
+        "MARGIN-REGULATORY-XVA-017"
+      ],
+      "reason": "Supervisory duration, per-trade maturity selection, IR buckets, non-IR entity/group aggregation.",
+      "sha256": "dbd5db47d057f74b7ab7819e9f83d74405feee13020b58d55b63d3863b15f686"
+    },
+    {
+      "path": "finstack-quant/margin/src/regulatory/sa_ccr/engine.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-REGULATORY-XVA-014",
+        "MARGIN-REGULATORY-XVA-015",
+        "MARGIN-REGULATORY-XVA-018"
+      ],
+      "reason": "Alpha/category/config validation, EAD computation and recursive margined cap, reporting maturity statistic.",
+      "sha256": "4c9640e3bf861bc8d4eb08a5918dbf3f2587461443a12b84d7787af891aa8b29"
+    },
+    {
+      "path": "finstack-quant/margin/src/regulatory/sa_ccr/maturity_factor.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-REGULATORY-XVA-015"
+      ],
+      "reason": "Unmargined floor/cap and margined business-day MPOR square-root factors.",
+      "sha256": "3f7d48c0d92c974b04459262b5b2f79265a27f6413bf93c1690a9fd363adc12a"
+    },
+    {
+      "path": "finstack-quant/margin/src/regulatory/sa_ccr/mod.rs",
+      "classification": "support",
+      "records": [
+        "MARGIN-REGULATORY-XVA-014"
+      ],
+      "reason": "SA-CCR module exports and model description; no numerical calculation.",
+      "sha256": "f9c6e83d22805cac8291889c64ac8d0179dffd61640ee659dedf624e019002c4"
+    },
+    {
+      "path": "finstack-quant/margin/src/regulatory/sa_ccr/pfe.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-REGULATORY-XVA-017",
+        "MARGIN-REGULATORY-XVA-018"
+      ],
+      "reason": "Asset-class router and strictly-positive class summation, collateral-dependent exponential multiplier.",
+      "sha256": "944a8d6d838a71229b255edf1281fb42b44c72900dba8f9a347120aa70f7e378"
+    },
+    {
+      "path": "finstack-quant/margin/src/regulatory/sa_ccr/replacement_cost.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-REGULATORY-XVA-018"
+      ],
+      "reason": "Signed VM plus NICA, MTM sum, margined/unmargined replacement-cost maxima.",
+      "sha256": "899c7cab09276953a56ebf264151756fa4877931dfe4c68f0e6e93704076ae5d"
+    },
+    {
+      "path": "finstack-quant/margin/src/regulatory/sa_ccr/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-REGULATORY-XVA-014",
+        "MARGIN-REGULATORY-XVA-015",
+        "MARGIN-REGULATORY-XVA-017",
+        "MARGIN-REGULATORY-XVA-018"
+      ],
+      "reason": "Category factors/correlations, constructors and config/trade validation, notionals/expiry/options and result semantics.",
+      "sha256": "80ed76f57a1f6943482f3fae06e68dfc6f61bde4abd7fe5d198eed8a265673b2"
+    },
+    {
+      "path": "finstack-quant/margin/src/xva/cva.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-REGULATORY-XVA-019",
+        "MARGIN-REGULATORY-XVA-020",
+        "MARGIN-REGULATORY-XVA-021"
+      ],
+      "reason": "Exposure/grid checks, IM interpolation/horizon checks, CVA/DVA/FVA quadrature, effective EPE and bilateral orchestration.",
+      "sha256": "73098358d0f5ab3f7a757e8313e08b5f9e0cf7e6075d42f09874d067b1a50a00"
+    },
+    {
+      "path": "finstack-quant/margin/src/xva/mod.rs",
+      "classification": "support",
+      "records": [
+        "MARGIN-REGULATORY-XVA-019"
+      ],
+      "reason": "XVA namespace documentation and public reexports without calculation.",
+      "sha256": "7616230c335f0028f8675fcc7b02d309082e3723885249bbd1dac0d5b49ed368"
+    },
+    {
+      "path": "finstack-quant/margin/src/xva/mva.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-REGULATORY-XVA-022",
+        "MARGIN-REGULATORY-XVA-023"
+      ],
+      "reason": "IM profile and spread validation, deterministic SIMM decay, spread interpolation, MVA/survival quadrature and average IM.",
+      "sha256": "2370abe3e41b499b7a69771998f336dce60fe6152d0c6e46524859d1ccc8d375"
+    },
+    {
+      "path": "finstack-quant/margin/src/xva/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "MARGIN-REGULATORY-XVA-019",
+        "MARGIN-REGULATORY-XVA-021",
+        "MARGIN-REGULATORY-XVA-022"
+      ],
+      "reason": "Funding defaults/fallbacks/validation, profile domain/failure diagnostics gate, XVA sign/composition and replay result schema.",
+      "sha256": "402d00ec737784b90c39d781677c1f431ece2cf05a0a357b4b5b34ef06e5da5f"
+    }
+  ]
+}

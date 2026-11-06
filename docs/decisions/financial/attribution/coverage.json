@@ -1,0 +1,363 @@
+{
+  "scope": "attribution",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "ATTRIBUTION-001",
+      "title": "Method dispatch, endpoint valuation and execution contracts",
+      "path": "01-execution-and-endpoints.md"
+    },
+    {
+      "id": "ATTRIBUTION-002",
+      "title": "Economic factor families and exact market restoration",
+      "path": "02-market-factor-restoration.md"
+    },
+    {
+      "id": "ATTRIBUTION-003",
+      "title": "Period cash, gross carry and flat-yield partition",
+      "path": "03-total-return-carry.md"
+    },
+    {
+      "id": "ATTRIBUTION-004",
+      "title": "Ordered waterfall revaluation and interaction allocation",
+      "path": "04-ordered-waterfall.md"
+    },
+    {
+      "id": "ATTRIBUTION-005",
+      "title": "Closing-state restoration and pairwise interaction correction",
+      "path": "05-parallel-and-cross-factor.md"
+    },
+    {
+      "id": "ATTRIBUTION-006",
+      "title": "Taylor key-rate sensitivities and directional curve gamma",
+      "path": "06-taylor-curve-risk.md"
+    },
+    {
+      "id": "ATTRIBUTION-007",
+      "title": "Taylor volatility, restored families and cash theta",
+      "path": "07-taylor-volatility-and-restoration.md"
+    },
+    {
+      "id": "ATTRIBUTION-008",
+      "title": "Metric selection, horizon matching and exact market-move pairing",
+      "path": "08-metric-inputs-and-move-pairing.md"
+    },
+    {
+      "id": "ATTRIBUTION-009",
+      "title": "Metric rates and credit first- and second-order P&L",
+      "path": "09-metric-rates-and-credit.md"
+    },
+    {
+      "id": "ATTRIBUTION-010",
+      "title": "Metric spot, FX, volatility, inflation and mixed interactions",
+      "path": "10-metric-other-factors.md"
+    },
+    {
+      "id": "ATTRIBUTION-011",
+      "title": "Issuer credit hierarchy planning and spread-replay allocation",
+      "path": "11-credit-factor-hierarchy.md"
+    },
+    {
+      "id": "ATTRIBUTION-012",
+      "title": "Yield-share credit carry and hierarchy-anchor allocation",
+      "path": "12-credit-carry-partition.md"
+    },
+    {
+      "id": "ATTRIBUTION-013",
+      "title": "Currency translation, quantity scaling and residual qualification",
+      "path": "13-target-currency-and-scaling.md"
+    },
+    {
+      "id": "ATTRIBUTION-014",
+      "title": "Single-period return contribution and exposure weighting",
+      "path": "14-return-contribution-weights.md"
+    },
+    {
+      "id": "ATTRIBUTION-015",
+      "title": "Detail identities, schema encoding and table projection",
+      "path": "15-detail-and-reporting-contracts.md"
+    },
+    {
+      "id": "ATTRIBUTION-016",
+      "title": "Single-period grouped benchmark-relative attribution",
+      "path": "16-benchmark-relative-return.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/attribution/src/bin/gen_schemas.rs",
+      "classification": "support",
+      "records": [
+        "ATTRIBUTION-015"
+      ],
+      "reason": "Schema CLI delegates artifact generation to core; no financial calculation or model selection.",
+      "sha256": "738f91877ef9360e4773b9aa2edac1909dd2cd36b099e5c36b9b14912313af67"
+    },
+    {
+      "path": "finstack-quant/attribution/src/credit_cascade.rs",
+      "classification": "algorithm",
+      "records": [
+        "ATTRIBUTION-011",
+        "ATTRIBUTION-012"
+      ],
+      "reason": "Issuer eligibility, beta-scaled ordered factor moves, par-spread replay, telescoping/linear detail allocation and diagnostics.",
+      "sha256": "1d467ae491fc2530dd87c754f886dea504ca95055958aa09432f393659dbc55c"
+    },
+    {
+      "path": "finstack-quant/attribution/src/credit_decomposition.rs",
+      "classification": "algorithm",
+      "records": [
+        "ATTRIBUTION-011",
+        "ATTRIBUTION-012"
+      ],
+      "reason": "Fresh quote-space CS01 linear hierarchy backsolve and rates/credit carry yield-share allocation with anchor proportions.",
+      "sha256": "d76b1232f6ef2213f5c4b5937e186ee1bd6362365f1790c8274689e93a49ab27"
+    },
+    {
+      "path": "finstack-quant/attribution/src/detail.rs",
+      "classification": "support",
+      "records": [
+        "ATTRIBUTION-012",
+        "ATTRIBUTION-015"
+      ],
+      "reason": "Inspected detail containers, unit labels, tuple-map serialization and unchecked SourceLine constructors; financial computations are in mapped owners.",
+      "sha256": "9666f041405f2194ca40ca3e59076655aeee0d62317416399f36c13b7ce48cb3"
+    },
+    {
+      "path": "finstack-quant/attribution/src/execution.rs",
+      "classification": "algorithm",
+      "records": [
+        "ATTRIBUTION-001"
+      ],
+      "reason": "Market/instrument reconstruction, rounding-currency probe fallback, metric validation and panic/error boundary for executed attribution.",
+      "sha256": "bd8081732a0d6821714b0c1ab04661a56ccf1bd36c5783689b90c9e5a08433b5"
+    },
+    {
+      "path": "finstack-quant/attribution/src/factors.rs",
+      "classification": "algorithm",
+      "records": [
+        "ATTRIBUTION-002"
+      ],
+      "reason": "Economic factor classification, snapshot selection and exact replacement/removal of market stores including fixing and volatility families.",
+      "sha256": "3e331b24021d6ac0f1419de75bce76c9d1f668e93c758e4abdffadb830ad29dc"
+    },
+    {
+      "path": "finstack-quant/attribution/src/helpers.rs",
+      "classification": "algorithm",
+      "records": [
+        "ATTRIBUTION-001",
+        "ATTRIBUTION-002",
+        "ATTRIBUTION-003"
+      ],
+      "reason": "Endpoint and FX arithmetic, gross cash carry and flat-yield/funding partition, dependency selection and invalid-factor conversion.",
+      "sha256": "d45f2229aa8fea0bcdca35678cdc1a87b25fbcd27c624850a71a384b48ce369e"
+    },
+    {
+      "path": "finstack-quant/attribution/src/lib.rs",
+      "classification": "algorithm",
+      "records": [
+        "ATTRIBUTION-001"
+      ],
+      "reason": "Method dispatch, opening-parameter/default controls, optional additive credit detail, target-currency transformation and raw PV bridge.",
+      "sha256": "e7b6a6b73b628a75556c068448e499e0ee507360c6a6fbde1178dc7dbf897ded"
+    },
+    {
+      "path": "finstack-quant/attribution/src/long_rows.rs",
+      "classification": "support",
+      "records": [
+        "ATTRIBUTION-015"
+      ],
+      "reason": "Inspected wide/long presentation mapping, currency-validation gate and summary/bucket row separation; no new attribution calculation.",
+      "sha256": "3ac6b0a7fb6ebfe4ea9d05060ba12f0abc170d2dadd60bddbc552c81f64a6df8"
+    },
+    {
+      "path": "finstack-quant/attribution/src/metrics_based/carry.rs",
+      "classification": "algorithm",
+      "records": [
+        "ATTRIBUTION-008"
+      ],
+      "reason": "Carry horizon matching, net CarryTotal funding addback, Theta fallback and missing-metric policy.",
+      "sha256": "a081bb951a24262fff27121a2a068a6f9eacd75f7839224e5a9ad45209789d0b"
+    },
+    {
+      "path": "finstack-quant/attribution/src/metrics_based/context.rs",
+      "classification": "algorithm",
+      "records": [
+        "ATTRIBUTION-008"
+      ],
+      "reason": "Rate dependency deduplication, curve/quote coordinate pairing, primary spot/FX selection and uniform aggregate-vol movement validation.",
+      "sha256": "594e5f2a7c156580069b40e1246a209f69b89c310a53bf0bb348edc9cf35dda7"
+    },
+    {
+      "path": "finstack-quant/attribution/src/metrics_based/credit.rs",
+      "classification": "algorithm",
+      "records": [
+        "ATTRIBUTION-009"
+      ],
+      "reason": "Bucket/aggregate CS01 P&L, scalar CsGamma and twist/large-spread diagnostic rules.",
+      "sha256": "5107904b4a7f8d416c734aaa91e2e6b500e2fd997f55220b52e7c18328204c82"
+    },
+    {
+      "path": "finstack-quant/attribution/src/metrics_based/cross_factor.rs",
+      "classification": "algorithm",
+      "records": [
+        "ATTRIBUTION-010"
+      ],
+      "reason": "Seven normalized mixed-sensitivity products, tiny-pair omission and invalid/nonfinite accumulation handling.",
+      "sha256": "e2fa9bde088cd99d5ad558306aa4af7244cedf8c8fd47256171e2ac8819ee9e2"
+    },
+    {
+      "path": "finstack-quant/attribution/src/metrics_based/equity.rs",
+      "classification": "algorithm",
+      "records": [
+        "ATTRIBUTION-010"
+      ],
+      "reason": "Primary absolute spot Delta/Gamma multiplication and missing-driver invalidation.",
+      "sha256": "00aa1ee7494b8a819b38e737602e049890d93827c91afe9df0183c86ca30e2df"
+    },
+    {
+      "path": "finstack-quant/attribution/src/metrics_based/fx.rs",
+      "classification": "algorithm",
+      "records": [
+        "ATTRIBUTION-010"
+      ],
+      "reason": "Joint FX01 times primary pair percentage move and explicit multi-pair approximation warning.",
+      "sha256": "e5f937bdefc8c5fd1c6ce6658f0f397dc966627a2c05909c59a0b51efa6f4066"
+    },
+    {
+      "path": "finstack-quant/attribution/src/metrics_based/inflation.rs",
+      "classification": "algorithm",
+      "records": [
+        "ATTRIBUTION-010"
+      ],
+      "reason": "Declared inflation-source average, Inflation01/convexity and incomplete-source invalidation.",
+      "sha256": "82948f7e8e6221e9e36ea46f24b4bd9c58303f9565a07faea43b5ca1d751304a"
+    },
+    {
+      "path": "finstack-quant/attribution/src/metrics_based/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "ATTRIBUTION-008"
+      ],
+      "reason": "Direct/prepriced and request execution, metric menu narrowing/drop policy, cash headline addback, factor sequencing and model-parameter difference.",
+      "sha256": "88a2e7f90ec13b883564abdc750204cccfd5af9f440a5c00b26e9eeebc08b3d0"
+    },
+    {
+      "path": "finstack-quant/attribution/src/metrics_based/rates.rs",
+      "classification": "algorithm",
+      "records": [
+        "ATTRIBUTION-009"
+      ],
+      "reason": "Compensated keyrate/aggregate DV01, risk-weighted representative move, distinct street/dollar convexity and diagnostic thresholds.",
+      "sha256": "49974cf734a7924490b68f70164734118e32800d5552002252ee139818e4a982"
+    },
+    {
+      "path": "finstack-quant/attribution/src/metrics_based/shifts.rs",
+      "classification": "algorithm",
+      "records": [
+        "ATTRIBUTION-006",
+        "ATTRIBUTION-008",
+        "ATTRIBUTION-009"
+      ],
+      "reason": "Exact rate/credit bucket parsing, calibrated quote-ID and pillar matching, aggregate moves and twist tests.",
+      "sha256": "29b2450576e9bfd90490803e983787ac41855a2de09b8d6c272c15505caa1a6d"
+    },
+    {
+      "path": "finstack-quant/attribution/src/metrics_based/tests.rs",
+      "classification": "test",
+      "records": [
+        "ATTRIBUTION-008",
+        "ATTRIBUTION-009",
+        "ATTRIBUTION-010"
+      ],
+      "reason": "Dedicated cfg(test) module with synthetic instruments and carry, risk-coordinate, units, failure and volatility-move assertions; sampled evidence only.",
+      "sha256": "744cbc9c78523f8dc077e3481a459dfc54321f7ceb49b4e15afbadf471b35649"
+    },
+    {
+      "path": "finstack-quant/attribution/src/metrics_based/volatility.rs",
+      "classification": "algorithm",
+      "records": [
+        "ATTRIBUTION-010"
+      ],
+      "reason": "Per-vol-point Vega/Volga contributions and missing/large-move note policy.",
+      "sha256": "b8be75427726d756a4ef098b20df158445366dd8f087abfc4a6a1b0132b31b3c"
+    },
+    {
+      "path": "finstack-quant/attribution/src/parallel.rs",
+      "classification": "algorithm",
+      "records": [
+        "ATTRIBUTION-005"
+      ],
+      "reason": "Closing-state independent restorations, pairwise interaction correction, optional full pair set and cumulative credit replay detail.",
+      "sha256": "f6903a1388bf41f18a8b4c0b699959da2ecd7f6ec6602af2d77fad35bedb4ed1"
+    },
+    {
+      "path": "finstack-quant/attribution/src/result.rs",
+      "classification": "algorithm",
+      "records": [
+        "ATTRIBUTION-001",
+        "ATTRIBUTION-013",
+        "ATTRIBUTION-015"
+      ],
+      "reason": "Method/metric defaults, residual/currency validation, amount transformations, aggregate accumulation and tolerance/percentage qualification.",
+      "sha256": "d26b4653839870b009fbabdc0dadef5b9e916fa38b5169cf250f49d8793d20a1"
+    },
+    {
+      "path": "finstack-quant/attribution/src/return_contribution.rs",
+      "classification": "algorithm",
+      "records": [
+        "ATTRIBUTION-014",
+        "ATTRIBUTION-016"
+      ],
+      "reason": "Gross/net/explicit return weights, grouped and factor contributions, benchmark mode and Brinson allocation/selection/interaction.",
+      "sha256": "39c88a1b766c529bdee261fc4df6185b64f38a0cacbc76ab30ee388d11851012"
+    },
+    {
+      "path": "finstack-quant/attribution/src/schema.rs",
+      "classification": "support",
+      "records": [
+        "ATTRIBUTION-015"
+      ],
+      "reason": "Feature-gated schema artifact registry and example construction; examples serialize payloads without economic calculation.",
+      "sha256": "0ad76a51742163a9cfc40641d27e694d438e096b5c98d0e96f166af7979609a7"
+    },
+    {
+      "path": "finstack-quant/attribution/src/spec.rs",
+      "classification": "algorithm",
+      "records": [
+        "ATTRIBUTION-001"
+      ],
+      "reason": "Strict input/version schema, execution defaults/config mapping, ordered batch behavior and validation route.",
+      "sha256": "cea9589d0e3c340ff245293a89575839c7022a0359fd0f7ba93e70785c1d1433"
+    },
+    {
+      "path": "finstack-quant/attribution/src/target_currency.rs",
+      "classification": "algorithm",
+      "records": [
+        "ATTRIBUTION-013"
+      ],
+      "reason": "Atomic target-currency total-return translation, separate opening-principal FX effect, all-money detail conversion and residual recalculation.",
+      "sha256": "654264002cbdca85bcc2bad6ad655ef782fda344b223b5201275612b9db330d2"
+    },
+    {
+      "path": "finstack-quant/attribution/src/taylor.rs",
+      "classification": "algorithm",
+      "records": [
+        "ATTRIBUTION-006",
+        "ATTRIBUTION-007"
+      ],
+      "reason": "Validated bump controls, keyrate central differences and directional gamma, quote replay, vol expansion, restored families and cash theta.",
+      "sha256": "1bdb291a7393210807cbb87cc83c927949d9553429b3d23d4ff10e7b47cf6de0"
+    },
+    {
+      "path": "finstack-quant/attribution/src/waterfall.rs",
+      "classification": "algorithm",
+      "records": [
+        "ATTRIBUTION-004"
+      ],
+      "reason": "Mandatory carry-first unique ordering, running hybrid-state repricing, cumulative credit substeps and parameter failure policy.",
+      "sha256": "984580cf9c975b1333b8a2b1e82b96a2043f555d7ad0a7b851bb4629c1073342"
+    }
+  ]
+}

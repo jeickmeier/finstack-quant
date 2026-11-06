@@ -24,6 +24,12 @@ explicit architectural decision. This rule concerns financial evaluation
 state and caches; static immutable registries and UI presentation caches are
 separate concerns.
 
+[ADR 0046](0046-portfolio-execution-operational-contract.md) supplies the
+detailed operational contract. It distinguishes an explicitly supplied immutable
+prior result, subject to complete reuse compatibility and an authoritative
+change set, from executor-retained caches across requests. It also defines
+metric-menu applicability, conditional conversion refresh and adapter boundaries.
+
 ## Rationale
 
 Duplicated pricing loops and caches can apply different financial policies or
@@ -64,8 +70,6 @@ in [state.rs](../../../finstack-quant/portfolio/src/evaluation/state.rs), and
 evaluation keys and invalidation inputs are defined in
 [plan.rs](../../../finstack-quant/portfolio/src/evaluation/plan.rs).
 
-Those mechanisms are existing implementation evidence, not proof that every
-workflow and invalidation case is covered. Audit callers and regression
-coverage against this decision, and record any missing cases before claiming
-complete enforcement. This documentation change does not alter the executor
-or its caches.
+Those mechanisms do not establish complete workflow or invalidation coverage.
+Caller audits and regression coverage are tracked in
+[FOLLOW_UPS.md](../FOLLOW_UPS.md#implementation-and-lifecycle-follow-up).

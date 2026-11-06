@@ -1,0 +1,884 @@
+{
+  "scope": "valuations-other-fixed-income",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "VALUATIONS-OTHER-FIXED-INCOME-01",
+      "title": "Bond-futures conversion factors, delivery carry and listed marks",
+      "path": "01-bond-futures.md"
+    },
+    {
+      "id": "VALUATIONS-OTHER-FIXED-INCOME-02",
+      "title": "Convertible defaultable-equity lattice and exercise sequencing",
+      "path": "02-convertible-lattice.md"
+    },
+    {
+      "id": "VALUATIONS-OTHER-FIXED-INCOME-03",
+      "title": "Convertible inverse quotes, sensitivities and spot regimes",
+      "path": "03-convertible-quotes-risk.md"
+    },
+    {
+      "id": "VALUATIONS-OTHER-FIXED-INCOME-04",
+      "title": "Inflation-linked cashflows, publication state and deflation floors",
+      "path": "04-inflation-indexation.md"
+    },
+    {
+      "id": "VALUATIONS-OTHER-FIXED-INCOME-05",
+      "title": "Real yields, breakeven inflation and inflation sensitivities",
+      "path": "05-inflation-yields-risk.md"
+    },
+    {
+      "id": "VALUATIONS-OTHER-FIXED-INCOME-06",
+      "title": "Loan discount margins, yields, cost and effective-interest amortization",
+      "path": "06-loan-quotes-eir.md"
+    },
+    {
+      "id": "VALUATIONS-OTHER-FIXED-INCOME-07",
+      "title": "Term-loan funding, amortization, covenants and fee compilation",
+      "path": "07-term-loan-cashflows.md"
+    },
+    {
+      "id": "VALUATIONS-OTHER-FIXED-INCOME-08",
+      "title": "Term-loan settlement value and callable rates-credit lattices",
+      "path": "08-term-loan-pricing.md"
+    },
+    {
+      "id": "VALUATIONS-OTHER-FIXED-INCOME-09",
+      "title": "Term-loan workout yields, quote-pinned risk and default metrics",
+      "path": "09-term-loan-risk-yields.md"
+    },
+    {
+      "id": "VALUATIONS-OTHER-FIXED-INCOME-10",
+      "title": "Revolver contractual state, utilization accrual and fee timing",
+      "path": "10-revolver-cashflows.md"
+    },
+    {
+      "id": "VALUATIONS-OTHER-FIXED-INCOME-11",
+      "title": "Revolver three-factor paths, survival and default integration",
+      "path": "11-revolver-monte-carlo-credit.md"
+    },
+    {
+      "id": "VALUATIONS-OTHER-FIXED-INCOME-12",
+      "title": "Revolver quote schedules, exposure and draw-option attribution",
+      "path": "12-revolver-quotes-risk.md"
+    },
+    {
+      "id": "VALUATIONS-OTHER-FIXED-INCOME-13",
+      "title": "Agency MBS amortization, prepayment and delayed cashflow ownership",
+      "path": "13-mbs-projection.md"
+    },
+    {
+      "id": "VALUATIONS-OTHER-FIXED-INCOME-14",
+      "title": "MBS effective rate risk and Monte Carlo OAS",
+      "path": "14-mbs-risk-oas.md"
+    },
+    {
+      "id": "VALUATIONS-OTHER-FIXED-INCOME-15",
+      "title": "TBA assumed collateral, settlement ownership and dollar-roll carry",
+      "path": "15-tba-and-dollar-roll.md"
+    },
+    {
+      "id": "VALUATIONS-OTHER-FIXED-INCOME-16",
+      "title": "Fixed-income index TRS carry returns and duration risk proxy",
+      "path": "16-fi-index-trs.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond_future/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-01"
+      ],
+      "reason": "Selects model-versus-market futures marks and supplied conversion-factor metrics; installs shared parallel and bucketed rate repricing.",
+      "sha256": "479e64eed5c24653d7e53f2770ed546d879e47e4aba2dc70f9d5e72c0021b68e"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond_future/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Declares and re-exports the inspected product/pricing modules; documentation and any inline tests add no production financial branch, default or arithmetic.",
+      "sha256": "542a6a2376b3850faf9f78ba8e3d50e2ab27a9a06ea2f99a7cfea4ae225e4e9a"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond_future/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-01"
+      ],
+      "reason": "Registers the selected-CTD clean-price proxy and delegates to the instrument fair-price and listed-lifecycle computations.",
+      "sha256": "70bc2f427011a317ad77ee9b7e907e2aa79ecdd967670c4cd578bf2597f76d59"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/bond_future/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-01"
+      ],
+      "reason": "Validates basket/CTD and settlement contract; computes CME-style rounded factors, repo carry-adjusted forward clean value, marks and listed payoff; production implementations after inline tests were inspected.",
+      "sha256": "541fcfadf7e01a4245d9452d8820a332a4d2201535ff5171a46f7d4d8ed7ddec"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/convertible/market_inputs.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-02",
+        "VALUATIONS-OTHER-FIXED-INCOME-03"
+      ],
+      "reason": "Resolves explicit/surface/flat volatility, strict dividend yield, currency-aware equity spot and admissible market domains.",
+      "sha256": "363a090283dcf2ee1b3ac803c3436a127f1d4c90e19255010bd935e48835b6bc"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/convertible/metrics/accrued_interest.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-03"
+      ],
+      "reason": "Calculates schedule-driven accrued interest at business-day settlement for the convertible quote surface.",
+      "sha256": "7ce4ef65e63928bd50c195315bd4630f7f717c0c76cd55e848f6ffedce644d9d"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/convertible/metrics/conversion01.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-03"
+      ],
+      "reason": "Bumps explicit conversion ratio or reciprocal conversion-price inputs and returns a half-difference money sensitivity.",
+      "sha256": "b8b071c5e89836e2f9e87bf08ad72b63fc9a3d3045a9aebef7156aef03008947"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/convertible/metrics/cs01.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-03"
+      ],
+      "reason": "Selects hazard repricing or synthetic zero-hazard one-sided CS01, including key-rate curve construction and the equity-credit drift effect.",
+      "sha256": "72d176af5a93fcace1bf20abd92b05964ca3c5b89a13e62127777dd454838dfe"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/convertible/metrics/dividend_risk.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-03"
+      ],
+      "reason": "Computes dividend-yield finite differences with an actual-width adjustment at the zero lower bound.",
+      "sha256": "f80134bd0d750f36d84f731d7ec9ba02dbb2288599c8096963579b1d3ab7e699"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/convertible/metrics/greeks.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-03"
+      ],
+      "reason": "Maps direct lattice Greek calculations to registered metric names and shares the calculated result cache.",
+      "sha256": "3cf928a58454affbc8d675c8078fdd57318d7490552cb73182ac54d1d225c03d"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/convertible/metrics/implied_vol.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-03"
+      ],
+      "reason": "Finds the CRR-admissible volatility domain then Brent-solves the settlement dirty quote with a normalized residual check.",
+      "sha256": "eab5b83c62e5d4a2f9183c3089f83e23751f494004e0432a58330f50293c8dbd"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/convertible/metrics/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-03"
+      ],
+      "reason": "Selects direct convertible Greek and inverse-quote calculators plus shared rate, credit and mixed-factor risk implementations.",
+      "sha256": "5cb7fcbb679b647d036484c7865753d2cb4ea778becd2bcbe029fd5c7e40007c"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/convertible/metrics/oas.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-03"
+      ],
+      "reason": "Solves a hazard shift when a credit curve exists or discount shift otherwise, respecting curve floors and settlement dirty target.",
+      "sha256": "84bcb98334a7d6ad4533c5e59f6a4975014a0a24a707abe472a2de99eaa7ddce"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/convertible/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Declares and re-exports the inspected product/pricing modules; documentation and any inline tests add no production financial branch, default or arithmetic.",
+      "sha256": "2e0ce1f19e13e58ccbd5c6d47d30c1c456f0af1945fbcedf70f64e1a28dc53bc"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/convertible/pricing/credit_tree.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-02"
+      ],
+      "reason": "Constructs defaultable-equity CRR induction, survivor martingale probabilities and fractional recovery of principal for total/cash components.",
+      "sha256": "4876136b7f738a9443f8b61f0023a0aadc6fac9c463fad56eef920cf942006a4"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/convertible/pricing/engine.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-02",
+        "VALUATIONS-OTHER-FIXED-INCOME-03"
+      ],
+      "reason": "Builds holder schedule and market inputs, maps curve/survival timing, computes settlement dirty and bond-floor values, finite-difference Greeks and parity.",
+      "sha256": "b7dcdba405be0288bb0270166ac4dc79846f91fe4ddc28f1fa54d95c708c553d"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/convertible/pricing/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Declares and re-exports the inspected product/pricing modules; documentation and any inline tests add no production financial branch, default or arithmetic.",
+      "sha256": "f47c83b292f65b8b2e0b793622feb5af4ebd8351c851975e853285c563906dcd"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/convertible/pricing/spot_ladder.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-03"
+      ],
+      "reason": "Sorts/deduplicates spot shocks and computes PV/delta/parity/premium rows with fixed hedge-ratio regime thresholds.",
+      "sha256": "f2ebc69e633d09cfbd70a2d35d7f84150c67162a5e42fed93332ad91c71e635d"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/convertible/pricing/tests.rs",
+      "classification": "test",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-02",
+        "VALUATIONS-OTHER-FIXED-INCOME-03"
+      ],
+      "reason": "Test-only source with lattice, exercise, credit, parity and Greek regression cases; evidence was inspected or located, not executed.",
+      "sha256": "c200582b3fa91f8ba75c1f5508ab22ad5ebc28620c48fda548409f398b5813bf"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/convertible/pricing/tree_pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-02",
+        "VALUATIONS-OTHER-FIXED-INCOME-03"
+      ],
+      "reason": "Registers the convertible Tree key, invokes native lattice pricing and exposes calculated risk/diagnostics.",
+      "sha256": "6448ed31ea9e8db62c0d8dca6e230012c258956f70ff35071ee173a2448dab03"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/convertible/pricing/valuator.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-02"
+      ],
+      "reason": "Maps coupon and exercise dates to steps, orders conversion/call/put rights, approximates soft-call observation memory and terminal split smoothing.",
+      "sha256": "c175f729a5b293bb6d861dc9d0347f95f4e43b57ca1585339f3457f42277f885"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/convertible/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-02",
+        "VALUATIONS-OTHER-FIXED-INCOME-03"
+      ],
+      "reason": "Validates conversion domains and ratio/price consistency, applies dated anti-dilution lists and selects conversion/call/put and reporting contracts.",
+      "sha256": "dfc05d06ca17e30e7381e7567c451663893aa6b7da02628a24c0c5cbca2bf01e"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/dollar_roll/carry.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-15"
+      ],
+      "reason": "Projects declining-balance coupon and principal carry, dirty-front financing rate and repo specialness with Actual/360 annualization.",
+      "sha256": "a997400861bb217ca08a83a59a8fe332e6260080a8bc68b9fdb381ad7565ac65"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/dollar_roll/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-15"
+      ],
+      "reason": "Resolves the actual roll-interval repo rate and registers implied financing, specialness and prepayment-aware rate risk.",
+      "sha256": "4f8de4aa8df713e97e45012083cffda5acd079fb75d160ccaf35af5bdb894b98"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/dollar_roll/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Declares and re-exports the inspected product/pricing modules; documentation and any inline tests add no production financial branch, default or arithmetic.",
+      "sha256": "0b10dd7f10e5d6e15b66cb002df2b4c8b10e363010fed25091ec6e3d256ea7bc"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/dollar_roll/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-15"
+      ],
+      "reason": "Values the sale-front/purchase-back position as back TBA PV minus front TBA PV without adding carry diagnostics.",
+      "sha256": "efd15c034cddf035c486f328bb5f4dbff35852db0eaf2b065e58e4a62c6e662c"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/dollar_roll/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-15"
+      ],
+      "reason": "Validates dated settlements, creates matching TBA legs, rebuilds both prepayment speeds for risk and exports dirty trade cash legs without collateral.",
+      "sha256": "fe81340c6c8c67e514087738c125d64c2cd51c0a6c181eab153d5f185feb9554"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/family.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-01",
+        "VALUATIONS-OTHER-FIXED-INCOME-02",
+        "VALUATIONS-OTHER-FIXED-INCOME-03",
+        "VALUATIONS-OTHER-FIXED-INCOME-04",
+        "VALUATIONS-OTHER-FIXED-INCOME-05",
+        "VALUATIONS-OTHER-FIXED-INCOME-06",
+        "VALUATIONS-OTHER-FIXED-INCOME-07",
+        "VALUATIONS-OTHER-FIXED-INCOME-08",
+        "VALUATIONS-OTHER-FIXED-INCOME-09",
+        "VALUATIONS-OTHER-FIXED-INCOME-10",
+        "VALUATIONS-OTHER-FIXED-INCOME-11",
+        "VALUATIONS-OTHER-FIXED-INCOME-12",
+        "VALUATIONS-OTHER-FIXED-INCOME-13",
+        "VALUATIONS-OTHER-FIXED-INCOME-14",
+        "VALUATIONS-OTHER-FIXED-INCOME-15",
+        "VALUATIONS-OTHER-FIXED-INCOME-16"
+      ],
+      "reason": "Registers the available model keys and metric sets for all fixed-income products; bond algorithms owned by valuations-bonds, other product selection detailed here.",
+      "sha256": "350655a337a14649e34a3802a30632c6d8bdf268389bf1d2a2a944a2de7ef861"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/fi_trs/marginable.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-16"
+      ],
+      "reason": "Maps a signed notional-duration proxy to one IR tenor bucket for SIMM input and uses carry-model PV for variation margin.",
+      "sha256": "908f910f3d0db194bee6dc266d9cb2d6e4264de6a8c491ab269fce0f433e6e45"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/fi_trs/metrics/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-16"
+      ],
+      "reason": "Registers financing curve risk, carry-model par spread/annuity and signed supplied-duration DV01, which is not a derivative of carry PV.",
+      "sha256": "21c894dfe9512bd402960467522567529bfff23876c7eba2cd6cbf0259130580"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/fi_trs/metrics/par_spread.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-16"
+      ],
+      "reason": "Solves receiver-side financing spread from return-leg PV, zero-spread financing PV and notional-weighted financing annuity.",
+      "sha256": "3c48356a4ca46a158ae075aeee44b988306a72294a047be60ced2fccd2748903"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/fi_trs/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Declares and re-exports the inspected product/pricing modules; documentation and any inline tests add no production financial branch, default or arithmetic.",
+      "sha256": "e26f797c829acaf29a1ff602577c9f872292407890922d056b53a2c42f25c215"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/fi_trs/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-16"
+      ],
+      "reason": "Selects exact historical endpoints, live-level seasoned returns or exponential future yield carry; delegates financing/discounting and nets cashflows.",
+      "sha256": "7ff0dcc4fdcd4f7e1afddd3f11ae602fdc7db0fca2f830f5413feb91f5fcf903"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/fi_trs/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-16"
+      ],
+      "reason": "Validates currency/notional/levels and schedule terms, resolves mandatory duration input, signs legs and declares projected schedule semantics.",
+      "sha256": "ac99fa317ff1803d00d61407d538f66e5d25d4ca50a80f636922300f3150427a"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/inflation_linked_bond/indexation.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-04"
+      ],
+      "reason": "Resolves jurisdiction lag/interpolation, independent publication-state CPI anchors and Black put time value for unpublished protected CPI.",
+      "sha256": "20614936670203c13c4e72b454813729805f20c50d24c2870ef76a8a92d78b91"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/inflation_linked_bond/metrics/inflation01.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-05"
+      ],
+      "reason": "Bumps projected inflation rates centrally while holding published fixings fixed; index-only markets produce zero projection sensitivity after validation.",
+      "sha256": "bc1dea89e19afaa719e806946439f466ec6f9e243d31fe2e275c0db836295150"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/inflation_linked_bond/metrics/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-05"
+      ],
+      "reason": "Computes real yield/duration, nominal-zero-versus-real-yield breakeven, inflation convexity and registers nominal rate risk.",
+      "sha256": "ee9b8999f1b5b8ce1f3e2a21a62c0a314e2a4eac6e7f5b1d6d715cffd7ca3fb1"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/inflation_linked_bond/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Declares and re-exports the inspected product/pricing modules; documentation and any inline tests add no production financial branch, default or arithmetic.",
+      "sha256": "ff8d78b3e3b517b24d1517b29787cc07a4138e366213cb2aec2facae87b3c13f"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/inflation_linked_bond/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-04",
+        "VALUATIONS-OTHER-FIXED-INCOME-05"
+      ],
+      "reason": "Generates indexed nominal and unindexed real schedules, values deflation protection, solves Street real yields and defines real quote/accrual conventions.",
+      "sha256": "807204d86a29792835d651b35c0ce20a02bd852972e2ac8e38b96b161a74ba71"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/lib.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Declares and re-exports the inspected product/pricing modules; documentation and any inline tests add no production financial branch, default or arithmetic.",
+      "sha256": "9d12b85ff178f4589c189966162c2b957a0d2d2370192feeebe0c21af4a4512b"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/loan_quotes.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-06"
+      ],
+      "reason": "Implements periodic DM discounting and Brent bracket solve, dated IRR, outstanding-weighted all-in cost, fee/OID grouping and amortized-cost EIR recurrence.",
+      "sha256": "14369970210b9ad6b2f01353773b2d75ab0cf1874e2659ebf37b05a1488dddcc"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/loan_terms.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-06",
+        "VALUATIONS-OTHER-FIXED-INCOME-07",
+        "VALUATIONS-OTHER-FIXED-INCOME-10"
+      ],
+      "reason": "Defines fee-inclusive EIR default and validates/selects dated commitment, margin and fee events; cumulative basis-point changes and last-effective commitment define cashflow state.",
+      "sha256": "6b2fb4976bbf7b024028f7d5e12c7548c3e3bd3e9d66f63edec5a6d3e88fb12d"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/mbs_passthrough/metrics/duration.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-14"
+      ],
+      "reason": "Rebuilds rate-sensitive prepayment specifications, computes effective duration/convexity and normalizes central rate shocks.",
+      "sha256": "6da9760ffac9acd59613911ad1d8e2452056b8601661a517d7ee57d1b45c596a"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/mbs_passthrough/metrics/mc_oas.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-14"
+      ],
+      "reason": "Generates Hull-White paths, scales pathwise SMM, discounts path cashflows, then Brent-solves spread to a settlement dirty quote.",
+      "sha256": "627d624201b7bfc7a0745a246babe076d266220fdbe61c5755a0fa0255d72d17"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/mbs_passthrough/metrics/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-13",
+        "VALUATIONS-OTHER-FIXED-INCOME-14"
+      ],
+      "reason": "Registers WAL, clean/dirty price and risk metrics; OAS explicitly selects the Monte Carlo engine and model-config parameters.",
+      "sha256": "f596910c4cda3635312e9638b1c2c86e450bfed8b11b7993dd38e2ebecf26cdc"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/mbs_passthrough/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Declares and re-exports the inspected product/pricing modules; documentation and any inline tests add no production financial branch, default or arithmetic.",
+      "sha256": "cdf5d2b4cda985a464f2a65ad80bbed55e8eb0fb65e3a7cbb60e709a34f6b1ac"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/mbs_passthrough/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-13"
+      ],
+      "reason": "Projects level-pay monthly amortization and scheduled-first prepayment, delayed payment ownership, quote-basis rebasing and spread discounting.",
+      "sha256": "f664e30def7e8ae4cf4e73b34bfa36dceac47f5ca694910972cdebe31a90266d"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/mbs_passthrough/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-13",
+        "VALUATIONS-OTHER-FIXED-INCOME-14"
+      ],
+      "reason": "Defines agency delay/seasoning/factor conventions and pool validation; dispatches native value, exports projected flows and rebuilds prepayment for rate risk.",
+      "sha256": "143361f6a243f2b257b9a8ec85d18aeff606de1d56c9ede397aabb24e7743c0b"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/revolving_credit/cashflow_engine.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-10"
+      ],
+      "reason": "Replays exact deterministic events or retained stochastic utilization, slices accrual/fees by dated terms, books principal and aggregates expected cashflows.",
+      "sha256": "5afcd912fb908aba098df74736ed8f4d8a83fb74f292d437e4012477e47dd9e1"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/revolving_credit/metrics/cs01.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-12"
+      ],
+      "reason": "Supplies deterministic signed holder schedules for periodic z-spread risk and rejects stochastic no-hazard fallback.",
+      "sha256": "171b4ff105796e95ad7a85039932229de3ce87585890504c6af01f05cf19205e"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/revolving_credit/metrics/exposure.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-12"
+      ],
+      "reason": "Computes EAD, default-free counterfactual expected loss, deterministic-hazard Recovery01 and immediate-default money loss.",
+      "sha256": "8a479dec9d01516ccc6280b11c68c20c2d5397b249f8d76b140302c50bdb0796"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/revolving_credit/metrics/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-12"
+      ],
+      "reason": "Registers hazard/z-spread selection, quote/credit metrics and calculates current capacity/utilization plus MC draw-option attribution mean.",
+      "sha256": "25b82bf51aae82616cc6d6cb207b6182b1cccdad34a8ac2e817749e36d2a4fac"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/revolving_credit/metrics/oid_eir.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-06",
+        "VALUATIONS-OTHER-FIXED-INCOME-12"
+      ],
+      "reason": "Builds issue-anchored facility cashflows with opening funding and upfront fee for shared EIR/amortization reporting.",
+      "sha256": "52855f12a14d0a274b9f6e755f484b26b7f50ef5d187d193e40303719f865075"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/revolving_credit/metrics/quotes.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-06",
+        "VALUATIONS-OTHER-FIXED-INCOME-12"
+      ],
+      "reason": "Constructs settlement clean/dirty targets, prorated accrued, DM/price inversion, dated YTM and running all-in rate on holder/expected schedules.",
+      "sha256": "d52232f26f07a91e78800faf296b05a789f1012cabc276c30637d5baf07e2c37"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/revolving_credit/metrics/weighted_average_cost.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-12"
+      ],
+      "reason": "Uses current balances/fee tiers and time-weighted forward rates to estimate annual cost divided by commitment.",
+      "sha256": "721f7946107ac58665a1929463f74328081b4142a7df94ad487dbd518c3d1ce0"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/revolving_credit/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-11"
+      ],
+      "reason": "Defines material CIR floor, interpolation tolerance, recovery bound and Actual/365F model clock in addition to module exports.",
+      "sha256": "dd1ff0d174274e171d24337b63af8e99ef800c38cf9a2dcac3fc56562cda6479"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/revolving_credit/pricing/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Declares and re-exports the inspected product/pricing modules; documentation and any inline tests add no production financial branch, default or arithmetic.",
+      "sha256": "5b9b582fa5c88624c48d32462a850e1d41de434d8c1e1dfcfe98107a87ab6b8f"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/revolving_credit/pricing/path_generator.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-11"
+      ],
+      "reason": "Maps utilization/rate/spread configurations into correlated Philox factor paths, curve-fits Hull-White drift, anchors spread and retains observation states.",
+      "sha256": "a05f299ca09afe4daefc465e3e4c31c25dc4de9604420e83108b3bc9554a190e"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/revolving_credit/pricing/path_pricing.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-11",
+        "VALUATIONS-OTHER-FIXED-INCOME-12"
+      ],
+      "reason": "Integrates path survival/discounting, values contractual/default-funding flows and computes spread-widening draw-option attribution.",
+      "sha256": "2ca2b5dbba5657696f13b1b8370c330a1534e1682a90d1efb7075e242dd6d0b1"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/revolving_credit/pricing/results.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Stores path/estimate results and exports already-computed money scalars with currency and integer-identity checks; no new pricing/risk statistic.",
+      "sha256": "fa336f57afef63458cbe7707b33b4810ed26a00a49be290b48937979260678fc"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/revolving_credit/pricing/stochastic.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-11"
+      ],
+      "reason": "Builds model defaults and observation grid, samples independent or antithetic paths, aggregates Student-t intervals and expected schedule rows.",
+      "sha256": "5c3364a2a9991d01ff727554873b9ceb9fa79ccb7afc0d1c44a41c0114ef1ca8"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/revolving_credit/pricing/unified.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-11"
+      ],
+      "reason": "Dispatches deterministic versus three-factor pricing from facility state, resolves run controls and publishes MC outputs.",
+      "sha256": "568716c19238a2bcc109e6a5ed1dd42b7470dfbeb58c3f761e0429966d2c55fb"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/revolving_credit/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-10",
+        "VALUATIONS-OTHER-FIXED-INCOME-11",
+        "VALUATIONS-OTHER-FIXED-INCOME-12"
+      ],
+      "reason": "Defines process/run defaults, dated facility/LC/fee terms, settlement lag, lifecycle and raw deterministic/expected schedule selection.",
+      "sha256": "80f57d690e2cd14444985dbb1d2be16ff7c0e5b8c05b9a67d29fd127834bfede"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/revolving_credit/utils.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-10",
+        "VALUATIONS-OTHER-FIXED-INCOME-11"
+      ],
+      "reason": "Builds unadjusted/adjusted coupon and reset/observation grids, resolves historical fixings/projection and applies dated rate parameters.",
+      "sha256": "c4306e709f183bbfccdd8fe6b712136d8ae48561bd97825baafb4c7663c842a0"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/revolving_credit/validation.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-10",
+        "VALUATIONS-OTHER-FIXED-INCOME-11"
+      ],
+      "reason": "Enforces commitment/drawn/LC/probability/process domains, recovery/default-model compatibility and dated event/fee contracts.",
+      "sha256": "563bed84fff14ecfec59e633478374659ce8aa39337cd8f3991c44f4b3ed4d97"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/tba/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-15"
+      ],
+      "reason": "Registers shared parallel and bucketed rate risk; instrument rebuilding carries mortgage prepayment response into those shocks.",
+      "sha256": "93b3ed8acaaca1281b3026d23cc0f22ef257c763350d976912df7802c27f81fc"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/tba/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Declares and re-exports the inspected product/pricing modules; documentation and any inline tests add no production financial branch, default or arithmetic.",
+      "sha256": "2911fef05b152e7d8104bcf78a525a19f3c6b28a6748bcee560d10b05a48bbc2"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/tba/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-15"
+      ],
+      "reason": "Loads generic pool assumptions, validates supplied delivery pools, rebases/scales ownership and discounts settlement dirty forward value.",
+      "sha256": "3a88063688fcad8bdd50a4bcc4a29bf1d604bfb4baa6424f5bff7d10acba06f3"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/tba/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-15"
+      ],
+      "reason": "Selects explicit or published settlement/class, validates trade terms, rebuilds prepayment risk and rejects money-only physical-delivery cashflow export.",
+      "sha256": "f148cafb35db692a5fa3c78279cb29f7872c4594ddda7de5ad6de2c4a79b43f4"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/term_loan/cashflows.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-07"
+      ],
+      "reason": "Compiles initial/delayed draws, OID funding, principal amortization, covenant sweeps/PIK toggles, coupons and commitment/usage/fixed fees.",
+      "sha256": "5f180fcf899d9edf3b091bfd295541d911c95dab89c700dd51798e8d451bbeb1"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/term_loan/metrics/cs01.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-09"
+      ],
+      "reason": "Chooses tree-hazard repricing or contractual periodic z-spread risk from the pinned model/quote view.",
+      "sha256": "cc13e5fe99d3a267019fad6f3a6a839685255e36d625cc0f2fe78b241d530319"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/term_loan/metrics/default_risk.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-09"
+      ],
+      "reason": "Requires tree-plus-hazard pricing for recovery and immediate-default risk, using outstanding principal and selected base value.",
+      "sha256": "327f63aaa218cb46ba35d11bef0b73a9054c69940d335368c73c9a7a4fe02d5b"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/term_loan/metrics/discount_margin.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-06",
+        "VALUATIONS-OTHER-FIXED-INCOME-09"
+      ],
+      "reason": "Solves floating-only contractual-flow discount margin against clean quote or zero-margin PV and requires quote for callables.",
+      "sha256": "0b7309abe0ea96603cf3d9d1bf41fd9c8e581dd1dacaa1d6d8d4b1e8a93adb04"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/term_loan/metrics/irr_helpers.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-09"
+      ],
+      "reason": "Builds settlement dirty targets, identifies finite call candidates and constructs cash/accrued/principal claims for workout IRRs.",
+      "sha256": "815cc12e837010f0cac5afd7e6e76b08dd460b0666df4cbf23afd6ed9d8712c3"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/term_loan/metrics/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-06",
+        "VALUATIONS-OTHER-FIXED-INCOME-09"
+      ],
+      "reason": "Registers rate/credit/yield/OID metrics and computes earliest-call, embedded-option, fee-inclusive cost and EIR diagnostics.",
+      "sha256": "6647da44382cd5857852931f445127bc1d779a8b227f982e5851134f624b67ee"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/term_loan/metrics/oas.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-09"
+      ],
+      "reason": "Solves callable tree spread against settlement quote through shared bond OAS machinery and rejects unsupported discounting interpretation.",
+      "sha256": "6af42fecdfc853a651ed5c0784a4bf62e9b9b119954adf70574aede6155e9961"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/term_loan/metrics/risk_view.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-09"
+      ],
+      "reason": "Pins tree OAS or deterministic z-spread to the observed quote, clears price drivers and preserves spread under risk shocks.",
+      "sha256": "91c5feb64827ddda3c73a9760a7b477b76e9e9d395cdc9df00a3083bc538cf9f"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/term_loan/metrics/ytm.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-09"
+      ],
+      "reason": "Solves dated holder-view YTM after settlement using quote-derived or model-carried dirty target.",
+      "sha256": "de0ffdce92b8837cc63b755e7ceeafa21e61b204e56554ea47598cd7e54786ce"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/term_loan/metrics/ytn.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-09"
+      ],
+      "reason": "Constructs hypothetical n-year redemptions including cash accrued and principal, capped by final cashflow/maturity, then solves IRR.",
+      "sha256": "06c412190d52c52a47cab54fec287ec29a300bac05a670329199a380f7d3b46f"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/term_loan/metrics/ytw.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-09"
+      ],
+      "reason": "Selects minimum dated yield across finite call candidates and maturity, with shared make-whole/exercise cash claims.",
+      "sha256": "f508c51f7a0c665d301decbb23f13ee4577906683688542dd819a7cf088a497a"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/term_loan/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Declares and re-exports the inspected product/pricing modules; documentation and any inline tests add no production financial branch, default or arithmetic.",
+      "sha256": "6ac4becd5ad984c7adee76dbb29a3f1f0080b25de60d035184281c76924467a3"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/term_loan/pricing/call.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-08",
+        "VALUATIONS-OTHER-FIXED-INCOME-09"
+      ],
+      "reason": "Resolves dirty par/premium/make-whole exercise claims, clean floors, accrued and outstanding principal for tree and workout yields.",
+      "sha256": "2061477e70d2cbabf63dc64ed8f7436f554295d6dfe152a7cf5d2a93d6eab63c"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/term_loan/pricing/discounting.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-08"
+      ],
+      "reason": "Values settlement holder cashflows at quote/DM/z-spread or curve PV; deterministic route omits default/survival modeling.",
+      "sha256": "2d4316c1af6db7cd5a7c9f4a0a19c73065092dd3c14c1e846aa27136ed0703bd"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/term_loan/pricing/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Declares and re-exports the inspected product/pricing modules; documentation and any inline tests add no production financial branch, default or arithmetic.",
+      "sha256": "415a3efaad5c57aa27c31175204878b928241a7990b353cba853851ff6939dc0"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/term_loan/pricing/tree_engine.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-08"
+      ],
+      "reason": "Chooses straight discounting, rates-only or joint rates-credit lattice and folds contractual coupon/funding/exercise state into induction.",
+      "sha256": "b5e7a85cae70db265060cf975f3e9c643c8d764ce136f3977f1d8598dc31a36f"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/term_loan/spec.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-07",
+        "VALUATIONS-OTHER-FIXED-INCOME-08"
+      ],
+      "reason": "Defines economically material amortization, rate, PIK, OID, draw, fee and covenant/call defaults and validations.",
+      "sha256": "1a994c05c2ce06f4a1dcb652ff60dc19ca0a96770f9a40e1deaed93d2e121cec"
+    },
+    {
+      "path": "finstack-quant/valuations/fixed-income/src/term_loan/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-OTHER-FIXED-INCOME-07",
+        "VALUATIONS-OTHER-FIXED-INCOME-08",
+        "VALUATIONS-OTHER-FIXED-INCOME-09"
+      ],
+      "reason": "Validates contract and dated features, selects native model/settlement, reconstructs outstanding and holder flows, and applies quote-pinned risk rebuilding.",
+      "sha256": "14ed0f48e0013078c38aa224496a86b1a9ef47a5faa59e8adbd4c339cbc00eec"
+    }
+  ]
+}

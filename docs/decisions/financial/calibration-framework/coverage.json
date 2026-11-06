@@ -1,0 +1,640 @@
+{
+  "scope": "calibration-framework",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "CALIBRATION-FRAMEWORK-001",
+      "title": "Strict envelopes and authoring defaults",
+      "path": "01-wire-and-authoring.md"
+    },
+    {
+      "id": "CALIBRATION-FRAMEWORK-002",
+      "title": "Numerical policy, freshness and initial context",
+      "path": "02-controls-and-market-context.md"
+    },
+    {
+      "id": "CALIBRATION-FRAMEWORK-003",
+      "title": "Dependency ordering, preflight and installation",
+      "path": "03-dependencies-and-execution.md"
+    },
+    {
+      "id": "CALIBRATION-FRAMEWORK-004",
+      "title": "Deposit/FRA construction and prepared quote clocks",
+      "path": "04-deposit-fra-materialization.md"
+    },
+    {
+      "id": "CALIBRATION-FRAMEWORK-005",
+      "title": "Listed rate futures and reference periods",
+      "path": "05-futures-materialization.md"
+    },
+    {
+      "id": "CALIBRATION-FRAMEWORK-006",
+      "title": "Term and overnight swap construction",
+      "path": "06-swap-materialization.md"
+    },
+    {
+      "id": "CALIBRATION-FRAMEWORK-007",
+      "title": "CDS accrual, maturity, upfront and protection roles",
+      "path": "07-cds-materialization.md"
+    },
+    {
+      "id": "CALIBRATION-FRAMEWORK-008",
+      "title": "Index tranche notional and schedule normalization",
+      "path": "08-tranche-materialization.md"
+    },
+    {
+      "id": "CALIBRATION-FRAMEWORK-009",
+      "title": "Cross-currency quote leg construction",
+      "path": "09-xccy-materialization.md"
+    },
+    {
+      "id": "CALIBRATION-FRAMEWORK-010",
+      "title": "Sequential knot bootstrapping and final repricing",
+      "path": "10-sequential-bootstrap.md"
+    },
+    {
+      "id": "CALIBRATION-FRAMEWORK-011",
+      "title": "Domain-aware scalar scan and root certification",
+      "path": "11-scalar-root-search.md"
+    },
+    {
+      "id": "CALIBRATION-FRAMEWORK-012",
+      "title": "Weighted Levenberg\u2013Marquardt and bound projection",
+      "path": "12-weighted-global-solve.md"
+    },
+    {
+      "id": "CALIBRATION-FRAMEWORK-013",
+      "title": "Deterministic Halton restart selection",
+      "path": "13-deterministic-multi-start.md"
+    },
+    {
+      "id": "CALIBRATION-FRAMEWORK-014",
+      "title": "Residual acceptance, plan aggregation and report units",
+      "path": "14-fit-reports.md"
+    },
+    {
+      "id": "CALIBRATION-FRAMEWORK-015",
+      "title": "Finite-difference sensitivities and condition estimates",
+      "path": "15-sensitivity-diagnostics.md"
+    },
+    {
+      "id": "CALIBRATION-FRAMEWORK-016",
+      "title": "Sampled curve shape, plausibility and bounds",
+      "path": "16-curve-validation.md"
+    },
+    {
+      "id": "CALIBRATION-FRAMEWORK-017",
+      "title": "Forward-moneyness calendar and call-spread checks",
+      "path": "17-surface-validation.md"
+    },
+    {
+      "id": "CALIBRATION-FRAMEWORK-018",
+      "title": "Dated Hull\u2013White quote preparation and persisted output",
+      "path": "18-hull-white-market-adapter.md"
+    },
+    {
+      "id": "CALIBRATION-FRAMEWORK-019",
+      "title": "Rate quote shocks and source-grid overlays",
+      "path": "19-rate-quote-replay.md"
+    },
+    {
+      "id": "CALIBRATION-FRAMEWORK-020",
+      "title": "Linked single-curve OIS discount/projection replay",
+      "path": "20-linked-ois-replay.md"
+    },
+    {
+      "id": "CALIBRATION-FRAMEWORK-021",
+      "title": "Lossless hazard replay, spread and recovery shocks",
+      "path": "21-hazard-quote-replay.md"
+    },
+    {
+      "id": "CALIBRATION-FRAMEWORK-022",
+      "title": "Deal quote overrides and horizon hazard reconstruction",
+      "path": "22-hazard-deal-and-horizon.md"
+    },
+    {
+      "id": "CALIBRATION-FRAMEWORK-023",
+      "title": "Content-keyed recalibration provider and cache lifetime",
+      "path": "23-recalibration-cache.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/calibration/src/api/authoring.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-001"
+      ],
+      "reason": "Quote validation, step-map defaults and typed authoring precedence",
+      "sha256": "dcf6ae68c53fbf59835042c039c51a89daa918bbebf40df4be6efbb6d415b22b"
+    },
+    {
+      "path": "finstack-quant/calibration/src/api/context_builder.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-002"
+      ],
+      "reason": "Initial prior objects and context-datum materialization with typed lookup rules",
+      "sha256": "6168cf340193b4fab97b17f63ed99aa1d36c5d0ad97027f0d5b994d5a4311bdd"
+    },
+    {
+      "path": "finstack-quant/calibration/src/api/dependency_review_tests.rs",
+      "classification": "test",
+      "records": [
+        "CALIBRATION-FRAMEWORK-003"
+      ],
+      "reason": "Dedicated dependency graph, stale-prior and serial/parallel consistency regressions",
+      "sha256": "35dc8d33373490eb240c0e7086ee4b73102a63239961c7a045ff33e2fd6259d8"
+    },
+    {
+      "path": "finstack-quant/calibration/src/api/engine.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-003",
+        "CALIBRATION-FRAMEWORK-014"
+      ],
+      "reason": "Dependency-ready batching, step execution, strict installation and plan report normalization",
+      "sha256": "b9fedd40abac09d160b126135c96dccc43637576d95782b6cfe5903c3ac6dbf0"
+    },
+    {
+      "path": "finstack-quant/calibration/src/api/errors.rs",
+      "classification": "support",
+      "records": [
+        "CALIBRATION-FRAMEWORK-003"
+      ],
+      "reason": "Maps internal calibration failures into public issue categories",
+      "sha256": "c80a5f9c79121e8705c2e293ad74b1aa30cac35bf426b0de12a264d0a784d176"
+    },
+    {
+      "path": "finstack-quant/calibration/src/api/market_datum.rs",
+      "classification": "support",
+      "records": [
+        "CALIBRATION-FRAMEWORK-001",
+        "CALIBRATION-FRAMEWORK-002"
+      ],
+      "reason": "Typed quote and context datum wire variants",
+      "sha256": "aeb6cfe210c56f954d5a43dd0233cb581edba7a8c3777e2f70617b90fb9b39b2"
+    },
+    {
+      "path": "finstack-quant/calibration/src/api/mod.rs",
+      "classification": "support",
+      "records": [
+        "CALIBRATION-FRAMEWORK-001",
+        "CALIBRATION-FRAMEWORK-003"
+      ],
+      "reason": "Public API module declarations and exports",
+      "sha256": "d75c623d586d6b561679b28c6e6c162002a08d4076eba189e359943ba68607c1"
+    },
+    {
+      "path": "finstack-quant/calibration/src/api/prior_market.rs",
+      "classification": "support",
+      "records": [
+        "CALIBRATION-FRAMEWORK-001",
+        "CALIBRATION-FRAMEWORK-002"
+      ],
+      "reason": "Typed prior curve, surface and model parameter variants",
+      "sha256": "43b002a54afcbbbafcc3e81c16ac032b183a1c86894094c93bd74cbfae9e3ff4"
+    },
+    {
+      "path": "finstack-quant/calibration/src/api/schema.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-001",
+        "CALIBRATION-FRAMEWORK-002",
+        "CALIBRATION-FRAMEWORK-003",
+        "CALIBRATION-FRAMEWORK-008",
+        "CALIBRATION-FRAMEWORK-018"
+      ],
+      "reason": "Strict versioned envelopes, step defaults, validation handoff and nested result market loading",
+      "sha256": "9c047b70348300626cefc67a72bac21a649bb3a13e8c13c813984131ed9ba7af"
+    },
+    {
+      "path": "finstack-quant/calibration/src/api/validate.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-001",
+        "CALIBRATION-FRAMEWORK-002",
+        "CALIBRATION-FRAMEWORK-003"
+      ],
+      "reason": "Static semantic diagnostics, identifier and quote-kind validation and dependency input checks",
+      "sha256": "c35e5461b3dff1dee403f2873c8b7293896c07bed4c189c286be009bf089395a"
+    },
+    {
+      "path": "finstack-quant/calibration/src/bin/gen_schemas.rs",
+      "classification": "support",
+      "records": [
+        "CALIBRATION-FRAMEWORK-001"
+      ],
+      "reason": "Command-line emission of hand-authored JSON-schema artifacts",
+      "sha256": "5e17eaf1f66bc16ed3f4bdcc75dcc99e49e44f2ee01d5955f210d999f36eaf49"
+    },
+    {
+      "path": "finstack-quant/calibration/src/build/cds.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-007"
+      ],
+      "reason": "CDS registry, date rolls, par/upfront and accrued premium construction",
+      "sha256": "d164fac9c0828635555d91029f77d83fe6c4571201e7d21fc2dff21c223784be"
+    },
+    {
+      "path": "finstack-quant/calibration/src/build/cds_tranche.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-008"
+      ],
+      "reason": "Tranche-width notional, upfront and date/schedule override normalization",
+      "sha256": "9af582a2c2b0d417615a27c53f8294af4ad000200631eb989bab1796b377223e"
+    },
+    {
+      "path": "finstack-quant/calibration/src/build/context.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-004",
+        "CALIBRATION-FRAMEWORK-005",
+        "CALIBRATION-FRAMEWORK-006",
+        "CALIBRATION-FRAMEWORK-007",
+        "CALIBRATION-FRAMEWORK-008",
+        "CALIBRATION-FRAMEWORK-009"
+      ],
+      "reason": "Required curve-role resolution and material CDS/OIS convention overrides",
+      "sha256": "cc681b966e8f6257d65ab9f410b1bb23b5999fa33b8afde0e25d26c176939005"
+    },
+    {
+      "path": "finstack-quant/calibration/src/build/helpers.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-004",
+        "CALIBRATION-FRAMEWORK-005",
+        "CALIBRATION-FRAMEWORK-006",
+        "CALIBRATION-FRAMEWORK-007",
+        "CALIBRATION-FRAMEWORK-008",
+        "CALIBRATION-FRAMEWORK-009"
+      ],
+      "reason": "Calendar, tenor/date and maturity resolution shared by quote builders",
+      "sha256": "36a5a1ec7107b628c7dd16b188c3496265db01a978215274c66fac8f549a4b92"
+    },
+    {
+      "path": "finstack-quant/calibration/src/build/mod.rs",
+      "classification": "support",
+      "records": [
+        "CALIBRATION-FRAMEWORK-004",
+        "CALIBRATION-FRAMEWORK-007",
+        "CALIBRATION-FRAMEWORK-009"
+      ],
+      "reason": "Private builder module declarations and exports",
+      "sha256": "7d8c83e9f563437d873248f6c9c04cc7be28fce405c39c891e28796a08969c53"
+    },
+    {
+      "path": "finstack-quant/calibration/src/build/prepared.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-004",
+        "CALIBRATION-FRAMEWORK-005",
+        "CALIBRATION-FRAMEWORK-006",
+        "CALIBRATION-FRAMEWORK-007",
+        "CALIBRATION-FRAMEWORK-009"
+      ],
+      "reason": "Prepared quote instruments and exact pillar clocks, including deposit raw-PV residual path",
+      "sha256": "9bf38e617dc3cb3a93c24e94a42830cdd828d2c7b8443e92a4341cb36521a46f"
+    },
+    {
+      "path": "finstack-quant/calibration/src/build/rates.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-004",
+        "CALIBRATION-FRAMEWORK-005",
+        "CALIBRATION-FRAMEWORK-006"
+      ],
+      "reason": "Deposit, FRA, rate future and swap construction with material schedule and pillar choices",
+      "sha256": "374b1bfb4ffcbcd785089b6a11c9b9374b964551d84dafe376c4397efb7444d7"
+    },
+    {
+      "path": "finstack-quant/calibration/src/build/tests_credit.rs",
+      "classification": "test",
+      "records": [
+        "CALIBRATION-FRAMEWORK-007",
+        "CALIBRATION-FRAMEWORK-008"
+      ],
+      "reason": "Dedicated CDS and tranche quote construction regressions",
+      "sha256": "cac15727df88daf5ee4c31d66a29011694ecb07615b7df682b619cd8368cf4fb"
+    },
+    {
+      "path": "finstack-quant/calibration/src/build/tests_quote_construction.rs",
+      "classification": "test",
+      "records": [
+        "CALIBRATION-FRAMEWORK-004",
+        "CALIBRATION-FRAMEWORK-005",
+        "CALIBRATION-FRAMEWORK-006",
+        "CALIBRATION-FRAMEWORK-007",
+        "CALIBRATION-FRAMEWORK-009"
+      ],
+      "reason": "Dedicated quote-to-instrument construction and dates tests",
+      "sha256": "72d16665cc44989daeb804a2e0633ea81bbb783383144c041aa8915ae55d4eae"
+    },
+    {
+      "path": "finstack-quant/calibration/src/build/tests_rates.rs",
+      "classification": "test",
+      "records": [
+        "CALIBRATION-FRAMEWORK-004",
+        "CALIBRATION-FRAMEWORK-005",
+        "CALIBRATION-FRAMEWORK-006"
+      ],
+      "reason": "Dedicated rate instrument date, curve and compounding tests",
+      "sha256": "762f9ddaef1b40912041fc1ea1f174a30ac8dda52ee82f2034d6f039e2d92444"
+    },
+    {
+      "path": "finstack-quant/calibration/src/build/xccy/tests.rs",
+      "classification": "test",
+      "records": [
+        "CALIBRATION-FRAMEWORK-009"
+      ],
+      "reason": "Dedicated cross-currency convention, calendar and leg construction tests",
+      "sha256": "ebd4c5a0b8973bdb21123054023e1afc30596506a81a2a2d87801da711579ca6"
+    },
+    {
+      "path": "finstack-quant/calibration/src/build/xccy.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-009"
+      ],
+      "reason": "Cross-currency convention lookup, maturity adjustment and basis-spread leg selection",
+      "sha256": "56c9a389e30a6674937479d6b8c78fadc2e0119a5fa1002dbf6fb60e3e039241"
+    },
+    {
+      "path": "finstack-quant/calibration/src/config.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-002"
+      ],
+      "reason": "Numerical, acceptance and validation controls, currency bounds, recursive override and validity gates",
+      "sha256": "d6e3049e366bac2c683e15bbdbba5400555610e5ee0bb25aca97b4e26f5f8f85"
+    },
+    {
+      "path": "finstack-quant/calibration/src/constants.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-010",
+        "CALIBRATION-FRAMEWORK-011",
+        "CALIBRATION-FRAMEWORK-012",
+        "CALIBRATION-FRAMEWORK-014"
+      ],
+      "reason": "Material knot/grid tolerances, DF floor, weight floor and penalty/report thresholds",
+      "sha256": "43efab69bfd09a67c956449ed988d4a9c291a37c3ff78a40fb7b9f0b82099e4f"
+    },
+    {
+      "path": "finstack-quant/calibration/src/json_schema.rs",
+      "classification": "support",
+      "records": [
+        "CALIBRATION-FRAMEWORK-001"
+      ],
+      "reason": "Schema artifact catalogue and illustrative envelope generation",
+      "sha256": "b3fe8efebad3be0ff2839b0c2c88e06270a6b9d61a88a17ab21de80d126afaaf"
+    },
+    {
+      "path": "finstack-quant/calibration/src/lib.rs",
+      "classification": "support",
+      "records": [
+        "CALIBRATION-FRAMEWORK-001",
+        "CALIBRATION-FRAMEWORK-003"
+      ],
+      "reason": "Crate module declarations, exports and usage documentation",
+      "sha256": "32c4285e9b19ca9e7557feff2b051d8d28afa836603f1455f4edf9148df562cf"
+    },
+    {
+      "path": "finstack-quant/calibration/src/recalibration/cache.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-023"
+      ],
+      "reason": "Per-key once-success concurrency, failed-result retry and unbounded retention policy",
+      "sha256": "3c8c12bdc20fc649f2c44d5ecd45a50b6a01c347d71c7ae7262efd76f4d9e85b"
+    },
+    {
+      "path": "finstack-quant/calibration/src/recalibration/hazard.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-021",
+        "CALIBRATION-FRAMEWORK-022",
+        "CALIBRATION-FRAMEWORK-023"
+      ],
+      "reason": "Lossless hazard policy replay, identity, spread/recovery/deal/horizon actions and cache keys",
+      "sha256": "113388ee6ff151f8d35f162cae50b248ab00265c8a04428db2f8c3638b3c7b94"
+    },
+    {
+      "path": "finstack-quant/calibration/src/recalibration/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-019",
+        "CALIBRATION-FRAMEWORK-021"
+      ],
+      "reason": "Recalibration fit acceptance and public replay exports",
+      "sha256": "b9ff1733da7fdbd2c95c95a9f3553ec2a15ccac93f167b29ca553ee7edddfa89"
+    },
+    {
+      "path": "finstack-quant/calibration/src/recalibration/provider.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-019",
+        "CALIBRATION-FRAMEWORK-020",
+        "CALIBRATION-FRAMEWORK-021",
+        "CALIBRATION-FRAMEWORK-022",
+        "CALIBRATION-FRAMEWORK-023"
+      ],
+      "reason": "Explicit pricing provider, action dispatch, shock-domain validation and dependency identity",
+      "sha256": "36eea59e9f77fac52d033d3851ba810e49b0ae2a9d082757629457f9975af8f0"
+    },
+    {
+      "path": "finstack-quant/calibration/src/recalibration/rates.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-019",
+        "CALIBRATION-FRAMEWORK-020",
+        "CALIBRATION-FRAMEWORK-023"
+      ],
+      "reason": "Approximate tenor shocks, source-grid overlays, OIS linkage, clock conversion and cache identity",
+      "sha256": "5760edf2c6b434a0791a3fc33d4ba2b0262141efb9e50c269b8737fd1deb9288"
+    },
+    {
+      "path": "finstack-quant/calibration/src/recalibration/rates_review_tests.rs",
+      "classification": "test",
+      "records": [
+        "CALIBRATION-FRAMEWORK-019",
+        "CALIBRATION-FRAMEWORK-020",
+        "CALIBRATION-FRAMEWORK-023"
+      ],
+      "reason": "Dedicated rate replay/direct-fit, zero-shock and composition regressions",
+      "sha256": "d86b3516934031afc27fcd07e06c0af8ed8ac14cca9e1954cfed8512f80b0bdc"
+    },
+    {
+      "path": "finstack-quant/calibration/src/report.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-014"
+      ],
+      "reason": "Residual norms, penalty filtering, acceptance and report finalization/metadata",
+      "sha256": "056ca21b96441136c24d2e6d3aca261cdd3b0241dbf1e9b37c7c3dc29ef9726d"
+    },
+    {
+      "path": "finstack-quant/calibration/src/solver/bootstrap.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-010",
+        "CALIBRATION-FRAMEWORK-015"
+      ],
+      "reason": "Ordered scalar knot bootstrapping, final curve repricing and finite-bump sensitivity diagnostics",
+      "sha256": "80b92e26a2a4fda6b6afb96d026b49420e0d3827fead25e94860b87026b8c9f6"
+    },
+    {
+      "path": "finstack-quant/calibration/src/solver/config.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-002",
+        "CALIBRATION-FRAMEWORK-012",
+        "CALIBRATION-FRAMEWORK-013"
+      ],
+      "reason": "Bootstrap/global/multistart configuration and default solver controls",
+      "sha256": "7db2635b778da6b0da725765ed5f508786aa5bb1a42fc1ff4b473eda3faf3c8a"
+    },
+    {
+      "path": "finstack-quant/calibration/src/solver/global.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-012",
+        "CALIBRATION-FRAMEWORK-015"
+      ],
+      "reason": "Weighted least squares, bound clamps, analytical/numerical Jacobians, final acceptance and diagnostics",
+      "sha256": "6e23dd847523a577ee20f65bc258c3cf5b71c075803f869fb57086e07e350afe"
+    },
+    {
+      "path": "finstack-quant/calibration/src/solver/helpers.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-011"
+      ],
+      "reason": "Bounds-clipped exponential scans, custom scalar refinements and minimum-absolute-residual search",
+      "sha256": "a9cb9450adb1508907ce7fb81cdbde0b1cf63c959213feeccb9f66278b89460c"
+    },
+    {
+      "path": "finstack-quant/calibration/src/solver/multi_start.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-013"
+      ],
+      "reason": "Deterministic start grids, reflection and weighted-L2 winning-result selection",
+      "sha256": "1d25160ee058a0a92f359e4fbaed46653d23e12e50020607faf301c372e21c3f"
+    },
+    {
+      "path": "finstack-quant/calibration/src/solver/traits.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-010",
+        "CALIBRATION-FRAMEWORK-012"
+      ],
+      "reason": "Target contracts and default curve, residual, Jacobian, penalty and solver capability behavior",
+      "sha256": "8372b049389d5e26ee4569e5a057cdb4b13e48e35db3a8256c54dc261fabfb9d"
+    },
+    {
+      "path": "finstack-quant/calibration/src/solver.rs",
+      "classification": "support",
+      "records": [
+        "CALIBRATION-FRAMEWORK-010",
+        "CALIBRATION-FRAMEWORK-012"
+      ],
+      "reason": "Shared solver module declarations and exports",
+      "sha256": "8484615a6e15511ad93edd8322a6096d55b526b19cb703adb695af6361142117"
+    },
+    {
+      "path": "finstack-quant/calibration/src/step_runtime.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-003",
+        "CALIBRATION-FRAMEWORK-014",
+        "CALIBRATION-FRAMEWORK-016",
+        "CALIBRATION-FRAMEWORK-017",
+        "CALIBRATION-FRAMEWORK-018"
+      ],
+      "reason": "Thirteen target runtime dispatches, prepared quotes, post-fit validation, model adaptation and outputs",
+      "sha256": "ccde312ff0ef93e7c5190a7d701e588542dadd03eb3c1ac1939ab146661ef749"
+    },
+    {
+      "path": "finstack-quant/calibration/src/test_support.rs",
+      "classification": "test",
+      "records": [
+        "CALIBRATION-FRAMEWORK-001",
+        "CALIBRATION-FRAMEWORK-003"
+      ],
+      "reason": "Shared test-only flat-market and envelope fixtures",
+      "sha256": "00a74a8ca8d71c84aa5abec4e849ce736676f44722042c19941c87999942f219"
+    },
+    {
+      "path": "finstack-quant/calibration/src/validation/config.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-002",
+        "CALIBRATION-FRAMEWORK-016",
+        "CALIBRATION-FRAMEWORK-017"
+      ],
+      "reason": "Post-fit validation switches, bounds and Error/Warn policy defaults",
+      "sha256": "6851693d9d7214d758153cb9bdb7f4966e37daf8da76772d71daaec04ff77545"
+    },
+    {
+      "path": "finstack-quant/calibration/src/validation/curves.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-016"
+      ],
+      "reason": "Sampled discount/forward/hazard/inflation checks and variance/knot-aware discount probes",
+      "sha256": "9b6cb05110e0d1fdbc1b4e1100c4ddbf9b092b2183c433a39c5d92412d70d2c1"
+    },
+    {
+      "path": "finstack-quant/calibration/src/validation/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-016",
+        "CALIBRATION-FRAMEWORK-017"
+      ],
+      "reason": "Attaches validation failure or warning without clearing existing fit failure",
+      "sha256": "7be624ac1abff5026c20374e0a6ba7d2935f21c03958a260f50d99d41a9ab7f6"
+    },
+    {
+      "path": "finstack-quant/calibration/src/validation/points.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-016"
+      ],
+      "reason": "Fixed year-fraction sampling grids that determine curve-validation coverage",
+      "sha256": "0c2d42b1427cf2f91bd8845477bc0669bd793f4c80ae1a7e5861939a98f2ca31"
+    },
+    {
+      "path": "finstack-quant/calibration/src/validation/preflight.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-003",
+        "CALIBRATION-FRAMEWORK-018"
+      ],
+      "reason": "Runtime typed dependency, base-date, quote convention and model-prerequisite checks",
+      "sha256": "1df483b33a83bafbe30c251250b7b6ed3185ac876e6c9ec8d33bb4d8176a72e5"
+    },
+    {
+      "path": "finstack-quant/calibration/src/validation/surfaces.rs",
+      "classification": "algorithm",
+      "records": [
+        "CALIBRATION-FRAMEWORK-017"
+      ],
+      "reason": "Volatility bounds, total-variance calendar and finite-strike convexity gates",
+      "sha256": "98548025df0099418f71aaa972c379cc0979c97d97f7e1aef0948cea84170c49"
+    },
+    {
+      "path": "finstack-quant/calibration/src/versions.rs",
+      "classification": "support",
+      "records": [
+        "CALIBRATION-FRAMEWORK-014",
+        "CALIBRATION-FRAMEWORK-018"
+      ],
+      "reason": "Human-readable methodology identifiers stamped on reports; not runtime dispatch",
+      "sha256": "5085aeae5046277962e8b0eca55af2bfed3ede57b662c50e01569f40e578692e"
+    }
+  ]
+}

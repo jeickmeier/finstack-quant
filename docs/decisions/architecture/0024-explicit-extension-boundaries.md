@@ -65,5 +65,6 @@ centrally defines supported persisted tags.
 The [portfolio guide](../../../finstack-quant/portfolio/README.md) states that
 reconstruction has no external-registry hook and cannot reconstruct positions
 whose custom instruments provide no supported serialized specification.
-Audit documentation and tests against these extension boundaries. This ADR
-does not add plugin loading, new callback execution, or custom-type persistence.
+This ADR does not add plugin loading, new callback execution, or custom-type
+persistence. Documentation and test coverage are tracked in
+[FOLLOW_UPS.md](../FOLLOW_UPS.md#implementation-and-lifecycle-follow-up).

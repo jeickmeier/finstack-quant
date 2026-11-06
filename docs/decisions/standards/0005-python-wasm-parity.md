@@ -42,9 +42,11 @@ The parity ledger checks surface coverage. Shared behavioral cases must also
 verify results, defaults, validation, and error meaning. Protect backlog
 ceilings and exclusion rules against unapproved relaxation.
 
-The existing backlog test reads its ceiling from the candidate ledger. It
-does not independently prevent a patch from raising both backlog and ceiling.
-Trusted-baseline enforcement under ADR 0016 remains necessary.
+Trusted-baseline enforcement follows
+[ADR 0016](../project/0016-independent-contract-protection.md); passing a
+candidate-tree check alone does not establish independent protection.
+Implementation and verification work is tracked in
+[FOLLOW_UPS.md](../FOLLOW_UPS.md#implementation-and-lifecycle-follow-up).
 
 ## Implementation notes and references
 

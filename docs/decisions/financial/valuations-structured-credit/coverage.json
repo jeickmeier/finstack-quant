@@ -1,0 +1,1129 @@
+{
+  "scope": "valuations-structured-credit",
+  "source_revision": "7e82fd03ad98346727769e88dd5ac5d84b56e9fc",
+  "audit_date": "2026-11-05",
+  "records": [
+    {
+      "id": "VALUATIONS-STRUCTURED-CREDIT-01",
+      "title": "Deal resolution, dispatch and assumption presets",
+      "path": "01-dispatch-and-assumptions.md"
+    },
+    {
+      "id": "VALUATIONS-STRUCTURED-CREDIT-02",
+      "title": "Collateral normalization and pool statistics",
+      "path": "02-pool-normalization-and-statistics.md"
+    },
+    {
+      "id": "VALUATIONS-STRUCTURED-CREDIT-03",
+      "title": "Statistical collateral cashflow projection",
+      "path": "03-statistical-collateral-projection.md"
+    },
+    {
+      "id": "VALUATIONS-STRUCTURED-CREDIT-04",
+      "title": "Delinquency migration, modification and servicer advancing",
+      "path": "04-delinquency-and-advancing.md"
+    },
+    {
+      "id": "VALUATIONS-STRUCTURED-CREDIT-05",
+      "title": "NPL resolution and reperformance",
+      "path": "05-npl-resolution.md"
+    },
+    {
+      "id": "VALUATIONS-STRUCTURED-CREDIT-06",
+      "title": "CMBS balloon extension, penalties and special servicing",
+      "path": "06-cmbs-servicing.md"
+    },
+    {
+      "id": "VALUATIONS-STRUCTURED-CREDIT-07",
+      "title": "Card master-trust allocation",
+      "path": "07-card-master-trust.md"
+    },
+    {
+      "id": "VALUATIONS-STRUCTURED-CREDIT-08",
+      "title": "Contractual instrument collateral, hazards and liquidity",
+      "path": "08-instrument-collateral.md"
+    },
+    {
+      "id": "VALUATIONS-STRUCTURED-CREDIT-09",
+      "title": "Collateral call and put exercise assumptions",
+      "path": "09-collateral-exercise.md"
+    },
+    {
+      "id": "VALUATIONS-STRUCTURED-CREDIT-10",
+      "title": "Reinvestment, reserves and hedge cash accounts",
+      "path": "10-reinvestment-reserves-and-hedges.md"
+    },
+    {
+      "id": "VALUATIONS-STRUCTURED-CREDIT-11",
+      "title": "Waterfall claims, fee priority, PIK and integer rounding",
+      "path": "11-waterfall-claims-and-rounding.md"
+    },
+    {
+      "id": "VALUATIONS-STRUCTURED-CREDIT-12",
+      "title": "Coverage collateral values, ratios and cure diversion",
+      "path": "12-coverage-and-cures.md"
+    },
+    {
+      "id": "VALUATIONS-STRUCTURED-CREDIT-13",
+      "title": "Step-down, shifting-interest and early-amortization regimes",
+      "path": "13-principal-regimes-and-amortization.md"
+    },
+    {
+      "id": "VALUATIONS-STRUCTURED-CREDIT-14",
+      "title": "Loss recognition, deal calls and terminal recovery treatment",
+      "path": "14-loss-recognition-and-terminal-cash.md"
+    },
+    {
+      "id": "VALUATIONS-STRUCTURED-CREDIT-15",
+      "title": "Monte Carlo factors, finite names and loss estimation",
+      "path": "15-stochastic-waterfall.md"
+    },
+    {
+      "id": "VALUATIONS-STRUCTURED-CREDIT-16",
+      "title": "Stochastic revolver utilization and draw-option attribution",
+      "path": "16-revolver-utilization-and-option-cost.md"
+    },
+    {
+      "id": "VALUATIONS-STRUCTURED-CREDIT-17",
+      "title": "OAS scenario discounting and inverse spread",
+      "path": "17-oas-scenarios.md"
+    },
+    {
+      "id": "VALUATIONS-STRUCTURED-CREDIT-18",
+      "title": "Agency CMO waterfall and dated PAC contracts",
+      "path": "18-agency-cmo-and-pac.md"
+    },
+    {
+      "id": "VALUATIONS-STRUCTURED-CREDIT-19",
+      "title": "Borrowing base and asset-backed facility synthesis",
+      "path": "19-borrowing-base-facility.md"
+    },
+    {
+      "id": "VALUATIONS-STRUCTURED-CREDIT-20",
+      "title": "Settlement quotes, yields, spreads and discount margin",
+      "path": "20-quotes-and-inverse-pricing.md"
+    },
+    {
+      "id": "VALUATIONS-STRUCTURED-CREDIT-21",
+      "title": "Risk bumps, breakeven default and scenario grids",
+      "path": "21-risk-bumps-and-scenarios.md"
+    },
+    {
+      "id": "VALUATIONS-STRUCTURED-CREDIT-22",
+      "title": "Cashflow classification, summary metrics and diagnostics",
+      "path": "22-diagnostics-and-reporting.md"
+    }
+  ],
+  "files": [
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/asset_backed_facility/metrics.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-19",
+        "VALUATIONS-STRUCTURED-CREDIT-20",
+        "VALUATIONS-STRUCTURED-CREDIT-21",
+        "VALUATIONS-STRUCTURED-CREDIT-22"
+      ],
+      "reason": "Facility borrowing-base/cushion/utilization formulas, lender/residual IRR and generic curve/spread risk dispatch.",
+      "sha256": "ecd6d4aad3199d3a4706171ddfeeb28c920f8fe04e466c2abfa9566fa8085695"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/asset_backed_facility/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Module declarations and public facility re-exports only.",
+      "sha256": "92d6b1fbdd4414725fb70827afc341a02334c4c0c788981534e0793de42b7687"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/asset_backed_facility/pricing.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-10",
+        "VALUATIONS-STRUCTURED-CREDIT-14",
+        "VALUATIONS-STRUCTURED-CREDIT-19",
+        "VALUATIONS-STRUCTURED-CREDIT-20"
+      ],
+      "reason": "Synthetic two-class deal, draws/readvance, term-out, commitment fee, lender cashflows, IRR and valuation.",
+      "sha256": "c008186858c575f88dc41f063990760d185e246a661962b179c3757323b9f229"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/asset_backed_facility/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-19"
+      ],
+      "reason": "Facility term validation, effective revolving/repayment dates and initial borrowing-base evaluation.",
+      "sha256": "fb8e44b9e1565bb495589af04c915e5f78995ee1e024db967f9e53266a91de73"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/cmo/metrics/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-18",
+        "VALUATIONS-STRUCTURED-CREDIT-21"
+      ],
+      "reason": "CMO quoted-clean-price requirement and static spread/common DV01 metric dispatch.",
+      "sha256": "5475bdc98780808ac9abe82747e76f120a7f31059adba69ff5f3f6c9aa348fc0"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/cmo/metrics/zspread.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-18",
+        "VALUATIONS-STRUCTURED-CREDIT-20"
+      ],
+      "reason": "CMO quote-basis collateral/accrued setup and bounded continuous-spread Brent solver.",
+      "sha256": "beeb4f51d15ad183035c325548725d05b2ae8cddd2e6a65be813a0d9eaa5fea0"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/cmo/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "CMO module declarations and public type/algorithm re-exports.",
+      "sha256": "7ebfd6430cdfb675d181e418e76aaa470ae8732baf4f75cf2931ac50abf23bf1"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/cmo/pac_support.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-18"
+      ],
+      "reason": "Persistent dated PAC generation from endpoint-collar collateral principal and schedule lookup/validation.",
+      "sha256": "fac23e509bf4b321b0a58ba83ae133f12e3f5fbf5feea727e7a63ff59bc639ca"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/cmo/pricer.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-18"
+      ],
+      "reason": "Explicit/assumed collateral resolution, full-waterfall reference-tranche projection, classification and PV.",
+      "sha256": "91be1169893a759e75e5f37726b739ff06ceae90b5abaf4158d9865105580e11"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/cmo/types.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-18"
+      ],
+      "reason": "CMO class behavior, balance/priority validation, collateral constraints and reference-tranche selection.",
+      "sha256": "f6312febe67bbe4392a720d45d93df70357b9e521b08cafaf4c45c96f4bc8375"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/cmo/waterfall.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-18"
+      ],
+      "reason": "Priority interest/principal, funded accrual, PAC/support and IO survival plus principal attribution.",
+      "sha256": "1a9cfc973cda71e62c945a52e6a69e215773603c9f62771013e86ff8e09e08c4"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/family.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-01",
+        "VALUATIONS-STRUCTURED-CREDIT-15",
+        "VALUATIONS-STRUCTURED-CREDIT-19",
+        "VALUATIONS-STRUCTURED-CREDIT-21",
+        "VALUATIONS-STRUCTURED-CREDIT-22"
+      ],
+      "reason": "Deterministic/stochastic model registration, seeded deterministic run and published MC risk ownership.",
+      "sha256": "8d27dc7d2326f8db753d3ccc9796bec9fdae3831a357c3bfc226b2daa7fb7db3"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/lib.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Crate modules, public family/type exports and lint configuration only.",
+      "sha256": "244fd020635768cbf42414125d59e98b3e7b0d8dad521f273a3d2a792a47f32c"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/assumptions.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-01",
+        "VALUATIONS-STRUCTURED-CREDIT-14",
+        "VALUATIONS-STRUCTURED-CREDIT-15",
+        "VALUATIONS-STRUCTURED-CREDIT-18"
+      ],
+      "reason": "Embedded JSON registry with validated economic defaults, fee/preset lookups and cleanup threshold.",
+      "sha256": "7d02e6512c31804bdce40f9ff6a77853403ac9cdc4ffe3f061bd725f0f2ceb2a"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/deal_specific/abs.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-07",
+        "VALUATIONS-STRUCTURED-CREDIT-22"
+      ],
+      "reason": "ABS delinquency, excess spread, payment/charge-off ratios and senior credit enhancement formulas.",
+      "sha256": "1ec7fcb32527a6290aae14466d59495bcd2222d8146850f99e2dff7c1cc96586"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/deal_specific/cmbs.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-06",
+        "VALUATIONS-STRUCTURED-CREDIT-22"
+      ],
+      "reason": "Loan-level live floating/annuity debt service and NOI-subset DSCR.",
+      "sha256": "64c1fadd6d13c1a734bd2b3e1abd2c8fdd6a89961d7fcda83e76ba69bec47395"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/deal_specific/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "ABS/CMBS metric module declarations and re-exports only.",
+      "sha256": "4bbef7276813de07734b7eec90650fbe60ba0a62ea48f99936954132390fc820"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/finite.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-22"
+      ],
+      "reason": "Financial-result finite guards for tranche/equity/OAS/scenario summaries.",
+      "sha256": "fa7296cffaf10a3d3b68081e3ac33c8f978aeb426cb4ef6afc900aaba766081a"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-20",
+        "VALUATIONS-STRUCTURED-CREDIT-21",
+        "VALUATIONS-STRUCTURED-CREDIT-22"
+      ],
+      "reason": "Settlement-relative discounted-flow conversion, tranche/deal repricing scope and metric model registration.",
+      "sha256": "db74b312961e4f6454e0ca93c83e74171aca7a7c12bf4e5b8dd6643b9648086b"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/pool.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-02",
+        "VALUATIONS-STRUCTURED-CREDIT-07",
+        "VALUATIONS-STRUCTURED-CREDIT-22"
+      ],
+      "reason": "WARF/WAS/WAM metric fallback policies and model CPR/CDR annualization at pool seasoning.",
+      "sha256": "d74f8f5e8f4309295acdc7551b55263cbb499e2419edc7e78bb851cc79bf0ba4"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/pricing/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-20",
+        "VALUATIONS-STRUCTURED-CREDIT-22"
+      ],
+      "reason": "Accrued coupon calculation from tranche or seeded deal accrual periods.",
+      "sha256": "6d3b0d0ffc58add9d1b1c2aec0b8d28995725b491080a02840c05ff8ebfba09e"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/pricing/prices.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-20"
+      ],
+      "reason": "Current-face quote notional and settlement clean/dirty price conversion.",
+      "sha256": "b38d3d18b88e7701e9157981c646e043b1c0c4116f1a920b7e7b126b22ebe7bd"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/pricing/wal.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-21",
+        "VALUATIONS-STRUCTURED-CREDIT-22"
+      ],
+      "reason": "Principal-weighted WAL; tagged principal-kind absolute-value fallback and missing-input error.",
+      "sha256": "57ba403930e8192b5000607b77db71650b42084c6f5133c468661b46d4272730"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/quote.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-20"
+      ],
+      "reason": "Settlement validation, clean/dirty target precedence, current-face and accrued quote basis.",
+      "sha256": "f562922256276585b131692f973505880aedaa37429e46a560e0a8c4787956b0"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/risk/breakeven_cdr.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-21"
+      ],
+      "reason": "Tranche default-stress loss objective and bounded monotonic bisection.",
+      "sha256": "ed4283a5bdddb81f642436b85a3838a842961dffe5763afc4d7a1192545a76bd"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/risk/convexity.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-21"
+      ],
+      "reason": "Fixed-flow symmetric ten-bp convexity and metric adaptation.",
+      "sha256": "afdb9db81411be69afd8dbae3820a69d8534f4c0231315c6a529f4f78031cdab"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/risk/default01.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-21"
+      ],
+      "reason": "Annual-equivalent default bumps for constant/SDA/vector/timing/cumulative models and scoped repricing.",
+      "sha256": "e7a14ff21e05c95586de42d7918649d185176eca723abc37d7d0bd03a59958c8"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/risk/duration.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-21"
+      ],
+      "reason": "PV-time Macaulay and one-sided one-bp fixed-flow modified duration.",
+      "sha256": "1e0aeb24406f5e91618b294531f7ffd10977dd8fbc3e8c4d353c5bd92fd3c2bc"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/risk/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-21"
+      ],
+      "reason": "Severity-vector arithmetic effective recovery and risk module exports.",
+      "sha256": "3f02c848e50ebe734b3ac141877c8a5d2fa8c028cab2fe475b31e10bda02606a"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/risk/oas.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-17",
+        "VALUATIONS-STRUCTURED-CREDIT-20"
+      ],
+      "reason": "Separate OU/lognormal-credit OAS scenarios, stochastic DFs, cached-flow Brent inverse and sampling error.",
+      "sha256": "37128e89a5dfceee114de1b411eee54f33ef41cea63bbffca6bc0707f069c856"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/risk/prepayment01.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-21"
+      ],
+      "reason": "Annual-equivalent CPR/PSA/vector perturbations and repricing normalization.",
+      "sha256": "3a7e8a65a18bf4049a02b22044f9eb8f2809c5bca63fe9f6d650c67a01bdbe8b"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/risk/recovery01.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-21"
+      ],
+      "reason": "One-percentage-point recovery/severity-vector changes and scoped repricing.",
+      "sha256": "ca56eb618e2c067b6534af8bfdc399a0839133be30c8b5e6dce11e8a4d307a3f"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/risk/severity01.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-21"
+      ],
+      "reason": "Loss-severity sensitivity via reversed recovery perturbation.",
+      "sha256": "a1b1e76ef8fda26d8228738e9334e05aafa61ebe110b84742c2eb9a207ed83d4"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/risk/spreads.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-20",
+        "VALUATIONS-STRUCTURED-CREDIT-21"
+      ],
+      "reason": "Continuous spread inversion, CS01, discount-margin validation, spread convexity and time-distributed buckets.",
+      "sha256": "214667c2300e2e978f9aaddde10b6db565849bb8237e79c772b2bd25e8cfdec5"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/risk/ytm.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-20"
+      ],
+      "reason": "Configurable compounding, tranche day-count selection and Brent yield inversion.",
+      "sha256": "359aea2b25d9b6380c989a5627f14af982e27e32afa13d89960e9e144c657e18"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/scenario.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-21",
+        "VALUATIONS-STRUCTURED-CREDIT-22"
+      ],
+      "reason": "Capped deterministic scenario grids, model overrides, tranche summary aggregation and finite checks.",
+      "sha256": "5551db09e52889c23f97de552b6dd3341e2c3caafffea860515855e599beef00"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/metrics/summary.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-14",
+        "VALUATIONS-STRUCTURED-CREDIT-20",
+        "VALUATIONS-STRUCTURED-CREDIT-21",
+        "VALUATIONS-STRUCTURED-CREDIT-22"
+      ],
+      "reason": "Call/maturity separation, reprojected curve sensitivities, quote/yield/spread summary and equity return calculations.",
+      "sha256": "0d891bedbcfb5e8658575a80c1cc9ed03f382ffd51d20ca78ecc1eac1a72d606"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Structured-credit public module facade and re-exports; no calculation or selection logic.",
+      "sha256": "87db163cceafdeaab2506f39cc2f8c1265246f758c5f0cd7e433c5bbccaf3bca"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/coverage_tests.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-12",
+        "VALUATIONS-STRUCTURED-CREDIT-19"
+      ],
+      "reason": "Production OC/IC/borrowing-base ratios, collateral adjustments and principal-order cure sizing; not a test-only file.",
+      "sha256": "8df8a19f9eb9b6b6da204af4f46890b28f3d3ef286dcf8daac8b6fb8611f3f31"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-01",
+        "VALUATIONS-STRUCTURED-CREDIT-03"
+      ],
+      "reason": "Public run_simulation lifecycle validation and deterministic pool-source dispatch.",
+      "sha256": "da8b06c9971eaa8f63e109ac4789c71d3a6470d81ee2730d88fb113ad96ea7e1"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/resolve.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-11",
+        "VALUATIONS-STRUCTURED-CREDIT-12",
+        "VALUATIONS-STRUCTURED-CREDIT-13"
+      ],
+      "reason": "Live waterfall edits for AFC, step-down/shifting weights, target OC, carryover and accumulation.",
+      "sha256": "2165282b24193d20e2aedf251778aeb68b56c2ea52486ac1654866059ab253f6"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/conservation.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-10"
+      ],
+      "reason": "Cash conservation threshold and reinvestment-principal recycling.",
+      "sha256": "953fb93e1a73e5546be6ab66ccee273306a8bbac08f7e4b61e9829d17a698bf7"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/delinquency.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-04"
+      ],
+      "reason": "Monthly delinquency migration, cures/modifications, arrears and advance repayment state.",
+      "sha256": "7b2557434dd0308f9f9fd884e3a444623cc256028e8b77d1c5417237a51b7cd3"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/exercise.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-09"
+      ],
+      "reason": "Collateral call/put rule selection, refinancing threshold and candidate yield comparisons.",
+      "sha256": "0f4efa609096c88ae7e803545d446f116bb169e1b4a61d028a1ff9fac0cbf79f"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/hedges.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-10"
+      ],
+      "reason": "IRS interval cash netting, live notional scaling and hedge payment waterfall placement.",
+      "sha256": "977dd043717254b98037361be438a2070d4a47758bedabc7103427908bbdc565"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/instrument_flows.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-08",
+        "VALUATIONS-STRUCTURED-CREDIT-09",
+        "VALUATIONS-STRUCTURED-CREDIT-16"
+      ],
+      "reason": "Prepared contractual schedules, opening balances, hazard/default exposure, exercise and capped draw funding.",
+      "sha256": "60c0bd252509beec0d6ca56fc3c0dcdf5b074fb8ab977bebdb4419773f0102b7"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/instrument_paths.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-08",
+        "VALUATIONS-STRUCTURED-CREDIT-09",
+        "VALUATIONS-STRUCTURED-CREDIT-15",
+        "VALUATIONS-STRUCTURED-CREDIT-16",
+        "VALUATIONS-STRUCTURED-CREDIT-17"
+      ],
+      "reason": "Path-specific per-name defaults, floating/exercise shifts, CIR/OU utilization and draw-spread counterfactual replay.",
+      "sha256": "75dee1c1b55537fb1d144665921127fef05f1dfdc11ee5b1fc7a160aad839671"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Simulation module wiring/imports and exports; algorithms reside in the named children.",
+      "sha256": "e5ff2bcc38ce40cbd45faf6aabed4c89c2388fb8803e1b2581815ddbc90ee451"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/orchestration.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-01",
+        "VALUATIONS-STRUCTURED-CREDIT-03",
+        "VALUATIONS-STRUCTURED-CREDIT-10",
+        "VALUATIONS-STRUCTURED-CREDIT-14",
+        "VALUATIONS-STRUCTURED-CREDIT-22"
+      ],
+      "reason": "Schedule preparation, period sequencing, initial state, cleanup/call tests and terminal account/recovery closure.",
+      "sha256": "b7622b08da537b2c57258075acca07637f057c532aeddb668dfe5ea5445552f7"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/period_helpers.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-03",
+        "VALUATIONS-STRUCTURED-CREDIT-11",
+        "VALUATIONS-STRUCTURED-CREDIT-20"
+      ],
+      "reason": "Contractual versus adjusted dates, float fixing/projection, live AFC rate and coupon accrual.",
+      "sha256": "e7d716f51115fbd49c551fb3ff17393f7bb80f51f793a552c553c697e7b311d7"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/pool_flow_source.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-03",
+        "VALUATIONS-STRUCTURED-CREDIT-08",
+        "VALUATIONS-STRUCTURED-CREDIT-15",
+        "VALUATIONS-STRUCTURED-CREDIT-17"
+      ],
+      "reason": "Deterministic/stochastic/OAS flow-source dispatch, monthly survival aggregation and per-name/default-recovery coupling.",
+      "sha256": "540cb41465585dc563361ae5dc73896e3e2dcd02cc78cb1288ea714255d5af25"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/pool_flows.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-03",
+        "VALUATIONS-STRUCTURED-CREDIT-04",
+        "VALUATIONS-STRUCTURED-CREDIT-05",
+        "VALUATIONS-STRUCTURED-CREDIT-06",
+        "VALUATIONS-STRUCTURED-CREDIT-07"
+      ],
+      "reason": "Statistical asset recursion including default/prepay ordering, annuities, NPL/CMBS/card and servicing branches.",
+      "sha256": "4a5f54b883e92dcc22bb094b6afc203ffb9fb42aba5bf3efb636a4cc9b7df1a4"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/reserve.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-10"
+      ],
+      "reason": "Reserve interest, target/release and reserve-funded cash shortfall handling.",
+      "sha256": "1771396db4fe11838eed7e4fb79238953d7b41249fe5fa99ede52ea101fa73b1"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/simulate_period/cash.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-07",
+        "VALUATIONS-STRUCTURED-CREDIT-08",
+        "VALUATIONS-STRUCTURED-CREDIT-10",
+        "VALUATIONS-STRUCTURED-CREDIT-19"
+      ],
+      "reason": "Period draws, collateral/recovery cash, reinvestment purchase sizing and cash-account transformations.",
+      "sha256": "7bac51a86843ca506cf25bc5d8ed07fe4826abf4c84a6ac025307e1c92010c7c"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/simulate_period/losses.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-12",
+        "VALUATIONS-STRUCTURED-CREDIT-13",
+        "VALUATIONS-STRUCTURED-CREDIT-14"
+      ],
+      "reason": "Incremental junior-first writedown, pending-default collateral values and persistent amortization triggers.",
+      "sha256": "d40dd84d54b65dcfb5c514937caa7dd355653737f10a3500895cd274f5a998cb"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/simulate_period/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-03",
+        "VALUATIONS-STRUCTURED-CREDIT-10",
+        "VALUATIONS-STRUCTURED-CREDIT-11",
+        "VALUATIONS-STRUCTURED-CREDIT-12",
+        "VALUATIONS-STRUCTURED-CREDIT-13",
+        "VALUATIONS-STRUCTURED-CREDIT-14"
+      ],
+      "reason": "Financial order of period operations and assembly of flow/loss/waterfall/record stages.",
+      "sha256": "c83258d87957378ca96ac5bed5aef90a5b5cb09401101159c2668f9b797624db"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/simulate_period/period_waterfall.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-10",
+        "VALUATIONS-STRUCTURED-CREDIT-11",
+        "VALUATIONS-STRUCTURED-CREDIT-12",
+        "VALUATIONS-STRUCTURED-CREDIT-13"
+      ],
+      "reason": "Per-period current claims, rule resolution, funding and waterfall execution.",
+      "sha256": "be4446465e33f046fcb99bb0e1caf91ee89a9e385f89b2a415763a5ca3d85d5a"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/simulate_period/record.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-11",
+        "VALUATIONS-STRUCTURED-CREDIT-14",
+        "VALUATIONS-STRUCTURED-CREDIT-22"
+      ],
+      "reason": "Recorded principal/interest/PIK/deferred/writedown and diagnostics after allocation.",
+      "sha256": "bdeb3e4ff2c13c85a1932c87d10ddb36e86bace4acdda3ed0cf086571d5e755b"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/state.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-02",
+        "VALUATIONS-STRUCTURED-CREDIT-04",
+        "VALUATIONS-STRUCTURED-CREDIT-10",
+        "VALUATIONS-STRUCTURED-CREDIT-13",
+        "VALUATIONS-STRUCTURED-CREDIT-14",
+        "VALUATIONS-STRUCTURED-CREDIT-22"
+      ],
+      "reason": "Opening pool/note/default state, trigger metrics, diagnostics and credit-enhancement snapshots.",
+      "sha256": "de723fe5135bd1292090f6ef29a16adeac9c661254e86ae85502768f5d96e55b"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/tests.rs",
+      "classification": "test",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-03",
+        "VALUATIONS-STRUCTURED-CREDIT-10",
+        "VALUATIONS-STRUCTURED-CREDIT-12",
+        "VALUATIONS-STRUCTURED-CREDIT-14"
+      ],
+      "reason": "Test-only cases for accrual/calendar, trigger, reinvestment and terminal behavior; no production algorithms.",
+      "sha256": "8bae3a1816265d5ec959587da030584ff8d6d80274b152357ec1f616b334493d"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/simulation_engine/triggers.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-12",
+        "VALUATIONS-STRUCTURED-CREDIT-13"
+      ],
+      "reason": "Stateful breach/cure hysteresis and waterfall/reinvestment/acceleration consequences.",
+      "sha256": "5f1eb393aa975f0fa912a172dfe6b0020745484da748b8ac4cb84ec194cee71a"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/stochastic/calibrations.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-01",
+        "VALUATIONS-STRUCTURED-CREDIT-15"
+      ],
+      "reason": "Named embedded stochastic prepay/default/correlation preset construction; no fitted calibration optimizer.",
+      "sha256": "114dc879ae5c97f242cfa0075da10282a7d0cfaa5aa715e72d9cf56c5193f178"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/stochastic/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Stochastic module declarations only.",
+      "sha256": "def91ab92d93fb80bfd1108788e92311c843ccbcc6988867e82d30c99ab6c171"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/stochastic/pricer/config.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-01",
+        "VALUATIONS-STRUCTURED-CREDIT-15"
+      ],
+      "reason": "Scenario defaults, latent-factor selection carrier, granularity and seed/refinancing configuration.",
+      "sha256": "ce60d35404be0cc5a00144d07ac27f231ae8c5091301009b8a56f98758595371"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/stochastic/pricer/engine.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-15",
+        "VALUATIONS-STRUCTURED-CREDIT-16",
+        "VALUATIONS-STRUCTURED-CREDIT-22"
+      ],
+      "reason": "Complete MC path generation/coupling, antithetics, waterfall evaluation, draw counterfactual and risk statistics.",
+      "sha256": "59fe156af62b8e130d5f4cc486b13de34f0fa215c1b6c2cc8c93442afb1eda1f"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/stochastic/pricer/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Private stochastic pricer/config re-exports only.",
+      "sha256": "cb040bd2fc2fc66a7534fc657ba60bca8a89181339b177e552bb4641492ad2ed"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/waterfall.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-11",
+        "VALUATIONS-STRUCTURED-CREDIT-12"
+      ],
+      "reason": "Cash-source/claim allocation, coverage diversion, sequential/capped pro-rata integer-unit rounding.",
+      "sha256": "6363191617b8e09d11baa7ac438bac65f84d7770408434a3437ee7c85dfc8c87"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/types/borrowing_base.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-12",
+        "VALUATIONS-STRUCTURED-CREDIT-19"
+      ],
+      "reason": "Advance eligibility, live delinquency/NPL adjustment and concentration-limit reductions.",
+      "sha256": "885da083bd5fc6d85615b298c19398dc959f443ce78846af42a29939a567ddfe"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/types/call.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-14"
+      ],
+      "reason": "Call date/scope/premium/early-amortization terms and validation.",
+      "sha256": "41308b2ce9b174e97cadcb00270acf700624edc04f162cc4803489db48b293a6"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/types/card.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-07"
+      ],
+      "reason": "Card rate/share parameter domain and master-trust model selection.",
+      "sha256": "b6b839b5dc113dee42322d67b28011f559724be0600b7f03ba78a7979d191a06"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/types/cmbs.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-06"
+      ],
+      "reason": "Balloon/penalty/workout specifications and financial-domain validation.",
+      "sha256": "51d6a5ac49ab8f5e3389db87bb2ab6b3cab9bc325721caa256bc1f091a75f600"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/types/collateral.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-08",
+        "VALUATIONS-STRUCTURED-CREDIT-09",
+        "VALUATIONS-STRUCTURED-CREDIT-10",
+        "VALUATIONS-STRUCTURED-CREDIT-16"
+      ],
+      "reason": "Instrument collateral, exercise policies, reserve conventions and stochastic funding terms.",
+      "sha256": "f01497cac3b6ed5a3b662f9df71efa9e0f753b8174685713ae14dc376ae43e2a"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/types/constants.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-20"
+      ],
+      "reason": "Numerical tolerance and initial bracket constants for spread/yield solvers.",
+      "sha256": "8ef1f08cb029ec3778129aa03b5e88f246e66513118bf57f09867d20fb1d65d8"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/types/constructors.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-01"
+      ],
+      "reason": "Family mapping, standard profile selection, dates and validated constructor defaults.",
+      "sha256": "80adccd8801597472c6c01a97e2b540a18f7e422f8c171ea6f9efa9079e668df"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/types/delinquency.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-04"
+      ],
+      "reason": "Bucket transition, modification and advancing parameter validation and defaults.",
+      "sha256": "a270184cbdeabdbeb6eb901721b7d6214a02eaaa872b0e5903529fa1c3e43957"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/types/draws.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-10",
+        "VALUATIONS-STRUCTURED-CREDIT-19"
+      ],
+      "reason": "Scheduled note funding and borrowing-base readvance term semantics.",
+      "sha256": "b5124645c69e4c81105cd575bc3d67abc691c9de08053f7345a46eb969c57048"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/types/enums.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-01",
+        "VALUATIONS-STRUCTURED-CREDIT-03",
+        "VALUATIONS-STRUCTURED-CREDIT-14"
+      ],
+      "reason": "Deal day-count, amortizing-asset and loss-allocation/recognition dispatch.",
+      "sha256": "9e61a3689b70db761b6a905b83cdf08a85eb1851d67c9818ea093aa26c0bf3b0"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/types/hedges.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-10"
+      ],
+      "reason": "Hedge notional/priority conventions and nested swap/currency validation.",
+      "sha256": "25f3c81c869a837190893634345af3bd64b9aba8ae55587ca3c2045e5271c292"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/types/instrument.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-01",
+        "VALUATIONS-STRUCTURED-CREDIT-03",
+        "VALUATIONS-STRUCTURED-CREDIT-08",
+        "VALUATIONS-STRUCTURED-CREDIT-10",
+        "VALUATIONS-STRUCTURED-CREDIT-20",
+        "VALUATIONS-STRUCTURED-CREDIT-22"
+      ],
+      "reason": "Base deterministic PV, market dependencies, metric seeding, contract/domain validation and parameter replacement.",
+      "sha256": "4aec193e4e8b78d6e6dcb44e52ece404a82ea4486c2bcf116f87216194c56955"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/types/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-01",
+        "VALUATIONS-STRUCTURED-CREDIT-04",
+        "VALUATIONS-STRUCTURED-CREDIT-07",
+        "VALUATIONS-STRUCTURED-CREDIT-10",
+        "VALUATIONS-STRUCTURED-CREDIT-14",
+        "VALUATIONS-STRUCTURED-CREDIT-15"
+      ],
+      "reason": "Public deal/credit model field defaults and optional economic-feature selection; not merely module plumbing.",
+      "sha256": "5f2b3334b7ae06650e0588afc6a6af1e0d061eae48225c69cd730fb831eba671"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/types/npl.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-05"
+      ],
+      "reason": "Resolution/reperformance/liquidation input domain and timing/cost validation.",
+      "sha256": "b3f88ebc27e2646cb5e877ae7f82b7a55ddbfe1ae68f3144e99e5dff2bef2ac3"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/types/pool.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-02",
+        "VALUATIONS-STRUCTURED-CREDIT-03",
+        "VALUATIONS-STRUCTURED-CREDIT-10",
+        "VALUATIONS-STRUCTURED-CREDIT-19"
+      ],
+      "reason": "Exclusive collateral normalization, representative-line conversion, pool statistics and reinvestment defaults.",
+      "sha256": "726db98ce7a77553c38de34c5637e5eba3b7b19e24188f81349b5954fc26b94e"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/types/pool_report.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-02",
+        "VALUATIONS-STRUCTURED-CREDIT-22"
+      ],
+      "reason": "Grouped concentration/report aggregation and financial statistic selection.",
+      "sha256": "03bf7db7226a91cb259ac3c7b5cf4154c3a4c7ca735d2ea0e4c4244ea4ebb20a"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/types/pool_state.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-02",
+        "VALUATIONS-STRUCTURED-CREDIT-03",
+        "VALUATIONS-STRUCTURED-CREDIT-10"
+      ],
+      "reason": "Live pool balances/default amounts and state transitions supporting projection.",
+      "sha256": "22724f8e4aafcf142bdd25f349426478870478e620030e40ca3240ee799c6a22"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/types/pricing_methods.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-01",
+        "VALUATIONS-STRUCTURED-CREDIT-15",
+        "VALUATIONS-STRUCTURED-CREDIT-20",
+        "VALUATIONS-STRUCTURED-CREDIT-22"
+      ],
+      "reason": "Explicit stochastic dispatch/configuration and limitations, scalar correlation, seed, tranche projection/PV.",
+      "sha256": "5172febf2cf6e80a00aaa42673b8e9a73cc8e91b06f89dd30352871c3c72da8f"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/types/resolved.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-01",
+        "VALUATIONS-STRUCTURED-CREDIT-02",
+        "VALUATIONS-STRUCTURED-CREDIT-10"
+      ],
+      "reason": "Date/model validation, collateral normalization, recovery-claim and reinvestment domain constraints.",
+      "sha256": "c1ee115b6c0456f2cfccbe0941b4501ebbe6fa07c0484a7ca43bcbac63bd8d96"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/types/results.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-20",
+        "VALUATIONS-STRUCTURED-CREDIT-22"
+      ],
+      "reason": "Accrued coupon formula, financial cash/noncash result channels and currency-checked table aggregation.",
+      "sha256": "0de5c856b6c9fd07a0a77cca53cbd2461b485f89905ae008853fb89b21fbd06e"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/types/setup.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-01",
+        "VALUATIONS-STRUCTURED-CREDIT-11"
+      ],
+      "reason": "Fee profile lookup and annual bp/fixed-money/incentive convention carriers.",
+      "sha256": "9c83db1e13d46251a14d771f74895b6d47a056d3b2c1f88a38e9530240c691d9"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/types/stochastic.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-01",
+        "VALUATIONS-STRUCTURED-CREDIT-15"
+      ],
+      "reason": "Stochastic-state flags, family preset enable/disable dispatch and constant-default restriction.",
+      "sha256": "a97962f9bbb9d0a808803bed2e87d7caa003933a6d4da22f32be03aadb8552ed"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/types/structured_credit_impl.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-01",
+        "VALUATIONS-STRUCTURED-CREDIT-11",
+        "VALUATIONS-STRUCTURED-CREDIT-12",
+        "VALUATIONS-STRUCTURED-CREDIT-14"
+      ],
+      "reason": "Registry defaults, fee conversion, waterfall composition, custom-claim validation and loss-policy selection.",
+      "sha256": "5244b85a6e70dbd9fe645ba37e60883af9993f3771d8e59910e6538f11b2914e"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/types/tranche_view.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-20",
+        "VALUATIONS-STRUCTURED-CREDIT-21",
+        "VALUATIONS-STRUCTURED-CREDIT-22"
+      ],
+      "reason": "Named tranche cashflow/PV/notional scope for generic metrics and model-parameter repricing.",
+      "sha256": "53366131818b9c7a29fd7c34c3940e726b7ccecf436fd76cd918129cfc6f187d"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/types/tranches.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-02",
+        "VALUATIONS-STRUCTURED-CREDIT-11",
+        "VALUATIONS-STRUCTURED-CREDIT-12",
+        "VALUATIONS-STRUCTURED-CREDIT-14"
+      ],
+      "reason": "Coupon/PIK/nondeferrable defaults, trigger hysteresis, capital structure derivation and loss fractions.",
+      "sha256": "aa68c7ab815de4267dba67325d421926871dc8c97f5402576c844a5557e48414"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/types/waterfall/builder.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-11",
+        "VALUATIONS-STRUCTURED-CREDIT-12"
+      ],
+      "reason": "Standard tier priority/funding construction, coverage placement and hedge-tier insertion.",
+      "sha256": "bcc58b1009e81d2065bf2b7ceaaa4c211c7427149a1b278c68041095fc42ed68"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/types/waterfall/coverage.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-12",
+        "VALUATIONS-STRUCTURED-CREDIT-19"
+      ],
+      "reason": "Coverage valuation/haircut parameters, CLO defaults, test placement/action and validation.",
+      "sha256": "ccb3bf009f6e9e1e575d38543c9b28476793ef57094950a308173ba48d323dc6"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/types/waterfall/mod.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-11",
+        "VALUATIONS-STRUCTURED-CREDIT-22"
+      ],
+      "reason": "Payment/funding conventions, equity-hurdle XIRR/bisection and paid-recipient aggregation.",
+      "sha256": "a15f7b8bd4ce01a6343e1bdaf93b27d5c56ba2a18d109264a6420e0ce4a7ab11"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/types/waterfall/rules.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-10",
+        "VALUATIONS-STRUCTURED-CREDIT-11",
+        "VALUATIONS-STRUCTURED-CREDIT-13"
+      ],
+      "reason": "Rule domains, reserve/target-OC formulas and default optional-feature behavior.",
+      "sha256": "a71f6416a4500c05c85af4ae4cbe0ad26c49dadbb6329638112fb38fc0a2ecb9"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/utils/amortization.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-03",
+        "VALUATIONS-STRUCTURED-CREDIT-06"
+      ],
+      "reason": "Stable level-pay annuity and remaining-period convention.",
+      "sha256": "8febce74a0993c4fb7ea5a1053e0c80c43699120127e9a710325a0cf78c77eb5"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/utils/mod.rs",
+      "classification": "support",
+      "records": [],
+      "reason": "Utility module declarations/re-exports only.",
+      "sha256": "aee96515e09ec92fbbc0b5ccdc5ad29f697a8144cd3b5ddd5980f1df0e092d55"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/utils/simulation.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-03",
+        "VALUATIONS-STRUCTURED-CREDIT-14"
+      ],
+      "reason": "Cashflow buffers and timed recovery/loss queue accumulation, maturity settlement and pending claims.",
+      "sha256": "be686aa6c740ccffb87e528233319cc1e7dfb46e1e4e4db340e1b001a3b4a3cd"
+    },
+    {
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/utils/validation.rs",
+      "classification": "algorithm",
+      "records": [
+        "VALUATIONS-STRUCTURED-CREDIT-01",
+        "VALUATIONS-STRUCTURED-CREDIT-11"
+      ],
+      "reason": "Waterfall structural and recipient financial-input validation, unique priorities and references.",
+      "sha256": "0b2daba09198faabc542a5e7e24264f19079370f446fc97af2becbfbda19dd7b"
+    }
+  ]
+}

@@ -22,6 +22,10 @@ missing observations and undefined numerical results follow their separately
 agreed operation-specific policies. Improving prose is allowed while error
 categories and required structured fields retain their meaning.
 
+[ADR 0049](0049-explicit-public-error-matching.md) defines the detailed
+requirements for explicit error-variant matching at semantic boundaries,
+canonical delegation, and non-exhaustive cross-crate handling.
+
 ## Rationale
 
 Structured errors allow reliable handling across hosts and preserve the
@@ -56,7 +60,6 @@ of every diagnostic field or binding.
 - [WASM adapters](../../../finstack-quant-wasm/src/utils/mod.rs) implement
   `to_js_err`; the [boundary checker](../../../scripts/check_wasm_boundary.py)
   enforces that path in binding API code.
-- **Known guidance gap:** [AGENTS.md](../../../AGENTS.md) still names
-  `JsValue::from_str` for WASM error handling. Its correction to the structured
-  path is explicitly approved by this decision and remains an implementation
-  follow-up; saving this ADR does not itself edit that instruction.
+
+Guidance reconciliation is tracked in
+[FOLLOW_UPS.md](../FOLLOW_UPS.md#reconciliation-items).
