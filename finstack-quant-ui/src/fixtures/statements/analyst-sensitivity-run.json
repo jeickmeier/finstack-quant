@@ -1,0 +1,9 @@
+{
+  "mode": "diagonal",
+  "targetMetric": "ebitda",
+  "period": "2025Q4",
+  "parameters": [
+    { "nodeId": "revenue", "periodId": "2025Q4", "pctRange": [-10, 10] },
+    { "nodeId": "opex", "periodId": "2025Q4", "pctRange": [-10, 10] }
+  ]
+}

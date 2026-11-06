@@ -30,11 +30,11 @@
 //! ### Gearing Excludes Spread (Affine Model)
 //! `rate = cap( max( all_in_floor, (gearing * max(index, floor)) + spread ) )`
 
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::fixings::require_fixing_value_exact;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
-use finstack_quant_core::Result;
 
 /// Parameters for floating rate projection.
 #[derive(Debug, Clone)]
@@ -127,20 +127,20 @@ impl FloatingRateParams {
             }
         }
 
-        if let (Some(floor), Some(cap)) = (self.index_floor_bp, self.index_cap_bp) {
-            if floor > cap {
-                return Err(finstack_quant_core::Error::Validation(
-                    "index floor must not exceed index cap".to_string(),
-                ));
-            }
+        if let (Some(floor), Some(cap)) = (self.index_floor_bp, self.index_cap_bp)
+            && floor > cap
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "index floor must not exceed index cap".to_string(),
+            ));
         }
 
-        if let (Some(floor), Some(cap)) = (self.all_in_floor_bp, self.all_in_cap_bp) {
-            if floor > cap {
-                return Err(finstack_quant_core::Error::Validation(
-                    "all-in floor must not exceed all-in cap".to_string(),
-                ));
-            }
+        if let (Some(floor), Some(cap)) = (self.all_in_floor_bp, self.all_in_cap_bp)
+            && floor > cap
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "all-in floor must not exceed all-in cap".to_string(),
+            ));
         }
 
         Ok(())

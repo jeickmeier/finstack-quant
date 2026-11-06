@@ -9,8 +9,8 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::money::fx::FxQuery;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::money::fx::FxQuery;
 use finstack_quant_core::types::PayoutTiming;
 use finstack_quant_core::types::{BarrierDirection, CurveId};
 use finstack_quant_valuations::instruments::fx::fx_barrier_option::FxBarrierOption;

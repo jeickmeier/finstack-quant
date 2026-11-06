@@ -8,7 +8,7 @@
 use crate::utils::input::{from_js_json, js_f64, js_f64_seq, js_string};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_models::credit::pd::{
-    self, MasterScale, MasterScaleGrade, PdCycleParams, BASEL_IRB_PD_FLOOR,
+    self, BASEL_IRB_PD_FLOOR, MasterScale, MasterScaleGrade, PdCycleParams,
 };
 use finstack_quant_models::credit::scoring::ScoringResult;
 use wasm_bindgen::prelude::*;

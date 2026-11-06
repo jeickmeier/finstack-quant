@@ -1957,6 +1957,13 @@ export interface D_572Ad1Befb7D94914652 {
    */
   call_friction_cents?: number | null;
   /**
+   * Optional government discount curve identifier for the bond `g_spread` metric.
+   *
+   * The metric subtracts this curve's par yield from the bond's yield. It
+   * enters no price, and `g_spread` is an error when it is unset.
+   */
+  government_curve_id?: D_94Cb251104De5Cf587B6 | null;
+  /**
    * Mean-reversion speed of the hazard factor (κ_λ) on the rates-credit
    * lattice, annualised.
    *
@@ -2444,7 +2451,6 @@ export interface DEe4323Acfdb49E4Fe15B {
            * Growth rate of the default barrier over time.
            */
           barrier_growth_rate: number;
-          [k: string]: unknown;
         };
       };
   /**
@@ -2471,7 +2477,6 @@ export interface DEe4323Acfdb49E4Fe15B {
            * Volatility of log-jump size.
            */
           jump_vol: number;
-          [k: string]: unknown;
         };
       }
     | {
@@ -2489,7 +2494,6 @@ export interface DEe4323Acfdb49E4Fe15B {
            * Mean recovery rate at default.
            */
           mean_recovery: number;
-          [k: string]: unknown;
         };
       };
   /**
@@ -2501,7 +2505,6 @@ export interface DEe4323Acfdb49E4Fe15B {
    * Continuously compounded risk-free rate `r`, as a decimal fraction.
    */
   risk_free_rate: number;
-  [k: string]: unknown;
 }
 /**
  * Hard threshold toggle configuration.
@@ -6349,8 +6352,8 @@ export interface DBef55Fa450B231D7B330 {
   maturity: Date27;
   metric_pricing_overrides?: MetricPricingOverrides3;
   /**
-   * Effective-interest-rate reporting switch for the
-   * `oid_eir_amortization` metric. `None` (the default) reports with fees
+   * Effective-interest-rate reporting switch for the `oid_eir_rate` and
+   * `oid_eir_amortization` metrics. `None` (the default) reports with fees
    * included, the same as `Some(OidEirSpec::default())`.
    */
   oid_eir?: DBa65527Bb807631Cd58F | null;

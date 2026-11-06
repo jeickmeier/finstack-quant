@@ -1,7 +1,5 @@
 use super::*;
 
-/// Release the unused spread-account balance to equity at deal end.
-///
 /// Record a residual principal distribution to a tranche at deal end: appends
 /// the flow to the tranche's cashflows and principal flows and bumps its
 /// `total_principal`. No-op if the tranche has no results entry. Shared by the
@@ -14,10 +12,13 @@ fn append_residual_principal(
     tranche_id: &str,
     amount: Money,
     date: Date,
+    source: NonWaterfallSource,
 ) -> Result<()> {
     let is_equity = state.tranches.tranches.iter().any(|tranche| {
         tranche.id.as_str() == tranche_id && tranche.seniority == TrancheSeniority::Equity
     });
+    let zero = Money::from((0_i64, state.currency));
+    let mut incentive_fee = zero;
     let amount = match (is_equity, state.incentive_fee) {
         (true, Some(spec)) => {
             let shortfall = state
@@ -30,6 +31,7 @@ fn append_residual_principal(
                 if let Some(last) = state.period_diagnostics.last_mut() {
                     last.fees_paid = last.fees_paid.checked_add(fee)?;
                 }
+                incentive_fee = fee;
                 amount.checked_sub(fee)?
             } else {
                 amount
@@ -42,6 +44,12 @@ fn append_residual_principal(
         res.principal_flows.push((date, amount));
         res.total_principal = res.total_principal.checked_add(amount)?;
     }
+    state
+        .pending_non_waterfall_payments
+        .push(NonWaterfallPayment {
+            incentive_fee,
+            ..NonWaterfallPayment::new(date, tranche_id, source, zero, amount)
+        });
     Ok(())
 }
 
@@ -100,6 +108,7 @@ fn release_spread_account(
                     &id,
                     Money::new(principal, state.currency)?,
                     date,
+                    NonWaterfallSource::SpreadAccountRelease,
                 )?;
                 state
                     .tranche_balances
@@ -108,11 +117,11 @@ fn release_spread_account(
             }
         }
     }
-    if remaining > 0.0 {
-        if let Some(&i) = order.last() {
-            let id = state.tranches.tranches[i].id.to_string();
-            append_terminal_interest(state, &id, Money::new(remaining, state.currency)?, date)?;
-        }
+    if remaining > 0.0
+        && let Some(&i) = order.last()
+    {
+        let id = state.tranches.tranches[i].id.to_string();
+        append_terminal_interest(state, &id, Money::new(remaining, state.currency)?, date)?;
     }
     state.spread_account = Money::from((0_i64, state.currency));
     state.undistributed_interest = Money::from((0_i64, state.currency));
@@ -130,6 +139,16 @@ fn append_terminal_interest(
         result.interest_flows.push((date, amount));
         result.total_interest = result.total_interest.checked_add(amount)?;
     }
+    let zero = Money::from((0_i64, state.currency));
+    state
+        .pending_non_waterfall_payments
+        .push(NonWaterfallPayment::new(
+            date,
+            id,
+            NonWaterfallSource::SpreadAccountRelease,
+            amount,
+            zero,
+        ));
     Ok(())
 }
 
@@ -139,6 +158,7 @@ fn distribute_terminal_principal(
     state: &mut SimulationState<'_>,
     amount: Money,
     date: Date,
+    source: NonWaterfallSource,
 ) -> Result<()> {
     let mut remaining = amount.amount();
     let mut order: Vec<_> = (0..state.tranches.tranches.len()).collect();
@@ -148,18 +168,24 @@ fn distribute_terminal_principal(
         let balance = state.tranche_balances[&id].amount();
         let paid = remaining.min(balance).max(0.0);
         if paid > 0.0 {
-            append_residual_principal(state, &id, Money::new(paid, state.currency)?, date)?;
+            append_residual_principal(state, &id, Money::new(paid, state.currency)?, date, source)?;
             state
                 .tranche_balances
                 .insert(id, Money::new(balance - paid, state.currency)?);
             remaining -= paid;
         }
     }
-    if remaining > 0.0 {
-        if let Some(&i) = order.last() {
-            let id = state.tranches.tranches[i].id.to_string();
-            append_residual_principal(state, &id, Money::new(remaining, state.currency)?, date)?;
-        }
+    if remaining > 0.0
+        && let Some(&i) = order.last()
+    {
+        let id = state.tranches.tranches[i].id.to_string();
+        append_residual_principal(
+            state,
+            &id,
+            Money::new(remaining, state.currency)?,
+            date,
+            source,
+        )?;
     }
     Ok(())
 }
@@ -168,7 +194,12 @@ fn distribute_terminal_principal(
 fn release_reserve_account(state: &mut SimulationState<'_>) -> Result<()> {
     let date = state.prev_date.unwrap_or(state.closing_date);
     if state.reserve_covers_principal_at_final {
-        distribute_terminal_principal(state, state.reserve_balance, date)?;
+        distribute_terminal_principal(
+            state,
+            state.reserve_balance,
+            date,
+            NonWaterfallSource::ReserveAccountRelease,
+        )?;
     } else if state.reserve_balance.amount() > 0.0 {
         // The rules release the reserve to the residual holder instead of
         // the notes.
@@ -179,7 +210,13 @@ fn release_reserve_account(state: &mut SimulationState<'_>) -> Result<()> {
             .max_by_key(|t| t.payment_priority)
             .map(|t| t.id.as_str().to_string());
         if let Some(id) = residual_id {
-            append_residual_principal(state, &id, state.reserve_balance, date)?;
+            append_residual_principal(
+                state,
+                &id,
+                state.reserve_balance,
+                date,
+                NonWaterfallSource::ReserveAccountRelease,
+            )?;
         }
     }
     state.reserve_balance = Money::from((0_i64, state.currency));
@@ -221,7 +258,12 @@ fn release_principal_funding_account(state: &mut SimulationState<'_>) -> Result<
     let amount = state
         .principal_funding_account
         .checked_add(state.undistributed_principal)?;
-    distribute_terminal_principal(state, amount, state.prev_date.unwrap_or(state.closing_date))?;
+    distribute_terminal_principal(
+        state,
+        amount,
+        state.prev_date.unwrap_or(state.closing_date),
+        NonWaterfallSource::PrincipalAccountRelease,
+    )?;
     state.principal_funding_account = Money::from((0_i64, state.currency));
     state.undistributed_principal = Money::from((0_i64, state.currency));
     Ok(())
@@ -311,6 +353,15 @@ fn redeem(
         let principal_paid = (redemption_amt - interest_paid).max(0.0);
         let haircut = (balance_amt - principal_claim).max(0.0);
 
+        state
+            .pending_non_waterfall_payments
+            .push(NonWaterfallPayment::new(
+                pay_date,
+                tranche_id_str,
+                NonWaterfallSource::Redemption,
+                Money::new(interest_paid, state.currency)?,
+                Money::new(principal_paid, state.currency)?,
+            ));
         if let Some(res) = state.results.get_mut(tranche_id_str) {
             res.cashflows
                 .push((pay_date, Money::new(redemption_amt, state.currency)?));
@@ -356,7 +407,13 @@ fn redeem(
             .map(|t| t.id.as_str().to_string());
         if let Some(id) = residual_id {
             let residual = Money::new(available, state.currency)?;
-            append_residual_principal(state, &id, residual, pay_date)?;
+            append_residual_principal(
+                state,
+                &id,
+                residual,
+                pay_date,
+                NonWaterfallSource::Redemption,
+            )?;
         }
     }
     Ok(())
@@ -490,7 +547,7 @@ pub(crate) fn prepare_deal_simulation(
     // Re-anchoring the schedule at `as_of` would shift legal coupon dates for
     // seasoned deals valued between payment dates.
     use finstack_quant_cashflows::builder::{
-        build_periods, build_single_period, BuildPeriodsParams,
+        BuildPeriodsParams, build_periods, build_single_period,
     };
     let schedule_params = finstack_quant_cashflows::builder::ScheduleParams {
         frequency: instrument.frequency,
@@ -575,6 +632,7 @@ impl SimulationRun {
                 reserve_replenished: zero,
                 early_amortization_date: None,
                 tranche_draws: Vec::new(),
+                first_breaches: Vec::new(),
             },
         }
     }
@@ -760,12 +818,38 @@ pub(crate) fn simulate_prepared<S: PoolFlowSource + ?Sized>(
     // Whatever principal the notes never received is a realized loss on the
     // final settlement date (see `realize_principal_shortfall`).
     realize_principal_shortfall(&mut state, final_date)?;
+    attach_non_waterfall_payments(&mut state)?;
 
     let (tranches, diagnostics) = state.finalize_with_diagnostics();
     Ok(SimulationRun {
         tranches,
         diagnostics,
     })
+}
+
+/// Put the redemption and terminal payments on the deal's last period, or on a
+/// settlement record of their own when no payment period ran.
+fn attach_non_waterfall_payments(state: &mut SimulationState<'_>) -> Result<()> {
+    let payments = std::mem::take(&mut state.pending_non_waterfall_payments);
+    if payments.is_empty() {
+        return Ok(());
+    }
+    if let Some(last) = state.period_diagnostics.last_mut() {
+        last.non_waterfall_payments.extend(payments);
+        return Ok(());
+    }
+    let date = state.prev_date.unwrap_or(state.closing_date);
+    let mut fees_paid = Money::from((0_i64, state.currency));
+    for payment in &payments {
+        fees_paid = fees_paid.checked_add(payment.incentive_fee)?;
+    }
+    let record = PeriodDiagnostics {
+        fees_paid,
+        non_waterfall_payments: payments,
+        ..PeriodDiagnostics::from_state(state, date)?
+    };
+    state.period_diagnostics.push(record);
+    Ok(())
 }
 
 /// Resolve, prepare and simulate a deal, returning tranche results with the
@@ -840,7 +924,12 @@ fn drain_pending_recoveries_at_end(
             calendar,
         )?;
         final_date = final_date.max(release_date);
-        distribute_terminal_principal(state, amount, release_date)?;
+        distribute_terminal_principal(
+            state,
+            amount,
+            release_date,
+            NonWaterfallSource::RecoveryRelease,
+        )?;
     }
     Ok(final_date)
 }

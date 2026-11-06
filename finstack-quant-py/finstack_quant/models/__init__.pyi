@@ -20,6 +20,7 @@ from finstack_quant.models import volatility as volatility
 from finstack_quant.models._closed_form import (
     BsGreeks as BsGreeks,
     ForwardGreeks as ForwardGreeks,
+    OptionCalculationResult as OptionCalculationResult,
     asian_option_price as asian_option_price,
     bachelier_greeks as bachelier_greeks,
     bachelier_price as bachelier_price,
@@ -34,6 +35,7 @@ from finstack_quant.models._closed_form import (
     bs_price as bs_price,
     heston_price as heston_price,
     lookback_option_price as lookback_option_price,
+    option_calculation as option_calculation,
     quanto_option_price as quanto_option_price,
     vanilla_expiry_payoff as vanilla_expiry_payoff,
 )
@@ -46,6 +48,7 @@ from finstack_quant.models._fourier import (
 __all__ = [
     "BsGreeks",
     "ForwardGreeks",
+    "OptionCalculationResult",
     "asian_option_price",
     "bachelier_greeks",
     "bachelier_price",
@@ -67,6 +70,7 @@ __all__ = [
     "lookback_option_price",
     "merton_jump_cos_price",
     "monte_carlo",
+    "option_calculation",
     "quanto_option_price",
     "rates",
     "vanilla_expiry_payoff",

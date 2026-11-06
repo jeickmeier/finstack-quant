@@ -39,19 +39,19 @@
 
 use crate::term_loan::TermLoan;
 use finstack_quant_cashflows::builder::RateSpec;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 use finstack_quant_models::trees::short_rate_tree::{ShortRateTree, ShortRateTreeConfig};
 use finstack_quant_models::trees::tree_framework::{NodeState, TreeValuator};
 use finstack_quant_models::trees::two_factor_rates_credit::{NodeCoupon, RatesCreditTree};
+use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::pricing::rates_credit::{
     build_rates_credit_targets, continuous_frp_weight,
 };
 use finstack_quant_valuations_core::instruments::pricing_overrides::resolve_rates_credit_config;
-use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError,
 };
@@ -535,7 +535,7 @@ impl TermLoanValuator {
     /// Build node-coupon descriptors for stochastic future floating resets.
     fn stochastic_node_coupons(&self, market: &MarketContext) -> Result<Vec<NodeCoupon>> {
         use finstack_quant_valuations_core::instruments::pricing::floating_reset_descriptors::{
-            build_node_coupons, has_future_pik, NodeCouponBuildInputs,
+            NodeCouponBuildInputs, build_node_coupons, has_future_pik,
         };
 
         let RateSpec::Floating(ref float_spec) = self.loan.rate else {

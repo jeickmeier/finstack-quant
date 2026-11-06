@@ -4,11 +4,11 @@ use crate::bond::pricing::tree::BondValuator;
 use crate::term_loan::{LoanCall, LoanCallType, TermLoan};
 use finstack_quant_cashflows::accrual::AccrualIndex;
 use finstack_quant_cashflows::builder::CashFlowSchedule;
+use finstack_quant_core::Result;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 
 /// Exercise-date claims on one loan schedule. The outstanding path and both
 /// accrual indexes are built once, so pricing every tree step or candidate

@@ -191,6 +191,48 @@ const CLAIMS = [
   claim('unsecured', 'senior_unsecured', 2, 80.0, 0.0, 0.0, null, 0.0),
   claim('junior', 'subordinated', 3, 50.0, 0.0, 1.0, null, 0.0),
 ];
+const WORKOUT = {
+  collateral: [{ collateral_type: 'real_estate', book_value: 800_000.0, haircut: 0.3 }],
+  costs: { direct_cost_rate: 0.05, indirect_cost_rate: 0.03 },
+  workout_years: 2.0,
+  discount_rate: 0.05,
+};
+const ALTMAN_Z = {
+  working_capital_to_total_assets: 0.1,
+  retained_earnings_to_total_assets: 0.2,
+  ebit_to_total_assets: 0.15,
+  market_equity_to_total_liabilities: 1.5,
+  sales_to_total_assets: 1.1,
+};
+const ALTMAN_Z_PRIME = {
+  working_capital_to_total_assets: 0.1,
+  retained_earnings_to_total_assets: 0.2,
+  ebit_to_total_assets: 0.15,
+  book_equity_to_total_liabilities: 0.9,
+  sales_to_total_assets: 1.1,
+};
+const ALTMAN_Z_DOUBLE_PRIME = {
+  working_capital_to_total_assets: 0.1,
+  retained_earnings_to_total_assets: 0.2,
+  ebit_to_total_assets: 0.15,
+  book_equity_to_total_liabilities: 0.9,
+};
+const OHLSON = {
+  log_total_assets_adjusted: 5.0,
+  total_liabilities_to_total_assets: 0.6,
+  working_capital_to_total_assets: 0.1,
+  current_liabilities_to_current_assets: 0.8,
+  liabilities_exceed_assets: 0.0,
+  net_income_to_total_assets: 0.05,
+  funds_from_operations_to_total_liabilities: 0.2,
+  negative_net_income_two_years: 0.0,
+  net_income_change: 0.1,
+};
+const ZMIJEWSKI = {
+  net_income_to_total_assets: 0.05,
+  total_liabilities_to_total_assets: 0.6,
+  current_assets_to_current_liabilities: 1.5,
+};
 const EXPOSURES = [
   { id: 'A', notional: 100.0, default_probability: 0.02, lgd: 0.6, factor_loadings: [0.4] },
   { id: 'B', notional: 150.0, default_probability: 0.05, lgd: 0.5, factor_loadings: [0.5] },
@@ -388,6 +430,7 @@ const CASES = {
     list(new credit.lgd.BetaRecovery(0.4, 0.2).sampleSeeded(4, 42)),
     list(new credit.lgd.BetaRecovery(0.4, 0.2).sampleSeeded(4, 42)),
   ],
+  'lgd.seniority_calibration_ids': () => credit.lgd.seniorityCalibrationIds(),
   'lgd.seniority_recovery_stats': () => [
     credit.lgd.seniorityRecoveryStats('senior_unsecured', 'moodys_recovery_1982_2023').mean,
     credit.lgd.seniorityRecoveryStats('senior_unsecured', 'moodys_recovery_1982_2023').stdDev,
@@ -404,7 +447,7 @@ const CASES = {
     return [
       workout.evaluate(1_000_000.0),
       workout.netRecovery(1_000_000.0),
-      credit.lgd.workoutLgd(1_000_000.0, [['real_estate', 800_000.0, 0.3]], 0.05, 0.03, 2.0, 0.05),
+      credit.lgd.WorkoutLgd.fromJson(WORKOUT).evaluate(1_000_000.0),
       credit.lgd.WorkoutCosts.standard().totalRate,
     ];
   },
@@ -441,17 +484,19 @@ const CASES = {
     masterScale()
       .mapPds([0.5, 0.001, 0.05])
       .map((row) => row.grade),
-    masterScale().mapScore(credit.scoring.zmijewskiScore(0.05, 0.6, 1.5)).grade,
+    masterScale().mapScore(credit.scoring.zmijewskiScore(ZMIJEWSKI)).grade,
     credit.pd.MasterScale.defaultCalibration().nGrades,
     credit.pd.MasterScale.fromRegistryId('moodys_assumptions').nGrades,
   ],
   scoring: () => [
-    credit.scoring.altmanZScore(0.1, 0.2, 0.15, 1.5, 1.1),
-    credit.scoring.altmanZPrime(0.1, 0.2, 0.15, 0.9, 1.1),
-    credit.scoring.altmanZDoublePrime(0.1, 0.2, 0.15, 0.9),
-    credit.scoring.altmanEmScore(0.1, 0.2, 0.15, 0.9),
-    credit.scoring.ohlsonOScore(5.0, 0.6, 0.1, 0.8, 0.0, 0.05, 0.2, 0.0, 0.1),
-    credit.scoring.zmijewskiScore(0.05, 0.6, 1.5),
+    credit.scoring.altmanZScore(ALTMAN_Z),
+    credit.scoring.altmanZPrime(ALTMAN_Z_PRIME),
+    credit.scoring.altmanZDoublePrime(ALTMAN_Z_DOUBLE_PRIME),
+    credit.scoring.altmanEmScore(ALTMAN_Z_DOUBLE_PRIME),
+    credit.scoring.ohlsonOScore(OHLSON),
+    credit.scoring.zmijewskiScore(ZMIJEWSKI),
+    credit.scoring.creditScoreReport({ model: 'zmijewski_score', input: ZMIJEWSKI }),
+    credit.scoring.creditScoreReport({ model: 'altman_z_score', input: ALTMAN_Z }),
   ],
   recovery_waterfall: () => credit.recoveryWaterfall.allocateRecovery(120.0, CLAIMS),
   'migration.scale': () => [
@@ -613,14 +658,17 @@ const CASES = {
   'factor.stress_attribution': () => factorRisk.buildStressAttribution(['A', 'B'], PNLS, 0.8),
   'factor.position_component_var': () => [
     factorRisk.positionComponentVar(
-      factorRisk.parametricVarDecomposition(
-        ['A', 'B'],
-        [1.0, 2.0],
-        [
-          [0.04, 0.01],
-          [0.01, 0.09],
-        ]
-      ),
+      factorRisk.positionRiskReport({
+        position_ids: ['A', 'B'],
+        source: {
+          kind: 'parametric',
+          weights: [1.0, 2.0],
+          covariance: [
+            [0.04, 0.01],
+            [0.01, 0.09],
+          ],
+        },
+      }).decomposition,
       'A'
     ),
     factorRisk.defaultUtilizationThreshold(),
@@ -781,18 +829,23 @@ const CASES = {
   ],
   'volatility.cube_slices': () => {
     const strikes = [0.02, 0.03, 0.04];
-    const tenorSlice = volatility.materializeCubeTenorSlice(cube(), 5.0, strikes);
+    const tenorSlice = volatility.materializeCubeTenorSlice(cube(), 5.0, strikes, 'lognormal');
     return [
       surfaceVols(tenorSlice),
-      surfaceVols(volatility.materializeCubeTenorSliceNormal(cube(), 5.0, strikes)),
-      surfaceVols(volatility.materializeCubeExpirySlice(cube(), 1.0, strikes)),
-      surfaceVols(volatility.materializeCubeExpirySliceNormal(cube(), 1.0, strikes)),
+      surfaceVols(volatility.materializeCubeTenorSlice(cube(), 5.0, strikes, 'normal')),
+      surfaceVols(volatility.materializeCubeExpirySlice(cube(), 1.0, strikes, 'lognormal')),
+      surfaceVols(volatility.materializeCubeExpirySlice(cube(), 1.0, strikes, 'normal')),
       volatility.getSurfaceVol(tenorSlice, 1.5, 0.025),
       volatility.getSurfaceVolClamped(tenorSlice, 9.0, 0.5),
     ];
   },
   'volatility.cube_expiry_slice': () => {
-    const expirySlice = volatility.materializeCubeExpirySlice(cube(), 1.0, [0.02, 0.03, 0.04]);
+    const expirySlice = volatility.materializeCubeExpirySlice(
+      cube(),
+      1.0,
+      [0.02, 0.03, 0.04],
+      'lognormal'
+    );
     const gridSlice = new core.VolCubeExpirySlice(
       'GRID',
       1.0,

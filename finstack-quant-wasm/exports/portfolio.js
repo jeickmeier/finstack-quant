@@ -38,6 +38,7 @@ export const portfolio = {
   parsePortfolioSpecJson: wasm.parsePortfolioSpecJson,
   brinsonFachler: wasm.brinsonFachler,
   carinoLink: wasm.carinoLink,
+  brinsonLinked: wasm.brinsonLinked,
   campisiAttribution: wasm.campisiAttribution,
   campisiCarinoLink: wasm.campisiCarinoLink,
   fiAttributionResultReconciliationCheck: wasm.fiAttributionResultReconciliationCheck,
@@ -76,6 +77,7 @@ export const portfolio = {
   // Rust methods on result types; WASM results are plain objects, so each
   // takes the object (or its JSON) as the first argument.
   portfolioAttributionExplainText: wasm.portfolioAttributionExplainText,
+  portfolioAttributionPctOfTotalByBucket: wasm.portfolioAttributionPctOfTotalByBucket,
   portfolioAttributionReconciliationCheck: wasm.portfolioAttributionReconciliationCheck,
   portfolioValuationGetPositionValue: wasm.portfolioValuationGetPositionValue,
   portfolioValuationGetEntityValue: wasm.portfolioValuationGetEntityValue,

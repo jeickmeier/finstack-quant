@@ -7,22 +7,23 @@
 //! management guidance (geometric shape = CAGR-to-terminal).
 
 use crate::error::{Error, Result};
+use crate::types::{FadeToTargetParams, ForecastFadeShape};
 use finstack_quant_core::dates::PeriodId;
 use indexmap::IndexMap;
 
 /// Glide from `base_value` to a target level over the forecast horizon.
 ///
-/// Supported shapes (`shape` parameter, default `"linear"`):
+/// Supported shapes:
 ///
-/// - `"linear"`: `v[t] = base + (target - base) * t / N`, where `N` is the
+/// - linear: `v[t] = base + (target - base) * t / N`, where `N` is the
 ///   number of forecast periods. Reaches the target exactly at the final
 ///   period.
-/// - `"geometric"`: `v[t] = base * (target / base)^(t / N)` — constant
+/// - geometric: `v[t] = base * (target / base)^(t / N)` — constant
 ///   compound growth (CAGR) interpolation. Requires `base_value` and
 ///   `target` to be non-zero and share the same sign.
-/// - `"exponential"`: `v[t] = target + (base - target) * 2^(-t / half_life)`
+/// - exponential: `v[t] = target + (base - target) * 2^(-t / half_life)`
 ///   — asymptotic half-life decay toward the target; never reaches it
-///   exactly. Requires the `half_life` parameter.
+///   exactly. Requires `half_life`.
 ///
 /// # Arguments
 ///
@@ -30,33 +31,23 @@ use indexmap::IndexMap;
 ///   node's own units; must be finite
 /// * `forecast_periods` - Periods that require projected values, in forecast
 ///   order; an empty slice returns an empty map
-/// * `params` - JSON parameter map containing `target` (required terminal
-///   level in the node's own units), optional `shape` (one of `"linear"`,
-///   `"geometric"`, `"exponential"`; default `"linear"`), and `half_life`
-///   (positive number of periods for the fade to close half the remaining
-///   gap; required for — and only legal with — the exponential shape)
+/// * `params` - Finite `target` level in the node's own units, the fade
+///   `shape`, and `half_life` (positive number of periods for the fade to
+///   close half the remaining gap; required for — and only legal with — the
+///   exponential shape)
 ///
 /// # Errors
 ///
-/// Returns an error when `target` is missing or non-finite, when
-/// `base_value` is non-finite, when `shape` is not one of the supported
-/// strings, when `half_life` is missing/non-positive for the exponential
-/// shape or supplied for any other shape, or when the geometric shape is
-/// requested with a zero or sign-crossing base/target pair.
+/// Returns an error when `target` or `base_value` is non-finite, when
+/// `half_life` is missing/non-positive for the exponential shape or supplied
+/// for any other shape, or when the geometric shape is requested with a zero
+/// or sign-crossing base/target pair.
 pub(super) fn fade_to_target(
     base_value: f64,
     forecast_periods: &[PeriodId],
-    params: &IndexMap<String, serde_json::Value>,
+    params: &FadeToTargetParams,
 ) -> Result<IndexMap<PeriodId, f64>> {
-    let target = params
-        .get("target")
-        .and_then(|v| v.as_f64())
-        .ok_or_else(|| {
-            Error::forecast(
-                "Missing or invalid 'target' parameter for FadeToTarget forecast. \
-                 Expected a finite number (the terminal level in the node's own units).",
-            )
-        })?;
+    let target = params.target;
     if !target.is_finite() {
         return Err(Error::forecast(format!(
             "FadeToTarget 'target' must be finite, got {target}"
@@ -68,24 +59,11 @@ pub(super) fn fade_to_target(
         )));
     }
 
-    let shape = params
-        .get("shape")
-        .map(|v| {
-            v.as_str().ok_or_else(|| {
-                Error::forecast(format!(
-                    "FadeToTarget 'shape' must be a string \
-                     (\"linear\", \"geometric\", or \"exponential\"), got {v}"
-                ))
-            })
-        })
-        .transpose()?
-        .unwrap_or("linear");
-
-    let half_life = params.get("half_life");
-    if shape != "exponential" && half_life.is_some() {
+    let shape = params.shape;
+    if shape != ForecastFadeShape::Exponential && params.half_life.is_some() {
         return Err(Error::forecast(format!(
             "FadeToTarget 'half_life' is only valid with shape = \"exponential\", \
-             but shape is \"{shape}\". Remove 'half_life' or switch the shape."
+             but shape is {shape:?}. Remove 'half_life' or switch the shape."
         )));
     }
 
@@ -96,7 +74,7 @@ pub(super) fn fade_to_target(
     let n = forecast_periods.len() as f64;
 
     match shape {
-        "linear" => {
+        ForecastFadeShape::Linear => {
             for (i, period_id) in forecast_periods.iter().enumerate() {
                 let weight = (i + 1) as f64 / n;
                 // Convex weights avoid overflowing target - base for finite
@@ -110,7 +88,7 @@ pub(super) fn fade_to_target(
                 results.insert(*period_id, value);
             }
         }
-        "geometric" => {
+        ForecastFadeShape::Geometric => {
             if base_value == 0.0 || target == 0.0 || (base_value < 0.0) != (target < 0.0) {
                 return Err(Error::forecast(format!(
                     "FadeToTarget geometric shape requires base_value and target to be \
@@ -132,8 +110,8 @@ pub(super) fn fade_to_target(
                 results.insert(*period_id, value);
             }
         }
-        "exponential" => {
-            let half_life = half_life.and_then(|v| v.as_f64()).ok_or_else(|| {
+        ForecastFadeShape::Exponential => {
+            let half_life = params.half_life.ok_or_else(|| {
                 Error::forecast(
                     "FadeToTarget exponential shape requires a numeric 'half_life' \
                      parameter (number of periods to close half the remaining gap, \
@@ -158,12 +136,6 @@ pub(super) fn fade_to_target(
                 results.insert(*period_id, value);
             }
         }
-        other => {
-            return Err(Error::forecast(format!(
-                "Unknown FadeToTarget shape '{other}'. \
-                 Expected \"linear\", \"geometric\", or \"exponential\"."
-            )));
-        }
     }
 
     Ok(results)
@@ -180,18 +152,25 @@ mod tests {
             .collect()
     }
 
-    fn params(entries: &[(&str, serde_json::Value)]) -> IndexMap<String, serde_json::Value> {
-        entries
-            .iter()
-            .map(|(k, v)| ((*k).to_string(), v.clone()))
-            .collect()
+    fn params(target: f64, shape: ForecastFadeShape, half_life: Option<f64>) -> FadeToTargetParams {
+        FadeToTargetParams {
+            target,
+            shape,
+            half_life,
+            min: None,
+            max: None,
+        }
+    }
+
+    fn linear(target: f64) -> FadeToTargetParams {
+        params(target, ForecastFadeShape::Linear, None)
     }
 
     #[test]
     fn linear_hits_target_at_last_period() {
         let periods = quarters(4);
-        let p = params(&[("target", serde_json::json!(200.0))]);
-        let results = fade_to_target(100.0, &periods, &p).expect("linear fade should succeed");
+        let results =
+            fade_to_target(100.0, &periods, &linear(200.0)).expect("linear fade should succeed");
         assert_eq!(results.len(), 4);
         assert!((results[&periods[0]] - 125.0).abs() < 1e-12);
         assert!((results[&periods[1]] - 150.0).abs() < 1e-12);
@@ -202,8 +181,8 @@ mod tests {
     #[test]
     fn linear_supports_downward_fade() {
         let periods = quarters(2);
-        let p = params(&[("target", serde_json::json!(0.02))]);
-        let results = fade_to_target(0.04, &periods, &p).expect("downward fade should succeed");
+        let results =
+            fade_to_target(0.04, &periods, &linear(0.02)).expect("downward fade should succeed");
         assert!((results[&periods[0]] - 0.03).abs() < 1e-12);
         assert!((results[&periods[1]] - 0.02).abs() < 1e-12);
     }
@@ -211,10 +190,7 @@ mod tests {
     #[test]
     fn geometric_is_cagr_interpolation() {
         let periods = quarters(4);
-        let p = params(&[
-            ("target", serde_json::json!(200.0)),
-            ("shape", serde_json::json!("geometric")),
-        ]);
+        let p = params(200.0, ForecastFadeShape::Geometric, None);
         let results = fade_to_target(100.0, &periods, &p).expect("geometric fade should succeed");
         let cagr = 2.0_f64.powf(0.25);
         for (i, pid) in periods.iter().enumerate() {
@@ -228,10 +204,7 @@ mod tests {
     fn geometric_rejects_sign_crossing_and_zero() {
         let periods = quarters(2);
         for (base, target) in [(100.0, -50.0), (-100.0, 50.0), (0.0, 50.0), (100.0, 0.0)] {
-            let p = params(&[
-                ("target", serde_json::json!(target)),
-                ("shape", serde_json::json!("geometric")),
-            ]);
+            let p = params(target, ForecastFadeShape::Geometric, None);
             let err = fade_to_target(base, &periods, &p).expect_err("should reject");
             assert!(err.to_string().contains("same sign"), "{err}");
         }
@@ -240,11 +213,7 @@ mod tests {
     #[test]
     fn exponential_halves_gap_each_half_life() {
         let periods = quarters(4);
-        let p = params(&[
-            ("target", serde_json::json!(100.0)),
-            ("shape", serde_json::json!("exponential")),
-            ("half_life", serde_json::json!(1.0)),
-        ]);
+        let p = params(100.0, ForecastFadeShape::Exponential, Some(1.0));
         let results = fade_to_target(200.0, &periods, &p).expect("exponential fade");
         assert!((results[&periods[0]] - 150.0).abs() < 1e-12);
         assert!((results[&periods[1]] - 125.0).abs() < 1e-12);
@@ -255,10 +224,7 @@ mod tests {
     #[test]
     fn exponential_requires_half_life() {
         let periods = quarters(2);
-        let p = params(&[
-            ("target", serde_json::json!(100.0)),
-            ("shape", serde_json::json!("exponential")),
-        ]);
+        let p = params(100.0, ForecastFadeShape::Exponential, None);
         let err = fade_to_target(200.0, &periods, &p).expect_err("missing half_life");
         assert!(err.to_string().contains("half_life"), "{err}");
     }
@@ -266,10 +232,7 @@ mod tests {
     #[test]
     fn half_life_rejected_for_other_shapes() {
         let periods = quarters(2);
-        let p = params(&[
-            ("target", serde_json::json!(100.0)),
-            ("half_life", serde_json::json!(2.0)),
-        ]);
+        let p = params(100.0, ForecastFadeShape::Linear, Some(2.0));
         let err = fade_to_target(200.0, &periods, &p).expect_err("half_life misuse");
         assert!(err.to_string().contains("only valid"), "{err}");
     }
@@ -278,47 +241,21 @@ mod tests {
     fn invalid_half_life_rejected() {
         let periods = quarters(2);
         for hl in [0.0, -1.0, f64::NAN] {
-            let p = params(&[
-                ("target", serde_json::json!(100.0)),
-                ("shape", serde_json::json!("exponential")),
-                ("half_life", serde_json::json!(hl)),
-            ]);
+            let p = params(100.0, ForecastFadeShape::Exponential, Some(hl));
             assert!(fade_to_target(200.0, &periods, &p).is_err());
         }
     }
 
     #[test]
-    fn unknown_shape_rejected() {
-        let periods = quarters(1);
-        let p = params(&[
-            ("target", serde_json::json!(100.0)),
-            ("shape", serde_json::json!("sigmoid")),
-        ]);
-        let err = fade_to_target(200.0, &periods, &p).expect_err("unknown shape");
-        assert!(
-            err.to_string().contains("Unknown FadeToTarget shape"),
-            "{err}"
-        );
-    }
-
-    #[test]
-    fn missing_target_rejected() {
-        let periods = quarters(1);
-        let p = params(&[]);
-        assert!(fade_to_target(100.0, &periods, &p).is_err());
-    }
-
-    #[test]
     fn non_finite_inputs_rejected() {
         let periods = quarters(1);
-        let p = params(&[("target", serde_json::json!(100.0))]);
-        assert!(fade_to_target(f64::NAN, &periods, &p).is_err());
+        assert!(fade_to_target(f64::NAN, &periods, &linear(100.0)).is_err());
+        assert!(fade_to_target(100.0, &periods, &linear(f64::INFINITY)).is_err());
     }
 
     #[test]
     fn empty_periods_return_empty_map() {
-        let p = params(&[("target", serde_json::json!(100.0))]);
-        let results = fade_to_target(50.0, &[], &p).expect("empty periods valid");
+        let results = fade_to_target(50.0, &[], &linear(100.0)).expect("empty periods valid");
         assert!(results.is_empty());
     }
 }

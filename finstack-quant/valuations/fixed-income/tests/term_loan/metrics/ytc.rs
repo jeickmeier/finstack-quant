@@ -7,8 +7,8 @@ use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Teno
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_fixed_income::term_loan::{
     LoanCall, LoanCallSchedule, LoanCallType, TermLoan,
@@ -58,7 +58,7 @@ fn test_ytc_callable_loan() {
     let result = loan.price_with_metrics(
         &market,
         as_of,
-        &[MetricId::custom("ytc")],
+        &[MetricId::Ytc],
         finstack_quant_valuations_core::instruments::PricingOptions::default(),
     );
 
@@ -110,7 +110,7 @@ fn test_ytc_uses_quoted_clean_price_pct_when_present() {
         .price_with_metrics(
             &market,
             as_of,
-            &[MetricId::custom("ytc")],
+            &[MetricId::Ytc],
             finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
@@ -122,7 +122,7 @@ fn test_ytc_uses_quoted_clean_price_pct_when_present() {
         .price_with_metrics(
             &market,
             as_of,
-            &[MetricId::custom("ytc")],
+            &[MetricId::Ytc],
             finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();

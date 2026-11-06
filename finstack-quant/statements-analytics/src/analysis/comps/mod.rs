@@ -5,22 +5,28 @@
 //!
 //! Start with [`PeerSet::from_universe`] to build a filtered peer group,
 //! then use [`compute_peer_multiples`] for multiples and
-//! [`score_relative_value`] for the composite rich/cheap signal.
+//! [`score_relative_value`] for the composite rich/cheap signal, or call
+//! [`relative_value_report`] for all of it at once.
 
 mod multiples;
 mod peer_set;
+mod report;
 mod scoring;
 mod stats;
 mod types;
 
 pub use multiples::{compute_multiple, compute_peer_multiples};
 pub use peer_set::{PeerFilter, PeerSet};
+pub use report::{
+    CompositeExclusion, RelativeValueCompany, RelativeValueDimension, RelativeValueMultiple,
+    RelativeValuePoint, RelativeValueReport, RelativeValueReportConfig, relative_value_report,
+};
 pub use scoring::{
-    score_relative_value, DimensionScore, MetricExtractor, RelativeValueResult, ScoreDirection,
-    ScoringDimension,
+    DimensionExclusion, DimensionScore, MetricExtractor, RelativeValueResult, ScoreDirection,
+    ScoringDimension, score_relative_value,
 };
 pub use stats::{
-    peer_stats, percentile_rank, regression_fair_value, z_score, PeerStats, RegressionResult,
+    PeerStats, RegressionResult, peer_stats, percentile_rank, regression_fair_value, z_score,
 };
 pub use types::{CompanyId, CompanyMetrics, Multiple, PeriodBasis};
 
@@ -362,11 +368,13 @@ mod tests {
         let subject = universe[0].clone(); // Company A
         let filter = PeerFilter::default();
 
-        let peer_set = PeerSet::from_universe(subject, &universe, &filter, PeriodBasis::Ltm);
+        let (peer_set, excluded) =
+            PeerSet::from_universe(subject, &universe, &filter, PeriodBasis::Ltm);
 
-        // Subject should not appear in peers
+        // Subject should not appear in peers, nor count as excluded
         assert!(!peer_set.peers.iter().any(|p| p.id.as_str() == "A"));
         assert_eq!(peer_set.peer_count(), universe.len() - 1);
+        assert_eq!(excluded, 0);
     }
 
     #[test]
@@ -379,9 +387,11 @@ mod tests {
             ..Default::default()
         };
 
-        let peer_set = PeerSet::from_universe(subject, &universe, &filter, PeriodBasis::Ltm);
+        let (peer_set, excluded) =
+            PeerSet::from_universe(subject, &universe, &filter, PeriodBasis::Ltm);
         // Energy + BB: A, B, D, F, I
         assert_eq!(peer_set.peer_count(), 5);
+        assert_eq!(excluded, universe.len() - 5);
     }
 
     // Multiples computation tests

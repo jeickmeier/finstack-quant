@@ -3,7 +3,7 @@
 //! Exposes:
 //!
 //! - Seniority-based Beta recovery distributions (Moody's / S&P calibrations).
-//! - Workout (collateral-waterfall) LGD as a builder and a one-shot function.
+//! - Workout (collateral-waterfall) LGD as a builder and a JSON-backed model.
 //! - Downturn LGD adjustments (stressed approximation, regulatory floor).
 //! - Exposure-at-default for term loans and revolvers.
 
@@ -129,6 +129,13 @@ fn seniority_recovery_stats(seniority: &str, calibration_id: &str) -> PyResult<P
     lgd::seniority_recovery_stats(seniority, calibration_id)
         .map(|inner| PyBetaRecovery { inner })
         .map_err(core_to_py)
+}
+
+#[doc = pydoc!("finstack_quant.models.credit.lgd", "seniority_calibration_ids")]
+#[pyfunction]
+#[pyo3(text_signature = "()")]
+fn seniority_calibration_ids() -> PyResult<Vec<String>> {
+    lgd::seniority_calibration_ids().map_err(core_to_py)
 }
 
 #[doc = pydoc!("finstack_quant.models.credit.lgd", "CollateralPiece")]
@@ -500,31 +507,6 @@ impl PyWorkoutLgdBuilder {
     }
 }
 
-#[doc = pydoc!("finstack_quant.models.credit.lgd", "workout_lgd")]
-#[pyfunction]
-#[pyo3(
-    text_signature = "(ead, collateral, direct_cost_pct, indirect_cost_pct, time_to_resolution_years, discount_rate)"
-)]
-fn workout_lgd(
-    ead: f64,
-    collateral: Vec<(String, f64, f64)>,
-    direct_cost_pct: f64,
-    indirect_cost_pct: f64,
-    time_to_resolution_years: f64,
-    discount_rate: f64,
-) -> PyResult<PyWorkoutLgdResult> {
-    lgd::workout_lgd(
-        ead,
-        collateral,
-        direct_cost_pct,
-        indirect_cost_pct,
-        time_to_resolution_years,
-        discount_rate,
-    )
-    .map(|inner| PyWorkoutLgdResult { inner })
-    .map_err(core_to_py)
-}
-
 #[doc = pydoc!("finstack_quant.models.credit.lgd", "DownturnLgd")]
 #[pyclass(
     module = "finstack_quant.models.credit.lgd",
@@ -706,8 +688,8 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyWorkoutLgd>()?;
     m.add_class::<PyWorkoutLgdBuilder>()?;
     m.add_class::<PyWorkoutLgdResult>()?;
+    m.add_function(wrap_pyfunction!(seniority_calibration_ids, &m)?)?;
     m.add_function(wrap_pyfunction!(seniority_recovery_stats, &m)?)?;
-    m.add_function(wrap_pyfunction!(workout_lgd, &m)?)?;
 
     let all = PyList::new(
         py,
@@ -720,8 +702,8 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "WorkoutLgd",
             "WorkoutLgdBuilder",
             "WorkoutLgdResult",
+            "seniority_calibration_ids",
             "seniority_recovery_stats",
-            "workout_lgd",
         ],
     )?;
     m.setattr("__all__", all)?;

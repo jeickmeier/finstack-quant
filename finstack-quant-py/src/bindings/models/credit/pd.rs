@@ -3,18 +3,18 @@
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pydoc::pydoc;
 use finstack_quant_models::credit::pd::{
+    BASEL_IRB_PD_FLOOR, MasterScale, MasterScaleGrade, MasterScaleResult, PdCycleParams,
     apply_basel_irb_pd_floor as core_apply_basel_irb_pd_floor,
     central_tendency as core_central_tendency, pit_to_ttc as core_pit_to_ttc,
-    ttc_to_pit as core_ttc_to_pit, MasterScale, MasterScaleGrade, MasterScaleResult, PdCycleParams,
-    BASEL_IRB_PD_FLOOR,
+    ttc_to_pit as core_ttc_to_pit,
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule};
 
 use super::scoring::PyScoringResult;
 use crate::bindings::pandas_utils::{
-    serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,
-    ColumnSchema,
+    ColumnSchema, serde_object_to_single_row_dataframe_with_schema,
+    serde_rows_to_dataframe_with_schema,
 };
 use crate::errors::{core_to_py, kinded_to_py};
 
@@ -133,6 +133,12 @@ wire_methods!(
 #[derive(Clone, PartialEq)]
 pub struct PyMasterScaleResult {
     inner: MasterScaleResult,
+}
+
+impl PyMasterScaleResult {
+    pub(super) fn from_inner(inner: MasterScaleResult) -> Self {
+        Self { inner }
+    }
 }
 
 #[pymethods]

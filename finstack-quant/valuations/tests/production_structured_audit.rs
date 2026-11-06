@@ -5,10 +5,11 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
+use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::fixed_income::structured_credit::AssetPool;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     RepLine, StructuredCredit,
 };
-use finstack_quant_valuations::instruments::Instrument;
 use time::macros::date;
 
 fn market(as_of: Date) -> MarketContext {
@@ -26,10 +27,10 @@ fn production_structured_constructor_rejects_date_overflow() {
     let base = StructuredCredit::example().expect("example");
     let (pool, tranches) = (|| base.pool.clone(), || base.tranches.clone());
     for deal in [
-        StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Abs, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: "BOUNDARY".into(), pool: pool(), tranches: tranches(), closing_date: Date::MAX, maturity: Date::MAX, discount_curve_id: "USD-OIS".into(), calendar_id: None }),
-        StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Clo, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: "BOUNDARY".into(), pool: pool(), tranches: tranches(), closing_date: Date::MAX, maturity: Date::MAX, discount_curve_id: "USD-OIS".into(), calendar_id: None }),
-        StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Cmbs, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: "BOUNDARY".into(), pool: pool(), tranches: tranches(), closing_date: Date::MAX, maturity: Date::MAX, discount_curve_id: "USD-OIS".into(), calendar_id: None }),
-        StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Rmbs, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: "BOUNDARY".into(), pool: pool(), tranches: tranches(), closing_date: Date::MAX, maturity: Date::MAX, discount_curve_id: "USD-OIS".into(), calendar_id: None }),
+        StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Abs, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: "BOUNDARY".into(), pool: AssetPool { deal_type: finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Abs, ..pool() }, tranches: tranches(), closing_date: Date::MAX, maturity: Date::MAX, discount_curve_id: "USD-OIS".into(), calendar_id: None }),
+        StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Clo, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: "BOUNDARY".into(), pool: AssetPool { deal_type: finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Clo, ..pool() }, tranches: tranches(), closing_date: Date::MAX, maturity: Date::MAX, discount_curve_id: "USD-OIS".into(), calendar_id: None }),
+        StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Cmbs, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: "BOUNDARY".into(), pool: AssetPool { deal_type: finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Cmbs, ..pool() }, tranches: tranches(), closing_date: Date::MAX, maturity: Date::MAX, discount_curve_id: "USD-OIS".into(), calendar_id: None }),
+        StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Rmbs, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: "BOUNDARY".into(), pool: AssetPool { deal_type: finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Rmbs, ..pool() }, tranches: tranches(), closing_date: Date::MAX, maturity: Date::MAX, discount_curve_id: "USD-OIS".into(), calendar_id: None }),
     ] {
         assert!(deal.is_err());
     }
@@ -41,22 +42,22 @@ fn production_structured_constructor_uses_closing_date() {
     let closing = date!(2026 - 09 - 09);
     for (deal, expected) in [
         (
-            StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Abs, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: "ABS".into(), pool: base.pool.clone(), tranches: base.tranches.clone(), closing_date: closing, maturity: base.maturity, discount_curve_id: "USD-OIS".into(), calendar_id: None })
+            StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Abs, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: "ABS".into(), pool: AssetPool { deal_type: finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Abs, ..base.pool.clone() }, tranches: base.tranches.clone(), closing_date: closing, maturity: base.maturity, discount_curve_id: "USD-OIS".into(), calendar_id: None })
             .expect("valid structured-credit dates"),
             date!(2026 - 10 - 09),
         ),
         (
-            StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Clo, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: "CLO".into(), pool: base.pool.clone(), tranches: base.tranches.clone(), closing_date: closing, maturity: base.maturity, discount_curve_id: "USD-OIS".into(), calendar_id: None })
+            StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Clo, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: "CLO".into(), pool: AssetPool { deal_type: finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Clo, ..base.pool.clone() }, tranches: base.tranches.clone(), closing_date: closing, maturity: base.maturity, discount_curve_id: "USD-OIS".into(), calendar_id: None })
             .expect("valid structured-credit dates"),
             date!(2026 - 12 - 09),
         ),
         (
-            StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Cmbs, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: "CMBS".into(), pool: base.pool.clone(), tranches: base.tranches.clone(), closing_date: closing, maturity: base.maturity, discount_curve_id: "USD-OIS".into(), calendar_id: None })
+            StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Cmbs, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: "CMBS".into(), pool: AssetPool { deal_type: finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Cmbs, ..base.pool.clone() }, tranches: base.tranches.clone(), closing_date: closing, maturity: base.maturity, discount_curve_id: "USD-OIS".into(), calendar_id: None })
             .expect("valid structured-credit dates"),
             date!(2026 - 10 - 09),
         ),
         (
-            StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Rmbs, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: "RMBS".into(), pool: base.pool.clone(), tranches: base.tranches.clone(), closing_date: closing, maturity: base.maturity, discount_curve_id: "USD-OIS".into(), calendar_id: None })
+            StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Rmbs, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: "RMBS".into(), pool: AssetPool { deal_type: finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Rmbs, ..base.pool.clone() }, tranches: base.tranches.clone(), closing_date: closing, maturity: base.maturity, discount_curve_id: "USD-OIS".into(), calendar_id: None })
             .expect("valid structured-credit dates"),
             date!(2026 - 10 - 09),
         ),

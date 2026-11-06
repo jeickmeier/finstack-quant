@@ -10,7 +10,7 @@ mod sensitivities;
 use crate::metrics::MetricRegistry;
 
 use crate::instruments::equity::real_estate::{
-    levered_pricer, pricer, LeveredRealEstateEquity, RealEstateAsset,
+    LeveredRealEstateEquity, RealEstateAsset, levered_pricer, pricer,
 };
 use crate::metrics::RfComponentPriced;
 use finstack_quant_core::dates::Date;

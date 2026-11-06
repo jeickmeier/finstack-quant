@@ -21,9 +21,9 @@
 
 use crate::structured_credit::StructuredCredit;
 use finstack_quant_cashflows::builder::DefaultModelSpec;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::Instrument;
 
 /// Upper bound of the CDR search (100% annual default rate).

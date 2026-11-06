@@ -105,14 +105,13 @@ pub(super) fn hong_kong<A: Array<Item = Date>>(year: i32, out: &mut SmallVec<A>)
             dates.extend([birthday, birthday + Duration::days(2)]);
         }
     }
-    if year <= 1996 {
-        if let Some(liberation) =
+    if year <= 1996
+        && let Some(liberation) =
             algo::nth_weekday_of_month(year, Month::August, Weekday::Monday, -1)
-        {
-            dates.push(liberation);
-            if year >= 1983 {
-                dates.push(liberation - Duration::days(2));
-            }
+    {
+        dates.push(liberation);
+        if year >= 1983 {
+            dates.push(liberation - Duration::days(2));
         }
     }
     if (1997..=1998).contains(&year) {

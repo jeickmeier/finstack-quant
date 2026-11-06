@@ -12,8 +12,8 @@
 use super::filter::{AttributeFilter, DependencyFilter};
 use crate::FactorId;
 use crate::MarketDependency;
-use finstack_quant_core::types::Attributes;
 use finstack_quant_core::FxHashMap;
+use finstack_quant_core::types::Attributes;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 

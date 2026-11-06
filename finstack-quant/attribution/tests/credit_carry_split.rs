@@ -12,7 +12,7 @@
 
 use finstack_quant_attribution::{AttributionConfig, AttributionMethod, AttributionSpec};
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{create_date, Date};
+use finstack_quant_core::dates::{Date, create_date};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;

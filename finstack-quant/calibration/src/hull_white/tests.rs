@@ -5,11 +5,11 @@ use super::pricing::{
 };
 use super::swaption::infer_hw_initial_guess;
 use super::targets::{
-    HullWhiteSwaptionTarget, PreparedSwaption, SwaptionPayoff, KAPPA_MAX, KAPPA_MIN,
+    HullWhiteSwaptionTarget, KAPPA_MAX, KAPPA_MIN, PreparedSwaption, SwaptionPayoff,
 };
 use super::*;
 use finstack_quant_models::rates::hull_white::{
-    hw1f_caplet_forward_rate_normal_vol, hw1f_convexity_adjustment, hw_b, hw_bond_vol,
+    hw_b, hw_bond_vol, hw1f_caplet_forward_rate_normal_vol, hw1f_convexity_adjustment,
 };
 
 /// Cap/floor shape for the synthetic-schedule HW1F test helpers below.
@@ -1415,33 +1415,43 @@ fn quote_deserialization_validates() {
     assert!((c.maturity - 5.0).abs() < 1e-15);
 
     // Unknown fields are rejected.
-    assert!(serde_json::from_str::<SwaptionQuote>(
-        r#"{"expiry": 1.0, "tenor": 5.0, "volatility": 0.006,
+    assert!(
+        serde_json::from_str::<SwaptionQuote>(
+            r#"{"expiry": 1.0, "tenor": 5.0, "volatility": 0.006,
             "is_normal_vol": true, "strike": 0.03}"#,
-    )
-    .is_err());
-    assert!(serde_json::from_str::<CapFloorQuote>(
-        r#"{"maturity": 5.0, "strike": 0.03, "volatility": 0.008,
+        )
+        .is_err()
+    );
+    assert!(
+        serde_json::from_str::<CapFloorQuote>(
+            r#"{"maturity": 5.0, "strike": 0.03, "volatility": 0.008,
             "is_cap": true, "is_normal_vol": true, "extra": 1}"#,
-    )
-    .is_err());
+        )
+        .is_err()
+    );
 
     // Invalid values are rejected at deserialization time.
-    assert!(serde_json::from_str::<SwaptionQuote>(
-        r#"{"expiry": -1.0, "tenor": 5.0, "volatility": 0.006, "is_normal_vol": true}"#,
-    )
-    .is_err());
-    assert!(serde_json::from_str::<CapFloorQuote>(
-        r#"{"maturity": 5.0, "strike": 0.03, "volatility": -0.008,
+    assert!(
+        serde_json::from_str::<SwaptionQuote>(
+            r#"{"expiry": -1.0, "tenor": 5.0, "volatility": 0.006, "is_normal_vol": true}"#,
+        )
+        .is_err()
+    );
+    assert!(
+        serde_json::from_str::<CapFloorQuote>(
+            r#"{"maturity": 5.0, "strike": 0.03, "volatility": -0.008,
             "is_cap": true, "is_normal_vol": true}"#,
-    )
-    .is_err());
+        )
+        .is_err()
+    );
     // Lognormal cap/floor quotes are not accepted yet.
-    assert!(serde_json::from_str::<CapFloorQuote>(
-        r#"{"maturity": 5.0, "strike": 0.03, "volatility": 0.2,
+    assert!(
+        serde_json::from_str::<CapFloorQuote>(
+            r#"{"maturity": 5.0, "strike": 0.03, "volatility": 0.2,
             "is_cap": true, "is_normal_vol": false}"#,
-    )
-    .is_err());
+        )
+        .is_err()
+    );
 }
 
 #[test]

@@ -5,6 +5,7 @@
 //! with an optional quoted forward override (`quoted_forward`).
 
 use finstack_quant_cashflows::builder::CashFlowSchedule;
+use finstack_quant_core::Result;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date};
@@ -13,11 +14,10 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::common_impl::parameters::CommodityConvention;
 use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
 use finstack_quant_valuations_core::instruments::Position;
+use finstack_quant_valuations_core::instruments::common_impl::parameters::CommodityConvention;
 
 use finstack_quant_valuations_core::instruments::SettlementType;
 
@@ -562,8 +562,8 @@ mod tests {
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, PriceCurve};
     use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
     use finstack_quant_valuations_core::instruments::Instrument;
-    use time::macros::date;
     use time::Month;
+    use time::macros::date;
 
     fn test_market(as_of: Date) -> MarketContext {
         // Create a PriceCurve for WTI forward prices
@@ -1021,8 +1021,8 @@ mod tests {
 
     #[test]
     fn commodity_forward_cash_schedule_reconciles_pv_and_physical_invoice() {
-        use finstack_quant_cashflows::builder::CashflowRepresentation;
         use finstack_quant_cashflows::CashflowScheduleSource;
+        use finstack_quant_cashflows::builder::CashflowRepresentation;
         let as_of = Date::from_calendar_date(2025, Month::January, 15).expect("date");
         let market = test_market(as_of);
         let mut forward = CommodityForward::example().expect("example");
@@ -1067,10 +1067,12 @@ mod tests {
                                 < 1e-8
                         );
                     }
-                    assert!(forward
-                        .dated_cashflows(&market, payment_date + time::Duration::days(1))
-                        .expect("expired")
-                        .is_empty());
+                    assert!(
+                        forward
+                            .dated_cashflows(&market, payment_date + time::Duration::days(1))
+                            .expect("expired")
+                            .is_empty()
+                    );
                     assert_eq!(
                         forward
                             .value(&market, payment_date + time::Duration::days(1))

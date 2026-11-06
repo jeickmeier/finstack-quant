@@ -7,18 +7,24 @@
 mod budget;
 mod parametric;
 mod position;
+mod report;
 mod residual;
 mod types;
 
 pub use budget::{
-    evaluate_risk_budget, PositionBudgetEntry, RiskBudgetResult, DEFAULT_UTILIZATION_THRESHOLD,
+    DEFAULT_UTILIZATION_THRESHOLD, PositionBudgetEntry, RiskBudgetResult, evaluate_risk_budget,
+    evaluate_risk_budget_from_decomposition,
 };
 pub use parametric::decompose_factors;
 pub use position::{
+    DecompositionMethod, PositionEsContribution, PositionRiskDecomposition,
+    PositionVarContribution, StressAttribution, StressPositionEntry, TailScenarioBreakdown,
     build_stress_attribution, flatten_position_pnls, historical_var_decomposition,
-    parametric_var_decomposition, DecompositionMethod, PositionEsContribution,
-    PositionRiskDecomposition, PositionVarContribution, StressAttribution, StressPositionEntry,
-    TailScenarioBreakdown,
+    parametric_var_decomposition,
+};
+pub use report::{
+    PositionRiskBudget, PositionRiskReport, PositionRiskRequest, PositionRiskSource,
+    position_risk_report,
 };
 pub use residual::apply_residual_contributions;
 pub use types::{

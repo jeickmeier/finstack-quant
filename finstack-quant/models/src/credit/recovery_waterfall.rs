@@ -12,7 +12,7 @@
 use std::collections::HashSet;
 
 use crate::invalid_input;
-use finstack_quant_core::math::summation::{neumaier_sum, NeumaierAccumulator};
+use finstack_quant_core::math::summation::{NeumaierAccumulator, neumaier_sum};
 use finstack_quant_core::validation::validate_f64_non_negative;
 use finstack_quant_core::{Error, Result};
 
@@ -36,7 +36,7 @@ pub struct RecoveryClaim {
     pub penalties: f64,
     /// Gross value of collateral pledged exclusively to this claim.
     pub collateral_value: Option<f64>,
-    /// Collateral haircut in the inclusive range `[0, 1]`.
+    /// Collateral haircut as a decimal fraction between 0 and 1 inclusive.
     pub collateral_haircut: f64,
 }
 

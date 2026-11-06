@@ -1,13 +1,18 @@
-//! `CovenantEngine` and `CovenantBreach` wrappers plus the typed template
-//! builders.
+//! `CovenantEngine` and `CovenantBreach` wrappers plus `CovenantTemplate` and
+//! its expansion into typed specs.
 
 use super::report::PyCovenantReport;
 use super::spec::{PyCovenantSpec, PyCovenantWaiver};
 use crate::bindings::date_utils::{date_to_py, py_to_date};
-use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, ColumnSchema};
+use crate::bindings::pandas_utils::{ColumnSchema, serde_rows_to_dataframe_with_schema};
 use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::{core_to_py, display_to_py, value_error};
-use finstack_quant_covenants::{CovenantBreach, CovenantEngine, DatedMetrics, HashMapMetricSource};
+use finstack_quant_covenants::templates::{
+    CovenantTemplate, covenant_template as covenant_template_rs,
+};
+use finstack_quant_covenants::{
+    CovenantBreach, CovenantEngine, DatedCovenantReports, DatedMetrics, HashMapMetricSource,
+};
 use indexmap::IndexMap;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -78,6 +83,35 @@ const SERIES_COLUMNS: [ColumnSchema<'static>; 8] = [
     ("details", "str"),
 ];
 
+/// Flatten dated covenant reports into the long frame of `SERIES_COLUMNS`:
+/// one row per (test date, covenant), dates in series order and covenants in
+/// engine order. Shared by `CovenantEngine.evaluate_series` and
+/// `statements_analytics.evaluate_covenants`.
+pub(crate) fn dated_reports_frame(
+    py: Python<'_>,
+    series: Vec<DatedCovenantReports>,
+) -> PyResult<Bound<'_, PyAny>> {
+    let records: Vec<serde_json::Value> = series
+        .into_iter()
+        .flat_map(|dated| {
+            let as_of = dated.as_of.to_string();
+            dated.reports.into_iter().map(move |(key, report)| {
+                serde_json::json!({
+                    "as_of": as_of,
+                    "covenant": key,
+                    "covenant_type": report.covenant_type,
+                    "passed": report.passed,
+                    "actual_value": report.actual_value,
+                    "threshold": report.threshold,
+                    "headroom": report.headroom,
+                    "details": report.details,
+                })
+            })
+        })
+        .collect();
+    serde_rows_to_dataframe_with_schema(py, &records, &SERIES_COLUMNS)
+}
+
 /// Read a date-indexed metrics frame into Rust `DatedMetrics` rows.
 ///
 /// Cells are preserved for canonical Rust validation. Duplicate metric
@@ -124,7 +158,7 @@ pub(crate) fn extract_metric_frame(frame: &Bound<'_, PyAny>) -> PyResult<Vec<Dat
 /// accumulated by ``evaluate_and_track``.
 ///
 /// Build it empty and chain ``add_spec`` / ``add_waiver``, or use
-/// ``CovenantEngine.from_specs(lbo_standard(...))``. Evaluate with a
+/// ``CovenantEngine.from_specs(covenant_template(CovenantTemplate.lbo_standard(...)))``. Evaluate with a
 /// ``dict[str, float]`` of metric values keyed by metric id; ratios are in
 /// turns (``4.5`` means 4.5x) and amounts share the caller's reporting
 /// currency. Serialize with ``to_json`` — only ``specs`` is required on the
@@ -265,25 +299,7 @@ impl PyCovenantEngine {
     ) -> PyResult<Bound<'py, PyAny>> {
         let rows = extract_metric_frame(metrics)?;
         let evaluated = py.detach(|| self.inner.evaluate_series(&rows).map_err(core_to_py))?;
-        let records: Vec<serde_json::Value> = evaluated
-            .into_iter()
-            .flat_map(|dated| {
-                let as_of = dated.as_of.to_string();
-                dated.reports.into_iter().map(move |(key, report)| {
-                    serde_json::json!({
-                        "as_of": as_of,
-                        "covenant": key,
-                        "covenant_type": report.covenant_type,
-                        "passed": report.passed,
-                        "actual_value": report.actual_value,
-                        "threshold": report.threshold,
-                        "headroom": report.headroom,
-                        "details": report.details,
-                    })
-                })
-            })
-            .collect();
-        serde_rows_to_dataframe_with_schema(py, &records, &SERIES_COLUMNS)
+        dated_reports_frame(py, evaluated)
     }
 
     /// Deserialize from JSON; only ``specs`` is required.
@@ -459,100 +475,144 @@ impl PyCovenantBreach {
     }
 }
 
-fn wrap_specs(
-    specs: finstack_quant_core::Result<Vec<finstack_quant_covenants::CovenantSpec>>,
-) -> PyResult<Vec<PyCovenantSpec>> {
-    specs
+/// One standard covenant package and its thresholds.
+///
+/// Build it with the variant constructors (``CovenantTemplate.lbo_standard``,
+/// ``cov_lite``, ``real_estate``, ``project_finance``) and expand it with
+/// ``covenant_template``. Ratios are in turns, debt yield and LTV are decimal
+/// fractions, and capex and liquidity are reporting-currency amounts.
+#[pyclass(
+    name = "CovenantTemplate",
+    module = "finstack_quant.covenants",
+    frozen,
+    eq,
+    from_py_object
+)]
+#[derive(Clone, PartialEq)]
+pub(crate) struct PyCovenantTemplate {
+    pub(crate) inner: CovenantTemplate,
+}
+
+#[pymethods]
+impl PyCovenantTemplate {
+    /// Standard leveraged-buyout package: quarterly maximum Debt/EBITDA
+    /// (``initial_leverage``, turns), minimum interest and fixed-charge
+    /// coverage (turns), and an annual maximum capex (reporting-currency
+    /// amount).
+    #[staticmethod]
+    #[pyo3(
+        text_signature = "(initial_leverage, interest_coverage, fixed_charge_coverage, max_capex)"
+    )]
+    fn lbo_standard(
+        initial_leverage: f64,
+        interest_coverage: f64,
+        fixed_charge_coverage: f64,
+        max_capex: f64,
+    ) -> Self {
+        Self {
+            inner: CovenantTemplate::LboStandard {
+                initial_leverage,
+                interest_coverage,
+                fixed_charge_coverage,
+                max_capex,
+            },
+        }
+    }
+
+    /// Covenant-lite package: incurrence-only maximum total and senior
+    /// leverage (turns) and a negative covenant on additional secured debt.
+    #[staticmethod]
+    #[pyo3(text_signature = "(max_leverage, max_senior_leverage)")]
+    fn cov_lite(max_leverage: f64, max_senior_leverage: f64) -> Self {
+        Self {
+            inner: CovenantTemplate::CovLite {
+                max_leverage,
+                max_senior_leverage,
+            },
+        }
+    }
+
+    /// Commercial real-estate package: minimum DSCR (turns), minimum debt
+    /// yield and maximum LTV (decimal fractions).
+    #[staticmethod]
+    #[pyo3(text_signature = "(min_dscr, min_debt_yield, max_ltv)")]
+    fn real_estate(min_dscr: f64, min_debt_yield: f64, max_ltv: f64) -> Self {
+        Self {
+            inner: CovenantTemplate::RealEstate {
+                min_dscr,
+                min_debt_yield,
+                max_ltv,
+            },
+        }
+    }
+
+    /// Project-finance package: default and distribution lock-up DSCR
+    /// (turns), minimum debt-service reserve (reporting-currency amount) and
+    /// maximum net Debt/EBITDA (turns).
+    #[staticmethod]
+    #[pyo3(
+        text_signature = "(min_dscr, distribution_lockup_dscr, min_liquidity, max_net_leverage)"
+    )]
+    fn project_finance(
+        min_dscr: f64,
+        distribution_lockup_dscr: f64,
+        min_liquidity: f64,
+        max_net_leverage: f64,
+    ) -> Self {
+        Self {
+            inner: CovenantTemplate::ProjectFinance {
+                min_dscr,
+                distribution_lockup_dscr,
+                min_liquidity,
+                max_net_leverage,
+            },
+        }
+    }
+
+    /// Package wire tag: ``lbo_standard``, ``cov_lite``, ``real_estate`` or
+    /// ``project_finance``.
+    #[getter]
+    fn kind(&self) -> PyResult<String> {
+        let wire = serde_json::to_value(self.inner).map_err(display_to_py)?;
+        wire["kind"]
+            .as_str()
+            .map(str::to_owned)
+            .ok_or_else(|| value_error("CovenantTemplate serialized without a kind tag"))
+    }
+
+    /// Deserialize from canonical JSON (strict: unknown fields are rejected).
+    #[staticmethod]
+    fn from_json(json: &str) -> PyResult<Self> {
+        serde_json::from_str(json)
+            .map(|inner| Self { inner })
+            .map_err(display_to_py)
+    }
+
+    /// Serialize to compact JSON.
+    fn to_json(&self) -> PyResult<String> {
+        serde_json::to_string(&self.inner).map_err(display_to_py)
+    }
+
+    /// Support ``pickle`` via the JSON round-trip.
+    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
+        let from_json = py.get_type::<Self>().getattr("from_json")?;
+        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
+    }
+
+    fn __repr__(&self) -> String {
+        repr_from_serde("CovenantTemplate", &self.inner)
+    }
+}
+
+/// Expand a ``CovenantTemplate`` into its typed covenant specs.
+///
+/// Raises ``ValueError`` when any threshold is NaN, infinite or negative.
+#[pyfunction]
+#[pyo3(text_signature = "(template)")]
+pub(crate) fn covenant_template(template: PyCovenantTemplate) -> PyResult<Vec<PyCovenantSpec>> {
+    covenant_template_rs(&template.inner)
         .map_err(core_to_py)
         .map(|specs| specs.into_iter().map(PyCovenantSpec::from_inner).collect())
-}
-
-/// Standard leveraged-buyout covenant package as typed specs.
-///
-/// Quarterly maintenance tests for maximum gross Debt/EBITDA
-/// (``initial_leverage``, turns), minimum interest coverage
-/// (``interest_coverage``, turns) and minimum fixed-charge coverage
-/// (``fixed_charge_coverage``, turns), plus an annual maximum-capex test
-/// (``max_capex``, reporting-currency amount). Leverage and interest
-/// coverage carry 30-day cure periods; a leverage breach steps the rate up
-/// 200bp and a coverage breach blocks distributions.
-///
-/// Raises ``ValueError`` when any input is NaN, infinite or negative.
-#[pyfunction]
-#[pyo3(text_signature = "(initial_leverage, interest_coverage, fixed_charge_coverage, max_capex)")]
-pub(crate) fn lbo_standard(
-    initial_leverage: f64,
-    interest_coverage: f64,
-    fixed_charge_coverage: f64,
-    max_capex: f64,
-) -> PyResult<Vec<PyCovenantSpec>> {
-    wrap_specs(finstack_quant_covenants::templates::lbo_standard(
-        initial_leverage,
-        interest_coverage,
-        fixed_charge_coverage,
-        max_capex,
-    ))
-}
-
-/// Covenant-lite leveraged-loan package as typed specs: incurrence-only
-/// maximum total leverage (``max_leverage``, turns), maximum senior leverage
-/// (``max_senior_leverage``, turns) and a negative covenant on additional
-/// secured debt.
-///
-/// Raises ``ValueError`` when any input is NaN, infinite or negative.
-#[pyfunction]
-#[pyo3(text_signature = "(max_leverage, max_senior_leverage)")]
-pub(crate) fn cov_lite(
-    max_leverage: f64,
-    max_senior_leverage: f64,
-) -> PyResult<Vec<PyCovenantSpec>> {
-    wrap_specs(finstack_quant_covenants::templates::cov_lite(
-        max_leverage,
-        max_senior_leverage,
-    ))
-}
-
-/// Commercial real-estate package as typed specs: minimum DSCR
-/// (``min_dscr``, turns; 30-day cure, 100% cash sweep), minimum debt yield
-/// (``min_debt_yield``, decimal fraction) and maximum LTV (``max_ltv``,
-/// decimal fraction; 50% cash sweep).
-///
-/// Raises ``ValueError`` when any input is NaN, infinite or negative.
-#[pyfunction]
-#[pyo3(text_signature = "(min_dscr, min_debt_yield, max_ltv)")]
-pub(crate) fn real_estate(
-    min_dscr: f64,
-    min_debt_yield: f64,
-    max_ltv: f64,
-) -> PyResult<Vec<PyCovenantSpec>> {
-    wrap_specs(finstack_quant_covenants::templates::real_estate(
-        min_dscr,
-        min_debt_yield,
-        max_ltv,
-    ))
-}
-
-/// Project-finance package as typed specs: default DSCR (``min_dscr``,
-/// turns; 60-day cure, event of default), distribution lock-up DSCR
-/// (``distribution_lockup_dscr``, turns), minimum debt-service reserve
-/// (``min_liquidity``, reporting-currency amount) and maximum net
-/// Debt/EBITDA (``max_net_leverage``, turns).
-///
-/// Raises ``ValueError`` when any input is NaN, infinite or negative.
-#[pyfunction]
-#[pyo3(text_signature = "(min_dscr, distribution_lockup_dscr, min_liquidity, max_net_leverage)")]
-pub(crate) fn project_finance(
-    min_dscr: f64,
-    distribution_lockup_dscr: f64,
-    min_liquidity: f64,
-    max_net_leverage: f64,
-) -> PyResult<Vec<PyCovenantSpec>> {
-    wrap_specs(finstack_quant_covenants::templates::project_finance(
-        min_dscr,
-        distribution_lockup_dscr,
-        min_liquidity,
-        max_net_leverage,
-    ))
 }
 
 /// Flatten ``evaluate`` output into one frame row per covenant.

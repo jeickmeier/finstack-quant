@@ -133,28 +133,36 @@ fn operation_validate_rejects_invalid_inputs() {
         discount_curve_id: None,
     };
 
-    assert!(same_currency
-        .validate()
-        .expect_err("same-currency FX pair should fail")
-        .to_string()
-        .contains("Base and quote currencies must be different"));
-    assert!(pct_floor
-        .validate()
-        .expect_err("percent floor should fail")
-        .to_string()
-        .contains("greater than -100%"));
-    for shock in invalid_price_shocks {
-        assert!(shock
+    assert!(
+        same_currency
             .validate()
-            .expect_err("negative post-shock prices should fail")
+            .expect_err("same-currency FX pair should fail")
             .to_string()
-            .contains("must be at least -100%"));
+            .contains("Base and quote currencies must be different")
+    );
+    assert!(
+        pct_floor
+            .validate()
+            .expect_err("percent floor should fail")
+            .to_string()
+            .contains("greater than -100%")
+    );
+    for shock in invalid_price_shocks {
+        assert!(
+            shock
+                .validate()
+                .expect_err("negative post-shock prices should fail")
+                .to_string()
+                .contains("must be at least -100%")
+        );
     }
-    assert!(empty_hierarchy
-        .validate()
-        .expect_err("empty hierarchy target should fail")
-        .to_string()
-        .contains("Hierarchy target path cannot be empty"));
+    assert!(
+        empty_hierarchy
+            .validate()
+            .expect_err("empty hierarchy target should fail")
+            .to_string()
+            .contains("Hierarchy target path cannot be empty")
+    );
 }
 
 /// W7 regression: correlation point deltas must lie in [-2, 2]. Anything
@@ -222,26 +230,34 @@ fn operation_validate_rejects_curve_node_and_binding_shape_errors() {
         roll_mode: TimeRollMode::BusinessDays,
     };
 
-    assert!(empty_nodes
-        .validate()
-        .expect_err("empty curve nodes should fail")
-        .to_string()
-        .contains("Curve nodes cannot be empty"));
-    assert!(empty_tenor
-        .validate()
-        .expect_err("blank curve node tenor should fail")
-        .to_string()
-        .contains("Curve node tenor cannot be empty"));
-    assert!(bad_binding
-        .validate()
-        .expect_err("blank rate binding tenor should fail")
-        .to_string()
-        .contains("RateBinding tenor cannot be empty"));
-    assert!(blank_roll
-        .validate()
-        .expect_err("blank time roll period should fail")
-        .to_string()
-        .contains("Time roll period cannot be empty"));
+    assert!(
+        empty_nodes
+            .validate()
+            .expect_err("empty curve nodes should fail")
+            .to_string()
+            .contains("Curve nodes cannot be empty")
+    );
+    assert!(
+        empty_tenor
+            .validate()
+            .expect_err("blank curve node tenor should fail")
+            .to_string()
+            .contains("Curve node tenor cannot be empty")
+    );
+    assert!(
+        bad_binding
+            .validate()
+            .expect_err("blank rate binding tenor should fail")
+            .to_string()
+            .contains("RateBinding tenor cannot be empty")
+    );
+    assert!(
+        blank_roll
+            .validate()
+            .expect_err("blank time roll period should fail")
+            .to_string()
+            .contains("Time roll period cannot be empty")
+    );
 }
 
 #[test]
@@ -271,24 +287,30 @@ fn operation_validate_rejects_non_finite_and_fx_floor_violation() {
         pct: -125.0,
     };
 
-    assert!(non_finite_fx
-        .validate()
-        .expect_err("NaN percentages should fail")
-        .to_string()
-        .contains("must be finite"));
-    assert!(fx_floor
-        .validate()
-        .expect_err("FX percent floor should fail")
-        .to_string()
-        .contains("greater than -100%"));
+    assert!(
+        non_finite_fx
+            .validate()
+            .expect_err("NaN percentages should fail")
+            .to_string()
+            .contains("must be finite")
+    );
+    assert!(
+        fx_floor
+            .validate()
+            .expect_err("FX percent floor should fail")
+            .to_string()
+            .contains("greater than -100%")
+    );
     vol_floor_relaxed
         .validate()
         .expect("vol surface -100% bucket shock should now validate");
-    assert!(type_floor_rejected
-        .validate()
-        .expect_err("instrument price shocks below -100% should fail")
-        .to_string()
-        .contains("must be at least -100%"));
+    assert!(
+        type_floor_rejected
+            .validate()
+            .expect_err("instrument price shocks below -100% should fail")
+            .to_string()
+            .contains("must be at least -100%")
+    );
 }
 
 #[test]

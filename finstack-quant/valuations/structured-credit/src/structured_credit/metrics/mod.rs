@@ -115,12 +115,12 @@ pub use deal_specific::{
 pub use pool::{CdrCalculator, CloWarfCalculator, CprCalculator};
 pub use pricing::calculate_tranche_wal;
 pub use risk::{
-    calculate_tranche_convexity, calculate_tranche_cs01, calculate_tranche_duration,
-    calculate_tranche_z_spread, tranche_breakeven_cdr, tranche_discount_margin, tranche_oas,
-    OasConfig, OasResult,
+    OasConfig, OasResult, calculate_tranche_convexity, calculate_tranche_cs01,
+    calculate_tranche_duration, calculate_tranche_z_spread, tranche_breakeven_cdr,
+    tranche_discount_margin, tranche_oas,
 };
-pub use scenario::{tranche_scenario_table, ScenarioCell, ScenarioGrid, ScenarioTable};
-pub use summary::{calculate_equity_metrics, tranche_metrics, EquityMetrics, TrancheMetrics};
+pub use scenario::{ScenarioCell, ScenarioGrid, ScenarioTable, tranche_scenario_table};
+pub use summary::{EquityMetrics, TrancheMetrics, calculate_equity_metrics, tranche_metrics};
 
 /// Register all structured credit metrics
 pub(crate) fn register_structured_credit_metrics(

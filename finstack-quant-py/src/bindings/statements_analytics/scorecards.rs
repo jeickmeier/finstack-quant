@@ -12,8 +12,8 @@
 use crate::bindings::extract::{extract_model_ref, extract_results_ref};
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::{
-    serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,
-    ColumnSchema,
+    ColumnSchema, serde_object_to_single_row_dataframe_with_schema,
+    serde_rows_to_dataframe_with_schema,
 };
 use crate::bindings::pydoc::pydoc;
 use crate::errors::display_to_py;
@@ -73,9 +73,7 @@ impl PyScorecardMetric {
         description: Option<&str>,
     ) -> PyResult<Self> {
         let thresholds: indexmap::IndexMap<String, (f64, f64)> = match thresholds {
-            Some(value) => {
-                crate::bindings::statements_analytics::extract_serde_any(py, value, "thresholds")?
-            }
+            Some(value) => crate::bindings::module_utils::spec_from_py(py, value, "thresholds")?,
             None => indexmap::IndexMap::new(),
         };
         Ok(Self {

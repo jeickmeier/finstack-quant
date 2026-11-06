@@ -5,8 +5,7 @@
 //! Exposed through the `models.factor.risk` facade namespace.
 
 use crate::utils::input::{
-    from_js_json, js_f64, js_f64_matrix, js_f64_seq, js_opt_bool, js_opt_f64, js_string,
-    js_string_seq,
+    from_js_json, js_f64, js_f64_matrix, js_f64_seq, js_opt_f64, js_string, js_string_seq,
 };
 use crate::utils::{to_js_err, to_js_value};
 
@@ -15,87 +14,38 @@ use wasm_bindgen::prelude::*;
 
 // Position-level VaR / ES decomposition and risk budgeting
 
-/// Decompose portfolio VaR and ES into position contributions via parametric
-/// Euler allocation.
+/// Decompose position VaR/ES from a parametric or historical source, with an
+/// optional risk budget and, for scenario P&L, the tail stress attribution.
 ///
-/// Returns the canonical `PositionRiskDecomposition` (the object Python's
-/// `parametric_var_decomposition` returns): portfolio VaR/ES (losses
-/// negative), `method`, and per-position `var_contributions` and
-/// `es_contributions` rows.
-/// @param position_ids - Position identifiers, one per weight.
-/// @param weights - Position weights or exposures in portfolio currency.
-/// @param covariance - Square position-return covariance matrix as nested rows (`n x n`, row-major).
-/// @param confidence - Optional tail confidence as a decimal probability in `(0.5, 1)`; omitted or `null` defaults to 0.95.
-/// @param compute_incremental - Optional; when `true`, also computes
-///   incremental VaR (one full repricing per position). Defaults to `false`.
+/// Returns the canonical `PositionRiskReport` (the object Python's
+/// `position_risk_report` returns): `decomposition` (portfolio and
+/// per-position VaR/ES, losses negative), `budget` (`null` without a budget)
+/// and `stress` (`null` for a parametric source).
 ///
-/// # Errors
+/// # Arguments
 ///
-/// Throws a `TypeError` if an argument has the wrong JavaScript type, and a
-/// `validation` error if identifier, weight, or covariance dimensions
-/// disagree; the covariance matrix is not finite, symmetric, and positive
-/// semidefinite; or `confidence` is not finite and in `(0.5, 1)`.
-#[wasm_bindgen(js_name = parametricVarDecomposition)]
-pub fn parametric_var_decomposition(
-    position_ids: JsValue,
-    weights: JsValue,
-    covariance: JsValue,
-    confidence: Option<JsValue>,
-    compute_incremental: Option<JsValue>,
-) -> Result<JsValue, JsValue> {
-    let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
-    use finstack_quant_core::math::linalg::flatten_square_matrix;
-    use finstack_quant_factor::risk::parametric_var_decomposition;
-    let ids = js_string_seq(&position_ids, "positionIds")?;
-    let weights = js_f64_seq(&weights, "weights")?;
-    let covariance = js_f64_matrix(&covariance, "covariance")?;
-    let compute_incremental = js_opt_bool(compute_incremental.as_ref(), "computeIncremental")?;
-
-    let cov_flat =
-        flatten_square_matrix(covariance, weights.len(), "covariance").map_err(to_js_err)?;
-    let result = parametric_var_decomposition(
-        &ids,
-        &weights,
-        &cov_flat,
-        confidence,
-        compute_incremental == Some(true),
-    )
-    .map_err(to_js_err)?;
-    crate::utils::to_js_value(&result)
-}
-
-/// Decompose portfolio VaR and ES from per-position scenario P&Ls via
-/// historical simulation.
-///
-/// Returns the canonical `PositionRiskDecomposition`, including the
-/// historical `es_contributions` rows (marginal and incremental VaR are
-/// `null`).
-/// @param position_ids - Position identifiers, one per P&L row.
-/// @param position_pnls - Position-major P&L matrix: one row per position, one column per scenario (losses negative).
-/// @param confidence - Optional tail confidence as a decimal probability in `(0.5, 1)`; omitted or `null` defaults to 0.95.
+/// * `request` - `PositionRiskRequest` object or JSON text: `position_ids`, an
+///   optional `confidence` (decimal in `(0.5, 1)`, default 0.95), a `source`
+///   tagged by `kind` (`{kind: "parametric", weights, covariance,
+///   compute_incremental}` with exposures in portfolio currency, an `n x n`
+///   covariance in position order and incremental VaR off by default, or
+///   `{kind: "historical", pnls}` with one row of scenario P&L per position,
+///   losses negative) and an optional `budget` (`{targets,
+///   utilization_threshold}`, target VaR shares in position order summing to
+///   ~1).
 ///
 /// # Errors
 ///
-/// Throws a `TypeError` if an argument has the wrong JavaScript type, and a
-/// `validation` error if the matrix does not have one row per position or its
-/// rows have different scenario counts, `confidence` is not finite and in
-/// `(0.5, 1)`, too few scenarios resolve the requested tail, or a P&L value is
-/// non-finite.
-#[wasm_bindgen(js_name = historicalVarDecomposition)]
-pub fn historical_var_decomposition(
-    position_ids: JsValue,
-    position_pnls: JsValue,
-    confidence: Option<JsValue>,
-) -> Result<JsValue, JsValue> {
-    let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
-    use finstack_quant_factor::risk::{flatten_position_pnls, historical_var_decomposition};
-    let ids = js_string_seq(&position_ids, "positionIds")?;
-    let position_pnls = js_f64_matrix(&position_pnls, "positionPnls")?;
-
-    let (flat, n_scenarios) = flatten_position_pnls(position_pnls, ids.len()).map_err(to_js_err)?;
-    let result =
-        historical_var_decomposition(&ids, &flat, n_scenarios, confidence).map_err(to_js_err)?;
-    crate::utils::to_js_value(&result)
+/// Throws a `validation` error for a malformed request, an unknown field or
+/// kind, dimensions that disagree with the position ids, an invalid
+/// covariance, too few scenarios for the tail, a confidence outside
+/// `(0.5, 1)` or a malformed budget; `invalid_type` for a non-finite number.
+#[wasm_bindgen(js_name = positionRiskReport)]
+pub fn position_risk_report(request: JsValue) -> Result<JsValue, JsValue> {
+    let request: finstack_quant_factor::risk::PositionRiskRequest =
+        from_js_json(&request, "request")?;
+    let report = finstack_quant_factor::risk::position_risk_report(&request).map_err(to_js_err)?;
+    crate::utils::to_js_value(&report)
 }
 
 /// Evaluate a per-position risk budget against actual component VaRs.
@@ -132,7 +82,7 @@ pub fn evaluate_risk_budget(
     let portfolio_var = js_f64(&portfolio_var, "portfolioVar")?;
     let utilization_threshold = js_opt_f64(utilization_threshold.as_ref(), "utilizationThreshold")?;
     use finstack_quant_factor::risk::{
-        evaluate_risk_budget as eval_risk_budget, DEFAULT_UTILIZATION_THRESHOLD,
+        DEFAULT_UTILIZATION_THRESHOLD, evaluate_risk_budget as eval_risk_budget,
     };
     let ids = js_string_seq(&position_ids, "positionIds")?;
     let actual_var = js_f64_seq(&actual_var, "actualVar")?;
@@ -141,6 +91,46 @@ pub fn evaluate_risk_budget(
 
     let result = eval_risk_budget(ids, &actual_var, &target_var_pct, portfolio_var, threshold)
         .map_err(to_js_err)?;
+    let js = crate::utils::to_js_value(&result)?;
+    let positions = js_sys::Reflect::get(&js, &JsValue::from("positions"))?;
+    crate::utils::restore_non_finite_rows::<finstack_quant_factor::risk::PositionBudgetEntry>(
+        &positions,
+    )?;
+    Ok(js)
+}
+
+/// Evaluate a risk budget against a position risk decomposition.
+///
+/// Twin of Python `evaluate_risk_budget_from_decomposition` (Rust
+/// `evaluate_risk_budget_from_decomposition`): reads each position's component
+/// VaR and the portfolio VaR from `decomp`. Rows keep the decomposition's order.
+/// @param decomp - `PositionRiskDecomposition` object or JSON, such as a `positionRiskReport` result's `decomposition`.
+/// @param target_var_pct - Target fraction of portfolio VaR in `[0, 1]` per position, aligned with `decomp.var_contributions`; non-empty targets must sum to one within 0.05.
+/// @param utilization_threshold - Optional actual-to-target ratio that flags a budget breach; omit for the Rust default of 1.2.
+/// @returns `RiskBudgetResult`: per-position `positions` rows, `total_overbudget` and `has_breach`.
+///
+/// # Errors
+///
+/// Throws a `TypeError` if an argument has the wrong JavaScript type, and a
+/// `validation` error if `decomp` is malformed, `targetVarPct` does not have one
+/// entry per position, targets are non-finite, outside [0, 1] or do not sum to
+/// one, the threshold is non-positive, or nonzero component VaR is paired with
+/// zero portfolio VaR.
+#[wasm_bindgen(js_name = evaluateRiskBudgetFromDecomposition)]
+pub fn evaluate_risk_budget_from_decomposition(
+    decomp: JsValue,
+    target_var_pct: JsValue,
+    utilization_threshold: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    let decomp: PositionRiskDecomposition = from_js_json(&decomp, "decomp")?;
+    let target_var_pct = js_f64_seq(&target_var_pct, "targetVarPct")?;
+    let utilization_threshold = js_opt_f64(utilization_threshold.as_ref(), "utilizationThreshold")?;
+    let result = finstack_quant_factor::risk::evaluate_risk_budget_from_decomposition(
+        &decomp,
+        &target_var_pct,
+        utilization_threshold,
+    )
+    .map_err(to_js_err)?;
     let js = crate::utils::to_js_value(&result)?;
     let positions = js_sys::Reflect::get(&js, &JsValue::from("positions"))?;
     crate::utils::restore_non_finite_rows::<finstack_quant_factor::risk::PositionBudgetEntry>(
@@ -191,7 +181,7 @@ pub fn build_stress_attribution(
 }
 
 /// One position's component VaR from a position risk decomposition.
-/// @param decomp - `PositionRiskDecomposition` object or JSON, as returned by `parametricVarDecomposition` or `historicalVarDecomposition`.
+/// @param decomp - `PositionRiskDecomposition` object or JSON, such as a `positionRiskReport` result's `decomposition`.
 /// @param position_id - Position identifier exactly as it appears in the decomposition.
 /// @returns The position's Euler-allocated component VaR (losses negative).
 ///

@@ -15,22 +15,23 @@ import {
 } from "@/components/finstack/shared/primitives/enum-field/enum-field";
 export const { fieldContext, formContext, useFieldContext, useFormContext } =
   createFormHookContexts();
+/**
+ * Every message an error value holds. A field validator yields issues, and a form
+ * validator yields `{ form: { [path]: issues } }` (TanStack's Standard Schema
+ * record), so issues can sit at any depth.
+ */
+function errorMessages(error: unknown): string[] {
+  if (!error) return [];
+  if (typeof error === "string") return [error];
+  if (Array.isArray(error)) return error.flatMap(errorMessages);
+  if (typeof error !== "object") return ["Invalid field value"];
+  if ("message" in error) return [String(error.message)];
+  if ("form" in error) return errorMessages(error.form);
+  const nested = Object.values(error).flatMap(errorMessages);
+  return nested.length ? nested : ["Invalid field value"];
+}
 export function errorText(errors: readonly unknown[]): string | undefined {
-  const messages = errors
-    .flat(Infinity)
-    .flatMap((error) =>
-      error && typeof error === "object" && "form" in error
-        ? [error.form]
-        : [error],
-    )
-    .filter(Boolean)
-    .map((error) =>
-      typeof error === "object" && error && "message" in error
-        ? String(error.message)
-        : typeof error === "string"
-          ? error
-          : "Invalid field value",
-    );
+  const messages = errors.flatMap(errorMessages);
   return messages.length ? [...new Set(messages)].join("; ") : undefined;
 }
 function TextField(
@@ -178,7 +179,8 @@ function ArrayField({
         size="sm"
         type="button"
 
-        onClick={() => field.pushValue(create())}
+        // Adding reveals a blank row; it does not edit it.
+        onClick={() => field.pushValue(create(), { dontUpdateMeta: true })}
       >
         Add {label}
       </Button>

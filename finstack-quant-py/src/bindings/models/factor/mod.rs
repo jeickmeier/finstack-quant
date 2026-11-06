@@ -63,6 +63,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "PositionFactorContribution",
             "PositionResidualContribution",
             "PositionRiskDecomposition",
+            "PositionRiskReport",
             "PositionVarContribution",
             "RiskBudgetResult",
             "RiskDecomposition",
@@ -72,9 +73,9 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "build_stress_attribution",
             "decompose_factors",
             "evaluate_risk_budget",
-            "historical_var_decomposition",
-            "parametric_var_decomposition",
+            "evaluate_risk_budget_from_decomposition",
             "position_component_var",
+            "position_risk_report",
         ],
     )?;
     risk.setattr("__all__", risk_all)?;

@@ -28,7 +28,7 @@ import math
 import pandas as pd
 import pytest
 
-from finstack_quant.analytics import MultiFactorResult, Performance
+from finstack_quant.analytics import MultiFactorResult, Performance, PerformancePanel
 from finstack_quant.core.market_data import FxMatrix, InflationIndex, ScalarTimeSeries
 from finstack_quant.models.credit import liability_management, pd as credit_pd, recovery_waterfall
 from finstack_quant.models.factor.credit import (
@@ -53,12 +53,15 @@ def _benchmarked_performance() -> Performance:
     benchmark = [-0.02, -0.01, 0.0, 0.01, 0.02, 0.03, 0.015, -0.005]
     residual = [0.004, -0.003, 0.006, -0.002, 0.001, -0.005, 0.003, -0.004]
     fund = [2.0 * value + noise for value, noise in zip(benchmark, residual, strict=True)]
-    return Performance.from_returns_arrays(
-        dates,
-        [fund, benchmark],
-        ["FUND", "BENCH"],
-        benchmark_ticker="BENCH",
-        frequency="monthly",
+    return Performance.from_panel(
+        PerformancePanel(
+            dates=dates,
+            series=[fund, benchmark],
+            kind="returns",
+            ticker_names=["FUND", "BENCH"],
+            benchmark_ticker="BENCH",
+            frequency="monthly",
+        )
     )
 
 
@@ -118,7 +121,9 @@ def _multi_factor_result(swap_factors: bool = False) -> MultiFactorResult:
     """Two-factor regression with betas 2.0 and 0.5, optionally supplied swapped."""
     dates = [dt_date(2024, 1, 1) + timedelta(days=i) for i in range(8)]
     returns = [2.0 * a + 0.5 * b for a, b in zip(_FACTOR_A, _FACTOR_B, strict=True)]
-    perf = Performance.from_returns_arrays(dates, [returns], ["FUND"], frequency="monthly")
+    perf = Performance.from_panel(
+        PerformancePanel(dates=dates, series=[returns], kind="returns", ticker_names=["FUND"], frequency="monthly")
+    )
     factors = [_FACTOR_B, _FACTOR_A] if swap_factors else [_FACTOR_A, _FACTOR_B]
     return perf.multi_factor_greeks(0, factors)
 
@@ -156,7 +161,9 @@ def test_multi_factor_result_to_dataframe_accepts_factor_names() -> None:
 
 def test_multi_factor_constant_response_frame_preserves_nan() -> None:
     dates = [dt_date(2024, 1, 1) + timedelta(days=i) for i in range(8)]
-    perf = Performance.from_returns_arrays(dates, [[0.01] * 8], ["FUND"])
+    perf = Performance.from_panel(
+        PerformancePanel(dates=dates, series=[[0.01] * 8], kind="returns", ticker_names=["FUND"])
+    )
     result = perf.multi_factor_greeks(0, [[-0.02, -0.01, 0.0, 0.01, 0.02, 0.03, 0.015, -0.005]])
     frame = result.to_dataframe(["market"])
     for column in ("r_squared", "adjusted_r_squared"):
@@ -286,7 +293,11 @@ def test_recovery_waterfall_ordering_ignores_the_input_order() -> None:
 
 
 def test_exchange_offer_analysis_to_dataframe_is_one_row() -> None:
-    analysis = liability_management.analyze_exchange_offer(60.0, 75.0, 2.0, 0.0, "par_for_par")
+    analysis = liability_management.analyze_exchange_offer(
+        liability_management.ExchangeOffer(
+            old_pv=60.0, new_pv=75.0, consent_fee=2.0, equity_sweetener_value=0.0, exchange_type="par_for_par"
+        )
+    )
     df = analysis.to_dataframe()
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1
@@ -328,7 +339,15 @@ _LME_COLUMNS = [
 
 
 def test_lme_analysis_to_dataframe_flattens_leverage_impact() -> None:
-    analysis = liability_management.analyze_lme("open_market_repurchase", 100.0, 0.70, 0.50, ebitda=12.5)
+    analysis = liability_management.analyze_lme(
+        liability_management.LmeTerms(
+            lme_type="open_market_repurchase",
+            notional=100.0,
+            repurchase_price_pct=0.70,
+            opt_acceptance_pct=0.50,
+            ebitda=12.5,
+        )
+    )
     df = analysis.to_dataframe()
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1
@@ -341,7 +360,11 @@ def test_lme_analysis_to_dataframe_flattens_leverage_impact() -> None:
 
 
 def test_lme_analysis_to_dataframe_nulls_leverage_without_ebitda() -> None:
-    analysis = liability_management.analyze_lme("open_market_repurchase", 100.0, 0.70, 0.50)
+    analysis = liability_management.analyze_lme(
+        liability_management.LmeTerms(
+            lme_type="open_market_repurchase", notional=100.0, repurchase_price_pct=0.70, opt_acceptance_pct=0.50
+        )
+    )
     df = analysis.to_dataframe()
     assert len(df) == 1
     assert list(df.columns) == _LME_COLUMNS

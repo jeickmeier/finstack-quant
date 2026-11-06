@@ -93,7 +93,13 @@ const scenario = {
   trancheId: data.scenarios.trancheId,
   gridJson: JSON.stringify(data.scenarios.grid),
   priceDomain: [80, 140] as const,
+  trancheMetrics: data.trancheAnalytics.cases[0]!.metrics,
 };
+
+/** A 50bp USD-OIS parallel shift, applied only when the reader asks. */
+const marketScenario = data.marketScenario.cases.find(
+  (entry) => entry.name === "usd-ois-50bp",
+)!.scenarioJson;
 
 export function Example({
   density = "compact",
@@ -130,6 +136,7 @@ export function Example({
       density={density}
       defaultCalibrationJson={JSON.stringify(data.calibration[0]!.input)}
       scenario={scenario}
+      marketScenario={marketScenario}
     />
   );
 }

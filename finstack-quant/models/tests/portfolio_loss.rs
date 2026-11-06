@@ -1,8 +1,8 @@
 //! Behavioral tests for portfolio credit-loss simulation.
 
 use finstack_quant_models::correlation::{
-    simulate_portfolio_loss, CopulaSpec, CreditExposure, PortfolioLossConfig, PortfolioLossResult,
-    RecoverySpec, MAX_PORTFOLIO_LOSS_PATHS,
+    CopulaSpec, CreditExposure, MAX_PORTFOLIO_LOSS_PATHS, PortfolioLossConfig, PortfolioLossResult,
+    RecoverySpec, simulate_portfolio_loss,
 };
 
 fn exposure(
@@ -167,9 +167,11 @@ fn simulation_rejects_invalid_paths_confidence_exposures_and_loadings() {
     cfg.num_paths = MAX_PORTFOLIO_LOSS_PATHS + 1;
     let error = simulate_portfolio_loss(std::slice::from_ref(&valid), &cfg, None)
         .expect_err("path maximum must be enforced before allocation");
-    assert!(error
-        .to_string()
-        .contains("portfolio loss num_paths must not exceed"));
+    assert!(
+        error
+            .to_string()
+            .contains("portfolio loss num_paths must not exceed")
+    );
     cfg.num_paths = 10;
     for confidence in [0.0, 1.0, f64::NAN, f64::INFINITY] {
         cfg.confidence = confidence;
@@ -304,9 +306,10 @@ fn tranche_statistics_reject_invalid_boundaries_and_pool_notional() {
     assert!(pool.tranche_loss_statistics(0.20, 0.10, 100.0).is_err());
     // outside [0, 1]
     for (attachment, detachment) in [(-0.01, 0.10), (0.10, 1.01), (f64::NAN, 0.10)] {
-        assert!(pool
-            .tranche_loss_statistics(attachment, detachment, 100.0)
-            .is_err());
+        assert!(
+            pool.tranche_loss_statistics(attachment, detachment, 100.0)
+                .is_err()
+        );
     }
     // non-positive or non-finite pool notional
     for notional in [0.0, -100.0, f64::NAN, f64::INFINITY] {

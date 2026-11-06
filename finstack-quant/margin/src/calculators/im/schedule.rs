@@ -11,16 +11,16 @@
 //! return `Result` rather than panicking,
 //! allowing callers to handle missing registry data gracefully.
 
+use crate::Marginable;
 use crate::calculators::traits::{ImCalculator, ImResult};
 use crate::registry::{embedded_registry, margin_registry_from_config};
 use crate::types::ImMethodology;
-use crate::Marginable;
+use finstack_quant_core::FxHashMap;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::summation::neumaier_sum;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::FxHashMap;
-use finstack_quant_core::Result;
 use std::borrow::Cow;
 
 /// Asset class for schedule-based IM calculation.
@@ -901,10 +901,11 @@ mod tests {
             .expect("bcbs_standard loads")
             .with_asset_class(ScheduleAssetClass::InterestRate);
 
-        assert!(calc
-            .calculate_netting_set_with_ngr(&[], test_date())
-            .expect("valid netting-set IM fixture")
-            .is_none());
+        assert!(
+            calc.calculate_netting_set_with_ngr(&[], test_date())
+                .expect("valid netting-set IM fixture")
+                .is_none()
+        );
 
         let mixed = [
             (
@@ -916,9 +917,10 @@ mod tests {
                 Money::new(50.0e6, Currency::EUR).expect("valid money fixture"),
             ),
         ];
-        assert!(calc
-            .calculate_netting_set_with_ngr(&ir_positions(&mixed), test_date())
-            .is_err());
+        assert!(
+            calc.calculate_netting_set_with_ngr(&ir_positions(&mixed), test_date())
+                .is_err()
+        );
     }
 
     #[test]

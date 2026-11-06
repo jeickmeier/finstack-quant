@@ -2,8 +2,8 @@
 
 use crate::bindings::date_utils::date_to_py;
 use crate::bindings::pandas_utils::{
-    serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,
-    serde_to_py, ColumnSchema,
+    ColumnSchema, serde_object_to_single_row_dataframe_with_schema,
+    serde_rows_to_dataframe_with_schema, serde_to_py,
 };
 use crate::errors::{display_to_py, serde_json_to_py};
 use finstack_quant_attribution::long_rows::{
@@ -504,6 +504,12 @@ impl PyPnlAttribution {
     #[pyo3(text_signature = "($self, amount)")]
     fn pct_of_total(&self, amount: f64) -> Option<f64> {
         self.inner.pct_of_total(amount)
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.attribution._pnl_attribution", "PnlAttribution.pct_of_total_by_bucket")]
+    #[pyo3(text_signature = "($self)")]
+    fn pct_of_total_by_bucket<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.pct_of_total_by_bucket())
     }
 
     /// Check whether the residual is within tolerance.

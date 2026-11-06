@@ -1,0 +1,409 @@
+{
+  "description": "Native models.credit.recoveryWaterfall.allocateRecovery, models.credit.lgd.WorkoutLgd.fromJson(model).evaluate(ead), seniorityRecoveryStats (read from the BetaRecovery handle) and seniorityCalibrationIds results: a four-claim stack with a pari passu shortfall and with a surplus, net collateral above the estate, a repeated claim id, a two-piece workout and a non-canonical collateral type, and statistics for a calibrated class, a class the S&P calibration lacks and an unknown calibration id.",
+  "calibrationIds": ["moodys_recovery_1982_2023", "sp_recovery_historical"],
+  "waterfall": {
+    "shortfall": {
+      "request": {
+        "estateValue": 150,
+        "claims": [
+          {
+            "id": "TL-B",
+            "seniority": "senior_secured",
+            "priority": 1,
+            "principal": 100,
+            "accrued": 2,
+            "penalties": 0,
+            "collateral_value": 80,
+            "collateral_haircut": 0.25
+          },
+          {
+            "id": "Notes-A",
+            "seniority": "senior_unsecured",
+            "priority": 2,
+            "principal": 60,
+            "accrued": 0,
+            "penalties": 0,
+            "collateral_value": null,
+            "collateral_haircut": 0
+          },
+          {
+            "id": "Notes-B",
+            "seniority": "senior_unsecured",
+            "priority": 2,
+            "principal": 40,
+            "accrued": 0,
+            "penalties": 0,
+            "collateral_value": null,
+            "collateral_haircut": 0
+          },
+          {
+            "id": "Sub-Notes",
+            "seniority": "subordinated",
+            "priority": 3,
+            "principal": 50,
+            "accrued": 0,
+            "penalties": 0,
+            "collateral_value": null,
+            "collateral_haircut": 0
+          }
+        ]
+      },
+      "result": {
+        "ok": true,
+        "value": {
+          "total_distributed": 150,
+          "undistributed_estate": 0,
+          "apr_satisfied": true,
+          "allocations": [
+            {
+              "id": "TL-B",
+              "seniority": "senior_secured",
+              "priority": 1,
+              "total_claim": 102,
+              "collateral_recovery": 60,
+              "general_recovery": 42,
+              "total_recovery": 102,
+              "recovery_rate": 1,
+              "deficiency": 0
+            },
+            {
+              "id": "Notes-A",
+              "seniority": "senior_unsecured",
+              "priority": 2,
+              "total_claim": 60,
+              "collateral_recovery": 0,
+              "general_recovery": 28.799999999999997,
+              "total_recovery": 28.799999999999997,
+              "recovery_rate": 0.4799999999999999,
+              "deficiency": 31.200000000000003
+            },
+            {
+              "id": "Notes-B",
+              "seniority": "senior_unsecured",
+              "priority": 2,
+              "total_claim": 40,
+              "collateral_recovery": 0,
+              "general_recovery": 19.200000000000003,
+              "total_recovery": 19.200000000000003,
+              "recovery_rate": 0.4800000000000001,
+              "deficiency": 20.799999999999997
+            },
+            {
+              "id": "Sub-Notes",
+              "seniority": "subordinated",
+              "priority": 3,
+              "total_claim": 50,
+              "collateral_recovery": 0,
+              "general_recovery": 0,
+              "total_recovery": 0,
+              "recovery_rate": 0,
+              "deficiency": 50
+            }
+          ]
+        }
+      }
+    },
+    "surplus": {
+      "request": {
+        "estateValue": 300,
+        "claims": [
+          {
+            "id": "TL-B",
+            "seniority": "senior_secured",
+            "priority": 1,
+            "principal": 100,
+            "accrued": 2,
+            "penalties": 0,
+            "collateral_value": 80,
+            "collateral_haircut": 0.25
+          },
+          {
+            "id": "Notes-A",
+            "seniority": "senior_unsecured",
+            "priority": 2,
+            "principal": 60,
+            "accrued": 0,
+            "penalties": 0,
+            "collateral_value": null,
+            "collateral_haircut": 0
+          },
+          {
+            "id": "Notes-B",
+            "seniority": "senior_unsecured",
+            "priority": 2,
+            "principal": 40,
+            "accrued": 0,
+            "penalties": 0,
+            "collateral_value": null,
+            "collateral_haircut": 0
+          },
+          {
+            "id": "Sub-Notes",
+            "seniority": "subordinated",
+            "priority": 3,
+            "principal": 50,
+            "accrued": 0,
+            "penalties": 0,
+            "collateral_value": null,
+            "collateral_haircut": 0
+          }
+        ]
+      },
+      "result": {
+        "ok": true,
+        "value": {
+          "total_distributed": 252,
+          "undistributed_estate": 48,
+          "apr_satisfied": true,
+          "allocations": [
+            {
+              "id": "TL-B",
+              "seniority": "senior_secured",
+              "priority": 1,
+              "total_claim": 102,
+              "collateral_recovery": 60,
+              "general_recovery": 42,
+              "total_recovery": 102,
+              "recovery_rate": 1,
+              "deficiency": 0
+            },
+            {
+              "id": "Notes-A",
+              "seniority": "senior_unsecured",
+              "priority": 2,
+              "total_claim": 60,
+              "collateral_recovery": 0,
+              "general_recovery": 60,
+              "total_recovery": 60,
+              "recovery_rate": 1,
+              "deficiency": 0
+            },
+            {
+              "id": "Notes-B",
+              "seniority": "senior_unsecured",
+              "priority": 2,
+              "total_claim": 40,
+              "collateral_recovery": 0,
+              "general_recovery": 40,
+              "total_recovery": 40,
+              "recovery_rate": 1,
+              "deficiency": 0
+            },
+            {
+              "id": "Sub-Notes",
+              "seniority": "subordinated",
+              "priority": 3,
+              "total_claim": 50,
+              "collateral_recovery": 0,
+              "general_recovery": 50,
+              "total_recovery": 50,
+              "recovery_rate": 1,
+              "deficiency": 0
+            }
+          ]
+        }
+      }
+    },
+    "collateralAboveEstate": {
+      "request": {
+        "estateValue": 50,
+        "claims": [
+          {
+            "id": "TL-B",
+            "seniority": "senior_secured",
+            "priority": 1,
+            "principal": 100,
+            "accrued": 2,
+            "penalties": 0,
+            "collateral_value": 80,
+            "collateral_haircut": 0.25
+          },
+          {
+            "id": "Notes-A",
+            "seniority": "senior_unsecured",
+            "priority": 2,
+            "principal": 60,
+            "accrued": 0,
+            "penalties": 0,
+            "collateral_value": null,
+            "collateral_haircut": 0
+          },
+          {
+            "id": "Notes-B",
+            "seniority": "senior_unsecured",
+            "priority": 2,
+            "principal": 40,
+            "accrued": 0,
+            "penalties": 0,
+            "collateral_value": null,
+            "collateral_haircut": 0
+          },
+          {
+            "id": "Sub-Notes",
+            "seniority": "subordinated",
+            "priority": 3,
+            "principal": 50,
+            "accrued": 0,
+            "penalties": 0,
+            "collateral_value": null,
+            "collateral_haircut": 0
+          }
+        ]
+      },
+      "result": {
+        "ok": false,
+        "error": {
+          "name": "FinstackError",
+          "message": "Validation error: net collateral recovery (60) exceeds estate_value (50); estate_value must include pledged collateral",
+          "kind": "validation"
+        }
+      }
+    },
+    "duplicateId": {
+      "request": {
+        "estateValue": 150,
+        "claims": [
+          {
+            "id": "Notes-A",
+            "seniority": "senior_unsecured",
+            "priority": 2,
+            "principal": 60,
+            "accrued": 0,
+            "penalties": 0,
+            "collateral_value": null,
+            "collateral_haircut": 0
+          },
+          {
+            "id": "Notes-A",
+            "seniority": "senior_unsecured",
+            "priority": 2,
+            "principal": 40,
+            "accrued": 0,
+            "penalties": 0,
+            "collateral_value": null,
+            "collateral_haircut": 0
+          }
+        ]
+      },
+      "result": {
+        "ok": false,
+        "error": {
+          "name": "FinstackError",
+          "message": "Validation error: duplicate recovery claim id after trimming: 'Notes-A'",
+          "kind": "validation"
+        }
+      }
+    }
+  },
+  "workout": {
+    "secured": {
+      "request": {
+        "ead": 1000000,
+        "model": {
+          "collateral": [
+            {
+              "collateral_type": "real_estate",
+              "book_value": 600000,
+              "haircut": 0.3
+            },
+            {
+              "collateral_type": "receivables",
+              "book_value": 200000,
+              "haircut": 0.35
+            }
+          ],
+          "costs": {
+            "direct_cost_rate": 0.05,
+            "indirect_cost_rate": 0.03
+          },
+          "workout_years": 2,
+          "discount_rate": 0.06
+        }
+      },
+      "result": {
+        "ok": true,
+        "value": {
+          "net_recovery": 418298.3268066927,
+          "lgd": 0.5817016731933073,
+          "recovery_rate": 0.41829832680669266
+        }
+      }
+    },
+    "unknownCollateral": {
+      "request": {
+        "ead": 1000000,
+        "model": {
+          "collateral": [
+            {
+              "collateral_type": "real-estate",
+              "book_value": 600000,
+              "haircut": 0.3
+            }
+          ],
+          "costs": {
+            "direct_cost_rate": 0.05,
+            "indirect_cost_rate": 0.03
+          },
+          "workout_years": 2,
+          "discount_rate": 0.06
+        }
+      },
+      "result": {
+        "ok": false,
+        "error": {
+          "name": "FinstackError",
+          "message": "Validation error: json: unknown variant `real-estate`, expected one of `cash`, `securities`, `receivables`, `inventory`, `equipment`, `real_estate`, `intellectual_property`, `other` at line 1 column 47",
+          "kind": "validation"
+        }
+      }
+    }
+  },
+  "stats": {
+    "seniorUnsecured": {
+      "request": {
+        "seniority": "senior_unsecured",
+        "calibrationId": "moodys_recovery_1982_2023"
+      },
+      "result": {
+        "ok": true,
+        "value": {
+          "mean": 0.37,
+          "std_dev": 0.24,
+          "variance": 0.0576,
+          "alpha": 1.12734375,
+          "beta_param": 1.91953125,
+          "mode": 0.12164179104477621,
+          "mean_lgd": 0.63
+        }
+      }
+    },
+    "classNotCalibrated": {
+      "request": {
+        "seniority": "1st_lien_secured",
+        "calibrationId": "sp_recovery_historical"
+      },
+      "result": {
+        "ok": false,
+        "error": {
+          "name": "FinstackError",
+          "message": "Validation error: seniority not in calibration",
+          "kind": "validation"
+        }
+      }
+    },
+    "unknownCalibration": {
+      "request": {
+        "seniority": "senior_secured",
+        "calibrationId": "moodys"
+      },
+      "result": {
+        "ok": false,
+        "error": {
+          "name": "FinstackError",
+          "message": "Requested item not found: credit assumptions registry seniority calibration 'moodys'",
+          "kind": "not_found"
+        }
+      }
+    }
+  }
+}

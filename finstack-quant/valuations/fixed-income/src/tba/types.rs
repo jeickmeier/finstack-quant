@@ -227,12 +227,12 @@ impl AgencyTba {
                 "{context} settlement_month must be in 1..=12"
             )));
         }
-        if let (Some(trade), Ok(settlement)) = (self.trade_date, self.effective_settlement_date()) {
-            if trade > settlement {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "{context} trade_date cannot follow settlement"
-                )));
-            }
+        if let (Some(trade), Ok(settlement)) = (self.trade_date, self.effective_settlement_date())
+            && trade > settlement
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} trade_date cannot follow settlement"
+            )));
         }
         if let Some(pool) = &self.assumed_pool {
             finstack_quant_valuations_core::instruments::Instrument::validate_for_pricing(

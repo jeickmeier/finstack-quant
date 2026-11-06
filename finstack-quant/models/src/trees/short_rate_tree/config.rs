@@ -1,5 +1,5 @@
-use finstack_quant_core::math::Compounding;
 use finstack_quant_core::Result;
+use finstack_quant_core::math::Compounding;
 
 /// Default normal (absolute) volatility for Ho-Lee model.
 ///

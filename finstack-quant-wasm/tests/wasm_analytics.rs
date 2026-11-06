@@ -30,6 +30,29 @@ fn to_js<T: serde::Serialize>(value: &T) -> JsValue {
     serde_wasm_bindgen::to_value(value).unwrap()
 }
 
+/// A return `PerformancePanel` as JSON text; a non-finite value is a `null` gap.
+fn return_panel(
+    dates: &[String],
+    series: &[Vec<f64>],
+    names: &[String],
+    benchmark: &str,
+    frequency: &str,
+) -> JsValue {
+    let series: Vec<Vec<Option<f64>>> = series
+        .iter()
+        .map(|row| row.iter().map(|&v| v.is_finite().then_some(v)).collect())
+        .collect();
+    let panel = serde_json::json!({
+        "dates": dates,
+        "series": series,
+        "kind": "returns",
+        "ticker_names": names,
+        "benchmark_ticker": benchmark,
+        "frequency": frequency,
+    });
+    JsValue::from_str(&panel.to_string())
+}
+
 fn to_f64_matrix(rows: &[Vec<f64>]) -> JsValue {
     let array = Array::new_with_length(rows.len() as u32);
     for (i, row) in rows.iter().enumerate() {
@@ -70,14 +93,7 @@ fn build_perf() -> JsPerformance {
     // for ticker i. Two columns => target series, benchmark series.
     let returns = vec![fx.returns.clone(), fx.benchmark.clone()];
     let names = vec!["TARGET".to_string(), "BENCH".to_string()];
-    JsPerformance::from_returns(
-        to_js(&fx.dates),
-        to_f64_matrix(&returns),
-        to_js(&names),
-        Some(JsValue::from("BENCH".to_string())),
-        Some(JsValue::from("daily".to_string())),
-    )
-    .unwrap()
+    JsPerformance::new(return_panel(&fx.dates, &returns, &names, "BENCH", "daily")).unwrap()
 }
 
 // ---- Construction ----
@@ -106,14 +122,8 @@ fn from_returns_exposes_ticker_specific_active_dates() {
         vec![f64::NAN, 0.04, 0.06, f64::NAN],
     ];
     let names = vec!["BENCH".to_string(), "PORT".to_string()];
-    let perf = JsPerformance::from_returns(
-        to_js(&dates),
-        to_f64_matrix(&returns),
-        to_js(&names),
-        Some(JsValue::from("BENCH".to_string())),
-        Some(JsValue::from("daily".to_string())),
-    )
-    .unwrap();
+    let perf =
+        JsPerformance::new(return_panel(&dates, &returns, &names, "BENCH", "daily")).unwrap();
 
     assert_eq!(
         perf.get_active_dates_for_ticker(JsValue::from(1.0))
@@ -212,14 +222,8 @@ fn periodic_returns_are_ticker_major_points_and_reconcile() {
     ];
     let returns = vec![vec![0.01, 0.02, -0.01], vec![0.005, -0.002, 0.015]];
     let names = vec!["FUND".to_string(), "BENCH".to_string()];
-    let perf = JsPerformance::from_returns(
-        to_js(&dates),
-        to_f64_matrix(&returns),
-        to_js(&names),
-        Some(JsValue::from("BENCH".to_string())),
-        Some(JsValue::from("daily".to_string())),
-    )
-    .unwrap();
+    let perf =
+        JsPerformance::new(return_panel(&dates, &returns, &names, "BENCH", "daily")).unwrap();
 
     let outer = perf
         .periodic_returns(None)
@@ -304,14 +308,8 @@ fn degenerate_beta_and_greeks_preserve_javascript_nan() {
     let dates = vec!["2025-01-01".to_string()];
     let returns = vec![vec![0.01], vec![0.01]];
     let names = vec!["TARGET".to_string(), "BENCH".to_string()];
-    let perf = JsPerformance::from_returns(
-        to_js(&dates),
-        to_f64_matrix(&returns),
-        to_js(&names),
-        Some(JsValue::from("BENCH".to_string())),
-        Some(JsValue::from("daily".to_string())),
-    )
-    .unwrap();
+    let perf =
+        JsPerformance::new(return_panel(&dates, &returns, &names, "BENCH", "daily")).unwrap();
 
     let betas = perf
         .beta()
@@ -360,13 +358,13 @@ fn greeks_optional_risk_free_rate_changes_alpha() {
     let benchmark = vec![-0.02, -0.01, 0.0, 0.01, 0.02];
     let target: Vec<f64> = benchmark.iter().map(|&b| 2.0 * b).collect();
     let names = vec!["TARGET".to_string(), "BENCH".to_string()];
-    let perf = JsPerformance::from_returns(
-        to_js(&dates),
-        to_f64_matrix(&[target, benchmark]),
-        to_js(&names),
-        Some(JsValue::from("BENCH".to_string())),
-        Some(JsValue::from("monthly".to_string())),
-    )
+    let perf = JsPerformance::new(return_panel(
+        &dates,
+        &[target, benchmark],
+        &names,
+        "BENCH",
+        "monthly",
+    ))
     .unwrap();
 
     let zero: serde_json::Value =
@@ -434,7 +432,9 @@ fn multi_factor_greeks_resolves_to_struct() {
 #[wasm_bindgen_test]
 fn lookback_returns_emit_mtd_qtd_ytd_fytd_arrays() {
     let perf = build_perf();
-    let raw = perf.lookback_returns(JsValue::from("2025-01-12")).unwrap();
+    let raw = perf
+        .lookback_returns(Some(JsValue::from("2025-01-12")))
+        .unwrap();
     let value: serde_json::Value = serde_wasm_bindgen::from_value(raw).unwrap();
     assert_eq!(value["mtd"].as_array().unwrap().len(), 2);
     assert_eq!(value["qtd"].as_array().unwrap().len(), 2);

@@ -14,7 +14,7 @@
 use crate::bindings::extract::{extract_model_ref, extract_results_ref};
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::{
-    labeled_values_to_series, serde_rows_to_dataframe_with_schema, serde_to_py, ColumnSchema,
+    ColumnSchema, labeled_values_to_series, serde_rows_to_dataframe_with_schema, serde_to_py,
 };
 use crate::bindings::statements::parse_period_id;
 use crate::bindings::statements::types::PyFinancialModelSpec;
@@ -77,6 +77,13 @@ fn extract_scenario_set(
 
 /// Run sensitivity analysis on a financial model.
 ///
+/// Each perturbation replaces its node's value in its one forecast period
+/// (Value > Forecast > Formula). It does not re-anchor the node's own
+/// forecast: later periods of a growth, seasonal or stochastic forecast keep
+/// their unshocked base. Formula nodes that read the shocked cell move, in
+/// its period and in later periods reached through ``lag``, ``ttm`` or
+/// ``cumsum``. Add one parameter per period to shock a whole forecast path.
+///
 /// Parameters
 /// ----------
 /// model : FinancialModelSpec | str
@@ -132,20 +139,24 @@ fn run_sensitivity(
 ///     A typed sensitivity result or its JSON serialization.
 /// metric_node : str
 ///     Node to extract tornado entries for.
-/// period : str | None
-///     Optional period string to pin the tornado to.
+/// period : str
+///     Period at which the metric is read in the baseline and every scenario
+///     (e.g. ``"2025Q4"``). Required: a shock replaces one forecast cell, so
+///     the metric moves only in the shocked period and in later periods whose
+///     formulas read it.
 ///
 /// Returns
 /// -------
-/// list[TornadoEntry]
+/// list[TornadoEntry] or None
 ///     Typed entries sorted by descending absolute swing, with parameter IDs
-///     preserving the perturbed ``node@period`` key.
+///     preserving the perturbed ``node@period`` key; ``None`` for a full-grid
+///     run, whose scenarios combine parameters and cannot be ranked.
 ///
 /// Raises
 /// ------
 /// ValueError
-///     If ``period`` does not parse, ``result`` is malformed JSON, the run
-///     uses a full grid, a scenario does not contain exactly one perturbed
+///     If ``period`` does not parse, ``result`` is malformed JSON, a
+///     one-at-a-time run's scenario does not contain exactly one perturbed
 ///     parameter, its unperturbed baseline is absent, the target metric/period
 ///     is missing, or a metric value or impact is non-finite.
 ///
@@ -162,26 +173,26 @@ fn run_sensitivity(
 /// >>> [entry.parameter_id for entry in entries]
 /// ['revenue@2025Q2']
 #[pyfunction]
-#[pyo3(signature = (result, metric_node, period=None))]
+#[pyo3(text_signature = "(result, metric_node, period)")]
 fn generate_tornado_entries(
     result: &Bound<'_, PyAny>,
     metric_node: &str,
-    period: Option<&str>,
-) -> PyResult<Vec<PyTornadoEntry>> {
+    period: &str,
+) -> PyResult<Option<Vec<PyTornadoEntry>>> {
     let result = extract_sensitivity_result(result)?;
-    let period_id: Option<finstack_quant_core::dates::PeriodId> =
-        period.map(parse_period_id).transpose()?;
-    Ok(
-        finstack_quant_statements_analytics::analysis::generate_tornado_entries(
-            &result,
-            metric_node,
-            period_id,
-        )
-        .map_err(statements_to_py)?
-        .into_iter()
-        .map(PyTornadoEntry::from_inner)
-        .collect(),
+    let period_id = parse_period_id(period)?;
+    let entries = finstack_quant_statements_analytics::analysis::generate_tornado_entries(
+        &result,
+        metric_node,
+        period_id,
     )
+    .map_err(statements_to_py)?;
+    Ok(entries.map(|entries| {
+        entries
+            .into_iter()
+            .map(PyTornadoEntry::from_inner)
+            .collect()
+    }))
 }
 
 /// Run variance analysis comparing two statement results.

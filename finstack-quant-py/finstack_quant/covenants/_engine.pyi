@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+from typing import Any
 import pandas as pd
 from finstack_quant.covenants import DateLike
 from finstack_quant.covenants._report import CovenantReport
@@ -14,8 +15,8 @@ class CovenantBreach:
 
     Examples
     --------
-    >>> from finstack_quant.covenants import CovenantEngine, cov_lite
-    >>> engine = CovenantEngine.from_specs(cov_lite(7.0, 4.5))
+    >>> from finstack_quant.covenants import CovenantEngine, CovenantTemplate, covenant_template
+    >>> engine = CovenantEngine.from_specs(covenant_template(CovenantTemplate.cov_lite(7.0, 4.5)))
     >>> _ = engine.evaluate_and_track({"total_leverage": 7.5, "senior_leverage": 3.0}, "2026-03-31", "incurrence")
     >>> breach = engine.breach_history[0]
     >>> breach.covenant_id, breach.breach_date.isoformat(), breach.is_cured
@@ -195,8 +196,8 @@ class CovenantEngine:
 
     Examples
     --------
-    >>> from finstack_quant.covenants import CovenantEngine, lbo_standard
-    >>> engine = CovenantEngine.from_specs(lbo_standard(6.0, 2.0, 1.1, 50.0))
+    >>> from finstack_quant.covenants import CovenantEngine, CovenantTemplate, covenant_template
+    >>> engine = CovenantEngine.from_specs(covenant_template(CovenantTemplate.lbo_standard(6.0, 2.0, 1.1, 50.0)))
     >>> list(
     ...     engine.evaluate(
     ...         {"debt_to_ebitda": 4.0, "interest_coverage": 3.0, "fixed_charge_coverage": 1.5, "capex": 40.0},
@@ -240,8 +241,13 @@ class CovenantEngine:
 
         Examples
         --------
-        >>> from finstack_quant.covenants import CovenantEngine, real_estate
-        >>> [s.covenant.label for s in CovenantEngine.from_specs(real_estate(1.25, 0.08, 0.75)).specs]
+        >>> from finstack_quant.covenants import CovenantEngine, CovenantTemplate, covenant_template
+        >>> [
+        ...     s.covenant.label
+        ...     for s in CovenantEngine.from_specs(
+        ...         covenant_template(CovenantTemplate.real_estate(1.25, 0.08, 0.75))
+        ...     ).specs
+        ... ]
         ['min_dscr', 'min_debt_yield', 'max_ltv']
         """
 
@@ -326,8 +332,8 @@ class CovenantEngine:
 
         Examples
         --------
-        >>> from finstack_quant.covenants import CovenantEngine, cov_lite
-        >>> engine = CovenantEngine.from_specs(cov_lite(7.0, 4.5))
+        >>> from finstack_quant.covenants import CovenantEngine, CovenantTemplate, covenant_template
+        >>> engine = CovenantEngine.from_specs(covenant_template(CovenantTemplate.cov_lite(7.0, 4.5)))
         >>> report = engine.evaluate({"total_leverage": 5.0, "senior_leverage": 3.0}, "2026-03-31")[
         ...     "max_senior_leverage"
         ... ]
@@ -371,8 +377,8 @@ class CovenantEngine:
 
         Examples
         --------
-        >>> from finstack_quant.covenants import CovenantEngine, cov_lite
-        >>> engine = CovenantEngine.from_specs(cov_lite(7.0, 4.5))
+        >>> from finstack_quant.covenants import CovenantEngine, CovenantTemplate, covenant_template
+        >>> engine = CovenantEngine.from_specs(covenant_template(CovenantTemplate.cov_lite(7.0, 4.5)))
         >>> _ = engine.evaluate_and_track({"total_leverage": 7.5, "senior_leverage": 3.0}, "2026-03-31", "incurrence")
         >>> _ = engine.evaluate_and_track({"total_leverage": 6.5, "senior_leverage": 3.0}, "2026-04-15", "incurrence")
         >>> engine.breach_history[0].is_cured
@@ -407,8 +413,8 @@ class CovenantEngine:
         Examples
         --------
         >>> import pandas as pd
-        >>> from finstack_quant.covenants import CovenantEngine, cov_lite
-        >>> engine = CovenantEngine.from_specs(cov_lite(7.0, 4.5))
+        >>> from finstack_quant.covenants import CovenantEngine, CovenantTemplate, covenant_template
+        >>> engine = CovenantEngine.from_specs(covenant_template(CovenantTemplate.cov_lite(7.0, 4.5)))
         >>> frame = pd.DataFrame(
         ...     {"total_leverage": [6.0, 7.5], "senior_leverage": [3.0, 3.5]},
         ...     index=pd.to_datetime(["2026-03-31", "2026-06-30"]),
@@ -441,8 +447,9 @@ class CovenantEngine:
 
         Examples
         --------
-        >>> from finstack_quant.covenants import CovenantEngine, cov_lite_json
-        >>> engine = CovenantEngine.from_json('{"specs": ' + cov_lite_json(7.0, 4.5) + "}")
+        >>> from finstack_quant.covenants import CovenantEngine, CovenantTemplate, covenant_template
+        >>> specs = ", ".join(s.to_json() for s in covenant_template(CovenantTemplate.cov_lite(7.0, 4.5)))
+        >>> engine = CovenantEngine.from_json('{"specs": [' + specs + "]}")
         >>> len(engine)
         3
         """
@@ -505,162 +512,274 @@ class CovenantEngine:
     def __len__(self) -> int: ...
     def __eq__(self, other: object) -> bool: ...
 
-def lbo_standard(
-    initial_leverage: float,
-    interest_coverage: float,
-    fixed_charge_coverage: float,
-    max_capex: float,
-) -> list[CovenantSpec]:
+class CovenantTemplate:
     """
-    Standard leveraged-buyout covenant package.
+    One standard covenant package and its thresholds.
 
-    Quarterly maintenance tests for maximum gross Debt/EBITDA, minimum
-    interest coverage and minimum fixed-charge coverage, plus an annual
-    maximum-capex test. Leverage and interest coverage carry 30-day cure
-    periods; a leverage breach steps the rate up 200bp and a coverage breach
-    blocks distributions. Labels: ``max_debt_ebitda``,
-    ``min_interest_coverage``, ``min_fcc``, ``max_capex``; metrics:
-    ``debt_to_ebitda``, ``interest_coverage``, ``fixed_charge_coverage``,
-    ``capex``.
+    Build it with a variant constructor and expand it with
+    :func:`covenant_template`. Ratios are in turns (``6.0`` is 6.0x), debt
+    yield and LTV are decimal fractions (``0.08`` is 8%), and capex and
+    liquidity are amounts in the caller's reporting currency.
+
+    Examples
+    --------
+    >>> from finstack_quant.covenants import CovenantTemplate
+    >>> template = CovenantTemplate.cov_lite(7.0, 4.5)
+    >>> template.kind
+    'cov_lite'
+    >>> CovenantTemplate.from_json(template.to_json()) == template
+    True
+    """
+
+    @staticmethod
+    def lbo_standard(
+        initial_leverage: float,
+        interest_coverage: float,
+        fixed_charge_coverage: float,
+        max_capex: float,
+    ) -> CovenantTemplate:
+        """
+        Standard leveraged-buyout package.
+
+        Quarterly maintenance tests for maximum gross Debt/EBITDA, minimum
+        interest coverage and minimum fixed-charge coverage, plus an annual
+        maximum-capex test. Leverage and interest coverage carry 30-day cure
+        periods; a leverage breach steps the rate up 200bp and a coverage
+        breach blocks distributions. Labels: ``max_debt_ebitda``,
+        ``min_interest_coverage``, ``min_fcc``, ``max_capex``; metrics:
+        ``debt_to_ebitda``, ``interest_coverage``, ``fixed_charge_coverage``,
+        ``capex``.
+
+        Parameters
+        ----------
+        initial_leverage : float
+            Maximum gross Debt/EBITDA in turns (``6.0`` for 6.0x).
+        interest_coverage : float
+            Minimum interest coverage ratio in turns.
+        fixed_charge_coverage : float
+            Minimum fixed-charge coverage ratio in turns.
+        max_capex : float
+            Maximum annual capex as a reporting-currency amount.
+
+        Returns
+        -------
+        CovenantTemplate
+            The ``lbo_standard`` template; :func:`covenant_template` validates
+            the thresholds.
+
+        Notes
+        -----
+        This constructor does not raise; :func:`covenant_template` raises
+        ``ValueError`` for a NaN, infinite or negative threshold.
+
+        Examples
+        --------
+        >>> from finstack_quant.covenants import CovenantTemplate, covenant_template
+        >>> specs = covenant_template(CovenantTemplate.lbo_standard(6.0, 2.0, 1.1, 50_000_000.0))
+        >>> [s.covenant.label for s in specs]
+        ['max_debt_ebitda', 'min_interest_coverage', 'min_fcc', 'max_capex']
+        """
+
+    @staticmethod
+    def cov_lite(max_leverage: float, max_senior_leverage: float) -> CovenantTemplate:
+        """
+        Covenant-lite leveraged-loan package (incurrence tests only).
+
+        Maximum total leverage, maximum senior leverage, and an annual
+        negative covenant restricting additional secured debt. Labels:
+        ``max_total_leverage``, ``max_senior_leverage``, ``negative``;
+        metrics: ``total_leverage``, ``senior_leverage``.
+
+        Parameters
+        ----------
+        max_leverage : float
+            Maximum total Debt/EBITDA in turns.
+        max_senior_leverage : float
+            Maximum senior Debt/EBITDA in turns.
+
+        Returns
+        -------
+        CovenantTemplate
+            The ``cov_lite`` template.
+
+        Notes
+        -----
+        This constructor does not raise; :func:`covenant_template` raises
+        ``ValueError`` for a NaN, infinite or negative threshold.
+
+        Examples
+        --------
+        >>> from finstack_quant.covenants import CovenantTemplate, covenant_template
+        >>> [s.covenant.scope for s in covenant_template(CovenantTemplate.cov_lite(7.0, 4.5))]
+        ['incurrence', 'incurrence', 'incurrence']
+        """
+
+    @staticmethod
+    def real_estate(min_dscr: float, min_debt_yield: float, max_ltv: float) -> CovenantTemplate:
+        """
+        Commercial real-estate package.
+
+        Quarterly maintenance tests for minimum DSCR (30-day cure, 100% cash
+        sweep), minimum debt yield and maximum LTV (50% cash sweep). Labels:
+        ``min_dscr``, ``min_debt_yield``, ``max_ltv``; metrics: ``dscr``,
+        ``debt_yield``, ``ltv``.
+
+        Parameters
+        ----------
+        min_dscr : float
+            Minimum debt-service coverage ratio in turns (``1.25`` for 1.25x).
+        min_debt_yield : float
+            Minimum NOI / loan balance as a decimal fraction (``0.08`` for 8%).
+        max_ltv : float
+            Maximum loan-to-value as a decimal fraction (``0.75`` for 75%).
+
+        Returns
+        -------
+        CovenantTemplate
+            The ``real_estate`` template.
+
+        Notes
+        -----
+        This constructor does not raise; :func:`covenant_template` raises
+        ``ValueError`` for a NaN, infinite or negative threshold.
+
+        Examples
+        --------
+        >>> from finstack_quant.covenants import CovenantTemplate, covenant_template
+        >>> [s.metric_id for s in covenant_template(CovenantTemplate.real_estate(1.25, 0.08, 0.75))]
+        ['dscr', 'debt_yield', 'ltv']
+        """
+
+    @staticmethod
+    def project_finance(
+        min_dscr: float,
+        distribution_lockup_dscr: float,
+        min_liquidity: float,
+        max_net_leverage: float,
+    ) -> CovenantTemplate:
+        """
+        Infrastructure / project-finance package.
+
+        Quarterly maintenance tests for a default DSCR (60-day cure, event of
+        default), a higher distribution lock-up DSCR (blocks distributions),
+        minimum debt-service-reserve liquidity and maximum net Debt/EBITDA.
+        Labels: ``min_dscr_default``, ``min_dscr_lockup``, ``min_liquidity``,
+        ``max_net_debt_ebitda``; metrics: ``dscr``, ``dscr``, ``liquidity``,
+        ``net_debt_to_ebitda``.
+
+        Parameters
+        ----------
+        min_dscr : float
+            Minimum DSCR in turns whose breach leads to default.
+        distribution_lockup_dscr : float
+            Higher DSCR in turns below which distributions are blocked.
+        min_liquidity : float
+            Minimum debt-service reserve as a reporting-currency amount.
+        max_net_leverage : float
+            Maximum net Debt/EBITDA in turns.
+
+        Returns
+        -------
+        CovenantTemplate
+            The ``project_finance`` template.
+
+        Notes
+        -----
+        This constructor does not raise; :func:`covenant_template` raises
+        ``ValueError`` for a NaN, infinite or negative threshold.
+
+        Examples
+        --------
+        >>> from finstack_quant.covenants import CovenantTemplate, covenant_template
+        >>> specs = covenant_template(CovenantTemplate.project_finance(1.2, 1.1, 10.0, 7.0))
+        >>> [s.covenant.label for s in specs]
+        ['min_dscr_default', 'min_dscr_lockup', 'min_liquidity', 'max_net_debt_ebitda']
+        """
+
+    @property
+    def kind(self) -> str:
+        """
+        Package wire tag: ``lbo_standard``, ``cov_lite``, ``real_estate`` or ``project_finance``.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            The serde ``kind`` tag of the template.
+        """
+
+    @staticmethod
+    def from_json(json: str) -> CovenantTemplate:
+        """
+        Deserialize from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            ``CovenantTemplate`` JSON: ``kind`` and that package's thresholds
+            (strict: unknown fields are rejected).
+
+        Returns
+        -------
+        CovenantTemplate
+            Reconstructed template.
+
+        Raises
+        ------
+        ValueError
+            If the payload is not valid ``CovenantTemplate`` JSON.
+
+        Examples
+        --------
+        >>> from finstack_quant.covenants import CovenantTemplate
+        >>> CovenantTemplate.from_json('{"kind": "cov_lite", "max_leverage": 7.0, "max_senior_leverage": 4.5}').kind
+        'cov_lite'
+        """
+
+    def to_json(self) -> str:
+        """
+        Serialize to compact JSON.
+
+        Returns
+        -------
+        str
+            JSON accepted by :meth:`from_json`.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails.
+        """
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
+    def __eq__(self, other: object) -> bool: ...
+
+def covenant_template(template: CovenantTemplate) -> list[CovenantSpec]:
+    """
+    Expand a standard covenant package into its typed specs.
 
     Parameters
     ----------
-    initial_leverage : float
-        Maximum gross Debt/EBITDA in turns (``6.0`` for 6.0x).
-    interest_coverage : float
-        Minimum interest coverage ratio in turns.
-    fixed_charge_coverage : float
-        Minimum fixed-charge coverage ratio in turns.
-    max_capex : float
-        Maximum annual capex as a reporting-currency amount.
+    template : CovenantTemplate
+        The package and its thresholds.
 
     Returns
     -------
     list[CovenantSpec]
-        Four specs in the order above.
+        The package's specs in their documented order, ready for
+        :meth:`CovenantEngine.from_specs`.
 
     Raises
     ------
     ValueError
-        If any input is NaN, infinite or negative.
+        If any threshold is NaN, infinite or negative.
 
     Examples
     --------
-    >>> from finstack_quant.covenants import lbo_standard
-    >>> [s.covenant.label for s in lbo_standard(6.0, 2.0, 1.1, 50_000_000.0)]
-    ['max_debt_ebitda', 'min_interest_coverage', 'min_fcc', 'max_capex']
-    """
-
-def cov_lite(max_leverage: float, max_senior_leverage: float) -> list[CovenantSpec]:
-    """
-    Covenant-lite leveraged-loan package (incurrence tests only).
-
-    Maximum total leverage, maximum senior leverage, and an annual negative
-    covenant restricting additional secured debt. Labels:
-    ``max_total_leverage``, ``max_senior_leverage``, ``negative``; metrics:
-    ``total_leverage``, ``senior_leverage``.
-
-    Parameters
-    ----------
-    max_leverage : float
-        Maximum total Debt/EBITDA in turns.
-    max_senior_leverage : float
-        Maximum senior Debt/EBITDA in turns.
-
-    Returns
-    -------
-    list[CovenantSpec]
-        Three specs in the order above.
-
-    Raises
-    ------
-    ValueError
-        If any input is NaN, infinite or negative.
-
-    Examples
-    --------
-    >>> from finstack_quant.covenants import cov_lite
-    >>> [s.covenant.scope for s in cov_lite(7.0, 4.5)]
-    ['incurrence', 'incurrence', 'incurrence']
-    """
-
-def real_estate(min_dscr: float, min_debt_yield: float, max_ltv: float) -> list[CovenantSpec]:
-    """
-    Commercial real-estate covenant package.
-
-    Quarterly maintenance tests for minimum DSCR (30-day cure, 100% cash
-    sweep), minimum debt yield and maximum LTV (50% cash sweep). Labels:
-    ``min_dscr``, ``min_debt_yield``, ``max_ltv``; metrics: ``dscr``,
-    ``debt_yield``, ``ltv``.
-
-    Parameters
-    ----------
-    min_dscr : float
-        Minimum debt-service coverage ratio in turns (``1.25`` for 1.25x).
-    min_debt_yield : float
-        Minimum NOI / loan balance as a decimal fraction (``0.08`` for 8%).
-    max_ltv : float
-        Maximum loan-to-value as a decimal fraction (``0.75`` for 75%).
-
-    Returns
-    -------
-    list[CovenantSpec]
-        Three specs in the order above.
-
-    Raises
-    ------
-    ValueError
-        If any input is NaN, infinite or negative.
-
-    Examples
-    --------
-    >>> from finstack_quant.covenants import real_estate
-    >>> [s.metric_id for s in real_estate(1.25, 0.08, 0.75)]
-    ['dscr', 'debt_yield', 'ltv']
-    """
-
-def project_finance(
-    min_dscr: float,
-    distribution_lockup_dscr: float,
-    min_liquidity: float,
-    max_net_leverage: float,
-) -> list[CovenantSpec]:
-    """
-    Infrastructure / project-finance covenant package.
-
-    Quarterly maintenance tests for a default DSCR (60-day cure, event of
-    default), a higher distribution lock-up DSCR (blocks distributions),
-    minimum debt-service-reserve liquidity and maximum net Debt/EBITDA.
-    Labels: ``min_dscr_default``, ``min_dscr_lockup``, ``min_liquidity``,
-    ``max_net_debt_ebitda``; metrics: ``dscr``, ``dscr``, ``liquidity``,
-    ``net_debt_to_ebitda``.
-
-    Parameters
-    ----------
-    min_dscr : float
-        Minimum DSCR in turns whose breach leads to default.
-    distribution_lockup_dscr : float
-        Higher DSCR in turns below which distributions are blocked.
-    min_liquidity : float
-        Minimum debt-service reserve as a reporting-currency amount.
-    max_net_leverage : float
-        Maximum net Debt/EBITDA in turns.
-
-    Returns
-    -------
-    list[CovenantSpec]
-        Four specs in the order above.
-
-    Raises
-    ------
-    ValueError
-        If any input is NaN, infinite or negative.
-
-    Examples
-    --------
-    >>> from finstack_quant.covenants import project_finance
-    >>> [s.covenant.label for s in project_finance(1.2, 1.1, 10.0, 7.0)]
-    ['min_dscr_default', 'min_dscr_lockup', 'min_liquidity', 'max_net_debt_ebitda']
+    >>> from finstack_quant.covenants import CovenantTemplate, covenant_template
+    >>> len(covenant_template(CovenantTemplate.project_finance(1.30, 1.10, 5_000_000.0, 5.0)))
+    4
     """
 
 def reports_to_dataframe(reports: dict[str, CovenantReport]) -> pd.DataFrame:
@@ -686,8 +805,8 @@ def reports_to_dataframe(reports: dict[str, CovenantReport]) -> pd.DataFrame:
 
     Examples
     --------
-    >>> from finstack_quant.covenants import CovenantEngine, cov_lite, reports_to_dataframe
-    >>> engine = CovenantEngine.from_specs(cov_lite(7.0, 4.5))
+    >>> from finstack_quant.covenants import CovenantEngine, CovenantTemplate, covenant_template, reports_to_dataframe
+    >>> engine = CovenantEngine.from_specs(covenant_template(CovenantTemplate.cov_lite(7.0, 4.5)))
     >>> frame = reports_to_dataframe(engine.evaluate({"total_leverage": 5.0, "senior_leverage": 3.0}, "2026-03-31"))
     >>> frame["covenant"].tolist()
     ['max_total_leverage', 'max_senior_leverage', 'negative']

@@ -7,12 +7,17 @@
 //! truthiness, `f64` through `ToNumber` (`null` becomes `0`, `"5"` becomes
 //! `5`), `&[f64]`/`Vec<f64>` through typed-array glue (a string becomes
 //! `NaN`s, `{}` becomes `[]`), and `Vec<String>` splits strings into
-//! characters or accepts `{}` as empty. This test scans every `#[wasm_bindgen]` export under
-//! `src/api` and rejects those parameter types, so a new binding cannot
-//! reintroduce the silent coercions.
+//! characters or accepts `{}` as empty. This test parses every source file
+//! under `src/api` with `syn` and rejects those parameter types on
+//! `#[wasm_bindgen]` exports, so a new binding cannot reintroduce the silent
+//! coercions.
 
 use std::fs;
 use std::path::{Path, PathBuf};
+
+use proc_macro2::{Delimiter, TokenStream, TokenTree};
+use quote::ToTokens;
+use syn::{Attribute, FnArg, ImplItem, Item, Pat, Visibility};
 
 /// Parameter types whose wasm-bindgen glue coerces or traps.
 const FORBIDDEN: &[&str] = &[
@@ -62,208 +67,23 @@ const FORBIDDEN: &[&str] = &[
 /// Reasoned exceptions as `(file, function, parameter)`; keep empty.
 const ALLOWED: &[(&str, &str, &str)] = &[];
 
-fn rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
-    for entry in fs::read_dir(dir).expect("readable src/api") {
-        let path = entry.expect("dir entry").path();
-        if path.is_dir() {
-            rust_files(&path, out);
-        } else if path.extension().is_some_and(|ext| ext == "rs") {
-            out.push(path);
-        }
-    }
+/// One exported function, constructor, method or accessor.
+struct Export {
+    /// Source file relative to the crate root.
+    file: String,
+    /// Rust function name; a `macro_rules!` metavariable keeps its `$`.
+    rust_name: String,
+    /// `(name, type)` per parameter in order, without `self`; types are
+    /// [`compact`]ed and carry no lifetimes.
+    params: Vec<(String, String)>,
 }
 
-/// Replace comments and string/char literal contents with spaces so braces
-/// and parentheses inside them do not affect matching; offsets are kept.
-fn blank(src: &str) -> Vec<u8> {
-    let bytes = src.as_bytes();
-    let mut out = bytes.to_vec();
-    let mut i = 0;
-    while i < bytes.len() {
-        match bytes[i] {
-            b'/' if bytes.get(i + 1) == Some(&b'/') => {
-                while i < bytes.len() && bytes[i] != b'\n' {
-                    out[i] = b' ';
-                    i += 1;
-                }
-            }
-            b'r' if matches!(bytes.get(i + 1), Some(b'"' | b'#'))
-                && (i == 0 || !(bytes[i - 1].is_ascii_alphanumeric() || bytes[i - 1] == b'_')) =>
-            {
-                let mut hashes = 0;
-                let mut j = i + 1;
-                while bytes.get(j) == Some(&b'#') {
-                    hashes += 1;
-                    j += 1;
-                }
-                if bytes.get(j) != Some(&b'"') {
-                    i += 1;
-                    continue;
-                }
-                j += 1;
-                let closing: Vec<u8> = std::iter::once(b'"')
-                    .chain(std::iter::repeat_n(b'#', hashes))
-                    .collect();
-                while j < bytes.len() && !bytes[j..].starts_with(&closing) {
-                    if bytes[j] != b'\n' {
-                        out[j] = b' ';
-                    }
-                    j += 1;
-                }
-                i = j + closing.len();
-            }
-            b'"' => {
-                let mut j = i + 1;
-                while j < bytes.len() && bytes[j] != b'"' {
-                    if bytes[j] == b'\\' {
-                        out[j] = b' ';
-                        j += 1;
-                    }
-                    if j < bytes.len() && bytes[j] != b'\n' {
-                        out[j] = b' ';
-                    }
-                    j += 1;
-                }
-                i = j + 1;
-            }
-            b'\'' if bytes.get(i + 2) == Some(&b'\'') => {
-                out[i + 1] = b' ';
-                i += 3;
-            }
-            _ => i += 1,
-        }
-    }
-    out
-}
-
-fn matching(src: &[u8], open_at: usize, open: u8, close: u8) -> usize {
-    let mut depth = 0usize;
-    for (offset, &byte) in src[open_at..].iter().enumerate() {
-        if byte == open {
-            depth += 1;
-        } else if byte == close {
-            depth -= 1;
-            if depth == 0 {
-                return open_at + offset;
-            }
-        }
-    }
-    panic!("unbalanced delimiters");
-}
-
-/// Spans of `#[cfg(test)] mod … { … }` blocks.
-fn test_spans(src: &[u8]) -> Vec<(usize, usize)> {
-    let text = std::str::from_utf8(src).expect("utf8");
-    let mut spans = Vec::new();
-    let mut from = 0;
-    while let Some(found) = text[from..].find("#[cfg(test)]") {
-        let at = from + found;
-        let rest = text[at + "#[cfg(test)]".len()..].trim_start();
-        let rest = rest.strip_prefix("pub(super) ").unwrap_or(rest);
-        let rest = rest.strip_prefix("pub(crate) ").unwrap_or(rest);
-        if rest.starts_with("mod ") {
-            let brace = at + text[at..].find('{').expect("module body");
-            spans.push((at, matching(src, brace, b'{', b'}')));
-        }
-        from = at + 1;
-    }
-    spans
-}
-
-/// Offsets of the `(` opening each exported function's parameter list, with
-/// the function name.
-fn exported_fns(src: &[u8]) -> Vec<(usize, String)> {
-    let text = std::str::from_utf8(src).expect("utf8");
-    let tests = test_spans(src);
-    let mut found = std::collections::BTreeMap::new();
-    let mut from = 0;
-    while let Some(hit) = text[from..].find("#[wasm_bindgen") {
-        let attr_at = from + hit;
-        from = attr_at + 1;
-        if tests.iter().any(|&(a, b)| a <= attr_at && attr_at <= b) {
-            continue;
-        }
-        let attr_end = matching(src, attr_at + 1, b'[', b']');
-        let attr = &text[attr_at..=attr_end];
-        if attr.contains("skip") {
-            continue;
-        }
-        // Skip further attributes between this one and the item.
-        let mut item = attr_end + 1;
-        loop {
-            let rest = &text[item..];
-            let trimmed = rest.trim_start();
-            item += rest.len() - trimmed.len();
-            if trimmed.starts_with("#[") {
-                item = matching(src, item + 1, b'[', b']') + 1;
-            } else {
-                break;
-            }
-        }
-        let rest = &text[item..];
-        if rest.starts_with("impl") {
-            let open = item + rest.find('{').expect("impl body");
-            let close = matching(src, open, b'{', b'}');
-            let body = &text[open..close];
-            let mut at = 0;
-            while let Some(pos) = body[at..].find("pub fn ") {
-                let fn_at = open + at + pos;
-                at += pos + 1;
-                let preceding = &text[..fn_at];
-                let attrs_start = preceding.rfind(['{', '}', ';']).unwrap_or(0);
-                if text[attrs_start..fn_at].contains("wasm_bindgen(skip") {
-                    continue;
-                }
-                let name_start = fn_at + "pub fn ".len();
-                let paren = name_start + text[name_start..].find('(').expect("params");
-                let name = text[name_start..paren]
-                    .split('<')
-                    .next()
-                    .unwrap_or("")
-                    .trim();
-                found.insert(paren, name.to_string());
-            }
-        } else if let Some(sig) = rest.strip_prefix("pub fn ") {
-            let paren = item + "pub fn ".len() + sig.find('(').expect("params");
-            let name = sig.split(['(', '<']).next().unwrap_or("").trim();
-            found.insert(paren, name.to_string());
-        }
-    }
-    found.into_iter().collect()
-}
-
-fn params(text: &str, open: usize, src: &[u8]) -> Vec<(String, String)> {
-    let close = matching(src, open, b'(', b')');
-    let list = &text[open + 1..close];
-    let mut out = Vec::new();
-    let mut depth = 0i32;
-    let mut start = 0;
-    for (i, ch) in list
-        .char_indices()
-        .chain(std::iter::once((list.len(), ',')))
-    {
-        match ch {
-            '<' | '(' | '[' => depth += 1,
-            '>' | ')' | ']' => depth -= 1,
-            ',' if depth == 0 => {
-                let param = list[start..i].trim();
-                start = i + 1;
-                if let Some((name, ty)) = param.split_once(':') {
-                    let ty: String = ty.split_whitespace().collect::<Vec<_>>().join(" ");
-                    let ty = ty.replace("& '", "&'");
-                    let ty = strip_lifetime(&ty);
-                    out.push((name.trim().trim_start_matches("mut ").to_string(), ty));
-                }
-            }
-            _ => {}
-        }
-    }
-    out
-}
-
-fn strip_lifetime(ty: &str) -> String {
+/// Whitespace removed except one space between two word characters, and
+/// lifetimes dropped, so `& 'a mut [f64]` and `&mut [f64]` compare equal.
+fn compact(text: &str) -> String {
     let mut out = String::new();
-    let mut chars = ty.chars().peekable();
+    let mut chars = text.chars().peekable();
+    let mut pending_space = false;
     while let Some(ch) = chars.next() {
         if ch == '\'' {
             while chars
@@ -272,45 +92,271 @@ fn strip_lifetime(ty: &str) -> String {
             {
                 chars.next();
             }
-            if chars.peek() == Some(&' ') {
-                chars.next();
-            }
+            pending_space = false;
+        } else if ch.is_whitespace() {
+            pending_space = true;
         } else {
+            let word = |c: char| c.is_alphanumeric() || c == '_';
+            if pending_space && out.chars().last().is_some_and(word) && word(ch) {
+                out.push(' ');
+            }
+            pending_space = false;
             out.push(ch);
         }
     }
     out
 }
 
-#[test]
-fn exported_bindings_take_host_values_as_js_value() {
-    let api = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/api");
-    let mut files = Vec::new();
-    rust_files(&api, &mut files);
-    files.sort();
-    let mut offenders = Vec::new();
-    let mut exported = 0;
-    for path in &files {
-        let text = fs::read_to_string(path).expect("readable source");
-        let blanked = blank(&text);
-        let blanked_text = String::from_utf8(blanked.clone()).expect("utf8");
-        let rel = path
-            .strip_prefix(Path::new(env!("CARGO_MANIFEST_DIR")))
-            .expect("inside crate")
-            .display()
-            .to_string();
-        for (open, name) in exported_fns(&blanked) {
-            exported += 1;
-            for (param, ty) in params(&blanked_text, open, &blanked) {
-                if FORBIDDEN.contains(&ty.as_str())
-                    && !ALLOWED.contains(&(rel.as_str(), name.as_str(), param.as_str()))
+/// The `#[wasm_bindgen]` attribute among `attrs`, if any.
+fn wasm_bindgen(attrs: &[Attribute]) -> Option<&Attribute> {
+    attrs
+        .iter()
+        .find(|attr| attr.path().is_ident("wasm_bindgen"))
+}
+
+fn is_skip(attr: &Attribute) -> bool {
+    attr.to_token_stream().to_string().contains("skip")
+}
+
+fn is_cfg_test(attrs: &[Attribute]) -> bool {
+    attrs.iter().any(|attr| {
+        attr.path().is_ident("cfg")
+            && compact(&attr.to_token_stream().to_string()) == "#[cfg(test)]"
+    })
+}
+
+fn signature_params(inputs: impl IntoIterator<Item = FnArg>) -> Vec<(String, String)> {
+    inputs
+        .into_iter()
+        .filter_map(|input| match input {
+            FnArg::Typed(typed) => {
+                let name = match *typed.pat {
+                    Pat::Ident(ident) => ident.ident.to_string(),
+                    other => other.to_token_stream().to_string(),
+                };
+                Some((name, compact(&typed.ty.to_token_stream().to_string())))
+            }
+            FnArg::Receiver(_) => None,
+        })
+        .collect()
+}
+
+/// Exports of the parsed items, recursing into inline modules except
+/// `#[cfg(test)]` ones.
+fn scan_items(items: Vec<Item>, file: &str, out: &mut Vec<Export>) {
+    for item in items {
+        match item {
+            Item::Fn(item) => {
+                if matches!(item.vis, Visibility::Public(_))
+                    && wasm_bindgen(&item.attrs).is_some_and(|attr| !is_skip(attr))
                 {
-                    offenders.push(format!("{rel}: {name}({param}: {ty})"));
+                    out.push(Export {
+                        file: file.to_string(),
+                        rust_name: item.sig.ident.to_string(),
+                        params: signature_params(item.sig.inputs),
+                    });
                 }
+            }
+            Item::Impl(item) => {
+                if wasm_bindgen(&item.attrs).is_none() {
+                    continue;
+                }
+                for member in item.items {
+                    let ImplItem::Fn(method) = member else {
+                        continue;
+                    };
+                    if matches!(method.vis, Visibility::Public(_))
+                        && !wasm_bindgen(&method.attrs).is_some_and(is_skip)
+                    {
+                        out.push(Export {
+                            file: file.to_string(),
+                            rust_name: method.sig.ident.to_string(),
+                            params: signature_params(method.sig.inputs),
+                        });
+                    }
+                }
+            }
+            Item::Mod(item) if !is_cfg_test(&item.attrs) => {
+                if let Some((_, items)) = item.content {
+                    scan_items(items, file, out);
+                }
+            }
+            Item::Macro(item) => scan_macro_tokens(item.mac.tokens, false, file, out),
+            _ => {}
+        }
+    }
+}
+
+/// Exports written inside a `macro_rules!` body or an item-level macro call,
+/// which `syn` leaves as tokens: `#[wasm_bindgen] pub fn`, and `pub fn` inside
+/// a `#[wasm_bindgen] impl` body. A function name may be a metavariable
+/// (`$name`), and a parameter type one (`$ty`).
+fn scan_macro_tokens(tokens: TokenStream, in_export_impl: bool, file: &str, out: &mut Vec<Export>) {
+    let tokens: Vec<TokenTree> = tokens.into_iter().collect();
+    // `Some(skip)` once a `#[wasm_bindgen(...)]` attribute precedes the next item.
+    let mut pending: Option<bool> = None;
+    let mut i = 0;
+    while i < tokens.len() {
+        match &tokens[i] {
+            TokenTree::Punct(p) if p.as_char() == '#' => {
+                if let Some(TokenTree::Group(attr)) = tokens.get(i + 1)
+                    && attr.delimiter() == Delimiter::Bracket
+                {
+                    let text = attr.stream().to_string();
+                    if text.starts_with("wasm_bindgen") {
+                        pending = Some(text.contains("skip"));
+                    }
+                    i += 2;
+                    continue;
+                }
+            }
+            TokenTree::Ident(ident) if ident == "impl" => {
+                let exported = pending.is_some_and(|skip| !skip);
+                if let Some(offset) = tokens[i..].iter().position(
+                    |t| matches!(t, TokenTree::Group(g) if g.delimiter() == Delimiter::Brace),
+                ) {
+                    if let TokenTree::Group(body) = &tokens[i + offset] {
+                        scan_macro_tokens(body.stream(), exported, file, out);
+                    }
+                    i += offset + 1;
+                    pending = None;
+                    continue;
+                }
+            }
+            TokenTree::Ident(ident) if ident == "fn" => {
+                let public = i > 0 && matches!(&tokens[i - 1], TokenTree::Ident(p) if p == "pub");
+                let exported = match pending {
+                    Some(skip) => !skip,
+                    None => in_export_impl,
+                };
+                let (name, after_name) = match (tokens.get(i + 1), tokens.get(i + 2)) {
+                    (Some(TokenTree::Punct(dollar)), Some(TokenTree::Ident(meta)))
+                        if dollar.as_char() == '$' =>
+                    {
+                        (format!("${meta}"), i + 3)
+                    }
+                    (Some(TokenTree::Ident(name)), _) => (name.to_string(), i + 2),
+                    _ => (String::new(), i + 1),
+                };
+                let params = tokens[after_name..].iter().find_map(|t| match t {
+                    TokenTree::Group(g) if g.delimiter() == Delimiter::Parenthesis => {
+                        Some(g.stream())
+                    }
+                    _ => None,
+                });
+                if public && exported && !name.is_empty() {
+                    out.push(Export {
+                        file: file.to_string(),
+                        rust_name: name,
+                        params: params.map(token_params).unwrap_or_default(),
+                    });
+                }
+                pending = None;
+            }
+            TokenTree::Group(group) => {
+                scan_macro_tokens(group.stream(), false, file, out);
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+}
+
+/// `(name, type)` of each parameter of a token-level parameter list, without `self`.
+fn token_params(list: TokenStream) -> Vec<(String, String)> {
+    let mut params = Vec::new();
+    let mut current: Vec<TokenTree> = Vec::new();
+    let mut depth = 0i32;
+    let mut previous_dash = false;
+    for token in list
+        .into_iter()
+        .chain(std::iter::once(TokenTree::Punct(proc_macro2::Punct::new(
+            ',',
+            proc_macro2::Spacing::Alone,
+        ))))
+    {
+        if let TokenTree::Punct(p) = &token {
+            match p.as_char() {
+                '<' => depth += 1,
+                '>' if !previous_dash => depth -= 1,
+                ',' if depth == 0 => {
+                    let text: TokenStream = current.drain(..).collect();
+                    let text = text.to_string();
+                    if let Some((name, ty)) = text.split_once(':') {
+                        let name = name.trim().trim_start_matches("mut ").trim();
+                        params.push((name.to_string(), compact(ty)));
+                    }
+                    previous_dash = false;
+                    continue;
+                }
+                _ => {}
+            }
+            previous_dash = p.as_char() == '-';
+        } else {
+            previous_dash = false;
+        }
+        current.push(token);
+    }
+    params
+}
+
+/// Every export under `src/api`, in path and source order.
+fn scan_exports() -> Vec<Export> {
+    fn rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
+        for entry in fs::read_dir(dir).expect("readable src/api") {
+            let path = entry.expect("dir entry").path();
+            if path.is_dir() {
+                rust_files(&path, out);
+            } else if path.extension().is_some_and(|ext| ext == "rs") {
+                out.push(path);
             }
         }
     }
-    assert!(exported > 500, "scanner found only {exported} exports");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let mut files = Vec::new();
+    rust_files(&root.join("src/api"), &mut files);
+    files.sort();
+    let mut exports = Vec::new();
+    for path in &files {
+        let text = fs::read_to_string(path).expect("readable source");
+        let parsed = syn::parse_file(&text)
+            .unwrap_or_else(|error| panic!("{} does not parse: {error}", path.display()));
+        let file = path
+            .strip_prefix(root)
+            .expect("inside crate")
+            .display()
+            .to_string();
+        scan_items(parsed.items, &file, &mut exports);
+    }
+    exports
+}
+
+#[test]
+fn exported_bindings_take_host_values_as_js_value() {
+    let exports = scan_exports();
+    let forbidden: Vec<String> = FORBIDDEN.iter().map(|ty| compact(ty)).collect();
+    let mut offenders = Vec::new();
+    for export in &exports {
+        for (param, ty) in &export.params {
+            if forbidden.contains(ty)
+                && !ALLOWED.contains(&(
+                    export.file.as_str(),
+                    export.rust_name.as_str(),
+                    param.as_str(),
+                ))
+            {
+                offenders.push(format!(
+                    "{}: {}({param}: {ty})",
+                    export.file, export.rust_name
+                ));
+            }
+        }
+    }
+    assert!(
+        exports.len() > 500,
+        "scanner found only {} exports",
+        exports.len()
+    );
     assert!(
         offenders.is_empty(),
         "take these as JsValue / Option<JsValue> and convert with utils::input:\n{}",

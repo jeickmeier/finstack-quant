@@ -153,6 +153,15 @@ pub(super) fn route_reserve_interest(
             res.cashflows.push((pay_date, amount));
             res.interest_flows.push((pay_date, amount));
             res.total_interest = res.total_interest.checked_add(amount)?;
+            state
+                .pending_non_waterfall_payments
+                .push(NonWaterfallPayment::new(
+                    pay_date,
+                    tranche_id,
+                    NonWaterfallSource::ReserveInterest,
+                    amount,
+                    zero,
+                ));
             Ok(ReserveInterest { to_waterfall: zero })
         }
         ReserveInterestDestination::Retain => {

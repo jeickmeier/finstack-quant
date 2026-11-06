@@ -1,7 +1,9 @@
 //! Monte Carlo evaluation types and aggregation utilities.
 
 use crate::error::{Error, Result};
-use crate::evaluator::results::EvalWarning;
+use crate::evaluator::results::{
+    CapitalStructureClaimCategory, CapitalStructureWarning, EvalWarning,
+};
 use crate::types::FinancialModelSpec;
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::math::stats::quantile_sorted;
@@ -109,7 +111,10 @@ pub struct MonteCarloResults {
     pub percentiles: Vec<f64>,
     /// Forecast (non-actual) periods included in the simulation.
     pub forecast_periods: Vec<PeriodId>,
-    /// Warnings encountered while evaluating Monte Carlo paths.
+    /// Distinct warnings raised in the simulated forecast periods, each
+    /// reported once however many paths raised it, in a canonical sorted
+    /// order. Warnings in actual periods are omitted: those periods are not
+    /// simulated and every path repeats the deterministic evaluation's.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub warnings: Vec<EvalWarning>,
     /// Internal storage of path-level values keyed by `(path_id, value)` so
@@ -150,11 +155,7 @@ impl MonteCarloResults {
             }
         }
 
-        if out.is_empty() {
-            None
-        } else {
-            Some(out)
-        }
+        if out.is_empty() { None } else { Some(out) }
     }
 
     /// Export one metric's percentile bands as a wide table.
@@ -182,8 +183,10 @@ impl MonteCarloResults {
             return Ok(None);
         };
         let periods = series.values.keys().map(ToString::to_string).collect();
-        let mut columns = vec![TableColumn::new("period", TableColumnData::String(periods))
-            .with_role(TableColumnRole::Index)];
+        let mut columns = vec![
+            TableColumn::new("period", TableColumnData::String(periods))
+                .with_role(TableColumnRole::Index),
+        ];
         for &percentile in &self.percentiles {
             let values = series
                 .values
@@ -334,6 +337,95 @@ fn normalize_percentiles(raw: &[f64]) -> Result<Vec<f64>> {
     Ok(v)
 }
 
+/// Totally ordered form of an [`EvalWarning`]; amounts compare by bit
+/// pattern so identical NaN warnings from different paths are equal.
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+enum WarningKey<'a> {
+    DivisionByZero(&'a PeriodId, &'a str),
+    NonFiniteValue(&'a PeriodId, &'a str, u64),
+    CapitalStructure(&'a PeriodId, CapitalStructureKey<'a>),
+    NonFiniteSkipped(&'a PeriodId, &'a str, &'a str, usize),
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+enum CapitalStructureKey<'a> {
+    ResidualScaleMismatch(u64),
+    CashflowIgnored(finstack_quant_core::dates::Date, String),
+    NegativeClaimNeutralized(CapitalStructureClaimCategory, &'a str, u64),
+    NegativeAvailableCashFloored(&'a str, u64),
+    InterestShortfall(&'a str, u64),
+    FeeShortfall(&'a str, u64),
+    PrincipalShortfall(&'a str, u64),
+}
+
+impl<'a> WarningKey<'a> {
+    fn of(warning: &'a EvalWarning) -> Self {
+        match warning {
+            EvalWarning::DivisionByZero { node_id, period } => {
+                Self::DivisionByZero(period, node_id)
+            }
+            EvalWarning::NonFiniteValue {
+                node_id,
+                period,
+                value,
+            } => Self::NonFiniteValue(period, node_id, value.to_bits()),
+            EvalWarning::CapitalStructure { period, warning } => {
+                Self::CapitalStructure(period, CapitalStructureKey::of(warning))
+            }
+            EvalWarning::NonFiniteSkipped {
+                node_id,
+                period,
+                function,
+                count,
+            } => Self::NonFiniteSkipped(period, node_id, function, *count),
+        }
+    }
+}
+
+impl<'a> CapitalStructureKey<'a> {
+    fn of(warning: &'a CapitalStructureWarning) -> Self {
+        match warning {
+            CapitalStructureWarning::ResidualScaleMismatch { applied_ratio } => {
+                Self::ResidualScaleMismatch(applied_ratio.to_bits())
+            }
+            CapitalStructureWarning::CashflowIgnored {
+                cashflow_kind,
+                cashflow_date,
+            } => Self::CashflowIgnored(*cashflow_date, cashflow_kind.to_string()),
+            CapitalStructureWarning::NegativeClaimNeutralized {
+                category,
+                instrument_id,
+                amount,
+            } => Self::NegativeClaimNeutralized(*category, instrument_id, amount.to_bits()),
+            CapitalStructureWarning::NegativeAvailableCashFloored { node_id, amount } => {
+                Self::NegativeAvailableCashFloored(node_id, amount.to_bits())
+            }
+            CapitalStructureWarning::InterestShortfall {
+                instrument_id,
+                amount,
+            } => Self::InterestShortfall(instrument_id, amount.to_bits()),
+            CapitalStructureWarning::FeeShortfall {
+                instrument_id,
+                amount,
+            } => Self::FeeShortfall(instrument_id, amount.to_bits()),
+            CapitalStructureWarning::PrincipalShortfall {
+                instrument_id,
+                amount,
+            } => Self::PrincipalShortfall(instrument_id, amount.to_bits()),
+        }
+    }
+}
+
+/// Period a warning was raised in.
+fn warning_period(warning: &EvalWarning) -> &PeriodId {
+    match warning {
+        EvalWarning::DivisionByZero { period, .. }
+        | EvalWarning::NonFiniteValue { period, .. }
+        | EvalWarning::CapitalStructure { period, .. }
+        | EvalWarning::NonFiniteSkipped { period, .. } => period,
+    }
+}
+
 pub(crate) struct MonteCarloAccumulator {
     expected_paths: usize,
     observed_paths: usize,
@@ -380,7 +472,13 @@ impl MonteCarloAccumulator {
         warnings: Vec<EvalWarning>,
     ) -> Result<()> {
         self.observed_paths += 1;
-        self.warnings.extend(warnings);
+        // Actual periods are not simulated: their warnings repeat the
+        // deterministic evaluation's on every path.
+        self.warnings.extend(
+            warnings
+                .into_iter()
+                .filter(|warning| self.forecast_set.contains(warning_period(warning))),
+        );
 
         for (metric, period_map) in path_results {
             let metric_entry = self.path_values.entry(metric.clone()).or_default();
@@ -446,8 +544,11 @@ impl MonteCarloAccumulator {
         // nondeterministic, so sort serialized outputs (path-table rows and
         // warnings) into a canonical order: serial ≡ parallel must hold for
         // everything that reaches the wire.
+        // Report each distinct warning once rather than once per path.
         self.warnings
-            .sort_by_cached_key(|warning| format!("{warning:?}"));
+            .sort_by(|lhs, rhs| WarningKey::of(lhs).cmp(&WarningKey::of(rhs)));
+        self.warnings
+            .dedup_by(|lhs, rhs| WarningKey::of(lhs) == WarningKey::of(rhs));
 
         let path_data = if !self.include_path_data
             || self
@@ -549,8 +650,8 @@ impl MonteCarloAccumulator {
 #[cfg(test)]
 mod tests {
     use super::{
-        normalize_percentiles, percentile_label, MonteCarloAccumulator, MonteCarloConfig,
-        MonteCarloResults, PathResult,
+        MonteCarloAccumulator, MonteCarloConfig, MonteCarloResults, PathResult,
+        normalize_percentiles, percentile_label,
     };
     use crate::builder::ModelBuilder;
     use crate::error::Result;

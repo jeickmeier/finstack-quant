@@ -195,11 +195,7 @@ fn generic_curvature_bucketed(
 /// contributing negative off-diagonal mass that would reduce the charge.
 #[inline]
 fn psi(x: f64, y: f64) -> f64 {
-    if x < 0.0 && y < 0.0 {
-        0.0
-    } else {
-        1.0
-    }
+    if x < 0.0 && y < 0.0 { 0.0 } else { 1.0 }
 }
 
 /// Compute `(K_b, S_b)` for a curvature bucket.

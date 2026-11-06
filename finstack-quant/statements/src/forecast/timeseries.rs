@@ -30,29 +30,19 @@
 //! schema typos and unsupported calendar shifts do not become silent no-ops.
 
 use crate::error::{Error, Result};
-use crate::types::SeasonalMode;
+use crate::types::{ForecastTrendMethod, SeasonalMode, SeasonalParams, TimeSeriesParams};
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::math::ZERO_TOLERANCE;
 use indexmap::IndexMap;
 
-fn parse_historical_series(historical: &[serde_json::Value], context: &str) -> Result<Vec<f64>> {
-    let mut parsed = Vec::with_capacity(historical.len());
-    for (idx, value) in historical.iter().enumerate() {
-        let number = value.as_f64().ok_or_else(|| {
-            Error::forecast(format!(
-                "{} historical value at index {} must be numeric, got {}",
-                context, idx, value
-            ))
-        })?;
-        if !number.is_finite() {
-            return Err(Error::forecast(format!(
-                "{} historical value at index {} must be finite, got {}",
-                context, idx, number
-            )));
-        }
-        parsed.push(number);
+fn finite_history(historical: &[f64], context: &str) -> Result<()> {
+    match historical.iter().position(|value| !value.is_finite()) {
+        Some(idx) => Err(Error::forecast(format!(
+            "{context} historical value at index {idx} must be finite, got {}",
+            historical[idx]
+        ))),
+        None => Ok(()),
     }
-    Ok(parsed)
 }
 
 /// Apply time-series forecasting to generate future values.
@@ -62,47 +52,35 @@ fn parse_historical_series(historical: &[serde_json::Value], context: &str) -> R
 /// - Exponential smoothing
 /// - Moving average
 ///
-/// # Parameters
+/// # Arguments
 ///
-/// * `historical` - Array of historical values for trend detection (required)
-/// * `method` - "linear", "exponential", "moving_average" (default: "linear")
-/// * `alpha` - Smoothing factor for exponential method (0-1, required for exponential)
-/// * `beta` - Trend smoothing factor for exponential method (0-1, required for exponential)
-/// * `phi` - Optional trend-damping factor for the exponential method, in
-///   (0, 1]; default 1.0 (classic undamped Holt). Values below 1 damp the
-///   trend so long-horizon forecasts level off instead of extrapolating
-///   linearly. Only valid with `method = "exponential"`.
-/// * `window` - Window size for moving average (required for moving_average)
+/// * `forecast_periods` - Periods that require projected values
+/// * `params` - At least 2 finite `historical` observations (oldest first) and
+///   the trend `method`: linear, exponential (Holt; requires `alpha` and `beta`
+///   in (0, 1), optional trend damping `phi` in (0, 1], default 1.0 = classic
+///   undamped Holt, legal only with this method) or moving average (requires a
+///   positive `window` no longer than the history)
 pub(super) fn timeseries_forecast(
-    _base_value: f64,
     forecast_periods: &[PeriodId],
-    params: &IndexMap<String, serde_json::Value>,
+    params: &TimeSeriesParams,
 ) -> Result<IndexMap<PeriodId, f64>> {
-    let historical = params
-        .get("historical")
-        .and_then(|v| v.as_array())
-        .ok_or_else(|| Error::forecast("'historical' must be an array"))?;
-
-    if historical.len() < 2 {
+    let hist_data = params.historical.as_slice();
+    if hist_data.len() < 2 {
         return Err(Error::forecast(format!(
             "Need at least 2 historical periods for trend detection, got {}. \
              Provide more historical data in the 'historical' parameter.",
-            historical.len()
+            hist_data.len()
         )));
     }
+    finite_history(hist_data, "Time-series forecast")?;
 
-    let hist_data = parse_historical_series(historical, "Time-series forecast")?;
-
-    let method = params
-        .get("method")
-        .and_then(|v| v.as_str())
-        .unwrap_or("linear");
+    let method = params.method;
 
     // `phi` (trend damping) only has meaning for exponential smoothing; a
     // damping factor silently ignored on another method would be a no-op typo.
-    if params.contains_key("phi") && method != "exponential" {
+    if params.phi.is_some() && method != ForecastTrendMethod::Exponential {
         return Err(Error::forecast(format!(
-            "'phi' is only valid with method = \"exponential\", but method is \"{method}\". \
+            "'phi' is only valid with method = \"exponential\", but method is {method:?}. \
              Remove 'phi' or switch the method."
         )));
     }
@@ -110,8 +88,8 @@ pub(super) fn timeseries_forecast(
     let mut result = IndexMap::new();
 
     match method {
-        "linear" => {
-            let (slope, intercept) = calculate_linear_trend(&hist_data);
+        ForecastTrendMethod::Linear => {
+            let (slope, intercept) = calculate_linear_trend(hist_data);
             let n_hist = hist_data.len() as f64;
 
             for (i, period_id) in forecast_periods.iter().enumerate() {
@@ -127,21 +105,18 @@ pub(super) fn timeseries_forecast(
             }
         }
 
-        "exponential" => {
+        ForecastTrendMethod::Exponential => {
             // Both Holt parameters are required; there is no universal default.
-            let alpha = params
-                .get("alpha")
-                .and_then(|v| v.as_f64())
-                .ok_or_else(|| {
-                    Error::forecast(
-                        "'alpha' parameter required for exponential smoothing. \
+            let alpha = params.alpha.ok_or_else(|| {
+                Error::forecast(
+                    "'alpha' parameter required for exponential smoothing. \
                      Typical range: 0.05 (slow/stable) to 0.3 (fast/responsive). \
                      Industry standard: alpha = 2/(n+1) where n is smoothing window. \
                      Example: alpha = 0.2 for moderate smoothing.",
-                    )
-                })?;
+                )
+            })?;
 
-            let beta = params.get("beta").and_then(|v| v.as_f64()).ok_or_else(|| {
+            let beta = params.beta.ok_or_else(|| {
                 Error::forecast(
                     "'beta' parameter required for exponential smoothing trend. \
                      Typical range: 0.05 (slow trend) to 0.2 (fast trend). \
@@ -176,27 +151,16 @@ pub(super) fn timeseries_forecast(
             // phi = 1.0 (default) is classic Holt; phi < 1 damps the trend so
             // long-horizon forecasts converge to level + phi/(1-phi) * trend
             // instead of extrapolating linearly forever.
-            let phi = match params.get("phi") {
-                None => 1.0,
-                Some(value) => {
-                    let phi = value.as_f64().ok_or_else(|| {
-                        Error::forecast(format!(
-                            "'phi' must be a number in (0, 1], got {value}. \
-                             Typical damping values: 0.8 to 0.98; phi = 1.0 is undamped Holt."
-                        ))
-                    })?;
-                    if !phi.is_finite() || phi <= 0.0 || phi > 1.0 {
-                        return Err(Error::forecast(format!(
-                            "phi must be in the half-open interval (0, 1], got {phi}. \
-                             phi=1 is classic (undamped) Holt; smaller values damp the trend \
-                             harder. Typical values: 0.8 to 0.98."
-                        )));
-                    }
-                    phi
-                }
-            };
+            let phi = params.phi.unwrap_or(1.0);
+            if !phi.is_finite() || phi <= 0.0 || phi > 1.0 {
+                return Err(Error::forecast(format!(
+                    "phi must be in the half-open interval (0, 1], got {phi}. \
+                     phi=1 is classic (undamped) Holt; smaller values damp the trend \
+                     harder. Typical values: 0.8 to 0.98."
+                )));
+            }
 
-            let (level, trend) = double_exponential_smoothing(&hist_data, alpha, beta, phi);
+            let (level, trend) = double_exponential_smoothing(hist_data, alpha, beta, phi);
 
             // Damped forecast function: ŷ_{t+h} = ℓ + (φ + φ² + … + φ^h)·b.
             // With φ = 1 the damped sum accumulates exactly 1.0 per step, so
@@ -217,18 +181,15 @@ pub(super) fn timeseries_forecast(
             }
         }
 
-        "moving_average" => {
-            let window = params
-                .get("window")
-                .and_then(|v| v.as_u64())
-                .ok_or_else(|| {
-                    Error::forecast(
-                        "'window' parameter required for moving average forecast. \
+        ForecastTrendMethod::MovingAverage => {
+            let window = params.window.ok_or_else(|| {
+                Error::forecast(
+                    "'window' parameter required for moving average forecast. \
                      Common values: 3 (short-term), 5-10 (medium-term), 20+ (long-term). \
                      Must be less than the number of historical periods. \
                      Example: window = 3 for 3-period moving average.",
-                    )
-                })?;
+                )
+            })?;
             let window = usize::try_from(window)
                 .map_err(|_| Error::forecast("window exceeds the supported platform size"))?;
 
@@ -282,13 +243,6 @@ pub(super) fn timeseries_forecast(
                     result.insert(*period_id, ma);
                 }
             }
-        }
-
-        _ => {
-            return Err(Error::forecast(format!(
-                "Unknown time series method: {}",
-                method
-            )));
         }
     }
 
@@ -367,42 +321,31 @@ fn double_exponential_smoothing(data: &[f64], alpha: f64, beta: f64, phi: f64) -
 /// Apply a seasonal forecast with decomposition.
 ///
 /// Uses seasonal decomposition of historical data to extract trend and
-/// seasonal components, then projects forward.
+/// seasonal components, then projects forward. Seasonal factors are keyed by
+/// data position.
 ///
-/// # Parameters
+/// # Arguments
 ///
-/// * `historical` - Array of historical values (need 2+ seasons, required)
-/// * `season_length` - Length of seasonal cycle (required)
-/// * `growth` - **Per-period** compound growth rate applied to the trend
-///   component (default: 0.0): forecast period `i` uses
-///   `last_trend * (1 + growth)^(i + 1)`. When `growth == 0.0` the trend is
-///   held flat at its last historical value. This rate **replaces** the
-///   historical trend slope rather than adding to it—the decomposition
-///   already captures the historical trajectory in the trend component.
-/// * `mode` - SeasonalMode enum: "additive" or "multiplicative" (required)
-///
-/// Unsupported calendar-shift parameters such as `season_start` are rejected;
-/// the decomposition keys seasonal factors by data position.
-///
-/// Note: `base_value` is provided for API parity with other forecast methods but
-/// is not used in the seasonal calculation—the historical series establishes
-/// the level for projections.
+/// * `base_value` - The node's last actual value; the level comes from
+///   `historical`, so this only drives a warning when the two disagree
+/// * `forecast_periods` - Periods that require projected values
+/// * `params` - Finite `historical` observations (oldest first, at least two
+///   full seasons), positive `season_length`, decomposition `mode`, and
+///   optional **per-period** compound trend `growth` (default 0.0): forecast
+///   period `i` uses `last_trend * (1 + growth)^(i + 1)`. This rate
+///   **replaces** the historical trend slope rather than adding to it—the
+///   decomposition already captures the historical trajectory in the trend
+///   component.
 pub(super) fn seasonal_forecast(
     base_value: f64,
     forecast_periods: &[PeriodId],
-    params: &IndexMap<String, serde_json::Value>,
+    params: &SeasonalParams,
 ) -> Result<IndexMap<PeriodId, f64>> {
-    // `base_value` is ignored for seasonal forecasts — the user-supplied
-    // `historical` array provides the level. That array is a separate input
-    // with no cross-check against the model's own actuals, so if its last
-    // entry has drifted away from the node's last actual the forecast opens
-    // with a discontinuity at the actual/forecast seam. Surface the drift.
-    if let Some(last_hist) = params
-        .get("historical")
-        .and_then(|v| v.as_array())
-        .and_then(|arr| arr.last())
-        .and_then(serde_json::Value::as_f64)
-    {
+    // The user-supplied `historical` array provides the level, with no
+    // cross-check against the model's own actuals, so if its last entry has
+    // drifted away from the node's last actual the forecast opens with a
+    // discontinuity at the actual/forecast seam. Surface the drift.
+    if let Some(&last_hist) = params.historical.last() {
         let scale = base_value.abs().max(last_hist.abs()).max(1.0);
         if base_value.is_finite() && (base_value - last_hist).abs() > 1e-6 * scale {
             tracing::warn!(
@@ -416,37 +359,11 @@ pub(super) fn seasonal_forecast(
         }
     }
 
-    seasonal_forecast_with_decomposition(base_value, forecast_periods, params)
-}
-
-/// Apply seasonal forecasting with decomposition.
-///
-/// This is the main implementation of seasonal forecasting, requiring historical
-/// data and explicit parameters for decomposition.
-fn seasonal_forecast_with_decomposition(
-    _base_value: f64,
-    forecast_periods: &[PeriodId],
-    params: &IndexMap<String, serde_json::Value>,
-) -> Result<IndexMap<PeriodId, f64>> {
-    let historical = params
-        .get("historical")
-        .and_then(|v| v.as_array())
-        .ok_or_else(|| Error::forecast("'historical' must be an array"))?;
-
-    let hist_data = parse_historical_series(historical, "Seasonal forecast")?;
+    let hist_data = params.historical.as_slice();
+    finite_history(hist_data, "Seasonal forecast")?;
 
     // No default: season length must match the data's cycle (4 quarterly, 12 monthly).
-    let season_length = params
-        .get("season_length")
-        .and_then(|v| v.as_u64())
-        .ok_or_else(|| {
-            Error::forecast(
-                "'season_length' parameter required for seasonal decomposition. \
-             Common values: 4 (quarterly), 12 (monthly). \
-             Must match the cyclical pattern in your data.",
-            )
-        })?;
-    let season_length = usize::try_from(season_length)
+    let season_length = usize::try_from(params.season_length)
         .map_err(|_| Error::forecast("season_length exceeds the supported platform size"))?;
 
     if season_length == 0 {
@@ -467,19 +384,10 @@ fn seasonal_forecast_with_decomposition(
         )));
     }
 
-    let mode = params.get("mode").ok_or_else(|| {
-        Error::forecast(
-            "'mode' parameter required for seasonal forecast. \
-             Must be either 'additive' or 'multiplicative'.",
-        )
-    })?;
-    let mode: SeasonalMode = serde_json::from_value(mode.clone()).map_err(|_| {
-        Error::forecast("Invalid 'mode' parameter. Must be 'additive' or 'multiplicative'.")
-    })?;
+    let mode = params.mode;
+    let (trend, seasonal) = decompose_series_with_mode(hist_data, season_length, mode)?;
 
-    let (trend, seasonal) = decompose_series_with_mode(&hist_data, season_length, mode)?;
-
-    let growth = params.get("growth").and_then(|v| v.as_f64()).unwrap_or(0.0);
+    let growth = params.growth.unwrap_or(0.0);
 
     let mut results = IndexMap::new();
     let last_trend = trend
@@ -694,22 +602,45 @@ fn decompose_multiplicative(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use indexmap::indexmap;
+
+    fn trend(historical: Vec<f64>, method: ForecastTrendMethod) -> TimeSeriesParams {
+        TimeSeriesParams {
+            historical,
+            method,
+            alpha: None,
+            beta: None,
+            phi: None,
+            window: None,
+            min: None,
+            max: None,
+        }
+    }
+
+    fn seasonal(historical: Vec<f64>, season_length: u64, mode: SeasonalMode) -> SeasonalParams {
+        SeasonalParams {
+            historical,
+            season_length,
+            mode,
+            growth: None,
+            min: None,
+            max: None,
+        }
+    }
 
     #[test]
     fn test_timeseries_forecast() {
-        let params = indexmap! {
-            "historical".into() => serde_json::json!([100.0, 110.0, 120.0, 130.0]),
-            "method".into() => serde_json::json!("linear"),
-        };
+        let params = trend(
+            vec![100.0, 110.0, 120.0, 130.0],
+            ForecastTrendMethod::Linear,
+        );
 
         let periods = vec![
             PeriodId::quarter(2025, 1).expect("valid period fixture"),
             PeriodId::quarter(2025, 2).expect("valid period fixture"),
         ];
 
-        let result = timeseries_forecast(100.0, &periods, &params)
-            .expect("timeseries_forecast should succeed");
+        let result =
+            timeseries_forecast(&periods, &params).expect("timeseries_forecast should succeed");
 
         // Should continue linear trend
         assert!(result[&PeriodId::quarter(2025, 1).expect("valid period fixture")] > 130.0);
@@ -727,11 +658,9 @@ mod tests {
             105.0, 95.0, 115.0, 90.0, // Year 2
         ];
 
-        let params = indexmap! {
-            "historical".into() => serde_json::json!(historical),
-            "season_length".into() => serde_json::json!(4),
-            "mode".into() => serde_json::json!("multiplicative"),
-            "growth".into() => serde_json::json!(0.02),
+        let params = SeasonalParams {
+            growth: Some(0.02),
+            ..seasonal(historical, 4, SeasonalMode::Multiplicative)
         };
 
         let periods = vec![
@@ -772,17 +701,16 @@ mod tests {
         assert!(trend > 0.0);
     }
 
-    fn holt_params(phi: Option<f64>) -> IndexMap<String, serde_json::Value> {
-        let mut params = indexmap::indexmap! {
-            "historical".to_string() => serde_json::json!([100.0, 110.0, 120.0, 130.0]),
-            "method".to_string() => serde_json::json!("exponential"),
-            "alpha".to_string() => serde_json::json!(0.3),
-            "beta".to_string() => serde_json::json!(0.1),
-        };
-        if let Some(phi) = phi {
-            params.insert("phi".to_string(), serde_json::json!(phi));
+    fn holt_params(phi: Option<f64>) -> TimeSeriesParams {
+        TimeSeriesParams {
+            alpha: Some(0.3),
+            beta: Some(0.1),
+            phi,
+            ..trend(
+                vec![100.0, 110.0, 120.0, 130.0],
+                ForecastTrendMethod::Exponential,
+            )
         }
-        params
     }
 
     /// `phi = 1.0` must reproduce classic (undamped) Holt exactly — both the
@@ -795,10 +723,9 @@ mod tests {
             PeriodId::quarter(2025, 2).expect("valid period fixture"),
             PeriodId::quarter(2025, 3).expect("valid period fixture"),
         ];
-        let undamped =
-            timeseries_forecast(0.0, &periods, &holt_params(None)).expect("classic Holt");
+        let undamped = timeseries_forecast(&periods, &holt_params(None)).expect("classic Holt");
         let phi_one =
-            timeseries_forecast(0.0, &periods, &holt_params(Some(1.0))).expect("phi = 1.0 Holt");
+            timeseries_forecast(&periods, &holt_params(Some(1.0))).expect("phi = 1.0 Holt");
         for pid in &periods {
             assert!(
                 (undamped[pid] - phi_one[pid]).abs() < 1e-12,
@@ -818,10 +745,8 @@ mod tests {
                 PeriodId::quarter(2025 + i / 4, (i % 4 + 1) as u8).expect("valid period fixture")
             })
             .collect();
-        let damped =
-            timeseries_forecast(0.0, &periods, &holt_params(Some(phi))).expect("damped Holt");
-        let undamped =
-            timeseries_forecast(0.0, &periods, &holt_params(None)).expect("classic Holt");
+        let damped = timeseries_forecast(&periods, &holt_params(Some(phi))).expect("damped Holt");
+        let undamped = timeseries_forecast(&periods, &holt_params(None)).expect("classic Holt");
 
         // Recompute the asymptote from the damped smoothing state.
         let (level, trend) =
@@ -849,7 +774,7 @@ mod tests {
     fn damped_holt_rejects_out_of_range_phi() {
         let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
         for phi in [0.0, -0.5, 1.5, f64::INFINITY] {
-            let err = timeseries_forecast(0.0, &periods, &holt_params(Some(phi)))
+            let err = timeseries_forecast(&periods, &holt_params(Some(phi)))
                 .expect_err("out-of-range phi must be rejected");
             assert!(err.to_string().contains("phi"), "{err}");
         }
@@ -858,12 +783,11 @@ mod tests {
     #[test]
     fn phi_rejected_for_non_exponential_methods() {
         let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
-        let params = indexmap::indexmap! {
-            "historical".to_string() => serde_json::json!([100.0, 110.0, 120.0]),
-            "method".to_string() => serde_json::json!("linear"),
-            "phi".to_string() => serde_json::json!(0.9),
+        let params = TimeSeriesParams {
+            phi: Some(0.9),
+            ..trend(vec![100.0, 110.0, 120.0], ForecastTrendMethod::Linear)
         };
-        let err = timeseries_forecast(0.0, &periods, &params)
+        let err = timeseries_forecast(&periods, &params)
             .expect_err("phi on a non-exponential method must be rejected");
         assert!(err.to_string().contains("only valid with method"), "{err}");
     }
@@ -902,28 +826,15 @@ mod tests {
 
     #[test]
     fn test_seasonal_forecast_rejects_unsupported_season_start() {
-        let periods = vec![
-            PeriodId::quarter(2025, 1).expect("valid period fixture"),
-            PeriodId::quarter(2025, 2).expect("valid period fixture"),
-        ];
-        let params = indexmap! {
-            "historical".into() => serde_json::json!([0.0, 10.0, 0.0, 10.0, 0.0, 10.0]),
-            "season_length".into() => serde_json::json!(2),
-            "mode".into() => serde_json::json!("additive"),
-            "season_start".into() => serde_json::json!(1),
-        };
-
-        let err = crate::forecast::apply_forecast_for_node(
-            &crate::types::ForecastSpec {
-                method: crate::types::ForecastMethod::Seasonal,
-                params,
-            },
-            0.0,
-            &periods,
-            "node",
-        )
-        .expect_err("unsupported season_start must be rejected");
-        assert!(err.to_string().contains("season_start"));
+        let spec: crate::types::ForecastSpec = serde_json::from_value(serde_json::json!({
+            "method": "seasonal",
+            "params": {"historical": [0.0, 10.0, 0.0, 10.0], "season_length": 2, "mode": "additive", "season_start": 1},
+        }))
+        .expect("forecast spec");
+        let err = spec
+            .parameters()
+            .expect_err("unknown parameter key must be rejected");
+        assert!(err.to_string().contains("season_start"), "{err}");
     }
 
     #[test]
@@ -932,18 +843,20 @@ mod tests {
         // The trailing MA is centered (window-1)/2 = 0.5 periods behind the
         // last observation, so the anchored projection must continue the
         // line exactly: 50, 60 (the unanchored form lagged by trend/2 = 5).
-        let params = indexmap! {
-            "historical".into() => serde_json::json!([10.0, 20.0, 30.0, 40.0]),
-            "method".into() => serde_json::json!("moving_average"),
-            "window".into() => serde_json::json!(2),
+        let params = TimeSeriesParams {
+            window: Some(2),
+            ..trend(
+                vec![10.0, 20.0, 30.0, 40.0],
+                ForecastTrendMethod::MovingAverage,
+            )
         };
         let periods = vec![
             PeriodId::quarter(2025, 1).expect("valid period fixture"),
             PeriodId::quarter(2025, 2).expect("valid period fixture"),
         ];
 
-        let result = timeseries_forecast(40.0, &periods, &params)
-            .expect("timeseries_forecast should succeed");
+        let result =
+            timeseries_forecast(&periods, &params).expect("timeseries_forecast should succeed");
 
         assert!(
             (result[&PeriodId::quarter(2025, 1).expect("valid period fixture")] - 50.0).abs()
@@ -957,56 +870,33 @@ mod tests {
 
     #[test]
     fn test_timeseries_forecast_rejects_unknown_param_keys() {
-        let params = indexmap! {
-            "historical".into() => serde_json::json!([100.0, 110.0, 120.0]),
-            "method".into() => serde_json::json!("moving_average"),
-            "windoww".into() => serde_json::json!(2),
-        };
-        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
-
-        let err = crate::forecast::apply_forecast_for_node(
-            &crate::types::ForecastSpec {
-                method: crate::types::ForecastMethod::TimeSeries,
-                params,
-            },
-            100.0,
-            &periods,
-            "node",
-        )
-        .expect_err("typoed parameter key must be rejected");
-        assert!(err.to_string().contains("windoww"));
+        let spec: crate::types::ForecastSpec = serde_json::from_value(serde_json::json!({
+            "method": "time_series",
+            "params": {"historical": [100.0, 110.0, 120.0], "method": "moving_average", "windoww": 2},
+        }))
+        .expect("forecast spec");
+        let err = spec
+            .parameters()
+            .expect_err("unknown parameter key must be rejected");
+        assert!(err.to_string().contains("windoww"), "{err}");
     }
 
     #[test]
     fn test_seasonal_forecast_rejects_unknown_param_keys() {
-        let params = indexmap! {
-            "historical".into() => serde_json::json!([100.0, 90.0, 110.0, 85.0]),
-            "season_length".into() => serde_json::json!(2),
-            "mode".into() => serde_json::json!("additive"),
-            "seasonstart".into() => serde_json::json!(1),
-        };
-        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
-
-        let err = crate::forecast::apply_forecast_for_node(
-            &crate::types::ForecastSpec {
-                method: crate::types::ForecastMethod::Seasonal,
-                params,
-            },
-            100.0,
-            &periods,
-            "node",
-        )
-        .expect_err("typoed parameter key must be rejected");
-        assert!(err.to_string().contains("seasonstart"));
+        let spec: crate::types::ForecastSpec = serde_json::from_value(serde_json::json!({
+            "method": "seasonal",
+            "params": {"historical": [100.0, 90.0, 110.0, 85.0], "season_length": 2, "mode": "additive", "seasonstart": 1},
+        }))
+        .expect("forecast spec");
+        let err = spec
+            .parameters()
+            .expect_err("unknown parameter key must be rejected");
+        assert!(err.to_string().contains("seasonstart"), "{err}");
     }
 
     #[test]
     fn test_seasonal_forecast_rejects_zero_season_length() {
-        let params = indexmap! {
-            "historical".into() => serde_json::json!([100.0, 90.0, 110.0, 85.0]),
-            "season_length".into() => serde_json::json!(0),
-            "mode".into() => serde_json::json!("additive"),
-        };
+        let params = seasonal(vec![100.0, 90.0, 110.0, 85.0], 0, SeasonalMode::Additive);
         let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
 
         let result = seasonal_forecast(100.0, &periods, &params);
@@ -1014,14 +904,11 @@ mod tests {
     }
 
     #[test]
-    fn test_timeseries_forecast_rejects_non_numeric_history_entries() {
-        let params = indexmap! {
-            "historical".into() => serde_json::json!([100.0, "bad", 110.0]),
-            "method".into() => serde_json::json!("linear"),
-        };
+    fn test_timeseries_forecast_rejects_non_finite_history_entries() {
+        let params = trend(vec![100.0, f64::NAN, 110.0], ForecastTrendMethod::Linear);
         let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
 
-        let result = timeseries_forecast(100.0, &periods, &params);
+        let result = timeseries_forecast(&periods, &params);
         assert!(
             result.is_err(),
             "malformed historical series should fail instead of being compacted"
@@ -1032,15 +919,17 @@ mod tests {
     fn test_multiplicative_seasonal_forecast_preserves_relative_factors() {
         // Stable-level data with clear seasonal pattern (3 years).
         // Seasonal ratios: Q1=1.0, Q2=0.8, Q3=1.2, Q4=0.9 relative to Q1.
-        let params = indexmap! {
-            "historical".into() => serde_json::json!([
-                100.0, 80.0, 120.0, 90.0,
-                102.0, 82.0, 122.0, 92.0,
-                104.0, 84.0, 124.0, 94.0
-            ]),
-            "season_length".into() => serde_json::json!(4),
-            "mode".into() => serde_json::json!("multiplicative"),
-            "growth".into() => serde_json::json!(0.0),
+        let params = SeasonalParams {
+            growth: Some(0.0),
+            ..seasonal(
+                vec![
+                    100.0, 80.0, 120.0, 90.0, //
+                    102.0, 82.0, 122.0, 92.0, //
+                    104.0, 84.0, 124.0, 94.0,
+                ],
+                4,
+                SeasonalMode::Multiplicative,
+            )
         };
         let periods = vec![
             PeriodId::quarter(2025, 1).expect("valid period fixture"),
@@ -1067,14 +956,11 @@ mod tests {
         // A sign-alternating series centred on zero has a zero trend; the
         // multiplicative ratio is undefined there and must fail loudly
         // instead of silently substituting identity factors.
-        let params = indexmap! {
-            "historical".into() => serde_json::json!([
-                -10.0, 10.0, -10.0, 10.0,
-                -10.0, 10.0, -10.0, 10.0
-            ]),
-            "season_length".into() => serde_json::json!(4),
-            "mode".into() => serde_json::json!("multiplicative"),
-        };
+        let params = seasonal(
+            vec![-10.0, 10.0, -10.0, 10.0, -10.0, 10.0, -10.0, 10.0],
+            4,
+            SeasonalMode::Multiplicative,
+        );
         let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
 
         let err = seasonal_forecast(10.0, &periods, &params)

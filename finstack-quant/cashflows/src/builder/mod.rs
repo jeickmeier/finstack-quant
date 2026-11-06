@@ -56,8 +56,8 @@ pub(crate) mod schedule;
 mod specs;
 
 pub use credit_rates::{
-    abs_to_smm, annual_to_monthly, annual_to_monthly_clamped, monthly_to_annual, psa_cpr,
-    PSA_RAMP_MONTHS, PSA_TERMINAL_CPR, SDA_PEAK_CDR,
+    PSA_RAMP_MONTHS, PSA_TERMINAL_CPR, SDA_PEAK_CDR, abs_to_smm, annual_to_monthly,
+    annual_to_monthly_clamped, monthly_to_annual, psa_cpr,
 };
 pub use floating_replay::{
     CompiledFloatingCoupon, FloatingCouponEconomics, FloatingCouponPeriod,
@@ -65,24 +65,25 @@ pub use floating_replay::{
 };
 pub use orchestrator::CashFlowBuilder;
 pub use overnight::{
-    overnight_day_count_basis, OvernightObservationSchedule, OvernightObservationSlice,
-    OvernightRateAccumulator, OvernightRateConstraints, OvernightRateReplay,
+    OvernightObservationSchedule, OvernightObservationSlice, OvernightRateAccumulator,
+    OvernightRateConstraints, OvernightRateReplay, overnight_day_count_basis,
 };
 pub use periods::{
-    build_periods, build_single_period, compute_reset_date, period_accrual, BuildPeriodsParams,
-    SchedulePeriod,
+    BuildPeriodsParams, SchedulePeriod, build_periods, build_single_period, compute_reset_date,
+    period_accrual,
 };
 pub use rate_helpers::{
-    apply_bp_bounds, calculate_floating_rate, observed_index_fixing, project_floating_rate,
-    project_index_rate, project_overnight_rate, FloatingRateParams,
+    FloatingRateParams, apply_bp_bounds, calculate_floating_rate, observed_index_fixing,
+    project_floating_rate, project_index_rate, project_overnight_rate,
 };
 pub use schedule::{
-    merge_cashflow_schedules, CashFlowMeta, CashFlowSchedule, CashflowRepresentation,
+    CashFlowMeta, CashFlowSchedule, CashflowRepresentation, merge_cashflow_schedules,
+    outstanding_on,
 };
 pub use specs::{
-    evaluate_fee_tiers, AmortizationSpec, CouponType, DefaultModelSpec, FeeAccrualBasis, FeeBase,
-    FeeSpec, FeeTier, FixedCouponSpec, FloatingCouponSpec, FloatingLegCompounding,
-    FloatingRateFallback, FloatingRateSpec, Notional, OvernightIndexConstraintApplication,
-    PrepaymentModelSpec, PrincipalEventSpec, PrincipalExchange, RateSpec, RecoveryModelSpec,
-    RollRule, ScheduleParams, StepUpCouponSpec,
+    AmortizationSpec, CouponType, DefaultModelSpec, FeeAccrualBasis, FeeBase, FeeSpec, FeeTier,
+    FixedCouponSpec, FloatingCouponSpec, FloatingLegCompounding, FloatingRateFallback,
+    FloatingRateSpec, Notional, OvernightIndexConstraintApplication, PrepaymentModelSpec,
+    PrincipalEventSpec, PrincipalExchange, RateSpec, RecoveryModelSpec, RollRule, ScheduleParams,
+    StepUpCouponSpec, evaluate_fee_tiers,
 };

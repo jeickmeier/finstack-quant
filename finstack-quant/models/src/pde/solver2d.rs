@@ -5,7 +5,7 @@
 //! Returns a [`PdeSolution2D`] with bilinear interpolation and finite-difference
 //! Greeks.
 
-use super::adi::{fill_boundaries, AdiWorkBuffers, McsStepper};
+use super::adi::{AdiWorkBuffers, McsStepper, fill_boundaries};
 use super::grid::find_nearest;
 use super::grid2d::Grid2D;
 use super::problem2d::PdeProblem2D;

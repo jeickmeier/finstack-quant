@@ -95,10 +95,12 @@ mod cases {
             "{principal} vs {opening}"
         );
         for tranche in run.tranches.values() {
-            assert!(tranche
-                .principal_flows
-                .iter()
-                .all(|(date, _)| *date == date!(2024 - 06 - 28)));
+            assert!(
+                tranche
+                    .principal_flows
+                    .iter()
+                    .all(|(date, _)| *date == date!(2024 - 06 - 28))
+            );
         }
     }
 
@@ -964,8 +966,9 @@ mod cases {
 
         let (diagnostics_wac, _, _) = state::pool_composition(&state).expect("composition");
         // Rounding only: two products and one division on exact inputs.
-        assert!((pool.wac() - 0.08).abs() < 1e-15, "{}", pool.wac());
-        assert_eq!(pool.wac().to_bits(), diagnostics_wac.to_bits());
+        let wac = pool.wac().expect("fixed-rate balance");
+        assert!((wac - 0.08).abs() < 1e-15, "{wac}");
+        assert_eq!(Some(wac), diagnostics_wac);
     }
 
     #[test]
@@ -2242,11 +2245,7 @@ mod cases {
                 weighted += years * amount.amount();
                 total += amount.amount();
             }
-            if total > 0.0 {
-                weighted / total
-            } else {
-                0.0
-            }
+            if total > 0.0 { weighted / total } else { 0.0 }
         };
 
         let mezz_wal_without = interest_wal(&untriggered, "CLASS_B");
@@ -2278,11 +2277,7 @@ mod cases {
                 weighted += years * amount.amount();
                 total += amount.amount();
             }
-            if total > 0.0 {
-                weighted / total
-            } else {
-                0.0
-            }
+            if total > 0.0 { weighted / total } else { 0.0 }
         };
 
         let wal_without = senior_principal_wal(&untriggered);
@@ -2337,8 +2332,8 @@ mod cases {
     /// Deal-attached OC trigger is evaluated and reports a breach.
     #[test]
     fn oc_trigger_is_evaluated_and_reports_its_breach() {
-        use crate::structured_credit::pricing::waterfall::execute_waterfall;
         use crate::structured_credit::pricing::waterfall::WaterfallContext;
+        use crate::structured_credit::pricing::waterfall::execute_waterfall;
         use crate::structured_credit::types::CoverageTestSpec;
 
         // A 150% OC requirement against a 10M pool supporting an 8M senior note
@@ -2391,12 +2386,13 @@ mod cases {
             .find(|(id, _, _)| id == "OC_CLASS_A")
             .expect("OC test must appear in the waterfall result");
         let (_, ratio, passing) = oc;
+        let ratio = ratio.expect("the OC test has a claim");
         assert!(
             !passing,
             "OC ratio {ratio:.4} against a 1.50 requirement must breach"
         );
         assert!(
-            (*ratio - 1.2875).abs() < 0.05,
+            (ratio - 1.2875).abs() < 0.05,
             "OC ratio must be ~(10M pool + 0.3M cash)/8M senior = 1.2875, got {ratio:.4}"
         );
     }
@@ -2404,8 +2400,8 @@ mod cases {
     /// Deal with no triggers reports no coverage tests.
     #[test]
     fn deal_without_triggers_reports_no_coverage_tests() {
-        use crate::structured_credit::pricing::waterfall::execute_waterfall;
         use crate::structured_credit::pricing::waterfall::WaterfallContext;
+        use crate::structured_credit::pricing::waterfall::execute_waterfall;
 
         let deal = oc_trigger_deal(vec![]);
         let market = MarketContext::new().insert(cleanup_discount_curve());
@@ -2486,7 +2482,7 @@ mod cases {
     /// Attached senior fees build a fee tier and pay service providers first.
     #[test]
     fn attached_fees_are_built_and_paid_ahead_of_the_notes() {
-        use crate::structured_credit::pricing::waterfall::{execute_waterfall, WaterfallContext};
+        use crate::structured_credit::pricing::waterfall::{WaterfallContext, execute_waterfall};
 
         let without = reserve_account_deal(0.0);
         let with_fees = reserve_account_deal(0.0).with_standard_fees();
@@ -2549,7 +2545,8 @@ mod cases {
 
         let service_provider_cash = |result: &WaterfallDistribution| -> f64 {
             result
-                .distributions
+                .distributions()
+                .expect("distributions")
                 .iter()
                 .filter(|(recipient, _)| matches!(recipient, RecipientType::ServiceProvider(_)))
                 .map(|(_, amount)| amount.amount())
@@ -2572,13 +2569,15 @@ mod cases {
 
         // And that cash is taken ahead of the notes in the same period.
         let to_notes_with = run(&with_fees)
-            .distributions
+            .distributions()
+            .expect("distributions")
             .iter()
             .filter(|(r, _)| !matches!(r, RecipientType::ServiceProvider(_)))
             .map(|(_, m)| m.amount())
             .sum::<f64>();
         let to_notes_without = run(&without)
-            .distributions
+            .distributions()
+            .expect("distributions")
             .iter()
             .filter(|(r, _)| !matches!(r, RecipientType::ServiceProvider(_)))
             .map(|(_, m)| m.amount())
@@ -2981,6 +2980,935 @@ mod cases {
             last_flow >= maturity,
             "drained recovery flows must release on/after the final date; \
              last flow {last_flow}"
+        );
+    }
+
+    // ── Period waterfall detail and its reconciliation to tranche flows ──
+
+    use super::super::state::tranche_credit_enhancement;
+    use crate::structured_credit::types::CallAssumption;
+
+    /// The records and the booked flows are the same `Money` values: float noise
+    /// from summing them is the only allowed gap.
+    const RECONCILE_TOLERANCE: f64 = 1e-6;
+
+    fn sum_on(flows: &[(Date, Money)], date: Date) -> f64 {
+        flows
+            .iter()
+            .filter(|(flow_date, _)| *flow_date == date)
+            .map(|(_, amount)| amount.amount())
+            .sum()
+    }
+
+    /// For every tranche and date: `payment_records` plus `non_waterfall_payments`
+    /// equal the tranche's interest flows, its principal flows and its cashflows.
+    fn assert_period_detail_reconciles(deal: &StructuredCredit, run: &SimulationRun) {
+        let periods = &run.diagnostics.periods;
+        for tranche in &deal.tranches.tranches {
+            let id = tranche.id.as_str();
+            let flows = &run.tranches[id];
+            let key = if tranche.seniority == TrancheSeniority::Equity {
+                RecipientType::Equity
+            } else {
+                RecipientType::Tranche(id.to_string())
+            };
+            let mut dates: Vec<Date> = flows
+                .interest_flows
+                .iter()
+                .chain(&flows.principal_flows)
+                .chain(&flows.cashflows)
+                .map(|(date, _)| *date)
+                .collect();
+            dates.extend(periods.iter().map(|period| period.payment_date));
+            dates.extend(
+                periods
+                    .iter()
+                    .flat_map(|period| &period.non_waterfall_payments)
+                    .map(|payment| payment.payment_date),
+            );
+            dates.sort();
+            dates.dedup();
+            for date in dates {
+                let records: Vec<_> = periods
+                    .iter()
+                    .filter(|period| period.payment_date == date)
+                    .flat_map(|period| &period.waterfall.payment_records)
+                    .filter(|record| record.recipient == key)
+                    .collect();
+                let external: Vec<_> = periods
+                    .iter()
+                    .flat_map(|period| &period.non_waterfall_payments)
+                    .filter(|payment| payment.payment_date == date && payment.tranche_id == id)
+                    .collect();
+                let paid = |principal: bool| -> f64 {
+                    records
+                        .iter()
+                        .filter(|record| record.is_principal == principal)
+                        .map(|record| record.paid_amount.amount())
+                        .sum()
+                };
+                let external_interest: f64 = external.iter().map(|p| p.interest.amount()).sum();
+                let external_principal: f64 = external.iter().map(|p| p.principal.amount()).sum();
+
+                let interest_gap =
+                    paid(false) + external_interest - sum_on(&flows.interest_flows, date);
+                let principal_gap =
+                    paid(true) + external_principal - sum_on(&flows.principal_flows, date);
+                let cash_gap = paid(false) + paid(true) + external_interest + external_principal
+                    - sum_on(&flows.cashflows, date);
+                assert!(
+                    interest_gap.abs() <= RECONCILE_TOLERANCE,
+                    "{id} interest on {date} is off by {interest_gap}"
+                );
+                assert!(
+                    principal_gap.abs() <= RECONCILE_TOLERANCE,
+                    "{id} principal on {date} is off by {principal_gap}"
+                );
+                assert!(
+                    cash_gap.abs() <= RECONCILE_TOLERANCE,
+                    "{id} cash on {date} is off by {cash_gap}"
+                );
+            }
+        }
+    }
+
+    fn run_reconciled(deal: &StructuredCredit) -> SimulationRun {
+        let market = MarketContext::new().insert(cleanup_discount_curve());
+        let run = deal
+            .run_simulation(&market, deal.closing_date)
+            .expect("simulation");
+        assert_period_detail_reconciles(deal, &run);
+        run
+    }
+
+    fn sources(run: &SimulationRun) -> Vec<NonWaterfallSource> {
+        let mut sources: Vec<NonWaterfallSource> = Vec::new();
+        for payment in run
+            .diagnostics
+            .periods
+            .iter()
+            .flat_map(|period| &period.non_waterfall_payments)
+        {
+            if !sources.contains(&payment.source) {
+                sources.push(payment.source);
+            }
+        }
+        sources
+    }
+
+    /// `distributions` cannot be JSON, so the period keeps a projection.
+    #[test]
+    fn waterfall_distribution_recipient_maps_do_not_serialize_to_json() {
+        let mut map = std::collections::BTreeMap::new();
+        map.insert(
+            RecipientType::Tranche("A".to_string()),
+            Money::from((1_i64, Currency::USD)),
+        );
+        assert!(serde_json::to_string(&map).is_err());
+    }
+
+    /// The executor's own records reach the period: every tier's allocation and
+    /// a paid coupon by name, and the interest/principal classification.
+    #[test]
+    fn period_waterfall_reports_who_was_paid() {
+        let deal = clo_with_mezz(Vec::new());
+        let run = run_reconciled(&deal);
+        let first = &run.diagnostics.periods[0];
+        let waterfall = &first.waterfall;
+        assert!(waterfall.total_available.amount() > 0.0);
+        assert!(!waterfall.tier_allocations.is_empty());
+        let coupon = waterfall
+            .payment_records
+            .iter()
+            .find(|record| {
+                record.recipient == RecipientType::Tranche("CLASS_A".to_string())
+                    && !record.is_principal
+            })
+            .expect("senior coupon");
+        let booked = sum_on(&run.tranches["CLASS_A"].interest_flows, first.payment_date);
+        assert!((coupon.paid_amount.amount() - booked).abs() <= RECONCILE_TOLERANCE);
+        assert_eq!(
+            coupon.shortfall.amount(),
+            coupon.requested_amount.amount() - coupon.paid_amount.amount()
+        );
+        let parsed: PeriodDiagnostics =
+            serde_json::from_str(&serde_json::to_string(first).expect("serialize"))
+                .expect("deserialize");
+        assert_eq!(&parsed, first);
+    }
+
+    /// A breached OC test's diversion is on the period, cash and all.
+    #[test]
+    fn period_waterfall_reports_a_diversion() {
+        use crate::structured_credit::types::CoverageTestSpec;
+        let deal = clo_with_mezz(vec![CoverageTestSpec::oc("CLASS_A", 2.0)]);
+        let run = run_reconciled(&deal);
+        let waterfall = &run.diagnostics.periods[0].waterfall;
+        assert!(waterfall.had_diversions);
+        assert!(waterfall.diverted_cash.amount() > 0.0);
+        let diverted: f64 = waterfall
+            .diverted_amounts
+            .iter()
+            .map(|record| record.amount.amount())
+            .sum();
+        assert!((diverted - waterfall.diverted_cash.amount()).abs() < 1e-6);
+        assert!(
+            waterfall
+                .payment_records
+                .iter()
+                .any(|record| record.diverted)
+        );
+    }
+
+    /// A clean-up call redeems the notes outside the waterfall.
+    #[test]
+    fn cleanup_call_redemption_is_recorded_on_the_last_period() {
+        let run = run_reconciled(&cleanup_call_deal());
+        assert_eq!(sources(&run), vec![NonWaterfallSource::Redemption]);
+        let last = run.diagnostics.periods.last().expect("period");
+        let redemption = &last.non_waterfall_payments[0];
+        assert_eq!(redemption.tranche_id, "A");
+        assert_eq!(redemption.payment_date, last.payment_date);
+        assert!(redemption.principal.amount() > 0.0);
+    }
+
+    /// A deal call above par: the premium is interest, the surplus goes to the
+    /// most junior class, and every class's record reconciles.
+    #[test]
+    fn deal_call_premium_and_surplus_reconcile() {
+        let mut deal = clo_with_mezz(Vec::new());
+        deal.call_assumption = Some(CallAssumption {
+            date: Date::from_calendar_date(2026, Month::January, 1).expect("date"),
+            price_pct: 101.0,
+            scope: CallScope::Deal,
+            after_early_amortization_months: None,
+        });
+        let run = run_reconciled(&deal);
+        assert_eq!(sources(&run), vec![NonWaterfallSource::Redemption]);
+        let payments = &run
+            .diagnostics
+            .periods
+            .last()
+            .expect("period")
+            .non_waterfall_payments;
+        let class_a = payments
+            .iter()
+            .find(|payment| payment.tranche_id == "CLASS_A")
+            .expect("senior redeemed");
+        assert!(class_a.interest.amount() > 0.0, "the premium is interest");
+        assert!(
+            payments
+                .iter()
+                .any(|payment| payment.tranche_id == "EQUITY")
+        );
+    }
+
+    /// A funded reserve is released to the notes at deal end.
+    #[test]
+    fn terminal_reserve_release_is_recorded_on_the_last_period() {
+        let run = run_reconciled(&reserve_account_deal(1_000_000.0));
+        assert!(sources(&run).contains(&NonWaterfallSource::ReserveAccountRelease));
+    }
+
+    /// The excess-spread account is released at deal end, and a loss trap
+    /// sends it to principal.
+    #[test]
+    fn terminal_spread_release_is_recorded_on_the_last_period() {
+        let run = run_reconciled(&excess_spread_deal(false));
+        assert!(sources(&run).contains(&NonWaterfallSource::SpreadAccountRelease));
+    }
+
+    /// Reserve interest routed to a tranche is on the period that earned it.
+    #[test]
+    fn reserve_interest_routed_to_a_tranche_is_recorded_on_each_period() {
+        let mut deal = reserve_account_deal(1_000_000.0);
+        deal.pool.reserve_account_rate = 0.04;
+        deal.pool.reserve_interest_destination =
+            crate::structured_credit::ReserveInterestDestination::Tranche {
+                tranche_id: "A".to_string(),
+            };
+        let run = run_reconciled(&deal);
+        for period in &run.diagnostics.periods[..run.diagnostics.periods.len() - 1] {
+            let [payment] = period.non_waterfall_payments.as_slice() else {
+                panic!("{}: expected one payment", period.payment_date);
+            };
+            assert_eq!(payment.source, NonWaterfallSource::ReserveInterest);
+            assert_eq!(payment.payment_date, period.payment_date);
+            assert!(payment.interest.amount() > 0.0);
+        }
+    }
+
+    /// Recoveries still pending at deal end settle after the last period and
+    /// carry their own later date on its record.
+    #[test]
+    fn recoveries_settling_after_the_last_period_carry_their_own_date() {
+        let mut deal = clo_with_mezz(Vec::new());
+        deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.20);
+        deal.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 18);
+        let run = run_reconciled(&deal);
+        let last = run.diagnostics.periods.last().expect("period");
+        let later = last
+            .non_waterfall_payments
+            .iter()
+            .filter(|payment| payment.source == NonWaterfallSource::RecoveryRelease)
+            .find(|payment| payment.payment_date > last.payment_date);
+        assert!(later.is_some(), "a recovery settles after the last period");
+    }
+
+    /// An incentive fee taken from a terminal release to equity is reported
+    /// next to the net cash equity received.
+    #[test]
+    fn incentive_fee_on_a_terminal_release_is_reported_with_the_payment() {
+        let mut deal = clo_with_mezz(Vec::new());
+        deal.call_assumption = Some(CallAssumption {
+            date: Date::from_calendar_date(2026, Month::January, 1).expect("date"),
+            price_pct: 100.0,
+            scope: CallScope::Deal,
+            after_early_amortization_months: None,
+        });
+        deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
+        let mut fees = DealFees::clo_standard(Currency::USD);
+        fees.incentive_fee = Some(IncentiveFeeSpec {
+            hurdle_irr: 0.0,
+            share: 0.5,
+        });
+        deal.fees = Some(fees);
+        let run = run_reconciled(&deal);
+        let last = run.diagnostics.periods.last().expect("period");
+        let fee: f64 = last
+            .non_waterfall_payments
+            .iter()
+            .map(|payment| payment.incentive_fee.amount())
+            .sum();
+        assert!(fee > 0.0 && fee <= last.fees_paid.amount());
+    }
+
+    /// With no payment period left, the settlement still has a record.
+    #[test]
+    fn deal_with_no_period_left_records_its_settlement() {
+        let mut deal = reserve_account_deal(1_000_000.0);
+        deal.pool.assets.clear();
+        let run = run_reconciled(&deal);
+        let [settlement] = run.diagnostics.periods.as_slice() else {
+            panic!("one settlement record");
+        };
+        assert_eq!(
+            sources(&run),
+            vec![NonWaterfallSource::ReserveAccountRelease]
+        );
+        assert_eq!(settlement.waterfall.total_available.amount(), 0.0);
+        assert_eq!(
+            settlement.non_waterfall_payments[0].principal,
+            Money::from((1_000_000_i64, Currency::USD))
+        );
+    }
+
+    /// `CLASS_A` interest and sequential principal, then remaining cash to
+    /// `CLASS_B`, optionally followed by a residual-holder tier.
+    fn residual_to_class_b_deal(equity_tier: bool) -> StructuredCredit {
+        use crate::structured_credit::types::{
+            PaymentCalculation, PaymentType, Recipient, Waterfall, WaterfallTier,
+        };
+        let mut deal = clo_with_mezz(Vec::new());
+        let mut waterfall = Waterfall::builder(Currency::USD)
+            .add_tier(
+                WaterfallTier::new("interest", 1, PaymentType::Interest)
+                    .add_recipient(Recipient::tranche_interest("a_interest", "CLASS_A")),
+            )
+            .add_tier(
+                WaterfallTier::new("principal", 2, PaymentType::Principal)
+                    .add_recipient(Recipient::tranche_principal("a", "CLASS_A", None))
+                    .add_recipient(Recipient::tranche_principal("b", "CLASS_B", None)),
+            )
+            .add_tier(
+                WaterfallTier::new("residual", 3, PaymentType::Residual).add_recipient(
+                    Recipient::new(
+                        "b_residual",
+                        RecipientType::Tranche("CLASS_B".to_string()),
+                        PaymentCalculation::ResidualCash,
+                    ),
+                ),
+            );
+        if equity_tier {
+            waterfall = waterfall.add_tier(
+                WaterfallTier::new("equity", 4, PaymentType::Residual).add_recipient(
+                    Recipient::new(
+                        "equity",
+                        RecipientType::Equity,
+                        PaymentCalculation::ResidualCash,
+                    ),
+                ),
+            );
+        }
+        deal.waterfall = Some(waterfall.build().expect("waterfall"));
+        deal
+    }
+
+    /// Residual cash paid to a debt class is a turbo: it reconciles as principal
+    /// on every date, retires the balance and never exceeds it.
+    #[test]
+    fn residual_to_a_debt_class_pays_down_principal() {
+        let deal = residual_to_class_b_deal(false);
+        let run = run_reconciled(&deal);
+        let first = &run.diagnostics.periods[0];
+        let date = first.payment_date;
+        let flows = &run.tranches["CLASS_B"];
+        let [record] = first
+            .waterfall
+            .payment_records
+            .iter()
+            .filter(|record| record.recipient == RecipientType::Tranche("CLASS_B".to_string()))
+            .filter(|record| record.paid_amount.amount() > 0.0)
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("one payment to CLASS_B");
+        };
+        assert!(record.is_principal);
+        let paid = record.paid_amount.amount();
+        assert!(paid > 0.0);
+        assert!((paid - sum_on(&flows.cashflows, date)).abs() <= RECONCILE_TOLERANCE);
+        assert!((paid - sum_on(&flows.principal_flows, date)).abs() <= RECONCILE_TOLERANCE);
+        assert_eq!(sum_on(&flows.interest_flows, date), 0.0);
+        // The cap reads the running balance, so payments spread over several
+        // periods stop at the original balance only if each one retired it.
+        assert!(flows.principal_flows.len() > 1);
+        assert_eq!(flows.total_interest.amount(), 0.0);
+        assert!((flows.total_principal.amount() - 2_000_000.0).abs() <= RECONCILE_TOLERANCE);
+        let cash: f64 = flows.cashflows.iter().map(|(_, m)| m.amount()).sum();
+        assert!((cash - 2_000_000.0).abs() <= RECONCILE_TOLERANCE);
+    }
+
+    /// Cash paid in `period` to `recipient`, one entry per payment made.
+    fn paid_to(period: &PeriodDiagnostics, recipient: &RecipientType) -> Vec<f64> {
+        period
+            .waterfall
+            .payment_records
+            .iter()
+            .filter(|record| record.recipient == *recipient)
+            .map(|record| record.paid_amount.amount())
+            .filter(|paid| *paid > 0.0)
+            .collect()
+    }
+
+    /// The turbo stops at the balance: within the period that retires the class,
+    /// the cash above it reaches the next tier.
+    #[test]
+    fn residual_above_a_debt_balance_passes_to_the_next_tier() {
+        let deal = residual_to_class_b_deal(true);
+        let run = run_reconciled(&deal);
+        let class_b = RecipientType::Tranche("CLASS_B".to_string());
+        assert!(
+            run.diagnostics.periods.iter().any(|period| {
+                !paid_to(period, &class_b).is_empty()
+                    && !paid_to(period, &RecipientType::Equity).is_empty()
+            }),
+            "no period pays both the class and the tier after it"
+        );
+        let total = run.tranches["CLASS_B"].total_principal.amount();
+        assert!((total - 2_000_000.0).abs() <= RECONCILE_TOLERANCE);
+    }
+
+    /// A class also paying down through an earlier principal tier takes only
+    /// what is left of its balance from the residual tier, so it is never overpaid.
+    #[test]
+    fn residual_to_a_debt_class_nets_principal_paid_earlier_in_the_period() {
+        let mut deal = residual_to_class_b_deal(false);
+        // `CLASS_B` first, so it takes principal before the residual tier runs.
+        deal.waterfall.as_mut().expect("waterfall").tiers[1]
+            .recipients
+            .reverse();
+        let run = run_reconciled(&deal);
+        let class_b = RecipientType::Tranche("CLASS_B".to_string());
+        let payments: Vec<Vec<f64>> = run
+            .diagnostics
+            .periods
+            .iter()
+            .map(|period| paid_to(period, &class_b))
+            .collect();
+        assert!(payments.iter().any(|paid| paid.len() == 2));
+        let total: f64 = payments.iter().flatten().sum();
+        assert!((total - 2_000_000.0).abs() <= RECONCILE_TOLERANCE);
+    }
+
+    /// `CLASS_A` coupon and sequential principal, plus one extra recipient for
+    /// `CLASS_B` in a tier funded after them.
+    fn deal_paying_class_b(
+        recipient_id: &str,
+        calculation: crate::structured_credit::types::PaymentCalculation,
+    ) -> StructuredCredit {
+        use crate::structured_credit::types::{PaymentType, Recipient, WaterfallTier};
+        let mut deal = residual_to_class_b_deal(false);
+        let waterfall = deal.waterfall.as_mut().expect("waterfall");
+        waterfall.tiers[2] = WaterfallTier::new("residual", 3, PaymentType::Residual)
+            .add_recipient(Recipient::new(
+                recipient_id,
+                RecipientType::Tranche("CLASS_B".to_string()),
+                calculation,
+            ));
+        deal
+    }
+
+    /// A fixed amount used to reach `cashflows` alone: lifetime cash 3,000,000
+    /// on a 2,000,000 note. The engine now refuses to price it, whichever path
+    /// built the deal.
+    #[test]
+    fn simulation_rejects_a_fixed_amount_paid_to_a_debt_class() {
+        use crate::structured_credit::types::PaymentCalculation;
+        let deal = deal_paying_class_b(
+            "b_extra",
+            PaymentCalculation::FixedAmount {
+                amount: Money::from((50_000_i64, Currency::USD)),
+                rounding: None,
+            },
+        );
+        let market = MarketContext::new().insert(cleanup_discount_curve());
+        let message = deal
+            .run_simulation(&market, deal.closing_date)
+            .expect_err("rejected")
+            .to_string();
+        assert!(message.contains("fixed_amount"), "{message}");
+        assert!(message.contains("CLASS_B"), "{message}");
+    }
+
+    /// A coupon rounded up pays cents above the claim the engine computes
+    /// unrounded. That cash is still interest, so no gap opens.
+    #[test]
+    fn coupon_rounded_above_its_claim_is_booked_as_interest() {
+        use crate::structured_credit::types::{
+            PaymentCalculation, PaymentType, Recipient, RoundingConvention, WaterfallTier,
+        };
+        let mut deal = residual_to_class_b_deal(true);
+        let waterfall = deal.waterfall.as_mut().expect("waterfall");
+        waterfall.tiers[0] = WaterfallTier::new("interest", 1, PaymentType::Interest)
+            .add_recipient(Recipient::new(
+                "a_interest",
+                RecipientType::Tranche("CLASS_A".to_string()),
+                PaymentCalculation::TrancheInterest {
+                    tranche_id: "CLASS_A".to_string(),
+                    rounding: Some(RoundingConvention::Ceiling),
+                },
+            ));
+        let run = run_reconciled(&deal);
+        assert!(run.tranches["CLASS_A"].total_interest.amount() > 0.0);
+    }
+
+    /// Carryover the engine cannot settle against a balance is rejected: the
+    /// tranche must accrue it and the recipient must carry the engine's id.
+    #[test]
+    fn simulation_rejects_carryover_with_no_balance_behind_it() {
+        use crate::structured_credit::types::PaymentCalculation;
+        let market = MarketContext::new().insert(cleanup_discount_curve());
+        for recipient_id in ["b_extra", "net_wac_carryover_CLASS_B"] {
+            let deal = deal_paying_class_b(
+                recipient_id,
+                PaymentCalculation::NetWacCarryover {
+                    tranche_id: "CLASS_B".to_string(),
+                    amount: Money::from((10_000_i64, Currency::USD)),
+                },
+            );
+            let message = deal
+                .run_simulation(&market, deal.closing_date)
+                .expect_err("rejected")
+                .to_string();
+            assert!(message.contains("net_wac_carryover_CLASS_B"), "{message}");
+        }
+    }
+
+    /// The carryover the validation admits: a capped class accruing it, repaid
+    /// under the engine's recipient id, reconciles as interest.
+    #[test]
+    fn carryover_a_custom_waterfall_repays_reconciles_as_interest() {
+        use crate::structured_credit::types::{
+            AfcSpec, PaymentCalculation, PaymentType, Recipient, WaterfallRules, WaterfallTier,
+        };
+        let mut deal = deal_paying_class_b(
+            "net_wac_carryover_CLASS_B",
+            PaymentCalculation::NetWacCarryover {
+                tranche_id: "CLASS_B".to_string(),
+                amount: Money::from((0_i64, Currency::USD)),
+            },
+        );
+        let waterfall = deal.waterfall.as_mut().expect("waterfall");
+        waterfall.tiers[0] = WaterfallTier::new("interest", 1, PaymentType::Interest)
+            .add_recipient(Recipient::tranche_interest("a_interest", "CLASS_A"))
+            .add_recipient(Recipient::tranche_interest("b_interest", "CLASS_B"));
+        deal.waterfall_rules = Some(WaterfallRules {
+            afc: Some(AfcSpec {
+                capped_tranches: vec!["CLASS_B".to_string()],
+                net_wac_fee_bp: Some(100.0),
+                carryover: true,
+            }),
+            ..WaterfallRules::default()
+        });
+        let run = run_reconciled(&deal);
+        let class_b = RecipientType::Tranche("CLASS_B".to_string());
+        let repaid = run
+            .diagnostics
+            .periods
+            .iter()
+            .flat_map(|period| &period.waterfall.payment_records)
+            .filter(|record| {
+                record.recipient == class_b && record.recipient_id == "net_wac_carryover_CLASS_B"
+            })
+            .map(|record| record.paid_amount.amount())
+            .sum::<f64>();
+        assert!(repaid > 0.0);
+    }
+
+    // ── First coverage breach and credit enhancement ─────────────────────
+
+    fn breach<'a>(run: &'a SimulationRun, test_id: &str) -> &'a CoverageTestBreach {
+        run.diagnostics
+            .first_breaches
+            .iter()
+            .find(|breach| breach.test_id == test_id)
+            .expect("test listed")
+    }
+
+    /// A pool eroding through an OC level: the first failing period is reported,
+    /// not the first period and not a later one.
+    #[test]
+    fn first_breach_is_the_first_failing_period() {
+        use crate::structured_credit::types::CoverageTestSpec;
+        let mut deal = oc_trigger_deal(vec![CoverageTestSpec::oc("CLASS_A", 1.20)]);
+        // No recovery cash pays the senior note down, so the ratio only erodes.
+        deal.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.0, 0);
+        let run = run_reconciled(&deal);
+        let tests: Vec<(Date, bool)> = run
+            .diagnostics
+            .periods
+            .iter()
+            .flat_map(|period| {
+                period
+                    .coverage_tests
+                    .iter()
+                    .map(|test| (period.payment_date, test.passing))
+            })
+            .collect();
+        let failing = tests
+            .iter()
+            .position(|(_, passing)| !passing)
+            .expect("the test fails");
+        assert!(failing > 0, "the test passes at first");
+        assert_eq!(
+            breach(&run, "OC_CLASS_A").first_breach,
+            Some(tests[failing].0)
+        );
+    }
+
+    /// A test that never fails is still listed, with no date.
+    #[test]
+    fn first_breach_is_none_when_the_test_always_passes() {
+        use crate::structured_credit::types::CoverageTestSpec;
+        let mut deal = oc_trigger_deal(vec![CoverageTestSpec::oc("CLASS_A", 1.01)]);
+        deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
+        let run = run_reconciled(&deal);
+        assert_eq!(
+            run.diagnostics.first_breaches,
+            vec![CoverageTestBreach {
+                test_id: "OC_CLASS_A".to_string(),
+                first_breach: None,
+            }]
+        );
+    }
+
+    /// One entry per test, sorted by id; none for a deal without tests.
+    #[test]
+    fn first_breaches_are_sorted_by_test_id() {
+        use crate::structured_credit::types::CoverageTestSpec;
+        let deal = clo_with_mezz(vec![
+            CoverageTestSpec::oc("CLASS_B", 1.01),
+            CoverageTestSpec::oc("CLASS_A", 1.01),
+            CoverageTestSpec::ic("CLASS_A", 1.01),
+        ]);
+        let run = run_reconciled(&deal);
+        let ids: Vec<&str> = run
+            .diagnostics
+            .first_breaches
+            .iter()
+            .map(|breach| breach.test_id.as_str())
+            .collect();
+        assert_eq!(ids, vec!["IC_CLASS_A", "OC_CLASS_A", "OC_CLASS_B"]);
+        assert!(
+            run_reconciled(&clo_with_mezz(Vec::new()))
+                .diagnostics
+                .first_breaches
+                .is_empty()
+        );
+    }
+
+    /// A tranche trigger that diverts nothing never reaches `coverage_tests`,
+    /// and its first breach is still reported under its trigger id.
+    #[test]
+    fn tranche_trigger_without_a_diversion_reports_its_first_breach() {
+        use crate::structured_credit::types::{CoverageTrigger, TriggerConsequence};
+        let mut deal = clo_with_mezz(Vec::new());
+        deal.tranches.tranches[0].oc_trigger = Some(CoverageTrigger::new(
+            2.0,
+            TriggerConsequence::StopReinvestment,
+        ));
+        let run = run_reconciled(&deal);
+        let first = &run.diagnostics.periods[0];
+        assert!(first.coverage_tests.is_empty());
+        assert_eq!(
+            breach(&run, "OC_CLASS_A_trigger").first_breach,
+            Some(first.payment_date)
+        );
+    }
+
+    /// A diverting trigger reports one entry under one id, whichever source saw it.
+    #[test]
+    fn diverting_tranche_trigger_has_one_entry() {
+        use crate::structured_credit::types::{CoverageTrigger, TriggerConsequence};
+        let mut deal = clo_with_mezz(Vec::new());
+        deal.tranches.tranches[0].oc_trigger = Some(CoverageTrigger::new(
+            2.0,
+            TriggerConsequence::DivertCashFlow,
+        ));
+        let run = run_reconciled(&deal);
+        let first = &run.diagnostics.periods[0];
+        assert_eq!(first.coverage_tests[0].test_id, "OC_CLASS_A_trigger");
+        assert_eq!(run.diagnostics.first_breaches.len(), 1);
+        assert_eq!(
+            breach(&run, "OC_CLASS_A_trigger").first_breach,
+            Some(first.payment_date)
+        );
+    }
+
+    /// 7M / 2M / 1M notes over 10M of collateral: 30%, 10%, 0%.
+    #[test]
+    fn credit_enhancement_matches_a_hand_calculation() {
+        let mut deal = clo_with_mezz(Vec::new());
+        deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
+        let run = run_reconciled(&deal);
+        let first = &run.diagnostics.periods[0];
+        assert_eq!(first.pool_balance.amount(), 10_000_000.0);
+        let values: Vec<(&str, f64)> = first
+            .credit_enhancement
+            .iter()
+            .map(|ce| (ce.tranche_id.as_str(), ce.credit_enhancement))
+            .collect();
+        assert_eq!(
+            values,
+            vec![("CLASS_A", 0.3), ("CLASS_B", 0.1), ("EQUITY", 0.0)]
+        );
+    }
+
+    /// With prepayments and defaults: `(pool − notes at or ahead) ÷ pool` on the
+    /// balances the row and the tranche flows report at that period's end.
+    #[test]
+    fn credit_enhancement_follows_end_of_period_balances() {
+        let mut deal = clo_with_mezz(Vec::new());
+        deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
+        let run = run_reconciled(&deal);
+        let period = &run.diagnostics.periods[3];
+        let balance = |id: &str, original: f64| {
+            let flows = &run.tranches[id];
+            let retired: f64 = flows
+                .principal_flows
+                .iter()
+                .chain(&flows.writedown_flows)
+                .filter(|(date, _)| *date <= period.payment_date)
+                .map(|(_, amount)| amount.amount())
+                .sum();
+            original - retired
+        };
+        let pool = period.pool_balance.amount();
+        let class_a = balance("CLASS_A", 7_000_000.0);
+        let class_b = balance("CLASS_B", 2_000_000.0);
+        assert!(
+            (period.credit_enhancement[0].credit_enhancement - (pool - class_a) / pool).abs()
+                < 1e-9
+        );
+        assert!(
+            (period.credit_enhancement[1].credit_enhancement - (pool - class_a - class_b) / pool)
+                .abs()
+                < 1e-9
+        );
+        assert!(period.credit_enhancement[0].credit_enhancement > 0.3);
+    }
+
+    /// The step-down trigger reads the recorded function's senior value.
+    #[test]
+    fn step_down_metric_is_the_senior_tranche_credit_enhancement() {
+        let deal = clo_with_mezz(Vec::new());
+        let mut state = SimulationState::new(
+            &deal.pool,
+            &deal.tranches,
+            deal.closing_date,
+            deal.closing_date,
+            0,
+        )
+        .expect("state");
+        state.principal_funding_account = Money::from((500_000_i64, Currency::USD));
+        let senior = deal
+            .tranches
+            .tranches
+            .iter()
+            .find(|tranche| tranche.id.as_str() == "CLASS_A")
+            .expect("senior");
+        let value = tranche_credit_enhancement(&state, senior);
+        assert_eq!(value, (10_500_000.0 - 7_000_000.0) / 10_500_000.0);
+        assert_eq!(step_down_metrics(&state).credit_enhancement, value);
+    }
+
+    /// Two `Senior` classes and a mezzanine under a `MinCreditEnhancement`
+    /// trigger of `level`. `TrancheStructure::new` ranks A1 ahead of A2.
+    fn same_seniority_deal(level: f64) -> StructuredCredit {
+        let mut deal = clo_with_mezz(Vec::new());
+        let maturity = deal.maturity;
+        let mk = |id: &str, seniority, attach: f64, detach: f64, bal: f64, rate: f64| {
+            Tranche::new(
+                id,
+                attach,
+                detach,
+                seniority,
+                Money::new(bal, Currency::USD).expect("valid money fixture"),
+                RateSpec::Fixed { rate },
+                maturity,
+            )
+            .expect("tranche")
+        };
+        deal.tranches = TrancheStructure::new(vec![
+            mk(
+                "A1",
+                TrancheSeniority::Senior,
+                60.0,
+                100.0,
+                4_000_000.0,
+                0.05,
+            ),
+            mk(
+                "A2",
+                TrancheSeniority::Senior,
+                30.0,
+                60.0,
+                3_000_000.0,
+                0.05,
+            ),
+            mk(
+                "B",
+                TrancheSeniority::Mezzanine,
+                10.0,
+                30.0,
+                2_000_000.0,
+                0.08,
+            ),
+            mk("EQ", TrancheSeniority::Equity, 0.0, 10.0, 1_000_000.0, 0.0),
+        ])
+        .expect("structure");
+        deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
+        deal.waterfall_rules = Some(crate::structured_credit::WaterfallRules {
+            step_down: Some(crate::structured_credit::StepDownSpec {
+                step_down_date: deal.closing_date,
+                triggers: vec![
+                    crate::structured_credit::StepDownTrigger::MinCreditEnhancement(level),
+                ],
+            }),
+            ..Default::default()
+        });
+        deal
+    }
+
+    fn state_of(deal: &StructuredCredit) -> SimulationState<'_> {
+        SimulationState::new(
+            &deal.pool,
+            &deal.tranches,
+            deal.closing_date,
+            deal.closing_date,
+            0,
+        )
+        .expect("state")
+    }
+
+    /// The trigger's formula at `e9a972feb5^`, before it shared
+    /// `tranche_credit_enhancement`: only the first tranche holding the lowest
+    /// `payment_priority` is subtracted.
+    fn formula_before_sharing(state: &SimulationState<'_>) -> f64 {
+        let pool = state.pool_outstanding.amount() + state.principal_funding_account.amount();
+        let senior = state
+            .tranches
+            .tranches
+            .iter()
+            .min_by_key(|t| t.payment_priority)
+            .and_then(|t| state.tranche_balances.get(t.id.as_str()))
+            .map_or(0.0, |m| m.amount());
+        (pool - senior) / pool
+    }
+
+    /// `TrancheStructure::new` and deserialization give same-seniority classes
+    /// distinct priorities, so the trigger subtracts A1 alone: the sharing of
+    /// `tranche_credit_enhancement` moved no value for any deal built that way.
+    #[test]
+    fn same_seniority_classes_stay_ranked_so_the_trigger_value_is_the_first_class_alone() {
+        let deal = same_seniority_deal(0.45);
+        assert_eq!(
+            deal.tranches
+                .tranches
+                .iter()
+                .map(|t| t.payment_priority)
+                .collect::<Vec<_>>(),
+            vec![1, 2, 3, 4]
+        );
+        let state = state_of(&deal);
+        assert_eq!(step_down_metrics(&state).credit_enhancement, 0.60);
+        assert_eq!(formula_before_sharing(&state), 0.60);
+        // The step-down is in effect because the trigger reads 0.60 and not 0.30:
+        // on the first payment date principal reaches the classes behind A1.
+        let run = run_reconciled(&deal);
+        let first_date = run.diagnostics.periods[0].payment_date;
+        assert!(sum_on(&run.tranches["A1"].principal_flows, first_date) > 0.0);
+        assert!(sum_on(&run.tranches["A2"].principal_flows, first_date) > 0.0);
+    }
+
+    /// Priorities tied by writing the public field (no constructor, wire form or
+    /// binding does) are the one place the two formulas differ.
+    #[test]
+    fn tied_priorities_written_by_hand_subtract_every_tied_class() {
+        let mut deal = same_seniority_deal(0.45);
+        deal.tranches.tranches[1].payment_priority = 1;
+        let state = state_of(&deal);
+        assert_eq!(step_down_metrics(&state).credit_enhancement, 0.30);
+        assert_eq!(formula_before_sharing(&state), 0.60);
+    }
+
+    /// A retired note leaves its OC and IC tests with no claim: the record states
+    /// no ratio or cushion, and the test still passes.
+    #[test]
+    fn a_retired_note_has_no_ratio_or_cushion() {
+        use crate::structured_credit::types::CoverageTestSpec;
+        let mut deal = clo_with_mezz(vec![
+            CoverageTestSpec::oc("CLASS_A", 1.2),
+            CoverageTestSpec::ic("CLASS_A", 1.1),
+            CoverageTestSpec::oc("CLASS_B", 1.1),
+        ]);
+        deal.tranches.tranches[0].current_balance = Money::from((0_i64, Currency::USD));
+        let run = run_reconciled(&deal);
+        let tests = &run.diagnostics.periods[0].coverage_tests;
+        let retired: Vec<_> = tests
+            .iter()
+            .filter(|test| test.test_id.contains("CLASS_A"))
+            .collect();
+        assert_eq!(retired.len(), 2);
+        for test in retired {
+            assert_eq!(test.ratio, None, "{}", test.test_id);
+            assert_eq!(test.cushion, None, "{}", test.test_id);
+            assert!(test.passing, "{}", test.test_id);
+        }
+        let live = tests
+            .iter()
+            .find(|test| test.test_id.contains("CLASS_B"))
+            .expect("CLASS_B test");
+        assert_eq!(
+            live.cushion.expect("claim outstanding"),
+            live.ratio.expect("claim outstanding") - live.trigger_level
+        );
+        let json = serde_json::to_value(&run.diagnostics.periods[0].coverage_tests).expect("json");
+        assert!(
+            json.as_array()
+                .expect("rows")
+                .iter()
+                .any(|row| row["ratio"].is_null())
         );
     }
 }

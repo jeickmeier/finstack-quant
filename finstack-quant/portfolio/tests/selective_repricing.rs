@@ -7,18 +7,18 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
+use finstack_quant_core::money::Money;
 use finstack_quant_core::money::fx::{
     FxConversionPolicy, FxMatrix, FxProvider, FxQuery, SimpleFxProvider,
 };
-use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
+use finstack_quant_portfolio::Portfolio;
 use finstack_quant_portfolio::dependencies::MarketFactorKey;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
 use finstack_quant_portfolio::valuation::{
-    revalue_affected, value_portfolio, PortfolioValuationOptions,
+    PortfolioValuationOptions, revalue_affected, value_portfolio,
 };
-use finstack_quant_portfolio::Portfolio;
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use finstack_quant_valuations::instruments::{
     Instrument, MarketDependencies, PricingOptions, RatesCurveKind,
@@ -27,8 +27,8 @@ use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::pricer::InstrumentType;
 use finstack_quant_valuations::results::ValuationResult;
 use std::any::Any;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 const EUR_KNOTS: [(f64, f64); 3] = [(0.0, 1.0), (1.0, 0.97), (5.0, 0.85)];
 const USD_KNOTS: [(f64, f64); 3] = [(0.0, 1.0), (1.0, 0.98), (5.0, 0.90)];
@@ -994,10 +994,12 @@ fn selective_profile_change_forces_a_full_metric_reprice() {
         portfolio.positions().len(),
         "a PV-only prior cannot satisfy an exact metric profile"
     );
-    assert!(result
-        .position_values
-        .values()
-        .all(|value| value.risk_metrics_complete));
+    assert!(
+        result
+            .position_values
+            .values()
+            .all(|value| value.risk_metrics_complete)
+    );
 }
 
 #[test]

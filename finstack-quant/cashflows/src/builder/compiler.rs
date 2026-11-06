@@ -25,15 +25,14 @@
 //! pieces may nest (the innermost wins) but must not partially overlap. Every
 //! produced schedule must contain at least two dates.
 
+use finstack_quant_core::InputError;
 use finstack_quant_core::dates::{Date, HolidayCalendar};
 use finstack_quant_core::money::Money;
-use finstack_quant_core::InputError;
 use rust_decimal::Decimal;
 
 use super::date_generation::{
-    build_schedule_period, compile_periods, effective_frequency, effective_stub,
+    CompiledPeriod, build_schedule_period, compile_periods, effective_frequency, effective_stub,
     generate_periods_with_adjustment, validate_accrual_grid, validate_unique_payment_dates,
-    CompiledPeriod,
 };
 use super::rate_helpers::FloatingRateParams;
 use super::specs::{
@@ -147,20 +146,19 @@ fn build_compiled_periods(
     // CDS front accrual belongs to the instrument's initial window only.
     // Reapplying it after a coupon or settlement-type change would charge the
     // portion before the change twice. Keep the next roll and clip the start.
-    if !allow_front_accrual {
-        if let Some(first) = periods
+    if !allow_front_accrual
+        && let Some(first) = periods
             .first_mut()
             .filter(|period| period.unadjusted_start < window.start)
-        {
-            *first = build_schedule_period(
-                window.start,
-                first.unadjusted_end,
-                params.business_day_convention,
-                params.payment_lag_days,
-                calendar_by_id_strict(&params.calendar_id)?,
-                params.adjust_accrual_dates,
-            )?;
-        }
+    {
+        *first = build_schedule_period(
+            window.start,
+            first.unadjusted_end,
+            params.business_day_convention,
+            params.payment_lag_days,
+            calendar_by_id_strict(&params.calendar_id)?,
+            params.adjust_accrual_dates,
+        )?;
     }
     compile_periods(periods, params.frequency, params.roll_rule)
 }

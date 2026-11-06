@@ -1,0 +1,190 @@
+{
+  "$defs": {
+    "BondWorkoutRow": {
+      "additionalProperties": false,
+      "description": "One admissible exit of a bond: a row of a [`BondWorkoutLadder`].",
+      "properties": {
+        "date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Exit date. A maturity row carries the business-day-adjusted final payment\ndate when that is later than the contractual maturity."
+        },
+        "i_spread": {
+          "description": "`yield_rate` less the swap par rate from the quote date, as a decimal, the\nconvention of the `i_spread` metric. The par rate runs to `date` when the\nbond has an exit other than maturity, and to contractual maturity when it\nhas none, which differs from `date` if the final payment rolls. `None` when\n`yield_rate` is `None`.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "is_worst": {
+          "description": "Whether this is the worst exit, the one the `ytw` metric selects. At most\none row is marked; none is when no exit has a yield and each pays at least\nthe price at once.",
+          "type": "boolean"
+        },
+        "kind": {
+          "$ref": "#/$defs/WorkoutExitKind",
+          "description": "Whether the exit is a call, a put or maturity."
+        },
+        "make_whole": {
+          "description": "Whether the redemption is a make-whole price off a reference curve.",
+          "type": "boolean"
+        },
+        "redemption_amount": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Clean cash the exit redeems, in the bond's currency; accrued interest is\npaid on top."
+        },
+        "redemption_price_pct": {
+          "description": "Clean redemption as percent of the principal outstanding at the exit\n(`103.0` = 103%). A make-whole call shows its make-whole price, which can\nexceed the contractual strike.",
+          "format": "double",
+          "type": "number"
+        },
+        "yield_rate": {
+          "description": "Street yield to this exit as a decimal, compounded at the coupon\nfrequency, timed from the quote date. `None` when the path has no finite\nyield: an exit on the quote date, or same-day cash at or above the price. A\nworst row can be `None`, where the `ytw` metric is negative infinity.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "date",
+        "kind",
+        "redemption_price_pct",
+        "redemption_amount",
+        "make_whole",
+        "is_worst"
+      ],
+      "type": "object"
+    },
+    "WorkoutExitKind": {
+      "description": "How the holder leaves the bond on a [`BondWorkoutRow`]'s date.",
+      "oneOf": [
+        {
+          "const": "call",
+          "description": "The issuer calls the bond; a lowered return floor also appears as a call.",
+          "type": "string"
+        },
+        {
+          "const": "put",
+          "description": "The holder puts the bond.",
+          "type": "string"
+        },
+        {
+          "const": "maturity",
+          "description": "The bond runs to its final contractual payment.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/results/1/bond_workout_ladder.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Yield and I-spread to every call, put and maturity exit of a bond, with the worst marked.",
+  "examples": [
+    {
+      "as_of": "2025-01-15",
+      "clean_price_pct": 108.0,
+      "dirty_price": {
+        "amount": "1080277.777777778",
+        "currency": "USD"
+      },
+      "instrument_id": "CALLABLE-USD-10Y",
+      "quote_date": "2025-01-17",
+      "rows": [
+        {
+          "date": "2027-01-15",
+          "i_spread": -0.0124989752045,
+          "is_worst": true,
+          "kind": "call",
+          "make_whole": false,
+          "redemption_amount": {
+            "amount": "1030000",
+            "currency": "USD"
+          },
+          "redemption_price_pct": 103.0,
+          "yield_rate": 0.0234863194143
+        },
+        {
+          "date": "2029-01-15",
+          "i_spread": -0.00508464353158,
+          "is_worst": false,
+          "kind": "call",
+          "make_whole": false,
+          "redemption_amount": {
+            "amount": "1010000",
+            "currency": "USD"
+          },
+          "redemption_price_pct": 101.0,
+          "yield_rate": 0.0309241980647
+        },
+        {
+          "date": "2031-01-15",
+          "i_spread": -0.000918268364712,
+          "is_worst": false,
+          "kind": "call",
+          "make_whole": false,
+          "redemption_amount": {
+            "amount": "1000000",
+            "currency": "USD"
+          },
+          "redemption_price_pct": 100.0,
+          "yield_rate": 0.035083108793
+        },
+        {
+          "date": "2034-01-16",
+          "i_spread": 0.00333392217268,
+          "is_worst": false,
+          "kind": "maturity",
+          "make_whole": false,
+          "redemption_amount": {
+            "amount": "1000000",
+            "currency": "USD"
+          },
+          "redemption_price_pct": 100.0,
+          "yield_rate": 0.0393402526507
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "as_of": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+      "description": "Valuation date."
+    },
+    "clean_price_pct": {
+      "description": "Clean price every row is solved at, as percent of the original notional:\nthe quoted clean price, or for a bond with no exercise rights and no quote\nthe model price at the quote date.",
+      "format": "double",
+      "type": "number"
+    },
+    "dirty_price": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+      "description": "`clean_price_pct` plus accrued interest at the quote date, in the bond's\ncurrency. Exits are alternatives for one price, so the rows share it."
+    },
+    "instrument_id": {
+      "description": "Identifier of the bond.",
+      "type": "string"
+    },
+    "quote_date": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+      "description": "Settlement date of the quote; every yield is timed from it."
+    },
+    "rows": {
+      "description": "One row per candidate exit, in date order. Adjacent call windows that share\na boundary date each keep a row; a put and a call on one date each keep\ntheirs. A bond with no exercise rights has one maturity row.",
+      "items": {
+        "$ref": "#/$defs/BondWorkoutRow"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "instrument_id",
+    "as_of",
+    "quote_date",
+    "clean_price_pct",
+    "dirty_price",
+    "rows"
+  ],
+  "title": "BondWorkoutLadder",
+  "type": "object"
+}

@@ -243,6 +243,7 @@ fn twrr_linked_geometrically_links_returns() {
     .unwrap();
     assert!((get_f64(&result, "cumulative") - 0.0815).abs() < 1e-12);
     assert!((get_f64(&result, "annualised") - 0.0815).abs() < 1e-12);
+    assert_eq!(as_json(&result)["is_annualised"], serde_json::json!(true));
     assert_eq!(as_json(&result)["num_periods"], serde_json::json!(2));
 }
 
@@ -329,8 +330,12 @@ fn campisi_golden_portfolio() -> serde_json::Value {
     serde_json::json!([
         campisi_snap("GOVT", 0.30, 0.0155, 0.040, 5.0, 0.0, 0.0, -0.0010, 0.0),
         campisi_snap("GOVT", 0.20, 0.0190, 0.045, 8.0, 0.0, 0.0, -0.0010, 0.0),
-        campisi_snap("CORP", 0.30, 0.0120, 0.060, 4.0, 3.8, 0.0150, -0.0010, 0.0020),
-        campisi_snap("CORP", 0.20, 0.0118, 0.070, 6.0, 5.5, 0.0250, -0.0010, 0.0020),
+        campisi_snap(
+            "CORP", 0.30, 0.0120, 0.060, 4.0, 3.8, 0.0150, -0.0010, 0.0020
+        ),
+        campisi_snap(
+            "CORP", 0.20, 0.0118, 0.070, 6.0, 5.5, 0.0250, -0.0010, 0.0020
+        ),
     ])
 }
 
@@ -338,8 +343,12 @@ fn campisi_golden_benchmark() -> serde_json::Value {
     serde_json::json!([
         campisi_snap("GOVT", 0.45, 0.0155, 0.038, 6.0, 0.0, 0.0, -0.0010, 0.0),
         campisi_snap("GOVT", 0.15, 0.0195, 0.042, 9.0, 0.0, 0.0, -0.0010, 0.0),
-        campisi_snap("CORP", 0.25, 0.0090, 0.055, 5.0, 4.8, 0.0120, -0.0010, 0.0020),
-        campisi_snap("CORP", 0.15, 0.0100, 0.065, 7.0, 6.5, 0.0200, -0.0010, 0.0020),
+        campisi_snap(
+            "CORP", 0.25, 0.0090, 0.055, 5.0, 4.8, 0.0120, -0.0010, 0.0020
+        ),
+        campisi_snap(
+            "CORP", 0.15, 0.0100, 0.065, 7.0, 6.5, 0.0200, -0.0010, 0.0020
+        ),
     ])
 }
 
@@ -404,30 +413,38 @@ fn campisi_attribution_rejects_unknown_and_missing_config_fields() {
     let portfolio = campisi_golden_portfolio().to_string();
     let benchmark = campisi_golden_benchmark().to_string();
 
-    assert!(campisi_attribution(
-        JsValue::from(&portfolio),
-        JsValue::from(&benchmark),
-        JsValue::from(&campisi_config(0.25))
-    )
-    .is_ok());
-    assert!(campisi_attribution(
-        JsValue::from(&portfolio),
-        JsValue::from(&benchmark),
-        JsValue::from("{}")
-    )
-    .is_err());
-    assert!(campisi_attribution(
-        JsValue::from(&portfolio),
-        JsValue::from(&benchmark),
-        JsValue::from(r#"{"period_years": 0.25, "spread_mode": "dts"}"#)
-    )
-    .is_err());
-    assert!(campisi_attribution(
-        JsValue::from("[]"),
-        JsValue::from(&benchmark),
-        JsValue::from(&campisi_config(0.25))
-    )
-    .is_err());
+    assert!(
+        campisi_attribution(
+            JsValue::from(&portfolio),
+            JsValue::from(&benchmark),
+            JsValue::from(&campisi_config(0.25))
+        )
+        .is_ok()
+    );
+    assert!(
+        campisi_attribution(
+            JsValue::from(&portfolio),
+            JsValue::from(&benchmark),
+            JsValue::from("{}")
+        )
+        .is_err()
+    );
+    assert!(
+        campisi_attribution(
+            JsValue::from(&portfolio),
+            JsValue::from(&benchmark),
+            JsValue::from(r#"{"period_years": 0.25, "spread_mode": "dts"}"#)
+        )
+        .is_err()
+    );
+    assert!(
+        campisi_attribution(
+            JsValue::from("[]"),
+            JsValue::from(&benchmark),
+            JsValue::from(&campisi_config(0.25))
+        )
+        .is_err()
+    );
 }
 
 /// `campisiCarinoLink` binds Rust `campisi_carino_link`, which links
@@ -585,11 +602,10 @@ fn fi_attribution_result_reconciliation_check_honours_tolerance_and_denies_unkno
     let mut bogus: serde_json::Value = serde_json::from_str(&canonical).expect("parse");
     bogus["bogus_field"] = serde_json::json!(1.0);
     let bogus = bogus.to_string();
-    assert!(fi_attribution_result_reconciliation_check(
-        JsValue::from(&bogus),
-        JsValue::from(1e-10)
-    )
-    .is_err());
+    assert!(
+        fi_attribution_result_reconciliation_check(JsValue::from(&bogus), JsValue::from(1e-10))
+            .is_err()
+    );
     assert!(campisi_carino_link(JsValue::from(&format!("[{bogus}]"))).is_err());
 }
 

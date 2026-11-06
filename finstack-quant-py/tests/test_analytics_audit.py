@@ -7,7 +7,15 @@ import pickle
 
 import pytest
 
-from finstack_quant.analytics import AnalyticsError, MultiFactorResult, Performance, max_drawdown, sharpe, sortino
+from finstack_quant.analytics import (
+    AnalyticsError,
+    MultiFactorResult,
+    Performance,
+    PerformancePanel,
+    max_drawdown,
+    sharpe,
+    sortino,
+)
 
 
 def dates(n: int) -> list[date]:
@@ -15,7 +23,11 @@ def dates(n: int) -> list[date]:
 
 
 def panel(values: list[float], frequency: str = "daily") -> Performance:
-    return Performance.from_returns_arrays(dates(len(values)), [values], ["A"], frequency=frequency)
+    return Performance.from_panel(
+        PerformancePanel(
+            dates=dates(len(values)), series=[values], kind="returns", ticker_names=["A"], frequency=frequency
+        )
+    )
 
 
 def test_empirical_tail_mass_is_preserved_in_metrics_and_summary() -> None:
@@ -61,8 +73,13 @@ def test_drawdown_ratios_preserve_non_finite_cash_rates(invalid: float) -> None:
 
 def test_treynor_preserves_non_finite_cash_rates_with_zero_beta() -> None:
     for portfolio_return in (0.01, 0.0):
-        perf = Performance.from_returns_arrays(
-            dates(3), [[-0.01, 0.01, 0.02], [portfolio_return] * 3], ["BENCH", "PORT"]
+        perf = Performance.from_panel(
+            PerformancePanel(
+                dates=dates(3),
+                series=[[-0.01, 0.01, 0.02], [portfolio_return] * 3],
+                kind="returns",
+                ticker_names=["BENCH", "PORT"],
+            )
         )
         for invalid in (math.nan, math.inf, -math.inf):
             assert math.isnan(perf.treynor(invalid).loc["PORT"])
@@ -75,13 +92,19 @@ def test_extreme_wealth_preserves_annualized_growth_and_relative_drawdowns() -> 
         ([date(year, 1, 1) for year in range(2001, 2021)], [-0.9] * 20, 0.1 ** (20 / (7305 / 365.25)) - 1),
         ([date(2021, 1, 1), date(2022, 1, 1)], [1e200] * 2, 1e200 ** (2 / (731 / 365.25))),
     ):
-        perf = Performance.from_returns_arrays(grid, [values], ["A"], frequency="annual")
+        perf = Performance.from_panel(
+            PerformancePanel(dates=grid, series=[values], kind="returns", ticker_names=["A"], frequency="annual")
+        )
         result = perf.cagr().iloc[0]
         assert math.isfinite(result)
         assert result == pytest.approx(expected, rel=1e-12)
 
     for values in ([-0.9] * 20, [1e300] * 4):
-        perf = Performance.from_returns_arrays(dates(len(values)), [values, values], ["BENCH", "A"])
+        perf = Performance.from_panel(
+            PerformancePanel(
+                dates=dates(len(values)), series=[values, values], kind="returns", ticker_names=["BENCH", "A"]
+            )
+        )
         assert all(value == 0.0 for series in perf.cumulative_returns_outperformance() for value in series)
 
     perf = panel([1e300, 1e300, -0.5, 0.0])
@@ -96,7 +119,11 @@ def test_extreme_wealth_preserves_annualized_growth_and_relative_drawdowns() -> 
 
 
 def test_lookback_returns_accepts_maximum_calendar_date() -> None:
-    perf = Performance.from_arrays([date(9999, 12, 30), date.max], [[100.0, 110.0]], ["A"])
+    perf = Performance.from_panel(
+        PerformancePanel(
+            dates=[date(9999, 12, 30), date.max], series=[[100.0, 110.0]], kind="prices", ticker_names=["A"]
+        )
+    )
     lookback = perf.lookback_returns(date.max)
     for values in (lookback.mtd, lookback.qtd, lookback.ytd, lookback.fytd):
         assert values[0] == pytest.approx(0.1)
@@ -142,9 +169,15 @@ def test_rolling_sortino_preserves_small_returns_after_positive_outlier(tail: fl
 
 def test_constructors_reject_duplicate_tickers_and_derived_nan() -> None:
     with pytest.raises(AnalyticsError, match="duplicate ticker"):
-        Performance.from_returns_arrays(dates(2), [[0.01, 0.02], [0.03, 0.04]], ["A", "A"])
+        Performance.from_panel(
+            PerformancePanel(
+                dates=dates(2), series=[[0.01, 0.02], [0.03, 0.04]], kind="returns", ticker_names=["A", "A"]
+            )
+        )
     with pytest.raises(AnalyticsError):
-        Performance.from_arrays(dates(2), [[1e-300, 1e300]], ["A"])
+        Performance.from_panel(
+            PerformancePanel(dates=dates(2), series=[[1e-300, 1e300]], kind="prices", ticker_names=["A"])
+        )
 
 
 def test_restoration_validates_state_and_rebuilds_caches() -> None:
@@ -163,7 +196,9 @@ def test_restoration_validates_state_and_rebuilds_caches() -> None:
 
 
 def test_initial_drawdown_and_performance_conventions() -> None:
-    perf = Performance.from_arrays(dates(3), [[100.0, 90.0, 100.0]], ["A"])
+    perf = Performance.from_panel(
+        PerformancePanel(dates=dates(3), series=[[100.0, 90.0, 100.0]], kind="prices", ticker_names=["A"])
+    )
     episode = perf.drawdown_details(0)[0]
     assert episode.start == dates(3)[0]
     assert episode.duration_days == 2

@@ -1,15 +1,15 @@
 //! Prepared quote envelopes for calibration pipelines.
 
+use crate::build::BuildCtx;
 use crate::build::cds::build_cds_instrument;
 use crate::build::rates::build_rate_instrument_with_dates;
 use crate::build::xccy::build_xccy_instrument;
-use crate::build::BuildCtx;
 use crate::quotes::CdsQuote;
 use crate::quotes::RateQuote;
 use crate::quotes::XccyQuote;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_rates::deposit::Deposit;
 use std::fmt;
@@ -99,10 +99,10 @@ impl PreparedQuote<RateQuote> {
         context: &MarketContext,
         as_of: Date,
     ) -> Result<f64> {
-        if matches!(self.quote.as_ref(), RateQuote::Deposit { .. }) {
-            if let Some(deposit) = self.instrument.as_any().downcast_ref::<Deposit>() {
-                return deposit.npv_raw(context, as_of);
-            }
+        if matches!(self.quote.as_ref(), RateQuote::Deposit { .. })
+            && let Some(deposit) = self.instrument.as_any().downcast_ref::<Deposit>()
+        {
+            return deposit.npv_raw(context, as_of);
         }
         self.instrument.value_raw(context, as_of)
     }

@@ -26,8 +26,13 @@ impl TornadoEntry {
 }
 
 /// Parameter to vary in sensitivity analysis.
+///
+/// The wire form carries exactly one of `perturbations` (absolute values) or
+/// `pct_range` (percentage moves of `base_value`, converted on deserialization
+/// as by [`Self::with_percentages`]); it always serializes the absolute values.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(try_from = "ParameterSpecWire")]
 pub struct ParameterSpec {
     /// Node identifier
     pub node_id: String,
@@ -43,13 +48,58 @@ pub struct ParameterSpec {
     pub perturbations: Vec<f64>,
 }
 
+#[derive(Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+struct ParameterSpecWire {
+    /// Node identifier
+    node_id: String,
+    /// Period to vary
+    period_id: PeriodId,
+    /// Base value in the node's units; `pct_range` moves are applied to it.
+    base_value: f64,
+    /// Absolute values to substitute for this node/period; give exactly one of
+    /// `perturbations` and `pct_range`.
+    #[serde(default)]
+    perturbations: Option<Vec<f64>>,
+    /// Percentage moves of `base_value` (`10.0` is a 10% increase), each
+    /// substituted as `base_value * (1 + pct / 100)`; give exactly one of
+    /// `perturbations` and `pct_range`.
+    #[serde(default)]
+    pct_range: Option<Vec<f64>>,
+}
+
+impl TryFrom<ParameterSpecWire> for ParameterSpec {
+    type Error = finstack_quant_statements::Error;
+
+    fn try_from(wire: ParameterSpecWire) -> finstack_quant_statements::Result<Self> {
+        match (wire.perturbations, wire.pct_range) {
+            (Some(perturbations), None) => Ok(Self::new(
+                wire.node_id,
+                wire.period_id,
+                wire.base_value,
+                perturbations,
+            )),
+            (None, Some(pct_range)) => {
+                Self::with_percentages(wire.node_id, wire.period_id, wire.base_value, pct_range)
+            }
+            _ => Err(finstack_quant_statements::Error::invalid_input(format!(
+                "Sensitivity parameter '{}@{}' takes exactly one of `perturbations` or `pct_range`",
+                wire.node_id, wire.period_id
+            ))),
+        }
+    }
+}
+
 impl ParameterSpec {
     /// Create a new parameter specification.
     ///
     /// # Arguments
     ///
     /// * `node_id` - Exact statement node identifier to vary.
-    /// * `period_id` - Forecast period whose node input is replaced.
+    /// * `period_id` - Forecast period whose node input is replaced. The
+    ///   replacement is a point override: it does not re-anchor the node's
+    ///   forecast in later periods (see [`crate::analysis::run_sensitivity`]).
     /// * `base_value` - Finite reference value in the node's units used when
     ///   constructing percentage shocks; the model supplies the chart baseline.
     /// * `perturbations` - Non-empty finite absolute input values in the node's
@@ -74,30 +124,53 @@ impl ParameterSpec {
     ///
     /// * `node_id` - Exact statement node identifier whose input is shocked.
     /// * `period_id` - Forecast model period whose selected node input is
-    ///   replaced; execution rejects actual periods.
+    ///   replaced; execution rejects actual periods. The replacement is a
+    ///   point override that does not re-anchor the node's forecast in later
+    ///   periods (see [`crate::analysis::run_sensitivity`]).
     /// * `base_value` - Finite reference input in the node's units, such as a
     ///   decimal rate or monetary currency amount; each shock multiplies this
     ///   value by `1 + pct / 100`. The model supplies the chart baseline.
-    /// * `pct_range` - Non-empty finite percentage figures, with `10.0` meaning
-    ///   a 10% increase and `-10.0` a 10% decrease. Execution rejects shocks
-    ///   whose converted absolute values overflow.
+    /// * `pct_range` - Finite percentage figures, with `10.0` meaning a 10%
+    ///   increase and `-10.0` a 10% decrease; a sensitivity run needs at least
+    ///   one.
+    ///
+    /// # Errors
+    ///
+    /// Returns an invalid-input error when `base_value` or a percentage is
+    /// not finite (`NaN` or infinite), or when a converted shock overflows to
+    /// a non-finite value.
     pub fn with_percentages(
         node_id: impl Into<String>,
         period_id: PeriodId,
         base_value: f64,
         pct_range: Vec<f64>,
-    ) -> Self {
+    ) -> finstack_quant_statements::Result<Self> {
+        let node_id = node_id.into();
+        if !base_value.is_finite() {
+            return Err(finstack_quant_statements::Error::invalid_input(format!(
+                "Sensitivity base value for '{node_id}@{period_id}' must be finite, got {base_value}"
+            )));
+        }
         let perturbations = pct_range
             .into_iter()
-            .map(|pct| base_value * (1.0 + pct / 100.0))
-            .collect();
+            .map(|pct| {
+                let value = base_value * (1.0 + pct / 100.0);
+                if value.is_finite() {
+                    Ok(value)
+                } else {
+                    Err(finstack_quant_statements::Error::invalid_input(format!(
+                        "Sensitivity shock {pct}% of '{node_id}@{period_id}' must be finite"
+                    )))
+                }
+            })
+            .collect::<finstack_quant_statements::Result<_>>()?;
 
-        Self {
-            node_id: node_id.into(),
+        Ok(Self {
+            node_id,
             period_id,
             base_value,
             perturbations,
-        }
+        })
     }
 }
 
@@ -331,5 +404,53 @@ mod tests {
             .expect_err("out of range");
         assert!(error.to_string().contains("scenario index 1 out of range"));
         assert!(result.get_value(3, "profit", &period).is_err());
+    }
+
+    #[test]
+    fn parameter_spec_wire_takes_absolute_or_percentage_perturbations() {
+        let absolute: ParameterSpec = serde_json::from_value(serde_json::json!({
+            "node_id": "revenue", "period_id": "2025Q2", "base_value": 100.0,
+            "perturbations": [90.0, 110.0],
+        }))
+        .expect("absolute");
+        assert_eq!(absolute.perturbations, vec![90.0, 110.0]);
+        let percent: ParameterSpec = serde_json::from_value(serde_json::json!({
+            "node_id": "revenue", "period_id": "2025Q2", "base_value": 100.0,
+            "pct_range": [-10.0, 10.0],
+        }))
+        .expect("percent");
+        let direct = ParameterSpec::with_percentages(
+            "revenue",
+            PeriodId::quarter(2025, 2).expect("valid period"),
+            100.0,
+            vec![-10.0, 10.0],
+        )
+        .expect("direct");
+        assert_eq!(percent.perturbations, direct.perturbations);
+        let written = serde_json::to_value(&percent).expect("serialize");
+        assert_eq!(
+            written["perturbations"],
+            serde_json::json!(direct.perturbations)
+        );
+        assert!(written.get("pct_range").is_none());
+    }
+
+    #[test]
+    fn parameter_spec_wire_rejects_both_neither_and_unknown_fields() {
+        let base = serde_json::json!({
+            "node_id": "revenue", "period_id": "2025Q2", "base_value": 100.0,
+        });
+        let with = |extra: serde_json::Value| {
+            let mut value = base.clone();
+            value
+                .as_object_mut()
+                .expect("object")
+                .extend(extra.as_object().expect("object").clone());
+            serde_json::from_value::<ParameterSpec>(value)
+        };
+        assert!(with(serde_json::json!({})).is_err());
+        assert!(with(serde_json::json!({"perturbations": [1.0], "pct_range": [1.0]})).is_err());
+        assert!(with(serde_json::json!({"perturbations": [1.0], "extra": 1})).is_err());
+        assert!(with(serde_json::json!({"pct_range": [-10.0]})).is_ok());
     }
 }

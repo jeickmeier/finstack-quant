@@ -150,7 +150,7 @@ impl FormatOpts {
                     _ => {
                         return Err(Error::Validation(
                             "group must be a single character such as ','".to_string(),
-                        ))
+                        ));
                     }
                 }
             }
@@ -1135,13 +1135,15 @@ mod tests {
 
     #[test]
     fn money_format_opts_new_bounds_precision() {
-        assert!(FormatOpts::new(
-            Some(FormatOpts::MAX_DECIMALS),
-            Some(true),
-            None,
-            Some(RoundingMode::Bankers)
-        )
-        .is_ok());
+        assert!(
+            FormatOpts::new(
+                Some(FormatOpts::MAX_DECIMALS),
+                Some(true),
+                None,
+                Some(RoundingMode::Bankers)
+            )
+            .is_ok()
+        );
         let result = FormatOpts::new(
             Some(FormatOpts::MAX_DECIMALS + 1),
             Some(true),

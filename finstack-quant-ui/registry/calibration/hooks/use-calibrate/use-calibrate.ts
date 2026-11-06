@@ -24,27 +24,20 @@ export function calibrationOptions<K extends "calibrate" | "dryRun">(
 }
 /** Pass null until the user requests a solve; returns the unchanged native result or structured failure. */
 export function useCalibrate(envelopeJson: string | null) {
-  return useWorkerQuery((worker) => ({
-    ...calibrationOptions(
+  return useWorkerQuery((worker) =>
+    calibrationOptions(
       worker.client,
       worker.session,
       "calibrate",
       envelopeJson,
     ),
-    enabled: worker.status === "ready" && envelopeJson !== null,
-  }));
+  );
 }
 /** Static dependency/error report; no solver is invoked and returns the native structured report. */
 export function useCalibrationDryRun(envelopeJson: string | null) {
-  return useWorkerQuery((worker) => ({
-    ...calibrationOptions(
-      worker.client,
-      worker.session,
-      "dryRun",
-      envelopeJson,
-    ),
-    enabled: worker.status === "ready" && envelopeJson !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    calibrationOptions(worker.client, worker.session, "dryRun", envelopeJson),
+  );
 }
 /** Native canonicalization for CalibrationForm; a superseded validation cannot accept old edits. */
 export function useCalibrationValidator() {

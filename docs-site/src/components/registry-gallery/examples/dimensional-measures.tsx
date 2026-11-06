@@ -1,10 +1,11 @@
 "use client";
 import type { ExampleProps } from "./props";
 import { DimensionalMeasures } from "@/components/finstack/valuations/components/dimensional-measures/dimensional-measures";
-import type { MetricMetadata, ValuationResult } from "finstack-quant-wasm";
+import type { MetricMetadata } from "finstack-quant-wasm";
 import data from "../data.json";
+import { bondResult } from "../fixtures";
 
-const result = data.bond.result as unknown as ValuationResult;
+const result = bondResult;
 
 export function Example(_props: ExampleProps) {
   return (

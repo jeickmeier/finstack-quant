@@ -6,6 +6,7 @@
 // integration-test crate, so it is repeated here for the closure below.
 #![allow(clippy::result_large_err)]
 
+use finstack_quant_calibration::CalibrationConfig;
 use finstack_quant_calibration::api::engine;
 use finstack_quant_calibration::api::schema::{
     CalibrationEnvelope, CalibrationPlan, CalibrationStep, StepParams, SurfaceExtrapolationPolicy,
@@ -13,8 +14,8 @@ use finstack_quant_calibration::api::schema::{
 };
 use finstack_quant_calibration::quotes::MarketQuote;
 use finstack_quant_calibration::quotes::QuoteId;
-use finstack_quant_calibration::CalibrationConfig;
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
@@ -25,7 +26,6 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_core::FxHashMap;
 use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations_core::instruments::{FixedLegSpec, FloatLegSpec};
 use finstack_quant_valuations_core::instruments::{SettlementType, VolatilityModel};
@@ -561,10 +561,11 @@ fn swaption_vol_settlement_lag_uses_canonical_tenor_axis() {
     let cube =
         finstack_quant_valuations_core::market::resolve_vol_source(&context, "USD-SWPT-SETTLED")
             .expect("contractual-coordinate cube");
-    assert!(cube
-        .get_normal_vol(expiry_time, contractual_tenor, 0.043)
-        .expect("exact contractual cube node")
-        .is_finite());
+    assert!(
+        cube.get_normal_vol(expiry_time, contractual_tenor, 0.043)
+            .expect("exact contractual cube node")
+            .is_finite()
+    );
 
     let settled_error = execute_for_tenor(settled_tenor_axis)
         .expect_err("raw settled-date year fraction must not become the cube coordinate");
@@ -653,11 +654,12 @@ fn swaption_cube_expiry_clock_is_independent_of_fixed_leg_day_count() {
         let context = calibrate_flat_normal_cube(fixed_day_count, 5);
         let cube = context.get_vol_cube("DATED-NORMAL").expect("normal cube");
         for (days, quoted) in [(180.0, 0.005), (360.0, 0.02)] {
-            let volatility = finstack_quant_models::volatility::get_cube_normal_vol(
+            let volatility = finstack_quant_models::volatility::get_cube_vol(
                 &cube,
                 days / 365.0,
                 5.0,
                 0.05,
+                finstack_quant_models::volatility::VolatilityConvention::Normal,
             )
             .expect("lookup on the swaption pricer's ACT/365F clock");
             assert!(

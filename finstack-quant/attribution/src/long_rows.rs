@@ -74,9 +74,9 @@
 //! # }
 //! ```
 
+use finstack_quant_core::Result;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::Result;
 use indexmap::IndexMap;
 use serde::Serialize;
 

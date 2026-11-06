@@ -15,6 +15,7 @@ impl MetricId {
         MetricId::MoosmullerYtm,
         MetricId::ZSpread,
         MetricId::ISpread,
+        MetricId::GSpread,
         MetricId::DiscountMargin,
         MetricId::Oas,
         MetricId::ASWPar,
@@ -23,6 +24,18 @@ impl MetricId {
         MetricId::DirtyPrice,
         MetricId::Accrued,
         MetricId::EmbeddedOptionValue,
+    ];
+
+    /// Standard metrics a calculator stores alongside the metric requested,
+    /// reported in the result even when not requested themselves: the
+    /// bucketed-vega reconciliation residual, the theta horizon and carry
+    /// diagnostics, and the two outputs of one loan effective-interest solve.
+    pub const SIDE_OUTPUT_METRICS: &'static [MetricId] = &[
+        MetricId::BucketedVegaResidual,
+        MetricId::ThetaPeriodDays,
+        MetricId::CarryDecompositionDegenerate,
+        MetricId::OidEirRate,
+        MetricId::OidEirAmortization,
     ];
 
     /// Return all standard metric IDs in group display order.

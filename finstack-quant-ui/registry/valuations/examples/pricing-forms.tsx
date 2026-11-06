@@ -14,6 +14,7 @@ import { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack"
 import { useInstrumentValidator } from "@/hooks/valuations/use-instrument-validator/use-instrument-validator";
 import {
   useModels,
+  usePriceDriverFields,
   useMetrics,
   usePriceInstrument,
 } from "@/hooks/valuations/use-price-instrument/use-price-instrument";
@@ -28,8 +29,9 @@ function Forms() {
   });
   const [request, setRequest] = useState<PriceRequest | null>(null);
   const validate = useInstrumentValidator();
+  const priceDriverFields = usePriceDriverFields();
   const models = useModels(),
-    metrics = useMetrics();
+    metrics = useMetrics(type);
   const price = usePriceInstrument(
     request ?? fixture.request,
     request !== null,
@@ -43,6 +45,7 @@ function Forms() {
         type={type}
         onTypeChange={setType}
         defaultJson={fixture.request.instrumentJson}
+        priceDriverFields={priceDriverFields.data}
         validate={validate}
         onSubmit={setInstrument}
         onValidated={setInstrument}

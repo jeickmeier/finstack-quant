@@ -555,14 +555,21 @@ async function main() {
     baseDate: '2024-01-02',
     knots: [0.0, 1.0, 1.0, 0.98, 5.0, 0.88],
   });
-  const pricePerf = new w.Performance(priceDates, [prices], ['bench'], null, 'daily');
-  const returnPerf = w.Performance.fromReturns(
-    returnDates,
-    [returns, returns.map((x) => x * 0.95)],
-    ['bench', 'benchmark'],
-    'benchmark',
-    'daily'
-  );
+  const pricePerf = new w.Performance({
+    dates: priceDates,
+    series: [prices],
+    kind: 'prices',
+    ticker_names: ['bench'],
+    frequency: 'daily',
+  });
+  const returnPerf = new w.Performance({
+    dates: returnDates,
+    series: [returns, returns.map((x) => x * 0.95)],
+    kind: 'returns',
+    ticker_names: ['bench', 'benchmark'],
+    benchmark_ticker: 'benchmark',
+    frequency: 'daily',
+  });
 
   const constructCurrency = () => new w.Currency('USD');
   for (let i = 0; i < 20; i++) {

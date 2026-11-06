@@ -3,15 +3,15 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::dates::{
-    build_fiscal_periods, build_periods, DayCount, DayCountContext, FiscalConfig, Period,
+    DayCount, DayCountContext, FiscalConfig, Period, build_fiscal_periods, build_periods,
 };
 use finstack_quant_core::money::Money;
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::capital_structure::{CapitalStructureCashflows, CashflowBreakdown};
 use finstack_quant_statements::dsl::parse_and_compile;
-use finstack_quant_statements::evaluator::evaluate_formula;
 use finstack_quant_statements::evaluator::EvaluationContext;
 use finstack_quant_statements::evaluator::Evaluator;
+use finstack_quant_statements::evaluator::evaluate_formula;
 use finstack_quant_statements::types::{AmountOrScalar, FinancialModelSpec};
 use indexmap::IndexMap;
 use std::sync::Arc;
@@ -199,6 +199,7 @@ fn parser_produced_cs_references_work_in_historical_functions() {
     // statement rows for every cashflow snapshot.
     let mut context = EvaluationContext::new(
         current,
+        &[],
         Arc::new(IndexMap::new()),
         Arc::new(IndexMap::new()),
     );
@@ -243,6 +244,7 @@ fn cashflow_period_aggregates_resolve_only_the_requested_window() {
     let old = PeriodId::month(2024, 12).unwrap();
     let mut context = EvaluationContext::new(
         current,
+        &[],
         Arc::new(IndexMap::new()),
         Arc::new(IndexMap::new()),
     );
@@ -303,5 +305,40 @@ fn ytd_starts_at_the_first_fiscal_period_of_the_fiscal_year() {
     let result = Evaluator::new().evaluate(&model).unwrap();
     for (index, expected) in [(0, 1.0), (1, 3.0), (2, 4.0), (3, 12.0)] {
         close(result.get("to_date", &periods[index].id).unwrap(), expected);
+    }
+}
+
+#[test]
+fn daily_ttm_sums_twelve_calendar_months_of_calendar_and_business_days() {
+    let all_days = build_periods("2024D1..2025D365", None).unwrap().periods;
+    for business_only in [false, true] {
+        let periods: Vec<Period> = all_days
+            .iter()
+            .filter(|p| !business_only || p.start.weekday().number_days_from_monday() < 5)
+            .cloned()
+            .collect();
+        let values: Vec<_> = periods
+            .iter()
+            .map(|period| (period.id, AmountOrScalar::scalar(1.0)))
+            .collect();
+        let mut model_builder = ModelBuilder::new("daily-ttm");
+        model_builder.periods_explicit(periods).unwrap();
+        model_builder.value("x", &values);
+        model_builder.compute("ltm", "ttm(x)").unwrap();
+        let result = Evaluator::new()
+            .evaluate(&model_builder.build().unwrap())
+            .unwrap();
+        // 2025 has 365 calendar days and 261 weekdays; a fixed 252-row window
+        // would cover only about 8.3 months of a calendar-day model.
+        let expected = if business_only { 261.0 } else { 365.0 };
+        let year_end = PeriodId::day(2025, 365).unwrap();
+        close(result.get("ltm", &year_end).unwrap(), expected);
+        // 2024-12-30 has one uncovered day (2023-12-31) in its window.
+        assert!(
+            result
+                .get("ltm", &PeriodId::day(2024, 365).unwrap())
+                .unwrap()
+                .is_nan()
+        );
     }
 }

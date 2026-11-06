@@ -1,3 +1,4 @@
+use super::contributions::PyPositionRiskDecomposition;
 use crate::bindings::macros::impl_repr_html_via_dataframe;
 use crate::bindings::pandas_utils::dict_to_dataframe;
 use pyo3::prelude::*;
@@ -124,7 +125,7 @@ pub(super) struct PyRiskBudgetResult {
 }
 
 impl PyRiskBudgetResult {
-    fn from_inner(inner: RiskBudgetResult) -> Self {
+    pub(super) fn from_inner(inner: RiskBudgetResult) -> Self {
         Self { inner }
     }
 }
@@ -245,6 +246,23 @@ pub(super) fn evaluate_risk_budget(
         .map_err(crate::errors::core_to_py)?;
 
     Ok(PyRiskBudgetResult::from_inner(result))
+}
+
+#[doc = crate::bindings::pydoc::pydoc!("finstack_quant.models.factor.risk._budget", "evaluate_risk_budget_from_decomposition")]
+#[pyfunction]
+#[pyo3(signature = (decomp, target_var_pct, utilization_threshold = None))]
+pub(super) fn evaluate_risk_budget_from_decomposition(
+    decomp: &PyPositionRiskDecomposition,
+    target_var_pct: Vec<f64>,
+    utilization_threshold: Option<f64>,
+) -> PyResult<PyRiskBudgetResult> {
+    model_risk::evaluate_risk_budget_from_decomposition(
+        &decomp.inner,
+        &target_var_pct,
+        utilization_threshold,
+    )
+    .map(PyRiskBudgetResult::from_inner)
+    .map_err(crate::errors::core_to_py)
 }
 
 // The literal default below must stay equal to the Rust canonical constant so

@@ -271,10 +271,10 @@ impl ShortRateTree {
                 for (offset, probability) in
                     transition_offsets(j_signed, boundary_j_max, step_probs[j])
                 {
-                    if let Some(idx) = transition_index(j_signed, offset, next_j_max) {
-                        if idx < next_q.len() {
-                            next_q[idx] += contribution * probability;
-                        }
+                    if let Some(idx) = transition_index(j_signed, offset, next_j_max)
+                        && idx < next_q.len()
+                    {
+                        next_q[idx] += contribution * probability;
                     }
                 }
             }

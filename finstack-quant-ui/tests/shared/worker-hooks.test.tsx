@@ -15,6 +15,7 @@ import {
   FinstackQueryProvider,
   useFinstack,
 } from "@/hooks/shared/use-finstack/use-finstack";
+import { useWorkerQuery } from "@/hooks/shared/use-finstack/query";
 import { useInstrumentValidator } from "@/hooks/valuations/use-instrument-validator/use-instrument-validator";
 import { usePriceInstrument } from "@/hooks/valuations/use-price-instrument/use-price-instrument";
 import { FinstackError } from "@/workers/finstack-contract";
@@ -263,4 +264,93 @@ it("shares query readiness, session isolation and explicit disabling", async () 
       call.mock.calls.filter(([method]) => method === "price"),
     ).toHaveLength(2),
   );
+});
+
+it.each(["omitted", "boolean", "callback"] as const)(
+  "gates %s eligibility on worker readiness and preserves caller control",
+  async (mode) => {
+    let initialize!: () => void;
+    call.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          initialize = resolve;
+        }),
+    );
+    const fetch = vi.fn(async () => "report");
+    const eligibility = vi.fn(
+      (query: { queryKey: readonly unknown[] }, allowed: boolean) => {
+        expect(query.queryKey[2]).toBe("eligibility");
+        return allowed;
+      },
+    );
+    const hook = renderHook(
+      ({ allowed }) =>
+        useWorkerQuery((worker) => ({
+          queryKey: ["finstack", worker.session, "eligibility"] as const,
+          queryFn: fetch,
+          enabled:
+            mode === "omitted"
+              ? undefined
+              : mode === "boolean"
+                ? allowed
+                : (query) => eligibility(query, allowed),
+        })),
+      {
+        initialProps: { allowed: false },
+        wrapper: ({ children }) => (
+          <FinstackQueryProvider>{children}</FinstackQueryProvider>
+        ),
+      },
+    );
+    expect(hook.result.current.workerStatus).toBe("starting");
+    expect(fetch).not.toHaveBeenCalled();
+    expect(eligibility).not.toHaveBeenCalled();
+    await act(async () => initialize());
+    await waitFor(() => expect(hook.result.current.workerStatus).toBe("ready"));
+    if (mode !== "omitted") {
+      expect(fetch).not.toHaveBeenCalled();
+      hook.rerender({ allowed: true });
+    }
+    await waitFor(() => expect(hook.result.current.data).toBe("report"));
+    expect(fetch).toHaveBeenCalledOnce();
+    if (mode === "callback") expect(eligibility).toHaveBeenCalled();
+  },
+);
+it("disables queries after initialization failure and gives worker errors precedence", async () => {
+  const initError = new FinstackError({
+    name: "InitError",
+    message: "bad asset",
+  });
+  call.mockRejectedValueOnce(initError);
+  const queryError = new Error("query failed");
+  const fetch = vi.fn(async () => {
+    throw queryError;
+  });
+  const hook = renderHook(
+    () => ({
+      query: useWorkerQuery((worker) => ({
+        queryKey: ["finstack", worker.session, "failure"] as const,
+        queryFn: fetch,
+        retry: false,
+      })),
+      worker: useFinstack(),
+    }),
+    {
+      wrapper: ({ children }) => (
+        <FinstackQueryProvider>{children}</FinstackQueryProvider>
+      ),
+    },
+  );
+  await waitFor(() => expect(hook.result.current.query.error).toBe(initError));
+  expect(fetch).not.toHaveBeenCalled();
+  act(() => hook.result.current.worker.reset());
+  await waitFor(() => expect(hook.result.current.query.error).toBe(queryError));
+  expect(fetch).toHaveBeenCalledOnce();
+  const crash = new FinstackError({ name: "WorkerError", message: "crashed" });
+  act(() => mocks.createClient.mock.calls.at(-1)![1](crash));
+  expect(hook.result.current.query.workerStatus).toBe("error");
+  expect(hook.result.current.worker.client).toBeNull();
+  expect(hook.result.current.query.error).toBe(crash);
+  hook.rerender();
+  expect(fetch).toHaveBeenCalledOnce();
 });

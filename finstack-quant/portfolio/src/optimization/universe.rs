@@ -2,9 +2,9 @@
 //!
 use crate::position::PositionUnit;
 use crate::types::{AttributeTest, AttributeValue, EntityId, PositionId};
-use finstack_quant_valuations::instruments::json_loader::instrument_json_of;
-use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
+use finstack_quant_valuations::instruments::json_loader::instrument_json_of;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;

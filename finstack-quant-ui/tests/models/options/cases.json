@@ -1,0 +1,313 @@
+{
+  "black_scholes_price": {
+    "request": {
+      "model": {
+        "kind": "black_scholes",
+        "spot": 100,
+        "strike": 100,
+        "rate": 0.05,
+        "div_yield": 0.01,
+        "expiry": 1,
+        "is_call": true
+      },
+      "solve": {
+        "kind": "price",
+        "vol": 0.2
+      }
+    },
+    "envelope": {
+      "ok": true,
+      "value": {
+        "price": 9.826297782739111,
+        "implied_vol": 0.2,
+        "greeks": {
+          "kind": "black_scholes",
+          "delta": 0.6117631008098845,
+          "gamma": 0.01887964716453252,
+          "vega": 0.3775929432906503,
+          "theta": -0.015703197115093385,
+          "rho_r": 0.5135001229824934,
+          "rho_q": -0.6117631008098845
+        }
+      }
+    }
+  },
+  "black_scholes_implied_vol": {
+    "request": {
+      "model": {
+        "kind": "black_scholes",
+        "spot": 100,
+        "strike": 100,
+        "rate": 0.05,
+        "div_yield": 0.01,
+        "expiry": 1,
+        "is_call": true
+      },
+      "solve": {
+        "kind": "implied_vol",
+        "price": 9.826297782739111
+      }
+    },
+    "envelope": {
+      "ok": true,
+      "value": {
+        "price": 9.826297782739111,
+        "implied_vol": 0.2,
+        "greeks": {
+          "kind": "black_scholes",
+          "delta": 0.6117631008098845,
+          "gamma": 0.01887964716453252,
+          "vega": 0.3775929432906503,
+          "theta": -0.015703197115093385,
+          "rho_r": 0.5135001229824934,
+          "rho_q": -0.6117631008098845
+        }
+      }
+    }
+  },
+  "black76_price": {
+    "request": {
+      "model": {
+        "kind": "black76",
+        "forward": 100,
+        "strike": 95,
+        "df": 0.97,
+        "expiry": 0.5,
+        "is_call": false
+      },
+      "solve": {
+        "kind": "price",
+        "vol": 0.25
+      }
+    },
+    "envelope": {
+      "ok": true,
+      "value": {
+        "price": 4.513759046893119,
+        "implied_vol": 0.25,
+        "greeks": {
+          "kind": "forward",
+          "delta": -0.35251212877862625,
+          "gamma": 0.021007207249695493,
+          "vega": 26.259009062119368
+        }
+      }
+    }
+  },
+  "black76_implied_vol": {
+    "request": {
+      "model": {
+        "kind": "black76",
+        "forward": 100,
+        "strike": 95,
+        "df": 0.97,
+        "expiry": 0.5,
+        "is_call": false
+      },
+      "solve": {
+        "kind": "implied_vol",
+        "price": 4.513759046893119
+      }
+    },
+    "envelope": {
+      "ok": true,
+      "value": {
+        "price": 4.513759046893119,
+        "implied_vol": 0.24999999999999983,
+        "greeks": {
+          "kind": "forward",
+          "delta": -0.35251212877862614,
+          "gamma": 0.021007207249695504,
+          "vega": 26.259009062119365
+        }
+      }
+    }
+  },
+  "bachelier_price": {
+    "request": {
+      "model": {
+        "kind": "bachelier",
+        "forward": 0.03,
+        "strike": 0.0325,
+        "expiry": 2,
+        "is_call": true
+      },
+      "solve": {
+        "kind": "price",
+        "vol": 0.0075
+      }
+    },
+    "envelope": {
+      "ok": true,
+      "value": {
+        "price": 0.0030984202170486787,
+        "implied_vol": 0.0075,
+        "greeks": {
+          "kind": "forward",
+          "delta": 0.4068318578833959,
+          "gamma": 36.58222099339706,
+          "vega": 0.5487333149009559
+        }
+      }
+    }
+  },
+  "bachelier_implied_vol": {
+    "request": {
+      "model": {
+        "kind": "bachelier",
+        "forward": 0.03,
+        "strike": 0.0325,
+        "expiry": 2,
+        "is_call": true
+      },
+      "solve": {
+        "kind": "implied_vol",
+        "price": 0.0030984202170486787
+      }
+    },
+    "envelope": {
+      "ok": true,
+      "value": {
+        "price": 0.0030984202170486787,
+        "implied_vol": 0.0075,
+        "greeks": {
+          "kind": "forward",
+          "delta": 0.4068318578833959,
+          "gamma": 36.58222099339706,
+          "vega": 0.5487333149009559
+        }
+      }
+    }
+  },
+  "theta_trading_days": {
+    "request": {
+      "model": {
+        "kind": "black_scholes",
+        "spot": 100,
+        "strike": 100,
+        "rate": 0.05,
+        "div_yield": 0.01,
+        "expiry": 1,
+        "is_call": true,
+        "theta_days_per_year": 252
+      },
+      "solve": {
+        "kind": "price",
+        "vol": 0.2
+      }
+    },
+    "envelope": {
+      "ok": true,
+      "value": {
+        "price": 9.826297782739111,
+        "implied_vol": 0.2,
+        "greeks": {
+          "kind": "black_scholes",
+          "delta": 0.6117631008098845,
+          "gamma": 0.01887964716453252,
+          "vega": 0.3775929432906503,
+          "theta": -0.02274471010717891,
+          "rho_r": 0.5135001229824934,
+          "rho_q": -0.6117631008098845
+        }
+      }
+    }
+  },
+  "zero_vol_rejects_greeks": {
+    "request": {
+      "model": {
+        "kind": "black_scholes",
+        "spot": 100,
+        "strike": 100,
+        "rate": 0.05,
+        "div_yield": 0.01,
+        "expiry": 1,
+        "is_call": true
+      },
+      "solve": {
+        "kind": "price",
+        "vol": 0
+      }
+    },
+    "envelope": {
+      "ok": false,
+      "error": {
+        "name": "FinstackError",
+        "message": "Validation error: Black-Scholes Greeks require positive vol, expiry, and theta_days_per_year, got vol=0, expiry=1, theta_days_per_year=365",
+        "kind": "validation"
+      }
+    }
+  },
+  "below_intrinsic": {
+    "request": {
+      "model": {
+        "kind": "black_scholes",
+        "spot": 120,
+        "strike": 100,
+        "rate": 0.05,
+        "div_yield": 0.01,
+        "expiry": 1,
+        "is_call": true
+      },
+      "solve": {
+        "kind": "implied_vol",
+        "price": 1
+      }
+    },
+    "envelope": {
+      "ok": false,
+      "error": {
+        "name": "FinstackError",
+        "message": "Validation error: Implied vol: target price 1.000000 is at or below intrinsic value 23.683038 for spot=120, strike=100, rate=0.05, div_yield=0.01, expiry=1. A positive-volatility inversion requires a premium strictly above discounted intrinsic.",
+        "kind": "validation"
+      }
+    }
+  },
+  "bachelier_below_intrinsic": {
+    "request": {
+      "model": {
+        "kind": "bachelier",
+        "forward": 0.05,
+        "strike": 0.0325,
+        "expiry": 2,
+        "is_call": true
+      },
+      "solve": {
+        "kind": "implied_vol",
+        "price": 0.001
+      }
+    },
+    "envelope": {
+      "ok": false,
+      "error": {
+        "name": "FinstackError",
+        "message": "Invalid volatility: expected positive finite value, got -1",
+        "kind": "validation"
+      }
+    }
+  },
+  "empty_field": {
+    "request": {
+      "model": {
+        "kind": "black76",
+        "forward": 100,
+        "strike": 95,
+        "df": "NaN",
+        "expiry": 0.5,
+        "is_call": false
+      },
+      "solve": {
+        "kind": "price",
+        "vol": 0.25
+      }
+    },
+    "envelope": {
+      "ok": false,
+      "error": {
+        "name": "TypeError",
+        "message": "request: request.model.df is NaN, which JSON cannot represent",
+        "kind": "invalid_type"
+      }
+    }
+  }
+}

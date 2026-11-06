@@ -1,6 +1,6 @@
 //! Tests for forecast backtesting and error metrics.
 
-use finstack_quant_statements_analytics::analysis::{backtest_forecast, ForecastMetrics};
+use finstack_quant_statements_analytics::analysis::{ForecastMetrics, backtest_forecast};
 
 const METRICS_TOLERANCE: f64 = 1e-10;
 

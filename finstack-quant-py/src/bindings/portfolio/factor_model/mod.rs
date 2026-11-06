@@ -19,7 +19,7 @@ use pyo3::prelude::*;
 
 use assignment::{PyFactorAssignmentReport, PyPositionAssignment, PyUnmatchedEntry};
 use credit_vol_report::{
-    build_credit_vol_report, PyCreditVolReport, PyLevelVolContribution, PyPositionVolContribution,
+    PyCreditVolReport, PyLevelVolContribution, PyPositionVolContribution, build_credit_vol_report,
 };
 use model::PyFactorModel;
 use whatif::{PyFactorContributionDelta, PyStressPnl, PyStressResult, PyWhatIfResult};

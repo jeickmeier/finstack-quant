@@ -46,6 +46,15 @@
       "type_name": "CovenantReport"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/covenants/1/covenant_template.schema.json",
+      "bytes": 4849,
+      "kind": "input",
+      "path": "schemas/covenants/1/covenant_template.schema.json",
+      "summary": "One standard covenant package and its thresholds.",
+      "title": "CovenantTemplate",
+      "type_name": "CovenantTemplate"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/covenants/1/dated_covenant_reports.schema.json",
       "bytes": 8878,
       "kind": "output",

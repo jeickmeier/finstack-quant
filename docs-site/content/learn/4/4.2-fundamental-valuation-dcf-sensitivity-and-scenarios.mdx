@@ -79,7 +79,7 @@ from _shared.borrower_model import borrower_model, borrower_vintage
 from finstack_quant.core.money import Money
 from finstack_quant.statements import ModelBuilder, Evaluator, ForecastSpec, MonteCarloConfig
 from finstack_quant.statements_analytics import (
-    TerminalValueSpec, evaluate_dcf, dcf_sensitivity, wacc, ScenarioSet, evaluate_scenario_set,
+    TerminalValueSpec, WaccInputs, evaluate_dcf, dcf_sensitivity, wacc, ScenarioSet, evaluate_scenario_set,
     SensitivityConfig, run_sensitivity, generate_tornado_entries, goal_seek, variance_bridge,
 )
 
@@ -100,7 +100,7 @@ valuation_builder.compute("ebitda_usd","ebitda * usd_unit")
 valuation_builder.compute("total_debt","debt_end * usd_unit").compute("cash","cash_end * usd_unit")
 valuation_model = valuation_builder.build()
 valuation_results = Evaluator().evaluate(valuation_model)
-cost_of_capital = wacc(0.65,0.12,0.35,0.075,0.25)
+cost_of_capital = wacc(WaccInputs(equity_weight=0.65,cost_of_equity=0.12,debt_weight=0.35,cost_of_debt=0.075,tax_rate=0.25))
 terminal_growth = 0.025
 terminal = TerminalValueSpec.gordon_growth(terminal_growth)
 base_dcf = evaluate_dcf(valuation_model,cost_of_capital,terminal,ufcf_node="ufcf_usd",as_of="2025-01-01")

@@ -1,7 +1,7 @@
 //! Asian option pricers (Monte Carlo and analytical).
 
 // Common imports for all pricers
-use crate::exotics::asian_option::types::{average_intrinsic, realized_average, AsianOption};
+use crate::exotics::asian_option::types::{AsianOption, average_intrinsic, realized_average};
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
@@ -9,7 +9,7 @@ use finstack_quant_core::math::stats::OnlineCovariance;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
-    expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, expect_inst,
 };
 use finstack_quant_valuations_core::results::ValuationResult;
 

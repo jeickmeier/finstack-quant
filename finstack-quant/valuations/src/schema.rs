@@ -24,7 +24,7 @@ use finstack_quant_valuations_core::schema::package_valuations_schema;
 /// The JSON is embedded via `include_str!` so the content is always present,
 /// but parsing can still fail if the JSON is malformed.
 macro_rules! try_include_schema {
-    ($path:expr) => {
+    ($path:expr_2021) => {
         serde_json::from_str::<Value>(include_str!($path))
             .map_err(|e| format!("invalid schema JSON at {}: {}", $path, e))
     };
@@ -43,8 +43,8 @@ pub fn instrument_envelope_schema() -> finstack_quant_core::Result<&'static Valu
         .map_err(|e| finstack_quant_core::Error::Validation(e.clone()))
 }
 
-fn instrument_schema_cache(
-) -> &'static std::collections::BTreeMap<&'static str, Result<Value, String>> {
+fn instrument_schema_cache()
+-> &'static std::collections::BTreeMap<&'static str, Result<Value, String>> {
     static CACHE: OnceLock<std::collections::BTreeMap<&'static str, Result<Value, String>>> =
         OnceLock::new();
     CACHE.get_or_init(|| {
@@ -131,8 +131,8 @@ fn common_schema_resources() -> finstack_quant_core::Result<Vec<(String, jsonsch
 }
 
 #[cfg(feature = "jsonschema-validate")]
-fn embedded_instrument_schema_resources(
-) -> finstack_quant_core::Result<Vec<(String, jsonschema::Resource)>> {
+fn embedded_instrument_schema_resources()
+-> finstack_quant_core::Result<Vec<(String, jsonschema::Resource)>> {
     let mut resources = std::collections::BTreeMap::new();
     for (tag, schema_result) in instrument_schema_cache() {
         let schema = schema_result.as_ref().map_err(|e| {
@@ -422,8 +422,8 @@ fn instrument_envelope_validator() -> finstack_quant_core::Result<&'static jsons
 /// than all at once because a validator retains its own copy of the resource
 /// registry (~20 MB measured): compiling all of them up front would cost about
 /// a second and 1.4 GB for callers that touch only a handful of types.
-fn instrument_validator_cache(
-) -> &'static std::collections::BTreeMap<&'static str, OnceLock<CachedValidator>> {
+fn instrument_validator_cache()
+-> &'static std::collections::BTreeMap<&'static str, OnceLock<CachedValidator>> {
     static CACHE: OnceLock<std::collections::BTreeMap<&'static str, OnceLock<CachedValidator>>> =
         OnceLock::new();
     CACHE.get_or_init(|| {
@@ -511,9 +511,9 @@ fn validate_with(
 mod examples;
 
 #[cfg(feature = "json-schema")]
-use crate::instruments::json_loader::instrument_registry;
-#[cfg(feature = "json-schema")]
 use crate::instruments::json_loader::InstrumentEnvelope;
+#[cfg(feature = "json-schema")]
+use crate::instruments::json_loader::instrument_registry;
 #[cfg(feature = "json-schema")]
 use crate::instruments::pricing_overrides::{
     InstrumentPricingOverrides, MetricPricingOverrides, ScenarioPricingOverrides,
@@ -719,28 +719,36 @@ pub fn artifacts_slice() -> &'static [SchemaArtifact] {
 /// entry with [`SchemaArtifact::generate`].
 #[must_use]
 pub fn artifacts() -> Vec<SchemaArtifact> {
-    use crate::instruments::cashflow_export::InstrumentCashflowEnvelope;
+    use crate::instruments::BondQuoteInput;
+    use crate::instruments::MarketDependencies;
+    use crate::instruments::cashflow_export::{CurrencyLadder, InstrumentCashflowEnvelope};
     use crate::instruments::composite::{CompositeHistoryRow, CompositeRebalanceResult};
     use crate::instruments::credit_derivatives::cds_index::CdsIndexParams;
     use crate::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
     use crate::instruments::fixed_income::asset_backed_facility::FacilityProjection;
     use crate::instruments::fixed_income::bond::pricing::merton_mc::MertonMcResult;
-    use crate::instruments::fixed_income::convertible::ConvertibleGreeks;
+    use crate::instruments::fixed_income::bond::pricing::quote_conversions::{
+        BondQuoteSet, BondWorkoutLadder,
+    };
+    use crate::instruments::fixed_income::convertible::{ConvertibleGreeks, ConvertibleSpotLadder};
     use crate::instruments::fixed_income::revolving_credit::EnhancedMonteCarloResult;
     use crate::instruments::fixed_income::structured_credit::{
-        BorrowingBaseReport, EquityMetrics, OasResult, PoolStats, ScenarioTable,
-        SimulationDiagnostics, SimulationRun, StandardDealParams, TrancheCashflows, TrancheMetrics,
+        BorrowingBaseReport, EquityMetrics, OasConfig, OasResult, PoolReport, PoolStats,
+        ScenarioGrid, ScenarioTable, SimulationDiagnostics, SimulationRun, StandardDealFamily,
+        StandardDealParams, TrancheCashflows, TrancheMetrics,
     };
     use crate::instruments::json_loader::InstrumentJson;
-    use crate::instruments::MarketDependencies;
     use crate::market::conventions::{
         CdsConventionSpec, InflationSwapConventions, IrFutureConventions, RateIndexConventions,
         SwaptionConventions, XccyConventions,
     };
     use crate::market::listed::ListedProductCoverage;
-    use crate::metrics::risk::var_calculator::VarResult;
     use crate::metrics::risk::MarketHistory;
-    use crate::pricer::MetricMetadata;
+    use crate::metrics::risk::var_calculator::VarResult;
+    use crate::pricer::{
+        EquityMetricsFieldUnits, MetricFieldUnit, MetricMetadata, PoolReportFieldUnits,
+        ScenarioTableFieldUnits, SimulationFieldUnits, TrancheSolveFieldUnits,
+    };
     use crate::results::ValuationResult;
     use finstack_quant_core::contract::{Diagnostic, ValidationReport};
     use finstack_quant_core::currency::Currency;
@@ -913,6 +921,16 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         .with_kind(SchemaKind::Output)
         .with_examples(examples::instrument_cashflow),
         finstack_quant_core::schema_artifact!(
+            CurrencyLadder,
+            "results",
+            "currency_ladder",
+            Component,
+            "One row currency's calendar-year non-principal, principal and native PV ladder."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::currency_ladder),
+        finstack_quant_core::schema_artifact!(
             ValuationResult,
             "results",
             "valuation_result",
@@ -944,6 +962,24 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
         .with_examples(examples::enhanced_monte_carlo_result),
+        finstack_quant_core::schema_artifact!(
+            OasConfig,
+            "common",
+            "oas_config",
+            Input,
+            "Structured-credit OAS solver configuration: paths, stochastic dimensions and seed."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::oas_config),
+        finstack_quant_core::schema_artifact!(
+            ScenarioGrid,
+            "common",
+            "scenario_grid",
+            Input,
+            "Structured-credit CPR x CDR x severity grid swept by the tranche scenario table."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::scenario_grid),
         finstack_quant_core::schema_artifact!(
             OasResult,
             "results",
@@ -1015,6 +1051,56 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         .with_kind(SchemaKind::Output)
         .with_examples(examples::listed_product_coverage),
         finstack_quant_core::schema_artifact!(
+            MetricFieldUnit,
+            "results",
+            "metric_field_unit",
+            Component,
+            "The display unit of one scalar field of a result struct."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::metric_field_unit),
+        finstack_quant_core::schema_artifact!(
+            TrancheSolveFieldUnits,
+            "results",
+            "tranche_solve_field_units",
+            Component,
+            "The display units of the tranche break-even CDR, discount margin and OAS results."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::tranche_solve_field_units),
+        finstack_quant_core::schema_artifact!(
+            ScenarioTableFieldUnits,
+            "results",
+            "scenario_table_field_units",
+            Component,
+            "The display units of a scenario table's axes and measures."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::scenario_table_field_units),
+        finstack_quant_core::schema_artifact!(
+            EquityMetricsFieldUnits,
+            "results",
+            "equity_metrics_field_units",
+            Component,
+            "The display units of an equity tranche's invested amount, IRR, MOIC, NAV and cash-on-cash."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::equity_metrics_field_units),
+        finstack_quant_core::schema_artifact!(
+            SimulationFieldUnits,
+            "results",
+            "simulation_field_units",
+            Component,
+            "The display units of a simulation's coverage, diversion, enhancement and excess-spread series."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::simulation_field_units),
+        finstack_quant_core::schema_artifact!(
             MetricMetadata,
             "results",
             "metric_metadata",
@@ -1045,6 +1131,46 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         .with_kind(SchemaKind::Output)
         .with_examples(examples::pool_stats),
         finstack_quant_core::schema_artifact!(
+            BondQuoteSet,
+            "results",
+            "bond_quote_set",
+            Component,
+            "Every price, yield and spread quote of a bond, solved from any one of them."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::bond_quote_set),
+        finstack_quant_core::schema_artifact!(
+            BondWorkoutLadder,
+            "results",
+            "bond_workout_ladder",
+            Component,
+            "Yield and I-spread to every call, put and maturity exit of a bond, with the worst marked."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::bond_workout_ladder),
+        finstack_quant_core::schema_artifact!(
+            PoolReport,
+            "results",
+            "pool_report",
+            Component,
+            "Collateral-pool statistics, WARF and concentration by obligor, industry and rating."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::pool_report),
+        finstack_quant_core::schema_artifact!(
+            PoolReportFieldUnits,
+            "results",
+            "pool_report_field_units",
+            Component,
+            "The display units of the collateral-pool report fields."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::pool_report_field_units),
+        finstack_quant_core::schema_artifact!(
             TrancheCashflows,
             "results",
             "tranche_cashflows",
@@ -1055,6 +1181,15 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         .with_kind(SchemaKind::Output)
         .with_examples(examples::tranche_cashflows),
         finstack_quant_core::schema_artifact!(
+            BondQuoteInput,
+            "common",
+            "bond_quote_input",
+            Input,
+            "The one market quote a bond's quote set is solved from: a price, a yield or a spread."
+        )
+        .with_packager(package_valuations_schema)
+        .with_examples(examples::bond_quote_input),
+        finstack_quant_core::schema_artifact!(
             StandardDealParams,
             "common",
             "standard_deal_params",
@@ -1063,6 +1198,16 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         )
         .with_packager(package_valuations_schema)
         .with_examples(examples::standard_deal_params),
+        finstack_quant_core::schema_artifact!(
+            StandardDealFamily,
+            "results",
+            "standard_deal_family",
+            Component,
+            "One deal family the standard structured-credit constructor accepts, with its registry profile and an example of its inputs."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::standard_deal_family),
         finstack_quant_core::schema_artifact!(
             SimulationRun,
             "results",
@@ -1103,6 +1248,16 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
         .with_examples(examples::convertible_greeks),
+        finstack_quant_core::schema_artifact!(
+            ConvertibleSpotLadder,
+            "results",
+            "convertible_spot_ladder",
+            Component,
+            "Price, delta, parity, conversion premium, regime and bond floor of a convertible at a ladder of share prices."
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+        .with_examples(examples::convertible_spot_ladder),
         finstack_quant_core::schema_artifact!(
             FacilityProjection,
             "results",

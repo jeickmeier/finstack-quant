@@ -56,6 +56,7 @@ pub use types::{
 };
 
 pub use pricing::{
+    ConvertibleRegime, ConvertibleSpotLadder, ConvertibleSpotRow, DEFAULT_CONVERTIBLE_TREE_STEPS,
     calculate_accrued_interest, calculate_convertible_greeks, calculate_parity,
-    price_convertible_bond, settlement_date, DEFAULT_CONVERTIBLE_TREE_STEPS,
+    convertible_spot_ladder, price_convertible_bond, settlement_date,
 };

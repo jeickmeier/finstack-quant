@@ -4,13 +4,14 @@ use finstack_quant_core::{
     cashflow::CFKind, currency::Currency, market_data::term_structures::DiscountCurve,
     money::Money, types::CreditRating,
 };
+use finstack_quant_margin::calculators::VmCalculator;
 use finstack_quant_margin::calculators::im::schedule::{ScheduleAssetClass, ScheduleImCalculator};
 use finstack_quant_margin::calculators::im::{HaircutImCalculator, SimmCalculator};
-use finstack_quant_margin::calculators::VmCalculator;
 use finstack_quant_margin::types::{
     CollateralAssetClass, CsaSpec, NettingSetId, RepoMarginSpec, SimmSensitivities,
 };
 use finstack_quant_margin::{
+    SimmVersion,
     metrics::MarginUtilization,
     regulatory::{
         frtb::{
@@ -24,7 +25,6 @@ use finstack_quant_margin::{
     },
     types::generate_margin_cashflows,
     xva::{cva::compute_fva, types::ExposureProfile},
-    SimmVersion,
 };
 
 fn usd(amount: f64) -> Money {
@@ -68,10 +68,11 @@ fn csa_rejects_cross_currency_independent_amount_at_calculation() {
     let mut csa = CsaSpec::usd_regulatory().expect("registry");
     csa.vm_params.independent_amount = Money::new(1_000_000.0, Currency::EUR).expect("money");
     assert!(csa.validate().is_err());
-    assert!(csa
-        .vm_params
-        .calculate_margin_call(usd(0.0), usd(0.0))
-        .is_err());
+    assert!(
+        csa.vm_params
+            .calculate_margin_call(usd(0.0), usd(0.0))
+            .is_err()
+    );
 }
 
 #[test]
@@ -88,14 +89,15 @@ fn haircut_enforces_maturity_rating_and_contractual_fx_addon() {
     let date = finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 10)
         .expect("date");
     let calc = HaircutImCalculator::us_treasuries().expect("registry");
-    assert!(calc
-        .calculate_for_collateral(
+    assert!(
+        calc.calculate_for_collateral(
             usd(1e6),
             &CollateralAssetClass::GovernmentBonds,
             false,
             date
         )
-        .is_err());
+        .is_err()
+    );
     let calc = calc
         .with_collateral_terms(10.0, Some(CreditRating::AAA))
         .expect("terms");
@@ -115,17 +117,19 @@ fn haircut_enforces_maturity_rating_and_contractual_fx_addon() {
         fx.amount, plain.amount,
         "the Treasury schedule elects zero FX add-on"
     );
-    assert!(calc
-        .calculate_for_collateral(
+    assert!(
+        calc.calculate_for_collateral(
             usd(-1e6),
             &CollateralAssetClass::GovernmentBonds,
             false,
             date
         )
-        .is_err());
-    assert!(calc
-        .calculate_for_collateral(usd(1e6), &CollateralAssetClass::Equity, false, date)
-        .is_err());
+        .is_err()
+    );
+    assert!(
+        calc.calculate_for_collateral(usd(1e6), &CollateralAssetClass::Equity, false, date)
+            .is_err()
+    );
 }
 
 #[test]
@@ -161,9 +165,10 @@ fn simm_preserves_ir_direction_and_does_not_erase_unrelated_equities() {
         .expect("IM")
         .0;
     assert!(hedged < positive);
-    assert!(calc
-        .calculate_from_sensitivities_parts(&same, Currency::EUR)
-        .is_err());
+    assert!(
+        calc.calculate_from_sensitivities_parts(&same, Currency::EUR)
+            .is_err()
+    );
     let mut equity = SimmSensitivities::new(Currency::USD);
     equity.add_equity_delta("AAPL", 100_000.0);
     equity.add_equity_delta("MSFT", -100_000.0);
@@ -325,12 +330,14 @@ fn schedule_rejects_invalid_maturity_at_every_entry_point() {
         .expect("date");
     for maturity in [-1.0, f64::NAN, f64::INFINITY] {
         assert!(calc.clone().with_maturity(maturity).is_err());
-        assert!(calc
-            .rate(ScheduleAssetClass::InterestRate, maturity)
-            .is_err());
-        assert!(calc
-            .calculate_for_notional(usd(1e6), ScheduleAssetClass::InterestRate, maturity, date)
-            .is_err());
+        assert!(
+            calc.rate(ScheduleAssetClass::InterestRate, maturity)
+                .is_err()
+        );
+        assert!(
+            calc.calculate_for_notional(usd(1e6), ScheduleAssetClass::InterestRate, maturity, date)
+                .is_err()
+        );
     }
 }
 
@@ -383,4 +390,51 @@ fn drc_charge(positions: &[DrcPosition]) -> finstack_quant_core::Result<f64> {
             .calculate(&sens)?
             .drc,
     )
+}
+
+#[test]
+fn vm_margin_calls_land_on_csa_business_days() {
+    use time::macros::date;
+    // USD regulatory CSA: `usny` calendar, one-business-day settlement lag.
+    let calc = VmCalculator::new(CsaSpec::usd_regulatory().expect("registry"));
+    let calls = calc
+        .generate_margin_calls(
+            &[
+                // Juneteenth, a `usny` holiday: the call is made on Thursday.
+                (date!(2024 - 06 - 19), usd(1_000_000.0)),
+                // Saturday: the call is made on Monday.
+                (date!(2024 - 06 - 22), usd(3_000_000.0)),
+            ],
+            usd(0.0),
+        )
+        .expect("calls");
+    let dates: Vec<_> = calls
+        .iter()
+        .map(|call| (call.call_date, call.settlement_date))
+        .collect();
+    assert_eq!(
+        dates,
+        [
+            (date!(2024 - 06 - 20), date!(2024 - 06 - 21)),
+            (date!(2024 - 06 - 24), date!(2024 - 06 - 25)),
+        ]
+    );
+
+    let result = calc
+        .calculate(usd(1_000_000.0), usd(0.0), date!(2024 - 06 - 19))
+        .expect("vm");
+    assert_eq!(result.date, date!(2024 - 06 - 20));
+    assert_eq!(result.settlement_date, date!(2024 - 06 - 21));
+}
+
+#[test]
+fn vm_net_margin_without_transfer_is_positive_zero() {
+    let calc = VmCalculator::new(CsaSpec::usd_regulatory().expect("registry"));
+    let date = finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 10)
+        .expect("date");
+    // Under the 500,000 regulatory MTA: no post, no collect.
+    let result = calc.calculate(usd(100_000.0), usd(0.0), date).expect("vm");
+    assert!(!result.requires_call());
+    let wire = serde_json::to_value(result.net_margin()).expect("serializes");
+    assert_eq!(wire["amount"], "0", "{wire}");
 }

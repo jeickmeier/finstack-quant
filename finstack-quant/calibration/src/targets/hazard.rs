@@ -1,5 +1,6 @@
 //! Calibration target construction and shared input validation.
 //!
+use crate::CalibrationReport;
 use crate::api::schema::HazardCurveParams;
 use crate::build::context::BuildCtx;
 use crate::build::prepared::PreparedQuote;
@@ -12,15 +13,14 @@ use crate::solver::global;
 use crate::solver::traits::TimeGridAndGuesses;
 use crate::solver::traits::{BootstrapTarget, GlobalSolveTarget};
 use crate::targets::util::{
-    scheme_factor, sorted_knot_grid, validate_global_knot_grid, ContextScratch,
+    ContextScratch, scheme_factor, sorted_knot_grid, validate_global_knot_grid,
 };
-use crate::CalibrationReport;
+use finstack_quant_core::FxHashMap;
+use finstack_quant_core::Result;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{
     HazardCalibrationInput, HazardCalibrationRecipe, HazardCurve,
 };
-use finstack_quant_core::FxHashMap;
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 use finstack_quant_valuations_core::market::conventions::{
     CdsConvention, CdsConventionSpec, ConventionRegistry,
@@ -184,14 +184,14 @@ pub(crate) fn validate_hazard_recipe_bindings(
             || (prepared.pillar_time - input.pillar_time).abs() > 1e-12 * time_scale
         {
             return Err(finstack_quant_core::Error::Validation(format!(
-                    "hazard {input_kind} serialized quote '{}' resolves to pillar date {} and time {}, \
+                "hazard {input_kind} serialized quote '{}' resolves to pillar date {} and time {}, \
                      not stored pillar date {} and time {}",
-                    quote.id(),
-                    prepared.pillar_date,
-                    prepared.pillar_time,
-                    input.pillar_date,
-                    input.pillar_time
-                )));
+                quote.id(),
+                prepared.pillar_date,
+                prepared.pillar_time,
+                input.pillar_date,
+                input.pillar_time
+            )));
         }
         let replay = ReplayQuote {
             quote,
@@ -867,9 +867,10 @@ mod tests {
         );
 
         // The grid must still span the full range and stay within bounds.
-        assert!(grid
-            .iter()
-            .all(|&v| v >= hcfg.hazard_hard_min && v <= max_h));
+        assert!(
+            grid.iter()
+                .all(|&v| v >= hcfg.hazard_hard_min && v <= max_h)
+        );
         assert!(
             grid.iter().any(|&v| (v - max_h).abs() < 1e-12),
             "hazard_hard_max anchor must still be present"

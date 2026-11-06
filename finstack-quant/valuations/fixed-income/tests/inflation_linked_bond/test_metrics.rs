@@ -76,9 +76,11 @@ fn test_price_with_metrics_real_duration() {
         .unwrap();
 
     // Assert
-    assert!(result
-        .measures
-        .contains_key(MetricId::RealDuration.as_str()));
+    assert!(
+        result
+            .measures
+            .contains_key(MetricId::RealDuration.as_str())
+    );
     let duration = result.measures[MetricId::RealDuration.as_str()];
     assert!(duration > 0.0);
 }
@@ -101,9 +103,11 @@ fn test_price_with_metrics_breakeven_inflation() {
         .unwrap();
 
     // Assert
-    assert!(result
-        .measures
-        .contains_key(MetricId::BreakevenInflation.as_str()));
+    assert!(
+        result
+            .measures
+            .contains_key(MetricId::BreakevenInflation.as_str())
+    );
     let breakeven = result.measures[MetricId::BreakevenInflation.as_str()];
     assert!(breakeven.is_finite());
 }
@@ -394,9 +398,11 @@ fn test_bucketed_dv01_metric() {
         .unwrap();
 
     // Assert
-    assert!(result
-        .measures
-        .contains_key(MetricId::BucketedDv01.as_str()));
+    assert!(
+        result
+            .measures
+            .contains_key(MetricId::BucketedDv01.as_str())
+    );
     // Note: BucketedDv01 might return 0.0 or aggregate value depending on implementation
     let bucketed = result.measures[MetricId::BucketedDv01.as_str()];
     assert!(bucketed.is_finite());

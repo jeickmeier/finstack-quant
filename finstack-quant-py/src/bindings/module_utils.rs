@@ -116,9 +116,9 @@ pub(crate) fn attach_submodule(
 ///
 /// Typed wrappers serialize through their canonical form, standalone or
 /// nested inside lists and dicts: ``to_dict`` when they carry one, otherwise
-/// the ``to_json`` every result and spec wrapper exposes. Objects with
-/// neither keep the standard ``TypeError: Object of type ... is not JSON
-/// serializable``.
+/// the ``to_json`` every result and spec wrapper exposes. NumPy arrays and
+/// scalars serialize through ``tolist``. Objects with none of these keep the
+/// standard ``TypeError: Object of type ... is not JSON serializable``.
 fn typed_wrapper_json_hook<'py>(
     py: Python<'py>,
     json_mod: &Bound<'py, PyModule>,
@@ -128,6 +128,7 @@ fn typed_wrapper_json_hook<'py>(
     py.eval(
         c"lambda o: o.to_dict() if hasattr(o, 'to_dict') \
            else json.loads(o.to_json()) if hasattr(o, 'to_json') \
+           else o.tolist() if hasattr(o, 'tolist') \
            else json.JSONEncoder().default(o)",
         Some(&globals),
         None,

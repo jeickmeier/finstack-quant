@@ -143,7 +143,7 @@
 //!
 //! [`HullWhiteTree`]: super::hull_white_tree::HullWhiteTree
 
-use finstack_quant_cashflows::builder::{calculate_floating_rate, FloatingRateParams};
+use finstack_quant_cashflows::builder::{FloatingRateParams, calculate_floating_rate};
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::{Error, Result};
 
@@ -152,6 +152,9 @@ use crate::monte_carlo::traits::RandomStream;
 
 use super::tree_framework::{NodeState, TreeValuator};
 
+pub use band_table::BandTable;
+
+mod band_table;
 mod calibration;
 mod pricing;
 mod sampling;
@@ -388,6 +391,10 @@ pub struct RatesCreditTree {
     hazard_floor_saturation: HazardFloorSaturation,
     /// Explicit calibration coordinates. Empty until calibration succeeds.
     calibration_times: Vec<f64>,
+    /// One-step rate terms of the nodes sampled paths usually visit.
+    rate_terms: BandTable<NodeTerms>,
+    /// One-step hazard terms of the nodes sampled paths usually visit.
+    hazard_terms: BandTable<NodeTerms>,
 }
 
 /// How much of the calibrated hazard lattice sits on the zero floor.
@@ -644,6 +651,64 @@ impl FactorRow {
     }
 }
 
+/// One-step terms of one factor node, as sampling consumes them.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct NodeTerms {
+    /// Short rate, or the non-negative effective hazard.
+    level: f64,
+    /// Marginal up-probability of the factor from this node.
+    up_prob: f64,
+    /// `exp(-level * dt)` to the next slice; `1` on the terminal slice.
+    decay_to_next: f64,
+    /// `1 - decay_to_next`, accurate for small exponents; `0` on the terminal
+    /// slice.
+    complement_to_next: f64,
+}
+
+/// Nodes of row `step` that sampled paths usually visit.
+///
+/// A daily lattice has about `steps² / 2` nodes per factor, but a binomial walk
+/// stays near the centre of each row, so sampling a path spends almost all its
+/// time in a band four standard deviations of a driftless walk (`√step / 2`)
+/// either side of the centre, plus a small margin. A factor with zero
+/// volatility has one level per row, held at node zero.
+fn usual_band(row: FactorRow, step: usize) -> std::ops::Range<usize> {
+    if row.shift == 0.0 {
+        return 0..1;
+    }
+    let half_width = 2 * (step as f64).sqrt().ceil() as usize + 2;
+    let centre = step / 2;
+    centre.saturating_sub(half_width)..(centre + half_width + 1).min(row.nodes)
+}
+
+/// [`NodeTerms`] of every row's [`usual_band`], three transcendental calls per
+/// path step turned into a lookup.
+fn node_terms_table(
+    rows: &[FactorRow],
+    terms_at: impl Fn(usize, f64) -> NodeTerms,
+) -> BandTable<NodeTerms> {
+    let bands = rows
+        .iter()
+        .enumerate()
+        .map(|(step, &row)| usual_band(row, step));
+    let Ok(table) = BandTable::build::<std::convert::Infallible>(bands, |step, node| {
+        Ok(terms_at(step, rows[step].value_unchecked(node)))
+    });
+    table
+}
+
+/// Terms of `node` on a row of `table`; a zero-volatility row holds its one
+/// level at node zero.
+#[inline]
+fn held_node_terms(
+    table: &BandTable<NodeTerms>,
+    row: FactorRow,
+    step: usize,
+    node: usize,
+) -> Option<NodeTerms> {
+    table.get(step, if row.shift == 0.0 { 0 } else { node })
+}
+
 /// Per-factor lattice geometry and calibration target shared by the rate and
 /// hazard passes of [`RatesCreditTree::calibrate`].
 #[derive(Debug, Clone, Copy)]
@@ -673,6 +738,8 @@ impl RatesCreditTree {
             hazard_ref: 0.0,
             hazard_floor_saturation: HazardFloorSaturation::default(),
             calibration_times: Vec::new(),
+            rate_terms: BandTable::default(),
+            hazard_terms: BandTable::default(),
         }
     }
 

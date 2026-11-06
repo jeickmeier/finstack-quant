@@ -28,7 +28,7 @@ use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
 use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
-    expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, expect_inst,
 };
 use finstack_quant_valuations_core::results::ValuationResult;
 

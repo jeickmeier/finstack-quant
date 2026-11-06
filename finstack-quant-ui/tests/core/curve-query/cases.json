@@ -1,0 +1,526 @@
+{
+  "market": {
+    "schema_version": 1,
+    "curves": [
+      {
+        "type": "forward",
+        "id": "FORWARD",
+        "base": "2025-01-01",
+        "reset_lag": 2,
+        "day_count": "act_365f",
+        "tenor": 0.25,
+        "knot_points": [
+          [0, 0.044],
+          [1, 0.041],
+          [5, 0.039]
+        ],
+        "projection_grid": null,
+        "interp_style": "linear",
+        "extrapolation": "flat_forward",
+        "rate_calibration": null,
+        "fx_policy": null
+      },
+      {
+        "type": "hazard",
+        "id": "HZ",
+        "base": "2025-01-01",
+        "knot_points": [
+          [0, 0.012],
+          [1, 0.014],
+          [3, 0.016],
+          [5, 0.018],
+          [10, 0.021],
+          [20, 0.025],
+          [40, 0.028]
+        ],
+        "recovery_rate": 0.4,
+        "issuer": null,
+        "seniority": null,
+        "currency": null,
+        "day_count": "act_365f",
+        "par_points": [],
+        "par_interp": "linear",
+        "hazard_calibration": null,
+        "fx_policy": null
+      },
+      {
+        "type": "price",
+        "id": "PRICE",
+        "base": "2025-01-01",
+        "day_count": "act_365f",
+        "spot_price": 100,
+        "knot_points": [
+          [0, 100],
+          [1, 102],
+          [5, 110]
+        ],
+        "interp_style": "linear",
+        "extrapolation": "flat_forward"
+      },
+      {
+        "type": "discount",
+        "id": "USD-OIS",
+        "base": "2026-05-08",
+        "day_count": "act_365f",
+        "knot_points": [
+          [0, 1],
+          [0.0958904109589041, 0.9949217535493369],
+          [0.26301369863013696, 0.9863126300274143],
+          [1.0164383561643835, 0.9500181643911029],
+          [2.0246575342465754, 0.9065521544949088],
+          [5.019178082191781, 0.7999882376687321],
+          [10.024657534246575, 0.6677728466654677]
+        ],
+        "interp_style": "linear",
+        "extrapolation": "flat_forward",
+        "min_forward_rate": -0.005,
+        "allow_non_monotonic": false,
+        "min_forward_tenor": 0.000001,
+        "rate_calibration": {
+          "currency": "USD",
+          "method": "bootstrap",
+          "curve_day_count": "act_365f",
+          "ois_compounding": null,
+          "role": {
+            "discount": {
+              "projection_curve_id": "USD-OIS"
+            }
+          },
+          "quotes": [
+            {
+              "deposit": {
+                "index_id": "USD-SOFR-OIS",
+                "pillar": {
+                  "tenor": {
+                    "count": 1,
+                    "unit": "months"
+                  }
+                },
+                "rate": 0.0525
+              }
+            },
+            {
+              "deposit": {
+                "index_id": "USD-SOFR-OIS",
+                "pillar": {
+                  "tenor": {
+                    "count": 3,
+                    "unit": "months"
+                  }
+                },
+                "rate": 0.052
+              }
+            },
+            {
+              "swap": {
+                "index_id": "USD-SOFR-OIS",
+                "pillar": {
+                  "tenor": {
+                    "count": 1,
+                    "unit": "years"
+                  }
+                },
+                "rate": 0.051,
+                "spread_decimal": null
+              }
+            },
+            {
+              "swap": {
+                "index_id": "USD-SOFR-OIS",
+                "pillar": {
+                  "tenor": {
+                    "count": 2,
+                    "unit": "years"
+                  }
+                },
+                "rate": 0.049,
+                "spread_decimal": null
+              }
+            },
+            {
+              "swap": {
+                "index_id": "USD-SOFR-OIS",
+                "pillar": {
+                  "tenor": {
+                    "count": 5,
+                    "unit": "years"
+                  }
+                },
+                "rate": 0.045,
+                "spread_decimal": null
+              }
+            },
+            {
+              "swap": {
+                "index_id": "USD-SOFR-OIS",
+                "pillar": {
+                  "tenor": {
+                    "count": 10,
+                    "unit": "years"
+                  }
+                },
+                "rate": 0.041,
+                "spread_decimal": null
+              }
+            }
+          ]
+        },
+        "fx_policy": null
+      }
+    ],
+    "fx": {
+      "config": {
+        "pivot_currency": "USD",
+        "enable_triangulation": true,
+        "cache_capacity": 17
+      },
+      "quotes": [["EUR", "USD", 1.1]],
+      "provider_quotes": [
+        ["JPY", "USD", 0.007],
+        ["EUR", "USD", 1.12]
+      ],
+      "provider_pinned_quotes": [
+        ["EUR", "USD", "2026-05-08", "period_end", 1.14]
+      ],
+      "pinned_quotes": [
+        ["EUR", "USD", "2026-05-08", "cashflow_date", 1.11],
+        ["EUR", "USD", "2026-05-08", "period_end", 1.13]
+      ]
+    },
+    "surfaces": [
+      {
+        "id": "EQ-VOL",
+        "expiries": [0.5, 1, 2],
+        "strikes": [80, 100, 120],
+        "secondary_axis": "strike",
+        "quote_type": "black_lognormal",
+        "interpolation_mode": "total_variance",
+        "vols_row_major": [0.3, 0.25, 0.27, 0.29, 0.24, 0.26, 0.28, 0.23, 0.25]
+      }
+    ],
+    "prices": {
+      "USD/CSA": {
+        "unitless": 1.25
+      }
+    },
+    "series": [],
+    "inflation_indices": [],
+    "dividends": [],
+    "credit_indices": [],
+    "fx_delta_vol_surfaces": [],
+    "vol_cubes": [],
+    "hierarchy": null
+  },
+  "cases": {
+    "discount": {
+      "request": {
+        "kind": "discount",
+        "id": "USD-OIS",
+        "points": [0.5, 1, 5, "2030-06-15"],
+        "forwards": [
+          [1, 2],
+          [2, 5]
+        ]
+      },
+      "result": {
+        "kind": "discount",
+        "points": [
+          {
+            "t": 0.5,
+            "df": {
+              "ok": true,
+              "value": 0.9748963708363564
+            },
+            "zeroRate": {
+              "ok": true,
+              "value": 0.05084819990953397
+            }
+          },
+          {
+            "t": 1,
+            "df": {
+              "ok": true,
+              "value": 0.9508100436413497
+            },
+            "zeroRate": {
+              "ok": true,
+              "value": 0.05044098019329764
+            }
+          },
+          {
+            "t": 5,
+            "df": {
+              "ok": true,
+              "value": 0.8006707147206837
+            },
+            "zeroRate": {
+              "ok": true,
+              "value": 0.04446110183375786
+            }
+          },
+          {
+            "t": "2030-06-15",
+            "df": {
+              "ok": true,
+              "value": 0.8324546459972928
+            },
+            "zeroRate": {
+              "ok": true,
+              "value": 0.044651391815446
+            }
+          }
+        ],
+        "forwards": [
+          {
+            "t1": 1,
+            "t2": 2,
+            "rate": {
+              "ok": true,
+              "value": 0.04649381848796564
+            }
+          },
+          {
+            "t1": 2,
+            "t2": 5,
+            "rate": {
+              "ok": true,
+              "value": 0.0417902368291753
+            }
+          }
+        ]
+      }
+    },
+    "forward": {
+      "request": {
+        "kind": "forward",
+        "id": "FORWARD",
+        "points": [0.25, 2, "2028-01-15"]
+      },
+      "result": {
+        "kind": "forward",
+        "points": [
+          {
+            "t": 0.25,
+            "rate": {
+              "ok": true,
+              "value": 0.04325
+            }
+          },
+          {
+            "t": 2,
+            "rate": {
+              "ok": true,
+              "value": 0.0405
+            }
+          },
+          {
+            "t": "2028-01-15",
+            "rate": {
+              "ok": true,
+              "value": 0.03998082191780822
+            }
+          }
+        ]
+      }
+    },
+    "hazard": {
+      "request": {
+        "kind": "hazard",
+        "id": "HZ",
+        "points": [1, 3, "2030-06-15"]
+      },
+      "result": {
+        "kind": "hazard",
+        "points": [
+          {
+            "t": 1,
+            "sp": {
+              "ok": true,
+              "value": 0.9860975442628619
+            },
+            "hazardRate": {
+              "ok": true,
+              "value": 0.014
+            }
+          },
+          {
+            "t": 3,
+            "sp": {
+              "ok": true,
+              "value": 0.9550419621907147
+            },
+            "hazardRate": {
+              "ok": true,
+              "value": 0.016
+            }
+          },
+          {
+            "t": "2030-06-15",
+            "sp": {
+              "ok": true,
+              "value": 0.9125150642163543
+            },
+            "hazardRate": {
+              "ok": true,
+              "value": 0.021
+            }
+          }
+        ]
+      }
+    },
+    "surface": {
+      "request": {
+        "kind": "surface",
+        "id": "EQ-VOL",
+        "points": [
+          {
+            "expiry": 0.75,
+            "strike": 100
+          },
+          {
+            "expiry": 1.5,
+            "strike": 90
+          }
+        ]
+      },
+      "result": {
+        "kind": "surface",
+        "points": [
+          {
+            "expiry": 0.75,
+            "strike": 100,
+            "vol": {
+              "ok": true,
+              "value": 0.2433789911502908
+            }
+          },
+          {
+            "expiry": 1.5,
+            "strike": 90,
+            "vol": {
+              "ok": true,
+              "value": 0.25958299892969366
+            }
+          }
+        ]
+      }
+    },
+    "rejected_points": {
+      "request": {
+        "kind": "discount",
+        "id": "USD-OIS",
+        "points": [1, "not-a-date"],
+        "forwards": [
+          [2, 1],
+          [1, 2]
+        ]
+      },
+      "result": {
+        "kind": "discount",
+        "points": [
+          {
+            "t": 1,
+            "df": {
+              "ok": true,
+              "value": 0.9508100436413497
+            },
+            "zeroRate": {
+              "ok": true,
+              "value": 0.05044098019329764
+            }
+          },
+          {
+            "t": "not-a-date",
+            "df": {
+              "ok": false,
+              "error": {
+                "name": "FinstackError",
+                "message": "Validation error: Invalid date 'not-a-date': the 'year' component could not be parsed",
+                "kind": "validation"
+              }
+            },
+            "zeroRate": {
+              "ok": false,
+              "error": {
+                "name": "FinstackError",
+                "message": "Validation error: Invalid date 'not-a-date': the 'year' component could not be parsed",
+                "kind": "validation"
+              }
+            }
+          }
+        ],
+        "forwards": [
+          {
+            "t1": 2,
+            "t2": 1,
+            "rate": {
+              "ok": false,
+              "error": {
+                "name": "FinstackError",
+                "message": "Validation error: forward interval must be finite with t2 > t1, got [2, 1]",
+                "kind": "validation"
+              }
+            }
+          },
+          {
+            "t1": 1,
+            "t2": 2,
+            "rate": {
+              "ok": true,
+              "value": 0.04649381848796564
+            }
+          }
+        ]
+      }
+    },
+    "rejected_coordinate": {
+      "request": {
+        "kind": "surface",
+        "id": "EQ-VOL",
+        "points": [
+          {
+            "expiry": 1,
+            "strike": 100
+          },
+          {
+            "expiry": 10,
+            "strike": 100
+          }
+        ]
+      },
+      "result": {
+        "kind": "surface",
+        "points": [
+          {
+            "expiry": 1,
+            "strike": 100,
+            "vol": {
+              "ok": true,
+              "value": 0.24
+            }
+          },
+          {
+            "expiry": 10,
+            "strike": 100,
+            "vol": {
+              "ok": false,
+              "error": {
+                "name": "FinstackError",
+                "message": "Validation error: volatility coordinate 10 is out of bounds [0.5, 2]",
+                "kind": "validation"
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "unknownId": {
+    "ok": false,
+    "error": {
+      "name": "FinstackError",
+      "message": "Curve not found: NO-SUCH-CURVE",
+      "kind": "not_found"
+    }
+  }
+}

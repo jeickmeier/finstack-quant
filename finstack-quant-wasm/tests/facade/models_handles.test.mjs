@@ -224,15 +224,44 @@ test('LGD, EAD and PD handles expose their accessors and reject bad input', () =
   assert.throws(() => new credit.pd.MasterScale([]), kind('validation'));
   assert.throws(() => credit.pd.MasterScale.fromRegistryId('nope'), kind('not_found'));
   // Altman scores carry no implied PD, so they cannot be mapped to a grade.
+  const altman = {
+    working_capital_to_total_assets: 0.1,
+    retained_earnings_to_total_assets: 0.2,
+    ebit_to_total_assets: 0.15,
+    market_equity_to_total_liabilities: 1.5,
+    sales_to_total_assets: 1.1,
+  };
   assert.throws(
-    () => scaleHandle.mapScore(credit.scoring.altmanZScore(0.1, 0.2, 0.15, 1.5, 1.1)),
+    () => scaleHandle.mapScore(credit.scoring.altmanZScore(altman)),
     kind('validation')
+  );
+  assert.equal(
+    credit.scoring.creditScoreReport({ model: 'altman_z_score', input: altman }).grade,
+    null
   );
   assert.throws(() => credit.pd.pitToTtc(1.5, 0.15, 0), kind('validation'));
   assert.throws(() => credit.pd.centralTendency([]), kind('validation'));
-  assert.throws(() => credit.scoring.altmanZScore(NaN, 0.2, 0.15, 1.5, 1.1), kind('validation'));
+  assert.throws(() => credit.scoring.altmanZScore({ ...altman, extra: 1 }), kind('validation'));
+  const missing = { ...altman };
+  delete missing.sales_to_total_assets;
+  assert.throws(() => credit.scoring.altmanZScore(missing), kind('validation'));
   assert.throws(
-    () => credit.scoring.ohlsonOScore(5, 0.6, 0.1, 0.8, 0.5, 0.05, 0.2, 0, 0.1),
+    () =>
+      credit.scoring.ohlsonOScore({
+        log_total_assets_adjusted: 5,
+        total_liabilities_to_total_assets: 0.6,
+        working_capital_to_total_assets: 0.1,
+        current_liabilities_to_current_assets: 0.8,
+        liabilities_exceed_assets: 0.5,
+        net_income_to_total_assets: 0.05,
+        funds_from_operations_to_total_liabilities: 0.2,
+        negative_net_income_two_years: 0,
+        net_income_change: 0.1,
+      }),
+    kind('validation')
+  );
+  assert.throws(
+    () => credit.scoring.creditScoreReport({ model: 'beaver', input: altman }),
     kind('validation')
   );
   assert.throws(() => credit.recoveryWaterfall.allocateRecovery(-1, []), kind('validation'));
@@ -377,14 +406,17 @@ test('factor handles and helpers follow the Rust accessors', () => {
   assert.throws(() => models.factor.validateFactorModelConfig({}), kind('validation'));
   assert.equal(typeof new factorCredit.CreditCalibrator().config.policy, 'string');
 
-  const decomposition = factorRisk.parametricVarDecomposition(
-    ['A', 'B'],
-    [1, 2],
-    [
-      [0.04, 0.01],
-      [0.01, 0.09],
-    ]
-  );
+  const { decomposition } = factorRisk.positionRiskReport({
+    position_ids: ['A', 'B'],
+    source: {
+      kind: 'parametric',
+      weights: [1, 2],
+      covariance: [
+        [0.04, 0.01],
+        [0.01, 0.09],
+      ],
+    },
+  });
   assert.throws(() => factorRisk.positionComponentVar(decomposition, 'missing'), kind('not_found'));
   assert.throws(
     () => factorRisk.buildStressAttribution(['A', 'B'], [[1, 2, 3]], 0.9),
@@ -632,7 +664,7 @@ test('volatility helpers take a VolSurface in its canonical wire form', () => {
   );
   // Materialized surfaces are `core.VolSurface` handles, the type the
   // surface evaluators take.
-  const surface = volatility.materializeCubeTenorSlice(cube, 5, [0.02, 0.03, 0.04]);
+  const surface = volatility.materializeCubeTenorSlice(cube, 5, [0.02, 0.03, 0.04], 'lognormal');
   assert.ok(surface instanceof core.VolSurface);
   assert.deepEqual(Array.from(surface.expiries), [1, 2]);
   assert.deepEqual(Array.from(surface.strikes), [0.02, 0.03, 0.04]);
@@ -649,7 +681,7 @@ test('volatility helpers take a VolSurface in its canonical wire form', () => {
   );
   assert.throws(() => volatility.getSurfaceVol({ id: 'x' }, 1, 0.03));
   assert.throws(
-    () => volatility.materializeCubeTenorSlice(cube, 5, [0.04, 0.03]),
+    () => volatility.materializeCubeTenorSlice(cube, 5, [0.04, 0.03], 'lognormal'),
     kind('validation')
   );
 
@@ -676,6 +708,38 @@ test('volatility helpers take a VolSurface in its canonical wire form', () => {
   assert.equal(
     models.bsGreeksIsValid({ ...models.bsGreeks(100, 100, 0.05, 0, 0.2, 1, true), gamma: -1 }),
     false
+  );
+});
+
+test('checkSurface runs the Rust arbitrage suite on a VolSurface handle', () => {
+  const surface = (vols, options) =>
+    new core.VolSurface('SPX-VOL', [1, 2], [90, 100, 110], vols, options);
+  const flat = surface([0.2, 0.2, 0.2, 0.2, 0.2, 0.2]);
+  // Omitted config fields take the Rust `ArbitrageCheckConfig` defaults.
+  const report = volatility.checkSurface(flat, { forward_prices: [100] });
+  assert.equal(report.passed, true);
+  assert.equal(report.vol_surface_id, 'SPX-VOL');
+  assert.deepEqual(report.violations, []);
+  assert.deepEqual(volatility.checkSurface(flat, '{"forward_prices":[100]}'), report);
+
+  const spiked = surface([0.2, 0.6, 0.2, 0.2, 0.6, 0.2]);
+  const butterfly = volatility.checkSurface(spiked, {
+    forward_prices: [100],
+    check_calendar_spread: false,
+    check_local_vol_density: false,
+  });
+  assert.equal(butterfly.passed, false);
+  assert.deepEqual(Object.keys(butterfly.counts_by_type), ['butterfly']);
+
+  assert.throws(() => volatility.checkSurface(flat, {}), kind('validation'));
+  assert.throws(
+    () => volatility.checkSurface(flat, { forward_prices: [100], forwards: [100] }),
+    kind('validation')
+  );
+  const normal = surface([0.01, 0.01, 0.01, 0.01, 0.01, 0.01], { quoteType: 'normal' });
+  assert.throws(
+    () => volatility.checkSurface(normal, { forward_prices: [100] }),
+    kind('validation')
   );
 });
 

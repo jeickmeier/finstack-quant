@@ -55,6 +55,24 @@ class LinkedReturn:
         ...
 
     @property
+    def is_annualised(self) -> bool:
+        """
+        Whether :attr:`annualised` was annualised over the horizon.
+
+        Returns
+        -------
+        bool
+            ``True`` when ``horizon_years`` was at least one year; ``False``
+            for shorter or non-positive horizons, where :attr:`annualised`
+            mirrors :attr:`cumulative` (GIPS 2020 reports them cumulatively).
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored or derived value.
+        """
+        ...
+
+    @property
     def num_periods(self) -> int:
         """
         Number of sub-periods that were linked.
@@ -74,7 +92,7 @@ class LinkedReturn:
         """
         Single-row pandas DataFrame view of the linked return.
 
-        Columns: ``cumulative``, ``annualised``, ``num_periods``. The schema is pinned, so an empty result keeps the
+        Columns: ``cumulative``, ``annualised``, ``is_annualised``, ``num_periods``. The schema is pinned, so an empty result keeps the
         same dtypes as a populated one.
 
         Returns
@@ -131,7 +149,7 @@ class LinkedReturn:
         Examples
         --------
         >>> from finstack_quant.portfolio import LinkedReturn
-        >>> doc = '{"cumulative": 0.0815, "annualised": 0.0815, "num_periods": 2}'
+        >>> doc = '{"cumulative": 0.0815, "annualised": 0.0815, "is_annualised": true, "num_periods": 2}'
         >>> LinkedReturn.from_json(doc).num_periods
         2
         """
@@ -186,19 +204,22 @@ def twrr_linked(returns_json: str | dict[str, Any] | list[Any] | pd.DataFrame, h
     returns_json : str | dict | list | pandas.DataFrame
         JSON array of sub-period decimal returns (e.g. from Modified Dietz).
     horizon_years : float
-        Reporting horizon in years used to annualize the linked return.
+        Full elapsed horizon in 365-day calendar years; must be finite.
+        Horizons of at least one year are annualized; shorter ones, including
+        zero and negative values, are reported cumulatively.
 
     Returns
     -------
     LinkedReturn
-        Typed result with ``cumulative``, ``annualised`` and
-        ``num_periods``; use serialize with ``to_json()`` for the wire string.
+        Typed result with ``cumulative``, ``annualised``,
+        ``is_annualised`` and ``num_periods``; use serialize with ``to_json()`` for the wire string.
 
     Raises
     ------
     ValueError
-        If ``returns_json`` is malformed, any sub-period return is non-finite
-        or at most -1, or the compounded growth factor is non-positive.
+        If ``returns_json`` is malformed, ``horizon_years`` is NaN or
+        infinite, any sub-period return is non-finite or at most -1, or the
+        compounded growth factor is non-positive.
 
     Examples
     --------

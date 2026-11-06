@@ -5,16 +5,17 @@
 //! pricing overrides, parse the as-of date and model key, and dispatch through
 //! the caller-selected registry or the shared standard registry.
 
-use super::{parse_model_key, ModelKey, STANDARD};
-use crate::instruments::envelope::{instrument_load_error, MAX_JSON_BYTES};
+use super::{ModelKey, STANDARD, parse_model_key};
+use crate::instruments::Instrument;
+use crate::instruments::envelope::{MAX_JSON_BYTES, instrument_load_error};
 use crate::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
 use crate::instruments::pricing_overrides::MetricPricingOverrides;
-use crate::instruments::Instrument;
-use crate::metrics::MetricId;
+use crate::metrics::{MetricId, MetricUnit, parse_key_rate_label};
 use crate::results::ValuationResult;
-use finstack_quant_core::contract::{parse_json_value, LoadLimits};
-use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Error;
+use finstack_quant_core::contract::{LoadLimits, parse_json_value};
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::market_data::context::MarketContext;
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -316,6 +317,91 @@ pub fn list_standard_metrics_grouped() -> BTreeMap<String, Vec<String>> {
         .collect()
 }
 
+/// List every metric the standard registry holds for one instrument type,
+/// grouped by display category.
+///
+/// This is the per-instrument counterpart to [`list_standard_metrics_grouped`]:
+/// each group keeps only the metrics for which the standard registry's
+/// [`MetricRegistry::is_applicable`](crate::metrics::MetricRegistry::is_applicable)
+/// holds for `instrument_type`, and groups left empty are omitted. Applicable
+/// metrics outside every [`MetricGroup`](crate::metrics::MetricGroup), such as
+/// `all_in_rate` or `parity`, are listed under
+/// [`MetricGroup::INSTRUMENT_SPECIFIC_DISPLAY_NAME`](crate::metrics::MetricGroup::INSTRUMENT_SPECIFIC_DISPLAY_NAME),
+/// so the values of the map are exactly
+/// [`MetricRegistry::metrics_for_instrument`](crate::metrics::MetricRegistry::metrics_for_instrument).
+/// A listed metric is registered for the type; whether it computes under a
+/// particular pricing model or market still depends on that model and market.
+///
+/// # Arguments
+///
+/// * `instrument_type` - Canonical [`InstrumentType`](crate::pricer::InstrumentType)
+///   display string, matched exactly (snake case, for example `"bond"`,
+///   `"fx_option"` or `"structured_credit"`); the same tag an instrument
+///   envelope carries in its `type` field.
+///
+/// # Returns
+///
+/// A map from display-group name to that group's applicable metric IDs in
+/// ascending order, in ascending group-name order.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when `instrument_type` is not a known
+/// instrument type.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_valuations::pricer::metrics_for_instrument;
+///
+/// let fx = metrics_for_instrument("fx_option")?;
+/// assert!(!fx.values().flatten().any(|id| id == "wal"));
+/// # Ok::<(), finstack_quant_core::Error>(())
+/// ```
+pub fn metrics_for_instrument(
+    instrument_type: &str,
+) -> finstack_quant_core::Result<BTreeMap<String, Vec<String>>> {
+    let instrument = instrument_type
+        .parse::<super::InstrumentType>()
+        .map_err(|e| {
+            Error::Validation(format!("Unknown instrument type: '{instrument_type}'. {e}"))
+        })?;
+    let registry = crate::pricer::STANDARD.metrics();
+    let mut groups: BTreeMap<String, Vec<String>> = registry
+        .available_metrics_grouped()
+        .into_iter()
+        .filter_map(|(group, metrics)| {
+            let ids: Vec<String> = metrics
+                .into_iter()
+                .filter(|metric| registry.is_applicable(metric, instrument))
+                .map(|metric| metric.to_string())
+                .collect();
+            (!ids.is_empty()).then(|| (group.display_name().to_string(), ids))
+        })
+        .collect();
+    let ungrouped: Vec<String> = registry
+        .metrics_for_instrument(instrument)
+        .into_iter()
+        .filter(|metric| display_group(metric).is_none())
+        .map(|metric| metric.to_string())
+        .collect();
+    if !ungrouped.is_empty() {
+        groups.insert(
+            crate::metrics::MetricGroup::INSTRUMENT_SPECIFIC_DISPLAY_NAME.to_string(),
+            ungrouped,
+        );
+    }
+    Ok(groups)
+}
+
+/// The [`MetricGroup`](crate::metrics::MetricGroup) holding `metric`, if any.
+fn display_group(metric: &MetricId) -> Option<crate::metrics::MetricGroup> {
+    crate::metrics::MetricGroup::ALL
+        .iter()
+        .copied()
+        .find(|group| group.metrics().contains(metric))
+}
+
 /// Canonical per-key metric interpretation for host presentation.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -327,12 +413,53 @@ pub struct MetricMetadata {
     pub metric: String,
     /// Decoded coordinate labels in original order; empty for scalar metrics.
     pub components: Vec<String>,
-    /// Native unit family; custom or calculator-dependent units remain unknown.
+    /// How each entry of `components` orders along its axis, aligned with it.
+    pub coordinates: Vec<MetricCoordinate>,
+    /// Native unit family; undeclared custom and calculator-dependent units are unknown.
     pub unit: crate::metrics::MetricUnit,
-    /// Native display group; absent for a non-standard base metric.
+    /// Native display group, the same name [`metrics_for_instrument`] lists the
+    /// base metric under; absent for a base metric the standard registry does
+    /// not hold.
     pub group: Option<String>,
     /// Whether this is a DV01/CS01 bucket with nonempty identifier and bucket coordinates.
     pub bucketed: bool,
+}
+
+/// Where one coordinate label sits on its axis.
+///
+/// A host sorts by `group` and then by `value`, so maturity and strike order
+/// is not recovered by parsing label text.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct MetricCoordinate {
+    /// Text the value is scoped by: the `{surface}::` of a vega row, empty for
+    /// a bare tenor or strike, and the whole label when it carries no number.
+    pub group: String,
+    /// Tenor in years (`3m` is 0.25, per [`parse_key_rate_label`]) or the
+    /// decimal strike; `None` when the label carries no number.
+    pub value: Option<f64>,
+}
+
+impl MetricCoordinate {
+    /// Read a decoded coordinate label: a tenor or decimal after any final `::`.
+    fn from_label(label: &str) -> Self {
+        let tail = label.rfind("::").map_or(0, |index| index + 2);
+        let (group, coordinate) = label.split_at(tail);
+        let value = parse_key_rate_label(coordinate)
+            .ok()
+            .or_else(|| coordinate.parse::<f64>().ok().filter(|v| v.is_finite()));
+        match value {
+            Some(value) => Self {
+                group: group.to_string(),
+                value: Some(value),
+            },
+            None => Self {
+                group: label.to_string(),
+                value: None,
+            },
+        }
+    }
 }
 
 /// Describe canonical metric keys without computing or transforming their values.
@@ -341,7 +468,10 @@ pub struct MetricMetadata {
 ///
 /// * `keys` - Canonical wire metric keys in desired output order. Qualified keys
 ///   retain their original spelling and use the native composite codec to decode
-///   coordinates. Custom names are accepted with unknown units and no group.
+///   coordinates. A custom name the standard registry holds gets
+///   [`MetricGroup::INSTRUMENT_SPECIFIC_DISPLAY_NAME`](crate::metrics::MetricGroup::INSTRUMENT_SPECIFIC_DISPLAY_NAME);
+///   any other is accepted with no group. A custom name has a unit only when
+///   [`MetricId::unit`] declares one, and is otherwise unknown.
 ///
 /// # Returns
 ///
@@ -357,16 +487,25 @@ pub fn metric_metadata(keys: &[String]) -> finstack_quant_core::Result<Vec<Metri
             let id: MetricId = key.parse()?;
             let base = id.base();
             let components = id.decode_components(&base).unwrap_or_default();
-            let group = crate::metrics::MetricGroup::ALL
-                .iter()
-                .find(|group| group.metrics().contains(&base))
-                .map(|group| group.display_name().to_string());
+            let group = match display_group(&base) {
+                Some(group) => Some(group.display_name().to_string()),
+                None => crate::pricer::STANDARD
+                    .metrics()
+                    .has_metric(base.clone())
+                    .then(|| {
+                        crate::metrics::MetricGroup::INSTRUMENT_SPECIFIC_DISPLAY_NAME.to_string()
+                    }),
+            };
             let bucketed = (base == MetricId::BucketedDv01 || base == MetricId::BucketedCs01)
                 && components.len() == 2
                 && components.iter().all(|component| !component.is_empty());
             Ok(MetricMetadata {
                 key: key.clone(),
                 metric: base.to_string(),
+                coordinates: components
+                    .iter()
+                    .map(|label| MetricCoordinate::from_label(label))
+                    .collect(),
                 components,
                 unit: id.unit(),
                 group,
@@ -374,6 +513,390 @@ pub fn metric_metadata(keys: &[String]) -> finstack_quant_core::Result<Vec<Metri
             })
         })
         .collect()
+}
+
+/// The display unit of one scalar field of a result struct.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct MetricFieldUnit {
+    /// Wire name of the field.
+    pub field: String,
+    /// Unit text as the field documents it, such as `USD per bp` or `years`.
+    pub label: String,
+    /// Canonical Rust field the unit is documented on.
+    pub source: String,
+}
+
+/// Units of the scalar `TrancheMetrics` fields, in the order the struct declares them.
+///
+/// `TrancheMetrics` documents these units in prose and does not state them on
+/// the wire, so a host reads them here. Values are never rescaled.
+///
+/// # Arguments
+///
+/// * `currency` - The `TrancheMetrics::currency` of the result being labelled;
+///   it names the unit of `pv`, `accrued` and `cs01`.
+///
+/// # Returns
+///
+/// One record per scalar field. `tranche_id`, `currency` and the
+/// registry-keyed `metrics` map have no field unit and are not listed; registry
+/// metrics keep the units their [`MetricMetadata`] reports.
+pub fn tranche_metric_field_units(currency: Currency) -> Vec<MetricFieldUnit> {
+    const CURRENT_BALANCE: &str = "% of current balance";
+    [
+        ("pv", currency.to_string()),
+        ("clean_price_pct", CURRENT_BALANCE.to_string()),
+        ("dirty_price_pct", CURRENT_BALANCE.to_string()),
+        ("accrued", currency.to_string()),
+        ("factor", "current / original balance".to_string()),
+        ("wal", "years".to_string()),
+        ("ytm", "decimal".to_string()),
+        ("z_spread_bp", "bp".to_string()),
+        ("cs01", format!("{currency} per bp")),
+        ("spread_duration", "years".to_string()),
+        ("spread_convexity", "years²".to_string()),
+        ("effective_duration", "years".to_string()),
+        ("effective_convexity", "years²".to_string()),
+        ("target_price_pct", CURRENT_BALANCE.to_string()),
+        ("wal_to_call", "years".to_string()),
+        ("z_spread_to_call_bp", "bp".to_string()),
+        ("dm_to_call_bp", "bp".to_string()),
+        ("dm_bp", "bp".to_string()),
+    ]
+    .into_iter()
+    .map(|(field, label)| MetricFieldUnit {
+        field: field.to_string(),
+        label,
+        source: format!("valuations::TrancheMetrics::{field}"),
+    })
+    .collect()
+}
+
+/// Units of the tranche solvers' results, which do not state them on the wire.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct TrancheSolveFieldUnits {
+    /// Unit of the value `tranche_breakeven_cdr` returns.
+    pub breakeven_cdr: MetricFieldUnit,
+    /// Unit of the value `tranche_discount_margin` returns.
+    pub discount_margin: MetricFieldUnit,
+    /// Unit of every `OasResult` field, in the order the struct declares them.
+    pub oas: Vec<MetricFieldUnit>,
+}
+
+/// Units of the tranche break-even CDR, discount margin and OAS results.
+///
+/// Those solvers document their units in prose: the two scalars are decimals
+/// (`0.0125` = 125 bp) and `OasResult` prices are percent of the tranche's current
+/// balance. Values are never rescaled.
+pub fn tranche_solve_field_units() -> TrancheSolveFieldUnits {
+    const CURRENT_BALANCE: &str = "% of current balance";
+    let scalar = |field: &str, source: &str| MetricFieldUnit {
+        field: field.to_string(),
+        label: "decimal".to_string(),
+        source: format!("valuations::{source}"),
+    };
+    TrancheSolveFieldUnits {
+        breakeven_cdr: scalar("breakeven_cdr", "tranche_breakeven_cdr"),
+        discount_margin: scalar("discount_margin", "tranche_discount_margin"),
+        oas: [
+            ("oas", "decimal"),
+            ("model_price", CURRENT_BALANCE),
+            ("market_price", CURRENT_BALANCE),
+            ("num_paths", "paths"),
+            ("price_std_error", CURRENT_BALANCE),
+        ]
+        .into_iter()
+        .map(|(field, label)| MetricFieldUnit {
+            field: field.to_string(),
+            label: label.to_string(),
+            source: format!("valuations::OasResult::{field}"),
+        })
+        .collect(),
+    }
+}
+
+/// Units of a `ScenarioTable`'s cells, which do not appear on the wire.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct ScenarioTableFieldUnits {
+    /// Unit of each swept `ScenarioCell` input, in the order the struct declares them.
+    pub axes: Vec<MetricFieldUnit>,
+    /// Unit of each measure `ScenarioCell` reports, in the order the struct declares them.
+    pub measures: Vec<MetricFieldUnit>,
+}
+
+/// Units of the `ScenarioCell` fields, the one place a host reads them from.
+///
+/// Rates are decimals, the price is percent of the tranche's current balance and
+/// the writedown is in currency units. Values are never rescaled.
+///
+/// # Arguments
+///
+/// * `currency` - The `ScenarioTable::currency` of the table being labelled; it
+///   names the unit of `writedown`.
+///
+/// # Returns
+///
+/// One record per numeric cell field, split into the swept axes and the reported
+/// measures so a host can offer the measures without naming them.
+pub fn scenario_table_field_units(currency: Currency) -> ScenarioTableFieldUnits {
+    let unit = |&(field, label): &(&str, &str)| MetricFieldUnit {
+        field: field.to_string(),
+        label: label.to_string(),
+        source: format!("valuations::ScenarioCell::{field}"),
+    };
+    let currency = currency.to_string();
+    ScenarioTableFieldUnits {
+        axes: [
+            ("cpr", "annual decimal"),
+            ("cdr", "annual decimal"),
+            ("severity", "decimal"),
+        ]
+        .iter()
+        .map(unit)
+        .collect(),
+        measures: [
+            ("price", "clean, % of current balance"),
+            ("wal", "years"),
+            ("writedown", currency.as_str()),
+        ]
+        .iter()
+        .map(unit)
+        .collect(),
+    }
+}
+
+/// Units of a `PoolReport`, which do not all appear on the wire.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct PoolReportFieldUnits {
+    /// Unit of `PoolReport::total_balance`.
+    pub total_balance: MetricFieldUnit,
+    /// Unit of `PoolReport::warf`.
+    pub warf: MetricFieldUnit,
+    /// Unit of every `PoolReport::stats` field, in the order `PoolStats`
+    /// declares them.
+    pub stats: Vec<MetricFieldUnit>,
+    /// Unit of the numeric fields of each `by_obligor`, `by_industry` and
+    /// `by_rating` row, in the order `PoolConcentrationEntry` declares them.
+    pub concentration: Vec<MetricFieldUnit>,
+}
+
+/// Units of the `PoolReport` fields, the one place a host reads them from.
+///
+/// `PoolStats` mixes a decimal coupon, a basis-point spread and a percent-point
+/// defaulted share. Values are never rescaled.
+///
+/// # Arguments
+///
+/// * `currency` - The `AssetPool::currency` of the report being labelled; it
+///   names the unit of `total_balance`, `undrawn_commitment` and each row's
+///   `balance`.
+///
+/// # Returns
+///
+/// One record per numeric field, grouped by the struct holding it. Each row's
+/// string `key` has no unit and is not listed.
+pub fn pool_report_field_units(currency: Currency) -> PoolReportFieldUnits {
+    const POOL_SHARE: &str = "% of current pool balance";
+    let unit = |owner: &str, field: &str, label: String| MetricFieldUnit {
+        field: field.to_string(),
+        label,
+        source: format!("valuations::{owner}::{field}"),
+    };
+    let currency = currency.to_string();
+    PoolReportFieldUnits {
+        total_balance: unit("PoolReport", "total_balance", currency.clone()),
+        warf: unit("PoolReport", "warf", "Moody's rating factor".to_string()),
+        stats: [
+            ("wac", "annual decimal, fixed-rate only"),
+            ("weighted_avg_spread_bp", "bp"),
+            ("weighted_avg_maturity", "years"),
+            ("diversity_score", "score"),
+            ("num_obligors", "named obligors"),
+            ("num_industries", "named industries"),
+            ("defaulted_balance_pct", POOL_SHARE),
+            ("undrawn_commitment", currency.as_str()),
+        ]
+        .into_iter()
+        .map(|(field, label)| unit("PoolStats", field, label.to_string()))
+        .collect(),
+        concentration: [
+            ("balance", currency.as_str()),
+            ("balance_pct", POOL_SHARE),
+            ("asset_count", "assets"),
+        ]
+        .into_iter()
+        .map(|(field, label)| unit("PoolConcentrationEntry", field, label.to_string()))
+        .collect(),
+    }
+}
+
+/// Units of the `BondQuoteSet` fields, in the order the struct declares them, the
+/// one place a host reads them from.
+///
+/// The set mixes currency prices, a percent-of-par price and decimal yields and
+/// spreads. Each field with a metric states that metric's [`MetricId::unit`], and
+/// `clean_price_pct`, which has none, states its quote convention. Values are never
+/// rescaled.
+///
+/// # Arguments
+///
+/// * `currency` - The currency of the bond whose set is being labelled; it names
+///   the unit of `clean_price_currency` and `dirty_price_currency`.
+///
+/// # Returns
+///
+/// One record per field of `BondQuoteSet`.
+pub fn bond_quote_set_field_units(currency: Currency) -> Vec<MetricFieldUnit> {
+    let label = |metric: Option<MetricId>| match metric.map(|metric| metric.unit()) {
+        None => "% of par".to_string(),
+        Some(MetricUnit::Currency) => currency.to_string(),
+        Some(unit) => unit.as_str().to_string(),
+    };
+    [
+        ("clean_price_currency", Some(MetricId::CleanPrice)),
+        ("clean_price_pct", None),
+        ("dirty_price_currency", Some(MetricId::DirtyPrice)),
+        ("ytm", Some(MetricId::Ytm)),
+        ("ytw", Some(MetricId::Ytw)),
+        ("z_spread", Some(MetricId::ZSpread)),
+        ("discount_margin", Some(MetricId::DiscountMargin)),
+        ("oas", Some(MetricId::Oas)),
+        ("asw_par", Some(MetricId::ASWPar)),
+        ("asw_market", Some(MetricId::ASWMarket)),
+        ("i_spread", Some(MetricId::ISpread)),
+        ("japanese_simple_yield", Some(MetricId::JapaneseSimpleYield)),
+        ("moosmuller_ytm", Some(MetricId::MoosmullerYtm)),
+    ]
+    .into_iter()
+    .map(|(field, metric)| MetricFieldUnit {
+        field: field.to_string(),
+        label: label(metric),
+        source: format!("valuations::BondQuoteSet::{field}"),
+    })
+    .collect()
+}
+
+/// Units of the charted `SimulationDiagnostics` series, which do not appear on the wire.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct SimulationFieldUnits {
+    /// Unit of each numeric `CoverageTestDiagnostic` field, in the order the
+    /// struct declares them.
+    pub coverage_tests: Vec<MetricFieldUnit>,
+    /// Unit of `WaterfallDistribution::diverted_cash` and of each diversion's amount.
+    pub diverted_cash: MetricFieldUnit,
+    /// Unit of `TrancheCreditEnhancement::credit_enhancement`.
+    pub credit_enhancement: MetricFieldUnit,
+    /// Unit of `PeriodDiagnostics::excess_spread`.
+    pub excess_spread: MetricFieldUnit,
+}
+
+/// Units of the coverage, diversion, enhancement and excess-spread series of a
+/// structured-credit simulation, the one place a host reads them from.
+///
+/// Coverage ratios, triggers and cushions are in times covered, credit enhancement
+/// is a decimal share of the collateral and excess spread an annual decimal of the opening pool
+/// balance. Values are never rescaled.
+///
+/// # Arguments
+///
+/// * `currency` - The deal currency of the simulation being labelled, as its
+///   `Money` amounts state it; it names the unit of `diverted_cash`.
+///
+/// # Returns
+///
+/// One record per charted field, grouped by the struct holding it.
+pub fn simulation_field_units(currency: Currency) -> SimulationFieldUnits {
+    let unit = |owner: &str, field: &str, label: String| MetricFieldUnit {
+        field: field.to_string(),
+        label,
+        source: format!("valuations::{owner}::{field}"),
+    };
+    SimulationFieldUnits {
+        coverage_tests: ["ratio", "trigger_level", "cushion"]
+            .into_iter()
+            .map(|field| unit("CoverageTestDiagnostic", field, "times covered".to_string()))
+            .collect(),
+        diverted_cash: unit(
+            "WaterfallDistribution",
+            "diverted_cash",
+            currency.to_string(),
+        ),
+        credit_enhancement: unit(
+            "TrancheCreditEnhancement",
+            "credit_enhancement",
+            "decimal share of collateral".to_string(),
+        ),
+        excess_spread: unit(
+            "PeriodDiagnostics",
+            "excess_spread",
+            "annual decimal of opening pool balance".to_string(),
+        ),
+    }
+}
+
+/// Units of an `EquityMetrics`, which do not all appear on the wire.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct EquityMetricsFieldUnits {
+    /// Unit of `EquityMetrics::invested`.
+    pub invested: MetricFieldUnit,
+    /// Unit of `EquityMetrics::irr`.
+    pub irr: MetricFieldUnit,
+    /// Unit of `EquityMetrics::moic`.
+    pub moic: MetricFieldUnit,
+    /// Unit of `EquityMetrics::nav_pct`.
+    pub nav_pct: MetricFieldUnit,
+    /// Unit of each `EquityMetrics::cash_on_cash` value.
+    pub cash_on_cash: MetricFieldUnit,
+    /// Unit of the `purchase_price_pct` argument of `calculate_equity_metrics`,
+    /// and what omitting it means.
+    pub purchase_price: MetricFieldUnit,
+}
+
+/// Units of the `EquityMetrics` fields, the one place a host reads them from.
+///
+/// The IRR is an annual decimal, the MOIC a multiple of the invested amount, the NAV
+/// a percent of the equity's current balance and cash-on-cash a decimal share of the
+/// invested amount. Values are never rescaled.
+///
+/// # Arguments
+///
+/// * `currency` - The `EquityMetrics::currency` of the result being labelled; it
+///   names the unit of `invested`.
+///
+/// # Returns
+///
+/// One record per numeric field, then the purchase price argument the amounts
+/// depend on. `tranche_id` and `currency` have no unit and are not listed.
+pub fn equity_metrics_field_units(currency: Currency) -> EquityMetricsFieldUnits {
+    let unit = |field: &str, label: String| MetricFieldUnit {
+        field: field.to_string(),
+        label,
+        source: format!("valuations::EquityMetrics::{field}"),
+    };
+    EquityMetricsFieldUnits {
+        invested: unit("invested", currency.to_string()),
+        irr: unit("irr", "annual decimal, ACT/365F".to_string()),
+        moic: unit("moic", "multiple of invested".to_string()),
+        nav_pct: unit("nav_pct", "% of current balance".to_string()),
+        cash_on_cash: unit("cash_on_cash", "decimal share of invested".to_string()),
+        purchase_price: MetricFieldUnit {
+            field: "purchase_price_pct".to_string(),
+            label: "% of current balance; omitted means par".to_string(),
+            source: "valuations::calculate_equity_metrics::purchase_price_pct".to_string(),
+        },
+    }
 }
 
 /// List every pricing model key that has a pricer in the standard registry.
@@ -740,16 +1263,16 @@ fn merge_metric_patch(
         ))
     })?;
     for (key, value) in patch {
-        if key == "bump_config" {
-            if let (Some(existing), Some(provided)) = (
+        if key == "bump_config"
+            && let (Some(existing), Some(provided)) = (
                 metric_pricing_overrides
                     .get_mut(&key)
                     .and_then(Value::as_object_mut),
                 value.as_object(),
-            ) {
-                existing.extend(provided.clone());
-                continue;
-            }
+            )
+        {
+            existing.extend(provided.clone());
+            continue;
         }
         metric_pricing_overrides.insert(key, value);
     }
@@ -806,6 +1329,334 @@ fn decode_pricing_envelope(
 mod tests {
     use super::*;
 
+    #[test]
+    fn coordinates_order_tenors_strikes_and_vega_rows_by_value() {
+        let at = |label: &str| {
+            let coordinate = MetricCoordinate::from_label(label);
+            (coordinate.group, coordinate.value)
+        };
+        let bare = |value: f64| (String::new(), Some(value));
+        assert_eq!(at("3m"), bare(0.25));
+        assert_eq!(at("12m"), bare(1.0));
+        assert_eq!(at("0.75y"), bare(0.75));
+        assert_eq!(at("10y"), bare(10.0));
+        assert_eq!(at("0.004"), bare(0.004));
+        assert_eq!(at("-0.5"), bare(-0.5));
+        assert_eq!(at("S::0.25y"), ("S::".to_string(), Some(0.25)));
+        assert_eq!(at("USD-OIS"), ("USD-OIS".to_string(), None));
+        assert_eq!(at(""), (String::new(), None));
+        // A word that f64::from_str reads as a number is still text.
+        assert_eq!(at("inf"), ("inf".to_string(), None));
+    }
+
+    fn bond_quote_set()
+    -> crate::instruments::fixed_income::bond::pricing::quote_conversions::BondQuoteSet {
+        use crate::instruments::fixed_income::bond::Bond;
+        use crate::instruments::fixed_income::bond::pricing::quote_conversions::compute_quotes;
+        use crate::instruments::{BondQuoteInput, PricingOptions};
+        use finstack_quant_core::market_data::context::MarketContext;
+        use finstack_quant_core::market_data::term_structures::DiscountCurve;
+
+        let bond = Bond::example().expect("bond");
+        let as_of = bond.issue_date;
+        let curve = DiscountCurve::builder(bond.discount_curve_id.as_str())
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (10.0, 0.70)])
+            .build()
+            .expect("curve");
+        compute_quotes(
+            &bond,
+            &MarketContext::new().insert(curve),
+            as_of,
+            BondQuoteInput::CleanPricePct(98.5),
+            PricingOptions::default(),
+        )
+        .expect("set")
+    }
+
+    #[test]
+    fn bond_quote_set_field_units_list_every_field_in_struct_order() {
+        // Text, not a Value: a struct writes its fields in the order it declares them.
+        let wire = serde_json::to_string(&bond_quote_set()).expect("serialize");
+        let keys: Value = serde_json::from_str(&wire).expect("parse");
+        let units = bond_quote_set_field_units(Currency::EUR);
+        assert_eq!(units.len(), keys.as_object().expect("object").len());
+        let positions: Vec<usize> = units
+            .iter()
+            .map(|unit| {
+                wire.find(&format!("\"{}\":", unit.field))
+                    .unwrap_or_else(|| panic!("{} is on the wire", unit.field))
+            })
+            .collect();
+        assert!(positions.is_sorted(), "struct order: {positions:?}");
+        assert_eq!(units[0].label, "EUR");
+        assert_eq!(units[1].label, "% of par");
+        assert_eq!(units[1].source, "valuations::BondQuoteSet::clean_price_pct");
+    }
+
+    #[test]
+    fn pool_report_field_units_list_every_numeric_field_in_struct_order() {
+        use finstack_quant_valuations_structured_credit::structured_credit::{
+            AssetPool, DealType, PoolAsset, pool_report,
+        };
+        let as_of = time::macros::date!(2025 - 01 - 01);
+        let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::EUR);
+        pool.assets.push(PoolAsset::fixed_rate_bond(
+            "A",
+            finstack_quant_core::money::Money::new(100.0, Currency::EUR).expect("money"),
+            0.05,
+            time::macros::date!(2030 - 01 - 01),
+            finstack_quant_core::dates::DayCount::Thirty360,
+        ));
+        let report =
+            serde_json::to_value(pool_report(&pool, as_of).expect("report")).expect("serialize");
+        let wire_fields = |value: &Value, skip: &[&str]| -> Vec<String> {
+            value
+                .as_object()
+                .expect("object")
+                .keys()
+                .filter(|key| !skip.contains(&key.as_str()))
+                .cloned()
+                .collect()
+        };
+        let names = |rows: &[MetricFieldUnit]| -> Vec<String> {
+            rows.iter().map(|row| row.field.clone()).collect()
+        };
+        let sorted = |mut fields: Vec<String>| {
+            fields.sort();
+            fields
+        };
+
+        let units = pool_report_field_units(Currency::EUR);
+        assert_eq!(
+            sorted(names(&units.stats)),
+            sorted(wire_fields(&report["stats"], &[]))
+        );
+        assert_eq!(
+            sorted(names(&units.concentration)),
+            sorted(wire_fields(&report["by_obligor"][0], &["key"]))
+        );
+        assert_eq!(units.total_balance.label, "EUR");
+        assert_eq!(units.warf.source, "valuations::PoolReport::warf");
+        assert_eq!(names(&units.stats)[0], "wac");
+        assert_eq!(units.stats[0].label, "annual decimal, fixed-rate only");
+        assert_eq!(units.stats[1].label, "bp");
+        assert_eq!(units.stats[6].label, "% of current pool balance");
+        assert_eq!(units.stats[7].label, "EUR");
+    }
+
+    #[test]
+    fn tranche_field_units_list_every_scalar_field_in_struct_order() {
+        use finstack_quant_valuations_structured_credit::structured_credit::TrancheMetrics;
+        let fields = [
+            "pv",
+            "clean_price_pct",
+            "dirty_price_pct",
+            "accrued",
+            "factor",
+            "wal",
+            "ytm",
+            "z_spread_bp",
+            "cs01",
+            "spread_duration",
+            "spread_convexity",
+            "effective_duration",
+            "effective_convexity",
+            "target_price_pct",
+            "wal_to_call",
+            "z_spread_to_call_bp",
+            "dm_to_call_bp",
+            "dm_bp",
+        ];
+        let mut wire: serde_json::Map<String, Value> = fields
+            .iter()
+            .map(|field| ((*field).to_string(), serde_json::json!(1.0)))
+            .collect();
+        wire.insert("tranche_id".to_string(), serde_json::json!("A"));
+        wire.insert("currency".to_string(), serde_json::json!("USD"));
+        // Strict deserialization proves these are the struct's fields; serializing
+        // lists them in declaration order, so the table cannot drift unnoticed.
+        let metrics: TrancheMetrics =
+            serde_json::from_value(Value::Object(wire)).expect("TrancheMetrics fields");
+        let mut declared: Vec<String> = serde_json::to_value(&metrics)
+            .expect("serialize")
+            .as_object()
+            .expect("object")
+            .keys()
+            .filter(|key| !["tranche_id", "currency", "metrics"].contains(&key.as_str()))
+            .cloned()
+            .collect();
+        declared.sort();
+        let units = tranche_metric_field_units(Currency::EUR);
+        let mut listed: Vec<String> = units.iter().map(|unit| unit.field.clone()).collect();
+        assert_eq!(listed, fields);
+        listed.sort();
+        assert_eq!(listed, declared);
+    }
+
+    #[test]
+    fn oas_field_units_list_every_oas_result_field_in_struct_order() {
+        let result = crate::instruments::fixed_income::structured_credit::OasResult {
+            oas: 0.01,
+            model_price: 99.0,
+            market_price: 99.5,
+            num_paths: 100,
+            price_std_error: 0.1,
+        };
+        let wire = serde_json::to_value(&result).expect("serialize");
+        let mut declared: Vec<&str> = wire
+            .as_object()
+            .expect("object")
+            .keys()
+            .map(String::as_str)
+            .collect();
+        declared.sort_unstable();
+        let units = tranche_solve_field_units();
+        let mut listed: Vec<&str> = units.oas.iter().map(|unit| unit.field.as_str()).collect();
+        assert_eq!(listed[0], "oas");
+        listed.sort_unstable();
+        assert_eq!(listed, declared);
+        assert_eq!(units.oas[0].source, "valuations::OasResult::oas");
+        assert_eq!(units.breakeven_cdr.label, "decimal");
+        assert_eq!(
+            units.discount_margin.source,
+            "valuations::tranche_discount_margin"
+        );
+    }
+
+    #[test]
+    fn scenario_table_units_list_every_cell_field_in_struct_order() {
+        use finstack_quant_valuations_structured_credit::structured_credit::ScenarioCell;
+        let cell = ScenarioCell {
+            cpr: 0.0,
+            cdr: 0.0,
+            severity: 0.0,
+            price: 0.0,
+            wal: 0.0,
+            writedown: 0.0,
+        };
+        let value = serde_json::to_value(&cell).expect("serialize");
+        let mut declared: Vec<&str> = value
+            .as_object()
+            .expect("object")
+            .keys()
+            .map(String::as_str)
+            .collect();
+        declared.sort_unstable();
+        let units = scenario_table_field_units(Currency::EUR);
+        let order: Vec<&str> = units
+            .axes
+            .iter()
+            .chain(&units.measures)
+            .map(|unit| unit.field.as_str())
+            .collect();
+        assert_eq!(
+            order,
+            ["cpr", "cdr", "severity", "price", "wal", "writedown"]
+        );
+        let mut listed = order;
+        listed.sort_unstable();
+        assert_eq!(listed, declared);
+        assert_eq!(units.measures[0].label, "clean, % of current balance");
+        assert_eq!(units.measures[2].label, "EUR");
+        assert_eq!(units.measures[1].source, "valuations::ScenarioCell::wal");
+    }
+
+    #[test]
+    fn equity_units_name_every_numeric_field_of_the_result() {
+        use finstack_quant_valuations_structured_credit::structured_credit::EquityMetrics;
+        let metrics = EquityMetrics {
+            tranche_id: "E".to_string(),
+            currency: Currency::EUR,
+            invested: 0.0,
+            irr: Some(0.0),
+            moic: Some(0.0),
+            nav_pct: 0.0,
+            cash_on_cash: Vec::new(),
+        };
+        let mut declared: Vec<String> = serde_json::to_value(&metrics)
+            .expect("serialize")
+            .as_object()
+            .expect("object")
+            .iter()
+            .filter(|(_, field)| field.is_number() || field.is_array())
+            .map(|(name, _)| name.clone())
+            .collect();
+        declared.sort_unstable();
+        let units = serde_json::to_value(equity_metrics_field_units(Currency::EUR))
+            .expect("serialize units");
+        let mut listed: Vec<String> = units
+            .as_object()
+            .expect("object")
+            .iter()
+            // The argument the result depends on, not a field of it.
+            .filter(|(name, _)| name.as_str() != "purchase_price")
+            .map(|(name, unit)| {
+                assert_eq!(unit["field"], name.as_str());
+                assert_eq!(unit["source"], format!("valuations::EquityMetrics::{name}"));
+                name.clone()
+            })
+            .collect();
+        listed.sort_unstable();
+        assert_eq!(listed, declared);
+        assert_eq!(units["invested"]["label"], "EUR");
+        assert_eq!(
+            units["purchase_price"]["label"],
+            "% of current balance; omitted means par"
+        );
+    }
+
+    #[test]
+    fn simulation_units_list_every_coverage_field_in_struct_order() {
+        use finstack_quant_valuations_structured_credit::structured_credit::CoverageTestDiagnostic;
+        let diagnostic = CoverageTestDiagnostic {
+            test_id: "OC_A".to_string(),
+            ratio: Some(0.0),
+            trigger_level: 0.0,
+            cushion: Some(0.0),
+            passing: true,
+        };
+        let value = serde_json::to_value(&diagnostic).expect("serialize");
+        let mut declared: Vec<&str> = value
+            .as_object()
+            .expect("object")
+            .iter()
+            .filter(|(_, field)| field.is_number())
+            .map(|(name, _)| name.as_str())
+            .collect();
+        declared.sort_unstable();
+        let units = simulation_field_units(Currency::EUR);
+        let order: Vec<&str> = units
+            .coverage_tests
+            .iter()
+            .map(|unit| unit.field.as_str())
+            .collect();
+        assert_eq!(order, ["ratio", "trigger_level", "cushion"]);
+        let mut listed = order;
+        listed.sort_unstable();
+        assert_eq!(listed, declared);
+        assert_eq!(units.diverted_cash.label, "EUR");
+        assert_eq!(
+            units.excess_spread.source,
+            "valuations::PeriodDiagnostics::excess_spread"
+        );
+    }
+
+    #[test]
+    fn tranche_field_units_state_the_result_currency_and_source() {
+        let units = tranche_metric_field_units(Currency::EUR);
+        let unit = |field: &str| {
+            units
+                .iter()
+                .find(|unit| unit.field == field)
+                .expect("listed")
+        };
+        assert_eq!(unit("pv").label, "EUR");
+        assert_eq!(unit("cs01").label, "EUR per bp");
+        assert_eq!(unit("wal").label, "years");
+        assert_eq!(unit("factor").source, "valuations::TrancheMetrics::factor");
+    }
+
     fn instrument_json_for_pricing(
         instrument_json: &str,
         metric_pricing_overrides: Option<&str>,
@@ -831,7 +1682,7 @@ mod tests {
     use crate::instruments::rates::swaption::Swaption;
     use crate::metrics::{MetricCalculator, MetricContext, MetricRegistry};
     use crate::pricer::{
-        expect_inst, InstrumentType, Pricer, PricerKey, PricerRegistry, PricingError,
+        InstrumentType, Pricer, PricerKey, PricerRegistry, PricingError, expect_inst,
     };
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
@@ -1004,8 +1855,8 @@ mod tests {
     fn equity_option_json_with_negative_vol_override() -> String {
         let option = EquityOption::example().expect("option");
         let mut json = envelope_value(InstrumentJson::EquityOption(option));
-        json["instrument"]["spec"]["instrument_pricing_overrides"]["market_quotes"]
-            ["implied_volatility"] = Value::from(-0.20);
+        json["instrument"]["spec"]["instrument_pricing_overrides"]["market_quotes"]["implied_volatility"] =
+            Value::from(-0.20);
         serde_json::to_string(&json).expect("serialize")
     }
 
@@ -1025,6 +1876,95 @@ mod tests {
             "notional": {"amount": "1000000", "currency": "EUR"},
             "attributes": {},
         })
+    }
+
+    #[test]
+    fn metrics_for_instrument_filters_by_registered_applicability() {
+        let offers = |ty: &str| -> bool {
+            metrics_for_instrument(ty)
+                .expect("known instrument type")
+                .values()
+                .flatten()
+                .any(|id| id == "wal")
+        };
+        assert!(!offers("fx_option"), "fx_option must not offer wal");
+        assert!(
+            offers("structured_credit"),
+            "structured_credit must offer wal"
+        );
+
+        let fx = metrics_for_instrument("fx_option").expect("fx_option");
+        let all = list_standard_metrics_grouped();
+        assert!(!fx.is_empty());
+        for (group, ids) in &fx {
+            assert!(!ids.is_empty(), "empty group {group} must be omitted");
+            if group == crate::metrics::MetricGroup::INSTRUMENT_SPECIFIC_DISPLAY_NAME {
+                continue;
+            }
+            let standard = all.get(group).expect("group of the standard listing");
+            assert!(ids.iter().all(|id| standard.contains(id)));
+        }
+    }
+
+    #[test]
+    fn metrics_for_instrument_lists_exactly_what_the_registry_applies() {
+        use crate::metrics::MetricGroup;
+        assert!(
+            MetricGroup::ALL
+                .iter()
+                .all(|group| group.display_name() != MetricGroup::INSTRUMENT_SPECIFIC_DISPLAY_NAME),
+            "the ungrouped name must not merge with a real group"
+        );
+        for ty in [
+            "bond",
+            "term_loan",
+            "revolving_credit",
+            "convertible_bond",
+            "fx_option",
+        ] {
+            let instrument: crate::pricer::InstrumentType = ty.parse().expect("known type");
+            let mut listed: Vec<String> = metrics_for_instrument(ty)
+                .expect("known type")
+                .into_values()
+                .flatten()
+                .collect();
+            listed.sort();
+            let registered: Vec<String> = crate::pricer::STANDARD
+                .metrics()
+                .metrics_for_instrument(instrument)
+                .iter()
+                .map(ToString::to_string)
+                .collect();
+            assert_eq!(listed, registered, "{ty}");
+        }
+    }
+
+    #[test]
+    fn metrics_for_instrument_surfaces_custom_ids_and_metadata_agrees() {
+        use crate::metrics::MetricGroup;
+        let ungrouped = |ty: &str| {
+            metrics_for_instrument(ty)
+                .expect("known type")
+                .remove(MetricGroup::INSTRUMENT_SPECIFIC_DISPLAY_NAME)
+                .unwrap_or_default()
+        };
+        assert!(ungrouped("revolving_credit").contains(&"utilization_rate".to_string()));
+        assert!(ungrouped("fx_swap").contains(&"carry_pv".to_string()));
+
+        let metadata =
+            metric_metadata(&["utilization_rate".to_string(), "no_such_metric".to_string()])
+                .expect("metadata");
+        assert_eq!(
+            metadata[0].group.as_deref(),
+            Some(MetricGroup::INSTRUMENT_SPECIFIC_DISPLAY_NAME)
+        );
+        assert_eq!(metadata[1].group, None);
+    }
+
+    #[test]
+    fn metrics_for_instrument_rejects_unknown_type() {
+        let err = metrics_for_instrument("not_an_instrument").expect_err("unknown type");
+        assert!(matches!(err, Error::Validation(_)), "{err:?}");
     }
 
     #[test]
@@ -1048,9 +1988,10 @@ mod tests {
             serde_json::json!({"type": "fx_spot", "spec": fx_spot_spec_value()}),
         )
         .expect_err("tagged payload should be rejected");
-        assert!(err
-            .to_string()
-            .contains("constructor requires a bare spec object"));
+        assert!(
+            err.to_string()
+                .contains("constructor requires a bare spec object")
+        );
     }
 
     #[test]
@@ -1062,9 +2003,10 @@ mod tests {
         .expect("json");
         let err = validate_typed_instrument_json("fx_forward", &fx_spot)
             .expect_err("wrong envelope type should be rejected");
-        assert!(err
-            .to_string()
-            .contains("expected instrument type `fx_forward`, got `fx_spot`"));
+        assert!(
+            err.to_string()
+                .contains("expected instrument type `fx_forward`, got `fx_spot`")
+        );
     }
 
     #[test]
@@ -1081,9 +2023,10 @@ mod tests {
             parse_typed_instrument_json::<crate::instruments::fx::fx_forward::FxForward>(&fx_spot)
                 .expect_err("wrong envelope type should be rejected");
         assert!(matches!(err, Error::Validation(_)));
-        assert!(err
-            .to_string()
-            .contains("expected instrument type `fx_forward`, got `fx_spot`"));
+        assert!(
+            err.to_string()
+                .contains("expected instrument type `fx_forward`, got `fx_spot`")
+        );
     }
 
     #[test]
@@ -1233,19 +2176,23 @@ mod tests {
         let mut cds_option = CdsOption::example().expect("CDS option");
         cds_option.exercise_settlement_date = Some(cds_option.expiry - time::Duration::days(1));
         let json = envelope_json(InstrumentJson::CdsOption(cds_option));
-        assert!(validate_instrument_json(&json, None)
-            .expect_err("exercise settlement before expiry must fail")
-            .to_string()
-            .contains("on or after legal expiry"));
+        assert!(
+            validate_instrument_json(&json, None)
+                .expect_err("exercise settlement before expiry must fail")
+                .to_string()
+                .contains("on or after legal expiry")
+        );
 
         let mut convertible = ConvertibleBond::example().expect("convertible");
         convertible.conversion.ratio = None;
         convertible.conversion.price = None;
         let json = envelope_json(InstrumentJson::ConvertibleBond(convertible));
-        assert!(validate_instrument_json(&json, None)
-            .expect_err("missing conversion terms must fail")
-            .to_string()
-            .contains("conversion.ratio"));
+        assert!(
+            validate_instrument_json(&json, None)
+                .expect_err("missing conversion terms must fail")
+                .to_string()
+                .contains("conversion.ratio")
+        );
     }
 
     #[test]
@@ -1260,10 +2207,12 @@ mod tests {
                 },
             ]);
         let json = envelope_json(InstrumentJson::RevolvingCredit(facility));
-        assert!(validate_instrument_json(&json, None)
-            .expect_err("post-maturity draw must fail")
-            .to_string()
-            .contains("maturity"));
+        assert!(
+            validate_instrument_json(&json, None)
+                .expect_err("post-maturity draw must fail")
+                .to_string()
+                .contains("maturity")
+        );
     }
 
     #[test]
@@ -1272,18 +2221,22 @@ mod tests {
         future.contract_specs.convexity_adjustment = None;
         future.vol_surface_id = None;
         let json = envelope_json(InstrumentJson::InterestRateFuture(future));
-        assert!(validate_instrument_json(&json, None)
-            .expect_err("missing convexity source must fail")
-            .to_string()
-            .contains("convexity_adjustment"));
+        assert!(
+            validate_instrument_json(&json, None)
+                .expect_err("missing convexity source must fail")
+                .to_string()
+                .contains("convexity_adjustment")
+        );
 
         let mut cmo = AgencyCmo::example().expect("CMO");
         cmo.reference_tranche_id = "MISSING".to_string();
         let json = envelope_json(InstrumentJson::AgencyCmo(cmo));
-        assert!(validate_instrument_json(&json, None)
-            .expect_err("unknown reference tranche must fail")
-            .to_string()
-            .contains("reference tranche"));
+        assert!(
+            validate_instrument_json(&json, None)
+                .expect_err("unknown reference tranche must fail")
+                .to_string()
+                .contains("reference tranche")
+        );
     }
 
     #[test]
@@ -1291,10 +2244,12 @@ mod tests {
         let mut loan = TermLoan::example().expect("term loan");
         loan.notional_limit = Money::from((-1_i64, Currency::USD));
         let json = envelope_json(InstrumentJson::TermLoan(loan));
-        assert!(validate_instrument_json(&json, None)
-            .expect_err("negative notional must fail")
-            .to_string()
-            .contains("notional_limit"));
+        assert!(
+            validate_instrument_json(&json, None)
+                .expect_err("negative notional must fail")
+                .to_string()
+                .contains("notional_limit")
+        );
     }
 
     #[test]
@@ -1368,10 +2323,12 @@ mod tests {
             validate_instrument_json(&prepared, None).expect("valid"),
             prepared
         );
-        assert!(validate_instrument_json(&json, Some("{"))
-            .expect_err("bad options")
-            .to_string()
-            .contains("invalid metric_pricing_overrides JSON"));
+        assert!(
+            validate_instrument_json(&json, Some("{"))
+                .expect_err("bad options")
+                .to_string()
+                .contains("invalid metric_pricing_overrides JSON")
+        );
     }
 
     #[test]
@@ -1446,9 +2403,11 @@ mod tests {
             parse_boxed_instruments_from_json(&format!("[{json},{json}]")).expect("inventory");
         assert_eq!(inventory.len(), 2);
         assert_eq!(inventory[0].id(), "TEST-BOND");
-        assert!(parse_boxed_instruments_from_json("[]")
-            .expect("empty inventory")
-            .is_empty());
+        assert!(
+            parse_boxed_instruments_from_json("[]")
+                .expect("empty inventory")
+                .is_empty()
+        );
 
         let bare: Value = serde_json::from_str::<Value>(&json).expect("json")["instrument"].clone();
         let single = parse_boxed_instrument_from_json(&bare.to_string(), None)
@@ -1744,9 +2703,11 @@ mod tests {
         .expect("HVar should price when market history is supplied");
 
         assert!(result.measures.contains_key(MetricId::HVar.as_str()));
-        assert!(result
-            .measures
-            .contains_key(MetricId::ExpectedShortfall.as_str()));
+        assert!(
+            result
+                .measures
+                .contains_key(MetricId::ExpectedShortfall.as_str())
+        );
     }
 
     #[test]
@@ -1806,6 +2767,19 @@ mod tests {
         assert_eq!(bucketed.unit, crate::metrics::MetricUnit::Currency);
         assert_eq!(bucketed.group.as_deref(), Some("Sensitivity"));
         assert_eq!(bucketed.components, vec!["A::B", "5y"]);
+        assert_eq!(
+            bucketed.coordinates,
+            vec![
+                MetricCoordinate {
+                    group: "A::B".to_string(),
+                    value: None
+                },
+                MetricCoordinate {
+                    group: String::new(),
+                    value: Some(5.0)
+                },
+            ]
+        );
         assert!(bucketed.bucketed);
 
         let custom = &metadata[2];

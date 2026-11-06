@@ -2,7 +2,7 @@
 
 use crate::types::NodeValueType;
 use finstack_quant_core::cashflow::CFKind;
-use finstack_quant_core::dates::{Date, PeriodId};
+use finstack_quant_core::dates::{Date, Period, PeriodId};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::wire::SchemaVersion;
 use indexmap::IndexMap;
@@ -51,6 +51,15 @@ use crate::types::NodeId;
 pub struct StatementResult {
     /// Required wire-format schema version. Only numeric `1` is accepted.
     pub schema_version: SchemaVersion,
+
+    /// The periods `nodes` is keyed by, in timeline order, with their dates and
+    /// actual/forecast split.
+    ///
+    /// [`Evaluator`](crate::evaluator::Evaluator) records the model's periods and
+    /// [`rollup`](Self::rollup) records its target periods, where a target is
+    /// actual only when every source period is. Empty only for hand-built
+    /// results, such as [`new`](Self::new).
+    pub periods: Vec<Period>,
 
     /// Map of node_id → (period_id → value). Native values are f64; JSON uses
     /// numbers for finite values and `"nan"`, `"inf"`, `"-inf"` for non-finite cells.
@@ -198,6 +207,7 @@ impl Default for StatementResult {
     fn default() -> Self {
         Self {
             schema_version: SchemaVersion::CURRENT,
+            periods: Vec::new(),
             nodes: IndexMap::new(),
             monetary_nodes: IndexMap::new(),
             node_value_types: IndexMap::new(),
@@ -290,7 +300,10 @@ impl StatementResult {
     ///
     /// # Arguments
     /// * `node_id` - Identifier to iterate over
-    pub fn all_periods(&self, node_id: &str) -> impl Iterator<Item = (&PeriodId, f64)> + '_ {
+    pub fn all_periods(
+        &self,
+        node_id: &str,
+    ) -> impl Iterator<Item = (&PeriodId, f64)> + '_ + use<'_> {
         self.get_node(node_id)
             .into_iter()
             .flat_map(|map| map.iter().map(|(k, v)| (k, *v)))
@@ -331,14 +344,14 @@ impl StatementResult {
             let node_id_str = node_id.as_str();
             self.node_value_types
                 .insert(node_id_str.to_string(), *value_type);
-            if let NodeValueType::Monetary { currency } = value_type {
-                if let Some(period_map) = self.nodes.get(node_id_str) {
-                    let (money_map, skipped) =
-                        monetary_map_skipping_nonfinite(period_map, *currency, node_id_str);
-                    self.monetary_nodes
-                        .insert(node_id_str.to_string(), money_map);
-                    self.meta.warnings.extend(skipped);
-                }
+            if let NodeValueType::Monetary { currency } = value_type
+                && let Some(period_map) = self.nodes.get(node_id_str)
+            {
+                let (money_map, skipped) =
+                    monetary_map_skipping_nonfinite(period_map, *currency, node_id_str);
+                self.monetary_nodes
+                    .insert(node_id_str.to_string(), money_map);
+                self.meta.warnings.extend(skipped);
             }
         }
     }
@@ -374,7 +387,7 @@ fn monetary_map_skipping_nonfinite(
 }
 
 /// Cash claim category affected by a capital-structure warning.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum CapitalStructureClaimCategory {

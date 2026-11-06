@@ -12,7 +12,7 @@
 //! Covers the main public APIs of finstack-quant-statements to track performance
 //! characteristics and regression over time.
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::evaluator::Evaluator;

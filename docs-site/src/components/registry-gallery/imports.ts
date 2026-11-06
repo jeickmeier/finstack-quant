@@ -34,6 +34,13 @@ export const importHarnesses = {
       import("@/workers/services/context"),
       import("@/workers/services/core"),
       import("@/workers/services/valuations"),
+      import("@/workers/services/cashflows"),
+      import("@/workers/services/covenants"),
+      import("@/workers/services/scenarios"),
+      import("@/workers/services/attribution"),
+      import("@/workers/services/analytics"),
+      import("@/workers/services/portfolio"),
+      import("@/workers/services/margin"),
       import("@/workers/services/calibration"),
       import("@/workers/services/models"),
       import("@/workers/services/statements"),
@@ -42,11 +49,43 @@ export const importHarnesses = {
       name: "finstack-worker",
       modules: modules.length,
     })),
+  "use-curve-query": () =>
+    Promise.all([import("@/hooks/core/use-curve-query/use-curve-query")]).then(
+      (modules) => ({ name: "use-curve-query", modules: modules.length }),
+    ),
   "use-market-validator": () =>
     Promise.all([
       import("@/hooks/core/use-market-validator/use-market-validator"),
     ]).then((modules) => ({
       name: "use-market-validator",
+      modules: modules.length,
+    })),
+  "use-convertible-spot-ladder": () =>
+    Promise.all([
+      import("@/hooks/valuations/use-convertible-spot-ladder/use-convertible-spot-ladder"),
+    ]).then((modules) => ({
+      name: "use-convertible-spot-ladder",
+      modules: modules.length,
+    })),
+  "use-bond-workout-ladder": () =>
+    Promise.all([
+      import("@/hooks/valuations/use-bond-workout-ladder/use-bond-workout-ladder"),
+    ]).then((modules) => ({
+      name: "use-bond-workout-ladder",
+      modules: modules.length,
+    })),
+  "use-compute-quotes": () =>
+    Promise.all([
+      import("@/hooks/valuations/use-compute-quotes/use-compute-quotes"),
+    ]).then((modules) => ({
+      name: "use-compute-quotes",
+      modules: modules.length,
+    })),
+  "use-metric-values": () =>
+    Promise.all([
+      import("@/hooks/valuations/use-metric-values/use-metric-values"),
+    ]).then((modules) => ({
+      name: "use-metric-values",
       modules: modules.length,
     })),
   "use-price-instrument": () =>
@@ -67,6 +106,13 @@ export const importHarnesses = {
     Promise.all([
       import("@/hooks/valuations/use-cashflows/use-cashflows"),
     ]).then((modules) => ({ name: "use-cashflows", modules: modules.length })),
+  "use-cashflow-ladder": () =>
+    Promise.all([
+      import("@/hooks/valuations/use-cashflow-ladder/use-cashflow-ladder"),
+    ]).then((modules) => ({
+      name: "use-cashflow-ladder",
+      modules: modules.length,
+    })),
   "use-scenario-table": () =>
     Promise.all([
       import("@/hooks/valuations/use-scenario-table/use-scenario-table"),
@@ -74,10 +120,282 @@ export const importHarnesses = {
       name: "use-scenario-table",
       modules: modules.length,
     })),
+  "use-deal-report": () =>
+    Promise.all([
+      import("@/hooks/valuations/use-deal-report/use-deal-report"),
+    ]).then((modules) => ({
+      name: "use-deal-report",
+      modules: modules.length,
+    })),
+  "use-tranche-analytics": () =>
+    Promise.all([
+      import("@/hooks/valuations/use-tranche-analytics/use-tranche-analytics"),
+    ]).then((modules) => ({
+      name: "use-tranche-analytics",
+      modules: modules.length,
+    })),
   "use-calibrate": () =>
     Promise.all([
       import("@/hooks/calibration/use-calibrate/use-calibrate"),
     ]).then((modules) => ({ name: "use-calibrate", modules: modules.length })),
+  "use-covenant-engine-validator": () =>
+    Promise.all([
+      import("@/hooks/covenants/use-covenant-engine-validator/use-covenant-engine-validator"),
+    ]).then((modules) => ({
+      name: "use-covenant-engine-validator",
+      modules: modules.length,
+    })),
+  "use-covenant-template": () =>
+    Promise.all([
+      import("@/hooks/covenants/use-covenant-template/use-covenant-template"),
+    ]).then((modules) => ({
+      name: "use-covenant-template",
+      modules: modules.length,
+    })),
+  "use-evaluate-covenants": () =>
+    Promise.all([
+      import("@/hooks/covenants/use-evaluate-covenants/use-evaluate-covenants"),
+    ]).then((modules) => ({
+      name: "use-evaluate-covenants",
+      modules: modules.length,
+    })),
+  "use-forecast-breaches": () =>
+    Promise.all([
+      import("@/hooks/covenants/use-forecast-breaches/use-forecast-breaches"),
+    ]).then((modules) => ({
+      name: "use-forecast-breaches",
+      modules: modules.length,
+    })),
+  "use-apply-market-scenario": () =>
+    Promise.all([
+      import("@/hooks/scenarios/use-apply-market-scenario/use-apply-market-scenario"),
+    ]).then((modules) => ({
+      name: "use-apply-market-scenario",
+      modules: modules.length,
+    })),
+  "use-horizon-return": () =>
+    Promise.all([
+      import("@/hooks/scenarios/use-horizon-return/use-horizon-return"),
+    ]).then((modules) => ({
+      name: "use-horizon-return",
+      modules: modules.length,
+    })),
+  "use-scenario-spec-validator": () =>
+    Promise.all([
+      import("@/hooks/scenarios/use-scenario-spec-validator/use-scenario-spec-validator"),
+    ]).then((modules) => ({
+      name: "use-scenario-spec-validator",
+      modules: modules.length,
+    })),
+  "use-list-builtin-template-metadata": () =>
+    Promise.all([
+      import("@/hooks/scenarios/use-list-builtin-template-metadata/use-list-builtin-template-metadata"),
+    ]).then((modules) => ({
+      name: "use-list-builtin-template-metadata",
+      modules: modules.length,
+    })),
+  "use-build-from-template": () =>
+    Promise.all([
+      import("@/hooks/scenarios/use-build-from-template/use-build-from-template"),
+    ]).then((modules) => ({
+      name: "use-build-from-template",
+      modules: modules.length,
+    })),
+  "use-build-template-component": () =>
+    Promise.all([
+      import("@/hooks/scenarios/use-build-template-component/use-build-template-component"),
+    ]).then((modules) => ({
+      name: "use-build-template-component",
+      modules: modules.length,
+    })),
+  "use-compose-scenarios": () =>
+    Promise.all([
+      import("@/hooks/scenarios/use-compose-scenarios/use-compose-scenarios"),
+    ]).then((modules) => ({
+      name: "use-compose-scenarios",
+      modules: modules.length,
+    })),
+  "use-attribute-pnl-many": () =>
+    Promise.all([
+      import("@/hooks/attribution/use-attribute-pnl-many/use-attribute-pnl-many"),
+    ]).then((modules) => ({
+      name: "use-attribute-pnl-many",
+      modules: modules.length,
+    })),
+  "use-default-waterfall-order": () =>
+    Promise.all([
+      import("@/hooks/attribution/use-default-waterfall-order/use-default-waterfall-order"),
+    ]).then((modules) => ({
+      name: "use-default-waterfall-order",
+      modules: modules.length,
+    })),
+  "use-performance-report": () =>
+    Promise.all([
+      import("@/hooks/analytics/use-performance-report/use-performance-report"),
+    ]).then((modules) => ({
+      name: "use-performance-report",
+      modules: modules.length,
+    })),
+  "use-benchmark-report": () =>
+    Promise.all([
+      import("@/hooks/analytics/use-benchmark-report/use-benchmark-report"),
+    ]).then((modules) => ({
+      name: "use-benchmark-report",
+      modules: modules.length,
+    })),
+  "use-correlation-matrix": () =>
+    Promise.all([
+      import("@/hooks/analytics/use-correlation-matrix/use-correlation-matrix"),
+    ]).then((modules) => ({
+      name: "use-correlation-matrix",
+      modules: modules.length,
+    })),
+  "analytics-report-presentation": () =>
+    Promise.all([
+      import("@/components/finstack/analytics/lib/analytics-report-presentation"),
+    ]).then((modules) => ({
+      name: "analytics-report-presentation",
+      modules: modules.length,
+    })),
+  "analytics-report-types": () =>
+    Promise.all([
+      import("@/components/finstack/analytics/lib/analytics-report-types"),
+    ]).then((modules) => ({
+      name: "analytics-report-types",
+      modules: modules.length,
+    })),
+  "use-value-portfolio": () =>
+    Promise.all([
+      import("@/hooks/portfolio/use-value-portfolio/use-value-portfolio"),
+    ]).then((modules) => ({
+      name: "use-value-portfolio",
+      modules: modules.length,
+    })),
+  "use-portfolio-metrics-series": () =>
+    Promise.all([
+      import("@/hooks/portfolio/use-portfolio-metrics-series/use-portfolio-metrics-series"),
+    ]).then((modules) => ({
+      name: "use-portfolio-metrics-series",
+      modules: modules.length,
+    })),
+  "use-portfolio-spec-validator": () =>
+    Promise.all([
+      import("@/hooks/portfolio/use-portfolio-spec-validator/use-portfolio-spec-validator"),
+    ]).then((modules) => ({
+      name: "use-portfolio-spec-validator",
+      modules: modules.length,
+    })),
+  "use-scenario-pnl-batch": () =>
+    Promise.all([
+      import("@/hooks/portfolio/use-scenario-pnl-batch/use-scenario-pnl-batch"),
+    ]).then((modules) => ({
+      name: "use-scenario-pnl-batch",
+      modules: modules.length,
+    })),
+  "use-apply-scenario-and-revalue": () =>
+    Promise.all([
+      import("@/hooks/portfolio/use-apply-scenario-and-revalue/use-apply-scenario-and-revalue"),
+    ]).then((modules) => ({
+      name: "use-apply-scenario-and-revalue",
+      modules: modules.length,
+    })),
+  "use-portfolio-margin": () =>
+    Promise.all([
+      import("@/hooks/portfolio/use-portfolio-margin/use-portfolio-margin"),
+    ]).then((modules) => ({
+      name: "use-portfolio-margin",
+      modules: modules.length,
+    })),
+  "use-attribute-portfolio-pnl": () =>
+    Promise.all([
+      import("@/hooks/portfolio/use-attribute-portfolio-pnl/use-attribute-portfolio-pnl"),
+    ]).then((modules) => ({
+      name: "use-attribute-portfolio-pnl",
+      modules: modules.length,
+    })),
+  "use-portfolio-returns": () =>
+    Promise.all([
+      import("@/hooks/portfolio/use-portfolio-returns/use-portfolio-returns"),
+    ]).then((modules) => ({
+      name: "use-portfolio-returns",
+      modules: modules.length,
+    })),
+  "use-brinson-linked": () =>
+    Promise.all([
+      import("@/hooks/portfolio/use-brinson-linked/use-brinson-linked"),
+    ]).then((modules) => ({
+      name: "use-brinson-linked",
+      modules: modules.length,
+    })),
+  "use-exposure-report": () =>
+    Promise.all([
+      import("@/hooks/portfolio/use-exposure-report/use-exposure-report"),
+    ]).then((modules) => ({
+      name: "use-exposure-report",
+      modules: modules.length,
+    })),
+  "use-simm-im": () =>
+    Promise.all([import("@/hooks/margin/use-simm-im/use-simm-im")]).then(
+      (modules) => ({ name: "use-simm-im", modules: modules.length }),
+    ),
+  "use-simm-sensitivities-validator": () =>
+    Promise.all([
+      import("@/hooks/margin/use-simm-sensitivities-validator/use-simm-sensitivities-validator"),
+    ]).then((modules) => ({
+      name: "use-simm-sensitivities-validator",
+      modules: modules.length,
+    })),
+  "use-csa-validator": () =>
+    Promise.all([
+      import("@/hooks/margin/use-csa-validator/use-csa-validator"),
+    ]).then((modules) => ({
+      name: "use-csa-validator",
+      modules: modules.length,
+    })),
+  "use-csa-preset": () =>
+    Promise.all([import("@/hooks/margin/use-csa-preset/use-csa-preset")]).then(
+      (modules) => ({ name: "use-csa-preset", modules: modules.length }),
+    ),
+  "use-vm": () =>
+    Promise.all([import("@/hooks/margin/use-vm/use-vm")]).then((modules) => ({
+      name: "use-vm",
+      modules: modules.length,
+    })),
+  "use-margin-calls": () =>
+    Promise.all([
+      import("@/hooks/margin/use-margin-calls/use-margin-calls"),
+    ]).then((modules) => ({
+      name: "use-margin-calls",
+      modules: modules.length,
+    })),
+  "use-margin-call-dates": () =>
+    Promise.all([
+      import("@/hooks/margin/use-margin-call-dates/use-margin-call-dates"),
+    ]).then((modules) => ({
+      name: "use-margin-call-dates",
+      modules: modules.length,
+    })),
+  "use-liability-management": () =>
+    Promise.all([
+      import("@/hooks/models/use-liability-management/use-liability-management"),
+    ]).then((modules) => ({
+      name: "use-liability-management",
+      modules: modules.length,
+    })),
+  "use-recovery-waterfall": () =>
+    Promise.all([
+      import("@/hooks/models/use-recovery-waterfall/use-recovery-waterfall"),
+    ]).then((modules) => ({
+      name: "use-recovery-waterfall",
+      modules: modules.length,
+    })),
+  "use-option-calculator": () =>
+    Promise.all([
+      import("@/hooks/models/use-option-calculator/use-option-calculator"),
+    ]).then((modules) => ({
+      name: "use-option-calculator",
+      modules: modules.length,
+    })),
   "use-fx-delta-samples": () =>
     Promise.all([
       import("@/hooks/models/use-fx-delta-samples/use-fx-delta-samples"),
@@ -85,11 +403,82 @@ export const importHarnesses = {
       name: "use-fx-delta-samples",
       modules: modules.length,
     })),
+  "use-fx-strike-surface": () =>
+    Promise.all([
+      import("@/hooks/models/use-fx-strike-surface/use-fx-strike-surface"),
+    ]).then((modules) => ({
+      name: "use-fx-strike-surface",
+      modules: modules.length,
+    })),
   "use-cube-samples": () =>
     Promise.all([
       import("@/hooks/models/use-cube-samples/use-cube-samples"),
     ]).then((modules) => ({
       name: "use-cube-samples",
+      modules: modules.length,
+    })),
+  "use-cube-slice": () =>
+    Promise.all([import("@/hooks/models/use-cube-slice/use-cube-slice")]).then(
+      (modules) => ({ name: "use-cube-slice", modules: modules.length }),
+    ),
+  "use-cube-smile": () =>
+    Promise.all([import("@/hooks/models/use-cube-smile/use-cube-smile")]).then(
+      (modules) => ({ name: "use-cube-smile", modules: modules.length }),
+    ),
+  "use-check-surface": () =>
+    Promise.all([
+      import("@/hooks/models/use-check-surface/use-check-surface"),
+    ]).then((modules) => ({
+      name: "use-check-surface",
+      modules: modules.length,
+    })),
+  "use-migration-matrix": () =>
+    Promise.all([
+      import("@/hooks/models/use-migration-matrix/use-migration-matrix"),
+    ]).then((modules) => ({
+      name: "use-migration-matrix",
+      modules: modules.length,
+    })),
+  "use-migration-projection": () =>
+    Promise.all([
+      import("@/hooks/models/use-migration-projection/use-migration-projection"),
+    ]).then((modules) => ({
+      name: "use-migration-projection",
+      modules: modules.length,
+    })),
+  "use-merton-report": () =>
+    Promise.all([
+      import("@/hooks/models/use-merton-report/use-merton-report"),
+    ]).then((modules) => ({
+      name: "use-merton-report",
+      modules: modules.length,
+    })),
+  "use-merton-model-validator": () =>
+    Promise.all([
+      import("@/hooks/models/use-merton-model-validator/use-merton-model-validator"),
+    ]).then((modules) => ({
+      name: "use-merton-model-validator",
+      modules: modules.length,
+    })),
+  "use-credit-score": () =>
+    Promise.all([
+      import("@/hooks/models/use-credit-score/use-credit-score"),
+    ]).then((modules) => ({
+      name: "use-credit-score",
+      modules: modules.length,
+    })),
+  "use-position-risk": () =>
+    Promise.all([
+      import("@/hooks/models/use-position-risk/use-position-risk"),
+    ]).then((modules) => ({
+      name: "use-position-risk",
+      modules: modules.length,
+    })),
+  "use-factor-risk": () =>
+    Promise.all([
+      import("@/hooks/models/use-factor-risk/use-factor-risk"),
+    ]).then((modules) => ({
+      name: "use-factor-risk",
       modules: modules.length,
     })),
   "use-evaluate-statement": () =>
@@ -155,6 +544,137 @@ export const importHarnesses = {
       name: "use-trace-statement",
       modules: modules.length,
     })),
+  "use-diff-statement-scenarios": () =>
+    Promise.all([
+      import("@/hooks/statements/use-diff-statement-scenarios/use-diff-statement-scenarios"),
+    ]).then((modules) => ({
+      name: "use-diff-statement-scenarios",
+      modules: modules.length,
+    })),
+  "use-trace-statement-scenario": () =>
+    Promise.all([
+      import("@/hooks/statements/use-trace-statement-scenario/use-trace-statement-scenario"),
+    ]).then((modules) => ({
+      name: "use-trace-statement-scenario",
+      modules: modules.length,
+    })),
+  "use-credit-assessment": () =>
+    Promise.all([
+      import("@/hooks/statements/use-credit-assessment/use-credit-assessment"),
+    ]).then((modules) => ({
+      name: "use-credit-assessment",
+      modules: modules.length,
+    })),
+  "use-statement-result-table": () =>
+    Promise.all([
+      import("@/hooks/statements/use-statement-result-table/use-statement-result-table"),
+    ]).then((modules) => ({
+      name: "use-statement-result-table",
+      modules: modules.length,
+    })),
+  "use-wacc": () =>
+    Promise.all([import("@/hooks/statements/use-wacc/use-wacc")]).then(
+      (modules) => ({ name: "use-wacc", modules: modules.length }),
+    ),
+  "use-normalize": () =>
+    Promise.all([
+      import("@/hooks/statements/use-normalize/use-normalize"),
+    ]).then((modules) => ({ name: "use-normalize", modules: modules.length })),
+  "use-capital-structure-summary": () =>
+    Promise.all([
+      import("@/hooks/statements/use-capital-structure-summary/use-capital-structure-summary"),
+    ]).then((modules) => ({
+      name: "use-capital-structure-summary",
+      modules: modules.length,
+    })),
+  "use-relative-value-report": () =>
+    Promise.all([
+      import("@/hooks/statements/use-relative-value-report/use-relative-value-report"),
+    ]).then((modules) => ({
+      name: "use-relative-value-report",
+      modules: modules.length,
+    })),
+  "use-normalization-config-validator": () =>
+    Promise.all([
+      import("@/hooks/statements/use-normalization-config-validator/use-normalization-config-validator"),
+    ]).then((modules) => ({
+      name: "use-normalization-config-validator",
+      modules: modules.length,
+    })),
+  "use-pl-summary-report": () =>
+    Promise.all([
+      import("@/hooks/statements/use-pl-summary-report/use-pl-summary-report"),
+    ]).then((modules) => ({
+      name: "use-pl-summary-report",
+      modules: modules.length,
+    })),
+  "use-evaluate-dcf": () =>
+    Promise.all([
+      import("@/hooks/statements/use-evaluate-dcf/use-evaluate-dcf"),
+    ]).then((modules) => ({
+      name: "use-evaluate-dcf",
+      modules: modules.length,
+    })),
+  "use-dcf-sensitivity": () =>
+    Promise.all([
+      import("@/hooks/statements/use-dcf-sensitivity/use-dcf-sensitivity"),
+    ]).then((modules) => ({
+      name: "use-dcf-sensitivity",
+      modules: modules.length,
+    })),
+  "use-evaluate-lbo": () =>
+    Promise.all([
+      import("@/hooks/statements/use-evaluate-lbo/use-evaluate-lbo"),
+    ]).then((modules) => ({
+      name: "use-evaluate-lbo",
+      modules: modules.length,
+    })),
+  "use-run-sensitivity": () =>
+    Promise.all([
+      import("@/hooks/statements/use-run-sensitivity/use-run-sensitivity"),
+    ]).then((modules) => ({
+      name: "use-run-sensitivity",
+      modules: modules.length,
+    })),
+  "use-goal-seek": () =>
+    Promise.all([
+      import("@/hooks/statements/use-goal-seek/use-goal-seek"),
+    ]).then((modules) => ({ name: "use-goal-seek", modules: modules.length })),
+  "use-run-variance": () =>
+    Promise.all([
+      import("@/hooks/statements/use-run-variance/use-run-variance"),
+    ]).then((modules) => ({
+      name: "use-run-variance",
+      modules: modules.length,
+    })),
+  "use-variance-bridge": () =>
+    Promise.all([
+      import("@/hooks/statements/use-variance-bridge/use-variance-bridge"),
+    ]).then((modules) => ({
+      name: "use-variance-bridge",
+      modules: modules.length,
+    })),
+  "use-backtest-forecast": () =>
+    Promise.all([
+      import("@/hooks/statements/use-backtest-forecast/use-backtest-forecast"),
+    ]).then((modules) => ({
+      name: "use-backtest-forecast",
+      modules: modules.length,
+    })),
+  "use-evaluate-monte-carlo": () =>
+    Promise.all([
+      import("@/hooks/statements/use-evaluate-monte-carlo/use-evaluate-monte-carlo"),
+    ]).then((modules) => ({
+      name: "use-evaluate-monte-carlo",
+      modules: modules.length,
+    })),
+  "use-monte-carlo-breach-probability": () =>
+    Promise.all([
+      import("@/hooks/statements/use-monte-carlo-breach-probability/use-monte-carlo-breach-probability"),
+    ]).then((modules) => ({
+      name: "use-monte-carlo-breach-probability",
+      modules: modules.length,
+    })),
   "finstack-fixtures": () =>
     Promise.all([import("@/lib/finstack/fixtures/results/bond.json")]).then(
       (modules) => ({ name: "finstack-fixtures", modules: modules.length }),
@@ -196,6 +716,87 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/meta/calibration"),
     ]).then((modules) => ({
       name: "contract-calibration",
+      modules: modules.length,
+    })),
+  "contract-oas-config": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/oas_config.json"),
+      import("@/lib/finstack/generated/types/oas_config"),
+      import("@/lib/finstack/generated/meta/oas_config"),
+    ]).then((modules) => ({
+      name: "contract-oas-config",
+      modules: modules.length,
+    })),
+  "contract-scenario-grid": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/scenario_grid.json"),
+      import("@/lib/finstack/generated/types/scenario_grid"),
+      import("@/lib/finstack/generated/meta/scenario_grid"),
+    ]).then((modules) => ({
+      name: "contract-scenario-grid",
+      modules: modules.length,
+    })),
+  "contract-standard-deal-params": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/standard_deal_params.json"),
+      import("@/lib/finstack/generated/types/standard_deal_params"),
+      import("@/lib/finstack/generated/meta/standard_deal_params"),
+    ]).then((modules) => ({
+      name: "contract-standard-deal-params",
+      modules: modules.length,
+    })),
+  "contract-covenant-engine": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/covenant_engine.json"),
+      import("@/lib/finstack/generated/types/covenant_engine"),
+      import("@/lib/finstack/generated/meta/covenant_engine"),
+    ]).then((modules) => ({
+      name: "contract-covenant-engine",
+      modules: modules.length,
+    })),
+  "contract-covenant-forecast-config": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/covenant_forecast_config.json"),
+      import("@/lib/finstack/generated/types/covenant_forecast_config"),
+      import("@/lib/finstack/generated/meta/covenant_forecast_config"),
+    ]).then((modules) => ({
+      name: "contract-covenant-forecast-config",
+      modules: modules.length,
+    })),
+  "contract-covenant-report": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/covenant_report.json"),
+      import("@/lib/finstack/generated/types/covenant_report"),
+      import("@/lib/finstack/generated/meta/covenant_report"),
+    ]).then((modules) => ({
+      name: "contract-covenant-report",
+      modules: modules.length,
+    })),
+  "contract-covenant-template": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/covenant_template.json"),
+      import("@/lib/finstack/generated/types/covenant_template"),
+      import("@/lib/finstack/generated/meta/covenant_template"),
+    ]).then((modules) => ({
+      name: "contract-covenant-template",
+      modules: modules.length,
+    })),
+  "contract-dated-covenant-reports": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/dated_covenant_reports.json"),
+      import("@/lib/finstack/generated/types/dated_covenant_reports"),
+      import("@/lib/finstack/generated/meta/dated_covenant_reports"),
+    ]).then((modules) => ({
+      name: "contract-dated-covenant-reports",
+      modules: modules.length,
+    })),
+  "contract-future-breach": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/future_breach.json"),
+      import("@/lib/finstack/generated/types/future_breach"),
+      import("@/lib/finstack/generated/meta/future_breach"),
+    ]).then((modules) => ({
+      name: "contract-future-breach",
       modules: modules.length,
     })),
   "contract-commodity-asian-option": () =>
@@ -1044,6 +1645,42 @@ export const importHarnesses = {
       name: "contract-yoy-inflation-swap",
       modules: modules.length,
     })),
+  "contract-csa-spec": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/csa_spec.json"),
+      import("@/lib/finstack/generated/types/csa_spec"),
+      import("@/lib/finstack/generated/meta/csa_spec"),
+    ]).then((modules) => ({
+      name: "contract-csa-spec",
+      modules: modules.length,
+    })),
+  "contract-im-result": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/im_result.json"),
+      import("@/lib/finstack/generated/types/im_result"),
+      import("@/lib/finstack/generated/meta/im_result"),
+    ]).then((modules) => ({
+      name: "contract-im-result",
+      modules: modules.length,
+    })),
+  "contract-simm-sensitivities-json": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/simm_sensitivities_json.json"),
+      import("@/lib/finstack/generated/types/simm_sensitivities_json"),
+      import("@/lib/finstack/generated/meta/simm_sensitivities_json"),
+    ]).then((modules) => ({
+      name: "contract-simm-sensitivities-json",
+      modules: modules.length,
+    })),
+  "contract-vm-result": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/vm_result.json"),
+      import("@/lib/finstack/generated/types/vm_result"),
+      import("@/lib/finstack/generated/meta/vm_result"),
+    ]).then((modules) => ({
+      name: "contract-vm-result",
+      modules: modules.length,
+    })),
   "contract-market-context-state": () =>
     Promise.all([
       import("@/lib/finstack/generated/schemas/market_context_state.json"),
@@ -1051,6 +1688,132 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/meta/market_context_state"),
     ]).then((modules) => ({
       name: "contract-market-context-state",
+      modules: modules.length,
+    })),
+  "contract-altman-z-double-prime-input": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/altman_z_double_prime_input.json"),
+      import("@/lib/finstack/generated/types/altman_z_double_prime_input"),
+      import("@/lib/finstack/generated/meta/altman_z_double_prime_input"),
+    ]).then((modules) => ({
+      name: "contract-altman-z-double-prime-input",
+      modules: modules.length,
+    })),
+  "contract-altman-z-prime-input": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/altman_z_prime_input.json"),
+      import("@/lib/finstack/generated/types/altman_z_prime_input"),
+      import("@/lib/finstack/generated/meta/altman_z_prime_input"),
+    ]).then((modules) => ({
+      name: "contract-altman-z-prime-input",
+      modules: modules.length,
+    })),
+  "contract-altman-z-score-input": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/altman_z_score_input.json"),
+      import("@/lib/finstack/generated/types/altman_z_score_input"),
+      import("@/lib/finstack/generated/meta/altman_z_score_input"),
+    ]).then((modules) => ({
+      name: "contract-altman-z-score-input",
+      modules: modules.length,
+    })),
+  "contract-arbitrage-report": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/arbitrage_report.json"),
+      import("@/lib/finstack/generated/types/arbitrage_report"),
+      import("@/lib/finstack/generated/meta/arbitrage_report"),
+    ]).then((modules) => ({
+      name: "contract-arbitrage-report",
+      modules: modules.length,
+    })),
+  "contract-merton-model": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/merton_model.json"),
+      import("@/lib/finstack/generated/types/merton_model"),
+      import("@/lib/finstack/generated/meta/merton_model"),
+    ]).then((modules) => ({
+      name: "contract-merton-model",
+      modules: modules.length,
+    })),
+  "contract-ohlson-o-score-input": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/ohlson_o_score_input.json"),
+      import("@/lib/finstack/generated/types/ohlson_o_score_input"),
+      import("@/lib/finstack/generated/meta/ohlson_o_score_input"),
+    ]).then((modules) => ({
+      name: "contract-ohlson-o-score-input",
+      modules: modules.length,
+    })),
+  "contract-recovery-claim": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/recovery_claim.json"),
+      import("@/lib/finstack/generated/types/recovery_claim"),
+      import("@/lib/finstack/generated/meta/recovery_claim"),
+    ]).then((modules) => ({
+      name: "contract-recovery-claim",
+      modules: modules.length,
+    })),
+  "contract-seniority-calibration": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/seniority_calibration.json"),
+      import("@/lib/finstack/generated/types/seniority_calibration"),
+      import("@/lib/finstack/generated/meta/seniority_calibration"),
+    ]).then((modules) => ({
+      name: "contract-seniority-calibration",
+      modules: modules.length,
+    })),
+  "contract-workout-lgd": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/workout_lgd.json"),
+      import("@/lib/finstack/generated/types/workout_lgd"),
+      import("@/lib/finstack/generated/meta/workout_lgd"),
+    ]).then((modules) => ({
+      name: "contract-workout-lgd",
+      modules: modules.length,
+    })),
+  "contract-zmijewski-input": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/zmijewski_input.json"),
+      import("@/lib/finstack/generated/types/zmijewski_input"),
+      import("@/lib/finstack/generated/meta/zmijewski_input"),
+    ]).then((modules) => ({
+      name: "contract-zmijewski-input",
+      modules: modules.length,
+    })),
+  "contract-portfolio-margin-result": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/portfolio_margin_result.json"),
+      import("@/lib/finstack/generated/types/portfolio_margin_result"),
+      import("@/lib/finstack/generated/meta/portfolio_margin_result"),
+    ]).then((modules) => ({
+      name: "contract-portfolio-margin-result",
+      modules: modules.length,
+    })),
+  "contract-portfolio-result": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/portfolio_result.json"),
+      import("@/lib/finstack/generated/types/portfolio_result"),
+      import("@/lib/finstack/generated/meta/portfolio_result"),
+    ]).then((modules) => ({
+      name: "contract-portfolio-result",
+      modules: modules.length,
+    })),
+  "contract-scenario-pnl-batch-item": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/scenario_pnl_batch_item.json"),
+      import("@/lib/finstack/generated/types/scenario_pnl_batch_item"),
+      import("@/lib/finstack/generated/meta/scenario_pnl_batch_item"),
+    ]).then((modules) => ({
+      name: "contract-scenario-pnl-batch-item",
+      modules: modules.length,
+    })),
+  "contract-scenario-revalue-view": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/scenario_revalue_view.json"),
+      import("@/lib/finstack/generated/types/scenario_revalue_view"),
+      import("@/lib/finstack/generated/meta/scenario_revalue_view"),
+    ]).then((modules) => ({
+      name: "contract-scenario-revalue-view",
       modules: modules.length,
     })),
   "contract-instrument-cashflow": () =>
@@ -1071,6 +1834,123 @@ export const importHarnesses = {
       name: "contract-valuation-result",
       modules: modules.length,
     })),
+  "contract-scenario-spec": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/scenario_spec.json"),
+      import("@/lib/finstack/generated/types/scenario_spec"),
+      import("@/lib/finstack/generated/meta/scenario_spec"),
+    ]).then((modules) => ({
+      name: "contract-scenario-spec",
+      modules: modules.length,
+    })),
+  "contract-bridge-chart": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/bridge_chart.json"),
+      import("@/lib/finstack/generated/types/bridge_chart"),
+      import("@/lib/finstack/generated/meta/bridge_chart"),
+    ]).then((modules) => ({
+      name: "contract-bridge-chart",
+      modules: modules.length,
+    })),
+  "contract-capital-structure-summary-config": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/capital_structure_summary_config.json"),
+      import("@/lib/finstack/generated/types/capital_structure_summary_config"),
+      import("@/lib/finstack/generated/meta/capital_structure_summary_config"),
+    ]).then((modules) => ({
+      name: "contract-capital-structure-summary-config",
+      modules: modules.length,
+    })),
+  "contract-capital-structure-summary": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/capital_structure_summary.json"),
+      import("@/lib/finstack/generated/types/capital_structure_summary"),
+      import("@/lib/finstack/generated/meta/capital_structure_summary"),
+    ]).then((modules) => ({
+      name: "contract-capital-structure-summary",
+      modules: modules.length,
+    })),
+  "contract-credit-assessment": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/credit_assessment.json"),
+      import("@/lib/finstack/generated/types/credit_assessment"),
+      import("@/lib/finstack/generated/meta/credit_assessment"),
+    ]).then((modules) => ({
+      name: "contract-credit-assessment",
+      modules: modules.length,
+    })),
+  "contract-dcf-options": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/dcf_options.json"),
+      import("@/lib/finstack/generated/types/dcf_options"),
+      import("@/lib/finstack/generated/meta/dcf_options"),
+    ]).then((modules) => ({
+      name: "contract-dcf-options",
+      modules: modules.length,
+    })),
+  "contract-dcf-sensitivity-result": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/dcf_sensitivity_result.json"),
+      import("@/lib/finstack/generated/types/dcf_sensitivity_result"),
+      import("@/lib/finstack/generated/meta/dcf_sensitivity_result"),
+    ]).then((modules) => ({
+      name: "contract-dcf-sensitivity-result",
+      modules: modules.length,
+    })),
+  "contract-forecast-metrics": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/forecast_metrics.json"),
+      import("@/lib/finstack/generated/types/forecast_metrics"),
+      import("@/lib/finstack/generated/meta/forecast_metrics"),
+    ]).then((modules) => ({
+      name: "contract-forecast-metrics",
+      modules: modules.length,
+    })),
+  "contract-lbo-config": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/lbo_config.json"),
+      import("@/lib/finstack/generated/types/lbo_config"),
+      import("@/lib/finstack/generated/meta/lbo_config"),
+    ]).then((modules) => ({
+      name: "contract-lbo-config",
+      modules: modules.length,
+    })),
+  "contract-lbo-result": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/lbo_result.json"),
+      import("@/lib/finstack/generated/types/lbo_result"),
+      import("@/lib/finstack/generated/meta/lbo_result"),
+    ]).then((modules) => ({
+      name: "contract-lbo-result",
+      modules: modules.length,
+    })),
+  "contract-relative-value-report-config": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/relative_value_report_config.json"),
+      import("@/lib/finstack/generated/types/relative_value_report_config"),
+      import("@/lib/finstack/generated/meta/relative_value_report_config"),
+    ]).then((modules) => ({
+      name: "contract-relative-value-report-config",
+      modules: modules.length,
+    })),
+  "contract-relative-value-report": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/relative_value_report.json"),
+      import("@/lib/finstack/generated/types/relative_value_report"),
+      import("@/lib/finstack/generated/meta/relative_value_report"),
+    ]).then((modules) => ({
+      name: "contract-relative-value-report",
+      modules: modules.length,
+    })),
+  "contract-scenario-diff": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/scenario_diff.json"),
+      import("@/lib/finstack/generated/types/scenario_diff"),
+      import("@/lib/finstack/generated/meta/scenario_diff"),
+    ]).then((modules) => ({
+      name: "contract-scenario-diff",
+      modules: modules.length,
+    })),
   "contract-scenario-set": () =>
     Promise.all([
       import("@/lib/finstack/generated/schemas/scenario_set.json"),
@@ -1078,6 +1958,24 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/meta/scenario_set"),
     ]).then((modules) => ({
       name: "contract-scenario-set",
+      modules: modules.length,
+    })),
+  "contract-sensitivity-result": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/sensitivity_result.json"),
+      import("@/lib/finstack/generated/types/sensitivity_result"),
+      import("@/lib/finstack/generated/meta/sensitivity_result"),
+    ]).then((modules) => ({
+      name: "contract-sensitivity-result",
+      modules: modules.length,
+    })),
+  "contract-variance-config": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/variance_config.json"),
+      import("@/lib/finstack/generated/types/variance_config"),
+      import("@/lib/finstack/generated/meta/variance_config"),
+    ]).then((modules) => ({
+      name: "contract-variance-config",
       modules: modules.length,
     })),
   "contract-check-suite-spec": () =>
@@ -1099,6 +1997,51 @@ export const importHarnesses = {
       name: "contract-financial-model-spec",
       modules: modules.length,
     })),
+  "contract-forecast-parameters": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/forecast_parameters.json"),
+      import("@/lib/finstack/generated/types/forecast_parameters"),
+      import("@/lib/finstack/generated/meta/forecast_parameters"),
+    ]).then((modules) => ({
+      name: "contract-forecast-parameters",
+      modules: modules.length,
+    })),
+  "contract-monte-carlo-config": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/monte_carlo_config.json"),
+      import("@/lib/finstack/generated/types/monte_carlo_config"),
+      import("@/lib/finstack/generated/meta/monte_carlo_config"),
+    ]).then((modules) => ({
+      name: "contract-monte-carlo-config",
+      modules: modules.length,
+    })),
+  "contract-monte-carlo-results": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/monte_carlo_results.json"),
+      import("@/lib/finstack/generated/types/monte_carlo_results"),
+      import("@/lib/finstack/generated/meta/monte_carlo_results"),
+    ]).then((modules) => ({
+      name: "contract-monte-carlo-results",
+      modules: modules.length,
+    })),
+  "contract-normalization-config": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/normalization_config.json"),
+      import("@/lib/finstack/generated/types/normalization_config"),
+      import("@/lib/finstack/generated/meta/normalization_config"),
+    ]).then((modules) => ({
+      name: "contract-normalization-config",
+      modules: modules.length,
+    })),
+  "contract-normalization-result": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/normalization_result.json"),
+      import("@/lib/finstack/generated/types/normalization_result"),
+      import("@/lib/finstack/generated/meta/normalization_result"),
+    ]).then((modules) => ({
+      name: "contract-normalization-result",
+      modules: modules.length,
+    })),
   "contract-rollup-spec": () =>
     Promise.all([
       import("@/lib/finstack/generated/schemas/rollup_spec.json"),
@@ -1115,6 +2058,15 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/meta/statement_result"),
     ]).then((modules) => ({
       name: "contract-statement-result",
+      modules: modules.length,
+    })),
+  "contract-table-envelope": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/table_envelope.json"),
+      import("@/lib/finstack/generated/types/table_envelope"),
+      import("@/lib/finstack/generated/meta/table_envelope"),
+    ]).then((modules) => ({
+      name: "contract-table-envelope",
       modules: modules.length,
     })),
   "instrument-catalogue": () =>

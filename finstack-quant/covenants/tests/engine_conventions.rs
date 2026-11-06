@@ -2,9 +2,9 @@
 
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_covenants::{
-    templates, Covenant, CovenantConsequence, CovenantEngine, CovenantMetricId, CovenantSpec,
-    CovenantType, CovenantWindow, HashMapMetricSource, InstrumentMutator, ThresholdSchedule,
-    ThresholdTest,
+    Covenant, CovenantConsequence, CovenantEngine, CovenantMetricId, CovenantSpec, CovenantType,
+    CovenantWindow, HashMapMetricSource, InstrumentMutator, ThresholdSchedule, ThresholdTest,
+    templates,
 };
 use time::Month;
 
@@ -62,7 +62,13 @@ impl InstrumentMutator for MockInstrument {
 #[test]
 fn project_finance_lockup_breach_blocks_distributions_without_default() {
     let mut engine = CovenantEngine::new();
-    for spec in templates::project_finance(1.05, 1.25, 5_000_000.0, 6.0).expect("valid template") {
+    let template = templates::CovenantTemplate::ProjectFinance {
+        min_dscr: 1.05,
+        distribution_lockup_dscr: 1.25,
+        min_liquidity: 5_000_000.0,
+        max_net_leverage: 6.0,
+    };
+    for spec in templates::covenant_template(&template).expect("valid template") {
         engine.add_spec(spec);
     }
 
@@ -174,10 +180,12 @@ fn negative_ebitda_leverage_breaches_max_ratio_covenant() {
         !report.passed,
         "negative leverage ratio (NM) must breach a max covenant"
     );
-    assert!(report
-        .details
-        .as_deref()
-        .is_some_and(|s| s.contains("not meaningful")));
+    assert!(
+        report
+            .details
+            .as_deref()
+            .is_some_and(|s| s.contains("not meaningful"))
+    );
 }
 
 #[test]

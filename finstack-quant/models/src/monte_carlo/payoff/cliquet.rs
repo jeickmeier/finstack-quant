@@ -5,9 +5,9 @@
 
 use crate::monte_carlo::traits::PathState;
 use crate::monte_carlo::traits::Payoff;
+use finstack_quant_core::Error;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Error;
 
 /// Cliquet payoff aggregation type.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

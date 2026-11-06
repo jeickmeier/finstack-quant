@@ -9,8 +9,8 @@ use finstack_quant_models::volatility::variance_replication::carr_madan_forward_
 
 type OhlcVecs = (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>);
 use finstack_quant_core::{
-    dates::Date, market_data::context::MarketContext, math::stats::realized_variance, money::Money,
-    Result,
+    Result, dates::Date, market_data::context::MarketContext, math::stats::realized_variance,
+    money::Money,
 };
 
 pub(crate) fn compute_pv(
@@ -169,13 +169,13 @@ impl VarianceSwap {
             .filter(|&d| d <= as_of)
             .collect();
 
-        if let Ok(series) = context.get_series(close_id) {
-            if past_dates.len() >= 2 {
-                return past_dates
-                    .iter()
-                    .map(|&date| series.value_on_exact(date))
-                    .collect();
-            }
+        if let Ok(series) = context.get_series(close_id)
+            && past_dates.len() >= 2
+        {
+            return past_dates
+                .iter()
+                .map(|&date| series.value_on_exact(date))
+                .collect();
         }
         if past_dates.len() >= 2 {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -935,8 +935,10 @@ mod tests {
         let dates = swap.observation_dates().expect("observation schedule");
         assert_eq!(dates[0], date!(2025 - 01 - 03));
         assert_eq!(dates[1], date!(2025 - 01 - 07));
-        assert!(dates
-            .iter()
-            .all(|d| !matches!(d.weekday(), time::Weekday::Saturday | time::Weekday::Sunday)));
+        assert!(
+            dates
+                .iter()
+                .all(|d| !matches!(d.weekday(), time::Weekday::Saturday | time::Weekday::Sunday))
+        );
     }
 }

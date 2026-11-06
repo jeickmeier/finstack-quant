@@ -2,14 +2,14 @@
 
 #![cfg(target_arch = "wasm32")]
 
-use finstack_quant_wasm::api::core::dates::{create_date, JsDayCount, JsDayCountContext};
+use finstack_quant_wasm::api::core::dates::{JsDayCount, JsDayCountContext, create_date};
 use finstack_quant_wasm::api::core::market_discount::JsDiscountCurve;
 use finstack_quant_wasm::api::core::market_forward::JsForwardCurve;
 use finstack_quant_wasm::api::core::market_fx::*;
 use finstack_quant_wasm::api::core::market_fx::{JsFxConversionPolicy, JsFxMatrix};
 use finstack_quant_wasm::api::core::surfaces::{JsFxDeltaVolSurface, JsVolCube};
 use finstack_quant_wasm::api::models::volatility::{
-    get_cube_normal_vol, get_cube_normal_vol_clamped, get_fx_delta_pillar_vols, get_fx_delta_vol,
+    get_cube_vol, get_cube_vol_clamped, get_fx_delta_pillar_vols, get_fx_delta_vol,
 };
 use js_sys::Float64Array;
 use wasm_bindgen::JsValue;
@@ -72,12 +72,16 @@ fn forward_curve_projection_grid_and_rate_between() {
             .abs()
             < 1e-14
     );
-    assert!(curve
-        .rate_between(JsValue::from(t_3m), JsValue::from(t_3m))
-        .is_err());
-    assert!(curve
-        .rate_between(JsValue::from(t_6m), JsValue::from(t_3m))
-        .is_err());
+    assert!(
+        curve
+            .rate_between(JsValue::from(t_3m), JsValue::from(t_3m))
+            .is_err()
+    );
+    assert!(
+        curve
+            .rate_between(JsValue::from(t_6m), JsValue::from(t_3m))
+            .is_err()
+    );
 
     let grid = Float64Array::new(&curve.projection_grid());
     assert_eq!(grid.length(), 3);
@@ -250,21 +254,27 @@ fn normal_sabr_requires_positive_shifted_levels_when_beta_is_positive() {
         None,
     )
     .unwrap();
-    assert!(get_cube_normal_vol(
-        &cev,
-        JsValue::from(1.0),
-        JsValue::from(2.0),
-        JsValue::from(-0.01)
-    )
-    .is_err());
-    assert!(get_cube_normal_vol_clamped(
-        &cev,
-        JsValue::from(1.0),
-        JsValue::from(2.0),
-        JsValue::from(-0.01)
-    )
-    .unwrap()
-    .is_nan());
+    assert!(
+        get_cube_vol(
+            &cev,
+            JsValue::from(1.0),
+            JsValue::from(2.0),
+            JsValue::from(-0.01),
+            JsValue::from("normal"),
+        )
+        .is_err()
+    );
+    assert!(
+        get_cube_vol_clamped(
+            &cev,
+            JsValue::from(1.0),
+            JsValue::from(2.0),
+            JsValue::from(-0.01),
+            JsValue::from("normal"),
+        )
+        .unwrap()
+        .is_nan()
+    );
 
     let normal = JsVolCube::new(
         JsValue::from("NORMAL"),
@@ -275,14 +285,17 @@ fn normal_sabr_requires_positive_shifted_levels_when_beta_is_positive() {
         None,
     )
     .unwrap();
-    assert!(get_cube_normal_vol(
-        &normal,
-        JsValue::from(1.0),
-        JsValue::from(2.0),
-        JsValue::from(-0.02)
-    )
-    .unwrap()
-    .is_finite());
+    assert!(
+        get_cube_vol(
+            &normal,
+            JsValue::from(1.0),
+            JsValue::from(2.0),
+            JsValue::from(-0.02),
+            JsValue::from("normal"),
+        )
+        .unwrap()
+        .is_finite()
+    );
 }
 
 #[wasm_bindgen_test]
@@ -290,13 +303,15 @@ fn day_count_context_supports_context_dependent_conventions() {
     let start = create_date(JsValue::from(2024), JsValue::from(1), JsValue::from(1)).unwrap();
     let end = create_date(JsValue::from(2024), JsValue::from(7), JsValue::from(1)).unwrap();
 
-    assert!(JsDayCount::act_act_isma()
-        .year_fraction(
-            JsValue::from(start),
-            JsValue::from(end),
-            &JsDayCountContext::new(None, None, None, None, None).expect("empty context")
-        )
-        .is_err());
+    assert!(
+        JsDayCount::act_act_isma()
+            .year_fraction(
+                JsValue::from(start),
+                JsValue::from(end),
+                &JsDayCountContext::new(None, None, None, None, None).expect("empty context")
+            )
+            .is_err()
+    );
 
     let isma_ctx =
         JsDayCountContext::new(None, Some(JsValue::from("6M")), None, None, None).expect("context");
@@ -332,12 +347,16 @@ fn day_count_exposes_act365l_and_signed_fraction() {
             .unwrap(),
         1.0
     );
-    assert!(JsDayCount::act365l()
-        .year_fraction(JsValue::from(start), JsValue::from(end), &empty)
-        .is_err());
-    assert!(JsDayCount::act365l()
-        .signed_year_fraction(JsValue::from(start), JsValue::from(end), &empty)
-        .is_err());
+    assert!(
+        JsDayCount::act365l()
+            .year_fraction(JsValue::from(start), JsValue::from(end), &empty)
+            .is_err()
+    );
+    assert!(
+        JsDayCount::act365l()
+            .signed_year_fraction(JsValue::from(start), JsValue::from(end), &empty)
+            .is_err()
+    );
     assert_eq!(
         JsDayCount::act_act()
             .signed_year_fraction(JsValue::from(end), JsValue::from(start), &empty)

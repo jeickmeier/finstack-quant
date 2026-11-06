@@ -1,7 +1,7 @@
 //! Tests for free calendar resolution APIs.
 
 use super::common::make_date;
-use finstack_quant_core::dates::{available_calendars, calendar_by_id_strict, HolidayCalendar};
+use finstack_quant_core::dates::{HolidayCalendar, available_calendars, calendar_by_id_strict};
 use finstack_quant_core::types::CalendarId;
 
 #[test]

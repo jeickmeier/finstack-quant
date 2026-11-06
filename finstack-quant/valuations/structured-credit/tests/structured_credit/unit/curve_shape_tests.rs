@@ -4,16 +4,16 @@
 
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    calculate_tranche_wal, AssetPool, AssetType, DealType, DelinquencyModel, PoolAsset,
-    StructuredCredit, Tranche, TrancheCashflows, TrancheStructure,
+    AssetPool, AssetType, DealType, DelinquencyModel, PoolAsset, StructuredCredit, Tranche,
+    TrancheCashflows, TrancheStructure, calculate_tranche_wal,
 };
 use time::Month;
 
@@ -195,16 +195,20 @@ fn stochastic_pricing_rejects_lifetime_curves_and_severity_vectors() {
     };
     let mut lifetime = auto_abs(false);
     lifetime.credit_model.default_spec = DefaultModelSpec::cumulative_loss(vec![1.0, 2.0], 0.5);
-    assert!(lifetime
-        .price_stochastic_with_mode(&market(), close(), mode.clone())
-        .is_err());
+    assert!(
+        lifetime
+            .price_stochastic_with_mode(&market(), close(), mode.clone())
+            .is_err()
+    );
 
     let mut severity = auto_abs(false);
     severity.credit_model.recovery_spec =
         RecoveryModelSpec::with_lag(0.5, 0).with_severity_vector(vec![0.6]);
-    assert!(severity
-        .price_stochastic_with_mode(&market(), close(), mode)
-        .is_err());
+    assert!(
+        severity
+            .price_stochastic_with_mode(&market(), close(), mode)
+            .is_err()
+    );
 }
 
 /// A charge-off curve through a delinquency model: the entries are sized

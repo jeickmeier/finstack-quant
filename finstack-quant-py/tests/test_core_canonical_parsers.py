@@ -59,10 +59,16 @@ def _period_stats_payload() -> dict[str, object]:
     import datetime as dt
     import json
 
-    from finstack_quant.analytics import Performance
+    from finstack_quant.analytics import Performance, PerformancePanel
 
-    performance = Performance.from_returns_arrays(
-        [dt.date(2025, 1, 1), dt.date(2025, 2, 1)], [[0.01, 0.02]], ["fund"], frequency="monthly"
+    performance = Performance.from_panel(
+        PerformancePanel(
+            dates=[dt.date(2025, 1, 1), dt.date(2025, 2, 1)],
+            series=[[0.01, 0.02]],
+            kind="returns",
+            ticker_names=["fund"],
+            frequency="monthly",
+        )
     )
     return json.loads(performance.period_stats(0, aggregation_frequency="monthly").to_json())
 

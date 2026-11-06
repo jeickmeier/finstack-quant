@@ -7,10 +7,10 @@
 //! them. Render an entry with
 //! [`SchemaArtifact::generate`](finstack_quant_core::schema::SchemaArtifact::generate).
 
-use finstack_quant_core::schema::{
-    externalize_schema_definitions, ExternalSchemaDefinition, SchemaArtifact,
-};
 use finstack_quant_core::Result;
+use finstack_quant_core::schema::{
+    ExternalSchemaDefinition, SchemaArtifact, externalize_schema_definitions,
+};
 use finstack_quant_statements::adjustments::NormalizationConfig;
 use finstack_quant_statements::evaluator::StatementResult;
 use finstack_quant_statements::types::FinancialModelSpec;
@@ -58,19 +58,21 @@ pub fn package_schema(schema: &mut Value) -> Result<()> {
 }
 
 use crate::{
-    analysis::BridgeChart, analysis::CapexReconciliation, analysis::CeclConfig,
-    analysis::CeclResult, analysis::CorporateAnalysis, analysis::CorporateAnalysisOptions,
-    analysis::CoverageFloorCheck, analysis::CreditAssessment, analysis::DcfOptions,
-    analysis::DcfSensitivityResult, analysis::DependencyTree, analysis::DepreciationReconciliation,
+    analysis::BridgeChart, analysis::CapexReconciliation, analysis::CapitalStructureSummary,
+    analysis::CapitalStructureSummaryConfig, analysis::CeclConfig, analysis::CeclResult,
+    analysis::CorporateAnalysis, analysis::CorporateAnalysisOptions, analysis::CoverageFloorCheck,
+    analysis::CreditAssessment, analysis::DcfOptions, analysis::DcfSensitivityResult,
+    analysis::DependencyTree, analysis::DepreciationReconciliation,
     analysis::DividendReconciliation, analysis::EclConfig, analysis::EffectiveTaxRateCheck,
     analysis::Explanation, analysis::Exposure, analysis::FcfSignCheck, analysis::ForecastMetrics,
     analysis::GoalSeekResult, analysis::GrowthRateConsistency,
     analysis::InterestExpenseReconciliation, analysis::LboConfig, analysis::LboResult,
     analysis::LeverageRangeCheck, analysis::LiquidityRunwayCheck, analysis::PeerFilter,
     analysis::PeerSet, analysis::PeerStats, analysis::RatingPdMap, analysis::RegressionResult,
+    analysis::RelativeValueReport, analysis::RelativeValueReportConfig,
     analysis::RelativeValueResult, analysis::ScenarioDiff, analysis::ScenarioResults,
     analysis::ScenarioSet, analysis::ScoringDimension, analysis::SensitivityResult,
-    analysis::StageResult, analysis::TrendCheck, analysis::VarianceConfig,
+    analysis::StageResult, analysis::TrendCheck, analysis::VarianceConfig, analysis::WaccInputs,
     analysis::WeightedEclResult, analysis::WorkingCapitalConsistency, extensions::CorkscrewConfig,
     extensions::CorkscrewReport, extensions::ScorecardConfig, extensions::ScorecardReport,
     templates::real_estate::LeaseSpec, templates::real_estate::ManagementFeeSpec,
@@ -93,6 +95,22 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "capex_reconciliation",
         Component,
         "Verifies that cash-flow-statement capex equals the sum of PP&E additions and intangible additions."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        CapitalStructureSummary,
+        "statements_analytics",
+        "capital_structure_summary",
+        Output,
+        "Debt stack by seniority at one period: leverage and coverage through each payment class, and the maturity wall."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        CapitalStructureSummaryConfig,
+        "statements_analytics",
+        "capital_structure_summary_config",
+        Input,
+        "Reporting period and statement nodes for a capital structure summary."
     )
     .with_packager(package_schema),
     finstack_quant_core::schema_artifact!(
@@ -368,6 +386,22 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
     )
     .with_packager(package_schema),
     finstack_quant_core::schema_artifact!(
+        RelativeValueReport,
+        "statements_analytics",
+        "relative_value_report",
+        Output,
+        "Comps table, peer statistics, regression scatter and composite rich/cheap score of a subject against its filtered peers."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        RelativeValueReportConfig,
+        "statements_analytics",
+        "relative_value_report_config",
+        Input,
+        "Peer filter, period basis, scoring dimensions and multiple columns for a relative value report."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
         RelativeValueResult,
         "statements_analytics",
         "relative_value_result",
@@ -453,6 +487,14 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "variance_config",
         Input,
         "Configuration for variance analysis between two `StatementResult`."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        WaccInputs,
+        "statements_analytics",
+        "wacc_inputs",
+        Input,
+        "Capital-structure inputs of a weighted-average cost of capital calculation."
     )
     .with_packager(package_schema),
     finstack_quant_core::schema_artifact!(

@@ -9,10 +9,9 @@
 //! the `models.rates.hullWhite.HullWhiteParams` handle, the one host type for
 //! Rust `HullWhiteParams`.
 //!
-//! wasm-bindgen cannot borrow an optional class handle, so the raw cap/floor
-//! functions take `forward` as a required handle; `exports/calibration.js`
-//! passes `discount` when the caller omits it, which is the Rust default
-//! (`forward: None` projects on the discount curve).
+//! wasm-bindgen cannot borrow an optional class handle, so each cap/floor fit
+//! has a raw export without and with `forward`; `exports/calibration.js`
+//! picks one (`forward: None` projects on the discount curve).
 
 use crate::api::core::market_discount::JsDiscountCurve;
 use crate::api::models::rates::hull_white::JsHullWhiteParams;
@@ -78,34 +77,17 @@ pub fn calibrate_hull_white_to_swaptions(
     to_js_value(&fitted)
 }
 
-/// Fit scalar Hull-White `(kappa, sigma)` to cap/floor quotes.
-///
-/// Twin of Python `calibrate_hull_white_to_cap_floors` (Rust
-/// `calibrate_hull_white_to_cap_floors`).
-/// @param discount - Discounting curve; its base date is the valuation date.
-/// @param quotes - Array (or JSON) of `CapFloorQuote` objects: `maturity` in years, `strike` and `volatility` as decimals, `is_cap`, `is_normal_vol`. A single quote requires `config.fixed_kappa`.
-/// @param config - `CapFloorCalibrationConfig` object: required `fit_tolerance` (normal-vol units), optional `frequency` (default `"semi_annual"`), `fixed_kappa` and `initial_guess`.
-/// @param forward - Curve projecting the caplet forwards; the published function defaults it to `discount`.
-/// @returns `[params, report]`: the fitted `HullWhiteCalibrationParams` and the `CalibrationReport`.
-///
-/// # Errors
-///
-/// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
-/// a `FinstackError` if no quotes are supplied, a single quote is given
-/// without `fixed_kappa`, a quote or the config is invalid
-/// (`kind: "validation"`), or the solver fails to converge.
-#[wasm_bindgen(js_name = calibrateHullWhiteToCapFloors)]
-pub fn calibrate_hull_white_to_cap_floors(
+fn calibrate_to_cap_floors_inner(
     discount: &JsDiscountCurve,
     quotes: JsValue,
     config: JsValue,
-    forward: &JsDiscountCurve,
+    forward: Option<&JsDiscountCurve>,
 ) -> Result<JsValue, JsValue> {
     let quotes: Vec<CapFloorQuote> = from_js_json(&quotes, "quotes")?;
     let config: CapFloorCalibrationConfig = from_js_json(&config, "config")?;
     let fitted = rust_hw::calibrate_hull_white_to_cap_floors(
         &discount.inner,
-        Some(&forward.inner),
+        forward.map(|curve| curve.inner.as_ref()),
         &quotes,
         config,
     )
@@ -113,34 +95,45 @@ pub fn calibrate_hull_white_to_cap_floors(
     to_js_value(&fitted)
 }
 
-/// Bootstrap a piecewise-constant Hull-White sigma schedule to cap/floor quotes.
-///
-/// Twin of Python `bootstrap_hull_white_sigma_schedule_to_cap_floors` (Rust
-/// `bootstrap_hull_white_sigma_schedule_to_cap_floors`).
-/// @param discount - Discounting curve; its base date is the valuation date.
-/// @param quotes - Array (or JSON) of `CapFloorQuote` objects with distinct maturities in years; each maturity adds one constant-sigma interval.
-/// @param config - `PiecewiseSigmaCalibrationConfig` object: `fixed_kappa`, `sigma_min`, `sigma_max` (absolute rate volatility), `fit_tolerance` and optional `frequency` (default `"semi_annual"`).
-/// @param forward - Curve projecting the caplet forwards; the published function defaults it to `discount`.
-/// @returns `[params, report]`: the piecewise `HullWhiteParams` handle (`models.rates.hullWhite.HullWhiteParams`) and the `CalibrationReport` object.
-///
-/// # Errors
-///
-/// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
-/// a `FinstackError` if no quotes are supplied, maturities repeat, the
-/// configuration bounds are invalid (`kind: "validation"`), or an interval's
-/// sigma cannot be bracketed or solved.
-#[wasm_bindgen(js_name = bootstrapHullWhiteSigmaScheduleToCapFloors)]
-pub fn bootstrap_hull_white_sigma_schedule_to_cap_floors(
+/// Raw export behind the published `calibration.calibrateHullWhiteToCapFloors` without a forward curve, projecting on `discount`; see that function.
+/// @param discount - Discounting curve handle; its base date is the valuation date.
+/// @param quotes - `CapFloorQuote` array or JSON, as the published function takes it.
+/// @param config - Calibration config object or JSON, as the published function takes it.
+#[wasm_bindgen(js_name = calibrateHullWhiteToCapFloorsWithoutForward)]
+pub fn calibrate_hull_white_to_cap_floors_without_forward(
+    discount: &JsDiscountCurve,
+    quotes: JsValue,
+    config: JsValue,
+) -> Result<JsValue, JsValue> {
+    calibrate_to_cap_floors_inner(discount, quotes, config, None)
+}
+
+/// Raw export behind the published `calibration.calibrateHullWhiteToCapFloors` with a forward curve; see that function.
+/// @param discount - Discounting curve handle; its base date is the valuation date.
+/// @param quotes - `CapFloorQuote` array or JSON, as the published function takes it.
+/// @param config - Calibration config object or JSON, as the published function takes it.
+/// @param forward - Curve handle projecting the caplet forwards.
+#[wasm_bindgen(js_name = calibrateHullWhiteToCapFloorsWithForward)]
+pub fn calibrate_hull_white_to_cap_floors_with_forward(
     discount: &JsDiscountCurve,
     quotes: JsValue,
     config: JsValue,
     forward: &JsDiscountCurve,
+) -> Result<JsValue, JsValue> {
+    calibrate_to_cap_floors_inner(discount, quotes, config, Some(forward))
+}
+
+fn bootstrap_sigma_schedule_inner(
+    discount: &JsDiscountCurve,
+    quotes: JsValue,
+    config: JsValue,
+    forward: Option<&JsDiscountCurve>,
 ) -> Result<js_sys::Array, JsValue> {
     let quotes: Vec<CapFloorQuote> = from_js_json(&quotes, "quotes")?;
     let config: PiecewiseSigmaCalibrationConfig = from_js_json(&config, "config")?;
     let (params, report) = rust_hw::bootstrap_hull_white_sigma_schedule_to_cap_floors(
         &discount.inner,
-        Some(&forward.inner),
+        forward.map(|curve| curve.inner.as_ref()),
         &quotes,
         config,
     )
@@ -149,6 +142,34 @@ pub fn bootstrap_hull_white_sigma_schedule_to_cap_floors(
         &JsHullWhiteParams { inner: params }.into(),
         &to_js_value(&report)?,
     ))
+}
+
+/// Raw export behind the published `calibration.bootstrapHullWhiteSigmaScheduleToCapFloors` without a forward curve, projecting on `discount`; see that function.
+/// @param discount - Discounting curve handle; its base date is the valuation date.
+/// @param quotes - `CapFloorQuote` array or JSON, as the published function takes it.
+/// @param config - Calibration config object or JSON, as the published function takes it.
+#[wasm_bindgen(js_name = bootstrapHullWhiteSigmaScheduleToCapFloorsWithoutForward)]
+pub fn bootstrap_hull_white_sigma_schedule_to_cap_floors_without_forward(
+    discount: &JsDiscountCurve,
+    quotes: JsValue,
+    config: JsValue,
+) -> Result<js_sys::Array, JsValue> {
+    bootstrap_sigma_schedule_inner(discount, quotes, config, None)
+}
+
+/// Raw export behind the published `calibration.bootstrapHullWhiteSigmaScheduleToCapFloors` with a forward curve; see that function.
+/// @param discount - Discounting curve handle; its base date is the valuation date.
+/// @param quotes - `CapFloorQuote` array or JSON, as the published function takes it.
+/// @param config - Calibration config object or JSON, as the published function takes it.
+/// @param forward - Curve handle projecting the caplet forwards.
+#[wasm_bindgen(js_name = bootstrapHullWhiteSigmaScheduleToCapFloorsWithForward)]
+pub fn bootstrap_hull_white_sigma_schedule_to_cap_floors_with_forward(
+    discount: &JsDiscountCurve,
+    quotes: JsValue,
+    config: JsValue,
+    forward: &JsDiscountCurve,
+) -> Result<js_sys::Array, JsValue> {
+    bootstrap_sigma_schedule_inner(discount, quotes, config, Some(forward))
 }
 
 #[cfg(test)]

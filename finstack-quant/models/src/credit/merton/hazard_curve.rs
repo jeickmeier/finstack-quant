@@ -73,14 +73,14 @@ impl MertonModel {
         // already embeds a recovery assumption. Letting the exported curve
         // carry a different one would price the same default event under two
         // inconsistent loss assumptions.
-        if let AssetDynamics::CreditGrades { mean_recovery, .. } = self.dynamics {
-            if (recovery - mean_recovery).abs() > 1e-12 {
-                return Err(Error::Validation(format!(
-                    "to_hazard_curve: recovery {recovery} contradicts the model's \
+        if let AssetDynamics::CreditGrades { mean_recovery, .. } = self.dynamics
+            && (recovery - mean_recovery).abs() > 1e-12
+        {
+            return Err(Error::Validation(format!(
+                "to_hazard_curve: recovery {recovery} contradicts the model's \
                      CreditGrades mean_recovery {mean_recovery}; the barrier is derived \
                      from mean_recovery, so the exported curve must use the same value"
-                )));
-            }
+            )));
         }
 
         let mut sorted_tenors: Vec<f64> = tenors.to_vec();
@@ -235,9 +235,10 @@ mod tests {
             "fixture must have increasing survival: 1Y={survival_1y}, 5Y={survival_5y}"
         );
 
-        assert!(m
-            .to_hazard_curve("BAD", base, &[1.0, 5.0], 0.40, DayCount::Act365F)
-            .is_err());
+        assert!(
+            m.to_hazard_curve("BAD", base, &[1.0, 5.0], 0.40, DayCount::Act365F)
+                .is_err()
+        );
     }
 
     #[test]
@@ -264,12 +265,14 @@ mod tests {
         let base =
             finstack_quant_core::dates::Date::from_calendar_date(2026, time::Month::March, 1)
                 .expect("valid date");
-        assert!(m
-            .to_hazard_curve("CG", base, &[1.0, 5.0], 0.60, DayCount::Act365F)
-            .is_err());
-        assert!(m
-            .to_hazard_curve("CG", base, &[1.0, 5.0], 0.40, DayCount::Act365F)
-            .is_ok());
+        assert!(
+            m.to_hazard_curve("CG", base, &[1.0, 5.0], 0.60, DayCount::Act365F)
+                .is_err()
+        );
+        assert!(
+            m.to_hazard_curve("CG", base, &[1.0, 5.0], 0.40, DayCount::Act365F)
+                .is_ok()
+        );
     }
 
     #[test]

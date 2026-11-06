@@ -17,11 +17,11 @@ use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::types::{ExerciseStyle, OptionType};
+use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::SettlementType;
 use finstack_quant_valuations::instruments::equity::equity_option::{
     EquityOption, EquityOptionExercise,
 };
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::SettlementType;
 use finstack_quant_valuations::metrics::{MetricContext, MetricId};
 use finstack_quant_valuations::pricer::STANDARD;
 use finstack_quant_valuations_test_support::builders::simple_option_market;
@@ -337,9 +337,10 @@ fn test_zero_quantity_is_rejected() {
     let err = option
         .value(&market, as_of)
         .expect_err("zero-quantity equity option must fail validation");
-    assert!(err
-        .to_string()
-        .contains("EquityOption.quantity must be non-zero"));
+    assert!(
+        err.to_string()
+            .contains("EquityOption.quantity must be non-zero")
+    );
 }
 
 #[test]

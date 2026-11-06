@@ -1,8 +1,8 @@
 //! Cross-currency swap market quote schema.
 
 use super::ids::{Pillar, QuoteId};
-use finstack_quant_core::validation::{validate_f64_finite, validate_f64_positive};
 use finstack_quant_core::Result;
+use finstack_quant_core::validation::{validate_f64_finite, validate_f64_positive};
 use finstack_quant_valuations_core::market::conventions::ids::XccyConventionId;
 use serde::{Deserialize, Serialize};
 

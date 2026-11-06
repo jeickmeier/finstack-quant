@@ -4,8 +4,8 @@
 //! simple fixed-rate bond.
 
 use finstack_quant_attribution::{
-    attribute_pnl, attribute_pnl_metrics_based, AttributionMethod, AttributionRequest,
-    ExecutionPolicy,
+    AttributionMethod, AttributionRequest, ExecutionPolicy, attribute_pnl,
+    attribute_pnl_metrics_based,
 };
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
@@ -14,8 +14,8 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::metrics::MetricId;
 use std::sync::Arc;
 use time::Month;
@@ -407,4 +407,87 @@ fn test_metrics_based_bond_attribution_without_carry_metrics_keeps_legacy_shape(
     scaled.scale(0.5).expect("finite representable scale");
     let scaled_detail = scaled.carry_detail.expect("scaled carry detail");
     assert!((scaled_detail.total.amount() * 2.0 - detail.total.amount()).abs() < 1e-6);
+}
+
+/// A bond priced off a hazard curve built directly from hazard rates (no
+/// calibration recipe) cannot produce quote-space credit metrics. The
+/// metrics-based method's own default menu drops them with a note, like the
+/// Taylor method's credit step, while an explicitly requested CS01 still
+/// fails and names the missing recipe.
+#[test]
+fn test_bond_metrics_based_on_unreplayable_hazard_curve() {
+    use finstack_quant_core::market_data::term_structures::HazardCurve;
+    use finstack_quant_core::types::CurveId;
+
+    let as_of_t0 = create_date(2025, Month::January, 15).unwrap();
+    let as_of_t1 = create_date(2025, Month::January, 16).unwrap();
+    let mut bond = Bond::fixed(
+        "CREDIT-BOND",
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
+        create_date(2025, Month::January, 1).unwrap(),
+        create_date(2030, Month::January, 1).unwrap(),
+        finstack_quant_core::dates::StubKind::ShortFront,
+        "USD-OIS",
+    )
+    .unwrap();
+    bond.credit_curve_id = Some(CurveId::new("HZ"));
+    let hazard = |base_date, rate: f64| {
+        HazardCurve::builder("HZ")
+            .base_date(base_date)
+            .recovery_rate(0.4)
+            .knots([(0.0, rate), (5.0, rate)])
+            .build()
+            .expect("hazard curve")
+    };
+    let market_t0 = MarketContext::new()
+        .insert(flat_curve("USD-OIS", as_of_t0, 0.04))
+        .insert(hazard(as_of_t0, 0.02));
+    let market_t1 = MarketContext::new()
+        .insert(flat_curve("USD-OIS", as_of_t1, 0.041))
+        .insert(hazard(as_of_t1, 0.02));
+    let config = FinstackConfig::default();
+    let instrument: Arc<dyn Instrument> = Arc::new(bond);
+    let request = AttributionRequest::new(
+        &instrument,
+        &market_t0,
+        &market_t1,
+        as_of_t0,
+        as_of_t1,
+        &config,
+    );
+
+    let attribution = attribute_pnl(&AttributionMethod::MetricsBased, &request)
+        .expect("the default metric menu degrades instead of failing");
+    assert!(
+        attribution.rates_curves_pnl.amount() < 0.0,
+        "rates still attribute: {}",
+        attribution.rates_curves_pnl.amount()
+    );
+    assert_eq!(attribution.credit_curves_pnl.amount(), 0.0);
+    assert!(
+        attribution
+            .meta
+            .notes
+            .iter()
+            .any(|note| note.contains("'HZ'") && note.contains("calibration recipe")),
+        "{:?}",
+        attribution.meta.notes
+    );
+
+    let explicit = [MetricId::Theta, MetricId::Cs01];
+    let error = attribute_pnl(
+        &AttributionMethod::MetricsBased,
+        &AttributionRequest {
+            metrics: Some(&explicit),
+            ..request
+        },
+    )
+    .expect_err("an explicitly requested CS01 must not be dropped");
+    assert!(
+        error
+            .to_string()
+            .contains("calibration recipe for hazard curve 'HZ'"),
+        "{error}"
+    );
 }

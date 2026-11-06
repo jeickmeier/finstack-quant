@@ -55,6 +55,7 @@ const fixtures = {
   },
   'rolling_greeks.schema.json': { dates: ['2025-01-02'], alphas: [0.0], betas: [1.0] },
   'lookback_returns.schema.json': {
+    ref_date: '2025-01-02',
     ticker_names: ['FUND'],
     mtd: [0.1],
     qtd: [0.1],
@@ -94,11 +95,12 @@ for (const [selector, value] of Object.entries(fixtures)) {
 test('optional recovery dates and numeric nonfinite host outputs are preserved', () => {
   const document = contract('drawdown_episode.schema.json');
   assert.equal(document.required.includes('end'), false);
-  const perf = analytics.Performance.fromReturns(
-    ['2025-01-01', '2025-01-02'],
-    [[0.01, 0.02]],
-    ['FUND']
-  );
+  const perf = new analytics.Performance({
+    dates: ['2025-01-01', '2025-01-02'],
+    series: [[0.01, 0.02]],
+    kind: 'returns',
+    ticker_names: ['FUND'],
+  });
   const beta = perf.beta()[0];
   assert.equal(beta.n_obs, 2);
   assert.equal(beta.confidence_level, 0.95);

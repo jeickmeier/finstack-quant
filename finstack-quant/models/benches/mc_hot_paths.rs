@@ -14,7 +14,7 @@
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::fractional::HurstExponent;
 use finstack_quant_models::monte_carlo::discretization::exact_hw1f::ExactHullWhite1F;

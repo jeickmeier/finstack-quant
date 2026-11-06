@@ -3,9 +3,9 @@
 //! `CoverageTestType::BorrowingBase` coverage test (and by the asset-backed
 //! facility instrument that synthesizes that test).
 
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::FxHashMap;
 use serde::{Deserialize, Serialize};
 
 use super::pool::{AssetPool, PoolAsset};
@@ -256,14 +256,14 @@ impl BorrowingBaseRules {
         live: Option<LiveCollateral<'_>>,
     ) -> finstack_quant_core::Result<BorrowingBaseReport> {
         let currency = pool.get_currency();
-        if let Some(balances) = balances {
-            if balances.len() != pool.assets.len() {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "borrowing base balances ({}) do not match the pool's assets ({})",
-                    balances.len(),
-                    pool.assets.len()
-                )));
-            }
+        if let Some(balances) = balances
+            && balances.len() != pool.assets.len()
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "borrowing base balances ({}) do not match the pool's assets ({})",
+                balances.len(),
+                pool.assets.len()
+            )));
         }
 
         // Eligible balance and advance rate per asset.
@@ -355,7 +355,7 @@ impl BorrowingBaseRules {
 
 /// Grouping key of `asset` under `scope`, or `None` when the asset carries
 /// no value on that dimension (it then escapes the limit).
-fn concentration_key(scope: ConcentrationScope, asset: &PoolAsset) -> Option<String> {
+pub(super) fn concentration_key(scope: ConcentrationScope, asset: &PoolAsset) -> Option<String> {
     match scope {
         ConcentrationScope::Obligor => asset.obligor_id.clone(),
         ConcentrationScope::Industry => asset.industry.clone(),

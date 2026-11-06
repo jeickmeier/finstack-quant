@@ -13,7 +13,8 @@ import { createChartRuntime } from "@tanstack/charts";
 import { MarketContextForm } from "@/components/finstack/core/components/market-context-form/market-context-form";
 import {
   marketModule,
-  importMarket,
+  calibratedMarket,
+  parseMarket,
 } from "@/components/finstack/core/components/market-context-form/market";
 import {
   curvePanels,
@@ -37,7 +38,7 @@ const native = createRequire(import.meta.url)(
 let harness: Awaited<ReturnType<typeof startWorker>>;
 beforeAll(async () => {
   harness = await startWorker();
-}, budget(30000));
+});
 afterAll(async () => harness?.close());
 afterEach(cleanup);
 const validate = async (json: string) =>
@@ -158,49 +159,60 @@ it("edits no-knot parametric and base-correlation shapes and preserves every oth
     JSON.parse(json).curves.every((c: object) => !("knot_points" in c)),
   ).toBe(true);
 });
-it("imports an actual native calibration envelope and canonical fixture, leaving other fields read-only", async () => {
-  // The recorded native envelope; `mise run ui-fixtures --check` regenerates it.
-  const envelope = calibrations.find(
-    (c) => c.source.endsWith("01_usd_discount.json") && !("variant" in c),
-  )!.result;
-  const imported = importMarket(serializeHost(envelope));
-  expect(imported).toEqual(
-    marketModule.codec.parse(
-      canonical(serializeHost(envelope.result.final_market)),
-    ),
-  );
-  const onSubmit = vi.fn();
-  render(
-    <MarketContextForm
-      defaultJson={bond.request.marketJson}
-      validate={validate}
-      onSubmit={onSubmit}
-    />,
-  );
-  const readonly = screen.getByRole("region", {
-    name: "Read-only market data",
-    hidden: true,
-  });
-  expect(readonly.querySelector("pre")?.textContent).toContain(
-    '"inflation_indices"',
-  );
-  expect(
-    document.querySelector('[data-field-path="inflation_indices"] input'),
-  ).toBeNull();
-  fireEvent.change(screen.getByLabelText("Market or calibration result JSON"), {
-    target: { value: serializeHost(envelope) },
-  });
-  fireEvent.click(screen.getByText("Import JSON"));
-  expect(JSON.parse(await submit(onSubmit))).toEqual(
-    JSON.parse(canonical(serializeHost(envelope.result.final_market))),
-  );
-  onSubmit.mockClear();
-  fireEvent.change(screen.getByLabelText("Market or calibration result JSON"), {
-    target: { value: bond.request.marketJson },
-  });
-  fireEvent.click(screen.getByText("Import JSON"));
-  expect(await submit(onSubmit)).toBe(canonical(bond.request.marketJson));
-});
+it(
+  "imports an actual native calibration envelope and canonical fixture, leaving other fields read-only",
+  async () => {
+    // The recorded native envelope; `mise run ui-fixtures --check` regenerates it.
+    const envelope = calibrations.find(
+      (c) => c.source.endsWith("01_usd_discount.json") && !("variant" in c),
+    )!.result;
+    const imported = calibratedMarket(serializeHost(envelope));
+    expect(imported).toEqual(
+      marketModule.codec.parse(
+        canonical(serializeHost(envelope.result.final_market)),
+      ),
+    );
+    // A plain market is not a calibration result, and an envelope is not a market.
+    expect(() => calibratedMarket(bond.request.marketJson)).toThrow(
+      /final_market is missing/,
+    );
+    expect(() => parseMarket(serializeHost(envelope))).toThrow();
+    const onSubmit = vi.fn();
+    render(
+      <MarketContextForm
+        defaultJson={bond.request.marketJson}
+        validate={validate}
+        onSubmit={onSubmit}
+      />,
+    );
+    const readonly = screen.getByRole("region", {
+      name: "Read-only market data",
+      hidden: true,
+    });
+    expect(readonly.querySelector("pre")?.textContent).toContain(
+      '"inflation_indices"',
+    );
+    expect(
+      document.querySelector('[data-field-path="inflation_indices"] input'),
+    ).toBeNull();
+    fireEvent.change(
+      screen.getByLabelText("Market or calibration result JSON"),
+      { target: { value: serializeHost(envelope) } },
+    );
+    fireEvent.click(screen.getByText("Import calibration result"));
+    expect(JSON.parse(await submit(onSubmit))).toEqual(
+      JSON.parse(canonical(serializeHost(envelope.result.final_market))),
+    );
+    onSubmit.mockClear();
+    fireEvent.change(
+      screen.getByLabelText("Market or calibration result JSON"),
+      { target: { value: bond.request.marketJson } },
+    );
+    fireEvent.click(screen.getByText("Import market JSON"));
+    expect(await submit(onSubmit)).toBe(canonical(bond.request.marketJson));
+  },
+  budget(15000),
+);
 it("retains actual native domain errors and one canonical validation handle", async () => {
   const local = await startWorker();
   try {
@@ -258,7 +270,7 @@ it("rejects malformed imports without discarding edits or exposing readonly data
   fireEvent.change(screen.getByLabelText("Market or calibration result JSON"), {
     target: { value: "{bad" },
   });
-  fireEvent.click(screen.getByText("Import JSON"));
+  fireEvent.click(screen.getByText("Import market JSON"));
   expect(screen.getAllByRole("alert").length).toBeGreaterThan(0);
   expect(
     (screen.getAllByLabelText("Stored value 1")[0] as HTMLInputElement).value,

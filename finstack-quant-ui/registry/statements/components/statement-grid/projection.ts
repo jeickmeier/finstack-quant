@@ -8,6 +8,10 @@ import { groupDecimal } from "@/lib/finstack/format/format";
 import Big from "big.js";
 
 const resultCodec = createWireCodec(statementSchema);
+/** The native evaluation layer that produced a cell (`Value > Forecast > Formula`, after a `where` mask). */
+export type StatementCellSource = NonNullable<
+  StatementResultWire["node_sources"]
+>[string][string];
 export type StatementPeriod = FinancialModelSpecWire["periods"][number];
 export interface StatementCell {
   periodId: string;
@@ -15,6 +19,8 @@ export interface StatementCell {
   text: string;
   /** The unmodified native number or sentinel; monetary values retain their Money wire object. */
   value: unknown;
+  /** The layer Rust recorded in `node_sources`; absent for results without it (for example a rollup). */
+  source?: StatementCellSource;
 }
 /** Explicit presentation scaling only; the returned value and exact text remain untouched. */
 export function displayStatementCell(
@@ -31,6 +37,7 @@ export function displayStatementCell(
     "currency" in value
   ) {
     const money = value as { amount: string; currency: string };
+    // finstack-arith: display-only millions scaling; the native value and exact text stay untouched
     return `${money.currency} ${groupDecimal(new Big(money.amount).div("1000000").toFixed(1))}m`;
   }
   if (typeof value === "number" && Number.isFinite(value))
@@ -48,9 +55,12 @@ export function reportStatementCell(
   const value = cell.value;
   if (value && typeof value === "object" && "amount" in value) {
     try {
+      // finstack-arith: parses the supplied amount for display
       const amount = new Big((value as { amount: string }).amount);
+      // finstack-arith: display-only millions scaling; the native value and exact text stay untouched
       const scaled = mode === "millions" ? amount.div("1000000") : amount;
       const text = groupDecimal(
+        // finstack-arith: accounting display of the supplied sign; the native value stays untouched
         mode === "millions" ? scaled.abs().toFixed(1) : scaled.abs().toString(),
       );
       return scaled.lt(0) ? `(${text})` : text;
@@ -61,6 +71,7 @@ export function reportStatementCell(
   if (typeof value === "number" && Number.isFinite(value)) {
     const text = new Intl.NumberFormat("en-US", {
       maximumFractionDigits: 3,
+      // finstack-arith: accounting display of the supplied sign; the native value stays untouched
     }).format(Math.abs(value));
     return value < 0 ? `(${text})` : text;
   }
@@ -100,11 +111,13 @@ export function statementRows(
         const monetary = result.monetary_nodes?.[nodeId]?.[period.id];
         const numeric = result.nodes[nodeId]?.[period.id];
         const present = monetary !== undefined || numeric !== undefined;
+        const source = result.node_sources?.[nodeId]?.[period.id];
         return [
           period.id,
           {
             periodId: period.id,
             present,
+            ...(source === undefined ? {} : { source }),
             value: monetary ?? numeric,
             text: monetary
               ? formatRawMoney(monetary)

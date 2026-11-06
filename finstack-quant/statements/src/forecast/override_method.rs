@@ -10,21 +10,18 @@ use indexmap::IndexMap;
 
 /// Override: use explicit period-specific values, forward fill for the rest.
 ///
-/// # Parameters
+/// # Arguments
 ///
-/// * `overrides` - Map of period_id string → value
+/// * `base_value` - Value carried forward until the first override
+/// * `forecast_periods` - Periods that require projected values
+/// * `overrides` - Exact levels keyed by period id text (e.g. `"2025Q2"`); every
+///   period must parse to one of `forecast_periods`, and no two keys may name
+///   the same period
 pub(super) fn apply_override(
     base_value: f64,
     forecast_periods: &[PeriodId],
-    params: &IndexMap<String, serde_json::Value>,
+    overrides: &IndexMap<String, f64>,
 ) -> Result<IndexMap<PeriodId, f64>> {
-    let overrides_json = params.get("overrides").ok_or_else(|| {
-        Error::forecast(
-            "Missing 'overrides' parameter for Override method. \
-             Expected a JSON object mapping period IDs to values (e.g., {\"2025Q2\": 120000}).",
-        )
-    })?;
-
     if !base_value.is_finite() {
         return Err(Error::forecast(format!(
             "base_value must be finite, got {}",
@@ -32,16 +29,8 @@ pub(super) fn apply_override(
         )));
     }
 
-    let raw_overrides: IndexMap<String, f64> = serde_json::from_value(overrides_json.clone())
-        .map_err(|e| {
-            Error::forecast(format!(
-                "Invalid 'overrides' parameter: expected map of period_id → value. Error: {}",
-                e
-            ))
-        })?;
-
-    let mut overrides_map = IndexMap::with_capacity(raw_overrides.len());
-    for (period_str, value) in raw_overrides {
+    let mut overrides_map = IndexMap::with_capacity(overrides.len());
+    for (period_str, &value) in overrides {
         if !value.is_finite() {
             return Err(Error::forecast(format!(
                 "Override value for period '{}' must be finite, got {}",
@@ -90,15 +79,14 @@ mod tests {
             PeriodId::quarter(2025, 2).expect("valid period fixture"),
         ];
 
-        let mut params = IndexMap::new();
-        let overrides = serde_json::json!({
+        let overrides: IndexMap<String, f64> = serde_json::from_value(serde_json::json!({
             "2025Q1": 120.0,
             "2025Q2": 130.0,
-        });
-        params.insert("overrides".to_string(), overrides);
+        }))
+        .expect("overrides");
 
         let results =
-            apply_override(100.0, &periods, &params).expect("apply_override should succeed");
+            apply_override(100.0, &periods, &overrides).expect("apply_override should succeed");
 
         assert_eq!(results.len(), 2);
         assert_eq!(
@@ -120,15 +108,14 @@ mod tests {
             PeriodId::quarter(2025, 4).expect("valid period fixture"),
         ];
 
-        let mut params = IndexMap::new();
-        let overrides = serde_json::json!({
+        let overrides: IndexMap<String, f64> = serde_json::from_value(serde_json::json!({
             "2025Q1": 120.0,
             "2025Q3": 130.0,
-        });
-        params.insert("overrides".to_string(), overrides);
+        }))
+        .expect("overrides");
 
         let results =
-            apply_override(100.0, &periods, &params).expect("apply_override should succeed");
+            apply_override(100.0, &periods, &overrides).expect("apply_override should succeed");
 
         assert_eq!(results.len(), 4);
         assert_eq!(
@@ -156,12 +143,11 @@ mod tests {
             PeriodId::quarter(2025, 2).expect("valid period fixture"),
         ];
 
-        let mut params = IndexMap::new();
-        let overrides = serde_json::json!({});
-        params.insert("overrides".to_string(), overrides);
+        let overrides: IndexMap<String, f64> =
+            serde_json::from_value(serde_json::json!({})).expect("overrides");
 
         let results =
-            apply_override(100.0, &periods, &params).expect("apply_override should succeed");
+            apply_override(100.0, &periods, &overrides).expect("apply_override should succeed");
 
         assert_eq!(results.len(), 2);
         assert_eq!(
@@ -175,25 +161,15 @@ mod tests {
     }
 
     #[test]
-    fn test_override_missing_parameter_error() {
-        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
-        let params = IndexMap::new();
-
-        let result = apply_override(100.0, &periods, &params);
-        assert!(result.is_err());
-    }
-
-    #[test]
     fn test_override_rejects_unmatched_period() {
         let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
 
-        let mut params = IndexMap::new();
-        let overrides = serde_json::json!({
+        let overrides: IndexMap<String, f64> = serde_json::from_value(serde_json::json!({
             "2025Q2": 120.0,
-        });
-        params.insert("overrides".to_string(), overrides);
+        }))
+        .expect("overrides");
 
-        let err = apply_override(100.0, &periods, &params)
+        let err = apply_override(100.0, &periods, &overrides)
             .expect_err("unmatched override period must be rejected");
         assert!(err.to_string().contains("not in the forecast periods"));
     }

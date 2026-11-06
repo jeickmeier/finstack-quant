@@ -271,9 +271,11 @@ fn cashflows_json_bridge_builds_floating_schedule_with_market_json() {
         .collect();
 
     assert!(!float_flows.is_empty());
-    assert!(float_flows
-        .iter()
-        .all(|flow| flow["rate"].as_f64().unwrap() > 0.015));
+    assert!(
+        float_flows
+            .iter()
+            .all(|flow| flow["rate"].as_f64().unwrap() > 0.015)
+    );
 }
 
 #[wasm_bindgen_test]
@@ -283,11 +285,13 @@ fn cashflows_json_bridge_builds_step_up_with_payment_program() {
             .expect("step-up schedule builds");
     let schedule: serde_json::Value =
         serde_json::from_str(&schedule_json).expect("schedule JSON parses");
-    assert!(schedule["flows"]
-        .as_array()
-        .expect("flows array")
-        .iter()
-        .any(|flow| flow["kind"] == "pik"));
+    assert!(
+        schedule["flows"]
+            .as_array()
+            .expect("flows array")
+            .iter()
+            .any(|flow| flow["kind"] == "pik")
+    );
 }
 
 #[wasm_bindgen_test]

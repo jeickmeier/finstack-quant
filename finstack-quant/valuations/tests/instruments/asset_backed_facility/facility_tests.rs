@@ -12,6 +12,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::{
     AmortizationEvent, AssetBackedFacility, TermOutSpec,
 };
@@ -23,7 +24,6 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, DealType, LiquidationSpec, PoolAsset,
 };
 use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
-use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::pricer::ModelKey;
 use finstack_quant_valuations::pricer::STANDARD;
@@ -239,7 +239,7 @@ fn borrowing_base_deficiency_forces_repayment_before_the_residual() {
     );
     assert_eq!(test.test_id, "BB_FACILITY");
     assert!(!test.passing);
-    assert!((test.ratio - 72.0 / 90.0).abs() < 1e-9);
+    assert!((test.ratio.expect("a drawn facility") - 72.0 / 90.0).abs() < 1e-9);
 
     // A facility inside its borrowing base pays the residual from day one and
     // repays nothing while revolving.
@@ -247,16 +247,20 @@ fn borrowing_base_deficiency_forces_repayment_before_the_residual() {
     let projection = covered.project(&market(), close()).expect("projection");
     assert!(projection.diagnostics.periods[0].coverage_tests[0].passing);
     let first_date = projection.facility.cashflows[0].0;
-    assert!(projection
-        .facility
-        .principal_flows
-        .iter()
-        .all(|(date, amount)| *date > d(2026, 1, 1) || amount.amount().abs() < 1e-6));
-    assert!(projection
-        .residual
-        .cashflows
-        .iter()
-        .any(|(date, amount)| *date == first_date && amount.amount() > 0.0));
+    assert!(
+        projection
+            .facility
+            .principal_flows
+            .iter()
+            .all(|(date, amount)| *date > d(2026, 1, 1) || amount.amount().abs() < 1e-6)
+    );
+    assert!(
+        projection
+            .residual
+            .cashflows
+            .iter()
+            .any(|(date, amount)| *date == first_date && amount.amount() > 0.0)
+    );
 }
 
 #[test]
@@ -295,11 +299,13 @@ fn commitment_fee_accrues_on_the_undrawn_commitment() {
         f.commitment_fee_bp = rust_decimal::Decimal::ZERO;
         f
     };
-    assert!(no_fee
-        .project(&market(), close())
-        .expect("projection")
-        .commitment_fees
-        .is_empty());
+    assert!(
+        no_fee
+            .project(&market(), close())
+            .expect("projection")
+            .commitment_fees
+            .is_empty()
+    );
 }
 
 /// After revolving ends (here accelerated by a dated amortization event),
@@ -792,11 +798,13 @@ fn borrowing_base_items_and_amortization_events_validate_on_their_own() {
     assert!(loss(0.04).validate().is_ok());
     assert!(loss(0.0).validate().is_err());
     assert!(loss(2.5).validate().is_err());
-    assert!(AmortizationEvent::ExcessSpread {
-        min_excess_spread_3m: f64::NAN
-    }
-    .validate()
-    .is_err());
+    assert!(
+        AmortizationEvent::ExcessSpread {
+            min_excess_spread_3m: f64::NAN
+        }
+        .validate()
+        .is_err()
+    );
 }
 
 #[test]

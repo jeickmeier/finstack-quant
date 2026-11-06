@@ -377,6 +377,46 @@ test('equity option and convertible analytics match Python', () => {
   same(plain(convertible.greeks(data.market, '2024-06-20')), data.greeks, 'greeks', 1e-4);
 });
 
+test('structured-credit period detail says who was paid', () => {
+  const sc = golden.structured;
+  const deal = instruments.StructuredCredit.fromJson(sc.deal);
+  const { periods } = deal.runSimulation(sc.market, sc.as_of).diagnostics;
+  const coupon = periods[0].waterfall.payment_records.find(
+    (record) => record.recipient.tranche === 'A' && !record.is_principal
+  );
+  assert.ok(Number(coupon.paid_amount.amount) > 0);
+  // The deal is called in 2028: the redemption is outside the waterfall.
+  const redemption = periods.at(-1).non_waterfall_payments.filter((p) => p.source === 'redemption');
+  assert.deepEqual(
+    redemption.map((p) => p.tranche_id),
+    ['A', 'B', 'E']
+  );
+  same(periods, sc.diagnostics.periods, 'periods', LOOSE);
+});
+
+test('structured-credit first breaches and credit enhancement come from runSimulation', () => {
+  const sc = golden.structured;
+  const { diagnostics } = instruments.StructuredCredit.fromJson(sc.deal).runSimulation(
+    sc.market,
+    sc.as_of
+  );
+  assert.deepEqual(
+    diagnostics.first_breaches.map((entry) => entry.test_id),
+    ['OC_A']
+  );
+  same(diagnostics.first_breaches, sc.diagnostics.first_breaches, 'first breaches');
+  assert.deepEqual(
+    diagnostics.periods[0].credit_enhancement.map((entry) => entry.tranche_id),
+    ['A', 'B', 'E']
+  );
+  same(
+    diagnostics.periods[0].credit_enhancement,
+    sc.diagnostics.periods[0].credit_enhancement,
+    'credit enhancement',
+    LOOSE
+  );
+});
+
 test('structured-credit deal analytics match Python', () => {
   const sc = golden.structured;
   const deal = instruments.StructuredCredit.fromJson(sc.deal);
@@ -391,6 +431,13 @@ test('structured-credit deal analytics match Python', () => {
   same(plain(deal.equityMetrics(sc.market, sc.as_of)), sc.equity_metrics, 'equity', LOOSE);
   const simulation = deal.runSimulation(sc.market, sc.as_of);
   same(plain(simulation.tranches.A), sc.tranche_cashflows, 'simulation flows', LOOSE);
+  const table = plain(instruments.trancheCashflowsTable(sc.tranche_cashflows));
+  same(
+    Object.fromEntries(table.columns.map((column) => [column.name, column.data.values])),
+    sc.tranche_cashflows_table,
+    'tranche cashflow table',
+    LOOSE
+  );
   same(plain(simulation.diagnostics), sc.diagnostics, 'diag', LOOSE);
   const waterfall = deal.createWaterfall();
   same(plain(waterfall), sc.create_waterfall, 'waterfall');
@@ -428,6 +475,11 @@ test('structured-credit deal analytics match Python', () => {
     close(Number(actual.amount), expected.amount, TIGHT, label);
     assert.equal(actual.currency, expected.currency, label);
   };
+  same(
+    plain(instruments.standardDealFamilies()),
+    sc.standard_deal_families,
+    'standard deal families'
+  );
   sameMoney(instruments.assetPoolTotalBalance(pool), analytics.total_balance, 'total balance');
   sameMoney(
     instruments.assetPoolPerformingBalance(pool),
@@ -435,19 +487,17 @@ test('structured-credit deal analytics match Python', () => {
     'performing balance'
   );
   close(instruments.assetPoolWac(pool), analytics.wac, TIGHT, 'wac');
-  close(
-    instruments.assetPoolWeightedAvgSpreadBp(pool),
-    analytics.weighted_avg_spread_bp,
-    TIGHT,
-    'was'
-  );
+  // The example pool is all fixed-rate: Rust's None, undefined here and null in the golden.
+  assert.equal(analytics.weighted_avg_spread_bp, null);
+  assert.equal(instruments.assetPoolWeightedAvgSpreadBp(pool), undefined);
   close(
     instruments.assetPoolWeightedAvgMaturity(pool, sc.as_of),
     analytics.weighted_avg_maturity,
     TIGHT,
     'wam'
   );
-  close(instruments.assetPoolDiversityScore(pool), analytics.diversity_score, TIGHT, 'diversity');
+  assert.equal(analytics.diversity_score, null);
+  assert.equal(instruments.assetPoolDiversityScore(pool), undefined);
   same(
     plain(instruments.assetPoolAssetsByObligor(pool, 'NOBODY')),
     analytics.assets_by_obligor,
@@ -459,6 +509,17 @@ test('structured-credit deal analytics match Python', () => {
     'by industry'
   );
   same(plain(instruments.calculatePoolStats(pool, sc.as_of)), analytics.pool_stats, 'pool stats');
+  const report = plain(instruments.poolReport(sc.pool_report.pool, sc.as_of));
+  same(report, sc.pool_report.report, 'pool report');
+  assert.deepEqual(
+    report.by_obligor.map((row) => [row.key, row.balance_pct, row.asset_count]),
+    [
+      ['X', 40, 2],
+      ['Y', 30, 1],
+      ['Z', 20, 1],
+      [null, 10, 1],
+    ]
+  );
 });
 
 test('Merton Monte Carlo bond pricing matches Python', () => {
@@ -857,4 +918,162 @@ test('commodity spot money currency is checked at expiry and in Monte Carlo', ()
         /Currency mismatch: expected USD, got EUR/.test(error.message)
     );
   }
+});
+
+test('bondWorkoutLadder matches Python, a null yield included', () => {
+  const { market, as_of: asOf, cases } = golden.bond_workout_ladder;
+  for (const { bond: bondJson, ladder } of cases) {
+    const bond = instruments.Bond.fromJson(bondJson);
+    try {
+      same(plain(instruments.bondWorkoutLadder(bond, market, asOf)), ladder, 'workout ladder');
+    } finally {
+      bond.free();
+    }
+  }
+  const [premium, quoteDateCall] = cases.map((entry) => entry.ladder.rows);
+  assert.deepEqual(
+    premium.map((row) => [row.date, row.kind, row.is_worst]),
+    [
+      ['2027-01-15', 'call', true],
+      ['2029-01-15', 'call', false],
+      ['2031-01-15', 'call', false],
+      ['2034-01-16', 'maturity', false],
+    ]
+  );
+  assert.deepEqual(
+    [quoteDateCall[0].date, quoteDateCall[0].yield_rate, quoteDateCall[0].is_worst],
+    ['2025-01-17', null, true]
+  );
+});
+
+test('g_spread by metric id matches Python and errors with no government curve named', () => {
+  const {
+    market,
+    as_of: asOf,
+    bond,
+    own_curve_bond: ownCurve,
+    plain_bond: plainBond,
+    ...expected
+  } = golden.g_spread;
+  const metric = (json, id) => {
+    const instrument = instruments.Bond.fromJson(json);
+    try {
+      return instrument.metric(market, asOf, id);
+    } finally {
+      instrument.free();
+    }
+  };
+  close(metric(bond, 'g_spread'), expected.g_spread, TIGHT, 'g_spread');
+  close(metric(ownCurve, 'g_spread'), expected.g_spread_over_own_curve, TIGHT, 'over own curve');
+  close(metric(ownCurve, 'i_spread'), expected.i_spread, TIGHT, 'i_spread');
+  assert.equal(metric(ownCurve, 'g_spread'), metric(ownCurve, 'i_spread'));
+  assert.throws(
+    () => metric(plainBond, 'g_spread'),
+    (e) => e.kind === 'validation' && e.message.includes('government_curve_id')
+  );
+  const [metadata] = instruments.metricMetadata(['g_spread']);
+  assert.equal(metadata.unit, 'decimal');
+});
+
+test('recovery01 and jump_to_default match Python and error off a hazard curve', () => {
+  const { market, as_of: asOf, cases, not_hazard_priced: plainBond } = golden.default_risk;
+  for (const [name, expected] of Object.entries(cases)) {
+    const instrument = instruments[name].fromJson(expected.json);
+    try {
+      for (const id of ['recovery01', 'jump_to_default']) {
+        close(instrument.metric(market, asOf, id), expected[id], TIGHT, `${name} ${id}`);
+      }
+    } finally {
+      instrument.free();
+    }
+  }
+  const bond = instruments.Bond.fromJson(plainBond);
+  try {
+    for (const id of ['recovery01', 'jump_to_default']) {
+      assert.throws(
+        () => bond.metric(market, asOf, id),
+        (e) => e.kind === 'validation' && e.message.includes('requires hazard pricing')
+      );
+    }
+  } finally {
+    bond.free();
+  }
+  const units = instruments.metricMetadata(['recovery01', 'jump_to_default']).map((m) => m.unit);
+  assert.deepEqual(units, ['currency', 'currency']);
+});
+
+test('computeQuotes matches Python, a null field included, and rejects a kind the bond lacks', () => {
+  const { market, as_of: asOf, cases, rejected } = golden.compute_quotes;
+  for (const { bond: bondJson, quote_input: quoteInput, quotes } of cases) {
+    const bond = instruments.Bond.fromJson(bondJson);
+    try {
+      same(plain(instruments.computeQuotes(bond, market, asOf, quoteInput)), quotes, 'quote set');
+      // The same quote as JSON text.
+      same(
+        plain(instruments.computeQuotes(bond, market, asOf, JSON.stringify(quoteInput))),
+        quotes,
+        'quote set from text'
+      );
+    } finally {
+      bond.free();
+    }
+  }
+  const [bullet, , , , frn] = cases.map((entry) => entry.quotes);
+  assert.equal(bullet.discount_margin, null);
+  assert.equal(bullet.clean_price_pct, 98.5);
+  assert.equal(frn.asw_market, null);
+  assert.equal(frn.japanese_simple_yield, null);
+
+  const bond = instruments.Bond.fromJson(rejected.bond);
+  try {
+    assert.throws(
+      () => instruments.computeQuotes(bond, market, asOf, rejected.quote_input),
+      (error) =>
+        error.name === 'FinstackError' &&
+        error.kind === 'validation' &&
+        error.message.includes('requires a floating-rate bond')
+    );
+    for (const strict of [{ yield: 0.05 }, { ytm: 0.05, ytw: 0.05 }]) {
+      assert.throws(
+        () => instruments.computeQuotes(bond, market, asOf, strict),
+        (error) => error.kind === 'validation'
+      );
+    }
+  } finally {
+    bond.free();
+  }
+});
+
+test('convertibleSpotLadder matches Python, the default grid included', () => {
+  const {
+    market,
+    as_of: asOf,
+    bond: bondJson,
+    spots,
+    supplied,
+    default: grid,
+  } = golden.convertible_spot_ladder;
+  const bond = instruments.ConvertibleBond.fromJson(bondJson);
+  try {
+    same(
+      plain(instruments.convertibleSpotLadder(bond, market, asOf, spots)),
+      supplied,
+      'supplied spots'
+    );
+    same(plain(instruments.convertibleSpotLadder(bond, market, asOf)), grid, 'default grid');
+    assert.throws(
+      () => instruments.convertibleSpotLadder(bond, market, asOf, [0]),
+      (error) => error.kind === 'validation'
+    );
+  } finally {
+    bond.free();
+  }
+  assert.deepEqual(
+    supplied.rows.map((row) => [row.spot, row.parity, row.regime]),
+    [
+      [50, 0.5, 'busted'],
+      [100, 1, 'balanced'],
+      [300, 3, 'equity_sensitive'],
+    ]
+  );
 });

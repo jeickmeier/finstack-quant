@@ -1,6 +1,6 @@
 //! Python bindings for Brinson-Fachler attribution.
 //!
-//! The entry points (`brinson_fachler`, `carino_link`) return `Py*` wrappers
+//! The entry points (`brinson_fachler`, `carino_link`, `brinson_linked`) return `Py*` wrappers
 //! over the canonical Rust results; each wrapper's `to_json()` gives the exact
 //! JSON wire string for pipelines that exchange documents.
 
@@ -8,7 +8,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyModule};
 
 use crate::bindings::pandas_utils::{
-    serde_rows_to_dataframe_with_schema, serde_to_py, ColumnSchema,
+    ColumnSchema, serde_rows_to_dataframe_with_schema, serde_to_py,
 };
 use crate::errors::{portfolio_to_py, serde_json_to_py};
 
@@ -258,11 +258,57 @@ fn carino_link(
         })?,
     })
 }
+/// Attribute each period with Brinson-Fachler and Carino-link the results.
+///
+/// Binds Rust ``brinson_linked``: the multi-period Brinson-Fachler report in
+/// one call, identical to ``carino_link([brinson_fachler(p) for p in periods])``.
+///
+/// Parameters
+/// ----------
+/// periods : str | list[list[dict]]
+///     Chronological periods, each a list of ``SectorPeriod`` objects
+///     (``sector``, ``portfolio_weight``, ``benchmark_weight``,
+///     ``portfolio_return``, ``benchmark_return``), or the JSON of that
+///     nested list. Weights are decimal fractions summing to one on each
+///     side; returns are decimal period returns. Every period lists the same
+///     sectors in the same order.
+///
+/// Returns
+/// -------
+/// CarinoLinkedAttribution
+///     Per-period sector effects, linked effects by sector and by effect,
+///     and the compounded portfolio and benchmark returns.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If the JSON is malformed.
+/// PortfolioError
+///     If there are no periods, a period fails Brinson-Fachler (the message
+///     names the zero-based period), the sector ordering changes between
+///     periods, or a period return is at most ``-1``.
+#[pyfunction]
+#[pyo3(text_signature = "(periods)")]
+fn brinson_linked(
+    py: Python<'_>,
+    periods: &Bound<'_, PyAny>,
+) -> PyResult<PyCarinoLinkedAttribution> {
+    let periods_json = crate::bindings::extract::extract_records_json(py, periods, "periods")?;
+    Ok(PyCarinoLinkedAttribution {
+        inner: py.detach(move || {
+            let periods: Vec<Vec<finstack_quant_portfolio::brinson::SectorPeriod>> =
+                serde_json::from_str(&periods_json)
+                    .map_err(|err| serde_json_to_py(err, "invalid Brinson sector periods JSON"))?;
+            finstack_quant_portfolio::brinson::brinson_linked(&periods).map_err(portfolio_to_py)
+        })?,
+    })
+}
 /// Register Brinson attribution functions on the portfolio submodule.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyBrinsonPeriodResult>()?;
     m.add_class::<PyCarinoLinkedAttribution>()?;
     m.add_function(wrap_pyfunction!(brinson_fachler, m)?)?;
     m.add_function(wrap_pyfunction!(carino_link, m)?)?;
+    m.add_function(wrap_pyfunction!(brinson_linked, m)?)?;
     Ok(())
 }

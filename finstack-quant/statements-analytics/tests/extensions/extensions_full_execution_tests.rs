@@ -846,10 +846,12 @@ fn test_scorecard_non_finite_metric_excluded_and_weights_renormalized() {
         report.data.get("weight_coverage").and_then(|v| v.as_f64()),
         Some(0.5)
     );
-    assert!(report
-        .warnings
-        .iter()
-        .any(|w| w.contains("not finite") && w.contains("excluding factor")));
+    assert!(
+        report
+            .warnings
+            .iter()
+            .any(|w| w.contains("not finite") && w.contains("excluding factor"))
+    );
     // metric_scores only lists the included factor.
     let metric_scores = report
         .data

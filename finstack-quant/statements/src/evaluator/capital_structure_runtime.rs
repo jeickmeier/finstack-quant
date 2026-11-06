@@ -69,6 +69,7 @@ impl Evaluator {
         instruments: &Instruments,
         cs_state: &mut crate::capital_structure::CapitalStructureState,
         cs_affected_nodes: &HashSet<NodeId>,
+        mut mc: Option<(u64, &mut super::engine::McZCache)>,
     ) -> Result<DynamicPeriodEvaluation> {
         let period_id = period.id;
 
@@ -93,9 +94,9 @@ impl Evaluator {
             is_actual,
             eval_order,
             &mut context,
+            mc.as_ref().map(|(seed, _)| *seed),
             None,
-            None,
-            None,
+            mc.as_mut().map(|(_, cache)| &mut **cache),
         )?;
 
         let mut waterfall_replaced_flows = false;
@@ -103,10 +104,9 @@ impl Evaluator {
             if let Some(waterfall_spec) = &cs_spec.waterfall {
                 if let Some(node) = model.nodes.get(&crate::types::NodeId::new(
                     &waterfall_spec.available_cash_node,
-                )) {
-                    if let Some(formula) = &node.formula_text {
-                        crate::capital_structure::reject_available_cash_debt_service(formula)?;
-                    }
+                )) && let Some(formula) = &node.formula_text
+                {
+                    crate::capital_structure::reject_available_cash_debt_service(formula)?;
                 }
                 let waterfall_result = crate::capital_structure::waterfall::execute_waterfall(
                     &context,
@@ -138,9 +138,9 @@ impl Evaluator {
                 is_actual,
                 eval_order,
                 &mut context,
-                None,
+                mc.as_ref().map(|(seed, _)| *seed),
                 Some(cs_affected_nodes),
-                None,
+                mc.as_mut().map(|(_, cache)| &mut **cache),
             )?;
         }
 
@@ -371,18 +371,17 @@ fn recompute_cs_totals(
         return Ok(());
     }
 
-    if let Some(ctx) = fx_ctx {
-        if let Some(rc) = ctx.reporting_currency {
-            let mut converted_total =
-                crate::capital_structure::CashflowBreakdown::with_currency(rc);
-            for breakdown in totals_by_currency.values() {
-                accumulate(&mut converted_total, breakdown, |money| {
-                    convert_to_reporting(money, ctx.snapshot_date, rc, ctx.fx_matrix, ctx.fx_policy)
-                })?;
-            }
-            cashflows.reporting_currency = Some(rc);
-            cashflows.totals.insert(period_id, converted_total);
+    if let Some(ctx) = fx_ctx
+        && let Some(rc) = ctx.reporting_currency
+    {
+        let mut converted_total = crate::capital_structure::CashflowBreakdown::with_currency(rc);
+        for breakdown in totals_by_currency.values() {
+            accumulate(&mut converted_total, breakdown, |money| {
+                convert_to_reporting(money, ctx.snapshot_date, rc, ctx.fx_matrix, ctx.fx_policy)
+            })?;
         }
+        cashflows.reporting_currency = Some(rc);
+        cashflows.totals.insert(period_id, converted_total);
     }
 
     Ok(())

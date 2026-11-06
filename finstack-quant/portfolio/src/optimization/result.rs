@@ -2,10 +2,10 @@
 //!
 use super::types::{SLACK_TOL, WEIGHT_TOL};
 use super::universe::CandidatePosition;
+use crate::Portfolio;
 use crate::error::{Error, Result};
 use crate::position::Position;
 use crate::types::{Entity, PositionId};
-use crate::Portfolio;
 use finstack_quant_core::config::ResultsMeta;
 use finstack_quant_core::wire::SchemaVersion;
 use indexmap::IndexMap;
@@ -331,7 +331,7 @@ pub(crate) fn trade_list(
 pub(crate) fn binding_constraint_names(slacks: &IndexMap<String, f64>) -> Vec<String> {
     slacks
         .iter()
-        .filter(|(_, &slack)| slack.abs() < SLACK_TOL)
+        .filter(|&(_, &slack)| slack.abs() < SLACK_TOL)
         .map(|(name, _)| name.clone())
         .collect()
 }

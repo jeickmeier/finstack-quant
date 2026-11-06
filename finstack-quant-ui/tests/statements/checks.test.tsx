@@ -14,10 +14,11 @@ import result from "../../src/fixtures/statements/analyst-result.json";
 import suite from "../../src/fixtures/statements/analyst-checks.json";
 import { StatementChecks } from "@/components/finstack/statements/components/statement-diagnostics/statement-checks";
 import { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack";
-const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
+import { createClient } from "../shared/worker/client";
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../shared/worker/client"),
+);
 const native = createRequire(import.meta.url)(
   "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
 );
@@ -35,27 +36,23 @@ beforeEach(() => {
         return { state: "ready", worker: true };
       case "validateCheckSuiteSpec":
         return native.validateCheckSuiteSpecJson(arg);
-      case "runStatementChecks":
-        switch (arg.kind) {
-          case "suite":
-            return native.runChecks(
-              arg.modelJson,
-              native.validateCheckSuiteSpecJson(arg.configJson),
-              arg.resultsJson,
-            );
-          case "three-statement":
-            return native.runThreeStatementChecks(
-              arg.modelJson,
-              arg.configJson,
-              arg.resultsJson,
-            );
-        }
-        throw new Error(`Unexpected check runner: ${arg.kind}`);
+      case "runChecks":
+        return native.runChecks(
+          arg.modelJson,
+          native.validateCheckSuiteSpecJson(arg.suiteSpecJson),
+          arg.resultsJson,
+        );
+      case "runThreeStatementChecks":
+        return native.runThreeStatementChecks(
+          arg.modelJson,
+          arg.mappingJson,
+          arg.resultsJson,
+        );
       default:
         throw new Error(`Unexpected worker call: ${method}`);
     }
   });
-  mock.createClient.mockReset().mockReturnValue({ call, close: vi.fn() });
+  createClient.mockReset().mockReturnValue({ call, close: vi.fn() });
 });
 afterEach(() => {
   cleanup();
@@ -91,11 +88,10 @@ it("runs the supplied suite as native canonical JSON and renders the native repo
     name: "Statement check report",
   });
   const canonical: string = native.validateCheckSuiteSpecJson(analystChecks);
-  expect(calls("runStatementChecks").at(-1)?.[1]).toEqual({
+  expect(calls("runChecks").at(-1)?.[1]).toEqual({
     modelJson,
     resultsJson,
-    kind: "suite",
-    configJson: canonical,
+    suiteSpecJson: canonical,
   });
   const { summary } = native.runChecks(modelJson, canonical, resultsJson);
   expect(
@@ -111,15 +107,16 @@ it("starts an unseeded suite empty and blocks submission until the required name
   renderChecks();
   const [name] = screen.getAllByRole("textbox", { name: "Name" });
   expect(name).toHaveProperty("value", "");
-  expect(name.getAttribute("aria-invalid")).toBe("true");
+  expect(name.getAttribute("aria-invalid")).not.toBe("true");
   // The Rust example (three_statement_integrity with a builtin and a formula check) is never synthesized.
   expect(screen.getAllByRole("textbox")).toHaveLength(1);
   expect(screen.queryByRole("group", { name: /^Builtin checks/ })).toBeNull();
   expect(screen.queryByRole("group", { name: /^Formula checks/ })).toBeNull();
   await user.click(await runButton());
   await waitFor(() => expect(document.activeElement).toBe(name));
+  expect(name.getAttribute("aria-invalid")).toBe("true");
   expect(calls("validateCheckSuiteSpec")).toHaveLength(0);
-  expect(calls("runStatementChecks")).toHaveLength(0);
+  expect(calls("runChecks")).toHaveLength(0);
 
   await user.type(name, "Desk review");
   await waitFor(() =>
@@ -127,7 +124,7 @@ it("starts an unseeded suite empty and blocks submission until the required name
   );
   await user.click(await runButton());
   await screen.findByRole("region", { name: "Statement check report" });
-  expect(calls("runStatementChecks").at(-1)?.[1].configJson).toBe(
+  expect(calls("runChecks").at(-1)?.[1].suiteSpecJson).toBe(
     native.validateCheckSuiteSpecJson(JSON.stringify({ name: "Desk review" })),
   );
 });
@@ -168,11 +165,10 @@ it("edits builtin struct fields and runs a raw three-statement mapping", async (
   await user.paste(mappingJson);
   await user.click(await runButton());
   await screen.findByRole("region", { name: "Statement check report" });
-  expect(calls("runStatementChecks").at(-1)?.[1]).toEqual({
+  expect(calls("runThreeStatementChecks").at(-1)?.[1]).toEqual({
     modelJson,
     resultsJson,
-    kind: "three-statement",
-    configJson: mappingJson,
+    mappingJson,
   });
 });
 
@@ -193,7 +189,7 @@ it("keeps the suite draft and its report when the runner is toggled away and bac
   await user.type(name, "edited suite");
   await user.click(await runButton());
   await screen.findByRole("region", { name: "Statement check report" });
-  expect(calls("runStatementChecks")).toHaveLength(1);
+  expect(calls("runChecks")).toHaveLength(1);
 
   await user.click(
     screen.getByRole("radio", { name: "Three statement mapping" }),
@@ -210,8 +206,8 @@ it("keeps the suite draft and its report when the runner is toggled away and bac
   expect(
     await screen.findByRole("region", { name: "Statement check report" }),
   ).toBeTruthy();
-  expect(calls("runStatementChecks")).toHaveLength(1);
-  expect(calls("runStatementChecks")[0][1].configJson).toBe(
+  expect(calls("runChecks")).toHaveLength(1);
+  expect(calls("runChecks")[0][1].suiteSpecJson).toBe(
     native.validateCheckSuiteSpecJson(
       JSON.stringify({ ...suite, name: "edited suite" }),
     ),
@@ -262,11 +258,10 @@ it("keeps a completed mapping report across a suite toggle and a suite reseed", 
   expect(
     screen.getByRole("region", { name: "Statement check report" }),
   ).toBeTruthy();
-  expect(calls("runStatementChecks")).toHaveLength(1);
-  expect(calls("runStatementChecks")[0][1]).toEqual({
+  expect(calls("runThreeStatementChecks")).toHaveLength(1);
+  expect(calls("runThreeStatementChecks")[0][1]).toEqual({
     modelJson,
     resultsJson,
-    kind: "three-statement",
-    configJson: threeStatementMapping,
+    mappingJson: threeStatementMapping,
   });
 });

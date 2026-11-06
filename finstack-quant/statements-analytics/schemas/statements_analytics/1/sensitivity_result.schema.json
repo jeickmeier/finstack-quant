@@ -1,10 +1,11 @@
 {
   "$defs": {
     "ParameterSpec": {
-      "description": "Parameter to vary in sensitivity analysis.",
+      "additionalProperties": false,
+      "description": "Parameter to vary in sensitivity analysis.\n\nThe wire form carries exactly one of `perturbations` (absolute values) or\n`pct_range` (percentage moves of `base_value`, converted on deserialization\nas by [`Self::with_percentages`]); it always serializes the absolute values.",
       "properties": {
         "base_value": {
-          "description": "Base value",
+          "description": "Base value in the node's units; `pct_range` moves are applied to it.",
           "format": "double",
           "type": "number"
         },
@@ -12,24 +13,39 @@
           "description": "Node identifier",
           "type": "string"
         },
+        "pct_range": {
+          "default": null,
+          "description": "Percentage moves of `base_value` (`10.0` is a 10% increase), each\nsubstituted as `base_value * (1 + pct / 100)`; give exactly one of\n`perturbations` and `pct_range`.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
         "period_id": {
           "$ref": "#/$defs/PeriodId",
           "description": "Period to vary"
         },
         "perturbations": {
-          "description": "Absolute values to substitute for this node/period; use\n[`Self::with_percentages`] to construct shocks from percentage inputs.",
+          "default": null,
+          "description": "Absolute values to substitute for this node/period; give exactly one of\n`perturbations` and `pct_range`.",
           "items": {
             "format": "double",
             "type": "number"
           },
-          "type": "array"
+          "type": [
+            "array",
+            "null"
+          ]
         }
       },
       "required": [
         "node_id",
         "period_id",
-        "base_value",
-        "perturbations"
+        "base_value"
       ],
       "type": "object"
     },

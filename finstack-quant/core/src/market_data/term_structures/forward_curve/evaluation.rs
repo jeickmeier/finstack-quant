@@ -3,7 +3,7 @@
 use super::{ForwardCurve, InputError};
 use crate::market_data::bumps::BumpType;
 use crate::market_data::term_structures::common::{
-    validate_pillars, PiecewiseLinearAdjustment, RateShock,
+    PiecewiseLinearAdjustment, RateShock, validate_pillars,
 };
 use crate::math::interp::Interp;
 

@@ -28,8 +28,6 @@ test('volatility engines are exposed only under models.volatility', () => {
     'getCubeVolClamped',
     'getCubeExpirySliceVol',
     'getCubeExpirySliceVolClamped',
-    'getCubeNormalVol',
-    'getCubeNormalVolClamped',
     'getFxDeltaPillarVols',
     'getFxDeltaVol',
     'deltaToStrike',
@@ -47,7 +45,7 @@ test('models.volatility evaluates core data artifacts', () => {
     [{ alpha: 0.03, beta: 0.5, rho: -0.2, nu: 0.4 }],
     [0.03]
   );
-  const vol = facade.models.volatility.getCubeVol(cube, 1, 5, 0.03);
+  const vol = facade.models.volatility.getCubeVol(cube, 1, 5, 0.03, 'lognormal');
   assert.ok(Number.isFinite(vol));
   assert.ok(vol > 0);
 
@@ -59,6 +57,29 @@ test('models.volatility evaluates core data artifacts', () => {
   );
 
   surface.free();
+  cube.free();
+});
+
+test('cube queries take the output convention and reject shifted lognormal', () => {
+  const { volatility } = facade.models;
+  const cube = new facade.core.VolCube(
+    'USD-SWAPTION',
+    [1],
+    [5],
+    [{ alpha: 0.03, beta: 0.5, rho: -0.2, nu: 0.4 }],
+    [0.03]
+  );
+  const black = volatility.getCubeVol(cube, 1, 5, 0.03, 'lognormal');
+  const normal = volatility.getCubeVol(cube, 1, 5, 0.03, 'normal');
+  assert.ok(Math.abs(normal - black * 0.03) / normal < 0.01);
+  const shifted = { shifted_lognormal: { shift: 0.01 } };
+  assert.throws(() => volatility.getCubeVol(cube, 1, 5, 0.03, shifted), /shifted/);
+  assert.ok(Number.isNaN(volatility.getCubeVolClamped(cube, 1, 5, 0.03, shifted)));
+  assert.throws(() => volatility.materializeCubeTenorSlice(cube, 5, [0.03], shifted), /shifted/);
+  assert.throws(() => volatility.materializeCubeExpirySlice(cube, 1, [0.03], shifted), /shifted/);
+  const slice = volatility.materializeCubeExpirySlice(cube, 1, [0.03], 'normal');
+  assert.equal(slice.quoteType, 'normal');
+  slice.free();
   cube.free();
 });
 
@@ -106,8 +127,8 @@ test('clamped cube preserves small quotes and invalid model domains', () => {
     [{ alpha: 0.0001, beta: 1, rho: 0, nu: 0.3 }],
     [0.02]
   );
-  const checked = facade.models.volatility.getCubeVol(low, 1, 5, 0.02);
-  const clamped = facade.models.volatility.getCubeVolClamped(low, 1, 5, 0.02);
+  const checked = facade.models.volatility.getCubeVol(low, 1, 5, 0.02, 'lognormal');
+  const clamped = facade.models.volatility.getCubeVolClamped(low, 1, 5, 0.02, 'lognormal');
   assert.ok(Math.abs(clamped - checked) < 1e-14);
   const invalid = new facade.core.VolCube(
     'INVALID',
@@ -116,7 +137,9 @@ test('clamped cube preserves small quotes and invalid model domains', () => {
     [{ alpha: 0.008, beta: 0.5, rho: 0, nu: 0.3 }],
     [-0.01]
   );
-  assert.ok(Number.isNaN(facade.models.volatility.getCubeVolClamped(invalid, 1, 5, -0.01)));
+  assert.ok(
+    Number.isNaN(facade.models.volatility.getCubeVolClamped(invalid, 1, 5, -0.01, 'lognormal'))
+  );
   low.free();
   invalid.free();
 });
@@ -143,12 +166,12 @@ test('canonical volatility state constructors preserve named parameters and opti
     );
     try {
       assert.equal(
-        facade.models.volatility.getCubeVol(fromJson, 1, 5, 0.025),
-        facade.models.volatility.getCubeVol(positional, 1, 5, 0.025)
+        facade.models.volatility.getCubeVol(fromJson, 1, 5, 0.025, 'lognormal'),
+        facade.models.volatility.getCubeVol(positional, 1, 5, 0.025, 'lognormal')
       );
       assert.equal(
-        facade.models.volatility.getCubeNormalVol(fromJson, 1, 5, 0.025),
-        facade.models.volatility.getCubeNormalVol(positional, 1, 5, 0.025)
+        facade.models.volatility.getCubeVol(fromJson, 1, 5, 0.025, 'normal'),
+        facade.models.volatility.getCubeVol(positional, 1, 5, 0.025, 'normal')
       );
     } finally {
       fromJson.free();

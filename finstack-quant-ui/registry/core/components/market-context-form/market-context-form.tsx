@@ -14,7 +14,7 @@ import {
   type KnotEdit,
 } from "../../primitives/knot-table/knot-table";
 import { JsonViewer } from "@/components/finstack/shared/primitives/json-viewer/json-viewer";
-import { marketModule, importMarket } from "./market";
+import { marketModule, parseMarket, calibratedMarket } from "./market";
 const editable = [
   "curves",
   "fx",
@@ -95,7 +95,7 @@ export function MarketContextForm({
   const [document, setDocument] = useState(() => {
     try {
       return {
-        value: importMarket(defaultJson),
+        value: parseMarket(defaultJson),
         revision: 0,
         error: null as string | null,
       };
@@ -104,12 +104,13 @@ export function MarketContextForm({
     }
   });
   const [text, setText] = useState(defaultJson);
-  const load = (json: string) => {
+  const load = (read: (json: string) => Record<string, unknown>) => {
     try {
-      const value = importMarket(json);
+      const value = read(text);
       onValidated?.(null);
       setDocument((current) => ({
         value,
+        // finstack-arith: remount revision counter, not a value
         revision: current.revision + 1,
         error: null,
       }));
@@ -145,9 +146,17 @@ export function MarketContextForm({
             variant="outline"
             size="sm"
             type="button"
-            onClick={() => load(text)}
+            onClick={() => load(parseMarket)}
           >
-            Import JSON
+            Import market JSON
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            type="button"
+            onClick={() => load(calibratedMarket)}
+          >
+            Import calibration result
           </Button>
         </div>
       </details>

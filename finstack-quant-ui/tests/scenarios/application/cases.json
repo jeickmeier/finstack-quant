@@ -1,0 +1,1147 @@
+{
+  "description": "Native market scenarios on the results-fixture bond: the ScenarioSpec as written and its canonical form from parseScenarioSpec, the applyScenario report and the bond repriced with the same model and metrics on the shocked market at the returned valuation date. The shocked market itself is not stored.",
+  "sources": [
+    {
+      "path": "finstack-quant-ui/src/fixtures/results/bond.json",
+      "sha256": "8a60765d749cd9b6aa9889c70475eeb9787646aee8845e6ca1a710052d793619"
+    }
+  ],
+  "base": {
+    "asOf": "2025-01-01",
+    "value": {
+      "amount": "1000438.964391248",
+      "currency": "USD"
+    }
+  },
+  "cases": [
+    {
+      "name": "usd-ois-50bp",
+      "spec": {
+        "id": "usd-ois-50bp",
+        "operations": [
+          {
+            "kind": "curve_parallel_bp",
+            "curve_kind": "discount",
+            "curve_id": "USD-OIS",
+            "bp": 50
+          }
+        ]
+      },
+      "scenarioJson": "{\"id\":\"usd-ois-50bp\",\"name\":null,\"description\":null,\"operations\":[{\"kind\":\"curve_parallel_bp\",\"curve_kind\":\"discount\",\"curve_id\":\"USD-OIS\",\"bp\":50}],\"priority\":0,\"resolution_mode\":\"most_specific_wins\"}",
+      "report": {
+        "operations_applied": 1,
+        "user_operations": 1,
+        "expanded_operations": 1,
+        "changes": {
+          "market_targets": [
+            {
+              "kind": "curve",
+              "curve_kind": "discount",
+              "curve_id": "USD-OIS"
+            }
+          ],
+          "changed_instrument_indices": [],
+          "as_of_changed": false,
+          "portfolio_shape_changed": false,
+          "all_dirty": false
+        },
+        "applied_shocks": [
+          {
+            "applies_to": {
+              "scope": "market",
+              "target": {
+                "kind": "curve",
+                "curve_kind": "discount",
+                "curve_id": "USD-OIS"
+              }
+            },
+            "shock": {
+              "kind": "uniform",
+              "value": 50,
+              "unit": "bp"
+            }
+          }
+        ],
+        "warnings": [],
+        "meta": {
+          "numeric_mode": "f64",
+          "rounding": {
+            "mode": "bankers",
+            "ingest_scale_by_currency": {},
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "generic_epsilon": 1e-10
+            },
+            "version": 1
+          },
+          "fx_policy_applied": null,
+          "version": "0.11.0"
+        }
+      },
+      "asOf": "2025-01-01",
+      "shocked": {
+        "schema_version": 1,
+        "instrument_id": "US912828XG33",
+        "as_of": "2025-01-01",
+        "value": {
+          "amount": "995488.150413341",
+          "currency": "USD"
+        },
+        "measures": {
+          "ytm": 0.04703884277653089,
+          "dv01": -98.76957239897456,
+          "duration_mod": 0.9667764980918357,
+          "bucketed_dv01": -98.76957239757758,
+          "bucketed_dv01::USD-OIS::10y": 0,
+          "bucketed_dv01::USD-OIS::15y": 0,
+          "bucketed_dv01::USD-OIS::1y": -97.47255685995333,
+          "bucketed_dv01::USD-OIS::20y": 0,
+          "bucketed_dv01::USD-OIS::2y": -0.26778174919309095,
+          "bucketed_dv01::USD-OIS::30y": 0,
+          "bucketed_dv01::USD-OIS::3m": -0.0169189115986228,
+          "bucketed_dv01::USD-OIS::3y": 0,
+          "bucketed_dv01::USD-OIS::5y": 0,
+          "bucketed_dv01::USD-OIS::6m": -1.0123148768325336,
+          "bucketed_dv01::USD-OIS::7y": 0
+        },
+        "meta": {
+          "numeric_mode": "f64",
+          "rounding": {
+            "mode": "bankers",
+            "ingest_scale_by_currency": {},
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "generic_epsilon": 1e-10
+            },
+            "version": 1
+          },
+          "fx_policy_applied": null,
+          "version": "0.11.0"
+        },
+        "covenants": null,
+        "provenance": {
+          "model": "discounting",
+          "requested_as_of": "2025-01-01",
+          "market_dependencies": {
+            "curves": {
+              "discount_curves": ["USD-OIS"],
+              "forward_curves": [],
+              "credit_curves": ["HZ"],
+              "inflation_curves": []
+            },
+            "market_scalar_ids": [],
+            "volatility_dependencies": [],
+            "fx_pairs": [],
+            "series_ids": []
+          },
+          "sensitivity_bumps": {
+            "rate_bump_bp": 1,
+            "credit_spread_bump_bp": 1,
+            "spot_bump_decimal": 0.01,
+            "vol_bump_decimal": 0.01
+          }
+        }
+      },
+      "metadata": [
+        {
+          "key": "ytm",
+          "metric": "ytm",
+          "components": [],
+          "coordinates": [],
+          "unit": "decimal",
+          "group": "Pricing",
+          "bucketed": false
+        },
+        {
+          "key": "dv01",
+          "metric": "dv01",
+          "components": [],
+          "coordinates": [],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": false
+        },
+        {
+          "key": "duration_mod",
+          "metric": "duration_mod",
+          "components": [],
+          "coordinates": [],
+          "unit": "years",
+          "group": "Pricing",
+          "bucketed": false
+        },
+        {
+          "key": "bucketed_dv01",
+          "metric": "bucketed_dv01",
+          "components": [],
+          "coordinates": [],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": false
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::10y",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "10y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 10
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::15y",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "15y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 15
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::1y",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "1y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 1
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::20y",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "20y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 20
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::2y",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "2y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 2
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::30y",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "30y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 30
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::3m",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "3m"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 0.25
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::3y",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "3y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 3
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::5y",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "5y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 5
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::6m",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "6m"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 0.5
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::7y",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "7y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 7
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        }
+      ]
+    },
+    {
+      "name": "roll-1m-25bp",
+      "spec": {
+        "id": "roll-1m-25bp",
+        "operations": [
+          {
+            "kind": "time_roll_forward",
+            "period": "1M"
+          },
+          {
+            "kind": "curve_parallel_bp",
+            "curve_kind": "discount",
+            "curve_id": "USD-OIS",
+            "bp": 25
+          }
+        ]
+      },
+      "scenarioJson": "{\"id\":\"roll-1m-25bp\",\"name\":null,\"description\":null,\"operations\":[{\"kind\":\"time_roll_forward\",\"period\":\"1M\",\"apply_shocks\":true,\"roll_mode\":\"business_days\"},{\"kind\":\"curve_parallel_bp\",\"curve_kind\":\"discount\",\"curve_id\":\"USD-OIS\",\"bp\":25}],\"priority\":0,\"resolution_mode\":\"most_specific_wins\"}",
+      "report": {
+        "operations_applied": 2,
+        "user_operations": 2,
+        "expanded_operations": 2,
+        "changes": {
+          "market_targets": [
+            {
+              "kind": "curve",
+              "curve_kind": "discount",
+              "curve_id": "USD-OIS"
+            }
+          ],
+          "changed_instrument_indices": [],
+          "as_of_changed": true,
+          "portfolio_shape_changed": false,
+          "all_dirty": true
+        },
+        "applied_shocks": [
+          {
+            "applies_to": {
+              "scope": "market",
+              "target": {
+                "kind": "curve",
+                "curve_kind": "discount",
+                "curve_id": "USD-OIS"
+              }
+            },
+            "shock": {
+              "kind": "uniform",
+              "value": 25,
+              "unit": "bp"
+            }
+          }
+        ],
+        "warnings": [],
+        "meta": {
+          "numeric_mode": "f64",
+          "rounding": {
+            "mode": "bankers",
+            "ingest_scale_by_currency": {},
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "generic_epsilon": 1e-10
+            },
+            "version": 1
+          },
+          "fx_policy_applied": null,
+          "version": "0.11.0"
+        },
+        "time_roll": {
+          "old_date": "2025-01-01",
+          "new_date": "2025-02-03",
+          "days": 33,
+          "instrument_carry": [
+            [
+              "US912828XG33",
+              {
+                "USD": {
+                  "amount": "4613.745264131",
+                  "currency": "USD"
+                }
+              }
+            ]
+          ],
+          "total_carry": {
+            "USD": {
+              "amount": "4613.745264131",
+              "currency": "USD"
+            }
+          },
+          "failed_instruments": []
+        }
+      },
+      "asOf": "2025-02-03",
+      "shocked": {
+        "schema_version": 1,
+        "instrument_id": "US912828XG33",
+        "as_of": "2025-02-03",
+        "value": {
+          "amount": "1002074.235114868",
+          "currency": "USD"
+        },
+        "measures": {
+          "ytm": 0.044364475006134364,
+          "dv01": -90.36448919400573,
+          "duration_mod": 0.8788724314855294,
+          "bucketed_dv01": -90.3644891398726,
+          "bucketed_dv01::USD-OIS::10y": 0,
+          "bucketed_dv01::USD-OIS::15y": 0,
+          "bucketed_dv01::USD-OIS::1y": -73.82201335747959,
+          "bucketed_dv01::USD-OIS::20y": 0,
+          "bucketed_dv01::USD-OIS::2y": 0,
+          "bucketed_dv01::USD-OIS::30y": 0,
+          "bucketed_dv01::USD-OIS::3m": -0.3198956688866019,
+          "bucketed_dv01::USD-OIS::3y": 0,
+          "bucketed_dv01::USD-OIS::5y": 0,
+          "bucketed_dv01::USD-OIS::6m": -16.22258011350641,
+          "bucketed_dv01::USD-OIS::7y": 0
+        },
+        "meta": {
+          "numeric_mode": "f64",
+          "rounding": {
+            "mode": "bankers",
+            "ingest_scale_by_currency": {},
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "generic_epsilon": 1e-10
+            },
+            "version": 1
+          },
+          "fx_policy_applied": null,
+          "version": "0.11.0"
+        },
+        "covenants": null,
+        "provenance": {
+          "model": "discounting",
+          "requested_as_of": "2025-02-03",
+          "market_dependencies": {
+            "curves": {
+              "discount_curves": ["USD-OIS"],
+              "forward_curves": [],
+              "credit_curves": ["HZ"],
+              "inflation_curves": []
+            },
+            "market_scalar_ids": [],
+            "volatility_dependencies": [],
+            "fx_pairs": [],
+            "series_ids": []
+          },
+          "sensitivity_bumps": {
+            "rate_bump_bp": 1,
+            "credit_spread_bump_bp": 1,
+            "spot_bump_decimal": 0.01,
+            "vol_bump_decimal": 0.01
+          }
+        }
+      },
+      "metadata": [
+        {
+          "key": "ytm",
+          "metric": "ytm",
+          "components": [],
+          "coordinates": [],
+          "unit": "decimal",
+          "group": "Pricing",
+          "bucketed": false
+        },
+        {
+          "key": "dv01",
+          "metric": "dv01",
+          "components": [],
+          "coordinates": [],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": false
+        },
+        {
+          "key": "duration_mod",
+          "metric": "duration_mod",
+          "components": [],
+          "coordinates": [],
+          "unit": "years",
+          "group": "Pricing",
+          "bucketed": false
+        },
+        {
+          "key": "bucketed_dv01",
+          "metric": "bucketed_dv01",
+          "components": [],
+          "coordinates": [],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": false
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::10y",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "10y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 10
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::15y",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "15y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 15
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::1y",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "1y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 1
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::20y",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "20y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 20
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::2y",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "2y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 2
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::30y",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "30y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 30
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::3m",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "3m"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 0.25
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::3y",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "3y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 3
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::5y",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "5y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 5
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::6m",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "6m"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 0.5
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::7y",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "7y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 7
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        }
+      ]
+    },
+    {
+      "name": "hz-par-cds-25bp",
+      "spec": {
+        "id": "hz-par-cds-25bp",
+        "operations": [
+          {
+            "kind": "curve_parallel_bp",
+            "curve_kind": "par_cds",
+            "curve_id": "HZ",
+            "bp": 25
+          }
+        ],
+        "hazard_bump_mode": "first_order_shift"
+      },
+      "scenarioJson": "{\"id\":\"hz-par-cds-25bp\",\"name\":null,\"description\":null,\"operations\":[{\"kind\":\"curve_parallel_bp\",\"curve_kind\":\"par_cds\",\"curve_id\":\"HZ\",\"bp\":25}],\"priority\":0,\"resolution_mode\":\"most_specific_wins\",\"hazard_bump_mode\":\"first_order_shift\"}",
+      "report": {
+        "operations_applied": 1,
+        "user_operations": 1,
+        "expanded_operations": 1,
+        "changes": {
+          "market_targets": [
+            {
+              "kind": "curve",
+              "curve_kind": "par_cds",
+              "curve_id": "HZ"
+            }
+          ],
+          "changed_instrument_indices": [],
+          "as_of_changed": false,
+          "portfolio_shape_changed": false,
+          "all_dirty": false
+        },
+        "applied_shocks": [
+          {
+            "applies_to": {
+              "scope": "market",
+              "target": {
+                "kind": "curve",
+                "curve_kind": "par_cds",
+                "curve_id": "HZ"
+              }
+            },
+            "shock": {
+              "kind": "uniform",
+              "value": 25,
+              "unit": "bp"
+            }
+          }
+        ],
+        "warnings": [
+          {
+            "kind": "hazard_spread_first_order",
+            "curve_id": "HZ",
+            "recovery_rate": 0.4
+          }
+        ],
+        "meta": {
+          "numeric_mode": "f64",
+          "rounding": {
+            "mode": "bankers",
+            "ingest_scale_by_currency": {},
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "generic_epsilon": 1e-10
+            },
+            "version": 1
+          },
+          "fx_policy_applied": null,
+          "version": "0.11.0"
+        }
+      },
+      "asOf": "2025-01-01",
+      "shocked": {
+        "schema_version": 1,
+        "instrument_id": "US912828XG33",
+        "as_of": "2025-01-01",
+        "value": {
+          "amount": "1000438.964391248",
+          "currency": "USD"
+        },
+        "measures": {
+          "ytm": 0.04192805926047216,
+          "dv01": -99.2633986165165,
+          "duration_mod": 0.969221509109137,
+          "bucketed_dv01": -99.26339861511951,
+          "bucketed_dv01::USD-OIS::10y": 0,
+          "bucketed_dv01::USD-OIS::15y": 0,
+          "bucketed_dv01::USD-OIS::1y": -97.9624820270692,
+          "bucketed_dv01::USD-OIS::20y": 0,
+          "bucketed_dv01::USD-OIS::2y": -0.26912769745104015,
+          "bucketed_dv01::USD-OIS::30y": 0,
+          "bucketed_dv01::USD-OIS::3m": -0.01696091325720772,
+          "bucketed_dv01::USD-OIS::3y": 0,
+          "bucketed_dv01::USD-OIS::5y": 0,
+          "bucketed_dv01::USD-OIS::6m": -1.0148279773420654,
+          "bucketed_dv01::USD-OIS::7y": 0
+        },
+        "meta": {
+          "numeric_mode": "f64",
+          "rounding": {
+            "mode": "bankers",
+            "ingest_scale_by_currency": {},
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "generic_epsilon": 1e-10
+            },
+            "version": 1
+          },
+          "fx_policy_applied": null,
+          "version": "0.11.0"
+        },
+        "covenants": null,
+        "provenance": {
+          "model": "discounting",
+          "requested_as_of": "2025-01-01",
+          "market_dependencies": {
+            "curves": {
+              "discount_curves": ["USD-OIS"],
+              "forward_curves": [],
+              "credit_curves": ["HZ"],
+              "inflation_curves": []
+            },
+            "market_scalar_ids": [],
+            "volatility_dependencies": [],
+            "fx_pairs": [],
+            "series_ids": []
+          },
+          "sensitivity_bumps": {
+            "rate_bump_bp": 1,
+            "credit_spread_bump_bp": 1,
+            "spot_bump_decimal": 0.01,
+            "vol_bump_decimal": 0.01
+          }
+        }
+      },
+      "metadata": [
+        {
+          "key": "ytm",
+          "metric": "ytm",
+          "components": [],
+          "coordinates": [],
+          "unit": "decimal",
+          "group": "Pricing",
+          "bucketed": false
+        },
+        {
+          "key": "dv01",
+          "metric": "dv01",
+          "components": [],
+          "coordinates": [],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": false
+        },
+        {
+          "key": "duration_mod",
+          "metric": "duration_mod",
+          "components": [],
+          "coordinates": [],
+          "unit": "years",
+          "group": "Pricing",
+          "bucketed": false
+        },
+        {
+          "key": "bucketed_dv01",
+          "metric": "bucketed_dv01",
+          "components": [],
+          "coordinates": [],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": false
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::10y",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "10y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 10
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::15y",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "15y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 15
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::1y",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "1y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 1
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::20y",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "20y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 20
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::2y",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "2y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 2
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::30y",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "30y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 30
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::3m",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "3m"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 0.25
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::3y",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "3y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 3
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::5y",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "5y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 5
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::6m",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "6m"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 0.5
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        },
+        {
+          "key": "bucketed_dv01::USD-OIS::7y",
+          "metric": "bucketed_dv01",
+          "components": ["USD-OIS", "7y"],
+          "coordinates": [
+            {
+              "group": "USD-OIS",
+              "value": null
+            },
+            {
+              "group": "",
+              "value": 7
+            }
+          ],
+          "unit": "currency",
+          "group": "Sensitivity",
+          "bucketed": true
+        }
+      ]
+    }
+  ]
+}

@@ -27,7 +27,7 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use crate::api::errors::EnvelopeError;
 use crate::api::market_datum::MarketDatum;
 use crate::api::prior_market::PriorMarketObject;
-use crate::api::schema::{CalibrationEnvelope, StepParams, CALIBRATION_CONTRACT};
+use crate::api::schema::{CALIBRATION_CONTRACT, CalibrationEnvelope, StepParams};
 use crate::quotes::MarketQuote;
 #[cfg(test)]
 use crate::quotes::{CdsQuote, RateQuote};
@@ -318,13 +318,13 @@ fn build_nodes(
         if let StepParams::BaseCorrelation(params) = &step.params {
             index_ids.push(params.index_id.clone());
         }
-        if let StepParams::StudentT(params) = &step.params {
-            if params.discount_curve_id.is_none() {
-                // Preflight requires exactly one discount curve. Track all
-                // candidates here so an earlier writer cannot be bypassed by
-                // an already available curve in the initial snapshot.
-                io.reads.extend(discount_ids.iter().cloned());
-            }
+        if let StepParams::StudentT(params) = &step.params
+            && params.discount_curve_id.is_none()
+        {
+            // Preflight requires exactly one discount curve. Track all
+            // candidates here so an earlier writer cannot be bypassed by
+            // an already available curve in the initial snapshot.
+            io.reads.extend(discount_ids.iter().cloned());
         }
         if let Some(quote_ids) = envelope.plan.quote_sets.get(&step.quote_set) {
             for quote_id in quote_ids {
@@ -1202,9 +1202,11 @@ mod tests {
             .expect("duplicate step error");
         assert_eq!(duplicate.kind_str(), "duplicate_step_id");
         assert_eq!(duplicate.step_id(), Some("duplicate"));
-        assert!(serde_json::to_string(&duplicate)
-            .expect("error JSON")
-            .contains("\"duplicate_index\":1"));
+        assert!(
+            serde_json::to_string(&duplicate)
+                .expect("error JSON")
+                .contains("\"duplicate_index\":1")
+        );
     }
 }
 
@@ -1213,8 +1215,8 @@ mod canonical_validation_tests {
     use super::*;
     use crate::api::market_datum::{MarketDatum, PriceDatum};
     use crate::api::schema::CalibrationPlan;
-    use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::FxHashMap;
+    use finstack_quant_core::market_data::scalars::MarketScalar;
 
     #[test]
     fn duplicate_price_id_is_flagged() {

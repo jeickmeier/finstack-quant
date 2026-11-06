@@ -5,7 +5,7 @@
 //! [`transform_panel`] is the typed Rust entry point and preserves
 //! operation order in [`PanelTransformResult`].
 
-use crate::{transform_cross_sectional, transform_timeseries, CrossSectionalOp, TimeSeriesOp};
+use crate::{CrossSectionalOp, TimeSeriesOp, transform_cross_sectional, transform_timeseries};
 use finstack_quant_core::{Error, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

@@ -10,9 +10,9 @@ use finstack_quant_analytics::{
     Performance, PeriodStats, RollingGreeks,
 };
 use finstack_quant_core::dates::{Date, PeriodKind};
-use serde::de::DeserializeOwned;
 use serde::Serialize;
-use serde_json::{json, Value};
+use serde::de::DeserializeOwned;
+use serde_json::{Value, json};
 use time::Month;
 
 fn schema(type_name: &str) -> Value {
@@ -97,13 +97,13 @@ fn performance_state_validates_against_its_schema() {
         vec![100.0, 101.0, 100.5, 102.0, 103.0, 102.5, 104.0],
         vec![50.0, 50.5, 50.2, 51.0, 51.5, 51.2, 52.0],
     ];
-    let perf = Performance::new(
+    let perf = Performance::new(&crate::support::prices_panel(
         dates,
         prices,
         vec!["SPY".into(), "QQQ".into()],
         Some("SPY"),
         PeriodKind::Daily,
-    )
+    ))
     .expect("valid panel");
     assert_wire_matches_schema("Performance", &perf);
 }
@@ -196,7 +196,7 @@ fn result_metadata_is_required_and_unknown_fields_are_rejected() {
     assert_strict_result::<LookbackReturns>(
         "LookbackReturns",
         json!({
-            "ticker_names": ["FUND"], "mtd": [0.1], "qtd": [0.1], "ytd": [0.1], "fytd": [0.1]
+            "ref_date": "2025-01-02", "ticker_names": ["FUND"], "mtd": [0.1], "qtd": [0.1], "ytd": [0.1], "fytd": [0.1]
         }),
         &[],
     );

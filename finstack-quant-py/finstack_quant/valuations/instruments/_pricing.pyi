@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 from typing import Any, Literal
 import pandas as pd
+from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import Tenor
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.valuations import ValuationResult
@@ -266,6 +267,47 @@ def list_standard_metrics_grouped() -> dict[str, list[str]]:
     """
     ...
 
+def metrics_for_instrument(instrument_type: str) -> dict[str, list[str]]:
+    """
+    Return every metric ID the standard registry holds for one instrument type, by group.
+
+    The per-instrument counterpart to :func:`list_standard_metrics_grouped`:
+    each display group keeps only the metrics the standard registry applies
+    to ``instrument_type``, and groups left empty are omitted. Applicable
+    metrics outside every display group, such as ``all_in_rate`` or
+    ``parity``, are listed under ``"Instrument Specific"``. A listed metric
+    is registered for the type; whether it computes under a given pricing
+    model or market still depends on that model and market.
+
+    Parameters
+    ----------
+    instrument_type : str
+        Canonical instrument-type tag, matched exactly in snake case (for
+        example ``"bond"``, ``"fx_option"`` or ``"structured_credit"``); the
+        same tag an instrument envelope carries in its ``type`` field.
+
+    Returns
+    -------
+    dict[str, list[str]]
+        Mapping from group label to that group's sorted applicable metric
+        IDs, in ascending group-label order.
+
+    Raises
+    ------
+    ValueError
+        If ``instrument_type`` is not a known instrument type.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import metrics_for_instrument
+    >>> def offers_wal(instrument_type):
+    ...     grouped = metrics_for_instrument(instrument_type)
+    ...     return any("wal" in ids for ids in grouped.values())
+    >>> (offers_wal("fx_option"), offers_wal("structured_credit"))
+    (False, True)
+    """
+    ...
+
 def metric_metadata(keys: list[str]) -> list[dict[str, Any]]:
     """
     Describe canonical metric keys using Rust-owned units and coordinates.
@@ -275,13 +317,17 @@ def metric_metadata(keys: list[str]) -> list[dict[str, Any]]:
     keys : list[str]
         Canonical scalar or qualified wire keys; input order and duplicates
         are retained and qualified coordinates require the native composite
-        escaping. Custom names are accepted with unknown units and no group.
+        escaping. Custom names are accepted, with a unit only when Rust declares
+        one; one the standard registry holds gets the group ``"Instrument Specific"``, any
+        other gets no group.
 
     Returns
     -------
     list[dict[str, Any]]
         One record per key with ``key``, ``metric``, ``components`` (decoded
-        coordinate labels in original order), ``unit`` (canonical unit family
+        coordinate labels in original order), ``coordinates`` (for each label,
+        the ``group`` and numeric ``value``, a tenor in years or a decimal
+        strike, that order it on its axis), ``unit`` (canonical unit family
         string), ``group`` (native display group or ``None``) and
         ``bucketed``. No prices are changed and a unit family does not imply
         a bump size or FX conversion.
@@ -296,6 +342,294 @@ def metric_metadata(keys: list[str]) -> list[dict[str, Any]]:
     >>> from finstack_quant.valuations.instruments import metric_metadata
     >>> metric_metadata(["ytm"])[0]["unit"]
     'decimal'
+    """
+    ...
+
+def price_driver_fields() -> list[str]:
+    """
+    Wire names of the mutually exclusive price-driving market quotes.
+
+    Validation rejects more than one of these on a
+    ``instrument_pricing_overrides.market_quotes`` object, so a host editor can
+    clear the others when one is entered. Other quotes, such as
+    ``implied_volatility``, are not in the set.
+
+    Returns
+    -------
+    list[str]
+        Field names as they appear on the wire, in precedence order.
+
+    Notes
+    -----
+    This function does not raise; the set is fixed.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import price_driver_fields
+    >>> price_driver_fields()[0]
+    'quoted_clean_price_pct'
+    """
+    ...
+
+def tranche_metric_field_units(currency: str | Currency) -> list[dict[str, str]]:
+    """
+    Units of the scalar ``TrancheMetrics`` fields, in struct order.
+
+    ``TrancheMetrics`` documents these units in prose and does not state them
+    on the wire. Values are never rescaled.
+
+    Parameters
+    ----------
+    currency : str | Currency
+        ISO-4217 code of the result's ``TrancheMetrics.currency``; it names the
+        unit of ``pv``, ``accrued`` and ``cs01``.
+
+    Returns
+    -------
+    list[dict[str, str]]
+        One ``{"field", "label", "source"}`` record per scalar field: the wire
+        field name, its unit text and the Rust field that documents it.
+        ``tranche_id``, ``currency`` and the ``metrics`` map are not listed.
+
+    Raises
+    ------
+    ValueError
+        If ``currency`` is not a recognized ISO-4217 code.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import tranche_metric_field_units
+    >>> tranche_metric_field_units("USD")[0]["label"]
+    'USD'
+    """
+    ...
+
+def tranche_solve_field_units() -> dict[str, Any]:
+    """
+    Units of the tranche break-even CDR, discount margin and OAS results.
+
+    Those solvers document their units in prose: the two scalars are decimals
+    (``0.0125`` = 125 bp) and ``OasResult`` prices are percent of the tranche's
+    current balance. Values are never rescaled.
+
+    Returns
+    -------
+    dict[str, Any]
+        ``breakeven_cdr`` and ``discount_margin``, each one record of ``field``,
+        ``label`` and ``source``, and ``oas``, one such record per ``OasResult``
+        field in struct order.
+
+    Notes
+    -----
+    This function does not raise.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import tranche_solve_field_units
+    >>> tranche_solve_field_units()["breakeven_cdr"]["label"]
+    'decimal'
+    """
+    ...
+
+def scenario_table_field_units(currency: str | Currency) -> dict[str, Any]:
+    """
+    Units of the :class:`ScenarioTable` cell fields, the one place a host reads them from.
+
+    Rates are decimals, the price is a clean percent of the tranche's current balance
+    and the writedown is in currency units. Values are never rescaled.
+
+    Parameters
+    ----------
+    currency : str | Currency
+        ``ScenarioTable.currency`` of the table being labelled, an ISO-4217 code
+        in any ASCII case or a ``Currency``. It names the unit of ``writedown``.
+
+    Returns
+    -------
+    dict[str, Any]
+        ``axes``, one record of ``field``, ``label`` and ``source`` per swept
+        input (``cpr``, ``cdr``, ``severity``); and ``measures``, one such record
+        per reported measure (``price``, ``wal``, ``writedown``), each in struct
+        order.
+
+    Raises
+    ------
+    ValueError
+        If ``currency`` is not a recognized ISO-4217 code.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import scenario_table_field_units
+    >>> units = scenario_table_field_units("USD")
+    >>> {row["field"]: row["label"] for row in units["measures"]}["wal"]
+    'years'
+    """
+    ...
+
+def simulation_field_units(currency: str | Currency) -> dict[str, Any]:
+    """
+    Units of a structured-credit simulation's charted series, the one place a host reads them from.
+
+    Coverage ratios, triggers and cushions are in times covered, credit enhancement
+    is a decimal share of the collateral and excess spread an annual decimal of the opening pool
+    balance. Values are never rescaled.
+
+    Parameters
+    ----------
+    currency : str | Currency
+        Deal currency of the simulation being labelled, an ISO-4217 code in any
+        ASCII case or a ``Currency``. It names the unit of ``diverted_cash``.
+
+    Returns
+    -------
+    dict[str, Any]
+        ``coverage_tests``, one record of ``field``, ``label`` and ``source`` per
+        numeric coverage-test field (``ratio``, ``trigger_level``, ``cushion``) in
+        struct order; and one such record each for ``diverted_cash``,
+        ``credit_enhancement`` and ``excess_spread``.
+
+    Raises
+    ------
+    ValueError
+        If ``currency`` is not a recognized ISO-4217 code.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import simulation_field_units
+    >>> simulation_field_units("USD")["diverted_cash"]["label"]
+    'USD'
+    """
+    ...
+
+def equity_metrics_field_units(currency: str | Currency) -> dict[str, Any]:
+    """
+    Units of the :class:`EquityMetrics` fields, the one place a host reads them from.
+
+    The IRR is an annual decimal, the MOIC a multiple of the invested amount, the NAV
+    a percent of the equity's current balance and cash-on-cash a decimal share of the
+    invested amount. Values are never rescaled.
+
+    Parameters
+    ----------
+    currency : str | Currency
+        Currency of the result being labelled, an ISO-4217 code in any ASCII case or
+        a ``Currency``. It names the unit of ``invested``.
+
+    Returns
+    -------
+    dict[str, Any]
+        One record of ``field``, ``label`` and ``source`` each for ``invested``,
+        ``irr``, ``moic``, ``nav_pct`` and ``cash_on_cash``, and ``purchase_price``
+        for the ``purchase_price_pct`` argument of ``equity_metrics``: percent of
+        current balance, omitted means par.
+
+    Raises
+    ------
+    ValueError
+        If ``currency`` is not a recognized ISO-4217 code.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import equity_metrics_field_units
+    >>> equity_metrics_field_units("USD")["invested"]["label"]
+    'USD'
+    """
+    ...
+
+def standard_deal_families() -> list[dict[str, Any]]:
+    """
+    Deal families :meth:`StructuredCredit.new_standard` accepts, the one place a host reads them from.
+
+    Returns
+    -------
+    list[dict[str, Any]]
+        One record per family in ``abs``, ``clo``, ``cmbs``, ``rmbs`` order:
+        ``deal_type``, the ``new_standard`` argument; ``profile_id``, the registry
+        profile supplying the family's frequency and credit assumptions; and
+        ``example``, complete ``StandardDealParams`` that ``new_standard`` accepts for
+        the family, with its id, tranche ids and ``pool.deal_type`` naming the family.
+
+    Raises
+    ------
+    ValueError
+        If an example cannot be constructed, which its fixed inputs do not trigger.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import standard_deal_families
+    >>> [(family["deal_type"], family["profile_id"]) for family in standard_deal_families()][0]
+    ('abs', 'abs_auto_standard')
+    """
+    ...
+
+def bond_quote_set_field_units(currency: str | Currency) -> list[dict[str, str]]:
+    """
+    Units of the :class:`BondQuoteSet` fields, in struct order, the one place a host reads them from.
+
+    The set mixes currency prices, a percent-of-par price and decimal yields and
+    spreads. Each field with a metric states that metric's unit, and
+    ``clean_price_pct``, which has none, states its quote convention. Values are never
+    rescaled.
+
+    Parameters
+    ----------
+    currency : str | Currency
+        Currency of the bond whose set is being labelled, an ISO-4217 code in any ASCII
+        case or a ``Currency``. It names the unit of ``clean_price_currency`` and
+        ``dirty_price_currency``.
+
+    Returns
+    -------
+    list[dict[str, str]]
+        One record per field: ``field``, its wire name; ``label``, its unit text; and
+        ``source``, the Rust field the unit is documented on.
+
+    Raises
+    ------
+    ValueError
+        If ``currency`` is not a recognized ISO-4217 code.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import bond_quote_set_field_units
+    >>> [(unit["field"], unit["label"]) for unit in bond_quote_set_field_units("USD")][:4]
+    [('clean_price_currency', 'USD'), ('clean_price_pct', '% of par'), ('dirty_price_currency', 'USD'), ('ytm', 'decimal')]
+    """
+    ...
+
+def pool_report_field_units(currency: str | Currency) -> dict[str, Any]:
+    """
+    Units of the :class:`PoolReport` fields, the one place a host reads them from.
+
+    ``PoolStats`` mixes a decimal coupon, a basis-point spread and a
+    percent-point defaulted share. Values are never rescaled.
+
+    Parameters
+    ----------
+    currency : str | Currency
+        Base currency of the pool being labelled, an ISO-4217 code in any ASCII
+        case or a ``Currency``. It names the unit of ``total_balance``,
+        ``undrawn_commitment`` and each row's ``balance``.
+
+    Returns
+    -------
+    dict[str, Any]
+        ``total_balance`` and ``warf``, each one record of ``field``, ``label``
+        and ``source``; ``stats``, one such record per ``PoolStats`` field in
+        struct order; and ``concentration``, one per numeric
+        ``PoolConcentrationEntry`` field in struct order.
+
+    Raises
+    ------
+    ValueError
+        If ``currency`` is not a recognized ISO-4217 code.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import pool_report_field_units
+    >>> units = pool_report_field_units("USD")
+    >>> {row["field"]: row["label"] for row in units["stats"]}["weighted_avg_spread_bp"]
+    'bp'
     """
     ...
 
@@ -1148,6 +1482,27 @@ class InstrumentCashflowEnvelope:
         This accessor does not raise; it returns the stored value.
         """
         ...
+    def calendar_year_ladder_by_currency(self) -> list[dict[str, Any]]:
+        """
+        Calendar-year ladders of this envelope, one per row currency.
+
+        Currencies never mix. Ladders follow the first appearance of each
+        currency in ``flows``, and each reads ``native_pv``, the row-currency PV
+        before FX conversion and any scenario price shock.
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            One ``{"currency": str, "rows": list}`` per row currency; each row has
+            ``year``, ``non_principal``, ``principal`` and ``pv``, in the units of
+            that currency, by ascending year.
+
+        Raises
+        ------
+        ValueError
+            If an amount or native PV is non-finite.
+        """
+        ...
     def to_dataframe(self) -> pd.DataFrame:
         """
         One row per cashflow as a pandas ``DataFrame``.
@@ -1163,7 +1518,10 @@ class InstrumentCashflowEnvelope:
             ``rate``, ``reset_date``, ``discount_factor``,
             ``discount_curve_id``, ``survival_probability``,
             ``conditional_default_prob``, ``inflation_index_ratio``,
-            ``prepayment_smm``, ``beginning_balance``, ``ending_balance``,
+            ``prepayment_smm``, ``beginning_balance``, ``ending_balance``
+            (outstanding principal before and after the row for bonds, term
+            loans and revolving credit, a period's pool balances for agency
+            MBS, null otherwise),
             ``native_pv`` (row currency, before FX and scenario shock),
             ``fx_rate`` (reporting per row currency) and ``pv``. The four date
             columns are ``datetime64`` and fields the model does not populate

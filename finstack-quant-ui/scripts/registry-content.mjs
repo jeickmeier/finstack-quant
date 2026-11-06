@@ -1,0 +1,194 @@
+import { readFile, readdir } from "node:fs/promises";
+import { basename, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { wasmVersion } from "./registry-metadata.mjs";
+
+import ts from "typescript";
+import { shadcnItems } from "./shadcn.mjs";
+import { byCodeUnit } from "./order.mjs";
+import { labelFor } from "../src/format/label.mjs";
+
+const defaultRoot = fileURLToPath(new URL("../", import.meta.url));
+/** Build root registry content without writing intermediate manifests. */
+export async function registryContent(cwd = defaultRoot) {
+  const root = `${resolve(cwd)}/`;
+  const read = (path) => readFile(`${root}${path}`, "utf8").then(JSON.parse);
+  const wasm = `finstack-quant-wasm@${await wasmVersion(root)}`;
+  const roots = await read("src/generated/roots.json");
+  const modules = new Set(await readdir(`${root}src/generated/instrument`));
+  const file = (path) => ({
+    path: `src/${path}`,
+    type: "registry:file",
+    target: `lib/finstack/${path}`,
+  });
+  const item = (
+    name,
+    description,
+    files,
+    registryDependencies = [],
+    dependencies = [],
+  ) => ({
+    name,
+    type: "registry:lib",
+    title: labelFor(name),
+    description,
+    files: files.map(file),
+    registryDependencies: registryDependencies.map(
+      (name) => `@finstack/${name}`,
+    ),
+    dependencies,
+  });
+  const sharedMarker =
+    "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json";
+  const contracts = [];
+  for (const { schema } of roots) {
+    const name = basename(schema, ".json");
+    const files = [
+      `generated/${schema}`,
+      `generated/types/${name}.ts`,
+      `generated/meta/${name}.ts`,
+    ];
+    const instrument = modules.has(`${name}.ts`);
+    if (instrument)
+      files.push(
+        `generated/instrument/${name}.ts`,
+        `generated/examples/${name}.json`,
+      );
+    if (name === "financial_model_spec")
+      files.push(`generated/examples/${name}.json`);
+    const text = await readFile(`${root}src/generated/${schema}`, "utf8");
+    const dependencies = [];
+    if (instrument) dependencies.push("finstack-codec");
+    if (text.includes(sharedMarker)) dependencies.push("shared-schema-defs");
+    contracts.push({
+      ...item(
+        `contract-${name.replaceAll("_", "-")}`,
+        `Generated schema, wire types${instrument ? ", metadata, validator module and example" : " and metadata"} for the canonical Rust ${name} contract. Validation is structural; native validation remains required.`,
+        files,
+        dependencies,
+      ),
+      title: `${labelFor(name)} contract`,
+    });
+  }
+  const items = [
+    item(
+      "finstack-fixtures",
+      "Native bond valuation result fixture for examples and tests.",
+      ["fixtures/results/bond.json"],
+      ["contract-bond", "contract-market-context-state"],
+    ),
+    item(
+      "primitive-contracts",
+      "Canonical option lists and constraints for controlled primitives, projected from the Rust schemas.",
+      ["generated/primitive-contracts.json"],
+    ),
+    item(
+      "shared-schema-defs",
+      "Shared definition document, wire types and metadata referenced by wide instrument schemas.",
+      [
+        "generated/defs/shared.json",
+        "generated/types/shared.ts",
+        "generated/meta/shared.ts",
+      ],
+      ["finstack-codec"],
+    ),
+    item(
+      "finstack-format",
+      "Exact decimal, money, rate and date display formatting, field labels, tenor ordering and TanStack Table column presets.",
+      [
+        "format/format.ts",
+        "format/columns.ts",
+        "format/label.mjs",
+        "format/label.d.mts",
+      ],
+      ["contract-valuation-result"],
+      [
+        "big.js@7.0.1",
+        "@tanstack/react-table@9.2.4",
+        "@types/big.js@6.2.2",
+        wasm,
+      ],
+    ),
+    item(
+      "finstack-codec",
+      "Lossless JSON codec and JSON Schema validator construction for the generated contracts.",
+      ["codec.mjs", "codec.d.mts", "schema.mjs", "schema.d.mts"],
+      [],
+      ["lossless-json@4.3.1", "zod@4.6.5"],
+    ),
+    ...contracts,
+    item(
+      "instrument-catalogue",
+      "Lazy catalogue of every instrument contract; each loader imports its schema, metadata and example on demand.",
+      ["generated/instruments.ts", "generated/catalogue.json"],
+      contracts
+        .filter((entry) =>
+          entry.files.some((f) => f.path.includes("/instrument/")),
+        )
+        .map((entry) => entry.name),
+    ),
+    item(
+      "contract-manifest",
+      "Schema root, fixture and provenance manifests for the generated contracts.",
+      [
+        "generated/roots.json",
+        "generated/fixtures.json",
+        "contract-provenance.json",
+      ],
+    ),
+    item(
+      "finstack-views",
+      "Read-only projections of stored curve and value state for display, without interpolation.",
+      ["views.ts", "generated/curve-views.json"],
+    ),
+    item(
+      "finstack-host",
+      "Adapters between structured WASM results and lossless UI state, including canonical export.",
+      ["host.ts"],
+      ["finstack-codec"],
+      [wasm],
+    ),
+  ];
+  for (const entry of items) {
+    const stock = new Set();
+    for (const source of entry.files ?? []) {
+      if (!/\.[cm]?[jt]sx?$/.test(source.path)) continue;
+      const content = await readFile(`${root}${source.path}`, "utf8");
+      for (const { fileName } of ts.preProcessFile(content, true, true)
+        .importedFiles)
+        if (fileName.startsWith("@/components/ui/")) {
+          const name = fileName.slice("@/components/ui/".length);
+          if (!shadcnItems.has(name))
+            throw Error(`Unknown shadcn dependency: ${name}`);
+          stock.add(name);
+        }
+    }
+    if (stock.size)
+      entry.registryDependencies = [
+        ...(entry.registryDependencies ?? []),
+        ...[...stock].sort(byCodeUnit),
+      ];
+  }
+  return {
+    $schema: "https://ui.shadcn.com/schema/registry.json",
+    name: "finstack",
+    homepage: "https://jeickmeier.github.io/finstack-quant/",
+    include: [
+      "base",
+      "theme",
+      "shared",
+      "core",
+      "valuations",
+      "calibration",
+      "covenants",
+      "scenarios",
+      "attribution",
+      "analytics",
+      "portfolio",
+      "margin",
+      "models",
+      "statements",
+    ].map((category) => `registry/${category}/registry.json`),
+    items,
+  };
+}

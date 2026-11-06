@@ -1,0 +1,137 @@
+{
+  "$defs": {
+    "MetricFieldUnit": {
+      "additionalProperties": false,
+      "description": "The display unit of one scalar field of a result struct.",
+      "properties": {
+        "field": {
+          "description": "Wire name of the field.",
+          "type": "string"
+        },
+        "label": {
+          "description": "Unit text as the field documents it, such as `USD per bp` or `years`.",
+          "type": "string"
+        },
+        "source": {
+          "description": "Canonical Rust field the unit is documented on.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "field",
+        "label",
+        "source"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/results/1/pool_report_field_units.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "The display units of the collateral-pool report fields.",
+  "examples": [
+    {
+      "concentration": [
+        {
+          "field": "balance",
+          "label": "USD",
+          "source": "valuations::PoolConcentrationEntry::balance"
+        },
+        {
+          "field": "balance_pct",
+          "label": "% of current pool balance",
+          "source": "valuations::PoolConcentrationEntry::balance_pct"
+        },
+        {
+          "field": "asset_count",
+          "label": "assets",
+          "source": "valuations::PoolConcentrationEntry::asset_count"
+        }
+      ],
+      "stats": [
+        {
+          "field": "wac",
+          "label": "annual decimal, fixed-rate only",
+          "source": "valuations::PoolStats::wac"
+        },
+        {
+          "field": "weighted_avg_spread_bp",
+          "label": "bp",
+          "source": "valuations::PoolStats::weighted_avg_spread_bp"
+        },
+        {
+          "field": "weighted_avg_maturity",
+          "label": "years",
+          "source": "valuations::PoolStats::weighted_avg_maturity"
+        },
+        {
+          "field": "diversity_score",
+          "label": "score",
+          "source": "valuations::PoolStats::diversity_score"
+        },
+        {
+          "field": "num_obligors",
+          "label": "named obligors",
+          "source": "valuations::PoolStats::num_obligors"
+        },
+        {
+          "field": "num_industries",
+          "label": "named industries",
+          "source": "valuations::PoolStats::num_industries"
+        },
+        {
+          "field": "defaulted_balance_pct",
+          "label": "% of current pool balance",
+          "source": "valuations::PoolStats::defaulted_balance_pct"
+        },
+        {
+          "field": "undrawn_commitment",
+          "label": "USD",
+          "source": "valuations::PoolStats::undrawn_commitment"
+        }
+      ],
+      "total_balance": {
+        "field": "total_balance",
+        "label": "USD",
+        "source": "valuations::PoolReport::total_balance"
+      },
+      "warf": {
+        "field": "warf",
+        "label": "Moody's rating factor",
+        "source": "valuations::PoolReport::warf"
+      }
+    }
+  ],
+  "properties": {
+    "concentration": {
+      "description": "Unit of the numeric fields of each `by_obligor`, `by_industry` and\n`by_rating` row, in the order `PoolConcentrationEntry` declares them.",
+      "items": {
+        "$ref": "#/$defs/MetricFieldUnit"
+      },
+      "type": "array"
+    },
+    "stats": {
+      "description": "Unit of every `PoolReport::stats` field, in the order `PoolStats`\ndeclares them.",
+      "items": {
+        "$ref": "#/$defs/MetricFieldUnit"
+      },
+      "type": "array"
+    },
+    "total_balance": {
+      "$ref": "#/$defs/MetricFieldUnit",
+      "description": "Unit of `PoolReport::total_balance`."
+    },
+    "warf": {
+      "$ref": "#/$defs/MetricFieldUnit",
+      "description": "Unit of `PoolReport::warf`."
+    }
+  },
+  "required": [
+    "total_balance",
+    "warf",
+    "stats",
+    "concentration"
+  ],
+  "title": "PoolReportFieldUnits",
+  "type": "object"
+}

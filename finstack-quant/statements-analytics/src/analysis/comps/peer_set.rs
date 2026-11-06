@@ -12,8 +12,14 @@ use serde::{Deserialize, Serialize};
 /// All criteria are AND-ed: a company must satisfy every non-empty
 /// constraint to be included. For OR semantics across sectors or
 /// ratings, supply multiple values in the respective `Vec`.
+///
+/// Every field may be omitted from the serde document: an omitted list or
+/// bound is no constraint, so `{}` (the [`Default`]) accepts every company.
+/// Unknown keys are rejected, so a misspelt criterion is an error rather than
+/// a silently dropped screen.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(default, deny_unknown_fields)]
 pub struct PeerFilter {
     /// GICS sector codes to include (meta key: "gics_sector").
     pub gics_sectors: Vec<String>,
@@ -62,15 +68,15 @@ impl PeerFilter {
         }
 
         // Market cap range
-        if let Some(min) = self.market_cap_min {
-            if metrics.market_cap.is_none_or(|mc| mc < min) {
-                return false;
-            }
+        if let Some(min) = self.market_cap_min
+            && metrics.market_cap.is_none_or(|mc| mc < min)
+        {
+            return false;
         }
-        if let Some(max) = self.market_cap_max {
-            if metrics.market_cap.is_none_or(|mc| mc > max) {
-                return false;
-            }
+        if let Some(max) = self.market_cap_max
+            && metrics.market_cap.is_none_or(|mc| mc > max)
+        {
+            return false;
         }
 
         if !self.ratings.is_empty() {
@@ -126,26 +132,46 @@ impl PeerSet {
     ///
     /// Applies `filter` to the universe. The subject is never included
     /// in the peer list even if it passes the filter.
+    ///
+    /// # Arguments
+    ///
+    /// * `subject` - Company being evaluated, stored apart from the peers.
+    /// * `universe` - Candidate companies; accepted ones are cloned into the
+    ///   peer list in this order, and a member with the subject's id is skipped.
+    /// * `filter` - Criteria a candidate must satisfy to become a peer.
+    /// * `period_basis` - Period basis recorded on the set; it labels the
+    ///   metrics and changes no value.
+    ///
+    /// # Returns
+    ///
+    /// The peer set and the number of universe members the filter dropped; a
+    /// member with the subject's id is not counted.
     pub fn from_universe(
         subject: CompanyMetrics,
         universe: &[CompanyMetrics],
         filter: &PeerFilter,
         period_basis: PeriodBasis,
-    ) -> Self {
-        let peers: Vec<CompanyMetrics> = universe
-            .iter()
-            .filter(|c| c.id != subject.id && filter.accepts(c))
-            .cloned()
-            .collect();
-
-        Self {
+    ) -> (Self, usize) {
+        let candidates = universe.iter().filter(|c| c.id != subject.id);
+        let (accepted, dropped): (Vec<&CompanyMetrics>, Vec<&CompanyMetrics>) =
+            candidates.partition(|c| filter.accepts(c));
+        let peer_set = Self {
             subject,
-            peers,
+            peers: accepted.into_iter().cloned().collect(),
             period_basis,
-        }
+        };
+        (peer_set, dropped.len())
     }
 
     /// Construct directly from a subject and an explicit peer list.
+    ///
+    /// # Arguments
+    ///
+    /// * `subject` - Company being evaluated, stored apart from the peers.
+    /// * `peers` - Comparison companies, used as given: no filter is applied
+    ///   and a peer with the subject's id is kept.
+    /// * `period_basis` - Period basis recorded on the set; it labels the
+    ///   metrics and changes no value.
     pub fn new(
         subject: CompanyMetrics,
         peers: Vec<CompanyMetrics>,
@@ -161,5 +187,41 @@ impl PeerSet {
     /// Number of peers (excluding subject).
     pub fn peer_count(&self) -> usize {
         self.peers.len()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use finstack_quant_core::types::Attributes;
+
+    fn sector(id: &str, sector: &str) -> CompanyMetrics {
+        let mut metrics = CompanyMetrics::new(id);
+        metrics.attributes = Attributes::default().with_meta("gics_sector", sector);
+        metrics
+    }
+
+    #[test]
+    fn partial_filter_defaults_the_omitted_criteria() {
+        let filter: PeerFilter =
+            serde_json::from_value(serde_json::json!({"gics_sectors": ["Energy"]}))
+                .expect("a partial filter deserializes");
+        assert_eq!(filter.gics_sectors, vec!["Energy".to_string()]);
+        assert!(filter.ratings.is_empty() && filter.market_cap_min.is_none());
+        assert!(filter.accepts(&sector("A", "Energy")));
+        assert!(!filter.accepts(&sector("B", "Tech")));
+
+        let empty: PeerFilter =
+            serde_json::from_value(serde_json::json!({})).expect("an empty filter deserializes");
+        assert!(empty.accepts(&sector("B", "Tech")));
+    }
+
+    #[test]
+    fn misspelt_filter_field_is_rejected() {
+        let error = serde_json::from_value::<PeerFilter>(serde_json::json!({
+            "gics_sector": ["Energy"],
+        }))
+        .expect_err("unknown field");
+        assert!(error.to_string().contains("gics_sector"), "{error}");
     }
 }

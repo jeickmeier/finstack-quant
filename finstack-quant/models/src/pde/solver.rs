@@ -7,7 +7,7 @@
 
 use super::boundary::BoundaryCondition;
 use super::exercise::{ExerciseError, ExerciseType, PenaltyExercise};
-use super::grid::{find_nearest, Grid1D};
+use super::grid::{Grid1D, find_nearest};
 use super::problem::PdeProblem1D;
 use super::stepper::{StepperError, ThetaStepper};
 
@@ -655,10 +655,12 @@ mod tests {
     #[test]
     fn solver_builder_rejects_incomplete() {
         assert!(Solver1D::builder().build().is_err());
-        assert!(Solver1D::builder()
-            .grid(Grid1D::uniform(0.0, 1.0, 5).expect("valid"))
-            .build()
-            .is_err());
+        assert!(
+            Solver1D::builder()
+                .grid(Grid1D::uniform(0.0, 1.0, 5).expect("valid"))
+                .build()
+                .is_err()
+        );
     }
 
     #[test]

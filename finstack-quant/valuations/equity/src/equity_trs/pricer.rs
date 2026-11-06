@@ -4,12 +4,12 @@
 //! a cost-of-carry forward model with dividend yield.
 
 use super::types::{EquityTotalReturnSwap, TrsDividendSettlement};
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::summation::neumaier_sum;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::pricing::{FinancingLegFlows, PeriodReturnInputs};
 use finstack_quant_valuations_core::instruments::{
     TotalReturnLegParams, TrsEngine, TrsReturnModel,

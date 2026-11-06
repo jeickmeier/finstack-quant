@@ -1,9 +1,8 @@
 "use client";
 import type { ExampleProps } from "./props";
 import { CurveChart } from "@/components/finstack/core/components/curve-chart/curve-chart";
-import type { MarketContextStateWire } from "@/lib/finstack/generated/types/market_context_state";
-import data from "../data.json";
-const market = data.market.supplemental as unknown as MarketContextStateWire;
+import { supplementalMarket } from "../fixtures";
+const market = supplementalMarket;
 export function Example({
   width = 880,
   presentation,

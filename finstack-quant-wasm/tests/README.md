@@ -85,15 +85,18 @@ TypeScript consumer.
   `WasmOwned` / `[Symbol.dispose]` handle contract, and that the package
   documents the hand-written facade rather than the raw wasm-bindgen types. It
   also reads [`../benchmarks/bench.mjs`](../benchmarks/bench.mjs) so the
-  benchmark script cannot drift from the declared API.
+  benchmark script cannot drift from the declared API. The parameter-order
+  check against the `#[wasm_bindgen]` signatures is the Node test
+  `facade/dts_parameter_order.test.mjs`, which reads the built package's raw
+  declarations.
 - **`return_shapes.rs`** pins _shapes_: no binding bypasses the
   JSON-compatible serializer, only `*Json`-suffixed exports return strings,
   computation results are structured rather than strings, prose-returning
   exports are named `*Text`, numeric vector exports declare `Float64Array`, and
   the facade does no JSON parsing of its own.
 
-- **`boundary_signatures.rs`** scans every `#[wasm_bindgen]` export under
-  `src/api` and rejects `&str`, `String`, `bool`, integer and `Vec<String>`
+- **`boundary_signatures.rs`** parses every `#[wasm_bindgen]` export under
+  `src/api` with `syn` and rejects `&str`, `String`, `bool`, integer and `Vec<String>`
   parameters: their generated glue traps the instance or coerces silently
   (`ToInt32`, truthiness). Exports take `JsValue` and convert through
   `src/utils/input.rs`.
@@ -147,6 +150,7 @@ regressions. `ls facade/` is the full list.
 | `contract_types.test.mjs`                                  | runtime calibration, materialization and valuation outputs type-check against the schema-generated TypeScript types under NodeNext                                        |
 | `statements_parity.test.mjs`                               | `Evaluator`, `ModelBuilder`, `Registry` and the statements free-function twins; goldens shared with `test_statements_wasm_parity.py`                                      |
 | `surface.test.mjs`                                         | the facade export surface equals the checked-in `../facade-surface.json`                                                                                                  |
+| `dts_parameter_order.test.mjs`                             | each `index.d.ts` declaration lists its parameters in the order of the raw wasm-bindgen signature (`pkg/finstack_quant_wasm.d.ts`), read with the TypeScript compiler API |
 | `statements_analytics_parity.test.mjs`                     | `DependencyTracer`, extensions, templates, ECL, DCF and twins; goldens shared with `test_statements_wasm_parity.py`                                                       |
 
 **These need a build.** All of them except `plain_object_returns.test.mjs` load

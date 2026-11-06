@@ -26,7 +26,7 @@
 use nalgebra::{DMatrix, DVector, SymmetricEigen};
 use serde::{Deserialize, Serialize};
 
-use super::types::{rows_to_dmatrix, validate_tenors, YieldPanel};
+use super::types::{YieldPanel, rows_to_dmatrix, validate_tenors};
 
 fn validate_components(
     eigenvalues: &[f64],

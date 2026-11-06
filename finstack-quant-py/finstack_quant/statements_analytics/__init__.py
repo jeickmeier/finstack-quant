@@ -36,6 +36,7 @@ goal_seek = _sa.goal_seek
 evaluate_dcf = _sa.evaluate_dcf
 dcf_sensitivity = _sa.dcf_sensitivity
 evaluate_lbo = _sa.evaluate_lbo
+WaccInputs = _sa.WaccInputs
 wacc = _sa.wacc
 run_corporate_analysis = _sa.run_corporate_analysis
 credit_assessment_report_text = _sa.credit_assessment_report_text
@@ -43,6 +44,8 @@ credit_assessment = _sa.credit_assessment
 DependencyTracer = _sa.DependencyTracer
 DependencyTree = _sa.DependencyTree
 explain_formula = _sa.explain_formula
+evaluate_covenants = _sa.evaluate_covenants
+forecast_breaches = _sa.forecast_breaches
 run_checks = _sa.run_checks
 run_three_statement_checks = _sa.run_three_statement_checks
 run_credit_underwriting_checks = _sa.run_credit_underwriting_checks
@@ -98,6 +101,20 @@ add_ncf_buildup = _sa.add_ncf_buildup
 add_rent_roll = _sa.add_rent_roll
 add_property_operating_statement = _sa.add_property_operating_statement
 
+# Debt stack by seniority
+capital_structure_summary = _sa.capital_structure_summary
+CapitalStructureSummary = _sa.CapitalStructureSummary
+CapitalStructureTranche = _sa.CapitalStructureTranche
+MaturityWallBucket = _sa.MaturityWallBucket
+
+# Comps table, regression scatter and composite score
+relative_value_report = _sa.relative_value_report
+RelativeValueCompany = _sa.RelativeValueCompany
+RelativeValueDimension = _sa.RelativeValueDimension
+RelativeValueMultiple = _sa.RelativeValueMultiple
+RelativeValuePoint = _sa.RelativeValuePoint
+RelativeValueReport = _sa.RelativeValueReport
+
 # Typed results, specs and mappings
 CompanyMetrics = _sa.CompanyMetrics
 CorporateAnalysis = _sa.CorporateAnalysis
@@ -138,6 +155,8 @@ __all__: list[str] = [
     "AccountType",
     "BridgeChart",
     "BridgeStep",
+    "CapitalStructureSummary",
+    "CapitalStructureTranche",
     "CompanyMetrics",
     "CorkscrewAccount",
     "CorkscrewConfig",
@@ -168,6 +187,7 @@ __all__: list[str] = [
     "LeaseSpec",
     "ManagementFeeBase",
     "ManagementFeeSpec",
+    "MaturityWallBucket",
     "PLSummaryReport",
     "ParameterSpec",
     "PeerFilter",
@@ -176,6 +196,11 @@ __all__: list[str] = [
     "PropertyTemplateNodes",
     "QualitativeFlags",
     "RegressionResult",
+    "RelativeValueCompany",
+    "RelativeValueDimension",
+    "RelativeValueMultiple",
+    "RelativeValuePoint",
+    "RelativeValueReport",
     "RelativeValueResult",
     "RenewalSpec",
     "RentRollOutputNodes",
@@ -199,6 +224,7 @@ __all__: list[str] = [
     "VarianceConfig",
     "VarianceReport",
     "VarianceRow",
+    "WaccInputs",
     "WeightedEclResult",
     "add_ncf_buildup",
     "add_noi_buildup",
@@ -208,6 +234,7 @@ __all__: list[str] = [
     "add_roll_forward_with_opening",
     "add_vintage_buildup",
     "backtest_forecast",
+    "capital_structure_summary",
     "classify_stage",
     "compute_ecl",
     "compute_ecl_weighted",
@@ -215,17 +242,20 @@ __all__: list[str] = [
     "credit_assessment",
     "credit_assessment_report_text",
     "dcf_sensitivity",
+    "evaluate_covenants",
     "evaluate_dcf",
     "evaluate_lbo",
     "evaluate_scenario_set",
     "evaluate_scenario_set_with_market",
     "explain_formula",
+    "forecast_breaches",
     "generate_tornado_entries",
     "goal_seek",
     "peer_stats",
     "percentile_rank",
     "pl_summary_report",
     "regression_fair_value",
+    "relative_value_report",
     "render_check_report_html",
     "render_check_report_text",
     "run_checks",

@@ -6,6 +6,7 @@
 use super::types::RevolvingCredit;
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_cashflows::builder::RateSpec;
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DateExt, DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -13,10 +14,9 @@ use finstack_quant_core::market_data::fixings::fixing_series_id;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::pricing::overnight::{
-    adjust_overnight_accrual_boundaries, project_overnight_coupon, OvernightCouponProjectionInput,
-    OvernightProjectionCurve,
+    OvernightCouponProjectionInput, OvernightProjectionCurve, adjust_overnight_accrual_boundaries,
+    project_overnight_coupon,
 };
 use finstack_quant_valuations_core::instruments::pricing::overnight_conventions;
 
@@ -45,7 +45,7 @@ pub(super) fn resolve_fixings<'a>(
 pub(super) fn build_payment_periods(
     facility: &RevolvingCredit,
 ) -> Result<Vec<finstack_quant_cashflows::builder::SchedulePeriod>> {
-    use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
+    use finstack_quant_cashflows::builder::{BuildPeriodsParams, build_periods};
 
     let periods = build_periods(BuildPeriodsParams {
         start: facility.issue_date,
@@ -199,7 +199,7 @@ pub(super) fn index_basis_at(
     accrual_end: Date,
     accrual_year_fraction: f64,
 ) -> Result<f64> {
-    use finstack_quant_models::rates::clock::{model_time, ModelDiscountCurve};
+    use finstack_quant_models::rates::clock::{ModelDiscountCurve, model_time};
 
     let index_forward = finstack_quant_cashflows::builder::project_index_rate(
         date,
@@ -234,7 +234,7 @@ pub(super) fn index_basis_at(
 pub(super) fn build_reset_dates(facility: &RevolvingCredit) -> Result<Option<Vec<Date>>> {
     match &facility.rate {
         RateSpec::Floating(spec) => {
-            use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
+            use finstack_quant_cashflows::builder::{BuildPeriodsParams, build_periods};
 
             let periods = build_periods(BuildPeriodsParams {
                 start: facility.issue_date,
@@ -709,7 +709,7 @@ mod tests {
         use finstack_quant_core::dates::calendar_by_id_strict;
         use finstack_quant_core::market_data::term_structures::ForwardCurve;
         use finstack_quant_valuations_core::instruments::pricing::overnight::{
-            project_overnight_coupon, OvernightCouponProjectionInput, OvernightProjectionCurve,
+            OvernightCouponProjectionInput, OvernightProjectionCurve, project_overnight_coupon,
         };
         use rust_decimal::Decimal;
 
@@ -867,7 +867,7 @@ mod tests {
         use finstack_quant_cashflows::builder::{
             FloatingLegCompounding, OvernightIndexConstraintApplication,
         };
-        use finstack_quant_core::dates::{calendar_by_id_strict, DateExt};
+        use finstack_quant_core::dates::{DateExt, calendar_by_id_strict};
         use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
         use finstack_quant_core::market_data::term_structures::ForwardCurve;
         use rust_decimal::Decimal;
@@ -1048,9 +1048,11 @@ mod tests {
 
         let result = apply_draw_repay_event(balance, &event, commitment);
         assert!(result.is_err());
-        assert!(result
-            .expect_err("should fail")
-            .to_string()
-            .contains("exceed commitment"));
+        assert!(
+            result
+                .expect_err("should fail")
+                .to_string()
+                .contains("exceed commitment")
+        );
     }
 }

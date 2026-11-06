@@ -1,9 +1,10 @@
 //! End-to-end integration tests for cross-factor P&L attribution.
 
 use finstack_quant_attribution::{
-    attribute_pnl, attribute_pnl_metrics_based, AttributionMethod, AttributionRequest,
-    ExecutionPolicy, PnlAttribution,
+    AttributionMethod, AttributionRequest, ExecutionPolicy, PnlAttribution, attribute_pnl,
+    attribute_pnl_metrics_based,
 };
+use finstack_quant_core::Result;
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
@@ -14,7 +15,6 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCur
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_core::Result;
 use finstack_quant_models::volatility::get_surface_vol;
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use finstack_quant_valuations::instruments::{Instrument, MarketDependencies};
@@ -286,11 +286,12 @@ fn single_factor_instrument_has_zero_cross_factor() {
     .expect("parallel attribution should succeed");
 
     assert_eq!(attr.cross_factor_pnl.amount(), 0.0);
-    assert!(attr
-        .cross_factor_detail
-        .as_ref()
-        .map(|detail| detail.total.amount().abs() < 1e-12)
-        .unwrap_or(true));
+    assert!(
+        attr.cross_factor_detail
+            .as_ref()
+            .map(|detail| detail.total.amount().abs() < 1e-12)
+            .unwrap_or(true)
+    );
 }
 
 #[test]

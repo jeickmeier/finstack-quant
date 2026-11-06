@@ -16,8 +16,8 @@ use finstack_quant_valuations::instruments::fixed_income::bond_future::BondFutur
 use finstack_quant_valuations::instruments::fx::fx_future::FxFuture;
 use finstack_quant_valuations::instruments::rates::ir_future::InterestRateFuture;
 use finstack_quant_valuations::instruments::{Instrument, ListedFutureTerms, Position};
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 use time::macros::date;
 

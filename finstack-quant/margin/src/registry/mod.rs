@@ -24,14 +24,14 @@ use tracing::{debug, info};
 mod validation;
 use validation::{to_validation, validate_haircut, validate_non_negative, validate_rate};
 
+use crate::SimmVersion;
 use crate::calculators::im::schedule::{MaturityBucket, ScheduleAssetClass};
 use crate::types::{
-    ordered_credit_sector_pair, ordered_risk_class_pair, ordered_tenor_pair, CollateralAssetClass,
-    CollateralEligibility, EligibleCollateralSchedule, ImMethodology, ImParameters,
-    MarginCallTiming, MarginTenor, MaturityConstraints, VmParameters,
+    CollateralAssetClass, CollateralEligibility, EligibleCollateralSchedule, ImMethodology,
+    ImParameters, MarginCallTiming, MarginTenor, MaturityConstraints, VmParameters,
+    ordered_credit_sector_pair, ordered_risk_class_pair, ordered_tenor_pair,
 };
 use crate::types::{SimmCreditSector, SimmRiskClass};
-use crate::SimmVersion;
 
 mod embedded;
 mod merge;
@@ -1267,12 +1267,12 @@ fn validate_cq_tables(p: &SimmParams) -> Result<()> {
                     p.version
                 )));
             }
-            if let Some(v) = rho {
-                if !(-1.0..=1.0).contains(&v) {
-                    return Err(Error::Validation(format!(
-                        "simm.cq_inter_bucket_correlations[({a:?},{b:?})] must be in [-1,1]"
-                    )));
-                }
+            if let Some(v) = rho
+                && !(-1.0..=1.0).contains(&v)
+            {
+                return Err(Error::Validation(format!(
+                    "simm.cq_inter_bucket_correlations[({a:?},{b:?})] must be in [-1,1]"
+                )));
             }
         }
     }

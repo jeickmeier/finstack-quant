@@ -22,11 +22,11 @@ use finstack_quant_valuations_core::results::structured_credit::{
     StructuredCreditPricingMode, TrancheSeniority,
 };
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    execute_waterfall, tranche_metrics, AllocationMode, AssetPool, AssetType, CallAssumption,
-    CardPortfolioSpec, ControlledAccumulationSpec, CoverageRules, CoverageTestSpec, DealType,
-    LiquidationSpec, PaymentCalculation, PaymentType, PoolAsset, Recipient, RecipientType,
-    ReinvestmentCriteria, ReinvestmentPeriod, StepDownSpec, StepDownTrigger, StructuredCredit,
-    Tranche, TrancheStructure, Waterfall, WaterfallContext, WaterfallRules, WaterfallTier,
+    AllocationMode, AssetPool, AssetType, CallAssumption, CardPortfolioSpec,
+    ControlledAccumulationSpec, CoverageRules, CoverageTestSpec, DealType, LiquidationSpec,
+    PaymentCalculation, PaymentType, PoolAsset, Recipient, RecipientType, ReinvestmentCriteria,
+    ReinvestmentPeriod, StepDownSpec, StepDownTrigger, StructuredCredit, Tranche, TrancheStructure,
+    Waterfall, WaterfallContext, WaterfallRules, WaterfallTier, execute_waterfall, tranche_metrics,
 };
 use time::Month;
 
@@ -505,7 +505,9 @@ fn p6_clo_standard_rules_carry_performing_collateral_at_par() {
         };
         deal.coverage_rules = Some(CoverageRules::clo_standard());
         let run = deal.run_simulation(&market(close), close).expect("run");
-        run.diagnostics.periods[0].coverage_tests[0].ratio
+        run.diagnostics.periods[0].coverage_tests[0]
+            .ratio
+            .expect("notes outstanding")
     };
     let b = ratio_for(CreditRating::B);
     let b_minus = ratio_for(CreditRating::BMinus);
@@ -1095,7 +1097,9 @@ fn rating_haircuts_key_by_rating_bucket() {
             ..CoverageRules::default()
         });
         let run = deal.run_simulation(&market(close), close).expect("run");
-        run.diagnostics.periods[0].coverage_tests[0].ratio
+        run.diagnostics.periods[0].coverage_tests[0]
+            .ratio
+            .expect("notes outstanding")
     };
     let b_minus = ratio_for(CreditRating::BMinus, vec![(CreditRating::B, 0.10)]);
     let b_minus_nr_only = ratio_for(CreditRating::BMinus, vec![(CreditRating::NR, 0.15)]);

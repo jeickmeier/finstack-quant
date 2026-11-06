@@ -5,8 +5,8 @@
 //! `(i, j)` maps to `i * n_y + j`, where `i` indexes the x-axis and
 //! `j` indexes the y-axis.
 
-use super::grid::find_interval;
 use super::grid::Grid1D;
+use super::grid::find_interval;
 
 /// Tensor-product 2D grid built from two [`Grid1D`] axes.
 ///

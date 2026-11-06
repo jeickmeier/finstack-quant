@@ -38,7 +38,7 @@ beforeAll(async () => {
   transport.call.mockImplementation(async (_method, arg) =>
     unwrap(await worker.proxy.sampleCube(arg)),
   );
-}, budget(30000));
+});
 afterAll(async () => worker?.close());
 afterEach(() => {
   cleanup();
@@ -55,7 +55,7 @@ it("preserves raw parameter/forward data, selects explicit evaluator and strike,
         cube={cube}
         initialStrike={0.05}
         initialConvention="normal"
-        colorDomains={{ normal: [0, 0.02], black_lognormal: [0, 1] }}
+        colorDomains={{ normal: [0, 0.02], lognormal: [0, 1] }}
       />
     </QueryClientProvider>,
   );
@@ -84,9 +84,7 @@ it("preserves raw parameter/forward data, selects explicit evaluator and strike,
   ).toEqual(cube);
   fireEvent.click(screen.getByRole("radio", { name: "Black/lognormal" }));
   await waitFor(() =>
-    expect(transport.call.mock.calls.at(-1)![1].convention).toBe(
-      "black_lognormal",
-    ),
+    expect(transport.call.mock.calls.at(-1)![1].convention).toBe("lognormal"),
   );
   const strike = screen.getByLabelText("Absolute strike (rate units)");
   fireEvent.focus(strike);

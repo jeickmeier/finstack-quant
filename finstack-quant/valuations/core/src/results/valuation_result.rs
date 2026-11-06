@@ -2,7 +2,7 @@
 //!
 use crate::metrics::MetricId;
 use crate::pricer::ModelKey;
-use finstack_quant_core::config::{results_meta, FinstackConfig, ResultsMeta};
+use finstack_quant_core::config::{FinstackConfig, ResultsMeta, results_meta};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::explain::ExplanationTrace;
 use finstack_quant_core::money::Money;

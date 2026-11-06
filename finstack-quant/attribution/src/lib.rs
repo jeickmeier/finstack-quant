@@ -154,6 +154,7 @@ pub use detail::{
 };
 pub use result::{
     AttributionFactor, AttributionMeta, AttributionMethod, ExecutionPolicy, PnlAttribution,
+    PnlBucket, PnlBucketShare,
 };
 
 /// Snapshot/restore primitives used by benches and integration tests.
@@ -161,16 +162,15 @@ pub use result::{
 pub use factors::{MarketRestoreFlags, MarketSnapshot};
 pub use metrics_based::attribute_pnl_metrics_based;
 pub use return_contribution::{
-    attribute_return_contribution, attribute_return_contribution_json,
-    validate_return_contribution_json, BenchmarkRelativeContribution, FactorContribution,
-    GroupContribution, InstrumentContribution, ReturnContributionFactor,
-    ReturnContributionPosition, ReturnContributionResult, ReturnContributionSpec,
-    ReturnContributionWeighting,
+    BenchmarkRelativeContribution, FactorContribution, GroupContribution, InstrumentContribution,
+    ReturnContributionFactor, ReturnContributionPosition, ReturnContributionResult,
+    ReturnContributionSpec, ReturnContributionWeighting, attribute_return_contribution,
+    attribute_return_contribution_json, validate_return_contribution_json,
 };
 pub use spec::{
-    attribute_pnl_many, default_attribution_metrics, validate_attribution_json, AttributionConfig,
-    AttributionEnvelope, AttributionInputs, AttributionResult, AttributionResultEnvelope,
-    AttributionSchema, AttributionSpec,
+    AttributionConfig, AttributionEnvelope, AttributionInputs, AttributionResult,
+    AttributionResultEnvelope, AttributionSchema, AttributionSpec, attribute_pnl_many,
+    default_attribution_metrics, validate_attribution_json,
 };
 pub use target_currency::translate_to_target_currency;
 pub use taylor::TaylorAttributionConfig;
@@ -247,8 +247,10 @@ pub struct AttributionRequest<'a> {
     /// `None` keeps the method's default.
     pub tolerance_pct: Option<f64>,
     /// Metrics-based only: the metrics to price at T₀. `None` prices the
-    /// default menu narrowed to what the instrument supports; a named
-    /// metric is not narrowed and errors if it is inapplicable.
+    /// default menu narrowed to what the instrument supports, and drops the
+    /// quote-space credit metrics with a note when that menu fails on a
+    /// hazard curve that has no calibration recipe; a named metric is not
+    /// narrowed and errors if it is inapplicable or fails.
     pub metrics: Option<&'a [MetricId]>,
     /// Metrics-based only: pricing options for the T₀ metrics and the T₁
     /// value, with `config` attached. `None` uses the calibration crate's
@@ -319,7 +321,8 @@ impl<'a> AttributionRequest<'a> {
 ///
 /// * `method` - Attribution methodology. `MetricsBased` prices both endpoints
 ///   with `request.metrics` or the default metric menu the instrument
-///   supports; call [`attribute_pnl_metrics_based`] directly when the
+///   supports (without quote-space credit metrics, and with a note, when an
+///   instrument hazard curve has no calibration recipe); call [`attribute_pnl_metrics_based`] directly when the
 ///   [`finstack_quant_valuations::results::ValuationResult`]s are already priced.
 /// * `request` - Instrument, market states, dates, configuration and the
 ///   optional overrides described on [`AttributionRequest`].

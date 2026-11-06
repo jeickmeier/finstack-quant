@@ -173,10 +173,10 @@ pub(super) fn definition_name_for(id: &str) -> String {
 /// Collect every absolute `$ref` target in a document.
 pub(super) fn collect_external_refs(node: &Value, found: &mut BTreeSet<String>) {
     for_each_object(node, &mut |object| {
-        if let Some(Value::String(target)) = object.get("$ref") {
-            if !target.starts_with('#') {
-                found.insert(target.clone());
-            }
+        if let Some(Value::String(target)) = object.get("$ref")
+            && !target.starts_with('#')
+        {
+            found.insert(target.clone());
         }
     });
 }
@@ -184,11 +184,11 @@ pub(super) fn collect_external_refs(node: &Value, found: &mut BTreeSet<String>) 
 /// Rewrite absolute `$ref`s to local ones, given the id-to-name mapping.
 pub(super) fn rewrite_refs(node: &mut Value, names: &BTreeMap<String, String>) {
     for_each_object_mut(node, &mut |object| {
-        if let Some(Value::String(target)) = object.get("$ref") {
-            if let Some(name) = names.get(target) {
-                let local = format!("#/$defs/{name}");
-                object.insert("$ref".to_string(), Value::String(local));
-            }
+        if let Some(Value::String(target)) = object.get("$ref")
+            && let Some(name) = names.get(target)
+        {
+            let local = format!("#/$defs/{name}");
+            object.insert("$ref".to_string(), Value::String(local));
         }
     });
 }
@@ -410,22 +410,22 @@ fn flatten_const_union(object: &mut Map<String, Value>) {
         {
             return;
         }
-        if let Some(Value::String(note)) = branch.get("description") {
-            if let Some(first) = note.lines().find(|line| !line.trim().is_empty()) {
-                let mut gloss = format!("`{constant}`: {}", first.trim());
-                // The variant's standards citation is the part that
-                // tells a payload author whether this is the spelling
-                // their contract actually calls for, so it rides along
-                // with the summary rather than being dropped with the
-                // rest of the body.
-                let citations = collect_citation_lines(note);
-                if !citations.is_empty() {
-                    gloss.push_str(" (");
-                    gloss.push_str(&citations.join("; "));
-                    gloss.push(')');
-                }
-                notes.push(gloss);
+        if let Some(Value::String(note)) = branch.get("description")
+            && let Some(first) = note.lines().find(|line| !line.trim().is_empty())
+        {
+            let mut gloss = format!("`{constant}`: {}", first.trim());
+            // The variant's standards citation is the part that
+            // tells a payload author whether this is the spelling
+            // their contract actually calls for, so it rides along
+            // with the summary rather than being dropped with the
+            // rest of the body.
+            let citations = collect_citation_lines(note);
+            if !citations.is_empty() {
+                gloss.push_str(" (");
+                gloss.push_str(&citations.join("; "));
+                gloss.push(')');
             }
+            notes.push(gloss);
         }
         values.push(Value::String(constant.clone()));
     }
@@ -697,13 +697,13 @@ pub(super) fn apply_strict_shape(node: &mut Value) {
     match node {
         Value::Object(object) => {
             for keyword in NON_PORTABLE_KEYWORDS {
-                if let Some(default) = object.remove(*keyword) {
-                    if *keyword == "default" {
-                        append_description_note(
-                            object,
-                            &format!("Defaults to `{default}` when omitted upstream."),
-                        );
-                    }
+                if let Some(default) = object.remove(*keyword)
+                    && *keyword == "default"
+                {
+                    append_description_note(
+                        object,
+                        &format!("Defaults to `{default}` when omitted upstream."),
+                    );
                 }
             }
 

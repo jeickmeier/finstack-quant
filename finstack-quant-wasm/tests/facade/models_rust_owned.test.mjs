@@ -117,3 +117,57 @@ test('SabrCalibrator.withShift parses "auto" in Rust and rejects booleans', () =
     kind('validation', /SABR shift must be null\/None, a number, or "auto"/)
   );
 });
+
+test('optionCalculation prices, inverts and returns the model Greeks in one call', () => {
+  const blackScholes = {
+    kind: 'black_scholes',
+    spot: 100,
+    strike: 105,
+    rate: 0.03,
+    div_yield: 0.01,
+    expiry: 0.75,
+    is_call: false,
+  };
+  const priced = models.optionCalculation({
+    model: blackScholes,
+    solve: { kind: 'price', vol: 0.25 },
+  });
+  assert.equal(priced.price, models.bsPrice(100, 105, 0.03, 0.01, 0.25, 0.75, false));
+  assert.equal(priced.implied_vol, 0.25);
+  assert.deepEqual(priced.greeks, {
+    kind: 'black_scholes',
+    ...models.bsGreeks(100, 105, 0.03, 0.01, 0.25, 0.75, false),
+  });
+  const bachelier = {
+    kind: 'bachelier',
+    forward: -0.002,
+    strike: 0.001,
+    expiry: 1.5,
+    is_call: true,
+  };
+  const normal = models.optionCalculation({
+    model: bachelier,
+    solve: { kind: 'price', vol: 0.006 },
+  });
+  const solved = models.optionCalculation(
+    JSON.stringify({ model: bachelier, solve: { kind: 'implied_vol', price: normal.price } })
+  );
+  assert.ok(Math.abs(solved.implied_vol - 0.006) < 1e-7);
+  assert.equal(solved.greeks.kind, 'forward');
+  assert.throws(
+    () =>
+      models.optionCalculation({
+        model: { ...blackScholes, spot: 120, is_call: true },
+        solve: { kind: 'implied_vol', price: 1 },
+      }),
+    (error) => error.kind === 'validation' && /intrinsic/.test(error.message)
+  );
+  assert.throws(
+    () =>
+      models.optionCalculation({
+        model: { ...blackScholes, df: 1 },
+        solve: { kind: 'price', vol: 0.2 },
+      }),
+    (error) => error.kind === 'validation' && /unknown field/.test(error.message)
+  );
+});

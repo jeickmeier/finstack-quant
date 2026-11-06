@@ -1,0 +1,231 @@
+{
+  "equity": {
+    "cds_par_spread": 0.00651346098323259,
+    "debt_spread": [
+      5.350909831307663e-08,
+      1.7641974605942912e-05,
+      0.00033043361142499433,
+      0.0018164456923322313
+    ],
+    "default_point": 50.0,
+    "default_probabilities": [
+      9.826424658800987e-07,
+      0.00035356472194204966,
+      0.007601101267356194,
+      0.05509499259367572
+    ],
+    "distance_to_default": [
+      4.7569616433581805,
+      3.3867998941234205,
+      2.4275258716114743,
+      1.5973397929527562
+    ],
+    "errors": {},
+    "grades": [
+      {
+        "central_pd": 4e-05,
+        "grade": "AAA",
+        "grade_index": 0,
+        "input_pd": 9.826424658800987e-07
+      },
+      {
+        "central_pd": 0.0002,
+        "grade": "AA",
+        "grade_index": 1,
+        "input_pd": 0.00035356472194204966
+      },
+      {
+        "central_pd": 0.01,
+        "grade": "BB",
+        "grade_index": 4,
+        "input_pd": 0.007601101267356194
+      },
+      {
+        "central_pd": 0.04,
+        "grade": "B",
+        "grade_index": 5,
+        "input_pd": 0.05509499259367572
+      }
+    ],
+    "horizons": [
+      0.5,
+      1.0,
+      2.0,
+      5.0
+    ],
+    "implied_equity": {
+      "value": 55.87510959248689,
+      "vol": 0.350798497799075
+    },
+    "implied_spread": [
+      1.1791713067092048e-06,
+      0.00021216133779023756,
+      0.002285546151132663,
+      0.006723145172355406
+    ],
+    "maturity": 5.0,
+    "model": {
+      "asset_value": 98.52142065620828,
+      "asset_vol": 0.2030351296945777,
+      "barrier_type": "terminal",
+      "debt_barrier": 50.0,
+      "dynamics": "geometric_brownian",
+      "payout_rate": 0.0,
+      "risk_free_rate": 0.03
+    },
+    "recovery": 0.4
+  },
+  "first_passage": {
+    "cds_par_spread": 0.05273808501630442,
+    "debt_spread": null,
+    "default_point": null,
+    "default_probabilities": [
+      0.0038960936696118068,
+      0.04144336801516946,
+      0.15002734030339698,
+      0.3645197838397415
+    ],
+    "distance_to_default": [
+      2.8861305666443076,
+      2.038302495063963,
+      1.4377619824632548,
+      0.9026123156240909
+    ],
+    "errors": {
+      "debt_spread": "Validation error: debt_spread: the endogenous Merton (1974) debt spread is defined for MertonBarrierType::Terminal only; a first-passage claim pays recovery at the hitting time. Use cds_par_spread or implied_spread instead."
+    },
+    "grades": [
+      {
+        "central_pd": 0.002,
+        "grade": "BBB",
+        "grade_index": 3,
+        "input_pd": 0.0038960936696118068
+      },
+      {
+        "central_pd": 0.04,
+        "grade": "B",
+        "grade_index": 5,
+        "input_pd": 0.04144336801516946
+      },
+      {
+        "central_pd": 0.12,
+        "grade": "CCC",
+        "grade_index": 6,
+        "input_pd": 0.15002734030339698
+      },
+      {
+        "central_pd": 0.4,
+        "grade": "CC/C",
+        "grade_index": 7,
+        "input_pd": 0.3645197838397415
+      }
+    ],
+    "horizons": [
+      0.5,
+      1.0,
+      2.0,
+      5.0
+    ],
+    "implied_equity": {
+      "value": 50.63484718383464,
+      "vol": 0.4582212856376535
+    },
+    "implied_spread": [
+      0.004680785571305198,
+      0.025180402870037505,
+      0.04716435310369513,
+      0.04936225462228437
+    ],
+    "maturity": 5.0,
+    "model": {
+      "asset_value": 100.0,
+      "asset_vol": 0.25,
+      "barrier_type": {
+        "first_passage": {
+          "barrier_growth_rate": 0.0
+        }
+      },
+      "debt_barrier": 60.0,
+      "dynamics": "geometric_brownian",
+      "payout_rate": 0.0,
+      "risk_free_rate": 0.03
+    },
+    "recovery": 0.4
+  },
+  "model": {
+    "cds_par_spread": 0.023936463273530047,
+    "debt_spread": [
+      0.0001916002006336442,
+      0.0017667693194893695,
+      0.005247937922050362,
+      0.009019959105114038
+    ],
+    "default_point": null,
+    "default_probabilities": [
+      0.0019500516120603815,
+      0.020759845258390343,
+      0.07525079984838666,
+      0.1833658439745175
+    ],
+    "distance_to_default": [
+      2.8861305666443076,
+      2.038302495063963,
+      1.4377619824632548,
+      0.9026123156240909
+    ],
+    "errors": {},
+    "grades": [
+      {
+        "central_pd": 0.002,
+        "grade": "BBB",
+        "grade_index": 3,
+        "input_pd": 0.0019500516120603815
+      },
+      {
+        "central_pd": 0.04,
+        "grade": "B",
+        "grade_index": 5,
+        "input_pd": 0.020759845258390343
+      },
+      {
+        "central_pd": 0.12,
+        "grade": "CCC",
+        "grade_index": 6,
+        "input_pd": 0.07525079984838666
+      },
+      {
+        "central_pd": 0.12,
+        "grade": "CCC",
+        "grade_index": 6,
+        "input_pd": 0.1833658439745175
+      }
+    ],
+    "horizons": [
+      0.5,
+      1.0,
+      2.0,
+      5.0
+    ],
+    "implied_equity": {
+      "value": 50.63484718383464,
+      "vol": 0.4582212856376535
+    },
+    "implied_spread": [
+      0.002341431975701445,
+      0.012534132221441702,
+      0.023100760751164764,
+      0.02331114675646606
+    ],
+    "maturity": 5.0,
+    "model": {
+      "asset_value": 100.0,
+      "asset_vol": 0.25,
+      "barrier_type": "terminal",
+      "debt_barrier": 60.0,
+      "dynamics": "geometric_brownian",
+      "payout_rate": 0.0,
+      "risk_free_rate": 0.03
+    },
+    "recovery": 0.4
+  }
+}

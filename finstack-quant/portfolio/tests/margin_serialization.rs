@@ -1,8 +1,8 @@
 //! Margin serialization tests for portfolio.
 
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::FxHashMap;
 use finstack_quant_margin::types::{
     ImMethodology, NettingSetId, SimmCreditSector, SimmRiskClass, SimmSensitivities,
 };
@@ -419,15 +419,17 @@ fn portfolio_wire_round_trip_preserves_all_sensitivity_buckets() {
 
 #[test]
 fn margin_constructor_rejects_mixed_currencies() {
-    assert!(NettingSetMargin::new(
-        NettingSetId::cleared("LCH"),
-        date!(2025 - 01 - 15),
-        Money::new(10.0, Currency::USD).expect("money"),
-        Money::new(5.0, Currency::EUR).expect("money"),
-        1,
-        ImMethodology::ClearingHouse
-    )
-    .is_err());
+    assert!(
+        NettingSetMargin::new(
+            NettingSetId::cleared("LCH"),
+            date!(2025 - 01 - 15),
+            Money::new(10.0, Currency::USD).expect("money"),
+            Money::new(5.0, Currency::EUR).expect("money"),
+            1,
+            ImMethodology::ClearingHouse
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -448,8 +450,10 @@ fn portfolio_margin_rejects_duplicate_netting_ids_before_collection() {
         .as_array_mut()
         .expect("array")
         .push(duplicate);
-    assert!(serde_json::from_value::<PortfolioMarginResult>(json)
-        .expect_err("duplicate")
-        .to_string()
-        .contains("duplicate netting-set"));
+    assert!(
+        serde_json::from_value::<PortfolioMarginResult>(json)
+            .expect_err("duplicate")
+            .to_string()
+            .contains("duplicate netting-set")
+    );
 }

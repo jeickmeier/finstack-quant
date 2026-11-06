@@ -69,6 +69,7 @@ pub(crate) fn table_to_dataframe<'py>(
             TableColumnData::NullableUInt32(values) => (PyList::new(py, values)?, "UInt32"),
             TableColumnData::Int64(values) => (PyList::new(py, values)?, "int64"),
             TableColumnData::NullableInt64(values) => (PyList::new(py, values)?, "Int64"),
+            TableColumnData::Boolean(values) => (PyList::new(py, values)?, "bool"),
         };
         let kwargs = PyDict::new(py);
         kwargs.set_item("dtype", dtype)?;

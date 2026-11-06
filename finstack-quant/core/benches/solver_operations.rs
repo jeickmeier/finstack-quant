@@ -2,7 +2,7 @@
 //!
 //! Brent root finding, XIRR/IRR, and Levenberg-Marquardt system solves.
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_core::cashflow::{irr, xirr};
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::math::solver::BrentSolver;

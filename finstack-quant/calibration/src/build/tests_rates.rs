@@ -1,8 +1,8 @@
 //! Quote-to-rate-instrument construction tests.
 #![allow(clippy::unwrap_used, clippy::panic)]
 
-use crate::build::rates::build_rate_instrument;
 use crate::build::BuildCtx;
+use crate::build::rates::build_rate_instrument;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_valuations_rates::deposit::Deposit;

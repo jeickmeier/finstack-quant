@@ -11,9 +11,9 @@ use crate::bindings::pandas_utils::{dates_to_pylist, int_values_to_series, value
 use crate::bindings::pydoc::pydoc;
 use crate::errors::analytics_to_py;
 use finstack_quant_analytics::{
-    CagrDayCount, Performance, ReturnKind, DEFAULT_ANNUALIZE, DEFAULT_CONFIDENCE,
-    DEFAULT_DRAWDOWN_COUNT, DEFAULT_FREQUENCY, DEFAULT_MAR, DEFAULT_PERIODIC_FREQUENCY,
-    DEFAULT_PERIODS_PER_YEAR, DEFAULT_RISK_FREE_RATE, DEFAULT_ROLLING_WINDOW,
+    CagrDayCount, DEFAULT_ANNUALIZE, DEFAULT_CONFIDENCE, DEFAULT_DRAWDOWN_COUNT, DEFAULT_MAR,
+    DEFAULT_PERIODIC_FREQUENCY, DEFAULT_PERIODS_PER_YEAR, DEFAULT_RISK_FREE_RATE,
+    DEFAULT_ROLLING_WINDOW, PanelSeriesKind, Performance, PerformancePanel, ReturnKind,
 };
 use finstack_quant_core::dates::{HolidayCalendar, PeriodKind};
 use pyo3::buffer::PyBuffer;
@@ -169,30 +169,143 @@ fn series_to_frame<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>
     value.call_method1("to_frame", (label,))
 }
 
-type PerformanceBuilder = fn(
-    Vec<finstack_quant_core::dates::Date>,
-    Vec<Vec<f64>>,
-    Vec<String>,
-    Option<&str>,
-    PeriodKind,
-) -> finstack_quant_core::Result<Performance>;
-
-/// Build a `Performance` from pre-extracted panel arrays using the given Rust constructor.
-fn build_performance_with(
+/// Build a `Performance` from a pandas price or return panel.
+fn performance_from_frame(
     py: Python<'_>,
-    dates: Vec<finstack_quant_core::dates::Date>,
-    columns: Vec<Vec<f64>>,
-    ticker_names: Vec<String>,
+    frame: &Bound<'_, PyAny>,
+    kind: PanelSeriesKind,
     benchmark_ticker: Option<&str>,
     frequency: Option<&str>,
-    ctor: PerformanceBuilder,
 ) -> PyResult<PyPerformance> {
-    let period_kind = parse_frequency(frequency, DEFAULT_FREQUENCY)?;
+    let frame = series_to_frame(frame)?;
+    let panel = extract_dataframe_panel(
+        &frame,
+        "Expected a pandas DataFrame or Series; use Performance.from_panel(PerformancePanel(...)) for raw lists",
+    )?;
+    let panel = PerformancePanel {
+        dates: panel.dates,
+        series: panel.columns,
+        kind,
+        ticker_names: panel.ticker_names,
+        benchmark_ticker: benchmark_ticker.map(str::to_owned),
+        frequency: frequency.map(parse_period_kind).transpose()?,
+    };
+    performance_from_panel(py, &panel)
+}
+
+fn performance_from_panel(py: Python<'_>, panel: &PerformancePanel) -> PyResult<PyPerformance> {
     let inner = py
-        .detach(|| ctor(dates, columns, ticker_names, benchmark_ticker, period_kind))
+        .detach(|| Performance::new(panel))
         .map_err(analytics_to_py)?;
     Ok(PyPerformance { inner })
 }
+
+fn parse_period_kind(frequency: &str) -> PyResult<PeriodKind> {
+    frequency.parse::<PeriodKind>().map_err(analytics_to_py)
+}
+
+fn parse_series_kind(kind: &str) -> PyResult<PanelSeriesKind> {
+    match kind {
+        "prices" => Ok(PanelSeriesKind::Prices),
+        "returns" => Ok(PanelSeriesKind::Returns),
+        other => Err(crate::errors::value_error(format!(
+            "kind must be 'prices' or 'returns', got {other:?}"
+        ))),
+    }
+}
+
+#[doc = pydoc!("finstack_quant.analytics._performance", "PerformancePanel")]
+#[pyclass(
+    name = "PerformancePanel",
+    module = "finstack_quant.analytics",
+    frozen,
+    eq,
+    from_py_object
+)]
+#[derive(Clone, PartialEq)]
+pub(super) struct PyPerformancePanel {
+    pub(crate) inner: PerformancePanel,
+}
+
+#[pymethods]
+impl PyPerformancePanel {
+    #[new]
+    #[pyo3(signature = (*, dates, series, kind, ticker_names, benchmark_ticker=None, frequency=None))]
+    fn new(
+        dates: Vec<Bound<'_, PyAny>>,
+        series: Vec<Vec<f64>>,
+        kind: &str,
+        ticker_names: Vec<String>,
+        benchmark_ticker: Option<String>,
+        frequency: Option<&str>,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            inner: PerformancePanel {
+                dates: dates.iter().map(py_to_date).collect::<PyResult<Vec<_>>>()?,
+                series,
+                kind: parse_series_kind(kind)?,
+                ticker_names,
+                benchmark_ticker,
+                frequency: frequency.map(parse_period_kind).transpose()?,
+            },
+        })
+    }
+
+    #[doc = pydoc!("finstack_quant.analytics._performance", "PerformancePanel.dates")]
+    #[getter]
+    fn dates<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
+        dates_to_pylist(py, &self.inner.dates)
+    }
+
+    #[doc = pydoc!("finstack_quant.analytics._performance", "PerformancePanel.series")]
+    #[getter]
+    fn series(&self) -> Vec<Vec<f64>> {
+        self.inner.series.clone()
+    }
+
+    #[doc = pydoc!("finstack_quant.analytics._performance", "PerformancePanel.kind")]
+    #[getter]
+    fn kind(&self) -> &'static str {
+        match self.inner.kind {
+            PanelSeriesKind::Prices => "prices",
+            PanelSeriesKind::Returns => "returns",
+        }
+    }
+
+    #[doc = pydoc!("finstack_quant.analytics._performance", "PerformancePanel.ticker_names")]
+    #[getter]
+    fn ticker_names(&self) -> Vec<String> {
+        self.inner.ticker_names.clone()
+    }
+
+    #[doc = pydoc!("finstack_quant.analytics._performance", "PerformancePanel.benchmark_ticker")]
+    #[getter]
+    fn benchmark_ticker(&self) -> Option<String> {
+        self.inner.benchmark_ticker.clone()
+    }
+
+    #[doc = pydoc!("finstack_quant.analytics._performance", "PerformancePanel.frequency")]
+    #[getter]
+    fn frequency(&self) -> Option<String> {
+        self.inner.frequency.map(|kind| kind.to_string())
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "PerformancePanel(kind={:?}, tickers={:?}, dates={})",
+            self.kind(),
+            self.inner.ticker_names,
+            self.inner.dates.len()
+        )
+    }
+}
+
+wire_methods!(
+    PyPerformancePanel,
+    PerformancePanel,
+    "PerformancePanel",
+    module = "finstack_quant.analytics._performance"
+);
 
 #[doc = pydoc!("finstack_quant.analytics._performance", "Performance")]
 #[pyclass(name = "Performance", module = "finstack_quant.analytics")]
@@ -224,42 +337,12 @@ impl PyPerformance {
         benchmark_ticker: Option<&str>,
         frequency: Option<&str>,
     ) -> PyResult<Self> {
-        let prices = series_to_frame(&prices)?;
-        let panel = extract_dataframe_panel(
+        performance_from_frame(
+            py,
             &prices,
-            "Expected a pandas DataFrame or Series; use Performance.from_arrays() for raw lists",
-        )?;
-        build_performance_with(
-            py,
-            panel.dates,
-            panel.columns,
-            panel.ticker_names,
+            PanelSeriesKind::Prices,
             benchmark_ticker,
             frequency,
-            Performance::new,
-        )
-    }
-
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.from_arrays")]
-    #[staticmethod]
-    #[pyo3(signature = (dates, prices, ticker_names, benchmark_ticker=None, frequency=None))]
-    fn from_arrays(
-        py: Python<'_>,
-        dates: Vec<Bound<'_, PyAny>>,
-        prices: Vec<Vec<f64>>,
-        ticker_names: Vec<String>,
-        benchmark_ticker: Option<&str>,
-        frequency: Option<&str>,
-    ) -> PyResult<Self> {
-        let rust_dates = dates.iter().map(py_to_date).collect::<PyResult<Vec<_>>>()?;
-        build_performance_with(
-            py,
-            rust_dates,
-            prices,
-            ticker_names,
-            benchmark_ticker,
-            frequency,
-            Performance::new,
         )
     }
 
@@ -272,43 +355,19 @@ impl PyPerformance {
         benchmark_ticker: Option<&str>,
         frequency: Option<&str>,
     ) -> PyResult<Self> {
-        let returns = series_to_frame(&returns)?;
-        let panel = extract_dataframe_panel(
-            &returns,
-            "Expected a pandas DataFrame or Series; use Performance.from_returns_arrays() for raw lists",
-        )?;
-        build_performance_with(
+        performance_from_frame(
             py,
-            panel.dates,
-            panel.columns,
-            panel.ticker_names,
+            &returns,
+            PanelSeriesKind::Returns,
             benchmark_ticker,
             frequency,
-            Performance::from_returns,
         )
     }
 
-    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.from_returns_arrays")]
+    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.from_panel")]
     #[staticmethod]
-    #[pyo3(signature = (dates, returns, ticker_names, benchmark_ticker=None, frequency=None))]
-    fn from_returns_arrays(
-        py: Python<'_>,
-        dates: Vec<Bound<'_, PyAny>>,
-        returns: Vec<Vec<f64>>,
-        ticker_names: Vec<String>,
-        benchmark_ticker: Option<&str>,
-        frequency: Option<&str>,
-    ) -> PyResult<Self> {
-        let rust_dates = dates.iter().map(py_to_date).collect::<PyResult<Vec<_>>>()?;
-        build_performance_with(
-            py,
-            rust_dates,
-            returns,
-            ticker_names,
-            benchmark_ticker,
-            frequency,
-            Performance::from_returns,
-        )
+    fn from_panel(py: Python<'_>, panel: &PyPerformancePanel) -> PyResult<Self> {
+        performance_from_panel(py, &panel.inner)
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.reset_date_range")]
@@ -924,18 +983,18 @@ impl PyPerformance {
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.lookback_returns")]
-    #[pyo3(signature = (ref_date, fiscal_config = None))]
+    #[pyo3(signature = (ref_date = None, fiscal_config = None))]
     fn lookback_returns(
         &self,
-        ref_date: Bound<'_, PyAny>,
+        ref_date: Option<Bound<'_, PyAny>>,
         fiscal_config: Option<&PyFiscalConfig>,
     ) -> PyResult<PyLookbackReturns> {
-        let d = py_to_date(&ref_date)?;
-        Ok(PyLookbackReturns {
-            inner: self
-                .inner
-                .lookback_returns(d, fiscal_config.map(|config| config.inner)),
-        })
+        let ref_date = ref_date.as_ref().map(py_to_date).transpose()?;
+        let inner = self
+            .inner
+            .lookback_returns(ref_date, fiscal_config.map(|config| config.inner))
+            .map_err(analytics_to_py)?;
+        Ok(PyLookbackReturns { inner })
     }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.period_stats")]
@@ -1037,6 +1096,7 @@ fn max_drawdown(returns: &Bound<'_, PyAny>) -> PyResult<f64> {
 
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyPerformance>()?;
+    m.add_class::<PyPerformancePanel>()?;
     m.add_function(wrap_pyfunction!(sharpe, m)?)?;
     m.add_function(wrap_pyfunction!(sortino, m)?)?;
     m.add_function(wrap_pyfunction!(volatility, m)?)?;

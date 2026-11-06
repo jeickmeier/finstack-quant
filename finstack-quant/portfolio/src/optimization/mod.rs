@@ -61,9 +61,9 @@ pub use constraints::{Constraint, Inequality};
 pub use lp_solver::optimize;
 pub use problem::PortfolioOptimizationProblem;
 pub use result::{
-    rebalance, OptimizationStatus, PortfolioOptimizationResult, TradeDirection, TradeSpec,
-    TradeType,
+    OptimizationStatus, PortfolioOptimizationResult, TradeDirection, TradeSpec, TradeType,
+    rebalance,
 };
-pub use spec::{optimize_portfolio, rebalance_from_spec, PortfolioOptimizationSpec};
+pub use spec::{PortfolioOptimizationSpec, optimize_portfolio, rebalance_from_spec};
 pub use types::{MetricExpr, MissingMetricPolicy, Objective, PerPositionMetric, WeightingScheme};
 pub use universe::{CandidatePosition, PositionFilter, TradeUniverse};

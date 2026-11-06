@@ -392,15 +392,15 @@ pub(crate) enum Rule {
 /// (`None` bounds are treated as unbounded).
 #[inline]
 const fn year_in_effective_range(year: i32, from: Option<i32>, to: Option<i32>) -> bool {
-    if let Some(f) = from {
-        if year < f {
-            return false;
-        }
+    if let Some(f) = from
+        && year < f
+    {
+        return false;
     }
-    if let Some(t) = to {
-        if year > t {
-            return false;
-        }
+    if let Some(t) = to
+        && year > t
+    {
+        return false;
     }
     true
 }
@@ -583,10 +583,10 @@ impl Rule {
                 month,
                 day,
             } => {
-                if year == *exact_year {
-                    if let Ok(date) = Date::from_calendar_date(year, *month, *day) {
-                        out.push(date);
-                    }
+                if year == *exact_year
+                    && let Ok(date) = Date::from_calendar_date(year, *month, *day)
+                {
+                    out.push(date);
                 }
             }
             Rule::Fixed {

@@ -1,7 +1,7 @@
 //! Bond price, yield, spread, duration, and risk metric calculations.
 //!
-use crate::bond::pricing::settlement::QuoteDateContext;
 use crate::bond::Bond;
+use crate::bond::pricing::settlement::QuoteDateContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 
@@ -77,25 +77,13 @@ impl MetricCalculator for YtwCalculator {
         // Construct current dirty market price from quoted clean price + accrued at quote_date,
         // or fall back to the model dirty price at quote_date when the bond has no exercise rights.
         let bond: &Bond = context.instrument_as()?;
-        let dirty_amt = match bond
-            .instrument_pricing_overrides
-            .market_quotes
-            .quoted_clean_price_pct
-        {
-            Some(clean_px) => quote_ctx.dirty_from_clean_pct(clean_px, bond.notional.amount()),
-            None if !bond.has_exercise_rights() => {
-                super::quote_date_dirty_target(bond, context, &quote_ctx)?
-            }
-            None => {
-                return Err(finstack_quant_core::Error::from(
-                    finstack_quant_core::InputError::NotFound {
-                        id:
-                            "bond.instrument_pricing_overrides.market_quotes.quoted_clean_price_pct"
-                                .to_string(),
-                    },
-                ));
-            }
-        };
+        let dirty_amt = crate::bond::pricing::quote_conversions::workout_dirty_target(
+            bond,
+            &context.curves,
+            context.as_of,
+            &quote_ctx,
+            || Ok(context.base_value.amount()),
+        )?;
         let dirty_now = Money::new(dirty_amt, bond.notional.currency())?;
 
         // Lower return-floor protection into its pricing-effective call

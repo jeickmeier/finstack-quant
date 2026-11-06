@@ -36,7 +36,7 @@ def test_sabr_zero_vol_of_vol_preserves_exact_black_cube() -> None:
     restored = VolCube.from_json(cube.to_json())
     assert restored.params_at(0, 0).nu == 0.0
     for strike in [0.02, 0.03, 0.04]:
-        assert get_cube_vol(restored, 3.0, 6.0, strike) == pytest.approx(0.2, abs=1e-14, rel=0.0)
+        assert get_cube_vol(restored, 3.0, 6.0, strike, "lognormal") == pytest.approx(0.2, abs=1e-14, rel=0.0)
 
 
 def test_bus252_discount_curve_counts_business_days_on_its_own_calendar() -> None:

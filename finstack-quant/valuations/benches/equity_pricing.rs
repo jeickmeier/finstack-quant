@@ -10,7 +10,7 @@
 
 #![allow(clippy::unwrap_used)]
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_cashflows::builder::ScheduleParams;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
@@ -26,6 +26,9 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_models::types::{ExerciseStyle, OptionType};
+use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::PayReceive;
+use finstack_quant_valuations::instruments::Position;
 use finstack_quant_valuations::instruments::equity::equity_future::EquityFuture;
 use finstack_quant_valuations::instruments::equity::equity_future_option::EquityFutureOption;
 use finstack_quant_valuations::instruments::equity::equity_trs::EquityTotalReturnSwap;
@@ -33,9 +36,6 @@ use finstack_quant_valuations::instruments::equity::spot::Equity;
 use finstack_quant_valuations::instruments::equity::variance_swap::VarianceSwap;
 use finstack_quant_valuations::instruments::equity::vol_index_future::VolatilityIndexFuture;
 use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::PayReceive;
-use finstack_quant_valuations::instruments::Position;
 use finstack_quant_valuations::instruments::{
     EquityUnderlyingParams, FinancingLegSpec, TrsScheduleSpec,
 };

@@ -74,7 +74,8 @@ fn run_rounding_test(amount: f64, rounding: RoundingConvention) -> f64 {
     .unwrap();
 
     result
-        .distributions
+        .distributions()
+        .expect("distributions")
         .get(&RecipientType::ServiceProvider("Test".into()))
         .map(|m| m.amount())
         .unwrap_or(0.0)

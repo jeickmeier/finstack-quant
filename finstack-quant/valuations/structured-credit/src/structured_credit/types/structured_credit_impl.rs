@@ -206,14 +206,14 @@ impl StructuredCredit {
         .into_iter()
         .chain(reserve_replenishment)
         .collect();
-        if let Some(spec) = fees.incentive_fee {
-            if !spec.share.is_finite() || !(0.0..=1.0).contains(&spec.share) {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "fees.incentive_fee.share must be a decimal fraction in [0, 1] \
+        if let Some(spec) = fees.incentive_fee
+            && (!spec.share.is_finite() || !(0.0..=1.0).contains(&spec.share))
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "fees.incentive_fee.share must be a decimal fraction in [0, 1] \
                      (0.2 = 20%), got {}",
-                    spec.share
-                )));
-            }
+                spec.share
+            )));
         }
         let incentive = fees.incentive_fee.map(|spec| {
             Recipient::new(
@@ -273,13 +273,13 @@ impl StructuredCredit {
         let mut seen_keys: finstack_quant_core::FxHashSet<(&str, super::CoverageTestType)> =
             finstack_quant_core::FxHashSet::default();
         for test in tests {
-            if let Some(pct) = test.divert_pct {
-                if !pct.is_finite() || pct <= 0.0 || pct > 100.0 {
-                    return Err(invalid(format!(
-                        "coverage test '{}' divert_pct ({pct}) must be a percent in (0, 100]",
-                        test.id
-                    )));
-                }
+            if let Some(pct) = test.divert_pct
+                && (!pct.is_finite() || pct <= 0.0 || pct > 100.0)
+            {
+                return Err(invalid(format!(
+                    "coverage test '{}' divert_pct ({pct}) must be a percent in (0, 100]",
+                    test.id
+                )));
             }
             let placement = test.placement_tranche().unwrap_or(test.tranche_id.as_str());
             for id in [test.tranche_id.as_str(), placement] {
@@ -290,14 +290,14 @@ impl StructuredCredit {
                              part of deal '{}'",
                             test.id,
                             self.id.as_str()
-                        )))
+                        )));
                     }
                     Some(t) if t.seniority == TrancheSeniority::Equity => {
                         return Err(invalid(format!(
                             "coverage test '{}' references equity tranche '{id}'; coverage \
                              tests apply to debt classes",
                             test.id
-                        )))
+                        )));
                     }
                     Some(_) => {}
                 }
@@ -460,6 +460,28 @@ impl StructuredCredit {
                     PaymentCalculation::TranchePrincipal { tranche_id, .. } => {
                         referenced.push(tranche_id.as_str());
                     }
+                    // The engine sets the amount from the balance the cap built
+                    // and settles the payment against that balance by this id,
+                    // so anything else pays interest no claim stands behind.
+                    PaymentCalculation::NetWacCarryover { tranche_id, .. } => {
+                        referenced.push(tranche_id.as_str());
+                        let accrues = self
+                            .waterfall_rules
+                            .as_ref()
+                            .and_then(|rules| rules.afc.as_ref())
+                            .is_some_and(|afc| {
+                                afc.carryover && afc.capped_tranches.contains(tranche_id)
+                            });
+                        if !accrues || recipient.id != format!("net_wac_carryover_{tranche_id}") {
+                            return Err(invalid(format!(
+                                "custom waterfall tier '{}' recipient '{}' repays net-WAC \
+                                 carryover for tranche '{tranche_id}'; the recipient must be \
+                                 named 'net_wac_carryover_{tranche_id}' and the tranche must \
+                                 accrue carryover under waterfall_rules.afc",
+                                tier.id, recipient.id
+                            )));
+                        }
+                    }
                     _ => {}
                 }
                 for id in referenced {
@@ -547,14 +569,14 @@ impl StructuredCredit {
                 let interest_position = ordered
                     .iter()
                     .position(|t| t.interest_tranche_ids().any(|id| id == test.tranche_id));
-                if let Some(interest_position) = interest_position {
-                    if interest_position > position {
-                        return Err(invalid(format!(
-                            "coverage test '{}' sits before the tier that pays tranche '{}' \
+                if let Some(interest_position) = interest_position
+                    && interest_position > position
+                {
+                    return Err(invalid(format!(
+                        "coverage test '{}' sits before the tier that pays tranche '{}' \
                              interest; place it after that tier",
-                            test.id, test.tranche_id
-                        )));
-                    }
+                        test.id, test.tranche_id
+                    )));
                 }
             }
         }

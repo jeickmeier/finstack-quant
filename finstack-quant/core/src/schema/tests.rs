@@ -3,8 +3,8 @@ use super::generator::*;
 use super::llm::*;
 use super::registry::*;
 use super::*;
-use serde_json::json;
 use serde_json::Map;
+use serde_json::json;
 
 #[allow(dead_code)]
 #[derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
@@ -796,9 +796,11 @@ fn registry_selection_and_index_use_the_published_contract() {
     let index = build_schema_index(REGISTRY).expect("index");
     assert_eq!(
         index["artifacts"][0]["bytes"],
-        json!(super::deterministic_json_bytes(&schema)
-            .expect("bytes")
-            .len())
+        json!(
+            super::deterministic_json_bytes(&schema)
+                .expect("bytes")
+                .len()
+        )
     );
 }
 

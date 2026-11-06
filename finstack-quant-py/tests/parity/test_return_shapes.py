@@ -71,6 +71,7 @@ ENTRY_SHAPES: list[tuple[str, str, str]] = [
     # `to_json()` is the wire form.
     ("finstack_quant.portfolio", "brinson_fachler", "wrapper"),
     ("finstack_quant.portfolio", "carino_link", "wrapper"),
+    ("finstack_quant.portfolio", "brinson_linked", "wrapper"),
     ("finstack_quant.portfolio", "campisi_attribution", "wrapper"),
     ("finstack_quant.portfolio", "campisi_carino_link", "wrapper"),
     ("finstack_quant.portfolio", "cell_returns_from_reference", "wrapper"),

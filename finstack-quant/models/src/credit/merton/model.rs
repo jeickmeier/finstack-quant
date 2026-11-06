@@ -21,7 +21,7 @@ use super::{AssetDynamics, MertonBarrierType};
 ///
 /// Deserialization is routed through [`MertonModel::new_with_dynamics`] via
 /// `RawMertonModel`, so a model loaded from JSON satisfies exactly the same
-/// invariants as one built in Rust. The serialized field set is unchanged.
+/// invariants as one built in Rust. Unknown fields are rejected.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "RawMertonModel")]
@@ -52,9 +52,12 @@ pub struct MertonModel {
 /// Exists solely so `#[serde(try_from = ...)]` can funnel deserialization
 /// through [`MertonModel::new_with_dynamics`]. Field names and types mirror
 /// [`MertonModel`] exactly, so the JSON representation is identical.
+/// Unknown fields are rejected, so a misspelled parameter fails instead of
+/// being silently ignored.
 #[derive(Debug, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "json-schema", schemars(rename = "MertonModel"))]
+#[serde(deny_unknown_fields)]
 struct RawMertonModel {
     /// Current firm asset value `V_0`, in the issuer's reporting currency.
     /// Strictly positive.
@@ -197,12 +200,11 @@ impl MertonModel {
         if let MertonBarrierType::FirstPassage {
             barrier_growth_rate,
         } = barrier_type
+            && !barrier_growth_rate.is_finite()
         {
-            if !barrier_growth_rate.is_finite() {
-                return Err(Error::Validation(format!(
-                    "MertonModel: barrier_growth_rate must be finite, got {barrier_growth_rate}"
-                )));
-            }
+            return Err(Error::Validation(format!(
+                "MertonModel: barrier_growth_rate must be finite, got {barrier_growth_rate}"
+            )));
         }
         dynamics.validate()?;
         match (&dynamics, &barrier_type) {

@@ -23,8 +23,7 @@ export function traceStatementOptions(
 }
 /** Native DependencyTree or structured failure. */
 export function useTraceStatement(request: StatementTraceRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...traceStatementOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    traceStatementOptions(worker.client, worker.session, request),
+  );
 }

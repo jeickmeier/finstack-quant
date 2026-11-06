@@ -6,7 +6,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyModule;
 use rust_decimal::Decimal;
 
-use crate::bindings::core::money::{decimal_from_py, decimal_to_py, is_python_decimal, PyMoney};
+use crate::bindings::core::money::{PyMoney, decimal_from_py, decimal_to_py, is_python_decimal};
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::errors::core_to_py;
 

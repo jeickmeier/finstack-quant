@@ -117,15 +117,18 @@ it.each([
     const frame = container.querySelector(`[data-field-path="${field}"]`)!;
     expect(frame).not.toBeNull();
     await waitFor(() =>
-      expect(frame.querySelector('[aria-invalid="true"]')).not.toBeNull(),
-    );
-    await waitFor(() =>
       expect(
         (container.querySelector('button[type="submit"]') as HTMLButtonElement)
           .disabled,
       ).toBe(false),
     );
+    expect(
+      screen.queryByRole("alert", { name: "Validation errors" }),
+    ).toBeNull();
     fireEvent.click(container.querySelector('button[type="submit"]')!);
+    await waitFor(() =>
+      expect(frame.querySelector('[aria-invalid="true"]')).not.toBeNull(),
+    );
     await waitFor(() =>
       expect(frame.contains(document.activeElement)).toBe(true),
     );
@@ -149,12 +152,12 @@ it("keeps unknown keys and hidden structural issues in the accessible summary", 
       onSubmit={submit}
     />,
   );
+  fireEvent.submit(container.querySelector("form")!);
   await waitFor(() =>
     expect(
       screen.getByRole("alert", { name: "Validation errors" }).textContent,
     ).toContain("unknown_registry_field"),
   );
-  fireEvent.submit(container.querySelector("form")!);
   await waitFor(() =>
     expect(document.activeElement).toBe(
       screen.getByRole("alert", { name: "Validation errors" }),

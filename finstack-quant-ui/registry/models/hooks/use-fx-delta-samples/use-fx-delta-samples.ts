@@ -1,8 +1,7 @@
 "use client";
-import { requestSnapshot } from "@/hooks/shared/use-finstack/snapshot";
 import {
+  snapshotQueryOptions,
   useWorkerQuery,
-  workerQueryOptions,
 } from "@/hooks/shared/use-finstack/query";
 import type { FinstackClient } from "@/hooks/shared/use-finstack/client";
 import type { FxDeltaSampleRequest } from "@/workers/finstack-contract";
@@ -13,20 +12,17 @@ export function fxDeltaOptions(
   session: number,
   request: FxDeltaSampleRequest | null,
 ) {
-  const { snapshot, key } = requestSnapshot(request);
-  return workerQueryOptions({
+  return snapshotQueryOptions(
     client,
-    queryKey: ["finstack", session, "sampleFxDelta", key] as const,
-    ready: snapshot !== null,
-    missing:
-      "FX sampling requires a ready worker and explicit coordinates/forwards",
-    queryFn: (ready) => ready.call("sampleFxDelta", snapshot!),
-  });
+    session,
+    "sampleFxDelta",
+    request,
+    "FX sampling requires a ready worker and explicit coordinates/forwards",
+  );
 }
 /** Native annualized Black decimal volatilities in coordinate order; errors are unchanged. */
 export function useFxDeltaSamples(request: FxDeltaSampleRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...fxDeltaOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    fxDeltaOptions(worker.client, worker.session, request),
+  );
 }

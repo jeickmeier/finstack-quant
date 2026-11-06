@@ -829,7 +829,7 @@ pub(super) fn validate_finite_ecl(ecl: f64) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::analysis::ecl::staging::{classify_stage_from_curves, StageResult};
+    use crate::analysis::ecl::staging::{StageResult, classify_stage_from_curves};
     use crate::analysis::ecl::types::{QualitativeFlags, RawPdCurve};
 
     struct Staged {
@@ -1211,21 +1211,27 @@ mod tests {
     #[test]
     fn lgd_type_validation_matrix() {
         // TTC requires ttc_lgd.
-        assert!(EclConfigBuilder::new()
-            .lgd_type(LgdType::ThroughTheCycle)
-            .build()
-            .is_err());
+        assert!(
+            EclConfigBuilder::new()
+                .lgd_type(LgdType::ThroughTheCycle)
+                .build()
+                .is_err()
+        );
         // Downturn requires downturn_lgd.
-        assert!(EclConfigBuilder::new()
-            .lgd_type(LgdType::Downturn)
-            .build()
-            .is_err());
+        assert!(
+            EclConfigBuilder::new()
+                .lgd_type(LgdType::Downturn)
+                .build()
+                .is_err()
+        );
         // ttc_lgd out of range.
-        assert!(EclConfigBuilder::new()
-            .lgd_type(LgdType::ThroughTheCycle)
-            .ttc_lgd(1.5)
-            .build()
-            .is_err());
+        assert!(
+            EclConfigBuilder::new()
+                .lgd_type(LgdType::ThroughTheCycle)
+                .ttc_lgd(1.5)
+                .build()
+                .is_err()
+        );
         // Symmetric inert-config guard: PIT with a set-but-unused knob is rejected.
         assert!(EclConfigBuilder::new().ttc_lgd(0.4).build().is_err());
         let adj =

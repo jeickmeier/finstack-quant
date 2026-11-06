@@ -144,6 +144,21 @@ impl ScenarioSpec {
     /// rejects scenarios with different [`HazardBumpMode`] values and scenarios
     /// that together contain more than one [`OperationSpec::TimeRollForward`].
     ///
+    /// # Merge rules
+    ///
+    /// Inputs are stably sorted by ascending `priority` (equal priorities keep
+    /// input order); every rule below follows that execution order.
+    ///
+    /// | Field | Composed value |
+    /// |-------|----------------|
+    /// | `id` | Input ids joined with `+` (`"composed"` when empty) |
+    /// | `name` | Input names (the id where a name is absent) joined with `" + "` |
+    /// | `description` | Present input descriptions joined with `" + "`; `None` when no input has one |
+    /// | `operations` | Input operations concatenated in execution order |
+    /// | `priority` | The lowest input priority, so the composed spec sorts where its first-running input did (`0` when empty) |
+    /// | `resolution_mode` | The shared mode, or [`ResolutionMode::Cumulative`] when inputs differ |
+    /// | `hazard_bump_mode` | The shared mode (inputs must agree) |
+    ///
     /// # Arguments
     ///
     /// * `scenarios` - Scenario specifications to merge in ascending priority
@@ -166,21 +181,20 @@ impl ScenarioSpec {
                 ))
             })?;
         }
-        if let Some(first) = scenarios.first() {
-            if let Some(conflicting) = scenarios
+        if let Some(first) = scenarios.first()
+            && let Some(conflicting) = scenarios
                 .iter()
                 .skip(1)
                 .find(|scenario| scenario.hazard_bump_mode != first.hazard_bump_mode)
-            {
-                return Err(crate::error::Error::validation(format!(
-                    "Cannot compose scenarios '{}' (hazard_bump_mode '{}') and '{}' \
+        {
+            return Err(crate::error::Error::validation(format!(
+                "Cannot compose scenarios '{}' (hazard_bump_mode '{}') and '{}' \
                      (hazard_bump_mode '{}'): all scenarios must use the same hazard_bump_mode.",
-                    first.id,
-                    finstack_quant_core::wire::serde_label(&first.hazard_bump_mode)?,
-                    conflicting.id,
-                    finstack_quant_core::wire::serde_label(&conflicting.hazard_bump_mode)?,
-                )));
-            }
+                first.id,
+                finstack_quant_core::wire::serde_label(&first.hazard_bump_mode)?,
+                conflicting.id,
+                finstack_quant_core::wire::serde_label(&conflicting.hazard_bump_mode)?,
+            )));
         }
 
         // Stable so equal-priority scenarios keep input order.
@@ -221,6 +235,12 @@ impl ScenarioSpec {
             .map_or_else(HazardBumpMode::default, |scenario| {
                 scenario.hazard_bump_mode
             });
+        let priority = scenarios.first().map_or(0, |scenario| scenario.priority);
+        let descriptions: Vec<&str> = scenarios
+            .iter()
+            .filter_map(|scenario| scenario.description.as_deref())
+            .collect();
+        let description = (!descriptions.is_empty()).then(|| descriptions.join(" + "));
 
         let mut all_operations = Vec::new();
         for scenario in scenarios {
@@ -242,9 +262,9 @@ impl ScenarioSpec {
         Ok(Self {
             id: composed_id,
             name: composed_name,
-            description: None,
+            description,
             operations: all_operations,
-            priority: 0,
+            priority,
             resolution_mode,
             hazard_bump_mode,
         })

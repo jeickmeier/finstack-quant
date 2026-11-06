@@ -3,7 +3,7 @@
 //! This module provides tools for:
 //!
 //! - DCF corporate valuation and the orchestrated analysis pipeline
-//! - Covenant forecasting and credit coverage metrics
+//! - Covenant forecasting, credit coverage metrics and the debt stack by seniority
 //! - Scenario sets, sensitivity sweeps, and variance
 //! - Dependency tracing and formula explanation ([`DependencyTracer`], [`explain_formula`])
 //! - Formatted P&L summaries and credit assessment reports ([`PLSummaryReport`])
@@ -51,53 +51,55 @@ mod goal_seek;
 mod introspection;
 mod reports;
 
-pub use backtesting::{backtest_forecast, ForecastMetrics};
+pub use backtesting::{ForecastMetrics, backtest_forecast};
 pub use credit::{
-    compute_credit_context, forecast_breaches, CreditContextMetrics, CreditNumeratorNodes,
-    StatementsAdapter,
+    CapitalStructureSummary, CapitalStructureSummaryConfig, CapitalStructureTranche,
+    CreditContextMetrics, CreditNumeratorNodes, DebtInstrumentKind, MaturityWallBucket,
+    StatementsAdapter, capital_structure_summary, compute_credit_context, evaluate_covenants,
+    forecast_breaches,
 };
-pub use goal_seek::{goal_seek, GoalSeekResult};
+pub use goal_seek::{GoalSeekResult, goal_seek};
 pub use introspection::{
-    explain_formula, render_tree_ascii, render_tree_detailed, DependencyTracer, DependencyTree,
-    Explanation, ExplanationStep,
+    DependencyTracer, DependencyTree, Explanation, ExplanationStep, explain_formula,
+    render_tree_ascii, render_tree_detailed,
 };
 pub use reports::{
     CreditAssessment, CreditAssessmentPoint, CreditAssessmentReport, PLSummaryReport,
 };
 pub use scenarios::{
-    generate_tornado_entries, run_sensitivity, run_variance, variance_bridge, BridgeChart,
-    BridgeStep, ParameterSpec, ScenarioDefinition, ScenarioDiff, ScenarioResults, ScenarioSet,
-    SensitivityConfig, SensitivityMode, SensitivityResult, SensitivityScenario, TornadoEntry,
-    VarianceConfig, VarianceReport, VarianceRow,
+    BridgeChart, BridgeStep, ParameterSpec, ScenarioDefinition, ScenarioDiff, ScenarioResults,
+    ScenarioSet, SensitivityConfig, SensitivityMode, SensitivityResult, SensitivityScenario,
+    TornadoEntry, VarianceConfig, VarianceReport, VarianceRow, generate_tornado_entries,
+    run_sensitivity, run_variance, variance_bridge,
 };
 pub use valuation::{
-    dcf_sensitivity, evaluate_dcf, evaluate_lbo, run_corporate_analysis, wacc, CorporateAnalysis,
-    CorporateAnalysisBuilder, CorporateAnalysisOptions, CorporateValuationResult, DcfOptions,
-    DcfPeriodRow, DcfSensitivityResult, ExitMultipleBump, LboCheckMappings, LboConfig, LboResult,
-    LboTranche, DEFAULT_UFCF_NODE,
+    CorporateAnalysis, CorporateAnalysisBuilder, CorporateAnalysisOptions,
+    CorporateValuationResult, DEFAULT_UFCF_NODE, DcfOptions, DcfPeriodRow, DcfSensitivityResult,
+    ExitMultipleBump, LboCheckMappings, LboConfig, LboResult, LboTranche, WaccInputs,
+    dcf_sensitivity, evaluate_dcf, evaluate_lbo, run_corporate_analysis, wacc,
 };
 
 pub use checks::{
-    credit_underwriting_checks, lbo_model_checks, render_check_report_html,
-    render_check_report_text, three_statement_checks, CapexReconciliation, CoverageFloorCheck,
-    CreditMapping, DepreciationReconciliation, DividendReconciliation, EffectiveTaxRateCheck,
-    FcfSignCheck, GrowthRateConsistency, InterestExpenseReconciliation, LeverageRangeCheck,
-    LiquidityRunwayCheck, ThreeStatementMapping, TrendCheck, TrendDirection,
-    WorkingCapitalConsistency,
+    CapexReconciliation, CoverageFloorCheck, CreditMapping, DepreciationReconciliation,
+    DividendReconciliation, EffectiveTaxRateCheck, FcfSignCheck, GrowthRateConsistency,
+    InterestExpenseReconciliation, LeverageRangeCheck, LiquidityRunwayCheck, ThreeStatementMapping,
+    TrendCheck, TrendDirection, WorkingCapitalConsistency, credit_underwriting_checks,
+    lbo_model_checks, render_check_report_html, render_check_report_text, three_statement_checks,
 };
 
 pub use ecl::{
-    classify_stage, classify_stage_from_curves, compute_ecl, compute_ecl_from_curve,
-    compute_ecl_weighted, compute_ecl_weighted_from_curves, CeclConfig, CeclEngine,
-    CeclMethodology, CeclResult, EclBucket, EclConfig, EclConfigBuilder, EclResult, Exposure,
-    LgdType, MacroScenario, PdTermStructure, QualitativeFlags, RatingPdMap, RawPdCurve,
-    ReversionMethod, Stage, StageResult, StagingConfig, StagingTrigger, WeightedEclResult,
-    DEFAULT_REVOLVER_CCF,
+    CeclConfig, CeclEngine, CeclMethodology, CeclResult, DEFAULT_REVOLVER_CCF, EclBucket,
+    EclConfig, EclConfigBuilder, EclResult, Exposure, LgdType, MacroScenario, PdTermStructure,
+    QualitativeFlags, RatingPdMap, RawPdCurve, ReversionMethod, Stage, StageResult, StagingConfig,
+    StagingTrigger, WeightedEclResult, classify_stage, classify_stage_from_curves, compute_ecl,
+    compute_ecl_from_curve, compute_ecl_weighted, compute_ecl_weighted_from_curves,
 };
 
 pub use comps::{
-    compute_multiple, compute_peer_multiples, peer_stats, percentile_rank, regression_fair_value,
-    score_relative_value, z_score, CompanyId, CompanyMetrics, DimensionScore, MetricExtractor,
-    Multiple, PeerFilter, PeerSet, PeerStats, PeriodBasis, RegressionResult, RelativeValueResult,
-    ScoreDirection, ScoringDimension,
+    CompanyId, CompanyMetrics, CompositeExclusion, DimensionExclusion, DimensionScore,
+    MetricExtractor, Multiple, PeerFilter, PeerSet, PeerStats, PeriodBasis, RegressionResult,
+    RelativeValueCompany, RelativeValueDimension, RelativeValueMultiple, RelativeValuePoint,
+    RelativeValueReport, RelativeValueReportConfig, RelativeValueResult, ScoreDirection,
+    ScoringDimension, compute_multiple, compute_peer_multiples, peer_stats, percentile_rank,
+    regression_fair_value, relative_value_report, score_relative_value, z_score,
 };

@@ -60,7 +60,7 @@ mod sobol;
 
 pub use brownian_bridge::BrownianBridge;
 pub use poisson::poisson_inverse_cdf;
-pub use sobol::{SobolRng, MAX_SOBOL_DIMENSION};
+pub use sobol::{MAX_SOBOL_DIMENSION, SobolRng};
 
 /// Random number generator trait for statistical sampling.
 ///

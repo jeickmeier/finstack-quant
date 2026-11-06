@@ -132,7 +132,7 @@ await cp(
 // renders the calibrated surfaces and cubes through them.
 await writeFile(
   path.join(external, "app/page.tsx"),
-  '"use client";\nimport { PricingWorkbench } from "@/components/finstack/valuations/blocks/pricing-workbench/pricing-workbench";\nimport { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack";\nimport fixture from "./bond.json";\nexport default function Page() { return <main className="finstack-surface mx-auto max-w-6xl p-4"><h1>Bond pricing</h1><FinstackQueryProvider><PricingWorkbench defaultRequest={fixture.request} surfaceOptions={() => ({ colorDomain: [0, 1] })} cubeOptions={() => ({ initialStrike: 0.05, initialConvention: "normal", colorDomains: { normal: [0, 0.1], black_lognormal: [0, 2] } })} fxOptions={() => ({ coordinates: [{ expiry: 1, strike: 1.1, forward: 1.12 }], colorDomain: [0, 1] })} /></FinstackQueryProvider></main>; }\n',
+  '"use client";\nimport { PricingWorkbench } from "@/components/finstack/valuations/blocks/pricing-workbench/pricing-workbench";\nimport { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack";\nimport fixture from "./bond.json";\nexport default function Page() { return <main className="finstack-surface mx-auto max-w-6xl p-4"><h1>Bond pricing</h1><FinstackQueryProvider><PricingWorkbench defaultRequest={fixture.request} surfaceOptions={() => ({ colorDomain: [0, 1] })} cubeOptions={() => ({ initialStrike: 0.05, initialConvention: "normal", colorDomains: { normal: [0, 0.1], lognormal: [0, 2] } })} fxOptions={() => ({ coordinates: [{ expiry: 1, strike: 1.1, forward: 1.12 }], colorDomain: [0, 1] })} /></FinstackQueryProvider></main>; }\n',
 );
 const hash = createHash("sha256")
   .update(

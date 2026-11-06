@@ -11,7 +11,8 @@ use finstack_quant_core::schema::SchemaArtifact;
 
 use crate::{
     BetaResult, CagrDayCount, DatedSeries, DrawdownEpisode, GreeksResult, LookbackReturns,
-    MultiFactorResult, Performance, PeriodStats, PeriodicReturn, ReturnKind, RollingGreeks,
+    MultiFactorResult, Performance, PerformancePanel, PeriodStats, PeriodicReturn, ReturnKind,
+    RollingGreeks,
 };
 
 /// The crate's complete schema registry.
@@ -64,6 +65,13 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "multi_factor_result",
         Output,
         "Result of a multi-factor regression."
+    ),
+    finstack_quant_core::schema_artifact!(
+        PerformancePanel,
+        "analytics",
+        "performance_panel",
+        Input,
+        "Dated price or return panel, one series per ticker, that a Performance is built from."
     ),
     finstack_quant_core::schema_artifact!(
         Performance,

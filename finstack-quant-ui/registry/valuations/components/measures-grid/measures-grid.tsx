@@ -8,7 +8,10 @@ import {
 } from "../valuation-summary/valuation-summary";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { MetricMetadata } from "finstack-quant-wasm";
-import { compareTenorLabels } from "@/lib/finstack/format/format";
+import {
+  compareCoordinates,
+  type AxisCoordinate,
+} from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 export interface MeasuresGridProps extends ValuationSummaryProps {
   /** Choose a compact valuation summary, detailed measures, or both. */
@@ -53,11 +56,23 @@ function measureLabel(key: string, props: MeasuresGridProps) {
     return `${metric} · ${descriptor.components[0]}`;
   return key;
 }
+/** The bucket coordinate of a row in a bucketed section: its second component. */
+function bucketCoordinate(
+  key: string,
+  props: MeasuresGridProps,
+): AxisCoordinate {
+  const descriptor = descriptorFor(key, props);
+  return {
+    label: descriptor?.components[1] ?? key,
+    group: descriptor?.coordinates[1]?.group ?? "",
+    value: descriptor?.coordinates[1]?.value,
+  };
+}
 function sortedBucketRows(rows: MeasureRow[], props: MeasuresGridProps) {
   return [...rows].sort((left, right) =>
-    compareTenorLabels(
-      measureLabel(left.key, props),
-      measureLabel(right.key, props),
+    compareCoordinates(
+      bucketCoordinate(left.key, props),
+      bucketCoordinate(right.key, props),
     ),
   );
 }

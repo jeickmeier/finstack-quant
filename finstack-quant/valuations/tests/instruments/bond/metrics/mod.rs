@@ -23,4 +23,5 @@ mod asw;
 mod callable_credit_risk;
 mod credit_quote_risk;
 mod cs01;
+mod default_risk_recalibrated;
 mod spread_duration;

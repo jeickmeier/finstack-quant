@@ -70,11 +70,11 @@ pub(super) fn apply(
             }
         } else {
             note_warning(
-                    attribution,
-                    "Volatility attribution has Vega but no measurable volatility-surface shift; vol P&L set to zero",
-                    inputs.instrument.id(),
-                    "vol",
-                );
+                attribution,
+                "Volatility attribution has Vega but no measurable volatility-surface shift; vol P&L set to zero",
+                inputs.instrument.id(),
+                "vol",
+            );
         }
     }
 }

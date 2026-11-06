@@ -10,6 +10,15 @@
       "type_name": "Attributes"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/common/1/bond_quote_input.schema.json",
+      "bytes": 3919,
+      "kind": "input",
+      "path": "schemas/common/1/bond_quote_input.schema.json",
+      "summary": "The one market quote a bond's quote set is solved from: a price, a yield or a spread.",
+      "title": "BondQuoteInput",
+      "type_name": "BondQuoteInput"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
       "bytes": 1989,
       "kind": "component",
@@ -110,7 +119,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json",
-      "bytes": 1004905,
+      "bytes": 1005745,
       "kind": "component",
       "path": "schemas/common/1/instrument_json.schema.json",
       "summary": "The instrument union embedded by portfolio positions and candidates; the same branches as the instrument envelope's `instrument` field.",
@@ -119,7 +128,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-      "bytes": 62986,
+      "bytes": 63588,
       "kind": "component",
       "path": "schemas/common/1/instrument_pricing_overrides.schema.json",
       "summary": "Instrument-owned market quote and model configuration overrides.",
@@ -163,6 +172,15 @@
       "type_name": "Money"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/common/1/oas_config.schema.json",
+      "bytes": 2370,
+      "kind": "input",
+      "path": "schemas/common/1/oas_config.schema.json",
+      "summary": "Structured-credit OAS solver configuration: paths, stochastic dimensions and seed.",
+      "title": "OasConfig",
+      "type_name": "OasConfig"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/common/1/rate_index_conventions.schema.json",
       "bytes": 10046,
       "kind": "component",
@@ -170,6 +188,15 @@
       "summary": "Market conventions of one interest-rate index.",
       "title": "RateIndexConventions",
       "type_name": "RateIndexConventions"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/common/1/scenario_grid.schema.json",
+      "bytes": 1521,
+      "kind": "input",
+      "path": "schemas/common/1/scenario_grid.schema.json",
+      "summary": "Structured-credit CPR x CDR x severity grid swept by the tranche scenario table.",
+      "title": "ScenarioGrid",
+      "type_name": "ScenarioGrid"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
@@ -182,7 +209,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/standard_deal_params.schema.json",
-      "bytes": 234245,
+      "bytes": 234265,
       "kind": "component",
       "path": "schemas/common/1/standard_deal_params.schema.json",
       "summary": "Inputs for the standard structured-credit registry constructor.",
@@ -299,7 +326,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
-      "bytes": 1012818,
+      "bytes": 1013658,
       "kind": "input",
       "path": "schemas/instruments/1/composite/composite.schema.json",
       "summary": "Resolved cross-asset synthetic instrument with immutable leg quantities.",
@@ -416,7 +443,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json",
-      "bytes": 191292,
+      "bytes": 191312,
       "kind": "input",
       "path": "schemas/instruments/1/equity/levered_real_estate_equity.schema.json",
       "summary": "Property equity net of its financing stack.",
@@ -497,7 +524,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
-      "bytes": 1011795,
+      "bytes": 1012635,
       "kind": "input",
       "path": "schemas/instruments/1/exotics/basket.schema.json",
       "summary": "Weighted basket of constituents priced as one position.",
@@ -578,7 +605,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/asset_backed_facility.schema.json",
-      "bytes": 280949,
+      "bytes": 280969,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/asset_backed_facility.schema.json",
       "summary": "Warehouse line against a collateral pool: advance rates, concentration limits, borrowing base.",
@@ -632,7 +659,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json",
-      "bytes": 63750,
+      "bytes": 63770,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/revolving_credit.schema.json",
       "summary": "Committed revolver with drawn/undrawn balances and commitment fees.",
@@ -641,7 +668,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
-      "bytes": 396729,
+      "bytes": 397569,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/structured_credit.schema.json",
       "summary": "ABS/CLO/RMBS/CMBS deal: collateral pool, tranches and waterfall.",
@@ -776,7 +803,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
-      "bytes": 1102797,
+      "bytes": 1103637,
       "kind": "input",
       "path": "schemas/instruments/1/instrument.schema.json",
       "summary": "The seventy-branch union of every instrument type. Prefer the per-type schema beside it: this document is too large to hand to a model.",
@@ -937,6 +964,24 @@
       "type_name": "SingleInstrumentEnvelope"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/results/1/bond_quote_set.schema.json",
+      "bytes": 3894,
+      "kind": "output",
+      "path": "schemas/results/1/bond_quote_set.schema.json",
+      "summary": "Every price, yield and spread quote of a bond, solved from any one of them.",
+      "title": "BondQuoteSet",
+      "type_name": "BondQuoteSet"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/results/1/bond_workout_ladder.schema.json",
+      "bytes": 6921,
+      "kind": "output",
+      "path": "schemas/results/1/bond_workout_ladder.schema.json",
+      "summary": "Yield and I-spread to every call, put and maturity exit of a bond, with the worst marked.",
+      "title": "BondWorkoutLadder",
+      "type_name": "BondWorkoutLadder"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/results/1/borrowing_base_report.schema.json",
       "bytes": 1382,
       "kind": "output",
@@ -956,7 +1001,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
-      "bytes": 1014426,
+      "bytes": 1015266,
       "kind": "output",
       "path": "schemas/results/1/composite_rebalance_result.schema.json",
       "summary": "Result of resolving a new composite holdings state.",
@@ -973,6 +1018,24 @@
       "type_name": "ConvertibleGreeks"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/results/1/convertible_spot_ladder.schema.json",
+      "bytes": 6472,
+      "kind": "output",
+      "path": "schemas/results/1/convertible_spot_ladder.schema.json",
+      "summary": "Price, delta, parity, conversion premium, regime and bond floor of a convertible at a ladder of share prices.",
+      "title": "ConvertibleSpotLadder",
+      "type_name": "ConvertibleSpotLadder"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/results/1/currency_ladder.schema.json",
+      "bytes": 2239,
+      "kind": "output",
+      "path": "schemas/results/1/currency_ladder.schema.json",
+      "summary": "One row currency's calendar-year non-principal, principal and native PV ladder.",
+      "title": "CurrencyLadder",
+      "type_name": "CurrencyLadder"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/results/1/enhanced_monte_carlo_result.schema.json",
       "bytes": 52720,
       "kind": "output",
@@ -983,7 +1046,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/equity_metrics.schema.json",
-      "bytes": 2285,
+      "bytes": 2772,
       "kind": "output",
       "path": "schemas/results/1/equity_metrics.schema.json",
       "summary": "Equity-tranche return metrics: IRR, MOIC, NAV and cash-on-cash.",
@@ -991,8 +1054,17 @@
       "type_name": "EquityMetrics"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/results/1/equity_metrics_field_units.schema.json",
+      "bytes": 3006,
+      "kind": "output",
+      "path": "schemas/results/1/equity_metrics_field_units.schema.json",
+      "summary": "The display units of an equity tranche's invested amount, IRR, MOIC, NAV and cash-on-cash.",
+      "title": "EquityMetricsFieldUnits",
+      "type_name": "EquityMetricsFieldUnits"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/results/1/facility_projection.schema.json",
-      "bytes": 39592,
+      "bytes": 57370,
       "kind": "output",
       "path": "schemas/results/1/facility_projection.schema.json",
       "summary": "Projected cashflows of an asset-backed facility and its residual.",
@@ -1001,7 +1073,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json",
-      "bytes": 20266,
+      "bytes": 20740,
       "kind": "output",
       "path": "schemas/results/1/instrument_cashflow.schema.json",
       "summary": "Native cashflow rows, reporting-currency PV and reconciliation status.",
@@ -1036,8 +1108,17 @@
       "type_name": "MertonMcResult"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/results/1/metric_field_unit.schema.json",
+      "bytes": 879,
+      "kind": "output",
+      "path": "schemas/results/1/metric_field_unit.schema.json",
+      "summary": "The display unit of one scalar field of a result struct.",
+      "title": "MetricFieldUnit",
+      "type_name": "MetricFieldUnit"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/results/1/metric_metadata.schema.json",
-      "bytes": 3353,
+      "bytes": 4734,
       "kind": "output",
       "path": "schemas/results/1/metric_metadata.schema.json",
       "summary": "Canonical per-key metric interpretation for host presentation.",
@@ -1054,8 +1135,26 @@
       "type_name": "OasResult"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/results/1/pool_report.schema.json",
+      "bytes": 7538,
+      "kind": "output",
+      "path": "schemas/results/1/pool_report.schema.json",
+      "summary": "Collateral-pool statistics, WARF and concentration by obligor, industry and rating.",
+      "title": "PoolReport",
+      "type_name": "PoolReport"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/results/1/pool_report_field_units.schema.json",
+      "bytes": 3980,
+      "kind": "output",
+      "path": "schemas/results/1/pool_report_field_units.schema.json",
+      "summary": "The display units of the collateral-pool report fields.",
+      "title": "PoolReportFieldUnits",
+      "type_name": "PoolReportFieldUnits"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/results/1/pool_stats.schema.json",
-      "bytes": 2491,
+      "bytes": 2872,
       "kind": "output",
       "path": "schemas/results/1/pool_stats.schema.json",
       "summary": "Collateral-pool statistics: WAC, spread, maturity, diversity and concentration.",
@@ -1064,7 +1163,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/scenario_table.schema.json",
-      "bytes": 2537,
+      "bytes": 2805,
       "kind": "output",
       "path": "schemas/results/1/scenario_table.schema.json",
       "summary": "Structured-credit scenario grid results for one tranche.",
@@ -1072,8 +1171,17 @@
       "type_name": "ScenarioTable"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/results/1/scenario_table_field_units.schema.json",
+      "bytes": 2448,
+      "kind": "output",
+      "path": "schemas/results/1/scenario_table_field_units.schema.json",
+      "summary": "The display units of a scenario table's axes and measures.",
+      "title": "ScenarioTableFieldUnits",
+      "type_name": "ScenarioTableFieldUnits"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/results/1/simulation_diagnostics.schema.json",
-      "bytes": 9967,
+      "bytes": 27711,
       "kind": "output",
       "path": "schemas/results/1/simulation_diagnostics.schema.json",
       "summary": "Deal-level accounting produced alongside the tranche cashflows.",
@@ -1081,13 +1189,31 @@
       "type_name": "SimulationDiagnostics"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/results/1/simulation_field_units.schema.json",
+      "bytes": 2982,
+      "kind": "output",
+      "path": "schemas/results/1/simulation_field_units.schema.json",
+      "summary": "The display units of a simulation's coverage, diversion, enhancement and excess-spread series.",
+      "title": "SimulationFieldUnits",
+      "type_name": "SimulationFieldUnits"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/results/1/simulation_run.schema.json",
-      "bytes": 36503,
+      "bytes": 54281,
       "kind": "output",
       "path": "schemas/results/1/simulation_run.schema.json",
       "summary": "Tranche cashflows and deal accounting from one deterministic simulation.",
       "title": "SimulationRun",
       "type_name": "SimulationRun"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/results/1/standard_deal_family.schema.json",
+      "bytes": 5325,
+      "kind": "output",
+      "path": "schemas/results/1/standard_deal_family.schema.json",
+      "summary": "One deal family the standard structured-credit constructor accepts, with its registry profile and an example of its inputs.",
+      "title": "StandardDealFamily",
+      "type_name": "StandardDealFamily"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/tranche_cashflows.schema.json",
@@ -1106,6 +1232,15 @@
       "summary": "Per-tranche risk and spread metrics from the tranche's own projected cashflows.",
       "title": "TrancheMetrics",
       "type_name": "TrancheMetrics"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/results/1/tranche_solve_field_units.schema.json",
+      "bytes": 2744,
+      "kind": "output",
+      "path": "schemas/results/1/tranche_solve_field_units.schema.json",
+      "summary": "The display units of the tranche break-even CDR, discount margin and OAS results.",
+      "title": "TrancheSolveFieldUnits",
+      "type_name": "TrancheSolveFieldUnits"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",

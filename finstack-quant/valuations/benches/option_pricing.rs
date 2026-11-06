@@ -7,7 +7,7 @@
 //!
 //! Market Standards Review (Week 5)
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -18,10 +18,10 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::BarrierType;
 use finstack_quant_models::types::OptionType;
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 use finstack_quant_valuations::instruments::exotics::barrier_option::BarrierOption;
 use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
-use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 #[allow(dead_code, unused_imports, clippy::expect_used, clippy::unwrap_used)]
 #[path = "../tests/support/equity_fx_options.rs"]

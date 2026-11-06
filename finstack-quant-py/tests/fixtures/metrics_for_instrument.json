@@ -1,0 +1,17 @@
+{
+  "group": "Instrument Specific",
+  "ids": {
+    "bond": [],
+    "convertible_bond": [],
+    "revolving_credit": [
+      "accrued_interest",
+      "available_capacity",
+      "draw_option_cost",
+      "exposure_at_default",
+      "price_from_dm",
+      "utilization_rate",
+      "weighted_average_cost"
+    ],
+    "term_loan": []
+  }
+}

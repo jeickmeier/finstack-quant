@@ -54,7 +54,7 @@ fn credit_reports_and_checks_reject_mixed_currency_ratios() {
         model_builder.build().unwrap()
     };
     let mut results = Evaluator::new().evaluate(&model).unwrap();
-    let report = CreditAssessment::compute(&results, period);
+    let report = CreditAssessment::compute(&results, period).unwrap();
     assert_eq!(report.leverage_ratio, None);
     assert_eq!(report.interest_coverage, None);
     let context = CheckContext::new(&model, &results);
@@ -73,7 +73,7 @@ fn credit_reports_and_checks_reject_mixed_currency_ratios() {
     assert!(leverage.execute(&context).is_err());
     assert!(coverage.execute(&context).is_err());
     results.node_value_types.clear();
-    let report = CreditAssessment::compute(&results, period);
+    let report = CreditAssessment::compute(&results, period).unwrap();
     assert_eq!(report.leverage_ratio, None);
     assert_eq!(report.interest_coverage, None);
     let context = CheckContext::new(&model, &results);
@@ -96,22 +96,26 @@ fn credit_checks_reject_overflowing_ratios() {
     };
     let results = Evaluator::new().evaluate(&model).unwrap();
     let context = CheckContext::new(&model, &results);
-    assert!(LeverageRangeCheck {
-        debt_node: "large".into(),
-        ebitda_node: "small".into(),
-        warn_range: (0.0, 6.0),
-        error_range: (0.0, 8.0),
-    }
-    .execute(&context)
-    .is_err());
-    assert!(CoverageFloorCheck {
-        numerator_node: "large".into(),
-        denominator_node: "small".into(),
-        min_warning: 2.0,
-        min_error: 1.0,
-    }
-    .execute(&context)
-    .is_err());
+    assert!(
+        LeverageRangeCheck {
+            debt_node: "large".into(),
+            ebitda_node: "small".into(),
+            warn_range: (0.0, 6.0),
+            error_range: (0.0, 8.0),
+        }
+        .execute(&context)
+        .is_err()
+    );
+    assert!(
+        CoverageFloorCheck {
+            numerator_node: "large".into(),
+            denominator_node: "small".into(),
+            min_warning: 2.0,
+            min_error: 1.0,
+        }
+        .execute(&context)
+        .is_err()
+    );
 }
 
 #[test]
@@ -132,7 +136,9 @@ fn credit_reports_reject_contradictory_numeric_and_monetary_values() {
     };
     let mut results = Evaluator::new().evaluate(&model).unwrap();
     assert_eq!(
-        CreditAssessment::compute(&results, period).leverage_ratio,
+        CreditAssessment::compute(&results, period)
+            .unwrap()
+            .leverage_ratio,
         Some(5.0)
     );
     results
@@ -141,7 +147,9 @@ fn credit_reports_reject_contradictory_numeric_and_monetary_values() {
         .unwrap()
         .insert(period, 1_000.0);
     assert_eq!(
-        CreditAssessment::compute(&results, period).leverage_ratio,
+        CreditAssessment::compute(&results, period)
+            .unwrap()
+            .leverage_ratio,
         None
     );
     let precise = Money::from_decimal_str("100.12345", Currency::USD).unwrap();
@@ -156,7 +164,9 @@ fn credit_reports_reject_contradictory_numeric_and_monetary_values() {
         .unwrap()
         .insert(period, precise.amount());
     assert_eq!(
-        CreditAssessment::compute(&results, period).leverage_ratio,
+        CreditAssessment::compute(&results, period)
+            .unwrap()
+            .leverage_ratio,
         Some(500.0 / precise.amount())
     );
 }
@@ -210,7 +220,7 @@ fn working_capital_rejects_currency_change_without_metadata() {
 #[test]
 fn growth_terminal_flow_rejects_missing_calendar_quarters() {
     use finstack_quant_core::{currency::Currency, money::Money};
-    use finstack_quant_statements_analytics::analysis::{evaluate_dcf, DcfOptions};
+    use finstack_quant_statements_analytics::analysis::{DcfOptions, evaluate_dcf};
     use finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec;
     let values: Vec<_> = (2025..=2026)
         .flat_map(|year| {
@@ -275,7 +285,7 @@ fn growth_terminal_flow_rejects_missing_calendar_quarters() {
 #[test]
 fn growth_terminal_flow_rejects_partial_week_at_calendar_year_boundary() {
     use finstack_quant_core::{currency::Currency, money::Money};
-    use finstack_quant_statements_analytics::analysis::{evaluate_dcf, DcfOptions};
+    use finstack_quant_statements_analytics::analysis::{DcfOptions, evaluate_dcf};
     use finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec;
     let values: Vec<_> = (1..=52)
         .map(|week| {
@@ -311,7 +321,7 @@ fn growth_terminal_flow_rejects_partial_week_at_calendar_year_boundary() {
 #[test]
 fn growth_terminal_flow_rejects_annual_identifier_on_partial_year() {
     use finstack_quant_core::{currency::Currency, dates::Period, money::Money};
-    use finstack_quant_statements_analytics::analysis::{evaluate_dcf, DcfOptions};
+    use finstack_quant_statements_analytics::analysis::{DcfOptions, evaluate_dcf};
     use finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec;
     let period = PeriodId::annual(2025);
     let model = {
@@ -347,7 +357,7 @@ fn growth_terminal_flow_rejects_annual_identifier_on_partial_year() {
 #[test]
 fn growth_terminal_flow_uses_complete_year_across_annual_stub_identifiers() {
     use finstack_quant_core::{currency::Currency, dates::Period, money::Money};
-    use finstack_quant_statements_analytics::analysis::{evaluate_dcf, DcfOptions};
+    use finstack_quant_statements_analytics::analysis::{DcfOptions, evaluate_dcf};
     use finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec;
     let actual = PeriodId::annual(2024);
     let forecast = PeriodId::annual(2025);

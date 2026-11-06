@@ -11,7 +11,8 @@ pub(crate) mod coverage_tests;
 pub(crate) mod resolve;
 pub(crate) mod simulation_engine;
 pub use simulation_engine::{
-    CoverageTestDiagnostic, PeriodDiagnostics, SimulationDiagnostics, SimulationRun,
+    CoverageTestBreach, CoverageTestDiagnostic, NonWaterfallPayment, NonWaterfallSource,
+    PeriodDiagnostics, SimulationDiagnostics, SimulationRun, TrancheCreditEnhancement,
 };
 pub(crate) mod stochastic;
 pub(crate) mod waterfall;
@@ -19,9 +20,9 @@ pub(crate) mod waterfall;
 pub use waterfall::execute_waterfall;
 
 use crate::structured_credit::types::StructuredCredit;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::Result;
 
 #[cfg(test)]
 thread_local! {

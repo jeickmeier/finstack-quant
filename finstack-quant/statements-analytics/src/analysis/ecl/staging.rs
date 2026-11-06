@@ -355,12 +355,12 @@ pub fn classify_stage_from_curves(
                 "current",
             ),
         ] {
-            if let Some(rating) = rating {
-                if !source.contains_rating(rating) {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "{snapshot} rating '{rating}' is absent from its PD source"
-                    )));
-                }
+            if let Some(rating) = rating
+                && !source.contains_rating(rating)
+            {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{snapshot} rating '{rating}' is absent from its PD source"
+                )));
             }
         }
         let (Some(orig), Some(curr)) = (&exposure.origination_rating, &exposure.current_rating)
@@ -469,15 +469,14 @@ pub(super) fn classify_stage_with_pds(
     {
         // 3b. Stage 2 quantitative: rating downgrade in notches
         //     (IFRS 9 B5.5.17(f)). A zero threshold disables the trigger.
-        if config.rating_downgrade_notches > 0 {
-            if let Some(notches) = rating_downgrade_notches(orig_rating, curr_rating, config) {
-                if notches >= config.rating_downgrade_notches {
-                    triggers.push(StagingTrigger::RatingDowngrade {
-                        notches,
-                        threshold: config.rating_downgrade_notches,
-                    });
-                }
-            }
+        if config.rating_downgrade_notches > 0
+            && let Some(notches) = rating_downgrade_notches(orig_rating, curr_rating, config)
+            && notches >= config.rating_downgrade_notches
+        {
+            triggers.push(StagingTrigger::RatingDowngrade {
+                notches,
+                threshold: config.rating_downgrade_notches,
+            });
         }
     }
 
@@ -504,14 +503,14 @@ pub(super) fn classify_stage_with_pds(
     // it bypass probation, which IFRS 9 B5.5.26 / EBA GL on default do
     // not permit.
     if !triggers.is_empty() {
-        if let Some(Stage::Stage3) = &exposure.previous_stage {
-            if exposure.consecutive_performing_periods < config.cure_periods_stage3_to_2 {
-                return Ok(StageResult {
-                    stage: Stage::Stage3,
-                    triggers,
-                    cured: false,
-                });
-            }
+        if let Some(Stage::Stage3) = &exposure.previous_stage
+            && exposure.consecutive_performing_periods < config.cure_periods_stage3_to_2
+        {
+            return Ok(StageResult {
+                stage: Stage::Stage3,
+                triggers,
+                cured: false,
+            });
         }
         return Ok(StageResult {
             stage: Stage::Stage2,
@@ -900,10 +899,12 @@ mod tests {
 
         let result = classify_stage_from_curves(&exposure, &curves, &curves, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage2);
-        assert!(result
-            .triggers
-            .iter()
-            .any(|t| matches!(t, StagingTrigger::PdDeltaAbsolute { .. })));
+        assert!(
+            result
+                .triggers
+                .iter()
+                .any(|t| matches!(t, StagingTrigger::PdDeltaAbsolute { .. }))
+        );
     }
 
     #[test]
@@ -915,10 +916,12 @@ mod tests {
 
         let result = classify_stage_from_curves(&exposure, &curve, &curve, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage2);
-        assert!(result
-            .triggers
-            .iter()
-            .any(|t| matches!(t, StagingTrigger::Qualitative { .. })));
+        assert!(
+            result
+                .triggers
+                .iter()
+                .any(|t| matches!(t, StagingTrigger::Qualitative { .. }))
+        );
     }
 
     #[test]
@@ -1043,10 +1046,12 @@ mod tests {
 
         let result = classify_stage_from_curves(&exposure, &curve, &curve, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage3);
-        assert!(result
-            .triggers
-            .iter()
-            .any(|t| matches!(t, StagingTrigger::Stage3Qualitative { .. })));
+        assert!(
+            result
+                .triggers
+                .iter()
+                .any(|t| matches!(t, StagingTrigger::Stage3Qualitative { .. }))
+        );
     }
 
     /// Distressed modification is Stage 3 evidence. Plain forbearance
@@ -1148,10 +1153,12 @@ mod tests {
         let unchanged =
             classify_stage_with_pds(&exposure, &config, || Ok(Some((0.0, 0.0)))).unwrap();
         assert_eq!(unchanged.stage, Stage::Stage1);
-        assert!(unchanged
-            .triggers
-            .iter()
-            .all(|trigger| !matches!(trigger, StagingTrigger::PdDeltaRelative { .. })));
+        assert!(
+            unchanged
+                .triggers
+                .iter()
+                .all(|trigger| !matches!(trigger, StagingTrigger::PdDeltaRelative { .. }))
+        );
         config.pd_delta_relative = None;
         let absolute_only =
             classify_stage_with_pds(&exposure, &config, || Ok(Some((0.0, 0.001)))).unwrap();
@@ -1201,9 +1208,11 @@ mod tests {
 
         let result = classify_stage_from_curves(&exposure, &map, &map, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage2);
-        assert!(result
-            .triggers
-            .iter()
-            .any(|t| matches!(t, StagingTrigger::PdDeltaAbsolute { .. })));
+        assert!(
+            result
+                .triggers
+                .iter()
+                .any(|t| matches!(t, StagingTrigger::PdDeltaAbsolute { .. }))
+        );
     }
 }

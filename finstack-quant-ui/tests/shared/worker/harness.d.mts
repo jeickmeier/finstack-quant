@@ -1,7 +1,10 @@
 import type { Worker } from "node:worker_threads";
 import type { Remote } from "comlink";
 import type { WorkerApi } from "../../../registry/shared/file/finstack-contract";
-export function startWorker(options?: { fail?: boolean }): Promise<{
+export function startWorker(options?: {
+  fail?: boolean;
+  failMarketSerialization?: boolean;
+}): Promise<{
   proxy: Remote<WorkerApi>;
   worker: Worker;
   close(): Promise<void>;

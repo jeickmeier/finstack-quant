@@ -7,11 +7,11 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_statements::builder::ModelBuilder;
-use finstack_quant_statements::checks::builtins::NonFiniteCheck;
 use finstack_quant_statements::checks::CheckSuite;
+use finstack_quant_statements::checks::builtins::NonFiniteCheck;
 use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::AmountOrScalar;
-use finstack_quant_statements_analytics::analysis::{evaluate_dcf, DcfOptions};
+use finstack_quant_statements_analytics::analysis::{DcfOptions, evaluate_dcf};
 use finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec;
 use time::Month;
 
@@ -926,5 +926,69 @@ fn evaluate_dcf_uses_curve_for_cs_interest() {
     assert_eq!(
         no_market_flows[1].1, q3_ufcf,
         "the fixed coupon is the same with or without the market"
+    );
+}
+
+/// Quarterly model with actuals through 2025Q2 whose UFCF is explicit in
+/// every quarter, as in the analyst model the UI values with a market.
+fn quarter_end_dcf_model() -> finstack_quant_statements::types::FinancialModelSpec {
+    let mut model_builder = ModelBuilder::new("quarter-end-as-of");
+    model_builder
+        .periods("2025Q1..Q4", Some("2025Q2"))
+        .expect("valid periods");
+    let flows: Vec<_> = (1..=4)
+        .map(|q| {
+            (
+                PeriodId::quarter(2025, q).expect("valid period fixture"),
+                Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
+            )
+        })
+        .collect();
+    model_builder.value_money("ufcf", &flows);
+    model_builder.with_meta("currency", serde_json::json!("USD"));
+    model_builder.build().expect("valid model")
+}
+
+fn dcf_with_market_as_of(as_of: Date) -> finstack_quant_statements::Result<()> {
+    evaluate_dcf(
+        &quarter_end_dcf_model(),
+        0.10,
+        TerminalValueSpec::GordonGrowth {
+            stable_growth_rate: 0.02,
+        },
+        "ufcf",
+        Some(0.0),
+        &DcfOptions::default(),
+        Some(&MarketContext::new()),
+        Some(as_of),
+    )
+    .map(|_| ())
+}
+
+/// A quarter-end `as_of` hides that quarter's actuals (they become visible on
+/// the period's exclusive end); the error names both dates and the remedy
+/// instead of only reporting a missing value.
+#[test]
+fn dcf_as_of_errors_explain_visibility_and_valuation_date() {
+    let quarter_end = Date::from_calendar_date(2025, Month::June, 30).expect("date");
+    let message = dcf_with_market_as_of(quarter_end)
+        .expect_err("2025Q2 actuals are not visible on 2025-06-30")
+        .to_string();
+    assert!(
+        message.contains("its actual is available on 2025-07-01, after as_of 2025-06-30")
+            && message.contains("availability_dates"),
+        "{message}"
+    );
+
+    dcf_with_market_as_of(Date::from_calendar_date(2025, Month::July, 1).expect("date"))
+        .expect("the day after quarter end sees 2025Q2");
+
+    let after_model = Date::from_calendar_date(2026, Month::January, 1).expect("date");
+    let message = dcf_with_market_as_of(after_model)
+        .expect_err("no forecast flow ends after the model")
+        .to_string();
+    assert!(
+        message.contains("in forecast periods ending after the valuation date 2026-01-01"),
+        "{message}"
     );
 }

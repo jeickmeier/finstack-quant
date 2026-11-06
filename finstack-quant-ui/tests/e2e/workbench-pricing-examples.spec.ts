@@ -1,5 +1,6 @@
 import { test, expect } from "playwright/test";
 import scenarios from "../valuations/scenario-table/cases.json" with { type: "json" };
+import tranches from "../valuations/scenario-table/tranche-analytics.json" with { type: "json" };
 
 const examples = [
   { type: "bond", id: "US912828XG33", model: "discounting", featured: 3 },
@@ -235,7 +236,69 @@ test("switching instrument loads its model and market, and gallery links retain 
   expect(errors).toEqual([]);
 });
 
-test("structured-credit scenario prices use the completed native request", async ({
+test("a standard deal family builds, prices and lists its native tranches", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto(
+    "/registry-gallery/?item=pricing-workbench&theme=light&density=compact&focus=1&instrument=structured_credit",
+  );
+  const state = page.locator(".finstack-workbench__state");
+  await expect(state).toHaveText("Priced");
+  await page.getByText("Start from a standard deal", { exact: true }).click();
+  await page.getByRole("radio", { name: "RMBS", exact: true }).click();
+  await page.getByRole("button", { name: "Build deal" }).click();
+  await expect(state).toHaveText("Priced");
+  const results = page.getByRole("region", { name: "Results", exact: true });
+  await results.getByRole("tab", { name: "Request" }).click();
+  await results.getByText("Priced instrument", { exact: true }).click();
+  await expect(
+    results.getByRole("region", { name: "Priced instrument JSON" }),
+  ).toContainText('"deal_type":"rmbs"');
+  await results.getByRole("tab", { name: "Scenarios" }).click();
+  await expect(
+    results.getByRole("region", {
+      name: `${scenarios.trancheId} tranche analytics`,
+    }),
+  ).toBeVisible();
+  // The built deal reaches its native pool report.
+  await results.locator("summary", { hasText: /^Pool report$/ }).click();
+  const pool = results.getByRole("region", { name: "Pool report" });
+  await expect(pool).toContainText("WARF");
+  await expect(pool.getByRole("table", { name: "By rating" })).toBeVisible();
+  // ... and its native waterfall, one row per simulated period with detail on expand.
+  await results.locator("summary", { hasText: /^Waterfall report$/ }).click();
+  const waterfall = results.getByRole("region", { name: "Waterfall report" });
+  await waterfall.getByRole("button", { expanded: false }).first().click();
+  await expect(
+    waterfall.getByRole("table", { name: "Payment records" }),
+  ).toBeVisible();
+  // ... and its coverage tests, as far as this family's waterfall carries any.
+  await results.locator("summary", { hasText: /^Coverage tests$/ }).click();
+  await expect(
+    results
+      .getByRole("region", { name: "Coverage tests" })
+      .or(results.getByText("No coverage test was evaluated.")),
+  ).toBeVisible();
+  // ... and its credit enhancement and excess spread.
+  await results
+    .locator("summary", { hasText: /^Credit enhancement and excess spread$/ })
+    .click();
+  await expect(
+    results
+      .getByRole("region", { name: "Credit enhancement and excess spread" })
+      .getByRole("table", { name: "By payment date" }),
+  ).toBeVisible();
+  // ... and its equity tranche: this family has none, and Rust says so.
+  await results.locator("summary", { hasText: /^Equity tranche$/ }).click();
+  await expect(
+    results.getByRole("region", { name: "Equity tranche" }).getByRole("alert"),
+  ).toContainText("deal has no equity tranche");
+  expect(errors).toEqual([]);
+});
+
+test("structured-credit scenarios use the completed native request", async ({
   page,
 }) => {
   const errors: string[] = [];
@@ -246,9 +309,9 @@ test("structured-credit scenario prices use the completed native request", async
   const results = page.getByRole("region", { name: "Results", exact: true });
   await expect(page.locator(".finstack-workbench__state")).toHaveText("Priced");
   await results.getByRole("tab", { name: "Scenarios" }).click();
-  await results.getByText("Scenario prices", { exact: true }).click();
+  await results.locator("summary", { hasText: /^Scenarios$/ }).click();
   const scenario = results.getByRole("region", {
-    name: "CLONOTES-A scenario prices",
+    name: "CLONOTES-A scenario measures",
   });
   // The grid shows the live native prices; the committed fixture holds the same
   // native table and `mise run ui-fixtures --check` keeps it fresh.
@@ -256,5 +319,126 @@ test("structured-credit scenario prices use the completed native request", async
     String(scenarios.cases[0]!.table.cells[0]!.price),
   );
   await expect(scenario).toContainText("trancheScenarioTable");
+  // WAL and writedown read the same returned cells, each with its native unit.
+  await scenario.getByRole("radio", { name: "WAL", exact: true }).click();
+  await expect(scenario).toContainText("WAL (years). Severity:");
+  await expect(scenario.getByRole("grid")).toContainText(
+    String(scenarios.cases[0]!.table.cells[0]!.wal),
+  );
+  await scenario.getByRole("radio", { name: "Writedown", exact: true }).click();
+  await expect(scenario).toContainText("Writedown (USD). Severity:");
+  // The native ScenarioGrid editor is seeded from the host grid.
+  await expect(
+    results.getByRole("button", { name: "Run scenarios" }),
+  ).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("structured-credit tranche analytics take no default price and solve OAS on request", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto(
+    "/registry-gallery/?item=pricing-workbench&theme=light&density=compact&focus=1&instrument=structured_credit",
+  );
+  const results = page.getByRole("region", { name: "Results", exact: true });
+  await expect(page.locator(".finstack-workbench__state")).toHaveText("Priced");
+  await results.getByRole("tab", { name: "Scenarios" }).click();
+  const tranche = results.getByRole("region", {
+    name: "CLONOTES-A tranche analytics",
+  });
+  const fixed = tranches.cases.find((entry) => entry.name === "fixed")!;
+  // Short native values only: the gallery build may rewrite long float literals.
+  await expect(
+    tranche.getByRole("region", { name: "Break-even CDR" }),
+  ).toContainText(String(fixed.results.breakevenCdr.value));
+  await expect(
+    tranche.getByRole("table", { name: "CLONOTES-A tranche metrics" }),
+  ).toContainText("Severity01");
+  await expect(
+    tranche.getByRole("region", { name: "Discount margin" }),
+  ).toContainText("Enter a clean price");
+  await expect(
+    tranche.getByRole("button", { name: "Solve OAS" }),
+  ).toBeDisabled();
+  await tranche.getByLabel("Clean price").fill("100");
+  await expect(
+    tranche.getByRole("region", { name: "Discount margin" }).getByRole("alert"),
+  ).toContainText("is fixed-rate");
+  const oas = tranche.getByRole("region", { name: "Option-adjusted spread" });
+  await expect(oas).toContainText("OAS runs on request");
+  await expect(oas.getByText("OAS configuration")).toBeVisible();
+  await tranche.getByRole("button", { name: "Solve OAS" }).click();
+  await expect(oas).toContainText("Num paths");
+  await expect(oas).toContainText(
+    String((fixed.results.oas.value as { num_paths: number }).num_paths),
+  );
+  expect(errors).toEqual([]);
+});
+
+test("a priced bond opens its cards on their own in the Analytics tab", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto(
+    "/registry-gallery/?item=pricing-workbench&theme=light&density=compact&focus=1&instrument=bond",
+  );
+  await expect(page.locator(".finstack-workbench__state")).toHaveText("Priced");
+  const results = page.getByRole("region", { name: "Results", exact: true });
+  await results.getByRole("tab", { name: "Analytics" }).click();
+  await results
+    .locator("summary", { hasText: /^Yield workout ladder$/ })
+    .click();
+  await expect(
+    results.getByRole("table", { name: "Yield to each exit" }),
+  ).toBeVisible();
+  await results
+    .locator("summary", { hasText: /^Spreads, risk and carry$/ })
+    .click();
+  const credit = results.getByRole("region", { name: "Bond credit" });
+  // No government curve is named on this bond: Rust's error in that row alone.
+  await expect(
+    credit.getByRole("row", { name: /^G spread/ }).getByRole("alert"),
+  ).toContainText("requires a government curve");
+  await expect(
+    credit.getByRole("row", { name: /^Duration mod/ }).getByRole("alert"),
+  ).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("a priced convertible shows the card by share price in the Analytics tab", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto(
+    "/registry-gallery/?item=pricing-workbench&theme=light&density=compact&focus=1&instrument=convertible_bond",
+  );
+  await expect(page.locator(".finstack-workbench__state")).toHaveText("Priced");
+  const results = page.getByRole("region", { name: "Results", exact: true });
+  await results.getByRole("tab", { name: "Analytics" }).click();
+  const ladder = results.getByRole("region", {
+    name: "Convertible by share price",
+  });
+  await expect(
+    ladder.getByRole("rowheader", { name: /\(market\)$/ }),
+  ).toHaveCount(1);
+  // Rust's error on this bond with no quote, in that row alone.
+  const metrics = results.getByRole("region", {
+    name: "Convertible",
+    exact: true,
+  });
+  await expect(
+    metrics.getByRole("row", { name: /^Oas/i }).getByRole("alert"),
+  ).toContainText("quoted_clean_price_pct");
+  await expect(
+    metrics.getByRole("row", { name: /^Parity/ }).getByRole("alert"),
+  ).toHaveCount(0);
+  // A share price entered reprices; Rust's rejection of one shows as returned.
+  await ladder.getByRole("textbox", { name: /Share prices/ }).fill("0");
+  await ladder.getByRole("button", { name: "Apply" }).click();
+  await expect(ladder.getByRole("alert")).toContainText("finite and positive");
   expect(errors).toEqual([]);
 });

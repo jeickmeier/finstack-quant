@@ -13,7 +13,7 @@ mod period_waterfall;
 mod record;
 
 use cash::{AccumulationPhase, WaterfallCash};
-use period_waterfall::{insert_hedge_payments, PeriodRuleFlags, PeriodRuleFlows};
+use period_waterfall::{PeriodRuleFlags, PeriodRuleFlows, insert_hedge_payments};
 
 /// Deal-level inputs shared by the phases of one period.
 pub(super) struct PeriodInputs<'a> {
@@ -472,7 +472,7 @@ pub(super) fn simulate_period(
         special_serviced: Some(&special_serviced_open),
         deferred_interest: Some(&state.deferred_interest),
         reserve_balance: state.reserve_balance,
-        // N2: funding-account principal is still collateral for the notes.
+        // Funding-account principal is still collateral for the notes.
         restricted_cash: state.principal_funding_account,
         defaulted_collateral_value,
         recovery_proceeds: released_recoveries,
@@ -494,7 +494,8 @@ pub(super) fn simulate_period(
     state.undistributed_principal = snap_de_minimis(waterfall_result.remaining_principal);
 
     // Update reserve balance from waterfall distributions to ReserveAccount recipients.
-    for (recipient, amount) in &waterfall_result.distributions {
+    let distributions = waterfall_result.distributions()?;
+    for (recipient, amount) in &distributions {
         if let RecipientType::ReserveAccount(_) = recipient {
             state.reserve_balance = state.reserve_balance.checked_add(*amount)?;
         }
@@ -510,8 +511,7 @@ pub(super) fn simulate_period(
     // Realized excess spread this period, annualized on the opening pool
     // balance: interest collections less the debt coupons due, the fees paid
     // and the net charge-off. Feeds the early-amortization excess-spread test.
-    let waterfall_fees: f64 = waterfall_result
-        .distributions
+    let waterfall_fees: f64 = distributions
         .iter()
         .filter(|(recipient, _)| {
             matches!(
@@ -560,11 +560,6 @@ pub(super) fn simulate_period(
     // Per-period deal accounting: end-of-period balances, the cash that moved
     // and the coverage tests exactly as the executor evaluated them (single
     // source: the waterfall's own results).
-    let pool_factor = if state.original_pool_balance.amount() > 0.0 {
-        state.pool_outstanding.amount() / state.original_pool_balance.amount()
-    } else {
-        0.0
-    };
     let trigger_levels: FxHashMap<&str, f64> = period_waterfall
         .coverage_tests()
         .map(|spec| (spec.id.as_str(), spec.trigger_level))
@@ -577,50 +572,33 @@ pub(super) fn simulate_period(
                 .get(test_id.as_str())
                 .copied()
                 .unwrap_or(f64::NAN);
+            let ratio = *ratio;
             super::state::CoverageTestDiagnostic {
                 test_id: test_id.clone(),
-                ratio: *ratio,
+                ratio,
                 trigger_level,
-                cushion: ratio - trigger_level,
+                cushion: ratio.map(|ratio| ratio - trigger_level),
                 passing: *passing,
             }
         })
         .collect();
-    let (wac, weighted_avg_spread_bp, warf) = super::state::pool_composition(state)?;
-    let delinquent: f64 = state
-        .pool_state
-        .delinquent
-        .iter()
-        .map(|buckets| super::delinquency::delinquent_balance(buckets))
-        .sum();
-    state
-        .period_diagnostics
-        .push(super::state::PeriodDiagnostics {
-            payment_date: pay_date,
-            pool_balance: state.pool_outstanding,
-            pool_factor,
-            wac,
-            weighted_avg_spread_bp,
-            warf,
-            interest_collections: pool_flows.interest,
-            principal_collections: pool_flows
-                .scheduled_principal
-                .checked_add(pool_flows.prepayment)?,
-            defaults: pool_flows.default,
-            recoveries: released_recoveries,
-            reinvested_par: reinvested_cash,
-            fees_paid: Money::new(fees_paid, state.currency)?,
-            reserve_balance: state.reserve_balance,
-            spread_account: state.spread_account,
-            funding_account: state.principal_funding_account,
-            delinquent_balance: Money::new(delinquent, state.currency)?,
-            servicer_advances_outstanding: Money::new(
-                state.servicer_advances_outstanding(),
-                state.currency,
-            )?,
-            excess_spread: state.excess_spread_history.last().copied().unwrap_or(0.0),
-            coverage_tests,
-        });
+    let record = super::state::PeriodDiagnostics {
+        interest_collections: pool_flows.interest,
+        principal_collections: pool_flows
+            .scheduled_principal
+            .checked_add(pool_flows.prepayment)?,
+        defaults: pool_flows.default,
+        recoveries: released_recoveries,
+        reinvested_par: reinvested_cash,
+        fees_paid: Money::new(fees_paid, state.currency)?,
+        excess_spread: state.excess_spread_history.last().copied().unwrap_or(0.0),
+        coverage_tests,
+        waterfall: waterfall_result,
+        // Reserve interest routed to a tranche this period.
+        non_waterfall_payments: std::mem::take(&mut state.pending_non_waterfall_payments),
+        ..super::state::PeriodDiagnostics::from_state(state, pay_date)?
+    };
+    state.period_diagnostics.push(record);
 
     state
         .reserve_balance_path
@@ -653,32 +631,31 @@ fn apply_tranche_draws(
                 .reinvestment_period
                 .as_ref()
                 .is_some_and(|window| window.is_active && pay_date <= window.end);
-        if revolving {
-            if let Some(rules) = instrument
+        if revolving
+            && let Some(rules) = instrument
                 .coverage_rules
                 .as_ref()
                 .and_then(|rules| rules.borrowing_base.as_ref())
-            {
-                let unresolved_npl = state.unresolved_npl();
-                let base = rules
-                    .evaluate_live(
-                        &state.pool,
-                        Some(&state.pool_state.balances),
-                        Some(state.live_collateral(&unresolved_npl)),
-                    )?
-                    .borrowing_base
-                    .amount();
-                let balance = state
-                    .tranche_balances
-                    .get(readvance.tranche_id.as_str())
-                    .map_or(0.0, Money::amount);
-                let headroom = readvance.commitment.amount().min(base) - balance;
-                if headroom > 1.0 {
-                    draws.push((
-                        readvance.tranche_id.clone(),
-                        Money::new(headroom, state.currency)?,
-                    ));
-                }
+        {
+            let unresolved_npl = state.unresolved_npl();
+            let base = rules
+                .evaluate_live(
+                    &state.pool,
+                    Some(&state.pool_state.balances),
+                    Some(state.live_collateral(&unresolved_npl)),
+                )?
+                .borrowing_base
+                .amount();
+            let balance = state
+                .tranche_balances
+                .get(readvance.tranche_id.as_str())
+                .map_or(0.0, Money::amount);
+            let headroom = readvance.commitment.amount().min(base) - balance;
+            if headroom > 1.0 {
+                draws.push((
+                    readvance.tranche_id.clone(),
+                    Money::new(headroom, state.currency)?,
+                ));
             }
         }
     }

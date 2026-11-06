@@ -5,12 +5,12 @@
 
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
     AssetPool, CoverageTestAction, CoverageTestSpec, DealType, PoolAsset, SimulationRun,
@@ -210,16 +210,16 @@ fn cure_on(run: &SimulationRun, test_id: &str, trigger: f64, stack: &[&str], dat
         .iter()
         .find(|test| test.test_id == test_id)
         .expect("test diagnostic");
+    let ratio = test.ratio.expect("a failing test has a ratio");
     assert!(
         !test.passing,
-        "{test_id} must fail on {date}, ratio {}",
-        test.ratio
+        "{test_id} must fail on {date}, ratio {ratio}"
     );
     let denominator: f64 = stack
         .iter()
         .map(|id| opening_balance(&run.tranches, id, date))
         .sum();
-    (denominator * (1.0 - test.ratio / trigger)).max(0.0)
+    (denominator * (1.0 - ratio / trigger)).max(0.0)
 }
 
 fn first_failure(run: &SimulationRun, test_id: &str) -> Date {

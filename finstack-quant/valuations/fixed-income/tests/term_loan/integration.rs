@@ -8,8 +8,8 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_valuations_core::metrics::MetricId;
 use finstack_quant_valuations_fixed_income::term_loan::{
     LoanCall, LoanCallSchedule, LoanCallType, TermLoan,
@@ -76,7 +76,7 @@ fn test_term_loan_yields_with_callability() {
         .price_with_metrics(
             &market,
             as_of,
-            &[MetricId::Ytm, MetricId::Ytw, MetricId::custom("ytc")],
+            &[MetricId::Ytm, MetricId::Ytw, MetricId::Ytc],
             finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
         .unwrap();
@@ -111,9 +111,9 @@ fn test_term_loan_yields_to_horizons() {
             as_of,
             &[
                 MetricId::Ytm,
-                MetricId::custom("yt2y"),
-                MetricId::custom("yt3y"),
-                MetricId::custom("yt4y"),
+                MetricId::Yt2y,
+                MetricId::Yt3y,
+                MetricId::Yt4y,
             ],
             finstack_quant_valuations_core::instruments::PricingOptions::default(),
         )
@@ -155,7 +155,7 @@ fn horizon_yields_use_quoted_clean_price_pct() {
             .price_with_metrics(
                 &market,
                 as_of,
-                &[MetricId::custom("yt2y")],
+                &[MetricId::Yt2y],
                 finstack_quant_valuations_core::instruments::PricingOptions::default(),
             )
             .expect("quoted horizon yield");

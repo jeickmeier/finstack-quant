@@ -3,101 +3,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { useState, type ReactNode } from "react";
 import { parse } from "lossless-json";
-import bondSchema from "@/lib/finstack/generated/schemas/bond.json";
-import { createWireCodec } from "@/lib/finstack/codec.mjs";
 import { DateInput } from "@/components/finstack/core/primitives/date-input/date-input";
 import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
 import { SchemaForm } from "@/components/finstack/core/components/schema-form/schema-form";
-import type {
-  InstrumentModule,
-  Schema,
-} from "@/components/finstack/core/components/schema-form/schema";
 import { MetricPicker } from "../../primitives/metric-picker/metric-picker";
 import { FieldFrame } from "@/components/finstack/shared/primitives/field-frame/field-frame";
 import { JsonViewer } from "@/components/finstack/shared/primitives/json-viewer/json-viewer";
-function reachableDefs(
-  node: Schema,
-  defs: Record<string, Schema>,
-  used: Record<string, Schema> = {},
-): Record<string, Schema> {
-  const visit = (value: unknown) => {
-    if (!value || typeof value !== "object") return;
-    if (Array.isArray(value)) {
-      for (const item of value) visit(item);
-      return;
-    }
-    const record = value as Schema;
-    const ref = record.$ref;
-    if (ref?.startsWith("#/$defs/")) {
-      const name = ref.slice("#/$defs/".length);
-      if (!Object.hasOwn(used, name)) {
-        const target = defs[name];
-        if (!target) throw new Error(`Missing schema reference: ${ref}`);
-        used[name] = target;
-        visit(target);
-      }
-    }
-    for (const child of Object.values(record)) visit(child);
-  };
-  visit(node);
-  return used;
-}
-function metricOverridesModule(): InstrumentModule {
-  const bond = bondSchema as unknown as Schema;
-  const defs = bond.$defs ?? {};
-  const source = Object.values(defs).find(
-    (node) => node?.title === "Metric Pricing Overrides",
-  );
-  if (!source) throw new Error("Metric Pricing Overrides schema is missing");
-  const schema = structuredClone({
-    ...source,
-    title: "Pricing overrides",
-    $defs: reachableDefs(source, defs),
-  });
-  return {
-    schema,
-    metadata: [],
-    codec: createWireCodec(schema),
-    example: {},
-  };
-}
-const metricOverrides = metricOverridesModule();
-function overrideValues(
-  text: string | null | undefined,
-): Record<string, unknown> {
-  if (!text) return {};
-  try {
-    const value = JSON.parse(text) as unknown;
-    return value && typeof value === "object" && !Array.isArray(value)
-      ? (value as Record<string, unknown>)
-      : {};
-  } catch {
-    return {};
-  }
-}
-function compactOverrides(text: string): string | undefined {
-  const compact = (value: unknown): unknown => {
-    if (typeof value === "string")
-      return value.trim() === "" ? undefined : value;
-    if (value == null) return undefined;
-    if (Array.isArray(value)) {
-      const items = value.map(compact);
-      return items.some((item) => item !== undefined) ? items : undefined;
-    }
-    if (typeof value === "object") {
-      const entries = Object.entries(value).flatMap(([key, item]) => {
-        const next = compact(item);
-        return next === undefined ? [] : [[key, next] as const];
-      });
-      return entries.length ? Object.fromEntries(entries) : undefined;
-    }
-    return value;
-  };
-  const value = compact(JSON.parse(text) as unknown);
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? JSON.stringify(value)
-    : undefined;
-}
+import {
+  compactOverrides,
+  metricOverrides,
+  overrideValues,
+} from "./metric-overrides";
 /** Caller-owned text is preserved even while incomplete; null/undefined mean omission. */
 export interface PricingParams {
   asOf: string;
@@ -189,6 +105,7 @@ function PricingOverrides({
         type="button"
         onClick={() => {
           onValueChange(undefined);
+          // finstack-arith: remount revision counter, not a value
           setGeneration((current) => current + 1);
         }}
       >
@@ -197,7 +114,7 @@ function PricingOverrides({
     </div>
   );
 }
-/** Independent controlled pricing controls. Supply groups from useModels/useMetrics within the shared provider. */
+/** Independent controlled pricing controls. Supply groups from useModels and useMetrics(instrumentType) within the shared provider. */
 export function PricingParamsForm({
   value,
   onValueChange,
@@ -215,12 +132,17 @@ export function PricingParamsForm({
   onValueChange(value: PricingParams): void;
   instrumentType: string;
   models: Readonly<Record<string, readonly string[]>>;
+  /** Native groups of the metrics registered for instrumentType (useMetrics(instrumentType)). */
   metrics: Readonly<Record<string, readonly string[]>>;
   /** Optional caller-owned history UI; the parent still owns value.marketHistory. */
   marketHistorySlot?: ReactNode;
   loading?: boolean;
   error?: string;
 }) {
+  const offered = new Set(Object.values(metrics).flat());
+  const unavailableMetrics = (value.metrics ?? []).filter(
+    (metric) => !offered.has(metric),
+  );
   return (
     <section
       aria-label="Pricing parameters"
@@ -273,6 +195,12 @@ export function PricingParamsForm({
             )}
             disabled={loading}
           />
+          {!loading && unavailableMetrics.length > 0 && (
+            <p role="status">
+              Selected metrics unavailable for {instrumentType}:{" "}
+              {unavailableMetrics.join(", ")}
+            </p>
+          )}
           <Button
             variant="outline"
             size="sm"

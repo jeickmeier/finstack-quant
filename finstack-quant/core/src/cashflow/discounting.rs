@@ -529,11 +529,7 @@ mod tests {
             Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date")
         }
         fn df(&self, t: f64) -> f64 {
-            if t.abs() < f64::EPSILON {
-                0.0
-            } else {
-                1.0
-            }
+            if t.abs() < f64::EPSILON { 0.0 } else { 1.0 }
         }
     }
 

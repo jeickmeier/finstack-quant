@@ -18,6 +18,7 @@ pub struct PeriodHistory {
     rows: Vec<Vec<Option<f64>>>,
     period_bounds: Arc<IndexMap<PeriodId, (Date, Date)>>,
     periods_by_start: Arc<BTreeMap<(PeriodKind, bool, Date), PeriodId>>,
+    periods: Arc<[Period]>,
 }
 
 impl PeriodHistory {
@@ -35,6 +36,7 @@ impl PeriodHistory {
             rows: Vec::new(),
             period_bounds: Arc::default(),
             periods_by_start: Arc::default(),
+            periods: Arc::from(Vec::new()),
         }
     }
 
@@ -65,7 +67,13 @@ impl PeriodHistory {
                 })
                 .collect(),
         );
+        history.periods = Arc::from(periods);
         history
+    }
+
+    /// The model's periods with their dates; empty for history built without them.
+    pub(crate) fn model_periods(&self) -> &[Period] {
+        &self.periods
     }
 
     /// Explicit start and exclusive end dates for a model period.
@@ -91,11 +99,14 @@ impl PeriodHistory {
     ///
     /// * `node_to_column` - Column layout for interned nodes. Extra keys in
     ///   `named` are appended so historical lookups still resolve them.
+    /// * `periods` - The model's periods with their dates, in timeline order,
+    ///   retained for calendar-window lookups; may be empty
     /// * `named` - Period → (node name → value) maps, typically built by
     ///   tests or by converting a completed [`StatementResult`](super::StatementResult).
     #[must_use]
     pub fn from_named_maps(
         node_to_column: Arc<IndexMap<NodeId, usize>>,
+        periods: &[Period],
         named: &IndexMap<PeriodId, IndexMap<String, f64>>,
     ) -> Self {
         let mut col_map = (*node_to_column).clone();
@@ -109,16 +120,16 @@ impl PeriodHistory {
         }
         let node_to_column = Arc::new(col_map);
         let n = node_to_column.len();
-        let mut history = Self::new(Arc::clone(&node_to_column));
+        let mut history = Self::with_periods(Arc::clone(&node_to_column), periods);
         history.rows.reserve(named.len());
         history.period_index.reserve(named.len());
         for (period, values) in named {
             let mut row = vec![None; n];
             for (name, value) in values {
-                if let Some(&idx) = node_to_column.get(name.as_str()) {
-                    if let Some(slot) = row.get_mut(idx) {
-                        *slot = Some(*value);
-                    }
+                if let Some(&idx) = node_to_column.get(name.as_str())
+                    && let Some(slot) = row.get_mut(idx)
+                {
+                    *slot = Some(*value);
                 }
             }
             history.push_row(*period, row);
@@ -154,12 +165,6 @@ impl PeriodHistory {
     #[must_use]
     pub fn contains_key(&self, period: &PeriodId) -> bool {
         self.period_index.contains_key(period)
-    }
-
-    /// Interned column layout shared with the evaluator.
-    #[must_use]
-    pub fn node_to_column(&self) -> &IndexMap<NodeId, usize> {
-        &self.node_to_column
     }
 
     /// Shared interned column layout used by every stored row.
@@ -252,7 +257,7 @@ mod tests {
         named.insert(q1, IndexMap::from_iter([("revenue".to_string(), 10.0)]));
         named.insert(q2, IndexMap::from_iter([("revenue".to_string(), 12.0)]));
 
-        let history = PeriodHistory::from_named_maps(Arc::clone(&cols), &named);
+        let history = PeriodHistory::from_named_maps(Arc::clone(&cols), &[], &named);
         assert_eq!(history.get_value("revenue", &q1), Some(10.0));
         assert_eq!(history.get_value("revenue", &q2), Some(12.0));
         let keys: Vec<_> = history.keys().copied().collect();

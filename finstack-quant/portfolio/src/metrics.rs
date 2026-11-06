@@ -20,11 +20,11 @@ use crate::error::Result;
 use crate::evaluation::try_map_positions;
 use crate::types::{EntityId, PositionId};
 use crate::valuation::PortfolioValuation;
+use finstack_quant_core::FxHashSet;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
-use finstack_quant_core::FxHashSet;
-use finstack_quant_valuations::metrics::{is_additive_metric, MetricId};
+use finstack_quant_valuations::metrics::{MetricId, is_additive_metric};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
@@ -517,15 +517,15 @@ fn aggregate_collected_metrics(collected: Vec<PositionMetricData>) -> PortfolioM
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Portfolio;
     use crate::position::{Position, PositionUnit};
     use crate::test_utils::build_test_market;
     use crate::types::Entity;
-    use crate::valuation::{value_portfolio, PositionValue};
-    use crate::Portfolio;
+    use crate::valuation::{PositionValue, value_portfolio};
     use finstack_quant_core::config::FinstackConfig;
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, SimpleFxProvider};
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, SimpleFxProvider};
     use finstack_quant_valuations::instruments::rates::deposit::Deposit;
     use finstack_quant_valuations::results::ValuationResult;
     use std::sync::Arc;

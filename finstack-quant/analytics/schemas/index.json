@@ -47,7 +47,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/analytics/1/lookback_returns.schema.json",
-      "bytes": 1351,
+      "bytes": 1728,
       "kind": "component",
       "path": "schemas/analytics/1/lookback_returns.schema.json",
       "summary": "Lookback returns for each period horizon.",
@@ -71,6 +71,15 @@
       "summary": "Central performance analytics engine.",
       "title": "Performance",
       "type_name": "Performance"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/analytics/1/performance_panel.schema.json",
+      "bytes": 4217,
+      "kind": "input",
+      "path": "schemas/analytics/1/performance_panel.schema.json",
+      "summary": "Dated price or return panel, one series per ticker, that a Performance is built from.",
+      "title": "PerformancePanel",
+      "type_name": "PerformancePanel"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/analytics/1/period_stats.schema.json",

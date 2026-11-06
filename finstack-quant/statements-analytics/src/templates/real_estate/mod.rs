@@ -23,7 +23,7 @@
 //!   are not modeled; include them in the CapEx nodes if material.
 //! - **Valuation/credit metric helpers**: no cap-rate value, DSCR,
 //!   debt-yield, or LTV node generators — the CRE covenant template
-//!   (`finstack_quant_covenants::templates::real_estate`) expects metric nodes
+//!   (`finstack_quant_covenants::templates::CovenantTemplate::RealEstate`) expects metric nodes
 //!   (`dscr`, `debt_yield`, `ltv`) that the caller must define.
 
 use finstack_quant_core::dates::PeriodId;

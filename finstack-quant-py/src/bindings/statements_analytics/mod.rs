@@ -7,10 +7,13 @@
 //! vintage / real-estate templates.
 
 mod analysis;
+mod capital_structure;
 mod checks;
 mod comps;
 mod corkscrew;
+mod covenants;
 mod ecl;
+mod relative_value;
 mod reports;
 mod scorecards;
 mod templates_common;
@@ -38,27 +41,9 @@ where
         .map_err(|e| crate::errors::serde_json_to_py(e, "enum conversion"))
 }
 
-/// Deserialize a canonical serde payload from a JSON string or a plain
-/// Python object (dict/list) with the same shape.
-pub(crate) fn extract_serde_any<'py, T: serde::de::DeserializeOwned + Send>(
-    py: Python<'py>,
-    obj: &Bound<'py, PyAny>,
-    label: &str,
-) -> PyResult<T> {
-    if let Ok(json) = obj.extract::<String>() {
-        return serde_json::from_str(&json)
-            .map_err(|e| crate::errors::serde_json_to_py(e, &format!("invalid {label}")));
-    }
-    crate::bindings::module_utils::py_to_serde(py, obj, label)
-}
-
 /// Python-style rendering of a bool for `__repr__`.
 pub(crate) fn py_bool(value: bool) -> &'static str {
-    if value {
-        "True"
-    } else {
-        "False"
-    }
+    if value { "True" } else { "False" }
 }
 
 /// Python-style rendering of an optional string for `__repr__`.
@@ -81,6 +66,9 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     typed::register(py, &m)?;
     valuation::register(py, &m)?;
     checks::register(py, &m)?;
+    capital_structure::register(py, &m)?;
+    relative_value::register(py, &m)?;
+    covenants::register(py, &m)?;
     reports::register(py, &m)?;
     ecl::register(py, &m)?;
     comps::register(py, &m)?;
@@ -96,6 +84,8 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "AccountType",
             "BridgeChart",
             "BridgeStep",
+            "CapitalStructureSummary",
+            "CapitalStructureTranche",
             "CompanyMetrics",
             "CorkscrewAccount",
             "CorkscrewConfig",
@@ -126,6 +116,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "LeaseSpec",
             "ManagementFeeBase",
             "ManagementFeeSpec",
+            "MaturityWallBucket",
             "PLSummaryReport",
             "ParameterSpec",
             "PeerFilter",
@@ -134,6 +125,11 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "PropertyTemplateNodes",
             "QualitativeFlags",
             "RegressionResult",
+            "RelativeValueCompany",
+            "RelativeValueDimension",
+            "RelativeValueMultiple",
+            "RelativeValuePoint",
+            "RelativeValueReport",
             "RelativeValueResult",
             "RenewalSpec",
             "RentRollOutputNodes",
@@ -166,6 +162,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "add_roll_forward_with_opening",
             "add_vintage_buildup",
             "backtest_forecast",
+            "capital_structure_summary",
             "classify_stage",
             "compute_ecl",
             "compute_ecl_weighted",
@@ -173,17 +170,20 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "credit_assessment",
             "credit_assessment_report_text",
             "dcf_sensitivity",
+            "evaluate_covenants",
             "evaluate_dcf",
             "evaluate_lbo",
             "evaluate_scenario_set",
             "evaluate_scenario_set_with_market",
             "explain_formula",
+            "forecast_breaches",
             "generate_tornado_entries",
             "goal_seek",
             "peer_stats",
             "percentile_rank",
             "pl_summary_report",
             "regression_fair_value",
+            "relative_value_report",
             "render_check_report_html",
             "render_check_report_text",
             "run_checks",
@@ -195,6 +195,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "scenario_diff",
             "score_relative_value",
             "variance_bridge",
+            "WaccInputs",
             "wacc",
             "z_score",
         ],

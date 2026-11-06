@@ -2,6 +2,66 @@
   "$schema": "https://ui.shadcn.com/schema/registry.json",
   "items": [
     {
+      "name": "curve-query",
+      "type": "registry:component",
+      "title": "Curve query",
+      "description": "Point lookup of a stored discount, forward or hazard curve or volatility surface: enter tenors or dates and read back the native values.",
+      "docs": "Reads one stored curve or surface at supplied points: discount factor and continuously compounded zero rate, plus continuously compounded forward rates over year-fraction intervals, of a discount curve; the forward rate of a forward curve; survival probability and hazard rate of a hazard curve; volatility of a stored surface at an expiry and strike. Curve points are years from the base date or ISO dates, which pass through as entered for Rust to convert with the curve day count. A point Rust rejects shows its native error in its own cell; an id the market does not hold is the whole error. Look up passes the lookup to the caller (usually, with the market, the useCurveQuery request). Mount it in market-context-browser through renderObject with curveQueryTarget, which names the queryable target of a browser entry. Accepts target, defaultPoints, defaultForwards, onSubmit, result, loading, error, formatValue and density props.",
+      "files": [
+        {
+          "path": "components/curve-query/curve-query.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/core/components/curve-query/curve-query.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/field-frame",
+        "@finstack/native-display",
+        "button",
+        "input",
+        "textarea"
+      ],
+      "dependencies": ["@tanstack/react-table@9.2.4", "react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-curve-query",
+      "type": "registry:hook",
+      "title": "useCurveQuery",
+      "description": "Reads a stored curve or surface at supplied points through the WASM worker.",
+      "docs": "MarketContext.getDiscount (df, zeroRate, forward), getForward (rate), getHazard (sp, hazardRate) or getSurface (models.volatility.getSurfaceVol), per supplied point, over the cached market handle. Null means no request. Requires FinstackQueryProvider. Each point keeps its own native error; an id the market does not hold is the hook error.",
+      "files": [
+        {
+          "path": "hooks/use-curve-query/use-curve-query.ts",
+          "type": "registry:hook",
+          "target": "hooks/core/use-curve-query/use-curve-query.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
       "name": "decimal-input",
       "type": "registry:ui",
       "title": "Decimal input",
@@ -49,35 +109,6 @@
         "@finstack/finstack-theme",
         "@finstack/decimal-input",
         "@finstack/enum-field"
-      ],
-      "categories": ["Primitive Components"],
-      "meta": {
-        "version": "0.2.0",
-        "wasmVersion": "0.11.0",
-        "schemaIds": [
-          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
-        ]
-      }
-    },
-    {
-      "name": "rate-input",
-      "type": "registry:ui",
-      "title": "Rate input",
-      "description": "Controlled rate input with a reversible, source-backed display unit; invalid text stays editable.",
-      "docs": "Controlled rate-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
-      "files": [
-        {
-          "path": "primitives/rate-input/rate-input.tsx",
-          "type": "registry:ui",
-          "target": "components/finstack/core/primitives/rate-input/rate-input.tsx"
-        }
-      ],
-      "registryDependencies": [
-        "@finstack/finstack-base",
-        "@finstack/finstack-theme",
-        "@finstack/finstack-codec",
-        "@finstack/decimal-input",
-        "@finstack/finstack-format"
       ],
       "categories": ["Primitive Components"],
       "meta": {
@@ -313,7 +344,7 @@
       "type": "registry:component",
       "title": "Market context form",
       "description": "Complete market editor for curves, FX, prices, surfaces and cubes, with native validation on submit.",
-      "docs": "Complete market editor using generated schema/meta and native validation. Edit curves, FX entries, prices, stored surfaces, SABR cubes and FX ATM/RR/BF quotes; other data stays read-only and is retained. Import canonical JSON or a calibration envelope final_market. Supply useMarketValidator and receive complete canonical JSON on submit.",
+      "docs": "Complete market editor using generated schema/meta and native validation. Edit curves, FX entries, prices, stored surfaces, SABR cubes and FX ATM/RR/BF quotes; other data stays read-only and is retained. Import market JSON (Import market JSON) or the final_market of a calibration result envelope (Import calibration result), each through the generated MarketContextState contract. Supply useMarketValidator and receive complete canonical JSON on submit.",
       "files": [
         {
           "path": "components/market-context-form/market-context-form.tsx",
@@ -515,7 +546,8 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
-          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
         ]
       }
     },

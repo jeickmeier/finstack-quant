@@ -10,9 +10,9 @@ mod spot_greek_decay;
 
 use crate::equity_option::EquityOption;
 use finstack_quant_core::Result;
+use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::bump_scalar_price;
 use finstack_quant_valuations_core::metrics::sensitivities::config as sens_config;
-use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::{MetricContext, MetricRegistry};
 
 /// Relative spot bump shared by the charm, speed and color stencils.
@@ -45,7 +45,7 @@ pub(crate) fn register_equity_option_metrics(
     registry: &mut MetricRegistry,
 ) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
     use finstack_quant_valuations_core::metrics::sensitivities::cross_factor::{
-        make_spot_bumper, make_vol_bumper, CrossFactorCalculator,
+        CrossFactorCalculator, make_spot_bumper, make_vol_bumper,
     };
     use finstack_quant_valuations_core::pricer::InstrumentType;
 

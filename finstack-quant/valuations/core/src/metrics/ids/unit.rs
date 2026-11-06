@@ -74,18 +74,21 @@ impl MetricId {
 
     /// Unit family of this metric's value.
     ///
-    /// Composite keys inherit the unit of their base metric. Custom metrics
-    /// and standard metrics whose unit is calculator-dependent (for example
-    /// `ir_convexity`, `inflation_convexity`) return [`MetricUnit::Unknown`].
+    /// Composite keys inherit the unit of their base metric. A custom metric,
+    /// and a standard metric whose unit is calculator-dependent (for example
+    /// `ir_convexity`, `inflation_convexity`), returns [`MetricUnit::Unknown`].
     pub fn unit(&self) -> MetricUnit {
         let base = self.base();
+        if let Some(unit) = explicit_unit(base.as_str()) {
+            return unit;
+        }
         if base.is_custom() {
             return MetricUnit::Unknown;
         }
         // Everything not listed explicitly is a PV component, a
         // currency-per-bump sensitivity or a notional-scaled Greek, all of
         // which are currency amounts.
-        explicit_unit(base.as_str()).unwrap_or(MetricUnit::Currency)
+        MetricUnit::Currency
     }
 }
 
@@ -103,6 +106,7 @@ fn explicit_unit(name: &str) -> Option<MetricUnit> {
         | "z_spread"
         | "oas"
         | "i_spread"
+        | "g_spread"
         | "asw_par"
         | "asw_market"
         | "discount_margin"
@@ -128,7 +132,14 @@ fn explicit_unit(name: &str) -> Option<MetricUnit> {
         | "abs_ce_level"
         | "expense_ratio"
         | "variance_expected"
-        | "variance_realized" => Decimal,
+        | "variance_realized"
+        | "ytc"
+        | "yt2y"
+        | "yt3y"
+        | "yt4y"
+        | "all_in_rate"
+        | "oid_eir_rate"
+        | "conversion_premium" => Decimal,
         // Basis points.
         "par_spread"
         | "basis_par_spread"
@@ -172,7 +183,8 @@ fn explicit_unit(name: &str) -> Option<MetricUnit> {
         | "variance_notional"
         | "theta_period_days"
         | "carry_decomposition_degenerate"
-        | "index_delta" => Dimensionless,
+        | "index_delta"
+        | "parity" => Dimensionless,
         // Calculator-dependent second-order measures and the breakeven shift
         // (whose unit follows the configured target).
         "ir_convexity" | "inflation_convexity" | "breakeven" => Unknown,
@@ -198,6 +210,26 @@ mod tests {
         assert_eq!(MetricId::CleanPrice.unit(), MetricUnit::Currency);
         assert_eq!(MetricId::Accrued.unit(), MetricUnit::Currency);
         assert_eq!(MetricId::IrConvexity.unit(), MetricUnit::Unknown);
+    }
+
+    #[test]
+    fn loan_and_convertible_metrics_carry_their_units() {
+        for (id, unit) in [
+            (MetricId::Ytc, MetricUnit::Decimal),
+            (MetricId::Yt2y, MetricUnit::Decimal),
+            (MetricId::Yt3y, MetricUnit::Decimal),
+            (MetricId::Yt4y, MetricUnit::Decimal),
+            (MetricId::AllInRate, MetricUnit::Decimal),
+            (MetricId::OidEirRate, MetricUnit::Decimal),
+            (MetricId::OidEirAmortization, MetricUnit::Currency),
+            (MetricId::Parity, MetricUnit::Dimensionless),
+            (MetricId::ConversionPremium, MetricUnit::Decimal),
+            (MetricId::ConversionValue, MetricUnit::Currency),
+            (MetricId::BondFloor, MetricUnit::Currency),
+        ] {
+            assert!(!id.is_custom(), "{id}");
+            assert_eq!(id.unit(), unit, "{id}");
+        }
     }
 
     #[test]

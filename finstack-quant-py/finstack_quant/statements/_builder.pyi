@@ -229,6 +229,45 @@ class ModelBuilder:
         """
         ...
 
+    def rollup(self, node_id: str, rollup: str) -> ModelBuilder:
+        """
+        Declare how an existing line rolls up to a coarser reporting frequency.
+
+        Call it after the method that creates the line, such as :meth:`value`
+        or :meth:`compute`. Redefining the node discards the declaration.
+
+        Parameters
+        ----------
+        node_id:
+            Existing node to declare the method on.
+        rollup:
+            ``"sum"`` for flows, ``"period_end"`` for balances and trailing
+            metrics, ``"formula"`` for ratios. A rollup rejects ``"formula"``
+            on a node without a formula, and a :class:`RollupSpec` entry for
+            the node overrides this declaration.
+
+        Returns
+        -------
+        ModelBuilder
+            This builder, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If ``rollup`` is not a recognized method, the node does not exist,
+            or the builder was consumed.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import ModelBuilder
+        >>> builder = ModelBuilder("demo")
+        >>> _ = builder.periods("2025Q1..Q1")
+        >>> _ = builder.value("cash", [("2025Q1", 40.0)])
+        >>> builder.rollup("cash", "period_end").build().get_node("cash").rollup
+        'period_end'
+        """
+        ...
+
     def compute(self, node_id: str, formula: str) -> ModelBuilder:
         """
         Add a calculated node from a DSL formula.
@@ -976,6 +1015,32 @@ class MixedNodeBuilder:
         ------
         ValueError
             If the mixed-node builder has already been consumed.
+
+        """
+        ...
+
+    def rollup(self, rollup: str) -> MixedNodeBuilder:
+        """
+        Declare how this line rolls up to a coarser reporting frequency.
+
+        Parameters
+        ----------
+        rollup:
+            ``"sum"`` for flows, ``"period_end"`` for balances and trailing
+            metrics, ``"formula"`` for ratios. A rollup rejects ``"formula"``
+            on a node without a formula, and a :class:`RollupSpec` entry for
+            the node overrides this declaration.
+
+        Returns
+        -------
+        MixedNodeBuilder
+            This builder, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If ``rollup`` is not a recognized method or the mixed-node builder
+            has already been consumed.
 
         """
         ...

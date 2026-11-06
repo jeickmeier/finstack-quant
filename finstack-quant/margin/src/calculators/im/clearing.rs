@@ -9,15 +9,15 @@
 //! an external source fed by the CCP's own calculators (e.g. LCH SMART,
 //! CME CORE).
 
-use crate::calculators::traits::{ImCalculator, ImResult};
-use crate::registry::{embedded_registry_or_panic, CcpParams, MarginRegistry};
-use crate::types::ImMethodology;
 use crate::Marginable;
+use crate::calculators::traits::{ImCalculator, ImResult};
+use crate::registry::{CcpParams, MarginRegistry, embedded_registry_or_panic};
+use crate::types::ImMethodology;
+use finstack_quant_core::FxHashMap;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::FxHashMap;
-use finstack_quant_core::Result;
 use std::sync::Arc;
 
 /// CCP methodology type.

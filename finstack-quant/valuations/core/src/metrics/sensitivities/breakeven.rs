@@ -6,11 +6,11 @@
 use crate::instruments::{BreakevenConfig, BreakevenMode, BreakevenTarget, Instrument};
 use crate::metrics::sensitivities::theta::calculate_theta_date;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
+use finstack_quant_core::Result;
 use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::Result;
 use std::borrow::Cow;
 
 /// Minimum absolute sensitivity value below which breakeven is undefined.
@@ -28,10 +28,10 @@ impl MetricCalculator for BreakevenCalculator {
                 id: "breakeven_config: set BreakevenConfig on MetricPricingOverrides".into(),
             })?;
 
-        if config.mode == BreakevenMode::Iterative {
-            if let Some(message) = iterative_mode_error(context, config.target) {
-                return Err(finstack_quant_core::Error::Validation(message));
-            }
+        if config.mode == BreakevenMode::Iterative
+            && let Some(message) = iterative_mode_error(context, config.target)
+        {
+            return Err(finstack_quant_core::Error::Validation(message));
         }
 
         let carry_total = context.computed_metric(&MetricId::CarryTotal)?;

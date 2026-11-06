@@ -64,8 +64,8 @@ pub(crate) fn register_convertible_metrics(
     registry: &mut MetricRegistry,
 ) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
     use finstack_quant_valuations_core::metrics::sensitivities::cross_factor::{
-        make_credit_bumper, make_rates_bumper, make_spot_bumper, make_vol_bumper,
-        CrossFactorCalculator,
+        CrossFactorCalculator, make_credit_bumper, make_rates_bumper, make_spot_bumper,
+        make_vol_bumper,
     };
     use finstack_quant_valuations_core::pricer::InstrumentType;
 
@@ -92,13 +92,10 @@ pub(crate) fn register_convertible_metrics(
             (CrossGammaRatesCredit, CrossFactorCalculator::new(make_rates_bumper, make_credit_bumper)),
             (CrossGammaCreditVol, CrossFactorCalculator::new(make_credit_bumper, make_vol_bumper)),
             (ImpliedVol, implied_vol::ImpliedVolCalculator),
-        ],
-        custom: [
-            // Custom metrics (not in standard MetricId enum)
-            ("parity", ParityCalculator),
-            ("conversion_premium", ConversionPremiumCalculator),
-            ("conversion_value", ConversionValueCalculator),
-            ("bond_floor", BondFloorCalculator),
+            (Parity, ParityCalculator),
+            (ConversionPremium, ConversionPremiumCalculator),
+            (ConversionValue, ConversionValueCalculator),
+            (BondFloor, BondFloorCalculator),
         ]
     }
     Ok(())

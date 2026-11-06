@@ -26,7 +26,7 @@
 //! )?;
 //! ```
 
-use crate::monte_carlo::engine::{run_path_loop, McEngine, NoiseHook};
+use crate::monte_carlo::engine::{McEngine, NoiseHook, run_path_loop};
 #[cfg(test)]
 use crate::monte_carlo::traits::PathState;
 use crate::monte_carlo::traits::{Discretization, Payoff, RandomStream, StochasticProcess};
@@ -89,13 +89,13 @@ where
 {
     McEngine::validate_scheme_pairing(process, disc)?;
     let num_steps = time_grid.num_steps();
-    if let Some(expected) = disc.expected_num_steps() {
-        if expected != num_steps {
-            return Err(Error::Validation(format!(
-                "discretization '{}' was precomputed for {expected} steps but time_grid has {num_steps} steps",
-                disc.scheme_id()
-            )));
-        }
+    if let Some(expected) = disc.expected_num_steps()
+        && expected != num_steps
+    {
+        return Err(Error::Validation(format!(
+            "discretization '{}' was precomputed for {expected} steps but time_grid has {num_steps} steps",
+            disc.scheme_id()
+        )));
     }
     let dim = process.dim();
     if initial_state.len() != dim || state.len() != dim {
@@ -118,14 +118,14 @@ where
             fbm_increments.len()
         )));
     }
-    if let Some((aux_index, aux_values)) = aux {
-        if aux_index >= z.len() || aux_values.len() < num_steps {
-            return Err(Error::Validation(format!(
-                "aux buffer (index={aux_index}, len={}) out of bounds for z_len={} or num_steps={num_steps}",
-                aux_values.len(),
-                z.len()
-            )));
-        }
+    if let Some((aux_index, aux_values)) = aux
+        && (aux_index >= z.len() || aux_values.len() < num_steps)
+    {
+        return Err(Error::Validation(format!(
+            "aux buffer (index={aux_index}, len={}) out of bounds for z_len={} or num_steps={num_steps}",
+            aux_values.len(),
+            z.len()
+        )));
     }
     let req_work = disc.work_size(process);
     if work.len() < req_work {

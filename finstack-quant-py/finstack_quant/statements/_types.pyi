@@ -392,7 +392,10 @@ class ForecastSpec:
         Raises
         ------
         ValueError
-            If ``params`` is not a valid parameter mapping for the method.
+            If ``params`` is not a JSON object / dict, names a parameter the
+            method does not accept, omits a required one, sets one to
+            ``null``/``None``, or carries a value of the wrong type (a string
+            ``rate``, a non-list ``curve``).
 
         """
         ...
@@ -1454,8 +1457,11 @@ class NodeSpec:
         node_type: NodeType,
         name: str | None = None,
         values: Mapping[str, float] | None = None,
-        formula_text: str | None = None,
         forecast: ForecastSpec | None = None,
+        formula_text: str | None = None,
+        where_text: str | None = None,
+        tags: list[str] | None = None,
+        rollup: str | None = None,
     ) -> None:
         """Construct a node specification.
 
@@ -1469,15 +1475,25 @@ class NodeSpec:
             Human-readable label.
         values : Mapping[str, float], optional
             Explicit observations keyed by period id (e.g. ``"2025Q1"``).
-        formula_text : str, optional
-            Statements DSL expression for calculated and mixed nodes.
         forecast : ForecastSpec, optional
             Forecast rule applied to forecast periods.
+        formula_text : str, optional
+            Statements DSL expression for calculated and mixed nodes.
+        where_text : str, optional
+            DSL guard; periods where it is false evaluate to 0.
+        tags : list[str], optional
+            Free-form labels for grouping and filtering. They do not affect rollups.
+        rollup : str, optional
+            How the line rolls up to a coarser frequency: ``"sum"`` (flows),
+            ``"period_end"`` (balances, trailing metrics) or ``"formula"``
+            (ratios, which need a formula). Without it the line sums. A
+            :class:`RollupSpec` entry overrides it.
 
         Raises
         ------
         ValueError
-            If the node id, formula or period ids are rejected.
+            If the node id, formula or period ids are rejected, or ``rollup`` is
+            not a recognized method.
 
         """
         ...
@@ -1605,6 +1621,24 @@ class NodeSpec:
         -------
         list[str]
             Free-form classification tags.
+        """
+        ...
+
+    @property
+    def rollup(self) -> str | None:
+        """
+        Declared rollup method: ``"sum"``, ``"period_end"`` or ``"formula"``, or ``None``.
+
+        Returns
+        -------
+        str | None
+            The declared method, or ``None`` when the line declares none and so
+            sums unless a :class:`RollupSpec` entry says otherwise.
+
+        Raises
+        ------
+        ValueError
+            If the method cannot be rendered as its label.
         """
         ...
 

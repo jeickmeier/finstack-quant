@@ -1,9 +1,54 @@
 //! Shared unit checks for ratios of statement nodes.
 
+use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::evaluator::StatementResult;
 use finstack_quant_statements::types::NodeValueType;
 use finstack_quant_statements::{Error, Result};
+
+/// Reject a monetary node in a currency other than `currency`; scalar and
+/// untyped nodes pass.
+///
+/// # Arguments
+///
+/// * `results` - Statement values and optional unit metadata to check.
+/// * `node` - Identifier of the node whose currency must be `currency`.
+/// * `period` - Period whose monetary payload, or else the node's declared
+///   type, gives the node's currency.
+/// * `currency` - The only currency the caller accepts; no FX is applied.
+pub(super) fn require_currency(
+    results: &StatementResult,
+    node: &str,
+    period: &PeriodId,
+    currency: Currency,
+) -> Result<()> {
+    if let Some(NodeValueType::Monetary { currency: found }) = node_unit_at(results, node, period)?
+        && found != currency
+    {
+        return Err(Error::invalid_input(format!(
+            "Currency mismatch: node '{node}' is in {found} in period {period}, expected \
+             {currency}; no implicit FX is applied"
+        )));
+    }
+    Ok(())
+}
+
+/// `numerator / denominator`, rejecting a non-finite quotient: finite inputs
+/// can still overflow on a tiny denominator.
+///
+/// # Arguments
+///
+/// * `numerator` - Finite dividend, in the units the ratio is quoted against.
+/// * `denominator` - Finite, non-zero divisor in the same units.
+pub(super) fn finite_ratio(numerator: f64, denominator: f64) -> Result<f64> {
+    let value = numerator / denominator;
+    if !value.is_finite() {
+        return Err(Error::invalid_input(format!(
+            "Ratio of {numerator} over {denominator} is non-finite"
+        )));
+    }
+    Ok(value)
+}
 
 /// Reject ratios between different representations or monetary currencies.
 ///

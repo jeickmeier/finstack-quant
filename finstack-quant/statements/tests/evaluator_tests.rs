@@ -1,12 +1,12 @@
 //! Evaluator tests for Phase 3
 
 use finstack_quant_core::dates::PeriodId;
+use finstack_quant_statements::Error;
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::{
     AmountOrScalar, FinancialModelSpec, ForecastMethod, ForecastSpec,
 };
-use finstack_quant_statements::Error;
 use indexmap::indexmap;
 
 // Evaluation Context Tests
@@ -23,6 +23,7 @@ fn test_context_set_and_get_value() {
 
     let mut ctx = EvaluationContext::new(
         PeriodId::quarter(2025, 1).expect("valid period fixture"),
+        &[],
         std::sync::Arc::new(node_to_column),
         std::sync::Arc::new(IndexMap::new()),
     );
@@ -41,6 +42,7 @@ fn test_context_unknown_node_error() {
 
     let ctx = EvaluationContext::new(
         PeriodId::quarter(2025, 1).expect("valid period fixture"),
+        &[],
         std::sync::Arc::new(IndexMap::new()),
         std::sync::Arc::new(IndexMap::new()),
     );
@@ -786,20 +788,24 @@ fn test_shift_function() {
     let results = evaluator.evaluate(&model).unwrap();
 
     // shift(revenue, 2) should return revenue from 2 periods ago
-    assert!(results
-        .get(
-            "shifted",
-            &PeriodId::quarter(2025, 1).expect("valid period fixture")
-        )
-        .unwrap()
-        .is_nan());
-    assert!(results
-        .get(
-            "shifted",
-            &PeriodId::quarter(2025, 2).expect("valid period fixture")
-        )
-        .unwrap()
-        .is_nan());
+    assert!(
+        results
+            .get(
+                "shifted",
+                &PeriodId::quarter(2025, 1).expect("valid period fixture")
+            )
+            .unwrap()
+            .is_nan()
+    );
+    assert!(
+        results
+            .get(
+                "shifted",
+                &PeriodId::quarter(2025, 2).expect("valid period fixture")
+            )
+            .unwrap()
+            .is_nan()
+    );
     assert_eq!(
         results
             .get(
@@ -1142,13 +1148,15 @@ fn test_shift_negative_returns_nan() {
     let results = evaluator.evaluate(&model).unwrap();
 
     // Negative shift (forward-looking) should return NaN
-    assert!(results
-        .get(
-            "future_shifted",
-            &PeriodId::quarter(2025, 1).expect("valid period fixture")
-        )
-        .unwrap()
-        .is_nan());
+    assert!(
+        results
+            .get(
+                "future_shifted",
+                &PeriodId::quarter(2025, 1).expect("valid period fixture")
+            )
+            .unwrap()
+            .is_nan()
+    );
 }
 
 #[test]
@@ -1539,13 +1547,15 @@ fn test_pct_change_division_by_zero() {
     let results = evaluator.evaluate(&model).unwrap();
 
     // pct_change from 0 should be NaN (division by zero)
-    assert!(results
-        .get(
-            "change",
-            &PeriodId::quarter(2025, 2).expect("valid period fixture")
-        )
-        .unwrap()
-        .is_nan());
+    assert!(
+        results
+            .get(
+                "change",
+                &PeriodId::quarter(2025, 2).expect("valid period fixture")
+            )
+            .unwrap()
+            .is_nan()
+    );
 }
 
 #[test]
@@ -1776,13 +1786,15 @@ fn test_ewm_var_insufficient_data() {
     let results = evaluator.evaluate(&model).unwrap();
 
     // With only 1 value, should return NaN
-    assert!(results
-        .get(
-            "ewm_variance",
-            &PeriodId::quarter(2025, 1).expect("valid period fixture")
-        )
-        .unwrap()
-        .is_nan());
+    assert!(
+        results
+            .get(
+                "ewm_variance",
+                &PeriodId::quarter(2025, 1).expect("valid period fixture")
+            )
+            .unwrap()
+            .is_nan()
+    );
 }
 
 // Regression tests
@@ -1988,13 +2000,15 @@ fn test_pct_change_zero_periods_propagates_nan() {
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
 
-    assert!(results
-        .get(
-            "y",
-            &PeriodId::quarter(2025, 1).expect("valid period fixture")
-        )
-        .unwrap()
-        .is_nan());
+    assert!(
+        results
+            .get(
+                "y",
+                &PeriodId::quarter(2025, 1).expect("valid period fixture")
+            )
+            .unwrap()
+            .is_nan()
+    );
 }
 
 /// `evaluate_prepared` must use the compiled formulas captured at prepare

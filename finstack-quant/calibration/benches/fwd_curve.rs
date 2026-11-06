@@ -1,12 +1,12 @@
 //! Fwd curve benchmarks for valuations.
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
+use finstack_quant_calibration::CalibrationConfig;
+use finstack_quant_calibration::CalibrationMethod;
 use finstack_quant_calibration::api::schema::{ForwardCurveParams, StepParams};
 use finstack_quant_calibration::quotes::MarketQuote;
 use finstack_quant_calibration::quotes::RateQuote;
 use finstack_quant_calibration::quotes::{Pillar, QuoteId};
-use finstack_quant_calibration::CalibrationConfig;
-use finstack_quant_calibration::CalibrationMethod;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;

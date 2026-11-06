@@ -143,18 +143,8 @@ fn credit_factor_hierarchy_dts_exposes_public_surface() {
 fn analytics_dts_matches_runtime_hotspots() {
     let dts = index_dts();
     let numeric_matrix_docs = preceding_jsdoc(&dts, "export type NumericMatrix = NumericArray[];");
-    let constructor_docs = preceding_jsdoc(
-        &dts,
-        "  constructor(
-    dates: string[],
-    prices: NumericMatrix,",
-    );
-    let from_returns_docs = preceding_jsdoc(
-        &dts,
-        "  static fromReturns(
-    dates: string[],
-    returns: NumericMatrix,",
-    );
+    let constructor_docs =
+        preceding_jsdoc(&dts, "  constructor(panel: PerformancePanel | string);");
     let ticker_names_docs = preceding_jsdoc(&dts, "  getTickerNames(): string[];");
     let drawdown_duration_docs = preceding_jsdoc(&dts, "  maxDrawdownDuration(): number[];");
     let periodic_returns_docs = preceding_jsdoc(
@@ -164,10 +154,7 @@ fn analytics_dts_matches_runtime_hotspots() {
 
     assert!(dts.contains("declare class Performance {"));
     assert!(dts.contains("Performance: typeof Performance;"));
-    assert!(contains_ignoring_ws(
-        &dts,
-        "static fromReturns(dates: string[], returns: NumericMatrix, tickerNames: string[], benchmarkTicker?: string | null, frequency?: string): Performance;",
-    ));
+    assert!(!dts.contains("static fromReturns("));
     assert!(contains_ignoring_ws(
         &dts,
         "rollingGreeks(tickerIdx: number, window?: number, riskFreeRate?: number): RollingGreeks;",
@@ -198,8 +185,9 @@ fn analytics_dts_matches_runtime_hotspots() {
     assert!(dts.contains("export type NumericMatrix = NumericArray[];"));
     assert!(contains_signature(
         &dts,
-        "constructor(dates: string[], prices: NumericMatrix, tickerNames: string[], benchmarkTicker?: string | null, frequency?: string);",
+        "constructor(panel: PerformancePanel | string);",
     ));
+    assert!(declares_type(&dts, "PerformancePanel"));
     assert!(
         numeric_matrix_docs.contains(
             "Nested numeric arrays represented as an outer collection of numeric vectors."
@@ -210,16 +198,12 @@ fn analytics_dts_matches_runtime_hotspots() {
         "Each API specifies the semantic meaning and required length of the outer and inner dimensions."
     ));
     assert!(!numeric_matrix_docs.contains("one inner array per row"));
-    assert!(constructor_docs.contains(
-        "@param prices - Ticker-major, column-oriented matrix where `prices[tickerIdx][dateIdx]` is the price for `tickerIdx` at `dates[dateIdx]`."
-    ));
+    assert!(
+        constructor_docs
+            .contains("ticker-major `series` (`series[i][t]` is ticker `i` at `dates[t]`")
+    );
     assert!(!constructor_docs.contains("Row-major"));
     assert!(!constructor_docs.contains("one row per"));
-    assert!(from_returns_docs.contains(
-        "@param returns - Ticker-major, column-oriented simple decimal return matrix where `returns[tickerIdx][dateIdx]` is the return for `tickerIdx` at `dates[dateIdx]`."
-    ));
-    assert!(!from_returns_docs.contains("Row-major"));
-    assert!(!from_returns_docs.contains("one row per"));
     assert!(contains_signature(&dts, "getTickerNames(): string[];"));
     assert!(contains_signature(
         &dts,
@@ -229,8 +213,10 @@ fn analytics_dts_matches_runtime_hotspots() {
     assert!(
         ticker_names_docs.contains("Ticker labels in column order as a JavaScript string array.")
     );
-    assert!(ticker_names_docs
-        .contains("Rejects if the ticker-name vector cannot be serialized to JavaScript."));
+    assert!(
+        ticker_names_docs
+            .contains("Rejects if the ticker-name vector cannot be serialized to JavaScript.")
+    );
     assert!(contains_signature(&dts, "maxDrawdownDuration(): number[];"));
     assert!(
         drawdown_duration_docs.contains("Longest drawdown duration in calendar days per asset.")
@@ -240,13 +226,17 @@ fn analytics_dts_matches_runtime_hotspots() {
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "lookbackReturns(refDate: string, fiscalConfig?: FiscalConfig | null): LookbackReturns;",
+        "lookbackReturns(refDate?: string | null, fiscalConfig?: FiscalConfig | null): LookbackReturns;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
         "periodStats(tickerIdx: number, aggregationFrequency?: string, fiscalConfig?: FiscalConfig | null): PeriodStats;",
     ));
     assert!(!dts.contains("lookbackReturnsWithFiscalConfig("));
+    assert!(!dts.contains("calibrateHullWhiteToCapFloorsWithForward("));
+    assert!(!dts.contains("calibrateHullWhiteToCapFloorsWithoutForward("));
+    assert!(!dts.contains("bootstrapHullWhiteSigmaScheduleToCapFloorsWithForward("));
+    assert!(!dts.contains("bootstrapHullWhiteSigmaScheduleToCapFloorsWithoutForward("));
     assert!(!dts.contains("periodStatsWithFiscalConfig("));
     assert!(declares_type(&dts, "LookbackReturns"));
     assert!(
@@ -519,7 +509,10 @@ fn valuations_dts_exposes_direct_fx_instruments() {
         "withStub(stub: 'none' | 'short_front' | 'short_back' | 'long_front' | 'long_back'): Bond;"
     ));
     let bond_ctor = interface_block(&dts, "BondConstructor");
-    assert!(contains_ignoring_ws(bond_ctor, "withConvention(id: string, notional: Money, couponRate: Rate, issueDate: string, maturity: string, convention:"));
+    assert!(contains_ignoring_ws(
+        bond_ctor,
+        "withConvention(id: string, notional: Money, couponRate: Rate, issueDate: string, maturity: string, convention:"
+    ));
     let touch = interface_block(&dts, "FxTouchOption ");
     assert!(contains_signature(
         touch,
@@ -795,14 +788,9 @@ fn portfolio_dts_pins_python_parity_optional_parameters() {
         &dts,
         "valuePortfolio(portfolio: Portfolio, market: MarketContext, strictRisk?: boolean, metrics?: string[]): PortfolioValuation;",
     ));
-    // Python defaults `confidence` from the Rust 95% presets; WASM does too.
     assert!(contains_ignoring_ws(
         &dts,
-        "parametricVarDecomposition(positionIds: string[], weights: NumericArray, covariance: NumericArray[], confidence?: number | null, computeIncremental?: boolean | null): PositionRiskDecomposition;",
-    ));
-    assert!(contains_ignoring_ws(
-        &dts,
-        "historicalVarDecomposition(positionIds: string[], positionPnls: NumericArray[], confidence?: number | null): PositionRiskDecomposition;",
+        "positionRiskReport(request: PositionRiskRequest | string): PositionRiskReport;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
@@ -1026,8 +1014,6 @@ fn covenants_dts_separates_typed_results_from_json_bridges() {
         "validateCovenantSpecJson(specJson: JsonInput): string;",
         "validateCovenantReportJson(reportJson: JsonInput): string;",
         "validateCovenantEngineJson(engineJson: JsonInput): string;",
-        "covLiteJson(maxLeverage: number, maxSeniorLeverage: number): string;",
-        "realEstateJson(minDscr: number, minDebtYield: number, maxLtv: number): string;",
     ] {
         assert!(contains_ignoring_ws(&dts, wire), "missing: {wire}");
     }
@@ -1111,7 +1097,7 @@ fn statements_analytics_dts_matches_runtime_exports() {
     assert!(declares_type(&dts, "TornadoEntry"));
     assert!(contains_ignoring_ws(
         &dts,
-        "generateTornadoEntries(resultJson: JsonInput, metricNode: string, period?: string | null): TornadoEntry[];"
+        "generateTornadoEntries(resultJson: JsonInput, metricNode: string, period: string): TornadoEntry[] | null;"
     ));
     assert!(declares_type(&dts, "CheckReport"));
     assert!(declares_type(&dts, "CheckResult"));
@@ -1147,16 +1133,20 @@ fn models_and_valuations_dts_expose_owned_credit_namespaces() {
     assert!(dts.contains("export interface ModelCreditNamespace"));
     let merton = interface_block(&dts, "MertonModel");
     let merton_statics = interface_block(&dts, "MertonModelConstructor");
-    assert!(merton
-        .contains("defaultProbabilityWithDrift(assetDrift: number, horizon: number): number;"));
+    assert!(
+        merton
+            .contains("defaultProbabilityWithDrift(assetDrift: number, horizon: number): number;")
+    );
     assert!(
         merton.contains("distanceToDefaultWithDrift(assetDrift: number, horizon: number): number;")
     );
     assert!(merton.contains("debtSpread(horizon: number): number;"));
     assert!(merton.contains("cdsParSpread(maturity: number, recovery: number): number;"));
     assert!(merton.contains("): HazardCurve;"));
-    assert!(merton_statics
-        .contains("kmvDefaultPoint(shortTermDebt: number, longTermDebt: number): number;"));
+    assert!(
+        merton_statics
+            .contains("kmvDefaultPoint(shortTermDebt: number, longTermDebt: number): number;")
+    );
     assert!(merton_statics.contains("creditGrades("));
     // Label lookups take strings; the index lookup takes numbers (the binding
     // converts with `js_uint` and throws a `TypeError` for a string).
@@ -1522,7 +1512,10 @@ fn core_market_data_dts_exposes_data_only_fx_surface_and_rate_result() {
         "flat(id: string, baseDate: string, hazardRate: number, recoveryRate: number): HazardCurve;",
         "fromJson(json: JsonInput): HazardCurve;",
     ] {
-        assert!(contains_signature(hazard_constructor, sig), "HazardCurveConstructor: {sig}");
+        assert!(
+            contains_signature(hazard_constructor, sig),
+            "HazardCurveConstructor: {sig}"
+        );
     }
     assert!(contains_signature(
         interface_block(&dts, "ForwardCurveConstructor "),
@@ -1836,7 +1829,10 @@ fn rust_computation_twins_are_declared() {
         "FxForward: FxForwardConstructor;",
         "FxOption: FxOptionConstructor;",
     ] {
-        assert!(contains_signature(&dts, sig), "index.d.ts is missing `{sig}`");
+        assert!(
+            contains_signature(&dts, sig),
+            "index.d.ts is missing `{sig}`"
+        );
     }
 }
 
@@ -1863,7 +1859,7 @@ fn typed_cashflows_and_covenants_surface_is_declared() {
         "materializeFixings(market: MarketContext, schedules: readonly (CashFlowSchedule | JsonInput)[], oldDate: string, newDate: string): MarketContext;",
         "cashFlowGetBalanceDate(flow: generated.cashflows.CashFlow): generated.core.DateWire;",
         "scheduleParamsUsdSofrSwap(): generated.cashflows.ScheduleParams;",
-        "covLite(maxLeverage: number, maxSeniorLeverage: number): generated.covenants.CovenantSpec[];",
+        "covenantTemplate(template: generated.covenants.CovenantTemplate | string): generated.covenants.CovenantSpec[];",
         "evaluate(metrics: Record<string, number> | string, asOf: string): Record<string, CovenantReport>;",
         "evaluateSeries(metrics: readonly generated.covenants.DatedMetrics[]): generated.covenants.DatedCovenantReports[];",
         "readonly breachHistory: generated.covenants.CovenantBreach[];",
@@ -1872,7 +1868,10 @@ fn typed_cashflows_and_covenants_surface_is_declared() {
         "covenantTypeCustom(metric: string, test: 'maximum' | 'minimum', value: number): generated.covenants.CovenantType;",
         "thresholdScheduleThresholdFor(schedule: generated.covenants.ThresholdSchedule, testDate: string): number | undefined;",
     ] {
-        assert!(contains_signature(&dts, sig), "index.d.ts is missing `{sig}`");
+        assert!(
+            contains_signature(&dts, sig),
+            "index.d.ts is missing `{sig}`"
+        );
     }
     // The facade joins the market / no-market twins; the raw twins are not published.
     assert!(!dts.contains("buildWithMarket("));

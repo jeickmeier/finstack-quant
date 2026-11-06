@@ -2,21 +2,21 @@
 
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{create_date, Date, DayCount};
+use finstack_quant_core::dates::{Date, DayCount, create_date};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
 use finstack_quant_core::money::Money;
+use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
 use finstack_quant_core::types::Attributes;
+use finstack_quant_portfolio::Portfolio;
 use finstack_quant_portfolio::optimization::{
-    optimize, rebalance, CandidatePosition, Constraint, Inequality, MetricExpr,
-    MissingMetricPolicy, Objective, PerPositionMetric, PortfolioOptimizationProblem,
-    PositionFilter, TradeDirection, TradeUniverse, WeightingScheme,
+    CandidatePosition, Constraint, Inequality, MetricExpr, MissingMetricPolicy, Objective,
+    PerPositionMetric, PortfolioOptimizationProblem, PositionFilter, TradeDirection, TradeUniverse,
+    WeightingScheme, optimize, rebalance,
 };
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
-use finstack_quant_portfolio::Portfolio;
-use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::pricer::InstrumentType;
 use finstack_quant_valuations::results::ValuationResult;
@@ -810,8 +810,8 @@ fn m7_existing_short_accepts_negative_weight_bounds() -> Result<(), Box<dyn std:
 }
 
 #[test]
-fn m8_candidate_entity_filters_apply_to_metric_constraints(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn m8_candidate_entity_filters_apply_to_metric_constraints()
+-> Result<(), Box<dyn std::error::Error>> {
     let as_of = create_date(2024, Month::January, 1)?;
     let portfolio = Portfolio::builder("EMPTY")
         .base_currency(Currency::USD)
@@ -1016,8 +1016,8 @@ fn m9_duplicate_turnover_constraints_are_rejected() -> Result<(), Box<dyn std::e
 }
 
 #[test]
-fn mo6_filtered_value_weighted_average_metric_bound_uses_filtered_denominator(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn mo6_filtered_value_weighted_average_metric_bound_uses_filtered_denominator()
+-> Result<(), Box<dyn std::error::Error>> {
     let as_of = create_date(2024, Month::January, 1)?;
     let mut low_measures = IndexMap::new();
     low_measures.insert(MetricId::Ytm, 0.0);
@@ -2104,8 +2104,8 @@ fn notional_weights_convert_native_currencies_before_normalizing() {
 #[test]
 fn rebalance_from_spec_matches_the_live_result_and_rejects_foreign_results() {
     use finstack_quant_portfolio::optimization::{
-        optimize_portfolio, rebalance_from_spec, Constraint, PortfolioOptimizationResult,
-        PortfolioOptimizationSpec,
+        Constraint, PortfolioOptimizationResult, PortfolioOptimizationSpec, optimize_portfolio,
+        rebalance_from_spec,
     };
     let as_of = create_date(2024, Month::January, 1).unwrap();
     let usd = test_deposit("USD", 1_000_000.0, as_of).unwrap();
@@ -2161,7 +2161,7 @@ fn rebalance_from_spec_matches_the_live_result_and_rejects_foreign_results() {
 /// MO-9 guard instead of silently getting a `Σw = 1` row.
 #[test]
 fn unit_scaling_spec_without_budget_is_rejected() {
-    use finstack_quant_portfolio::optimization::{optimize_portfolio, PortfolioOptimizationSpec};
+    use finstack_quant_portfolio::optimization::{PortfolioOptimizationSpec, optimize_portfolio};
     let as_of = create_date(2024, Month::January, 1).unwrap();
     let deposit = test_deposit("USD", 1_000_000.0, as_of).unwrap();
     let portfolio = Portfolio::builder("UNIT_SCALING")
@@ -2206,7 +2206,7 @@ fn unit_scaling_spec_without_budget_is_rejected() {
 /// solving instead of reporting `Infeasible` or solving a malformed problem.
 #[test]
 fn invalid_json_constraints_are_rejected_before_solving() {
-    use finstack_quant_portfolio::optimization::{optimize_portfolio, PortfolioOptimizationSpec};
+    use finstack_quant_portfolio::optimization::{PortfolioOptimizationSpec, optimize_portfolio};
     let as_of = create_date(2024, Month::January, 1).unwrap();
     let deposit = test_deposit("USD", 1_000_000.0, as_of).unwrap();
     let portfolio = Portfolio::builder("INVALID_CONSTRAINTS")

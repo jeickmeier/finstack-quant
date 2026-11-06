@@ -8,16 +8,16 @@ use crate::structured_credit::types::{
     AfcSpec, AllocationMode, AssetPool, CoverageRules, CoverageTestAction, CoverageTestSpec,
     DiversionRecord, EquityHistory, FundingSource, LiveCollateral, PaymentCalculation,
     PaymentRecord, PaymentType, Recipient, RecipientType, RoundingConvention, Tranche,
-    TrancheStructure, Waterfall, WaterfallDistribution, WaterfallTier,
+    TrancheSeniority, TrancheStructure, Waterfall, WaterfallDistribution, WaterfallTier,
 };
 use finstack_quant_cashflows::builder::RateSpec;
+use finstack_quant_core::Error;
+use finstack_quant_core::FxHashMap;
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Error;
-use finstack_quant_core::FxHashMap;
-use finstack_quant_core::Result;
 
 /// Returns the number of decimal places for currency-aware penny-safe allocation.
 #[inline]
@@ -193,7 +193,9 @@ pub fn execute_waterfall(
     {
         return Err(Error::Validation(format!(
             "waterfall available cash must equal nonnegative interest plus principal in its base currency: available={}, interest={}, principal={}",
-            context.available_cash.amount(), interest_remaining.amount(), principal_remaining.amount()
+            context.available_cash.amount(),
+            interest_remaining.amount(),
+            principal_remaining.amount()
         )));
     }
     let mut total_diverted = Money::from((0_i64, waterfall.currency));
@@ -238,10 +240,10 @@ pub fn execute_waterfall(
     let mut payable_principal_tranche_ids = Vec::new();
     if let Some(tier) = diversion_principal_tier {
         for recipient in &tier.recipients {
-            if let RecipientType::Tranche(tranche_id) = &recipient.recipient_type {
-                if !payable_principal_tranche_ids.contains(&tranche_id.as_str()) {
-                    payable_principal_tranche_ids.push(tranche_id.as_str());
-                }
+            if let RecipientType::Tranche(tranche_id) = &recipient.recipient_type
+                && !payable_principal_tranche_ids.contains(&tranche_id.as_str())
+            {
+                payable_principal_tranche_ids.push(tranche_id.as_str());
             }
         }
     }
@@ -304,7 +306,7 @@ pub fn execute_waterfall(
         .iter()
         .map(|t| t.recipients.len())
         .sum::<usize>();
-    let mut allocation_output = AllocationOutput::with_capacity(estimated_recipients);
+    let mut allocation_output = AllocationOutput::new(waterfall.currency, estimated_recipients);
 
     // Cash allocated per tier, in execution order.
     let mut tier_allocations = Vec::with_capacity(waterfall.tiers.len());
@@ -334,12 +336,11 @@ pub fn execute_waterfall(
                 if let Some(result) = coverage_test_results
                     .iter()
                     .find(|result| result.test_id == test.id)
+                    && !result.passing
                 {
-                    if !result.passing {
-                        failing.push(test.id.as_str());
-                        if let Some(cure) = result.cure_amount {
-                            binding_cure = binding_cure.max(cure.amount());
-                        }
+                    failing.push(test.id.as_str());
+                    if let Some(cure) = result.cure_amount {
+                        binding_cure = binding_cure.max(cure.amount());
                     }
                 }
             }
@@ -469,9 +470,17 @@ pub fn execute_waterfall(
     // Interest retained by a `Reinvest` test carries forward as principal.
     principal_remaining = principal_remaining.checked_add(diverted_to_reinvestment)?;
 
-    let coverage_tests_public: Vec<(String, f64, bool)> = coverage_test_results
+    // The executor's infinite ratio is its zero denominator: no claim is
+    // outstanding for the test, so no ratio exists to report.
+    let coverage_tests_public: Vec<(String, Option<f64>, bool)> = coverage_test_results
         .iter()
-        .map(|r| (r.test_id.clone(), r.ratio, r.passing))
+        .map(|r| {
+            (
+                r.test_id.clone(),
+                r.ratio.is_finite().then_some(r.ratio),
+                r.passing,
+            )
+        })
         .collect();
     // DiversionRecords are built only from payments that actually moved cash.
     // A failing coverage test with no cash to divert (e.g. an empty waterfall
@@ -496,11 +505,6 @@ pub fn execute_waterfall(
         payment_date: context.payment_date,
         total_available: context.available_cash,
         tier_allocations,
-        distributions: allocation_output.distributions.into_iter().collect(),
-        principal_distributions: allocation_output
-            .principal_distributions
-            .into_iter()
-            .collect(),
         payment_records: allocation_output.payment_records,
         coverage_tests: coverage_tests_public,
         diverted_cash: total_diverted,
@@ -555,24 +559,29 @@ pub(crate) struct AllocationContext<'a> {
 ///
 /// Groups mutable state that is updated during allocation.
 pub(crate) struct AllocationOutput {
-    /// Accumulated distributions by recipient
-    pub(crate) distributions: FxHashMap<RecipientType, Money>,
-    /// The PRINCIPAL portion of `distributions`, per recipient.
-    pub(crate) principal_distributions: FxHashMap<RecipientType, Money>,
+    /// Cash paid so far this period to `RecipientType::Equity`, the base of
+    /// the incentive-fee hurdle.
+    pub(crate) equity_paid: Money,
     /// Payment records for audit trail
     pub(crate) payment_records: Vec<PaymentRecord>,
 }
 
 impl AllocationOutput {
     /// Create new allocation state with pre-allocated capacity.
-    pub(crate) fn with_capacity(estimated_recipients: usize) -> Self {
-        let mut distributions = FxHashMap::default();
-        distributions.reserve(estimated_recipients);
+    pub(crate) fn new(currency: Currency, estimated_recipients: usize) -> Self {
         Self {
-            distributions,
-            principal_distributions: FxHashMap::default(),
+            equity_paid: Money::from((0_i64, currency)),
             payment_records: Vec::with_capacity(estimated_recipients),
         }
+    }
+
+    /// Record one recipient's payment.
+    fn record(&mut self, record: PaymentRecord) -> Result<()> {
+        if record.recipient == RecipientType::Equity {
+            self.equity_paid = self.equity_paid.checked_add(record.paid_amount)?;
+        }
+        self.payment_records.push(record);
+        Ok(())
     }
 }
 
@@ -616,12 +625,10 @@ fn allocate_sequential(
             diverted,
             ctx.floating_rate_shift,
             ctx.equity_history,
-            output
-                .distributions
-                .get(&RecipientType::Equity)
-                .copied()
-                .unwrap_or(Money::from((0_i64, currency))),
+            output.equity_paid,
         )?;
+        let requested =
+            cap_residual_at_debt_balance(ctx, recipient, requested, principal_paid_in_period)?;
 
         let paid = if requested.amount() <= available.amount() {
             requested
@@ -629,46 +636,13 @@ fn allocate_sequential(
             available
         };
 
-        record_in_period_principal(
-            principal_paid_in_period,
-            &recipient.calculation,
-            paid,
-            currency,
-        )?;
+        record_in_period_principal(ctx, principal_paid_in_period, recipient, paid)?;
 
         let shortfall = requested
             .checked_sub(paid)
             .unwrap_or(Money::from((0_i64, currency)));
 
-        use std::collections::hash_map::Entry;
-        match output.distributions.entry(recipient.recipient_type.clone()) {
-            Entry::Occupied(mut e) => {
-                let next = e.get().checked_add(paid)?;
-                e.insert(next);
-            }
-            Entry::Vacant(e) => {
-                e.insert(paid);
-            }
-        }
-        // Record the PRINCIPAL portion separately, keyed off the
-        // payment calculation that produced it, so the engine never has to
-        // re-derive the split from an aggregate.
-        if is_principal_payment(&recipient.calculation, tier.payment_type) {
-            match output
-                .principal_distributions
-                .entry(recipient.recipient_type.clone())
-            {
-                Entry::Occupied(mut e) => {
-                    let next = e.get().checked_add(paid)?;
-                    e.insert(next);
-                }
-                Entry::Vacant(e) => {
-                    e.insert(paid);
-                }
-            }
-        }
-
-        output.payment_records.push(PaymentRecord {
+        output.record(PaymentRecord {
             tier_id: tier.id.clone(),
             recipient_id: recipient.id.clone(),
             priority: tier.priority,
@@ -677,7 +651,8 @@ fn allocate_sequential(
             paid_amount: paid,
             shortfall,
             diverted,
-        });
+            is_principal: is_principal_payment(ctx, recipient, tier.payment_type),
+        })?;
 
         tier_total = tier_total.checked_add(paid)?;
         available = available.checked_sub(paid)?;
@@ -727,12 +702,10 @@ fn allocate_pro_rata(
             diverted,
             ctx.floating_rate_shift,
             ctx.equity_history,
-            output
-                .distributions
-                .get(&RecipientType::Equity)
-                .copied()
-                .unwrap_or(Money::from((0_i64, currency))),
+            output.equity_paid,
         )?;
+        let requested =
+            cap_residual_at_debt_balance(ctx, recipient, requested, principal_paid_in_period)?;
         total_requested = total_requested.checked_add(requested)?;
         recipient_requests.push((recipient, requested));
     }
@@ -778,46 +751,13 @@ fn allocate_pro_rata(
             *requested
         };
 
-        record_in_period_principal(
-            principal_paid_in_period,
-            &recipient.calculation,
-            paid,
-            currency,
-        )?;
+        record_in_period_principal(ctx, principal_paid_in_period, recipient, paid)?;
 
         let shortfall = requested
             .checked_sub(paid)
             .unwrap_or(Money::from((0_i64, currency)));
 
-        use std::collections::hash_map::Entry;
-        match output.distributions.entry(recipient.recipient_type.clone()) {
-            Entry::Occupied(mut e) => {
-                let next = e.get().checked_add(paid)?;
-                e.insert(next);
-            }
-            Entry::Vacant(e) => {
-                e.insert(paid);
-            }
-        }
-        // Record the PRINCIPAL portion separately, keyed off the
-        // payment calculation that produced it, so the engine never has to
-        // re-derive the split from an aggregate.
-        if is_principal_payment(&recipient.calculation, tier.payment_type) {
-            match output
-                .principal_distributions
-                .entry(recipient.recipient_type.clone())
-            {
-                Entry::Occupied(mut e) => {
-                    let next = e.get().checked_add(paid)?;
-                    e.insert(next);
-                }
-                Entry::Vacant(e) => {
-                    e.insert(paid);
-                }
-            }
-        }
-
-        output.payment_records.push(PaymentRecord {
+        output.record(PaymentRecord {
             tier_id: tier.id.clone(),
             recipient_id: recipient.id.clone(),
             priority: tier.priority,
@@ -826,7 +766,8 @@ fn allocate_pro_rata(
             paid_amount: paid,
             shortfall,
             diverted,
-        });
+            is_principal: is_principal_payment(ctx, recipient, tier.payment_type),
+        })?;
 
         tier_total = tier_total.checked_add(paid)?;
     }
@@ -961,11 +902,75 @@ fn water_fill_allocation(total_units: i64, weights: &[f64], caps: &[i64]) -> Vec
 /// and its principal, so `distributions` aggregates them; without this the
 /// engine had to guess the split by assuming interest is satisfied first.
 ///
-/// Residual cash retains its source: only a principal tier repays capital.
-fn is_principal_payment(calculation: &PaymentCalculation, payment_type: PaymentType) -> bool {
-    matches!(calculation, PaymentCalculation::TranchePrincipal { .. })
-        || (matches!(calculation, PaymentCalculation::ResidualCash)
-            && payment_type == PaymentType::Principal)
+/// Residual cash keeps its source for the residual holder, where only a
+/// principal tier repays capital. A debt class has no residual claim, so what
+/// reaches it is always principal: see [`residual_debt_tranche`].
+fn is_principal_payment(
+    ctx: &AllocationContext<'_>,
+    recipient: &Recipient,
+    payment_type: PaymentType,
+) -> bool {
+    match recipient.calculation {
+        PaymentCalculation::TranchePrincipal { .. } => true,
+        PaymentCalculation::ResidualCash => {
+            payment_type == PaymentType::Principal
+                || residual_debt_tranche(ctx, recipient).is_some()
+        }
+        _ => false,
+    }
+}
+
+/// The debt class a [`PaymentCalculation::ResidualCash`] recipient pays, if any.
+///
+/// A note is owed its coupon and the return of its balance and nothing more, so
+/// remaining cash directed at one is the turbo feature of ABS and CLO interest
+/// waterfalls: it retires principal until the class is paid in full. An extra
+/// coupon has no contractual basis and would not retire the balance the
+/// coverage tests read. Equity is the residual holder and is excluded.
+fn residual_debt_tranche<'a>(
+    ctx: &AllocationContext<'a>,
+    recipient: &Recipient,
+) -> Option<&'a Tranche> {
+    let (PaymentCalculation::ResidualCash, RecipientType::Tranche(id)) =
+        (&recipient.calculation, &recipient.recipient_type)
+    else {
+        return None;
+    };
+    let tranche = &ctx.tranches.tranches[*ctx.tranche_index.get(id.as_str())?];
+    (tranche.seniority != TrancheSeniority::Equity).then_some(tranche)
+}
+
+/// Balance a tranche still has outstanding within the current period: its
+/// period-start balance less the principal earlier tiers paid it this period.
+fn unpaid_tranche_balance(
+    tranche: &Tranche,
+    tranche_balances: Option<&FxHashMap<String, Money>>,
+    principal_paid_in_period: &FxHashMap<String, Money>,
+) -> f64 {
+    let current = tranche_balances
+        .and_then(|b| b.get(tranche.id.as_str()))
+        .copied()
+        .unwrap_or(tranche.current_balance);
+    let paid_this_period = principal_paid_in_period
+        .get(tranche.id.as_str())
+        .map(|m| m.amount())
+        .unwrap_or(0.0);
+    current.amount() - paid_this_period
+}
+
+/// Limit residual cash requested for a debt class to the balance it has left.
+/// The cash above that stays available for the next recipient or tier.
+fn cap_residual_at_debt_balance(
+    ctx: &AllocationContext<'_>,
+    recipient: &Recipient,
+    requested: Money,
+    principal_paid_in_period: &FxHashMap<String, Money>,
+) -> Result<Money> {
+    let Some(tranche) = residual_debt_tranche(ctx, recipient) else {
+        return Ok(requested);
+    };
+    let unpaid = unpaid_tranche_balance(tranche, ctx.tranche_balances, principal_paid_in_period);
+    Money::new(requested.amount().min(unpaid.max(0.0)), ctx.currency)
 }
 
 /// Contractual coupon for the period with the simulated rate-path shift applied.
@@ -1172,18 +1177,22 @@ pub(super) fn evaluate_coverage_tests(
 /// later tiers (e.g. an OC/IC diversion into the senior principal tier) see
 /// the post-payment balance instead of the stale period-start snapshot.
 fn record_in_period_principal(
+    ctx: &AllocationContext<'_>,
     principal_paid_in_period: &mut FxHashMap<String, Money>,
-    calculation: &PaymentCalculation,
+    recipient: &Recipient,
     paid: Money,
-    currency: Currency,
 ) -> Result<()> {
     if paid.amount() <= 0.0 {
         return Ok(());
     }
-    if let PaymentCalculation::TranchePrincipal { tranche_id, .. } = calculation {
+    let tranche_id = match &recipient.calculation {
+        PaymentCalculation::TranchePrincipal { tranche_id, .. } => Some(tranche_id.as_str()),
+        _ => residual_debt_tranche(ctx, recipient).map(|tranche| tranche.id.as_str()),
+    };
+    if let Some(tranche_id) = tranche_id {
         let entry = principal_paid_in_period
-            .entry(tranche_id.clone())
-            .or_insert(Money::from((0_i64, currency)));
+            .entry(tranche_id.to_string())
+            .or_insert(Money::from((0_i64, ctx.currency)));
         *entry = entry.checked_add(paid)?;
     }
     Ok(())
@@ -1349,20 +1358,13 @@ fn calculate_payment_amount(
                 })
             })?;
             let tranche = &tranches.tranches[idx];
-            // Use current tranche balance when available
-            let current = tranche_balances
-                .and_then(|b| b.get(tranche_id.as_str()))
-                .copied()
-                .unwrap_or(tranche.current_balance);
             // Net out principal already paid to this tranche by earlier tiers
             // in the SAME period (e.g. its regular principal tier before an
             // OC/IC diversion). The snapshot balance is period-start, so
             // without this the tranche requests its full balance twice and
             // gets over-paid into a negative balance.
-            let paid_this_period = principal_paid_in_period
-                .get(tranche_id.as_str())
-                .map(|m| m.amount())
-                .unwrap_or(0.0);
+            let unpaid =
+                unpaid_tranche_balance(tranche, tranche_balances, principal_paid_in_period);
             // A coverage-cure diversion pays the senior tranche *below* its
             // scheduled target (toward zero) to de-leverage the structure;
             // the scheduled target only applies to the tier's regular pass.
@@ -1371,7 +1373,7 @@ fn calculate_payment_amount(
             } else {
                 target_balance.unwrap_or(Money::from((0_i64, currency)))
             };
-            let needed = (current.amount() - paid_this_period - target.amount()).max(0.0);
+            let needed = (unpaid - target.amount()).max(0.0);
             (needed, *rounding)
         }
 
@@ -1458,8 +1460,8 @@ mod coverage_position_tests {
     //! a junior class never traps a senior class's coupon. The IC cure-sizing
     //! rules (recipient order, out-of-denominator recipients) are covered at
     //! the `CoverageTest::calculate` level in `coverage_tests.rs`.
-    use super::execute_waterfall;
     use super::WaterfallContext;
+    use super::execute_waterfall;
     use crate::structured_credit::types::{
         AllocationMode, AssetPool, AssetType, CoverageTestSpec, DealType, PaymentCalculation,
         PaymentType, PoolAsset, Recipient, RecipientType, Tranche, TrancheSeniority,
@@ -1651,7 +1653,7 @@ mod coverage_position_tests {
             .iter()
             .find(|(id, _, _)| id == "OC_B")
             .expect("OC_B evaluated");
-        assert!(!oc.2, "the B test must fail (ratio {})", oc.1);
+        assert!(!oc.2, "the B test must fail (ratio {:?})", oc.1);
         assert!(result.had_diversions);
 
         let a_interest = paid_to(&result, "a_int");
@@ -1772,8 +1774,8 @@ mod coverage_position_tests {
             .iter()
             .find(|(id, _, _)| id == "IC_CLASS_A")
             .expect("IC result present");
-        assert!(oc.2, "OC test should pass (ratio {})", oc.1);
-        assert!(!ic.2, "IC test should fail (ratio {})", ic.1);
+        assert!(oc.2, "OC test should pass (ratio {:?})", oc.1);
+        assert!(!ic.2, "IC test should fail (ratio {:?})", ic.1);
 
         let a_interest = paid_to(&result, "class_a_int");
         let diverted = result.diverted_cash.amount();
@@ -2075,15 +2077,18 @@ mod coverage_position_tests {
         );
         assert!(
             result
-                .distributions
+                .distributions()
+                .expect("distributions")
                 .get(&RecipientType::Equity)
                 .is_none_or(|m| m.amount() < 1.0),
             "nothing reaches equity below a failing test"
         );
-        assert!(result
-            .diverted_amounts
-            .iter()
-            .any(|record| record.target_tranche == "principal_account"));
+        assert!(
+            result
+                .diverted_amounts
+                .iter()
+                .any(|record| record.target_tranche == "principal_account")
+        );
     }
 
     /// A fee tier ranked behind note interest is junior to the IC claim and
@@ -2134,6 +2139,7 @@ mod coverage_position_tests {
             .find(|(id, _, _)| id == "IC_CLASS_A")
             .expect("IC result")
             .1
+            .expect("the IC test has a claim")
         };
         let without = ratio(None);
         let with = ratio(Some(500.0));
@@ -2234,13 +2240,15 @@ mod water_fill_tests {
 
         let key = RecipientType::Tranche("A".to_string());
         let total = result
-            .distributions
+            .distributions()
+            .expect("distributions")
             .get(&key)
             .copied()
             .expect("tranche paid")
             .amount();
         let principal = result
-            .principal_distributions
+            .principal_distributions()
+            .expect("principal_distributions")
             .get(&key)
             .copied()
             .unwrap_or(Money::from((0_i64, ccy)))

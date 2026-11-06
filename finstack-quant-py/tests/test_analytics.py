@@ -24,6 +24,7 @@ from finstack_quant.analytics import (
     LookbackReturns,
     MultiFactorResult,
     Performance,
+    PerformancePanel,
     PeriodStats,
     RollingGreeks,
 )
@@ -57,13 +58,25 @@ def _returns_panel(prices: pd.DataFrame) -> pd.DataFrame:
 def test_beta_confidence_interval_uses_actual_degrees_of_freedom() -> None:
     benchmark = [-0.02 + i * 0.001 for i in range(42)]
     fund = [1.4 * value + (0.002 if i % 2 == 0 else -0.0015) for i, value in enumerate(benchmark)]
-    perf = Performance.from_returns_arrays(_daily_dates(42), [fund, benchmark], ["FUND", "BENCH"], "BENCH")
+    perf = Performance.from_panel(
+        PerformancePanel(
+            dates=_daily_dates(42),
+            series=[fund, benchmark],
+            kind="returns",
+            ticker_names=["FUND", "BENCH"],
+            benchmark_ticker="BENCH",
+        )
+    )
     result = perf.beta()[0]
     assert (result.ci_upper - result.beta) / result.std_err == pytest.approx(2.0210753903062733, abs=1e-9)
 
 
 def test_native_frames_preserve_infinite_period_statistics() -> None:
-    perf = Performance.from_returns_arrays(_daily_dates(4), [[0.01, 0.02, 0.03, 0.04]], ["FUND"])
+    perf = Performance.from_panel(
+        PerformancePanel(
+            dates=_daily_dates(4), series=[[0.01, 0.02, 0.03, 0.04]], kind="returns", ticker_names=["FUND"]
+        )
+    )
     stats = perf.period_stats(0, aggregation_frequency="daily")
     frame = stats.to_dataframe()
     for name in ("payoff_ratio", "profit_factor", "cpc_ratio"):
@@ -75,8 +88,14 @@ def test_native_frames_preserve_infinite_period_statistics() -> None:
 
 
 def test_degenerate_regression_frames_keep_numeric_nan_columns() -> None:
-    perf = Performance.from_returns_arrays(
-        _daily_dates(4), [[0.01, -0.02, 0.03, 0.04], [0.01] * 4], ["FUND", "BENCH"], "BENCH"
+    perf = Performance.from_panel(
+        PerformancePanel(
+            dates=_daily_dates(4),
+            series=[[0.01, -0.02, 0.03, 0.04], [0.01] * 4],
+            kind="returns",
+            ticker_names=["FUND", "BENCH"],
+            benchmark_ticker="BENCH",
+        )
     )
     for frame in (
         perf.beta()[0].to_dataframe(),
@@ -91,7 +110,11 @@ def test_degenerate_regression_frames_keep_numeric_nan_columns() -> None:
 
 
 def test_drawdown_episode_frame_retains_populated_dtypes() -> None:
-    perf = Performance.from_arrays(_daily_dates(4), [[100.0, 90.0, 100.0, 110.0]], ["FUND"])
+    perf = Performance.from_panel(
+        PerformancePanel(
+            dates=_daily_dates(4), series=[[100.0, 90.0, 100.0, 110.0]], kind="prices", ticker_names=["FUND"]
+        )
+    )
     frame = perf.drawdown_details(0)[0].to_dataframe()
     assert frame["duration_days"].dtype == "int64"
     assert frame["truncated_at_start"].dtype == "bool"
@@ -99,8 +122,13 @@ def test_drawdown_episode_frame_retains_populated_dtypes() -> None:
 
 
 def test_lookback_frame_preserves_ticker_and_metric_labels() -> None:
-    perf = Performance.from_returns_arrays(
-        _daily_dates(4), [[0.01, 0.02, 0.03, 0.04], [-0.01, 0.03, 0.02, 0.01]], ["A", "B"]
+    perf = Performance.from_panel(
+        PerformancePanel(
+            dates=_daily_dates(4),
+            series=[[0.01, 0.02, 0.03, 0.04], [-0.01, 0.03, 0.02, 0.01]],
+            kind="returns",
+            ticker_names=["A", "B"],
+        )
     )
     frame = perf.lookback_returns(_daily_dates(4)[-1]).to_dataframe()
     assert list(frame.index) == ["A", "B"]
@@ -161,21 +189,20 @@ class TestConstruction:
         assert perf.get_active_dates_for_ticker(1) == [date(2024, 1, 4), date(2024, 1, 5)]
         assert perf.cumulative_returns()[1] == pytest.approx([0.10, 0.21])
 
-    def test_from_arrays(self) -> None:
+    def test_from_panel_of_prices(self) -> None:
         dates = _daily_dates(5)
         prices = [[100.0, 101.0, 102.0, 103.0, 104.0], [50.0, 50.5, 51.0, 51.5, 52.0]]
-        perf = Performance.from_arrays(dates, prices, ["A", "B"])
+        perf = Performance.from_panel(
+            PerformancePanel(dates=dates, series=prices, kind="prices", ticker_names=["A", "B"])
+        )
         assert perf.get_ticker_names() == ["A", "B"]
         assert list(perf.cagr().index) == ["A", "B"]
 
-    def test_from_returns_arrays(self) -> None:
+    def test_from_panel_of_returns(self) -> None:
         dates = _daily_dates(4)
         returns = [[0.01, -0.02, 0.015, 0.0], [0.005, -0.01, 0.0, 0.005]]
-        perf = Performance.from_returns_arrays(
-            dates,
-            returns,
-            ["A", "B"],
-            benchmark_ticker="B",
+        perf = Performance.from_panel(
+            PerformancePanel(dates=dates, series=returns, kind="returns", ticker_names=["A", "B"], benchmark_ticker="B")
         )
         assert perf.get_benchmark_idx() == 1
         assert list(perf.cagr().index) == ["A", "B"]
@@ -247,7 +274,9 @@ class TestReturnRiskMetrics:
             [0.01, -0.02, 0.015, 0.0, 0.01, -0.01],
             [0.005, -0.01, 0.0, 0.005, 0.02, -0.015],
         ]
-        perf = Performance.from_returns_arrays(dates, returns, ["A", "B"])
+        perf = Performance.from_panel(
+            PerformancePanel(dates=dates, series=returns, kind="returns", ticker_names=["A", "B"])
+        )
         corr, repaired = perf.correlation_matrix()
         assert repaired is False
         assert len(corr) == 2
@@ -387,11 +416,14 @@ class TestBenchmark:
         assert all(isinstance(r, GreeksResult) for r in results)
 
     def test_degenerate_beta_and_greeks_wire_round_trips_preserve_nan(self) -> None:
-        perf = Performance.from_returns_arrays(
-            [date(2024, 1, 1)],
-            [[0.01], [0.01]],
-            ["TARGET", "BENCH"],
-            benchmark_ticker="BENCH",
+        perf = Performance.from_panel(
+            PerformancePanel(
+                dates=[date(2024, 1, 1)],
+                series=[[0.01], [0.01]],
+                kind="returns",
+                ticker_names=["TARGET", "BENCH"],
+                benchmark_ticker="BENCH",
+            )
         )
 
         beta_result = perf.beta()[0]
@@ -420,12 +452,15 @@ class TestBenchmark:
         dates = _daily_dates(6)
         benchmark = [-0.02, -0.01, 0.0, 0.01, 0.02, 0.03]
         target = [2.0 * value for value in benchmark]
-        perf = Performance.from_returns_arrays(
-            dates,
-            [target, benchmark],
-            ["TARGET", "BENCH"],
-            benchmark_ticker="BENCH",
-            frequency="monthly",
+        perf = Performance.from_panel(
+            PerformancePanel(
+                dates=dates,
+                series=[target, benchmark],
+                kind="returns",
+                ticker_names=["TARGET", "BENCH"],
+                benchmark_ticker="BENCH",
+                frequency="monthly",
+            )
         )
 
         zero_rf = perf.greeks()[0]
@@ -444,12 +479,15 @@ class TestBenchmark:
         dates = _daily_dates(8)
         benchmark = [-0.03, -0.02, -0.01, 0.0, 0.01, 0.02, 0.03, 0.04]
         target = [1.5 * value for value in benchmark]
-        perf = Performance.from_returns_arrays(
-            dates,
-            [target, benchmark],
-            ["TARGET", "BENCH"],
-            benchmark_ticker="BENCH",
-            frequency="monthly",
+        perf = Performance.from_panel(
+            PerformancePanel(
+                dates=dates,
+                series=[target, benchmark],
+                kind="returns",
+                ticker_names=["TARGET", "BENCH"],
+                benchmark_ticker="BENCH",
+                frequency="monthly",
+            )
         )
 
         zero_rf = perf.rolling_greeks(0, window=5)

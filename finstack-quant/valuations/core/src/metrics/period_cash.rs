@@ -1,10 +1,10 @@
 //! Period cash: signed economic cash an instrument pays over a horizon, split
 //! into income and principal, for theta and total-return attribution.
 
+use finstack_quant_core::Result;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::Result;
 
 /// Signed cash receipts used by total-return and income attribution.
 #[derive(Debug, Clone, Copy)]

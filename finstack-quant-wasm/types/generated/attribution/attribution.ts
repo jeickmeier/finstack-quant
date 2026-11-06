@@ -523,7 +523,6 @@ export type MertonBarrierType =
          * Growth rate of the default barrier over time.
          */
         barrier_growth_rate: number;
-        [k: string]: unknown;
       };
     };
 /**
@@ -547,7 +546,6 @@ export type AssetDynamics =
          * Volatility of log-jump size.
          */
         jump_vol: number;
-        [k: string]: unknown;
       };
     }
   | {
@@ -565,7 +563,6 @@ export type AssetDynamics =
          * Mean recovery rate at default.
          */
         mean_recovery: number;
-        [k: string]: unknown;
       };
     };
 /**
@@ -3977,9 +3974,10 @@ export type ShiftMode = "shift_of_subordinate" | "senior_share";
  * - cumulative loss is a fraction of the *original* pool balance;
  * - the OC ratio is `current pool balance ÷ rated (non-equity) note balance`;
  * - credit enhancement is the senior cushion `(pool − senior note) ÷ pool`,
- *   where the senior note is the *single* most-senior tranche by payment
- *   priority — for pari-passu senior classes (e.g. A-1/A-2) only the
- *   lowest-priority one is taken as the reference.
+ *   where the senior note is the tranche with the lowest `payment_priority`.
+ *   `TrancheStructure` gives every tranche a distinct priority, so for
+ *   same-seniority senior classes (e.g. A-1/A-2) this is the first one in
+ *   input order: A-1 is subtracted and A-2, ranked behind it, is not.
  *
  * `MaxDelinquency` reads the delinquent share of the pool, which is zero
  * unless the deal carries a `credit_model.delinquency` model.
@@ -5081,6 +5079,23 @@ export type RoundingMode = "bankers" | "away_from_zero" | "toward_zero" | "floor
  * amount per one such unit.
  */
 export type MoveUnit = "basis_point" | "vol_point" | "percent" | "price_unit";
+/**
+ * A money bucket of an attribution result, named by the result field holding
+ * it; the instrument and portfolio results use the same fields.
+ */
+export type PnlBucket =
+  | "carry"
+  | "rates_curves_pnl"
+  | "credit_curves_pnl"
+  | "inflation_curves_pnl"
+  | "correlations_pnl"
+  | "fx_pnl"
+  | "fx_translation_pnl"
+  | "vol_pnl"
+  | "cross_factor_pnl"
+  | "model_params_pnl"
+  | "market_scalars_pnl"
+  | "residual";
 
 /**
  * Advance rate applied to one collateral class.
@@ -5563,6 +5578,13 @@ export interface ModelConfig {
    */
   call_friction_cents?: number | null;
   /**
+   * Optional government discount curve identifier for the bond `g_spread` metric.
+   *
+   * The metric subtracts this curve's par yield from the bond's yield. It
+   * enters no price, and `g_spread` is an error when it is unset.
+   */
+  government_curve_id?: Id | null;
+  /**
    * Mean-reversion speed of the hazard factor (κ_λ) on the rates-credit
    * lattice, annualised.
    *
@@ -5937,7 +5959,7 @@ export interface EndogenousHazardSpec {
  *
  * Deserialization is routed through [`MertonModel::new_with_dynamics`] via
  * `RawMertonModel`, so a model loaded from JSON satisfies exactly the same
- * invariants as one built in Rust. The serialized field set is unchanged.
+ * invariants as one built in Rust. Unknown fields are rejected.
  */
 export interface MertonModel {
   /**
@@ -5973,7 +5995,6 @@ export interface MertonModel {
    * Continuously compounded risk-free rate `r`, as a decimal fraction.
    */
   risk_free_rate: number;
-  [k: string]: unknown;
 }
 /**
  * Hard threshold toggle configuration.
@@ -8312,8 +8333,8 @@ export interface RevolvingCredit {
    */
   metric_pricing_overrides?: MetricPricingOverrides;
   /**
-   * Effective-interest-rate reporting switch for the
-   * `oid_eir_amortization` metric. `None` (the default) reports with fees
+   * Effective-interest-rate reporting switch for the `oid_eir_rate` and
+   * `oid_eir_amortization` metrics. `None` (the default) reports with fees
    * included, the same as `Some(OidEirSpec::default())`.
    */
   oid_eir?: OidEirSpec | null;
@@ -21447,4 +21468,23 @@ export interface AttributionResultEnvelope {
    * re-interpreting them as the current result contract.
    */
   schema: AttributionSchema;
+}
+/**
+ * One money bucket of a P&L attribution with its share of total P&L
+ */
+export interface PnlBucketShare {
+  /**
+   * The bucket's P&L as attributed, in the `total_pnl` currency.
+   */
+  amount: Money;
+  /**
+   * Result field holding this bucket (`carry`, `rates_curves_pnl`, ...,
+   * `residual`); the instrument and portfolio results use the same names.
+   */
+  field: PnlBucket;
+  /**
+   * Signed share of total P&L in percentage points (`25.0` = 25%); `None`
+   * when `total_pnl` is effectively zero and the share is undefined.
+   */
+  pct_of_total?: number | null;
 }

@@ -1,4 +1,4 @@
-use finstack_quant_core::contract::{check_json_limits, ContractError, LoadLimits};
+use finstack_quant_core::contract::{ContractError, LoadLimits, check_json_limits};
 
 #[test]
 fn lexical_depth_scan_counts_objects_and_arrays() {

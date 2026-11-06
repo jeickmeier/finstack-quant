@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Literal
 import pandas as pd
+from finstack_quant.core.dates import Period
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
 from finstack_quant.core.table import ArrowTable
@@ -231,6 +232,34 @@ class StatementResult:
         """
         ...
 
+    @property
+    def periods(self) -> list[Period]:
+        """
+        The periods this result is keyed by, in timeline order.
+
+        The model's periods for an evaluated result; the target periods for a
+        rolled-up one. Empty only for a result deserialized with no periods.
+
+        Returns
+        -------
+        list[Period]
+            Each period's id, inclusive start, exclusive end and actual flag.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import Evaluator, ModelBuilder
+        >>> builder = ModelBuilder("demo")
+        >>> _ = builder.periods("2025Q1..Q1")
+        >>> _ = builder.value("revenue", [("2025Q1", 100.0)])
+        >>> [str(period.id) for period in Evaluator().evaluate(builder.build()).periods]
+        ['2025Q1']
+        """
+        ...
+
     def rollup(self, model: FinancialModelSpec | str, spec: RollupSpec | str) -> StatementResult:
         """
         Roll these results up to a coarser frequency, such as quarterly to annual.
@@ -256,8 +285,9 @@ class StatementResult:
         StatementResult
             Values keyed by the target periods (``"2025"``, ``"2025H1"``,
             ``"2025Q1"``; fiscal periods keep their ``FY`` prefix), with
-            monetary values and value types. It carries no ``node_sources``,
-            capital-structure cashflows or check report.
+            monetary values, value types and those periods in ``periods`` (each
+            actual only when every source period is). It carries no
+            ``node_sources``, capital-structure cashflows or check report.
 
         Raises
         ------
@@ -813,6 +843,11 @@ class Evaluator:
     ) -> MonteCarloResults:
         """
         Run a Monte Carlo simulation of ``model`` under this evaluator.
+
+        Each path evaluates the model as ``evaluate`` does on that path's
+        sampled forecasts, so a capital structure (built from an empty market
+        as of the first period's start) and its waterfall run per path and
+        ``cs.*`` references see that path's debt service and balances.
 
         Parameters
         ----------

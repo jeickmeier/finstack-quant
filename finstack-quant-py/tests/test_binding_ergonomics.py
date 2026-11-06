@@ -298,7 +298,10 @@ class TestDateAcceptanceIsUniform:
     def test_covenants_evaluate_engine(self) -> None:
         from finstack_quant import covenants
 
-        specs = json.loads(covenants.lbo_standard_json(6.0, 2.0, 1.1, 50_000_000.0))
+        specs = [
+            json.loads(s.to_json())
+            for s in covenants.covenant_template(covenants.CovenantTemplate.lbo_standard(6.0, 2.0, 1.1, 50_000_000.0))
+        ]
         engine = covenants.validate_covenant_engine_json(
             json.dumps({
                 "specs": [specs[0]],
@@ -378,7 +381,10 @@ class TestDateAcceptanceIsUniform:
         """
         from finstack_quant import covenants
 
-        specs = json.loads(covenants.lbo_standard_json(6.0, 2.0, 1.1, 50_000_000.0))
+        specs = [
+            json.loads(s.to_json())
+            for s in covenants.covenant_template(covenants.CovenantTemplate.lbo_standard(6.0, 2.0, 1.1, 50_000_000.0))
+        ]
         engine = covenants.validate_covenant_engine_json(
             json.dumps({
                 "specs": [specs[0]],

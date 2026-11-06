@@ -55,9 +55,9 @@ bond/
 │   ├── settlement.rs        # quote date, accrued interest, ex-coupon windows
 │   └── time_basis.rs        # metric time axis helpers
 └── metrics/                 # bond-specific MetricCalculator impls
-    ├── price_yield_spread/  # clean/dirty price, YTM, YTW, Z, OAS, I-spread, DM, ASW, vega
+    ├── price_yield_spread/  # clean/dirty price, YTM, YTW, Z, OAS, I-spread, G-spread, DM, ASW, vega
     ├── return_metrics/      # MOIC and XIRR (spot and to-worst)
-    ├── accrued.rs  convexity.rs  cs01.rs  dv01.rs  yield_dv01.rs
+    ├── accrued.rs  convexity.rs  cs01.rs  default_risk.rs  dv01.rs  yield_dv01.rs
     ├── duration_macaulay.rs  duration_modified.rs  effective.rs  spread_duration.rs  wal.rs
     └── risk_view.rs         # quote-reproducing basis shared by the bump metrics
 ```
@@ -140,6 +140,13 @@ risk-free benchmark PV, not a corporate market value. Choose one credit basis:
 - **Straight bond:** calibrate `ZSpread` from a clean market quote with
   `pricing::quote_conversions::compute_quotes`, or set `quoted_z_spread` as the
   price driver. The Z-spread shifts the risk-free discount curve.
+- **Whole quote set:** `pricing::quote_conversions::compute_quotes` solves every
+  price, yield and spread from any one of them. Each equals the metric of the
+  same name at that clean price, and a quote kind that does not apply to the bond
+  is an error.
+- **Worst workout:** `pricing::quote_conversions::bond_workout_ladder` returns
+  the yield and I-spread to every call, put and maturity exit, with the row the
+  `ytw` metric selects marked.
 - **Rates-only callable/putable bond:** use `ModelKey::Tree`; calibrate or
   supply `quoted_oas` for the option-adjusted spread over the risk-free curve.
 - **Hazard basis:** set `credit_curve_id` to a calibrated survival/hazard curve

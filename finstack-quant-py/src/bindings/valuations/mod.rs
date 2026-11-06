@@ -3,8 +3,11 @@
 //! Exposes the [`PyValuationResult`] envelope for pricing output,
 //! JSON-based instrument loading and the standard pricer pipeline.
 
+mod bond_quotes;
+mod bond_workout;
 pub(crate) mod composite;
 pub(crate) mod convert;
+mod convertible_spot_ladder;
 pub(crate) mod instruments;
 pub(crate) mod market;
 mod merton_mc;
@@ -396,10 +399,13 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     m.add_function(wrap_pyfunction!(bond_from_cashflows_json, &m)?)?;
     instruments::register(py, &m)?;
     merton_mc::register(py, &m)?;
+    bond_quotes::register(&m)?;
+    bond_workout::register(&m)?;
     typed_legs::register(py, &m)?;
     typed_rates::register(py, &m)?;
     typed_credit::register(py, &m)?;
     typed_convertible::register(py, &m)?;
+    convertible_spot_ladder::register(&m)?;
     typed_equity::register(py, &m)?;
     typed_fx::register(py, &m)?;
     typed_structured_credit::register(py, &m)?;
@@ -416,12 +422,15 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
         "bond_from_cashflows_json",
     ];
     exports.extend_from_slice(merton_mc::EXPORTS);
+    exports.extend_from_slice(bond_quotes::EXPORTS);
+    exports.extend_from_slice(bond_workout::EXPORTS);
     exports.extend_from_slice(typed_structured_credit::tranche_analytics::EXPORTS);
     exports.extend_from_slice(instruments::EXPORTS);
     exports.extend_from_slice(typed_legs::EXPORTS);
     exports.extend_from_slice(typed_rates::EXPORTS);
     exports.extend_from_slice(typed_credit::EXPORTS);
     exports.extend_from_slice(typed_convertible::EXPORTS);
+    exports.extend_from_slice(convertible_spot_ladder::EXPORTS);
     exports.extend_from_slice(typed_equity::EXPORTS);
     exports.extend_from_slice(typed_fx::EXPORTS);
     exports.extend_from_slice(typed_structured_credit::EXPORTS);

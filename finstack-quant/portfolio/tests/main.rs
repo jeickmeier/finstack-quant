@@ -16,6 +16,7 @@ mod factor_model_engines;
 mod factor_model_serialization;
 mod integration_scenarios;
 mod margin_aggregation;
+mod margin_bilateral_irs;
 mod margin_serialization;
 mod materialization;
 mod materialization_benchmark_contract;

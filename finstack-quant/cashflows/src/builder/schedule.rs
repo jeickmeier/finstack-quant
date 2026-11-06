@@ -569,13 +569,13 @@ impl CashFlowSchedule {
         let mut principal_currency = None;
         let mut multiple_principal_currencies = false;
         for flow in &self.flows {
-            if let Some(delta) = flow_principal_delta(flow, false)? {
-                if delta.amount() != 0.0 {
-                    if let Some(currency) = principal_currency {
-                        multiple_principal_currencies |= currency != delta.currency();
-                    } else {
-                        principal_currency = Some(delta.currency());
-                    }
+            if let Some(delta) = flow_principal_delta(flow, false)?
+                && delta.amount() != 0.0
+            {
+                if let Some(currency) = principal_currency {
+                    multiple_principal_currencies |= currency != delta.currency();
+                } else {
+                    principal_currency = Some(delta.currency());
                 }
             }
         }
@@ -654,24 +654,24 @@ impl CashFlowSchedule {
                             flow.principal_delta = Some(Money::from((0_i64, initial.currency())));
                         }
                     }
-                } else if flow.date < as_of {
-                    if let Some(delta) = delta.filter(|delta| delta.amount() != 0.0) {
-                        // Cash settled before its economic boundary. Keep the
-                        // future balance movement without paying that cash again.
-                        let date = flow.get_balance_date();
-                        pending_principal.push(
-                            CashFlow::new(
-                                date,
-                                None,
-                                Money::from((0_i64, initial.currency())),
-                                CFKind::Notional,
-                                0.0,
-                                None,
-                            )
-                            .with_principal_delta(delta)
-                            .with_principal_date(date),
-                        );
-                    }
+                } else if flow.date < as_of
+                    && let Some(delta) = delta.filter(|delta| delta.amount() != 0.0)
+                {
+                    // Cash settled before its economic boundary. Keep the
+                    // future balance movement without paying that cash again.
+                    let date = flow.get_balance_date();
+                    pending_principal.push(
+                        CashFlow::new(
+                            date,
+                            None,
+                            Money::from((0_i64, initial.currency())),
+                            CFKind::Notional,
+                            0.0,
+                            None,
+                        )
+                        .with_principal_delta(delta)
+                        .with_principal_date(date),
+                    );
                 }
             }
             self.notional.initial = balance;
@@ -921,6 +921,73 @@ impl CashFlowSchedule {
         Ok(closing)
     }
 
+    /// Outstanding principal before and after each flow, aligned with
+    /// [`Self::get_flows`].
+    ///
+    /// Replays the same path as [`Self::outstanding_by_date`], one row at a
+    /// time. An amortization, PIK, draw or repayment row moves the balance, in
+    /// replay order. The issue funding row, which the opening notional already
+    /// counts, goes from zero to that notional. A row that moves nothing keeps
+    /// the balance it sits at: for a coupon that is the balance just before its
+    /// accrual end, so a coupon paid after a principal date on the accrual end
+    /// still shows the principal it accrued on. A balance within half a minor
+    /// currency unit of zero reads as zero: it is the float residue of the
+    /// amortization amounts, not principal.
+    ///
+    /// # Returns
+    ///
+    /// One `(before, after)` pair per flow, in the notional currency.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when `meta.issue_date` is unset, and propagates
+    /// currency mismatches or decimal overflow from balance replay.
+    pub fn balances_by_flow(&self) -> finstack_quant_core::Result<Vec<(Money, Money)>> {
+        let issue = self.meta.issue_date.ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "balances_by_flow: schedule.meta.issue_date is required to identify the initial funding flow"
+                    .into(),
+            )
+        })?;
+        let mut outstanding = self.notional.initial;
+        let mut balances = vec![(outstanding, outstanding); self.flows.len()];
+        let mut path: Vec<(Date, Money)> = Vec::new();
+        for (index, is_initial_funding) in self.balance_replay_order(issue, |_| true) {
+            let flow = &self.flows[index];
+            let before = if is_initial_funding {
+                Money::from((0_i64, outstanding.currency()))
+            } else {
+                outstanding
+            };
+            apply_flow_to_outstanding(&mut outstanding, flow, is_initial_funding)?;
+            balances[index] = (before, outstanding);
+            if outstanding != before {
+                path.push((flow.get_balance_date(), outstanding));
+            }
+        }
+        for (flow, balance) in self.flows.iter().zip(&mut balances) {
+            if let (Some(accrual), true) = (&flow.accrual, balance.0 == balance.1) {
+                let moved = path.partition_point(|(date, _)| *date < accrual.end);
+                let held = moved
+                    .checked_sub(1)
+                    .map_or(self.notional.initial, |last| path[last].1);
+                *balance = (held, held);
+            }
+        }
+        let currency = self.notional.initial.currency();
+        let residue = 0.5 * 10f64.powi(-i32::from(currency.decimals()));
+        let settle = |money: &mut Money| {
+            if money.amount().abs() < residue {
+                *money = Money::from((0_i64, currency));
+            }
+        };
+        for (before, after) in &mut balances {
+            settle(before);
+            settle(after);
+        }
+        Ok(balances)
+    }
+
     /// Issue date, else the first flow date: where the issue funding row sits.
     fn funding_anchor(&self) -> Option<Date> {
         self.meta
@@ -984,6 +1051,30 @@ fn merge_matching_option<T: Copy + PartialEq>(current: &mut Option<Option<T>>, v
         Some(existing) if existing == value => existing,
         Some(_) => None,
     });
+}
+
+/// Outstanding principal on `date` from a balance path, floored at zero.
+///
+/// The balance is the last after-event balance dated on or before `date`, so
+/// an event on `date` counts, or `initial` before the first event. A replayed
+/// balance below zero (an over-repayment) reads as no principal outstanding.
+///
+/// # Arguments
+///
+/// * `path` - After-event balances in date order, as returned by
+///   [`CashFlowSchedule::outstanding_by_date`].
+/// * `date` - Date the balance is read at.
+/// * `initial` - Balance before the first event, in the path's currency.
+///
+/// # Returns
+///
+/// The outstanding amount in the path's currency, never negative.
+pub fn outstanding_on(path: &[(Date, Money)], date: Date, initial: f64) -> f64 {
+    path.partition_point(|(event_date, _)| *event_date <= date)
+        .checked_sub(1)
+        .and_then(|last| path.get(last))
+        .map_or(initial, |(_, balance)| balance.amount())
+        .max(0.0)
 }
 
 /// Merge multiple schedules into one deterministic composite schedule.
@@ -1147,10 +1238,10 @@ fn apply_flow_to_outstanding(
     is_initial_funding: bool,
 ) -> finstack_quant_core::Result<()> {
     const NEGATIVE_BALANCE_EPSILON: f64 = 1e-9;
-    if let Some(delta) = flow_principal_delta(cf, is_initial_funding)? {
-        if delta.amount() != 0.0 {
-            *outstanding = outstanding.checked_add(delta)?;
-        }
+    if let Some(delta) = flow_principal_delta(cf, is_initial_funding)?
+        && delta.amount() != 0.0
+    {
+        *outstanding = outstanding.checked_add(delta)?;
     }
     if outstanding.amount() < -NEGATIVE_BALANCE_EPSILON {
         tracing::warn!(
@@ -1311,6 +1402,19 @@ mod tests {
         )
     }
 
+    #[test]
+    fn outstanding_on_reads_last_event_on_or_before_date_floored_at_zero() {
+        let day = |d: u8| Date::from_calendar_date(2025, Month::January, d).expect("valid date");
+        let usd = |amount: f64| Money::new(amount, Currency::USD).expect("valid money");
+        let path = vec![(day(10), usd(60.0)), (day(20), usd(-5.0))];
+
+        assert_eq!(outstanding_on(&path, day(5), 100.0), 100.0);
+        assert_eq!(outstanding_on(&path, day(10), 100.0), 60.0);
+        assert_eq!(outstanding_on(&path, day(15), 100.0), 60.0);
+        assert_eq!(outstanding_on(&path, day(20), 100.0), 0.0);
+        assert_eq!(outstanding_on(&[], day(20), 100.0), 100.0);
+    }
+
     fn assert_every_row_order_is_canonical(rows: Vec<CashFlow>) {
         fn canonical_json(rows: &[CashFlow]) -> String {
             let schedule = CashFlowSchedule::from_flows(
@@ -1467,13 +1571,15 @@ mod tests {
         let mismatched_currency = flow(date, -98.0, CFKind::Notional)
             .with_principal_delta(Money::from((100_i64, Currency::EUR)));
         for bad in [negative_accrual, late_reset, mismatched_currency] {
-            assert!(CashFlowSchedule::from_flows(
-                vec![flow(date, 1.0, CFKind::Fixed), bad.clone()],
-                notional.clone(),
-                DayCount::Act360,
-                CashFlowMeta::default(),
-            )
-            .is_err());
+            assert!(
+                CashFlowSchedule::from_flows(
+                    vec![flow(date, 1.0, CFKind::Fixed), bad.clone()],
+                    notional.clone(),
+                    DayCount::Act360,
+                    CashFlowMeta::default(),
+                )
+                .is_err()
+            );
             let raw = CashFlowSchedule::from_flows_unchecked(
                 vec![bad],
                 notional.clone(),
@@ -1837,14 +1943,18 @@ mod tests {
         );
 
         assert_eq!(merged.flows.len(), 2);
-        assert!(merged
-            .flows
-            .iter()
-            .any(|flow| flow.amount.currency() == Currency::USD));
-        assert!(merged
-            .flows
-            .iter()
-            .any(|flow| flow.amount.currency() == Currency::EUR));
+        assert!(
+            merged
+                .flows
+                .iter()
+                .any(|flow| flow.amount.currency() == Currency::USD)
+        );
+        assert!(
+            merged
+                .flows
+                .iter()
+                .any(|flow| flow.amount.currency() == Currency::EUR)
+        );
     }
 
     #[test]
@@ -2230,10 +2340,12 @@ mod tests {
             vec![100.0, 100.0, 50.0, 50.0, 50.0]
         );
         assert!(schedule.outstanding_at_dates(&[payment, economic]).is_err());
-        assert!(schedule
-            .outstanding_at_dates(&[])
-            .expect("empty query")
-            .is_empty());
+        assert!(
+            schedule
+                .outstanding_at_dates(&[])
+                .expect("empty query")
+                .is_empty()
+        );
     }
 
     #[test]

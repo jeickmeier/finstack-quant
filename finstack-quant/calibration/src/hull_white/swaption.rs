@@ -1,8 +1,8 @@
 use super::quotes::validate_swaption_quote;
 use super::targets::{
-    quote_fit_report, reject_at_bound_params, require_quote_vega, solve_hw1f_two_param,
-    validate_fit_tolerance, HullWhiteSwaptionTarget, PreparedSwaption, SwaptionPayoff,
-    HW_NUM_RESTARTS, SWAPTION_VEGA_FLOOR,
+    HW_NUM_RESTARTS, HullWhiteSwaptionTarget, PreparedSwaption, SWAPTION_VEGA_FLOOR,
+    SwaptionPayoff, quote_fit_report, reject_at_bound_params, require_quote_vega,
+    solve_hw1f_two_param, validate_fit_tolerance,
 };
 use super::*;
 use finstack_quant_models::rates::hull_white::{
@@ -94,14 +94,14 @@ pub(crate) fn calibrate_hull_white_to_swaptions_with_fn(
             quotes.len()
         )));
     }
-    if let Some(schedules) = schedules {
-        if schedules.len() != quotes.len() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "schedules.len() ({}) must match quotes.len() ({})",
-                schedules.len(),
-                quotes.len()
-            )));
-        }
+    if let Some(schedules) = schedules
+        && schedules.len() != quotes.len()
+    {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "schedules.len() ({}) must match quotes.len() ({})",
+            schedules.len(),
+            quotes.len()
+        )));
     }
     for (i, q) in quotes.iter().enumerate() {
         validate_swaption_quote(q.expiry, q.tenor, q.volatility).map_err(|err| {
@@ -472,11 +472,11 @@ fn build_swaption_cashflows(
     cashflows.sort_by(|left, right| left.0.total_cmp(&right.0));
     let mut aggregated: Vec<(f64, f64)> = Vec::with_capacity(cashflows.len());
     for (time, amount) in cashflows {
-        if let Some(last) = aggregated.last_mut() {
-            if last.0.to_bits() == time.to_bits() {
-                last.1 += amount;
-                continue;
-            }
+        if let Some(last) = aggregated.last_mut()
+            && last.0.to_bits() == time.to_bits()
+        {
+            last.1 += amount;
+            continue;
         }
         aggregated.push((time, amount));
     }

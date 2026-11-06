@@ -216,13 +216,13 @@ impl Autocallable {
             }
         }
         // Safe: observation_dates is non-empty (checked above).
-        if let Some(&last_obs) = self.observation_dates.last() {
-            if last_obs > self.expiry {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "Autocallable last observation date {} is after expiry {}",
-                    last_obs, self.expiry
-                )));
-            }
+        if let Some(&last_obs) = self.observation_dates.last()
+            && last_obs > self.expiry
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Autocallable last observation date {} is after expiry {}",
+                last_obs, self.expiry
+            )));
         }
         if self.payment_dates.len() != n {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -344,13 +344,13 @@ impl Autocallable {
                 "Autocallable notional amount must be finite".into(),
             ));
         }
-        if let Some(level) = self.initial_level {
-            if !level.is_finite() || level <= 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "Autocallable initial_level = {} must be finite and positive",
-                    level
-                )));
-            }
+        if let Some(level) = self.initial_level
+            && (!level.is_finite() || level <= 0.0)
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Autocallable initial_level = {} must be finite and positive",
+                level
+            )));
         }
         crate::past_fixings::validate_positive_fixings(&"Autocallable", &self.past_fixings)
     }
@@ -574,30 +574,38 @@ mod validation_tests {
 
     #[test]
     fn builder_rejects_invalid_nested_final_payoff_parameters() {
-        assert!(base_builder()
-            .final_payoff_type(FinalPayoffType::CapitalProtection {
-                floor: -0.1,
-                participation_rate: 1.0,
-            })
-            .build()
-            .is_err());
-        assert!(base_builder()
-            .final_payoff_type(FinalPayoffType::CapitalProtection {
-                floor: 1.0,
-                participation_rate: f64::NAN,
-            })
-            .build()
-            .is_err());
-        assert!(base_builder()
-            .final_payoff_type(FinalPayoffType::Participation {
-                participation_rate: -1.0,
-            })
-            .build()
-            .is_err());
-        assert!(base_builder()
-            .final_payoff_type(FinalPayoffType::KnockInPut { strike_ratio: 0.0 })
-            .build()
-            .is_err());
+        assert!(
+            base_builder()
+                .final_payoff_type(FinalPayoffType::CapitalProtection {
+                    floor: -0.1,
+                    participation_rate: 1.0,
+                })
+                .build()
+                .is_err()
+        );
+        assert!(
+            base_builder()
+                .final_payoff_type(FinalPayoffType::CapitalProtection {
+                    floor: 1.0,
+                    participation_rate: f64::NAN,
+                })
+                .build()
+                .is_err()
+        );
+        assert!(
+            base_builder()
+                .final_payoff_type(FinalPayoffType::Participation {
+                    participation_rate: -1.0,
+                })
+                .build()
+                .is_err()
+        );
+        assert!(
+            base_builder()
+                .final_payoff_type(FinalPayoffType::KnockInPut { strike_ratio: 0.0 })
+                .build()
+                .is_err()
+        );
     }
 
     #[test]

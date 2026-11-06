@@ -7,17 +7,17 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
+use finstack_quant_portfolio::Portfolio;
 use finstack_quant_portfolio::optimization::{
-    optimize, CandidatePosition, Constraint, MetricExpr, Objective, PerPositionMetric,
-    PortfolioOptimizationProblem, PositionFilter, TradeUniverse, WeightingScheme,
+    CandidatePosition, Constraint, MetricExpr, Objective, PerPositionMetric,
+    PortfolioOptimizationProblem, PositionFilter, TradeUniverse, WeightingScheme, optimize,
 };
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::AttributeValue;
-use finstack_quant_portfolio::Portfolio;
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
-use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::pricer::InstrumentType;
 use finstack_quant_valuations::results::ValuationResult;
@@ -338,10 +338,10 @@ fn optimize_max_yield_with_ccc_limit() {
     let portfolio_ref = &problem.portfolio;
     let mut ccc_weight = 0.0_f64;
     for (pos_id, &w) in &result.optimal_weights {
-        if let Some(position) = portfolio_ref.get_position(pos_id.as_str()) {
-            if position.attributes.get("rating") == Some(&AttributeValue::from("CCC")) {
-                ccc_weight += w;
-            }
+        if let Some(position) = portfolio_ref.get_position(pos_id.as_str())
+            && position.attributes.get("rating") == Some(&AttributeValue::from("CCC"))
+        {
+            ccc_weight += w;
         }
     }
     assert!(

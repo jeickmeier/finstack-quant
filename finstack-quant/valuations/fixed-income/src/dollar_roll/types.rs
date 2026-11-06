@@ -221,20 +221,19 @@ impl DollarRoll {
                 "{context} back settlement month must follow front settlement month"
             )));
         }
-        if let (Some(front), Some(back)) = (self.front_settlement_date, self.back_settlement_date) {
-            if back <= front {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "{context} explicit back settlement must follow explicit front settlement"
-                )));
-            }
+        if let (Some(front), Some(back)) = (self.front_settlement_date, self.back_settlement_date)
+            && back <= front
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} explicit back settlement must follow explicit front settlement"
+            )));
         }
         if let (Some(trade), Ok(front)) = (self.trade_date, self.effective_front_settlement_date())
+            && trade > front
         {
-            if trade > front {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "{context} trade_date cannot follow front settlement"
-                )));
-            }
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} trade_date cannot follow front settlement"
+            )));
         }
         if let Some(model) = &self.prepayment_spec {
             model.validate()?;

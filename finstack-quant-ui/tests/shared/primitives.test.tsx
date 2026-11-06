@@ -9,10 +9,9 @@ import {
   waitFor,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { axe } from "vitest-axe";
+import { axe } from "./axe";
 import { DecimalInput } from "@/components/finstack/core/primitives/decimal-input/decimal-input";
 import { MoneyInput } from "@/components/finstack/core/primitives/money-input/money-input";
-import { RateInput } from "@/components/finstack/core/primitives/rate-input/rate-input";
 import { TenorInput } from "@/components/finstack/core/primitives/tenor-input/tenor-input";
 import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
 import { DayCountSelect } from "@/components/finstack/core/primitives/day-count-select/day-count-select";
@@ -124,48 +123,6 @@ it("edits money without changing amount precision when currency changes", async 
     amount: "12345678901234567890.1",
     currency: "EUR",
   });
-});
-it("converts only explicit rate units and permits invalid/empty working text", () => {
-  const change = vi.fn();
-  const { rerender } = render(
-    <RateInput
-      label="Rate"
-      value="0.12345678901234567890"
-      onValueChange={change}
-      presentation={presentation}
-    />,
-  );
-  const input = screen.getByRole("textbox") as HTMLInputElement;
-  fireEvent.focus(input);
-  expect(input.value).toBe("12.345678901234567890");
-  fireEvent.change(input, { target: { value: "12.345678901234567891" } });
-  expect(change).toHaveBeenLastCalledWith("0.12345678901234567891");
-  rerender(
-    <RateInput
-      label="Rate"
-      value="0.12345678901234567890"
-      onValueChange={change}
-    />,
-  );
-  expect(input.value).toBe("0.12345678901234567890");
-  expect(screen.getByText("Unit unavailable")).toBeTruthy();
-  fireEvent.change(input, { target: { value: "" } });
-  expect(change).toHaveBeenLastCalledWith("");
-});
-it("keeps explicit number-representation rates numeric after valid editing", () => {
-  const change = vi.fn();
-  render(
-    <RateInput
-      label="Rate"
-      value={0.1}
-      representation="number"
-      onValueChange={change}
-    />,
-  );
-  fireEvent.change(screen.getByRole("textbox"), { target: { value: "0.2" } });
-  expect(change).toHaveBeenCalledWith(0.2);
-  fireEvent.change(screen.getByRole("textbox"), { target: { value: "0x10" } });
-  expect(change).toHaveBeenLastCalledWith("0x10");
 });
 it("edits tenor count without inventing a schema minimum", () => {
   const change = vi.fn();
@@ -279,6 +236,38 @@ it("accepts free-text IDs without requiring a suggestion", async () => {
   await user.type(screen.getByRole("combobox"), "NEW-CURVE");
   expect(change).toHaveBeenLastCalledWith("NEW-CURVE");
 });
+it.each([
+  ["Tab", "{Tab}"],
+  ["Escape", "{Escape}"],
+])(
+  "keeps typed free text as the ID when %s closes the suggestions",
+  async (_, key) => {
+    const user = userEvent.setup();
+    function Example() {
+      const [value, setValue] = useState("");
+      return (
+        <>
+          <IdCombobox
+            label="Target ID"
+            value={value}
+            options={["revenue", "ebitda"]}
+            onValueChange={setValue}
+          />
+          <output aria-label="Accepted ID">{value}</output>
+        </>
+      );
+    }
+    render(<Example />);
+    const input = screen.getByRole("combobox") as HTMLInputElement;
+    await user.type(input, "ebit-adj");
+    screen.getByRole("listbox");
+    await user.keyboard(key);
+    // Base UI resets the input to the selection once the popup has unmounted.
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
+    expect(input.value).toBe("ebit-adj");
+    expect(screen.getByLabelText("Accepted ID").textContent).toBe("ebit-adj");
+  },
+);
 it("date text preserves invalid edits and calendar selection emits ISO", async () => {
   const user = userEvent.setup();
   const change = vi.fn();
@@ -492,7 +481,6 @@ it.each([
     currencies={["USD"]}
     onValueChange={() => {}}
   />,
-  <RateInput label="Rate" value="0.1" onValueChange={() => {}} />,
   <TenorInput
     label="Tenor"
     value={{ count: 3, unit: "months" }}
@@ -541,10 +529,7 @@ it.each([
   <KnotTable value={[[1, 2]]} rowIds={["a"]} onValueChange={() => {}} />,
 ])("primitive %# has no DOM accessibility violations", async (element) => {
   const { container } = render(element);
-  const result = await axe(container, {
-    rules: { "color-contrast": { enabled: false } },
-  });
-  expect(result.violations).toEqual([]);
+  expect((await axe(container)).violations).toEqual([]);
 });
 
 it("JSON viewer supports undefined and error states without claiming a copy", () => {

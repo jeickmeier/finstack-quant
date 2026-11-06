@@ -7,10 +7,10 @@ use super::collateral::EligibleCollateralSchedule;
 use super::enums::ImMethodology;
 use super::serde_validation;
 use super::thresholds::{ImParameters, VmParameters};
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::Result;
 
 use crate::registry::{embedded_registry, margin_registry_from_config};
 use finstack_quant_core::config::FinstackConfig;
@@ -250,15 +250,15 @@ impl CsaSpec {
             ("rounding", rounding),
             ("independent_amount", independent_amount),
         ] {
-            if let Some(money) = money {
-                if money.currency() != self.base_currency {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "CSA '{}' VM {name} currency mismatch: expected {}, got {}",
-                        self.id,
-                        self.base_currency,
-                        money.currency()
-                    )));
-                }
+            if let Some(money) = money
+                && money.currency() != self.base_currency
+            {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CSA '{}' VM {name} currency mismatch: expected {}, got {}",
+                    self.id,
+                    self.base_currency,
+                    money.currency()
+                )));
             }
         }
         let frequency = self.vm_params.frequency;
@@ -478,12 +478,15 @@ mod tests {
 
     #[test]
     fn regulatory_constructors_return_validated_specs() {
-        let error = CsaSpec::regulatory_for_currency(Currency::USD, "", "USD-OIS")
-            .expect_err("an empty CSA id must fail at construction");
-        assert!(
-            error.to_string().contains("CSA id must not be empty"),
-            "{error}"
-        );
+        for id in ["", "   "] {
+            let error = CsaSpec::regulatory_for_currency(Currency::USD, id, "USD-OIS")
+                .expect_err("an empty or blank CSA id must fail at construction");
+            assert!(
+                matches!(error, finstack_quant_core::Error::Validation(_))
+                    && error.to_string().contains("CSA id must not be empty"),
+                "{error}"
+            );
+        }
     }
 
     #[test]

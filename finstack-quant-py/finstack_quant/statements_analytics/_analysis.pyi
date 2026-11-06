@@ -1037,7 +1037,7 @@ def explain_formula(model: Any, results: Any, node_id: str, period: str) -> Expl
     50.0
     """
 
-def generate_tornado_entries(result: Any, metric_node: str, period: str | None = None) -> list[TornadoEntry]:
+def generate_tornado_entries(result: Any, metric_node: str, period: str) -> list[TornadoEntry] | None:
     """Generate tornado chart entries for a sensitivity result.
 
     Parameters
@@ -1046,20 +1046,24 @@ def generate_tornado_entries(result: Any, metric_node: str, period: str | None =
         A typed sensitivity result or its JSON serialization.
     metric_node : str
         Node to extract tornado entries for.
-    period : str | None
-        Optional period string to pin the tornado to.
+    period : str
+        Period at which the metric is read in the baseline and every scenario
+        (e.g. ``"2025Q4"``). Required: a shock replaces one forecast cell, so
+        the metric moves only in the shocked period and in later periods whose
+        formulas read it.
 
     Returns
     -------
-    list[TornadoEntry]
+    list[TornadoEntry] or None
         Typed entries sorted by descending absolute swing, with parameter IDs
-        preserving the perturbed ``node@period`` key.
+        preserving the perturbed ``node@period`` key; ``None`` for a full-grid
+        run, whose scenarios combine parameters and cannot be ranked.
 
     Raises
     ------
     ValueError
-        If ``period`` does not parse, ``result`` is malformed JSON, the run
-        uses a full grid, a scenario does not contain exactly one perturbed
+        If ``period`` does not parse, ``result`` is malformed JSON, a
+        one-at-a-time run's scenario does not contain exactly one perturbed
         parameter, its unperturbed baseline is absent, the target metric/period
         is missing, or a metric value or impact is non-finite.
 
@@ -1147,6 +1151,13 @@ def goal_seek(
 
 def run_sensitivity(model: Any, config: Any) -> SensitivityResult:
     """Run sensitivity analysis on a financial model.
+
+    Each perturbation replaces its node's value in its one forecast period
+    (Value > Forecast > Formula). It does not re-anchor the node's own
+    forecast: later periods of a growth, seasonal or stochastic forecast keep
+    their unshocked base. Formula nodes that read the shocked cell move, in
+    its period and in later periods reached through ``lag``, ``ttm`` or
+    ``cumsum``. Add one parameter per period to shock a whole forecast path.
 
     Parameters
     ----------

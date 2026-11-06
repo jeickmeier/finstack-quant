@@ -49,7 +49,7 @@
 //! - Random recovery and random-factor-loading extensions: `docs/REFERENCES.md#andersen-sidenius-2005-rfl`
 //!
 
-use super::{select_quadrature, Copula, DEFAULT_QUADRATURE_ORDER};
+use super::{Copula, DEFAULT_QUADRATURE_ORDER, select_quadrature};
 use finstack_quant_core::math::{
     integration::GaussHermiteQuadrature,
     solver::BrentSolver,
@@ -252,10 +252,9 @@ impl RandomFactorLoadingCopula {
         }
         if let Some((cached_correlation, location)) =
             self.location_cache.lock().ok().and_then(|cache| *cache)
+            && cached_correlation == correlation.to_bits()
         {
-            if cached_correlation == correlation.to_bits() {
-                return location;
-            }
+            return location;
         }
 
         // Forty normal standard deviations bracket all representable
@@ -547,10 +546,12 @@ mod tests {
             assert!(copula.stress_correlation_proxy(correlation).is_err());
         }
         for correlation in [0.0, 0.5, 1.0] {
-            assert!(copula
-                .stress_correlation_proxy(correlation)
-                .expect("valid correlation")
-                .is_finite());
+            assert!(
+                copula
+                    .stress_correlation_proxy(correlation)
+                    .expect("valid correlation")
+                    .is_finite()
+            );
         }
     }
 

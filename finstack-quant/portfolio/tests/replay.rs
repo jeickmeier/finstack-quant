@@ -10,12 +10,12 @@ mod replay_tests {
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::Attributes;
+    use finstack_quant_portfolio::Portfolio;
     use finstack_quant_portfolio::position::{Position, PositionUnit};
     use finstack_quant_portfolio::replay::{
         ReplayConfig, ReplayErrorPolicy, ReplayMode, ReplayTimeline,
     };
     use finstack_quant_portfolio::types::Entity;
-    use finstack_quant_portfolio::Portfolio;
     use finstack_quant_portfolio::{
         valuation::PortfolioValuationOptions, valuation::RequestedMetrics,
     };
@@ -27,8 +27,8 @@ mod replay_tests {
     use indexmap::IndexMap;
     use std::any::Any;
     use std::sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     };
     use time::macros::date;
 
@@ -841,12 +841,14 @@ mod replay_tests {
             "bounded strict batches must not reprice overlapping endpoints"
         );
         for step in result.steps {
-            assert!(step.valuation.position_values["REPLAY_PROBE_POSITION"]
-                .valuation_result
-                .as_ref()
-                .expect("phase-A result")
-                .measures
-                .is_empty());
+            assert!(
+                step.valuation.position_values["REPLAY_PROBE_POSITION"]
+                    .valuation_result
+                    .as_ref()
+                    .expect("phase-A result")
+                    .measures
+                    .is_empty()
+            );
         }
     }
 
@@ -871,9 +873,11 @@ mod replay_tests {
         )
         .expect_err("strict attribution retry must surface its metric failure");
 
-        assert!(error
-            .to_string()
-            .contains("configured replay metric failure on 2024-01-01"));
+        assert!(
+            error
+                .to_string()
+                .contains("configured replay metric failure on 2024-01-01")
+        );
         assert_eq!(base_calls.load(Ordering::SeqCst), 2);
         assert_eq!(pv_only_calls.load(Ordering::SeqCst), 0);
         assert_eq!(

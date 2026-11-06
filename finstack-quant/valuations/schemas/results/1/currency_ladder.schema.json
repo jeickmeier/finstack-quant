@@ -1,0 +1,73 @@
+{
+  "$defs": {
+    "CalendarYearLadderRow": {
+      "additionalProperties": false,
+      "description": "Calendar-year non-principal / principal / PV totals for one reporting year.",
+      "properties": {
+        "non_principal": {
+          "description": "Sum of amounts that are not [`CFKind::is_principal_like`] in that year,\nin the flow's native units (interest, fees, recovery, and unknown-kind\nflows are not mixed in: unknown labels are rejected).",
+          "format": "double",
+          "type": "number"
+        },
+        "principal": {
+          "description": "Sum of [`CFKind::is_principal_like`] amounts in that year.",
+          "format": "double",
+          "type": "number"
+        },
+        "pv": {
+          "description": "Sum of present values in that year, in the same units as `non_principal`.",
+          "format": "double",
+          "type": "number"
+        },
+        "year": {
+          "description": "Calendar year of the grouped cashflows (Gregorian, as on `Date::year`).",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "year",
+        "non_principal",
+        "principal",
+        "pv"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/results/1/currency_ladder.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "One row currency's calendar-year non-principal, principal and native PV ladder.",
+  "examples": [
+    {
+      "currency": "USD",
+      "rows": [
+        {
+          "non_principal": 21250.0,
+          "principal": 0.0,
+          "pv": 20801.625,
+          "year": 2025
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "currency": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+      "description": "Row currency every figure of `rows` is stated in."
+    },
+    "rows": {
+      "description": "Calendar-year non-principal, principal and native PV totals, by ascending year.",
+      "items": {
+        "$ref": "#/$defs/CalendarYearLadderRow"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "currency",
+    "rows"
+  ],
+  "title": "CurrencyLadder",
+  "type": "object"
+}

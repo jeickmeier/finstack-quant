@@ -1,6 +1,6 @@
 //! Generate checked-in calibration and market-quote schemas.
 
-use finstack_quant_core::schema::{run_schema_generator, SchemaGenerationCommand};
+use finstack_quant_core::schema::{SchemaGenerationCommand, run_schema_generator};
 use std::path::Path;
 
 fn main() -> finstack_quant_core::Result<()> {

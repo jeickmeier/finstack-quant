@@ -9,7 +9,7 @@ pub mod wire;
 
 pub use date::{date_to_iso, parse_iso_date, parse_iso_dates};
 
-use finstack_quant_core::wire::{non_finite_f64, NonFiniteFields};
+use finstack_quant_core::wire::{NonFiniteFields, non_finite_f64};
 use wasm_bindgen::JsValue;
 
 /// Anything the bindings can turn into a structured JS error.
@@ -368,7 +368,7 @@ pub fn materialization_to_js_error(error: finstack_quant_portfolio::Error) -> Js
             js
         }
         Error::ContractLimitExceeded { .. } => {
-            return named_js_error("ContractValidationError", &error)
+            return named_js_error("ContractValidationError", &error);
         }
         _ => return to_js_err(error),
     };

@@ -12,8 +12,8 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::impl_instrument_base;
 
-use super::definitions::Bond;
 use super::CashflowSpec;
+use super::definitions::Bond;
 
 // Explicit Instrument trait implementation (replaces macro for better IDE visibility)
 impl finstack_quant_valuations_core::instruments::Instrument for Bond {
@@ -24,6 +24,20 @@ impl finstack_quant_valuations_core::instruments::Instrument for Bond {
 
     fn notional_draw_date(&self) -> Option<finstack_quant_core::dates::Date> {
         Some(self.issue_date)
+    }
+
+    fn cashflow_export_terms(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<
+        finstack_quant_valuations_core::instruments::cashflow_export::CashflowExportTerms,
+    > {
+        use finstack_quant_cashflows::CashflowProvider;
+        finstack_quant_valuations_core::instruments::cashflow_export::CashflowExportTerms::from_schedule(
+                self.cashflow_schedule(market, as_of)?,
+            )
+            .with_schedule_balances()
     }
 
     fn validate_cashflow_export(
@@ -119,6 +133,13 @@ impl finstack_quant_valuations_core::instruments::Instrument for Bond {
             .asw_forward_curve_id
         {
             deps.add_forward_curve(curve_id.clone());
+        }
+        if let Some(curve_id) = &self
+            .instrument_pricing_overrides
+            .model_config
+            .government_curve_id
+        {
+            deps.add_discount_curve(curve_id.clone());
         }
         Ok(deps)
     }
@@ -467,11 +488,13 @@ mod metrics_equivalent_tests {
         let equivalent = bond.metrics_equivalent().expect("bond equivalent");
         let equivalent = equivalent.as_any().downcast_ref::<Bond>().expect("bond");
         assert_eq!(coupon_type_of(&equivalent.cashflow_spec), CouponType::Cash);
-        assert!(equivalent
-            .instrument_pricing_overrides
-            .model_config
-            .merton_mc_config
-            .is_none());
+        assert!(
+            equivalent
+                .instrument_pricing_overrides
+                .model_config
+                .merton_mc_config
+                .is_none()
+        );
         assert_eq!(
             serde_json::to_value(&bond).expect("original unchanged"),
             original

@@ -105,14 +105,14 @@ const usd = new core.Currency("USD");
 const money = new core.Money(1000.5, usd);
 const date = core.createDate(2024, 9, 30);
 
-// Analytics
-const perf = analytics.Performance.fromReturns(
-  ["2024-01-01", "2024-01-02", "2024-01-03"],
-  [[0.01, 0.02, -0.01]],
-  ["asset"],
-  null,
-  "daily",
-);
+// Analytics: the constructor takes a `PerformancePanel` of prices or returns
+const perf = new analytics.Performance({
+  dates: ["2024-01-01", "2024-01-02", "2024-01-03"],
+  series: [[0.01, 0.02, -0.01]],
+  kind: "returns",
+  ticker_names: ["asset"],
+  frequency: "daily",
+});
 const s = perf.sharpe(0.0); // Float64Array, one value per ticker
 
 // Valuations: typed instruments are built with their Rust constructors
@@ -251,13 +251,13 @@ test("core.Currency creation", () => {
 });
 
 test("analytics.Performance.sharpe returns a typed array", () => {
-  const perf = analytics.Performance.fromReturns(
-    ["2024-01-01", "2024-01-02"],
-    [[0.01, 0.02]],
-    ["asset"],
-    null,
-    "daily",
-  );
+  const perf = new analytics.Performance({
+    dates: ["2024-01-01", "2024-01-02"],
+    series: [[0.01, 0.02]],
+    kind: "returns",
+    ticker_names: ["asset"],
+    frequency: "daily",
+  });
   const value = perf.sharpe(0.0);
   assert.equal(value instanceof Float64Array, true);
 });

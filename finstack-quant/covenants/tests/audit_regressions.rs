@@ -84,10 +84,12 @@ fn window_breach_retains_cure_and_consequences_after_window_expires() {
     );
     let snapshots = engine.breach_history.clone();
     let mut target = Target::default();
-    assert!(engine
-        .apply_consequences(&mut target, &snapshots, date!(2026 - 04 - 30))
-        .unwrap()
-        .is_empty());
+    assert!(
+        engine
+            .apply_consequences(&mut target, &snapshots, date!(2026 - 04 - 30))
+            .unwrap()
+            .is_empty()
+    );
     engine.specs.clear();
     engine.windows.clear();
     assert_eq!(
@@ -144,13 +146,17 @@ fn consequence_retry_commits_each_action_once_and_discards_failed_mutation() {
         fail_sweep: true,
         ..Target::default()
     };
-    assert!(engine
-        .apply_consequences(&mut target, &snapshots, date!(2026 - 03 - 30))
-        .unwrap()
-        .is_empty());
-    assert!(engine
-        .apply_consequences(&mut target, &snapshots, date!(2026 - 03 - 31))
-        .is_err());
+    assert!(
+        engine
+            .apply_consequences(&mut target, &snapshots, date!(2026 - 03 - 30))
+            .unwrap()
+            .is_empty()
+    );
+    assert!(
+        engine
+            .apply_consequences(&mut target, &snapshots, date!(2026 - 03 - 31))
+            .is_err()
+    );
     assert_eq!(target.sweep, 0.0);
     assert_eq!(engine.breach_history[0].applied_consequences.len(), 1);
     target.fail_sweep = false;
@@ -163,10 +169,12 @@ fn consequence_retry_commits_each_action_once_and_discards_failed_mutation() {
     );
     assert!((target.rate - 0.01).abs() < 1e-12);
     assert_eq!(target.sweep, 0.5);
-    assert!(engine
-        .apply_consequences(&mut target, &snapshots, date!(2026 - 04 - 02))
-        .unwrap()
-        .is_empty());
+    assert!(
+        engine
+            .apply_consequences(&mut target, &snapshots, date!(2026 - 04 - 02))
+            .unwrap()
+            .is_empty()
+    );
 }
 
 #[test]
@@ -192,14 +200,18 @@ fn stale_breach_snapshot_cannot_override_cure_or_invent_history() {
         )
         .unwrap();
     let mut target = Target::default();
-    assert!(engine
-        .apply_consequences(&mut target, &snapshots, date!(2026 - 05 - 01))
-        .unwrap()
-        .is_empty());
+    assert!(
+        engine
+            .apply_consequences(&mut target, &snapshots, date!(2026 - 05 - 01))
+            .unwrap()
+            .is_empty()
+    );
     engine.breach_history.clear();
-    assert!(engine
-        .apply_consequences(&mut target, &snapshots, date!(2026 - 05 - 01))
-        .is_err());
+    assert!(
+        engine
+            .apply_consequences(&mut target, &snapshots, date!(2026 - 05 - 01))
+            .is_err()
+    );
 }
 
 #[test]
@@ -220,9 +232,11 @@ fn unsupported_collateral_remains_outstanding() {
         )
         .unwrap();
     let snapshots = engine.breach_history.clone();
-    assert!(engine
-        .apply_consequences(&mut Target::default(), &snapshots, date!(2026 - 03 - 31))
-        .is_err());
+    assert!(
+        engine
+            .apply_consequences(&mut Target::default(), &snapshots, date!(2026 - 03 - 31))
+            .is_err()
+    );
     assert!(engine.breach_history[0].applied_consequences.is_empty());
 }
 
@@ -271,14 +285,16 @@ fn incurrence_requires_explicit_tracking_scope() {
     let mut spec = leverage();
     spec.covenant.scope = CovenantScope::Incurrence;
     let mut engine = engine(spec);
-    assert!(engine
-        .evaluate_and_track(
-            &source(5.0),
-            date!(2026 - 03 - 31),
-            CovenantScope::Maintenance
-        )
-        .unwrap()
-        .is_empty());
+    assert!(
+        engine
+            .evaluate_and_track(
+                &source(5.0),
+                date!(2026 - 03 - 31),
+                CovenantScope::Maintenance
+            )
+            .unwrap()
+            .is_empty()
+    );
     assert!(engine.breach_history.is_empty());
     engine
         .evaluate_and_track(
@@ -330,9 +346,11 @@ fn validation_rejects_invalid_triggers_consequences_and_overlapping_waivers() {
 #[test]
 fn cure_date_overflow_leaves_history_unchanged() {
     let mut engine = engine(leverage());
-    assert!(engine
-        .evaluate_and_track(&source(5.0), Date::MAX, CovenantScope::Maintenance)
-        .is_err());
+    assert!(
+        engine
+            .evaluate_and_track(&source(5.0), Date::MAX, CovenantScope::Maintenance)
+            .is_err()
+    );
     assert!(engine.breach_history.is_empty());
 }
 
@@ -378,12 +396,14 @@ fn net_cash_passes_but_non_positive_denominator_does_not() {
         assert_eq!(report.passed, earnings > 0.0);
         assert_eq!(report.headroom.is_some(), earnings > 0.0);
     }
-    assert!(engine
-        .evaluate(
-            &HashMapMetricSource::from_pairs([("net_debt_to_ebitda", -1.0)]),
-            date!(2026 - 03 - 31)
-        )
-        .is_err());
+    assert!(
+        engine
+            .evaluate(
+                &HashMapMetricSource::from_pairs([("net_debt_to_ebitda", -1.0)]),
+                date!(2026 - 03 - 31)
+            )
+            .is_err()
+    );
     let forecast = forecast_covenant_generic(
         &spec,
         &Series,
@@ -463,13 +483,15 @@ fn stochastic_cutoff_never_hides_base_case_breaches() {
 fn forecast_rejects_reversed_dates_future_reference_and_one_independent_sample() {
     let mut dates = periods();
     dates.reverse();
-    assert!(forecast_covenant_generic(
-        &leverage(),
-        &Series,
-        &dates,
-        CovenantForecastConfig::default()
-    )
-    .is_err());
+    assert!(
+        forecast_covenant_generic(
+            &leverage(),
+            &Series,
+            &dates,
+            CovenantForecastConfig::default()
+        )
+        .is_err()
+    );
     for (count, antithetic) in [(1, false), (2, true)] {
         let config = CovenantForecastConfig {
             stochastic: true,

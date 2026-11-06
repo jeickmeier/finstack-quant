@@ -9,8 +9,10 @@ import { parse } from "culori";
 import {
   themeOutput,
   generateBrand,
-  generateTheme,
+  themeArtifacts,
 } from "../../scripts/gen-theme.mjs";
+import { generateRegistry } from "../../scripts/gen-registry.mjs";
+import { budget } from "./budget.ts";
 import {
   checkContrast,
   checkStockContrast,
@@ -29,16 +31,21 @@ const tokens = JSON.parse(
     "utf8",
   ),
 );
-it("generates matching modes deterministically from one source", async () => {
-  expect(Object.keys(tokens.light).sort()).toEqual(
-    Object.keys(tokens.dark).sort(),
-  );
-  expect(themeOutput(tokens)).toEqual(themeOutput(structuredClone(tokens)));
-  await expect(generateTheme(true)).resolves.toHaveLength(2);
-  // The CLI would append cssVars to the application stylesheet after the theme
-  // import, overriding a brand stylesheet; theme.css owns every token instead.
-  expect(themeOutput(tokens).item).not.toHaveProperty("cssVars");
-});
+it(
+  "generates matching modes deterministically from one source",
+  async () => {
+    expect(Object.keys(tokens.light).sort()).toEqual(
+      Object.keys(tokens.dark).sort(),
+    );
+    expect(themeOutput(tokens)).toEqual(themeOutput(structuredClone(tokens)));
+    expect((await themeArtifacts()).size).toBe(2);
+    await generateRegistry(true);
+    // The CLI would append cssVars to the application stylesheet after the theme
+    // import, overriding a brand stylesheet; theme.css owns every token instead.
+    expect(themeOutput(tokens).item).not.toHaveProperty("cssVars");
+  },
+  budget(15000),
+);
 it("keeps contrast in the default and single-stylesheet tenant themes", async () => {
   const css = await readFile(
     new URL("./fixtures/tenant.css", import.meta.url),

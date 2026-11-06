@@ -25,7 +25,7 @@
 //! - `(issue_date, -V0)` is the initial outflow (holder pays `V0`).
 //! - All subsequent positive flows received by the holder are inflows.
 
-use super::moic::{cost_basis, exit_paths, lifetime_dated_cashflows, ExitPaths};
+use super::moic::{ExitPaths, cost_basis, exit_paths, lifetime_dated_cashflows};
 use crate::bond::Bond;
 use finstack_quant_core::cashflow::xirr;
 use finstack_quant_core::dates::{Date, DayCount};

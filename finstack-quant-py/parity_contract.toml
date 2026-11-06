@@ -160,7 +160,7 @@ public = ["FactorCovarianceMatrix", "FactorModelConfig", "credit", "risk", "sche
 [crates.models.factor.modules]
 matching           = { python = "finstack_quant.models.factor.matching", status = "missing", note = "MatchingConfig typed host-language constructors deferred; JSON contracts remain Rust-owned. The crate-root matching re-exports (CascadeMatcher, HierarchicalMatcher, MappingTableMatcher, FactorMatcher trait family, MappingRule, AttributeFilter, DependencyFilter) are Rust-only." }
 credit             = { python = "finstack_quant.models.factor.credit", status = "exists", note = "Credit hierarchy artifacts, covariance forecasts, VolHorizon, and typed FactorCovarianceMatrix/FactorModelConfig forecast outputs are flattened into this namespace. CreditCalibrator accepts CreditCalibrationConfig / CreditCalibrationInputs as dicts or JSON strings (plus CreditCalibrator.from_dataframe for pandas panels, which converts the frames and calls Rust CreditCalibrationInputs::from_panel to anchor at the last panel date; the generic series is named by a required GenericFactorSpec dict/JSON); the config/input structs themselves (CreditCalibrationConfig, CreditCalibrationInputs, HistoryPanel, IssuerTagPanel, GenericFactorSeries, BucketSizeThresholds and the enum families PanelFrequency, PanelSpace, VolModelChoice, CovarianceStrategy, BetaShrinkage, BucketWeighting, IssuerBetaPolicy) are reached through those wire shapes and CreditFactorModel getters, not parallel constructors. Rust-only families: hierarchy internals (CreditHierarchySpec, HierarchyDimension, IssuerBetaRow, IssuerBetas, IssuerBetaMode, IssuerTags, FitQuality, LevelsAtAnchor, LevelAnchor, VolState, FactorVolModel, FactorHistories, FactorCorrelationMatrix, CalibrationDiagnostics, FoldUpRecord, DateRange, dimension_key; GenericFactorSpec is reached as a wire shape), the peel kernel (credit::peel), unit helpers (credit::units), DecompositionError (mapped to KeyError/ValueError/RuntimeError), and the calibration sub-pipeline (assemble, inventory, panel, peel_fit, statistics, validation)." }
-risk               = { python = "finstack_quant.models.factor.risk", status = "exists", note = "Pure factor and position decomposition, stress attribution, and risk-budget result types and functions. Both hosts return the canonical Rust results: parametric_var_decomposition and historical_var_decomposition return PositionRiskDecomposition (whose portfolio_es / es_contributions carry the parametric Expected Shortfall attribution) and evaluate_risk_budget returns RiskBudgetResult (WASM returns the same serde shapes as plain objects). The two decomposition functions and build_stress_attribution are Rust free functions under the same names (finstack_quant_models::factor::risk); an omitted confidence defaults to 0.95 in Rust, not in the bindings, which only convert the matrix input and call them. Position P&L matrices are position-major (one row per position) in both hosts; Python additionally reads a labelled pandas.DataFrame (rows = scenarios) and NumPy arrays as host input conversions. decompose_factors / decomposeFactors bind the Rust free function of the same name: Python takes the portfolio SensitivityMatrix handle, WASM the SensitivityMatrixJson wire object (or its JSON text); both take a FactorCovarianceMatrix and an optional RiskMeasure (omitted = the Rust RiskMeasure::default(), variance) and return RiskDecomposition. Rust-only families: DecompositionMethod as a bare enum (hosts read PositionRiskDecomposition.method), residual plumbing (apply_residual_contributions, ResidualContributionSource as a bare enum - hosts read source_kind/source_issuer_id), the flat-matrix adapter flatten_position_pnls and core::math::linalg::flatten_square_matrix (the hosts call them on list input), and risk::math kernels. Documented rename: position_component_var / positionComponentVar is the free-function form of the Rust method PositionRiskDecomposition::component_var in both hosts (the decomposition is a plain value there, not a handle)." }
+risk               = { python = "finstack_quant.models.factor.risk", status = "exists", note = "Pure factor and position decomposition, stress attribution, and risk-budget result types and functions. Both hosts return the canonical Rust results: position_risk_report / positionRiskReport take a PositionRiskRequest (position ids, optional confidence, a parametric or historical source tagged by kind, an optional budget) and return PositionRiskReport (the PositionRiskDecomposition, the RiskBudgetResult when budgeted and the StressAttribution of a historical source); evaluate_risk_budget returns RiskBudgetResult (WASM returns the same serde shapes as plain objects). The positional parametric_var_decomposition and historical_var_decomposition stay Rust-only kernels behind the report; build_stress_attribution is the Rust free function of the same name, whose position P&L matrix is position-major (one row per position) in both hosts, Python additionally reading a labelled pandas.DataFrame (rows = scenarios) and NumPy arrays as host input conversions. An omitted confidence defaults to 0.95 in Rust, not in the bindings. decompose_factors / decomposeFactors bind the Rust free function of the same name: Python takes the portfolio SensitivityMatrix handle, WASM the SensitivityMatrixJson wire object (or its JSON text); both take a FactorCovarianceMatrix and an optional RiskMeasure (omitted = the Rust RiskMeasure::default(), variance) and return RiskDecomposition. Rust-only families: DecompositionMethod as a bare enum (hosts read PositionRiskDecomposition.method), residual plumbing (apply_residual_contributions, ResidualContributionSource as a bare enum - hosts read source_kind/source_issuer_id), the flat-matrix adapter flatten_position_pnls and core::math::linalg::flatten_square_matrix (the hosts call them on list input), and risk::math kernels. Documented rename: position_component_var / positionComponentVar is the free-function form of the Rust method PositionRiskDecomposition::component_var in both hosts (the decomposition is a plain value there, not a handle)." }
 schema             = { python = "finstack_quant.models.factor.schema", status = "exists", note = "Compiled-in JSON Schema accessors; bound in WASM as the `schema` sub-namespace (plain objects instead of JSON text)." }
 
 # The remaining crate-root `pub use` surface (BumpSizeConfig,
@@ -197,6 +197,7 @@ public = [
     "PositionFactorContribution",
     "PositionResidualContribution",
     "PositionRiskDecomposition",
+    "PositionRiskReport",
     "PositionVarContribution",
     "RiskBudgetResult",
     "RiskDecomposition",
@@ -206,9 +207,9 @@ public = [
     "build_stress_attribution",
     "decompose_factors",
     "evaluate_risk_budget",
-    "historical_var_decomposition",
-    "parametric_var_decomposition",
+    "evaluate_risk_budget_from_decomposition",
     "position_component_var",
+    "position_risk_report",
 ]
 
 [crates.models.factor.module_symbols.schema]
@@ -241,7 +242,7 @@ drawdown     = { python = "finstack_quant.analytics", status = "flattened", note
 multi_factor  = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via Performance.multi_factor_greeks; MultiFactorResult and ReturnKind are re-exported at the crate root. ReturnKind is built by Rust ReturnKind::from_label(label, risk_free_rate) (excess / total; a non-zero rate with excess is rejected) — no binding-side parse tables." }
 performance  = { python = "finstack_quant.analytics", status = "flattened", note = "Performance class is the panel entry point on finstack_quant.analytics. Rust/Python accessors use callable get_* names, including get_ticker_index; WASM uses the corresponding get* camelCase methods. Result-object fields remain properties. Canonical Rust Performance::periodic_returns is shared as Python Performance.periodic_returns and WASM Performance.periodicReturns. Rust returns PeriodicReturn {date, value} points: WASM emits them as plain `{date, value}` objects (TS `PeriodicReturn`), Python as `(date, value)` tuples. Rolling methods return Rust DatedSeries {values, dates, value_column} (value_column = Rust RollingMetric name): Python wraps it as the DatedSeries class (to_json is the same object), WASM returns it as a plain object with values as a Float64Array. Rust Performance::correlation_matrix returns (matrix, repaired): Python returns the same `(matrix, repaired)` tuple, WASM the plain object `{matrix, repaired}`. Omitted arguments on both hosts resolve to the Rust `finstack_quant_analytics::DEFAULT_*` constants (DEFAULT_FREQUENCY, DEFAULT_PERIODIC_FREQUENCY, DEFAULT_ROLLING_WINDOW, DEFAULT_CONFIDENCE, DEFAULT_DRAWDOWN_COUNT, DEFAULT_ANNUALIZE, DEFAULT_RISK_FREE_RATE, DEFAULT_MAR — also the omega threshold), ReturnKind::from_label(None, ..) (excess), CagrDayCount::default() (act365_25) and FiscalConfig::default() (calendar year). Both hosts take the core FiscalConfig handle (Python fiscal_config, WASM fiscalConfig); omitted, None or null passes Rust None, so FYTD uses the calendar year and period_stats uses Gregorian periods with ISO weeks. WASM joins lookbackReturns and periodStats with raw *WithFiscalConfig twins in exports/analytics.js because wasm-bindgen cannot borrow an optional handle. Rust, Python, and WASM always expose LookbackReturns.fytd as a non-null per-ticker vector; the serialized field name is fytd." }
 regression   = { python = "finstack_quant.analytics", status = "flattened", note = "constrained_least_squares (Jeet & Partani 2023, Appendix A) exposed flat on finstack_quant.analytics; plain numeric list[float] API, no JSON envelope" }
-returns      = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via Performance constructors (prices) / Performance.from_returns. Naming exception: Python Performance(prices) and Performance.from_returns(returns) take a DataFrame or a single-asset Series; the Rust-shaped (dates, matrix, ticker_names) constructors are Performance.from_arrays and Performance.from_returns_arrays. Rust and WASM expose only the array-shaped constructors; WASM publishes them as `new Performance(dates, prices, tickerNames, ...)` / `Performance.fromReturns(...)`; Python array adapters map to those canonical WASM constructors. `to_json` / `from_json` (WASM `toJson` / `fromJson`) are the serde round trip of the Rust Performance panel in both hosts." }
+returns      = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via the one Rust constructor Performance::new(&PerformancePanel), whose panel kind (prices or returns) selects the price-to-return or return-span path. Python Performance(prices) and Performance.from_returns(returns) are pandas host adapters (DataFrame or single-asset Series; row index = dates, column headings = ticker names) that build the PerformancePanel; Performance.from_panel(PerformancePanel(...)) is the Rust-shaped path and maps to the WASM constructor `new Performance(panel)`. `to_json` / `from_json` (WASM `toJson` / `fromJson`) are the serde round trip of the Rust Performance panel in both hosts." }
 risk_metrics = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via Performance scalar methods (CAGR/Sharpe/Sortino/VaR/etc.) plus the four freestanding single-series functions analytics.sharpe / sortino / volatility / max_drawdown (WASM camelCase twins). CagrDayCount parses via Rust FromStr (labels act365_25 / DayCount names); ReturnKind is built by Rust ReturnKind::from_label(label, risk_free_rate) (excess / total; a non-zero rate with excess is rejected) — no binding-side parse tables. Python Performance.cagr(day_count=...) additionally accepts a core DayCount object; WASM Performance.cagr(dayCount) accepts labels only (pass dayCount.toString() to reuse a core.DayCount handle). Both resolve through Rust CagrDayCount (FromStr, or the DayCount variant directly)." }
 
 [crates.analytics.symbols]
@@ -254,6 +255,7 @@ public = [
     "LookbackReturns",
     "MultiFactorResult",
     "Performance",
+    "PerformancePanel",
     "PeriodStats",
     "RollingGreeks",
     "constrained_least_squares",
@@ -338,13 +340,13 @@ status = "exists"
 note = "Python binds the typed engine surface flat on finstack_quant.covenants (Covenant, CovenantType, CovenantSpec (with_denominator_metric selects required net-leverage earnings), ThresholdSchedule, CovenantWaiver, SpringingCondition, CovenantConsequence, CovenantEngine, CovenantBreach), the typed templates, DataFrame-backed forecasting, and keeps the JSON wire surface (`_json` twins + validators + evaluate_engine) shared with WASM. WASM binds CovenantEngine as a class; the definition types cross as plain objects whose constructors and methods are free functions (see the [parity] ledger)."
 
 [crates.covenants.modules]
-json = { python = "finstack_quant.covenants", status = "exists", note = "validate_covenant_spec_json, validate_covenant_report_json, validate_covenant_engine_json, and the covenant template builders (lbo_standard_json, cov_lite_json, real_estate_json, project_finance_json) exposed flat on finstack_quant.covenants, matching the Rust `json` module names. Each `_json` template has a typed twin (lbo_standard, cov_lite, real_estate, project_finance -> list[CovenantSpec]). Rust `evaluate_engine` is bound as Python `evaluate_engine` / WASM `evaluateEngine` and returns dict[str, CovenantReport] in spec (IndexMap) order. Documented host-ergonomics deviation: Python takes `metrics` (dict[str, float] or a JSON string passed through unchanged) where Rust/WASM take `metrics_json`; a dict is never serialised but handed to Rust `evaluate_engine_with_source` as a HashMapMetricSource, so it behaves exactly like CovenantEngine.evaluate. A JSON metric map is parsed only by Rust `HashMapMetricSource::from_json`, so both hosts report identical errors." }
+json = { python = "finstack_quant.covenants", status = "exists", note = "validate_covenant_spec_json, validate_covenant_report_json and validate_covenant_engine_json exposed flat on finstack_quant.covenants, matching the Rust `json` module names. Rust `evaluate_engine` is bound as Python `evaluate_engine` / WASM `evaluateEngine` and returns dict[str, CovenantReport] in spec (IndexMap) order. Documented host-ergonomics deviation: Python takes `metrics` (dict[str, float] or a JSON string passed through unchanged) where Rust/WASM take `metrics_json`; a dict is never serialised but handed to Rust `evaluate_engine_with_source` as a HashMapMetricSource, so it behaves exactly like CovenantEngine.evaluate. A JSON metric map is parsed only by Rust `HashMapMetricSource::from_json`, so both hosts report identical errors." }
 report = { python = "finstack_quant.covenants", status = "flattened", note = "CovenantReport wrapper exposed flat on finstack_quant.covenants (frozen, `__eq__` via Rust PartialEq, Python-style `__repr__`); `evaluate_engine` and `CovenantEngine.evaluate` return dict[str, CovenantReport]. Python-only ergonomic helper `reports_to_dataframe(dict) -> DataFrame` flattens that dict. WASM `evaluateEngine` returns a typed plain-object map (keyed by covenant instance key) from the same evaluate_engine kernel — NOT a JSON string; the dts_contract gate pins this. Rust-only: CovenantReport::passed/::failed builder constructors are not bound in Python because the constructor names collide with the `passed` boolean property on the wrapper; construct reports via evaluate_engine or from_json." }
 engine    = { python = "finstack_quant.covenants", status = "flattened", note = "Typed Covenant / CovenantType (one staticmethod per Rust variant; ThresholdTest is spelled as the string pair (\"maximum\"|\"minimum\", value) in CovenantType.custom and SpringingCondition) / CovenantSpec / CovenantWaiver / SpringingCondition / CovenantConsequence / CovenantEngine (evaluate_and_track requires explicit scope; breaches retain original consequences; new, from_specs, add_spec, add_waiver, validate, evaluate, evaluate_and_track, evaluate_series (Rust CovenantEngine::evaluate_series over DatedMetrics rows; Python reads a date-indexed DataFrame and returns a long DataFrame), specs, waivers, breach_history, to_json/from_json) / CovenantBreach exposed flat. `CovenantScope` and `BoundKind` are spelled as strings (\"maintenance\"|\"incurrence\", \"at_most\"|\"at_least\"). Rust-only: CovenantWindow / add_window (reachable through engine JSON only), InstrumentMutator, ConsequenceApplication and apply_consequences (instrument mutation is a Rust trait seam). WASM: CovenantEngine class with the same members; add_spec / add_waiver mutate in place and return nothing." }
 forward   = { python = "finstack_quant.covenants", status = "flattened", note = "CovenantForecastConfig, CovenantForecast (to_dataframe) and FutureBreach exposed flat; `forecast_covenant(spec, metrics: DataFrame, config)` and `forecast_breaches(engine, metrics: DataFrame, config)` bind Rust forecast_covenant / forecast_breaches, which run forecast_covenant_generic / forecast_breaches_generic over a Rust DatedMetricSeries (each date becomes a daily PeriodId whose period end is the date; empty input and duplicate dates are rejected in Rust; rows carry no period start, so a stochastic forecast requires config.reference_date). Batch forecasts default to maintenance and with_scope selects incurrence; missing required observations fail. Python reads the series from a date-indexed DataFrame (duplicate columns are rejected in the binding); WASM takes DatedMetrics rows (`forecastCovenant` / `forecastBreaches`). ModelTimeSeries itself is a Rust trait and stays Rust-only. Python-only helper: breaches_to_dataframe. statements-analytics keeps its statement-model adapter." }
 metric    = { python = "finstack_quant.covenants.metric",    status = "missing", note = "CovenantMetricId/CovenantMetricSource/HashMapMetricSource are Rust trait plumbing; hosts pass metrics as a dict / JSON map to CovenantEngine.evaluate or evaluate_engine (a JSON map is parsed by HashMapMetricSource::from_json)" }
 schedule  = { python = "finstack_quant.covenants", status = "flattened", note = "ThresholdSchedule (step-down limits) exposed flat: constructor from (date, value) pairs, `entries`, `threshold_for(date)`, to_json/from_json." }
-templates = { python = "finstack_quant.covenants", status = "flattened", note = "Typed template constructors lbo_standard, cov_lite, real_estate, project_finance exposed flat returning list[CovenantSpec]; the flat *_json builders remain as their JSON twins (shared with WASM). All template thresholds are validated finite and non-negative in Rust (ValueError)." }
+templates = { python = "finstack_quant.covenants", status = "flattened", note = "CovenantTemplate (Rust tagged enum; one staticmethod per variant: lbo_standard, cov_lite, real_estate, project_finance) and covenant_template(template) -> list[CovenantSpec] exposed flat; WASM covenantTemplate takes the CovenantTemplate wire object. All template thresholds are validated finite and non-negative in Rust (ValueError)." }
 
 [crates.covenants.symbols]
 public = [
@@ -356,23 +358,17 @@ public = [
     "CovenantForecastConfig",
     "CovenantReport",
     "CovenantSpec",
+    "CovenantTemplate",
     "CovenantType",
     "CovenantWaiver",
     "FutureBreach",
     "SpringingCondition",
     "ThresholdSchedule",
     "breaches_to_dataframe",
-    "cov_lite",
-    "cov_lite_json",
+    "covenant_template",
     "evaluate_engine",
     "forecast_breaches",
     "forecast_covenant",
-    "lbo_standard",
-    "lbo_standard_json",
-    "project_finance",
-    "project_finance_json",
-    "real_estate",
-    "real_estate_json",
     "reports_to_dataframe",
     "validate_covenant_engine_json",
     "validate_covenant_report_json",
@@ -494,6 +490,7 @@ rates        = { python = "finstack_quant.models.rates", status = "exists", note
 public = [
     "BsGreeks",
     "ForwardGreeks",
+    "OptionCalculationResult",
     "asian_option_price",
     "bachelier_greeks",
     "bachelier_price",
@@ -510,6 +507,7 @@ public = [
     "heston_price",
     "lookback_option_price",
     "merton_jump_cos_price",
+    "option_calculation",
     "quanto_option_price",
     "vanilla_expiry_payoff",
     "vg_cos_price",
@@ -600,8 +598,12 @@ public = [
 
 [crates.models.volatility]
 python_package = "finstack_quant.models.volatility"
-# `check_surface_grid` returns the typed `ArbitrageReport`; the per-check
-# `check_*_grid` functions return serde violation rows. `convert_atm_volatility`
+# `check_surface` (on a core `VolSurface`) and `check_surface_grid` return the
+# typed `ArbitrageReport`; the per-check `check_*_grid` functions return serde
+# violation rows. `check_surface` takes the serde shape of the Rust
+# `ArbitrageCheckConfig` (a dict / JSON text in Python, the schema-generated
+# object / JSON text in WASM; omitted fields take the Rust defaults), so the
+# config has no host class. `convert_atm_volatility`
 # takes the serde form of `VolatilityConvention` (`"normal"`, `"lognormal"`,
 # `{"shifted_lognormal": {"shift": s}}`). `delta_to_strike` / `strike_to_delta`
 # have one fixed convention (forward, premium-unadjusted call delta) — there is
@@ -616,8 +618,7 @@ python_package = "finstack_quant.models.volatility"
 # `SabrParameters::quote_convention` (the hosts' `implied_vol` returns the
 # beta-dependent vol, documented on each method),
 # `SabrParameters::effective_rates` (the shift is on `SabrParameters.shift`),
-# `ArbitrageCheckConfig` /
-# `check_surface` on a `VolSurface`, and `SviParams::{validate, butterfly_violation}`
+# and `SviParams::{validate, butterfly_violation}`
 # (validation runs in the constructor). `LocalVolSurface` is a class in Python
 # and a plain object with `localVol*` free functions in WASM; the Dupire
 # density check stays reachable through `check_local_vol_density_grid`.
@@ -635,13 +636,12 @@ public = [
     "check_butterfly_grid",
     "check_calendar_spread_grid",
     "check_local_vol_density_grid",
+    "check_surface",
     "check_surface_grid",
     "convert_atm_volatility",
     "delta_to_strike",
     "get_cube_expiry_slice_vol",
     "get_cube_expiry_slice_vol_clamped",
-    "get_cube_normal_vol",
-    "get_cube_normal_vol_clamped",
     "get_cube_vol",
     "get_cube_vol_clamped",
     "get_fx_delta_pillar_vols",
@@ -651,9 +651,7 @@ public = [
     "implied_vol_bachelier",
     "implied_vol_black",
     "materialize_cube_expiry_slice",
-    "materialize_cube_expiry_slice_normal",
     "materialize_cube_tenor_slice",
-    "materialize_cube_tenor_slice_normal",
     "materialize_fx_delta_surface",
     "strike_to_delta",
 ]
@@ -776,7 +774,7 @@ schema       = { python = "finstack_quant.valuations.schema",       status = "ex
 constants    = { python = "finstack_quant.valuations.constants",    status = "missing", note = "Rust-only numeric/convention constants; hosts see the values through APIs that consume them (e.g. theta_days_per_year defaults), not as a namespace" }
 error        = { python = "finstack_quant.valuations.error",        status = "missing", note = "Rust-only error types; hosts receive mapped exceptions (Python ValueError/KeyError, JS Error), not the enum" }
 market       = { python = "finstack_quant.valuations.market",       status = "exists", note = "Listed-product coverage metadata plus the read-only ConventionRegistry lookups (rate index, CDS, swaption, inflation swap, IR future, xccy) and their frozen convention records. Rust-only: resolve_vol_source internals and the market-object builders behind the calibration pipeline." }
-metrics      = { python = "finstack_quant.valuations.metrics",      status = "missing", note = "Rust-only MetricId/MetricRegistry plumbing; hosts enumerate metrics via list_standard_metrics* instead. The metrics::risk computation entry points are bound under instruments, not as a metrics namespace: MarketHistory, calculate_var (multi-instrument full-revaluation historical VaR/ES) and its VarResult (WASM valuations.instruments.calculateVar returning the VarResult object). VarConfig/VarMethod are its dict/JSON config argument." }
+metrics      = { python = "finstack_quant.valuations.metrics",      status = "missing", note = "Rust-only MetricId/MetricRegistry plumbing; hosts enumerate metrics via list_standard_metrics* (the whole registry) and metrics_for_instrument (the grouped metrics registered for one instrument type, WASM valuations.instruments.metricsForInstrument) instead. The metrics::risk computation entry points are bound under instruments, not as a metrics namespace: MarketHistory, calculate_var (multi-instrument full-revaluation historical VaR/ES) and its VarResult (WASM valuations.instruments.calculateVar returning the VarResult object). VarConfig/VarMethod are its dict/JSON config argument." }
 pricer       = { python = "finstack_quant.valuations.pricer",       status = "missing", note = "Rust-only pricer registry and JSON pricing entry points; hosts reach them through the flattened price_* / validate_* / instrument_envelope_from_spec helpers under instruments" }
 recalibration = { python = "finstack_quant.valuations.recalibration", status = "missing", note = "Rust-only quote-space recalibration contracts; the calibration crate implements them and hosts never name them" }
 results      = { python = "finstack_quant.valuations.results",      status = "missing", note = "Rust-only result envelope types; the host-facing ValuationResult wrapper is pinned in [crates.valuations.symbols]" }
@@ -915,7 +913,7 @@ public = [
 # disable_stochastic and the effective_* policy getters; AssetPool carries the
 # collateral analytics (total/performing balance, wac, weighted_avg_spread_bp,
 # weighted_avg_maturity, diversity_score, assets_by_obligor/industry) and
-# calculate_pool_stats returns PoolStats. Rust-only: value_tranche*,
+# calculate_pool_stats returns PoolStats, pool_report returns PoolReport. Rust-only: value_tranche*,
 # AssetPool::add_bond. TrancheAccrualPeriod,
 # CoverageTestSpec, CoverageTrigger, DelinquencyModel, CardPortfolioSpec and the
 # CMBS PoolAsset sub-specs stay dict/JSON sub-fields. WASM stays JSON-first;
@@ -932,6 +930,9 @@ public = [
     "BarrierCrossing",
     "Bond",
     "BondBuilder",
+    "BondQuoteSet",
+    "BondWorkoutLadder",
+    "BondWorkoutRow",
     "BorrowingBaseRules",
     "CallAssumption",
     "CallPutSchedule",
@@ -950,6 +951,8 @@ public = [
     "ConversionSpec",
     "ConvertibleBond",
     "ConvertibleBondBuilder",
+    "ConvertibleSpotLadder",
+    "ConvertibleSpotRow",
     "CoverageRules",
     "CreditDefaultSwap",
     "CreditDefaultSwapBuilder",
@@ -980,6 +983,8 @@ public = [
     "PikMode",
     "PikSchedule",
     "PoolAsset",
+    "PoolConcentrationEntry",
+    "PoolReport",
     "PoolStats",
     "PremiumLegSpec",
     "PrepaymentPenalty",
@@ -1008,8 +1013,13 @@ public = [
     "VarResult",
     "Waterfall",
     "bond_from_cashflows_json",
+    "bond_quote_set_field_units",
+    "bond_workout_ladder",
     "calculate_pool_stats",
     "calculate_var",
+    "compute_quotes",
+    "convertible_spot_ladder",
+    "equity_metrics_field_units",
     "instrument_cashflows",
     "instrument_envelope_from_spec",
     "list_models",
@@ -1017,13 +1027,22 @@ public = [
     "list_standard_metrics",
     "list_standard_metrics_grouped",
     "metric_metadata",
+    "metrics_for_instrument",
+    "pool_report",
+    "pool_report_field_units",
     "pretty_instrument_json",
+    "price_driver_fields",
     "price_instrument",
+    "scenario_table_field_units",
+    "simulation_field_units",
+    "standard_deal_families",
     "tranche_breakeven_cdr",
     "tranche_discount_margin",
+    "tranche_metric_field_units",
     "tranche_metrics",
     "tranche_oas",
     "tranche_scenario_table",
+    "tranche_solve_field_units",
     "validate_instrument_json",
     "validate_typed_instrument_json",
 ]
@@ -1042,7 +1061,6 @@ note = "Typed rates/fixed-income instruments (Bond, TermLoan, InterestRateSwap, 
 #   - merton::RawMertonModel (serde `try_from` funnel, not a public constructor)
 #   - migration::MigrationError, pd::PdCalibrationError,
 #     scoring::CreditScoringError (mapped to Python exceptions in errors.rs)
-#   - scoring::*Input structs (flattened into the scoring function arguments)
 #   - pd::PdCycleParams (flattened into the `asset_correlation` / `cycle_index`
 #     arguments of pit_to_ttc / ttc_to_pit)
 #   - lgd::SeniorityClass / SeniorityCalibration, lgd::CreditConversionFactor,
@@ -1074,11 +1092,13 @@ public = [
     "EndogenousHazardSpec",
     "MertonBarrierType",
     "MertonModel",
+    "MertonReport",
     "RatingFactorTable",
     "SimulatedPaths",
     "ToggleExerciseModel",
     "lgd",
     "liability_management",
+    "merton_report",
     "migration",
     "moodys_warf_factor",
     "pd",
@@ -1101,8 +1121,8 @@ public = [
     "WorkoutLgd",
     "WorkoutLgdBuilder",
     "WorkoutLgdResult",
+    "seniority_calibration_ids",
     "seniority_recovery_stats",
-    "workout_lgd",
 ]
 
 [crates.models.credit.module_symbols.pd]
@@ -1133,11 +1153,18 @@ public = [
 [crates.models.credit.module_symbols.scoring]
 python_package = "finstack_quant.models.credit.scoring"
 public = [
+    "AltmanZDoublePrimeInput",
+    "AltmanZPrimeInput",
+    "AltmanZScoreInput",
+    "CreditScoreReport",
+    "OhlsonOScoreInput",
     "ScoringResult",
+    "ZmijewskiInput",
     "altman_em_score",
     "altman_z_double_prime",
     "altman_z_prime",
     "altman_z_score",
+    "credit_score_report",
     "ohlson_o_score",
     "zmijewski_score",
 ]
@@ -1154,9 +1181,11 @@ public = [
 [crates.models.credit.module_symbols.liability_management]
 python_package = "finstack_quant.models.credit.liability_management"
 public = [
+    "ExchangeOffer",
     "ExchangeOfferAnalysis",
     "LeverageImpact",
     "LmeAnalysis",
+    "LmeTerms",
     "TENDER_RECOMMENDATION_HURDLE",
     "analyze_exchange_offer",
     "analyze_lme",
@@ -1340,11 +1369,24 @@ templates                   = { python = "finstack_quant.statements_analytics", 
 #   same three entry points (classifyStage, computeEcl, computeEclWeighted);
 #   the two PDs are arguments there because the Python Exposure carries them.
 #   `stage` is required in every host (classify first).
-# - analysis::credit covenant forecasting (forecast_breaches,
-#   compute_credit_context with per-period
+# - analysis::credit: compute_credit_context with per-period
 #   reference_values, CreditContextMetrics including dscr_incl_fees,
-#   CorporateAnalysisBuilder.ltv_value_node — the last is bound on
-#   run_corporate_analysis), StatementsAdapter, compute_peer_multiples, and
+#   CorporateAnalysisBuilder.ltv_value_node (the last is bound on
+#   run_corporate_analysis), and the StatementsAdapter type itself. The two
+#   statement covenant entry points built on StatementsAdapter are bound in
+#   both hosts: evaluate_covenants /
+#   evaluateCovenants (compliance at every result period end; covenant windows
+#   decide which metrics a date requires) and forecast_breaches /
+#   forecastBreaches. Python returns the evaluation as the long DataFrame of
+#   CovenantEngine.evaluate_series and the forecast as FutureBreach objects;
+#   WASM returns DatedCovenantReports rows and FutureBreach wire objects.
+#   capital_structure_summary / capitalStructureSummary are bound in both hosts
+#   with their result types; the request is the Rust serde document in each.
+#   relative_value_report / relativeValueReport likewise: both take the
+#   universe as a list or one JSON array text, and both report a dimension's
+#   `y` / `x` as the typed MetricExtractor document ({"named": ...},
+#   {"custom": ...}, {"multiple": ...}), never a flattened label.
+# - compute_peer_multiples, and
 #   the comps/scenarios/reports/valuation typed result surfaces beyond the
 #   bound entry points. lbo_model_checks is reached in both hosts through the
 #   `check_mappings` of the LboConfig that evaluate_lbo / evaluateLbo take.
@@ -1354,6 +1396,8 @@ public = [
     "AccountType",
     "BridgeChart",
     "BridgeStep",
+    "CapitalStructureSummary",
+    "CapitalStructureTranche",
     "CompanyMetrics",
     "CorkscrewAccount",
     "CorkscrewConfig",
@@ -1384,6 +1428,7 @@ public = [
     "LeaseSpec",
     "ManagementFeeBase",
     "ManagementFeeSpec",
+    "MaturityWallBucket",
     "PLSummaryReport",
     "ParameterSpec",
     "PeerFilter",
@@ -1392,6 +1437,11 @@ public = [
     "PropertyTemplateNodes",
     "QualitativeFlags",
     "RegressionResult",
+    "RelativeValueCompany",
+    "RelativeValueDimension",
+    "RelativeValueMultiple",
+    "RelativeValuePoint",
+    "RelativeValueReport",
     "RelativeValueResult",
     "RenewalSpec",
     "RentRollOutputNodes",
@@ -1424,6 +1474,7 @@ public = [
     "add_roll_forward_with_opening",
     "add_vintage_buildup",
     "backtest_forecast",
+    "capital_structure_summary",
     "classify_stage",
     "compute_ecl",
     "compute_ecl_weighted",
@@ -1431,17 +1482,20 @@ public = [
     "credit_assessment",
     "credit_assessment_report_text",
     "dcf_sensitivity",
+    "evaluate_covenants",
     "evaluate_dcf",
     "evaluate_lbo",
     "evaluate_scenario_set",
     "evaluate_scenario_set_with_market",
     "explain_formula",
+    "forecast_breaches",
     "generate_tornado_entries",
     "goal_seek",
     "peer_stats",
     "percentile_rank",
     "pl_summary_report",
     "regression_fair_value",
+    "relative_value_report",
     "render_check_report_html",
     "render_check_report_text",
     "run_checks",
@@ -1453,6 +1507,7 @@ public = [
     "scenario_diff",
     "score_relative_value",
     "variance_bridge",
+    "WaccInputs",
     "wacc",
     "z_score",
 ]
@@ -1512,7 +1567,7 @@ status = "exists"
 [crates.portfolio.modules]
 attribution  = { python = "finstack_quant.portfolio.attribution",  status = "missing", note = "Bindings are currently exported from finstack_quant.portfolio root" }
 book         = { python = "finstack_quant.portfolio.book",         status = "missing", note = "Book hierarchy types (Book, BookId, ...) are bound in no host; Rust-only. The Python root does NOT carry them." }
-brinson      = { python = "finstack_quant.portfolio",              status = "flattened", note = "Brinson-Fachler and Carino attribution helpers are exported flat on finstack_quant.portfolio" }
+brinson      = { python = "finstack_quant.portfolio",              status = "flattened", note = "Brinson-Fachler and Carino attribution helpers (brinson_fachler, carino_link, and brinson_linked, which attributes raw sector periods and links them in one call) are exported flat on finstack_quant.portfolio" }
 builder      = { python = "finstack_quant.portfolio",              status = "flattened", note = "PortfolioBuilder is bound flat on finstack_quant.portfolio behind Portfolio.builder(id, base_currency, as_of) (fluent name/entity/position/tag/meta/build); Portfolio.from_spec remains the JSON path" }
 cashflows    = { python = "finstack_quant.portfolio.cashflows",    status = "missing", note = "Bindings are currently exported from finstack_quant.portfolio root" }
 dataframe    = { python = "finstack_quant.portfolio.dataframe",    status = "missing", note = "Python does not bind the Rust dataframe free functions (positions_to_table, metrics_to_table, aggregated_metrics_to_table); they back the typed exits (PortfolioValuation.to_dataframe/to_arrow_positions, PortfolioMetrics.to_position_dataframe/to_dataframe)." }
@@ -1626,6 +1681,7 @@ public = [
     "apply_scenario_and_revalue",
     "attribute_portfolio_pnl",
     "brinson_fachler",
+    "brinson_linked",
     "build_credit_vol_report",
 
     "campisi_attribution",
@@ -1901,7 +1957,7 @@ excluded = { "__version__" = "dunder" }
 
 [parity.modules."finstack_quant.analytics"]
 js = "analytics"
-types = { AnalyticsError = "FinstackError", BetaResult = "BetaResult", DatedSeries = "DatedSeries", DrawdownEpisode = "DrawdownEpisode", GreeksResult = "GreeksResult", LookbackReturns = "LookbackReturns", MultiFactorResult = "MultiFactorResult", PeriodStats = "PeriodStats", RollingGreeks = "RollingGreeks" }
+types = { AnalyticsError = "FinstackError", BetaResult = "BetaResult", DatedSeries = "DatedSeries", DrawdownEpisode = "DrawdownEpisode", GreeksResult = "GreeksResult", LookbackReturns = "LookbackReturns", MultiFactorResult = "MultiFactorResult", PerformancePanel = "PerformancePanel", PeriodStats = "PeriodStats", RollingGreeks = "RollingGreeks" }
 
 [parity.modules."finstack_quant.attribution"]
 js = "attribution"
@@ -2017,7 +2073,7 @@ js = "core"
 
 [parity.modules."finstack_quant.covenants"]
 js = "covenants"
-types = { Covenant = "Covenant", CovenantBreach = "CovenantBreach", CovenantConsequence = "CovenantConsequence", CovenantForecast = "CovenantForecast", CovenantForecastConfig = "CovenantForecastConfig", CovenantReport = "CovenantReport", CovenantSpec = "CovenantSpec", CovenantType = "CovenantType", CovenantWaiver = "CovenantWaiver", FutureBreach = "FutureBreach", SpringingCondition = "SpringingCondition", ThresholdSchedule = "ThresholdSchedule" }
+types = { Covenant = "Covenant", CovenantBreach = "CovenantBreach", CovenantConsequence = "CovenantConsequence", CovenantForecast = "CovenantForecast", CovenantForecastConfig = "CovenantForecastConfig", CovenantReport = "CovenantReport", CovenantSpec = "CovenantSpec", CovenantTemplate = "CovenantTemplate", CovenantType = "CovenantType", CovenantWaiver = "CovenantWaiver", FutureBreach = "FutureBreach", SpringingCondition = "SpringingCondition", ThresholdSchedule = "ThresholdSchedule" }
 excluded = { breaches_to_dataframe = "pandas", reports_to_dataframe = "pandas" }
 
 [parity.modules."finstack_quant.features"]
@@ -2037,7 +2093,7 @@ js = "margin.schema"
 
 [parity.modules."finstack_quant.models"]
 js = "models"
-types = { BsGreeks = "BsGreeks", ForwardGreeks = "ForwardGreeks" }
+types = { BsGreeks = "BsGreeks", ForwardGreeks = "ForwardGreeks", OptionCalculationResult = "OptionCalculationResult" }
 
 [parity.modules."finstack_quant.models.correlation"]
 js = "models.correlation"
@@ -2045,7 +2101,7 @@ types = { CreditExposure = "CreditExposure", PortfolioLossConfig = "PortfolioLos
 
 [parity.modules."finstack_quant.models.credit"]
 js = "models.credit"
-types = { CreditState = "CreditState" }
+types = { CreditState = "CreditState", MertonReport = "MertonReport" }
 
 [parity.modules."finstack_quant.models.credit.lgd"]
 js = "models.credit.lgd"
@@ -2053,7 +2109,7 @@ types = { CollateralPiece = "CollateralPiece", WorkoutLgdResult = "WorkoutLgdRes
 
 [parity.modules."finstack_quant.models.credit.liability_management"]
 js = "models.credit.liabilityManagement"
-types = { ExchangeOfferAnalysis = "ExchangeOfferAnalysis", LeverageImpact = "LeverageImpact", LmeAnalysis = "LmeAnalysis" }
+types = { ExchangeOffer = "ExchangeOffer", ExchangeOfferAnalysis = "ExchangeOfferAnalysis", LeverageImpact = "LeverageImpact", LmeAnalysis = "LmeAnalysis", LmeTerms = "LmeTerms" }
 
 [parity.modules."finstack_quant.models.credit.migration"]
 # TransitionMatrix.from_labeled <-> fromLabeled owns ordered-label validation;
@@ -2072,7 +2128,7 @@ types = { RecoveryAllocation = "RecoveryAllocation", RecoveryClaim = "RecoveryCl
 
 [parity.modules."finstack_quant.models.credit.scoring"]
 js = "models.credit.scoring"
-types = { ScoringResult = "ScoringResult" }
+types = { AltmanZDoublePrimeInput = "AltmanZDoublePrimeInput", AltmanZPrimeInput = "AltmanZPrimeInput", AltmanZScoreInput = "AltmanZScoreInput", CreditScoreReport = "CreditScoreReport", OhlsonOScoreInput = "OhlsonOScoreInput", ScoringResult = "ScoringResult", ZmijewskiInput = "ZmijewskiInput" }
 
 [parity.modules."finstack_quant.models.factor"]
 js = "models.factor"
@@ -2083,7 +2139,7 @@ js = "models.factor.credit"
 
 [parity.modules."finstack_quant.models.factor.risk"]
 js = "models.factor.risk"
-types = { FactorContribution = "FactorContribution", PositionBudgetEntry = "PositionBudgetEntry", PositionEsContribution = "PositionEsContribution", PositionFactorContribution = "PositionFactorContribution", PositionResidualContribution = "PositionResidualContribution", PositionRiskDecomposition = "PositionRiskDecomposition", PositionVarContribution = "PositionVarContribution", RiskBudgetResult = "RiskBudgetResult", RiskDecomposition = "RiskDecomposition", StressAttribution = "StressAttribution", StressPositionEntry = "StressPositionEntry", TailScenarioBreakdown = "TailScenarioBreakdown" }
+types = { FactorContribution = "FactorContribution", PositionBudgetEntry = "PositionBudgetEntry", PositionEsContribution = "PositionEsContribution", PositionFactorContribution = "PositionFactorContribution", PositionResidualContribution = "PositionResidualContribution", PositionRiskDecomposition = "PositionRiskDecomposition", PositionRiskReport = "PositionRiskReport", PositionVarContribution = "PositionVarContribution", RiskBudgetResult = "RiskBudgetResult", RiskDecomposition = "RiskDecomposition", StressAttribution = "StressAttribution", StressPositionEntry = "StressPositionEntry", TailScenarioBreakdown = "TailScenarioBreakdown" }
 
 [parity.modules."finstack_quant.models.factor.schema"]
 js = "models.factor.schema"
@@ -2146,7 +2202,7 @@ js = "statements.schema"
 [parity.modules."finstack_quant.statements_analytics"]
 js = "statements_analytics"
 renames = { PLSummaryReport = { js = "statements_analytics.plSummaryReport", reason = "the Rust PLSummaryReport borrows the statement result, so it is not a WASM handle; plSummaryReport returns its to_table TableEnvelope and plSummaryReportText its text rendering" } }
-types = { AccountType = "AccountType", BridgeChart = "BridgeChart", BridgeStep = "BridgeStep", CompanyMetrics = "CompanyMetrics", CorkscrewAccount = "CorkscrewAccount", CorkscrewConfig = "CorkscrewConfig", CorkscrewReport = "CorkscrewReport", CorporateAnalysis = "CorporateAnalysis", CorporateValuationResult = "CorporateValuationResult", CreditAssessment = "CreditAssessment", CreditAssessmentPoint = "CreditAssessmentPoint", CreditMapping = "CreditMapping", DcfSensitivityResult = "DcfSensitivityResult", DependencyTree = "DependencyTree", DimensionScore = "DimensionScore", EclBucket = "EclBucket", EclResult = "EclResult", EquityBridge = "EquityBridge", Explanation = "Explanation", ExplanationStep = "ExplanationStep", Exposure = "Exposure", ForecastMetrics = "ForecastMetrics", FreeRentWindowSpec = "FreeRentWindowSpec", GoalSeekResult = "GoalSeekResult", LboCheckMappings = "LboCheckMappings", LboResult = "LboResult", LeaseGrowthConvention = "LeaseGrowthConvention", LeaseSpec = "LeaseSpec", ManagementFeeBase = "ManagementFeeBase", ManagementFeeSpec = "ManagementFeeSpec", ParameterSpec = "ParameterSpec", PeerFilter = "PeerFilter", PeerSet = "PeerSet", PeerStats = "PeerStats", PropertyTemplateNodes = "PropertyTemplateNodes", QualitativeFlags = "QualitativeFlags", RegressionResult = "RegressionResult", RelativeValueResult = "RelativeValueResult", RenewalSpec = "RenewalSpec", RentRollOutputNodes = "RentRollOutputNodes", RentStepSpec = "RentStepSpec", ScenarioDiff = "ScenarioDiff", ScenarioResults = "ScenarioResults", ScenarioSet = "ScenarioSet", ScorecardConfig = "ScorecardConfig", ScorecardMetric = "ScorecardMetric", ScorecardReport = "ScorecardReport", ScoringDimension = "ScoringDimension", SensitivityConfig = "SensitivityConfig", SensitivityResult = "SensitivityResult", Stage = "Stage", StageResult = "StageResult", StagingConfig = "StagingConfig", TerminalValueSpec = "TerminalValueSpec", ThreeStatementMapping = "ThreeStatementMapping", TornadoEntry = "TornadoEntry", ValuationDiscounts = "ValuationDiscounts", VarianceConfig = "VarianceConfig", VarianceReport = "VarianceReport", VarianceRow = "VarianceRow", WeightedEclResult = "WeightedEclResult" }
+types = { AccountType = "AccountType", BridgeChart = "BridgeChart", BridgeStep = "BridgeStep", CapitalStructureSummary = "CapitalStructureSummary", CapitalStructureTranche = "CapitalStructureTranche", CompanyMetrics = "CompanyMetrics", CorkscrewAccount = "CorkscrewAccount", CorkscrewConfig = "CorkscrewConfig", CorkscrewReport = "CorkscrewReport", CorporateAnalysis = "CorporateAnalysis", CorporateValuationResult = "CorporateValuationResult", CreditAssessment = "CreditAssessment", CreditAssessmentPoint = "CreditAssessmentPoint", CreditMapping = "CreditMapping", DcfSensitivityResult = "DcfSensitivityResult", DependencyTree = "DependencyTree", DimensionScore = "DimensionScore", EclBucket = "EclBucket", EclResult = "EclResult", EquityBridge = "EquityBridge", Explanation = "Explanation", ExplanationStep = "ExplanationStep", Exposure = "Exposure", ForecastMetrics = "ForecastMetrics", FreeRentWindowSpec = "FreeRentWindowSpec", GoalSeekResult = "GoalSeekResult", LboCheckMappings = "LboCheckMappings", LboResult = "LboResult", LeaseGrowthConvention = "LeaseGrowthConvention", LeaseSpec = "LeaseSpec", ManagementFeeBase = "ManagementFeeBase", ManagementFeeSpec = "ManagementFeeSpec", MaturityWallBucket = "MaturityWallBucket", ParameterSpec = "ParameterSpec", PeerFilter = "PeerFilter", PeerSet = "PeerSet", PeerStats = "PeerStats", PropertyTemplateNodes = "PropertyTemplateNodes", QualitativeFlags = "QualitativeFlags", RegressionResult = "RegressionResult", RelativeValueCompany = "RelativeValueCompany", RelativeValueDimension = "RelativeValueDimension", RelativeValueMultiple = "RelativeValueMultiple", RelativeValuePoint = "RelativeValuePoint", RelativeValueReport = "RelativeValueReport", RelativeValueResult = "RelativeValueResult", RenewalSpec = "RenewalSpec", RentRollOutputNodes = "RentRollOutputNodes", RentStepSpec = "RentStepSpec", ScenarioDiff = "ScenarioDiff", ScenarioResults = "ScenarioResults", ScenarioSet = "ScenarioSet", ScorecardConfig = "ScorecardConfig", ScorecardMetric = "ScorecardMetric", ScorecardReport = "ScorecardReport", ScoringDimension = "ScoringDimension", SensitivityConfig = "SensitivityConfig", SensitivityResult = "SensitivityResult", Stage = "Stage", StageResult = "StageResult", StagingConfig = "StagingConfig", TerminalValueSpec = "TerminalValueSpec", ThreeStatementMapping = "ThreeStatementMapping", TornadoEntry = "TornadoEntry", ValuationDiscounts = "ValuationDiscounts", VarianceConfig = "VarianceConfig", VarianceReport = "VarianceReport", VarianceRow = "VarianceRow", WeightedEclResult = "WeightedEclResult", WaccInputs = "WaccInputs"}
 
 [parity.modules."finstack_quant.valuations"]
 js = "valuations"
@@ -2158,7 +2214,7 @@ types = { CompositeExposureReport = "CompositeExposureReport", CompositeHistoryR
 
 [parity.modules."finstack_quant.valuations.instruments"]
 js = "valuations.instruments"
-types = { AdvanceRate = "AdvanceRate", AmortizationEvent = "AmortizationEvent", AssetPool = "AssetPool", BalloonSpec = "BalloonSpec", BarrierCrossing = "BarrierCrossing", BorrowingBaseRules = "BorrowingBaseRules", CallAssumption = "CallAssumption", CallPutSchedule = "CallPutSchedule", CdsIndexConstituent = "CdsIndexConstituent", CdsIndexParams = "CdsIndexParams", CdsTrancheParams = "CdsTrancheParams", ConcentrationLimit = "ConcentrationLimit", ConversionSpec = "ConversionSpec", CoverageRules = "CoverageRules", EligibilityRule = "EligibilityRule", EnhancedMonteCarloResult = "EnhancedMonteCarloResult", EquityMetrics = "EquityMetrics", FacilityProjection = "FacilityProjection", FixedLegSpec = "FixedLegSpec", FloatLegSpec = "FloatLegSpec", HedgeSwap = "HedgeSwap", InstrumentCashflowEnvelope = "InstrumentCashflowEnvelope", LiquidationSpec = "LiquidationSpec", MarketHistory = "MarketHistory", MertonMcCalibrationSpec = "MertonMcCalibrationSpec", MertonMcResult = "MertonMcResult", MetricPricingOverrides = "MetricPricingOverrides", OasResult = "OasResult", PathStatistics = "PathStatistics", PikMode = "PikMode", PikSchedule = "PikSchedule", PoolAsset = "PoolAsset", PoolStats = "PoolStats", PremiumLegSpec = "PremiumLegSpec", PrepaymentPenalty = "PrepaymentPenalty", ProtectionLegSpec = "ProtectionLegSpec", RepLine = "RepLine", ScenarioTable = "ScenarioTable", SimulationDiagnostics = "SimulationDiagnostics", SimulationRun = "SimulationRun", StandardDealParams = "StandardDealParams", SpecialServicingSpec = "SpecialServicingSpec", StochasticPricingResult = "StochasticPricingResult", TermOutSpec = "TermOutSpec", Tranche = "Tranche", TrancheCashflows = "TrancheCashflows", TrancheMetrics = "TrancheMetrics", TrancheStructure = "TrancheStructure", VarResult = "VarResult", Waterfall = "Waterfall" }
+types = { AdvanceRate = "AdvanceRate", AmortizationEvent = "AmortizationEvent", AssetPool = "AssetPool", BalloonSpec = "BalloonSpec", BarrierCrossing = "BarrierCrossing", BorrowingBaseRules = "BorrowingBaseRules", BondQuoteSet = "BondQuoteSet", BondWorkoutLadder = "BondWorkoutLadder", BondWorkoutRow = "BondWorkoutRow", CallAssumption = "CallAssumption", CallPutSchedule = "CallPutSchedule", CdsIndexConstituent = "CdsIndexConstituent", CdsIndexParams = "CdsIndexParams", CdsTrancheParams = "CdsTrancheParams", ConcentrationLimit = "ConcentrationLimit", ConversionSpec = "ConversionSpec", ConvertibleSpotLadder = "ConvertibleSpotLadder", ConvertibleSpotRow = "ConvertibleSpotRow", CoverageRules = "CoverageRules", EligibilityRule = "EligibilityRule", EnhancedMonteCarloResult = "EnhancedMonteCarloResult", EquityMetrics = "EquityMetrics", FacilityProjection = "FacilityProjection", FixedLegSpec = "FixedLegSpec", FloatLegSpec = "FloatLegSpec", HedgeSwap = "HedgeSwap", InstrumentCashflowEnvelope = "InstrumentCashflowEnvelope", LiquidationSpec = "LiquidationSpec", MarketHistory = "MarketHistory", MertonMcCalibrationSpec = "MertonMcCalibrationSpec", MertonMcResult = "MertonMcResult", MetricPricingOverrides = "MetricPricingOverrides", OasResult = "OasResult", PathStatistics = "PathStatistics", PikMode = "PikMode", PikSchedule = "PikSchedule", PoolAsset = "PoolAsset", PoolConcentrationEntry = "PoolConcentrationEntry", PoolReport = "PoolReport", PoolStats = "PoolStats", PremiumLegSpec = "PremiumLegSpec", PrepaymentPenalty = "PrepaymentPenalty", ProtectionLegSpec = "ProtectionLegSpec", RepLine = "RepLine", ScenarioTable = "ScenarioTable", SimulationDiagnostics = "SimulationDiagnostics", SimulationRun = "SimulationRun", StandardDealParams = "StandardDealParams", SpecialServicingSpec = "SpecialServicingSpec", StochasticPricingResult = "StochasticPricingResult", TermOutSpec = "TermOutSpec", Tranche = "Tranche", TrancheCashflows = "TrancheCashflows", TrancheMetrics = "TrancheMetrics", TrancheStructure = "TrancheStructure", VarResult = "VarResult", Waterfall = "Waterfall" }
 
 [parity.modules."finstack_quant.valuations.market"]
 js = "valuations.market"
@@ -2204,6 +2260,11 @@ validateCapitalStructureSpecJson = "JSON wire validation through Rust CapitalStr
 valuationResultToJson = "twin of Python ValuationResult.to_json (WASM results are plain objects)"
 
 [parity.js."valuations.instruments".wasm_only]
+trancheCashflowsTable = "twin of Python TrancheCashflows.to_dataframe (WASM cashflows are a plain object, so Rust TrancheCashflows::to_table is a function taking it)"
+bondWorkoutLadderTable = "twin of Python BondWorkoutLadder.to_dataframe (WASM ladders are plain objects, so Rust BondWorkoutLadder::to_table is a function taking it)"
+convertibleSpotLadderTable = "twin of Python ConvertibleSpotLadder.to_dataframe (WASM ladders are plain objects, so Rust ConvertibleSpotLadder::to_table is a function taking it)"
+bondQuoteSetTable = "twin of Python BondQuoteSet.to_dataframe (WASM quote sets are plain objects, so Rust BondQuoteSet::to_table is a function taking it)"
+poolReportTable = "twin of Python PoolReport.to_dataframe (WASM reports are plain objects, so Rust PoolReport::to_table is a function taking it)"
 FxBarrierOption = "typed WASM class; JSON-envelope only in Python by decision (see the [crates.valuations.instruments] note): built with instrument_envelope_from_spec and priced through price_instrument"
 FxDigitalOption = "typed WASM class; JSON-envelope only in Python by decision (see the [crates.valuations.instruments] note): built with instrument_envelope_from_spec and priced through price_instrument"
 FxSpot = "typed WASM class; JSON-envelope only in Python by decision (see the [crates.valuations.instruments] note): built with instrument_envelope_from_spec and priced through price_instrument"
@@ -2236,6 +2297,9 @@ excluded = { manual = "literal" }
 [parity.members."finstack_quant.valuations.composite.WeightingMethod"]
 renames = { metric_weighted = { js = "valuations.composite.weightingMethodMetricWeighted", reason = "WASM `WeightingMethod` values are plain objects; the Rust constructor or method is a free function" }, dv01_neutral = { js = "valuations.composite.weightingMethodDv01Neutral", reason = "WASM `WeightingMethod` values are plain objects; the Rust constructor or method is a free function" }, delta_neutral = { js = "valuations.composite.weightingMethodDeltaNeutral", reason = "WASM `WeightingMethod` values are plain objects; the Rust constructor or method is a free function" }, duration_weighted = { js = "valuations.composite.weightingMethodDurationWeighted", reason = "WASM `WeightingMethod` values are plain objects; the Rust constructor or method is a free function" }, volatility_weighted = { js = "valuations.composite.weightingMethodVolatilityWeighted", reason = "WASM `WeightingMethod` values are plain objects; the Rust constructor or method is a free function" } }
 excluded = { fixed_quantity = "literal", notional_weighted = "literal" }
+
+[parity.members."finstack_quant.valuations.instruments.InstrumentCashflowEnvelope"]
+renames = { calendar_year_ladder_by_currency = { js = "valuations.instruments.calendarYearLadderByCurrency", reason = "WASM cashflow envelopes are plain objects; the Rust InstrumentCashflowEnvelope::calendar_year_ladder_by_currency method is a free function taking the object" } }
 
 [parity.members."finstack_quant.valuations.instruments.SimulationDiagnostics"]
 excluded = { coverage_tests_dataframe = "pandas" }
@@ -2299,9 +2363,12 @@ renames = { synthesized_deal = { js = "synthesizedDealJson", reason = "the Rust 
 [parity.js."statements_analytics".wasm_only]
 explainFormulaText = "Text rendering of explain_formula in one call; Python calls Explanation.to_text on the returned explanation"
 plSummaryReportText = "Text rendering of a PLSummaryReport in one call; Python calls PLSummaryReport.to_text on the returned report"
+capitalStructureSummaryTable = "twin of Python CapitalStructureSummary.to_dataframe (WASM summaries are plain objects, so Rust CapitalStructureSummary::to_table is a function taking it)"
+relativeValueReportTable = "twin of Python RelativeValueReport.to_dataframe (WASM reports are plain objects, so Rust RelativeValueReport::to_table is a function taking it)"
 
 [parity.members."finstack_quant.analytics.Performance"]
-renames = { from_arrays = { js = "constructor", reason = "Python distinguishes its pandas constructor from the Rust-shaped array adapter; WASM's constructor already accepts arrays (Rust Performance::new)" }, from_returns_arrays = { js = "fromReturns", reason = "Python distinguishes pandas and array input adapters; WASM fromReturns already accepts arrays (Rust Performance::from_returns)" } }
+renames = { from_panel = { js = "constructor", reason = "Python's constructor is the pandas price adapter; from_panel takes the Rust PerformancePanel, which the WASM constructor takes (Rust Performance::new)" } }
+excluded = { from_returns = "pandas" }
 wasm_only = { summary = "WASM twin of the pandas exit Performance.to_dataframe, returned as a TableEnvelope" }
 
 [parity.members."finstack_quant.core.dates.BusinessDayConvention"]
@@ -2408,6 +2475,12 @@ renames = { with_scope = { js = "covenants.covenantForecastConfigWithScope", rea
 [parity.members."finstack_quant.covenants.CovenantSpec"]
 renames = { with_denominator_metric = { js = "covenants.covenantSpecWithDenominatorMetric", reason = "WASM CovenantSpec values are plain objects; the Rust CovenantSpec::with_denominator_metric function is a free function over the wire value" }, with_threshold_schedule = { js = "covenants.covenantSpecWithThresholdSchedule", reason = "WASM CovenantSpec values are plain objects; the Rust CovenantSpec::with_threshold_schedule function is a free function over the wire value" } }
 
+[parity.members."finstack_quant.covenants.CovenantTemplate".excluded]
+cov_lite = "literal"
+lbo_standard = "literal"
+project_finance = "literal"
+real_estate = "literal"
+
 [parity.members."finstack_quant.covenants.CovenantType"]
 renames = { affirmative = { js = "covenants.covenantTypeAffirmative", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::Affirmative variant is built by a free function returning the wire value" }, basket = { js = "covenants.covenantTypeBasket", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::Basket variant is built by a free function returning the wire value" }, custom = { js = "covenants.covenantTypeCustom", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::Custom variant is built by a free function returning the wire value" }, max_capex = { js = "covenants.covenantTypeMaxCapex", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MaxCapex variant is built by a free function returning the wire value" }, max_debt_to_ebitda = { js = "covenants.covenantTypeMaxDebtToEbitda", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MaxDebtToEbitda variant is built by a free function returning the wire value" }, max_net_debt_to_ebitda = { js = "covenants.covenantTypeMaxNetDebtToEbitda", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MaxNetDebtToEbitda variant is built by a free function returning the wire value" }, max_senior_leverage = { js = "covenants.covenantTypeMaxSeniorLeverage", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MaxSeniorLeverage variant is built by a free function returning the wire value" }, max_total_leverage = { js = "covenants.covenantTypeMaxTotalLeverage", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MaxTotalLeverage variant is built by a free function returning the wire value" }, min_asset_coverage = { js = "covenants.covenantTypeMinAssetCoverage", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MinAssetCoverage variant is built by a free function returning the wire value" }, min_dscr = { js = "covenants.covenantTypeMinDscr", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MinDscr variant is built by a free function returning the wire value" }, min_fixed_charge_coverage = { js = "covenants.covenantTypeMinFixedChargeCoverage", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MinFixedChargeCoverage variant is built by a free function returning the wire value" }, min_interest_coverage = { js = "covenants.covenantTypeMinInterestCoverage", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MinInterestCoverage variant is built by a free function returning the wire value" }, min_liquidity = { js = "covenants.covenantTypeMinLiquidity", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MinLiquidity variant is built by a free function returning the wire value" }, negative = { js = "covenants.covenantTypeNegative", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::Negative variant is built by a free function returning the wire value" } }
 
@@ -2415,7 +2488,7 @@ renames = { affirmative = { js = "covenants.covenantTypeAffirmative", reason = "
 renames = { threshold_for = { js = "covenants.thresholdScheduleThresholdFor", reason = "WASM ThresholdSchedule values are plain objects; the Rust ThresholdSchedule::threshold_for function is a free function over the wire value" } }
 
 [parity.members."finstack_quant.attribution.PnlAttribution"]
-renames = { explain = { js = "attribution.pnlAttributionExplainText", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::explain method is a free function taking the object" }, pct_of_total = { js = "attribution.pnlAttributionPctOfTotal", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::pct_of_total method is a free function taking the object" }, required_metrics = { js = "attribution.pnlAttributionRequiredMetrics", reason = "WASM attribution results are plain objects; Rust AttributionMethod::required_metrics of meta.method is a free function taking the object" }, residual_within_tolerance = { js = "attribution.pnlAttributionResidualWithinTolerance", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::residual_within_tolerance method is a free function taking the object" }, validate_currencies = { js = "attribution.pnlAttributionValidateCurrencies", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::validate_currencies method is a free function taking the object" } }
+renames = { explain = { js = "attribution.pnlAttributionExplainText", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::explain method is a free function taking the object" }, pct_of_total = { js = "attribution.pnlAttributionPctOfTotal", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::pct_of_total method is a free function taking the object" }, pct_of_total_by_bucket = { js = "attribution.pnlAttributionPctOfTotalByBucket", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::pct_of_total_by_bucket method is a free function taking the object" }, required_metrics = { js = "attribution.pnlAttributionRequiredMetrics", reason = "WASM attribution results are plain objects; Rust AttributionMethod::required_metrics of meta.method is a free function taking the object" }, residual_within_tolerance = { js = "attribution.pnlAttributionResidualWithinTolerance", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::residual_within_tolerance method is a free function taking the object" }, validate_currencies = { js = "attribution.pnlAttributionValidateCurrencies", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::validate_currencies method is a free function taking the object" } }
 
 [parity.members."finstack_quant.calibration.CalibrationEnvelope"]
 renames = { content_hash = { js = "calibration.calibrationEnvelopeContentHash", reason = "WASM envelopes are plain objects; the Rust CalibrationEnvelope::content_hash method is a free function taking the envelope" } }
@@ -2554,6 +2627,7 @@ renames = { values = { js = "features.timeSeriesOpValues", reason = "WASM TimeSe
 
 [parity.members."finstack_quant.scenarios.ApplicationReport"]
 excluded = { carry_to_dataframe = "pandas", changes_to_dataframe = "pandas" }
+renames = { effective_as_of = { js = "scenarios.applicationReportEffectiveAsOf", reason = "WASM application reports are plain objects; the Rust ApplicationReport::effective_as_of method is a free function taking the object" } }
 
 [parity.members."finstack_quant.scenarios.Compounding"]
 excluded = { continuous = "literal", monthly = "literal", quarterly = "literal", semi_annual = "literal", simple = "literal" }
@@ -2613,6 +2687,9 @@ renames = { add_adjustment = { js = "statements.normalizationConfigAddAdjustment
 [parity.members."finstack_quant.statements.PikToggleSpec"]
 renames = { validate = { js = "statements.validatePikToggleSpecJson", reason = "WASM specs are plain objects; the Rust PikToggleSpec::validate method runs inside the JSON validation function" } }
 
+[parity.members."finstack_quant.statements.RollupSpec"]
+renames = { declared_methods = { js = "statements.rollupSpecDeclaredMethods", reason = "WASM rollup specs are plain objects; the Rust RollupSpec::declared_methods associated function is a free function" } }
+
 [parity.members."finstack_quant.statements.StatementResult"]
 renames = { rollup = { js = "statements.statementResultRollup", reason = "WASM statement results are plain objects; the Rust StatementResult::rollup method is a free function taking the object" }, get = { js = "statements.statementResultGet", reason = "WASM statement results are plain objects; the Rust StatementResult::get method is a free function taking the object" }, get_money = { js = "statements.statementResultGetMoney", reason = "WASM statement results are plain objects; the Rust StatementResult::get_money method is a free function taking the object" }, get_scalar = { js = "statements.statementResultGetScalar", reason = "WASM statement results are plain objects; the Rust StatementResult::get_scalar method is a free function taking the object" }, get_or = { js = "statements.statementResultGetOr", reason = "WASM statement results are plain objects; the Rust StatementResult::get_or method is a free function taking the object" }, all_periods = { js = "statements.statementResultAllPeriods", reason = "WASM statement results are plain objects; the Rust StatementResult::all_periods method is a free function taking the object" }, get_node = { js = "statements.statementResultGetNode", reason = "WASM statement results are plain objects; the Rust StatementResult::get_node method is a free function taking the object" }, node_ids = { js = "statements.statementResultNodeIds", reason = "WASM statement results are plain objects; the Rust StatementResult node-id accessor is a free function taking the object" }, to_dated_schedule = { js = "statements.nodeToDatedSchedule", reason = "WASM statement results are plain objects; the Rust evaluator::node_to_dated_schedule function is a free function taking the object" }, to_arrow_long = { js = "statements.statementResultToTableLong", reason = "WASM statement results are plain objects; Rust StatementResult::to_table_long returns the TableEnvelope that Python wraps as an Arrow table" }, to_arrow_wide = { js = "statements.statementResultToTableWide", reason = "WASM statement results are plain objects; Rust StatementResult::to_table_wide returns the TableEnvelope that Python wraps as an Arrow table" } }
 
@@ -2635,13 +2712,13 @@ renames = { summary = { js = "statements_analytics.forecastMetricsSummaryText", 
 renames = { validate = { js = "statements_analytics.validateLeaseSpecJson", reason = "WASM lease specs are plain objects; the Rust LeaseSpec::validate method runs inside the JSON validation function" } }
 
 [parity.members."finstack_quant.statements_analytics.ParameterSpec"]
-renames = { with_percentages = { js = "statements_analytics.parameterSpecWithPercentages", reason = "WASM parameter specs are plain objects; the Rust ParameterSpec::with_percentages constructor is a free function returning the object" } }
+renames = { with_percentages = { js = "statements_analytics.runSensitivity", reason = "WASM parameter specs are plain objects: a spec's `pct_range` field is converted to absolute shocks by Rust ParameterSpec deserialization (ParameterSpec::with_percentages) inside runSensitivity" } }
 
 [parity.members."finstack_quant.statements_analytics.PeerFilter"]
 renames = { accepts = { js = "statements_analytics.peerFilterAccepts", reason = "WASM peer filters are plain objects; the Rust PeerFilter::accepts method is a free function taking the object" } }
 
 [parity.members."finstack_quant.statements_analytics.PeerSet"]
-renames = { from_universe = { js = "statements_analytics.peerSetFromUniverse", reason = "WASM peer sets are plain objects; the Rust PeerSet::from_universe constructor is a free function returning the object" } }
+renames = { from_universe = { js = "statements_analytics.peerSetFromUniverse", reason = "WASM peer sets are plain objects; the Rust PeerSet::from_universe constructor is a free function returning [peerSet, excludedCount]" } }
 
 [parity.members."finstack_quant.statements_analytics.RenewalSpec"]
 renames = { validate = { js = "statements_analytics.validateRenewalSpecJson", reason = "WASM renewal specs are plain objects; the Rust RenewalSpec::validate method runs inside the JSON validation function" } }
@@ -2695,7 +2772,7 @@ wasm_only = { numPositions = "Rust position count; twin of Python len(portfolio)
 
 [parity.members."finstack_quant.portfolio.PortfolioAttribution"]
 excluded = { by_position_json = "literal" }
-renames = { explain = { js = "portfolio.portfolioAttributionExplainText", reason = "WASM results are plain objects; the Rust PortfolioAttribution::explain method is a free function taking the object" }, reconciliation_check = { js = "portfolio.portfolioAttributionReconciliationCheck", reason = "WASM results are plain objects; the Rust PortfolioAttribution::reconciliation_check method is a free function taking the object" } }
+renames = { explain = { js = "portfolio.portfolioAttributionExplainText", reason = "WASM results are plain objects; the Rust PortfolioAttribution::explain method is a free function taking the object" }, pct_of_total_by_bucket = { js = "portfolio.portfolioAttributionPctOfTotalByBucket", reason = "WASM results are plain objects; the Rust PortfolioAttribution::pct_of_total_by_bucket method is a free function taking the object" }, reconciliation_check = { js = "portfolio.portfolioAttributionReconciliationCheck", reason = "WASM results are plain objects; the Rust PortfolioAttribution::reconciliation_check method is a free function taking the object" } }
 
 [parity.members."finstack_quant.portfolio.PortfolioCashflows"]
 excluded = { by_date_json = "literal", events_json = "literal", issues_json = "literal" }

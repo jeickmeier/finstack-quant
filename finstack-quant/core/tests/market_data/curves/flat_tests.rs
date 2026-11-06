@@ -178,13 +178,15 @@ fn test_from_zero_rates_continuous_matches_flat() {
     )
     .expect("valid annual zero-rate curve");
     assert!((annual.df(2.0) - 1.05_f64.powi(-2)).abs() < 1e-12);
-    assert!(DiscountCurve::from_zero_rates(
-        "EMPTY",
-        base_date(),
-        &[],
-        Compounding::Periodic(std::num::NonZeroU32::MIN)
-    )
-    .is_err());
+    assert!(
+        DiscountCurve::from_zero_rates(
+            "EMPTY",
+            base_date(),
+            &[],
+            Compounding::Periodic(std::num::NonZeroU32::MIN)
+        )
+        .is_err()
+    );
 }
 
 #[test]

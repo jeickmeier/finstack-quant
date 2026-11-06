@@ -22,6 +22,7 @@ from typing import Any
 import pytest
 
 from finstack_quant import statements as st, statements_analytics as sa
+from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -48,11 +49,13 @@ def built_model() -> st.FinancialModelSpec:
     builder.forecast("revenue", st.ForecastSpec.growth(0.05))
     builder.compute("profit", "revenue * 0.5")
     builder.value_money("cash", {Q1: Money(100.0, "USD"), Q2: Money(110.0, "USD")})
+    builder.rollup("cash", "period_end")
     builder.with_meta("currency", "USD")
     mixed = builder.mixed("capex")
     mixed.values({Q1: 10.0})
     mixed.formula("revenue * 0.1")
     mixed.name("Capex")
+    mixed.rollup("formula")
     return mixed.build().build()
 
 
@@ -83,7 +86,20 @@ def statements_cases() -> dict[str, Any]:
     registry = st.Registry.with_builtins()
     first = registry.metric_ids()[0]
 
+    rollup_model = json.dumps(INPUTS["rollup_model"])
+    rollup_spec = st.RollupSpec.declared_methods(rollup_model, "annual")
+
+    rollup_results = st.Evaluator().evaluate(rollup_model)
+    rolled_up = doc(rollup_results.rollup(rollup_model, rollup_spec))
+    empty_spec = st.RollupSpec("annual")
+    override_spec = st.RollupSpec("annual", {"cash": "sum"})
+
     return {
+        "rollup.declared_methods": doc(rollup_spec),
+        "rollup.annual": rolled_up["nodes"],
+        "rollup.empty_spec": doc(rollup_results.rollup(rollup_model, empty_spec))["nodes"],
+        "rollup.spec_overrides": doc(rollup_results.rollup(rollup_model, override_spec))["nodes"]["cash"],
+        "rollup.periods": rolled_up["periods"],
         "result.get": result.get("profit", Q2),
         "result.get_missing": result.get("nope", Q2),
         "result.get_or": result.get_or("nope", Q2, -1.0),
@@ -158,6 +174,38 @@ def statements_cases() -> dict[str, Any]:
             "definition": doc(registry.get(first)),
             "dependencies": registry.get_dependencies(first),
         },
+    }
+
+
+def capital_structure_cases() -> dict[str, Any]:
+    """Debt stack over a real evaluation: two classes, a pari passu pair and a swap."""
+    model_json = json.dumps(INPUTS["capital_structure_model"])
+    results = st.Evaluator().evaluate_with_market(
+        st.FinancialModelSpec.from_json(model_json),
+        MarketContext.from_json(json.dumps(INPUTS["capital_structure_market"])),
+        INPUTS["capital_structure_as_of"],
+    )
+    return {
+        "full_year": doc(
+            sa.capital_structure_summary(
+                results, model_json, {"period": "2025Q4", "ebitda_node": "ebitda", "cash_node": "cash"}
+            )
+        ),
+        "short_window": doc(
+            sa.capital_structure_summary(results, model_json, {"period": "2025Q3", "ebitda_node": "ebitda"})
+        ),
+    }
+
+
+def relative_value_cases() -> dict[str, Any]:
+    """Comps table, regression scatter and score; a table with no usable dimension; a partial filter."""
+    subject, universe = INPUTS["relative_value_subject"], INPUTS["relative_value_universe"]
+    return {
+        "full": doc(sa.relative_value_report(subject, universe, INPUTS["relative_value_config"])),
+        "table_only": doc(sa.relative_value_report(subject, universe, INPUTS["relative_value_table_only_config"])),
+        "partial_filter": doc(
+            sa.relative_value_report(subject, universe, INPUTS["relative_value_partial_filter_config"])
+        ),
     }
 
 
@@ -283,7 +331,7 @@ def analytics_cases() -> dict[str, Any]:
         "company_get": [subject.get("ebitda"), subject.get("rule_of_40"), subject.get("nope")],
         "peer_accepts": [peer_filter.accepts(row) for row in universe],
         "peer_set": [
-            row["id"] for row in doc(sa.PeerSet.from_universe(subject, universe, peer_filter, "ltm"))["peers"]
+            row["id"] for row in doc(sa.PeerSet.from_universe(subject, universe, peer_filter, "ltm")[0])["peers"]
         ],
         "sensitivity": {
             "config": doc(extended),
@@ -291,6 +339,8 @@ def analytics_cases() -> dict[str, Any]:
             "parameter_missing": sensitivity.get_parameter_value(0, f"cogs@{Q2}"),
             "value": sensitivity.get_value(0, "profit", Q2),
         },
+        "capital_structure_summary": capital_structure_cases(),
+        "relative_value_report": relative_value_cases(),
         "explanation_text": sa.explain_formula(MODEL, result, "profit", Q1).to_text(),
         "forecast_summary": sa.backtest_forecast([100.0, 110.0], [98.0, 112.0]).summary(),
         # Execution goldens for the comps statistics, the LBO and the DCF tornado

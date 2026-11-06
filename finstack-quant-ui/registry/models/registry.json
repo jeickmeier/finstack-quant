@@ -2,6 +2,238 @@
   "$schema": "https://ui.shadcn.com/schema/registry.json",
   "items": [
     {
+      "name": "liability-management-card",
+      "type": "registry:component",
+      "title": "Liability management card",
+      "description": "Forms and native economics of a distressed exchange offer (ExchangeOfferCard) and a liability management exercise (LiabilityManagementCard), with Rust's own tender recommendation.",
+      "docs": "Two components, one form each. ExchangeOfferCard, the holder's view: hold-out PV, new instrument PV, consent fee, equity sweetener and offer structure, with the returned tender total, NPV pickup, breakeven recovery and tender_recommended, which is Rust's field and never compared here; the hurdle Rust applies shows beside it as supplied. LiabilityManagementCard, the issuer's view: structure, notional, participation, EBITDA and a price input that Rust reads as a price, an extension fee or a transferred-asset fraction by structure, with the returned cost, par retired, discount capture, holder impact and, for a positive EBITDA, the leverage block. Amounts use one unit you choose, with no currency conversion; percentages are fractions. An empty amount is sent as NaN for Rust to reject and an empty EBITDA stays unset. Each analysis shows its own native error. Each accepts defaultTerms, onSubmit, state, formatValue and density props (ExchangeOfferCard also hurdle), typed by the worker's ExchangeOfferRequest and LmeRequest contracts; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/liability-management-card/liability-management-card.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/liability-management-card/liability-management-card.tsx"
+        },
+        {
+          "path": "components/liability-management-card/exchange-offer-card.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/liability-management-card/exchange-offer-card.tsx"
+        },
+        {
+          "path": "components/liability-management-card/liability-fields.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/liability-management-card/liability-fields.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/decimal-input",
+        "@finstack/enum-field",
+        "@finstack/native-display",
+        "@finstack/finstack-worker",
+        "badge",
+        "button"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-liability-management",
+      "type": "registry:hook",
+      "title": "useLiabilityManagement",
+      "description": "Runs the native exchange-offer and LME analyses and reads the tender hurdle through the WASM worker.",
+      "docs": "useExchangeOffer passes a Rust ExchangeOffer wire value to models.credit.liabilityManagement.analyzeExchangeOffer, useLme a Rust LmeTerms wire value to analyzeLme, and useTenderRecommendationHurdle calls tenderRecommendationHurdle, each one native call. Null means no request. Requires FinstackQueryProvider. A rejected input is the hook error.",
+      "files": [
+        {
+          "path": "hooks/use-liability-management/use-liability-management.ts",
+          "type": "registry:hook",
+          "target": "hooks/models/use-liability-management/use-liability-management.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "recovery-waterfall",
+      "type": "registry:component",
+      "title": "Recovery waterfall",
+      "description": "Allocate an estate down a stack of claims under absolute priority (RecoveryWaterfall), calculate a workout LGD (WorkoutLgdCard) and read seniority recovery statistics (SeniorityRecoveryCard), all as Rust returns them.",
+      "docs": "Three components, one form each. RecoveryWaterfall: an estate value and claims (id, a free-text seniority label, integer priority, principal, accrued, penalties, an optional collateral value and its haircut), with Rust's allocations in its priority-then-entry order (total claim, collateral and general recovery, total recovery, recovery rate and deficiency per claim) and the estate's total distributed, undistributed estate and apr_satisfied. WorkoutLgdCard: EAD, direct and indirect cost fractions, years to resolution, a discount rate and collateral pieces whose types come from the generated WorkoutCollateralType contract, with the returned net recovery, LGD and recovery rate. SeniorityRecoveryCard: a class from the generated SeniorityClass contract and a calibration from the supplied calibrationIds (Rust's seniorityCalibrationIds, default first), with the Beta distribution's mean, standard deviation, variance, shape parameters, mode and mean LGD. Nothing is summed, divided or ranked here; amounts use one unit you choose and rates are fractions. An empty amount is sent as NaN for Rust to reject, an empty collateral value is an unsecured claim, and each analysis shows its own native error, including a class a calibration lacks. Each accepts defaultTerms (SeniorityRecoveryCard: defaultSeniority and calibrationIds), onSubmit, state, formatValue and density props, typed by the worker's RecoveryWaterfallRequest, WorkoutLgdRequest and SeniorityRecoveryRequest contracts; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/recovery-waterfall/recovery-waterfall.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/recovery-waterfall/recovery-waterfall.tsx"
+        },
+        {
+          "path": "components/recovery-waterfall/workout-lgd-card.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/recovery-waterfall/workout-lgd-card.tsx"
+        },
+        {
+          "path": "components/recovery-waterfall/seniority-recovery-card.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/recovery-waterfall/seniority-recovery-card.tsx"
+        },
+        {
+          "path": "components/recovery-waterfall/recovery-fields.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/recovery-waterfall/recovery-fields.tsx"
+        },
+        {
+          "path": "components/recovery-waterfall/recovery-contracts.ts",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/recovery-waterfall/recovery-contracts.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/decimal-input",
+        "@finstack/enum-field",
+        "@finstack/contract-workout-lgd",
+        "@finstack/contract-seniority-calibration",
+        "@finstack/contract-recovery-claim",
+        "@finstack/native-display",
+        "@finstack/finstack-worker",
+        "button"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/models/1/recovery_claim.schema.json",
+          "https://finstack_quant.dev/schemas/models/1/seniority_calibration.schema.json",
+          "https://finstack_quant.dev/schemas/models/1/workout_lgd.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-recovery-waterfall",
+      "type": "registry:hook",
+      "title": "useRecoveryWaterfall",
+      "description": "Runs the native recovery waterfall, workout LGD and seniority recovery statistics and lists the calibration ids through the WASM worker.",
+      "docs": "useAllocateRecovery calls models.credit.recoveryWaterfall.allocateRecovery, useWorkoutLgd evaluates the request's canonical WorkoutLgd (models.credit.lgd.WorkoutLgd.fromJson, then evaluate at the request's EAD; the handle is freed), useSeniorityRecoveryStats calls seniorityRecoveryStats (the worker reads the BetaRecovery handle's getters and frees it) and useSeniorityCalibrationIds calls seniorityCalibrationIds, each one native call. Null means no request. Requires FinstackQueryProvider. A rejected input is the hook error.",
+      "files": [
+        {
+          "path": "hooks/use-recovery-waterfall/use-recovery-waterfall.ts",
+          "type": "registry:hook",
+          "target": "hooks/models/use-recovery-waterfall/use-recovery-waterfall.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "option-calculator",
+      "type": "registry:component",
+      "title": "Option calculator",
+      "description": "Calculator of a European option under Black-Scholes, Black-76 or Bachelier: the price or implied volatility and the Greeks, as Rust returned them.",
+      "docs": "Edits the terms of a European option under Black-Scholes (spot, strike, rate, dividend yield, expiry), Black-76 (forward, strike, discount factor, expiry) or Bachelier (forward, strike, expiry), with a volatility to price or a price to invert. Calculate passes the request to the caller (usually the useOptionCalculator request); typed text becomes numbers as entered and an empty field is sent as NaN for Rust to reject. The returned price or implied volatility and the Greeks at that volatility are shown as Rust returned them, with the conventions the facade documents: Black-76 prices are discounted, Bachelier prices undiscounted; Black-Scholes vega and rhos are per 1% move and theta per day, forward-Greek vega per unit of volatility. The request and result are Rust's OptionCalculation and OptionCalculationResult wire values; the labels follow the last submitted request. A price Rust cannot invert or Greeks it rejects (at zero volatility under Black-Scholes) is the whole error. Accepts defaultRequest, onSubmit, result, loading, error, formatValue and density props.",
+      "files": [
+        {
+          "path": "components/option-calculator/option-calculator.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/option-calculator/option-calculator.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/decimal-input",
+        "@finstack/enum-field",
+        "@finstack/native-display",
+        "button"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-option-calculator",
+      "type": "registry:hook",
+      "title": "useOptionCalculator",
+      "description": "Runs a native Black-Scholes, Black-76 or Bachelier price or implied volatility with its Greeks through the WASM worker.",
+      "docs": "One models.optionCalculation of a Rust OptionCalculation (a closed-form model and a price or implied-volatility solve), returning the price, the volatility and the model's Greeks at it. Null means no request. Requires FinstackQueryProvider. A calculation Rust rejects is the hook error.",
+      "files": [
+        {
+          "path": "hooks/use-option-calculator/use-option-calculator.ts",
+          "type": "registry:hook",
+          "target": "hooks/models/use-option-calculator/use-option-calculator.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
       "name": "monte-carlo-diagnostics",
       "type": "registry:component",
       "title": "Monte Carlo diagnostics",
@@ -43,7 +275,34 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
-          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-fx-strike-surface",
+      "type": "registry:hook",
+      "title": "useFxStrikeSurface",
+      "description": "Materializes an FX delta surface as a strike-space volatility surface through the WASM worker.",
+      "docs": "Native models.volatility.materializeFxDeltaSurface with complete immutable quote/spot/rate keys. Null means no request. Spot is domestic per unit of foreign; rates are continuously compounded decimals, never defaulted. Requires FinstackQueryProvider; returns the canonical stored-surface JSON or native errors.",
+      "files": [
+        {
+          "path": "hooks/use-fx-strike-surface/use-fx-strike-surface.ts",
+          "type": "registry:hook",
+          "target": "hooks/models/use-fx-strike-surface/use-fx-strike-surface.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
         ]
       }
     },
@@ -68,7 +327,86 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
-          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-cube-slice",
+      "type": "registry:hook",
+      "title": "useCubeSlice",
+      "description": "Materializes a fixed-tenor or fixed-expiry slice of a SABR volatility cube at explicit strikes through the WASM worker.",
+      "docs": "Native models.volatility.materializeCubeTenorSlice/ExpirySlice in the request's wire VolatilityConvention with complete immutable cube/axis/value/strike/convention keys. Null means no request. Strikes are absolute in the stored forwards' rate units; off-node values are Rust-interpolated. Requires FinstackQueryProvider; returns the canonical slice JSON or native errors.",
+      "files": [
+        {
+          "path": "hooks/use-cube-slice/use-cube-slice.ts",
+          "type": "registry:hook",
+          "target": "hooks/models/use-cube-slice/use-cube-slice.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-cube-smile",
+      "type": "registry:hook",
+      "title": "useCubeSmile",
+      "description": "Evaluates the SABR smile of one volatility-cube node, its static-arbitrage check and an optional repair through the WASM worker.",
+      "docs": "Native VolCube paramsAt/forwardAt, SabrParameters.fromJson and SabrSmile generateSmile, validateNoArbitrage and repairArbitrage with complete immutable keys. The continuously compounded decimal rate is required and never defaulted; omitted repair passes run no repair. Requires FinstackQueryProvider; errors are unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-cube-smile/use-cube-smile.ts",
+          "type": "registry:hook",
+          "target": "hooks/models/use-cube-smile/use-cube-smile.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-check-surface",
+      "type": "registry:hook",
+      "title": "useCheckSurface",
+      "description": "Checks a stored volatility surface for static arbitrage with host-supplied forwards through the WASM worker.",
+      "docs": "core.VolSurface.fromJson of the canonical stored surface, then models.volatility.checkSurface with the request's Rust ArbitrageCheckConfig unchanged (host-supplied forward_prices, one to broadcast or one per expiry in the surface strike units; an omitted tolerance, check switch or minimum severity leaves Rust's default); the handle is freed. Keyed on the complete surface and config and the worker session; null means no request. Rust rejects normal-quoted, shifted-Black and tenor-axis surfaces and missing or mis-sized forwards with a validation error, returned unchanged. Requires FinstackQueryProvider.",
+      "files": [
+        {
+          "path": "hooks/use-check-surface/use-check-surface.ts",
+          "type": "registry:hook",
+          "target": "hooks/models/use-check-surface/use-check-surface.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
         ]
       }
     },
@@ -76,8 +414,8 @@
       "name": "fx-surface-chart",
       "type": "registry:component",
       "title": "FX surface chart",
-      "description": "FX volatility surface: raw quotes plus natively evaluated Black volatilities as a heatmap, table and slices.",
-      "docs": "Raw FX quotes and native evaluated Black volatility, sharing surface table/slices/selection/exports. Supply original coordinates with explicit quote/base forwards and an explicit color domain. Missing forwards show only raw quotes; no curve choice or local conversion occurs. Requires FinstackQueryProvider. Quote editing uses market-context-form and use-market-validator.",
+      "description": "FX volatility surface: raw quotes, natively evaluated Black volatilities and a Rust-materialized strike grid as heatmaps, tables and slices.",
+      "docs": "Raw FX quotes and native evaluated Black volatility, sharing surface table/slices/selection/exports. Supply original coordinates with explicit quote/base forwards and an explicit color domain. Missing forwards show only raw quotes; no curve choice or local conversion occurs. The strike grid materializes the quotes natively (models.volatility.materializeFxDeltaSurface) from an editable spot (domestic per unit of foreign) and continuously compounded domestic and foreign decimal rates, seeded only from initialSpot, initialDomesticRate and initialForeignRate. Requires FinstackQueryProvider. Quote editing uses market-context-form and use-market-validator.",
       "files": [
         {
           "path": "components/fx-surface-chart/fx-surface-chart.tsx",
@@ -88,7 +426,9 @@
       "registryDependencies": [
         "@finstack/vol-surface-chart",
         "@finstack/fx-delta-quotes",
-        "@finstack/use-fx-delta-samples"
+        "@finstack/use-fx-delta-samples",
+        "@finstack/use-fx-strike-surface",
+        "@finstack/decimal-input"
       ],
       "dependencies": ["react@19.2.8"],
       "categories": ["Individual Components"],
@@ -97,7 +437,82 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
-          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "vol-cube-slice",
+      "type": "registry:component",
+      "title": "Volatility cube slice",
+      "description": "Rust-materialized fixed-tenor or fixed-expiry slice of a SABR volatility cube, plus one node's native SABR smile, arbitrage check and repair.",
+      "docs": "Slices a canonical cube at explicit absolute strikes (initialStrikes, one editable field each, in the given order) through models.volatility.materializeCube{Tenor,Expiry}Slice in the selected convention (\"normal\" or \"lognormal\"), rendered by the shared surface view with an explicit color extent per convention. The node smile comes from SabrSmile at the selected expiry/tenor node: normal volatility when beta < 1e-4, Black otherwise, as the facade documents; the arbitrage check needs an explicit continuously compounded decimal rate (initialRate, never defaulted) and the repaired line appears only when repairIterations is supplied. Strike ordering and domain are validated natively. Requires FinstackQueryProvider.",
+      "files": [
+        {
+          "path": "components/vol-cube-slice/vol-cube-slice.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/vol-cube-slice/vol-cube-slice.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/use-cube-slice",
+        "@finstack/use-cube-smile",
+        "@finstack/vol-surface-chart",
+        "@finstack/finstack-chart",
+        "@finstack/finstack-table",
+        "@finstack/json-viewer",
+        "@finstack/finstack-codec",
+        "@finstack/decimal-input",
+        "@finstack/enum-field"
+      ],
+      "dependencies": ["react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "surface-arbitrage-badge",
+      "type": "registry:component",
+      "title": "Surface arbitrage badge",
+      "description": "Badge and popover of a stored volatility surface native static-arbitrage report: passed, violations by type and severity, not checked, or forwards not supplied.",
+      "docs": "Runs models.volatility.checkSurface (through useCheckSurface) on a canonical stored surface with a host-supplied Rust ArbitrageCheckConfig (forward_prices one to broadcast or one per expiry, in the surface strike units, never inferred; optional tolerance and check switches). The badge shows Passed, the violation count, Not checked (the native error, such as a normal-quoted, shifted-Black or tenor-axis surface Rust does not check) or Forwards not supplied (no config, so no request is made). The popover lists the returned counts by type and severity and every violation (type, severity, expiry, adjacent expiry, strike, magnitude in total variance, suggested fix, description) in the order Rust returned them. Requires FinstackQueryProvider.",
+      "files": [
+        {
+          "path": "components/surface-arbitrage-badge/surface-arbitrage-badge.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/surface-arbitrage-badge/surface-arbitrage-badge.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/finstack-surface",
+        "@finstack/contract-arbitrage-report",
+        "@finstack/use-check-surface",
+        "badge",
+        "button",
+        "popover"
+      ],
+      "dependencies": ["@tanstack/react-table@9.2.4", "react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/models/1/arbitrage_report.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
         ]
       }
     },
@@ -105,8 +520,8 @@
       "name": "vol-cube-explorer",
       "type": "registry:component",
       "title": "Volatility cube explorer",
-      "description": "Explores a volatility cube by strike and convention using natively evaluated samples.",
-      "docs": "Checked native volatility cube exploration. Supply canonical cube state, initial absolute strike and explicit normal or Black/lognormal convention, plus color extents for both output units. Original SABR parameters, forwards and shifts remain separate from evaluated samples. Requires FinstackQueryProvider; editing uses market-context-form and native validation.",
+      "description": "Explores a volatility cube by strike and convention using natively evaluated samples, with an optional Rust-materialized slice and node smile.",
+      "docs": "Checked native volatility cube exploration. Supply canonical cube state, initial absolute strike and explicit normal or Black/lognormal convention, plus color extents for both output units. Original SABR parameters, forwards and shifts remain separate from evaluated samples. Supplying slice (explicit initialStrikes, optional initialRate and repairIterations) adds vol-cube-slice. Requires FinstackQueryProvider; editing uses market-context-form and native validation.",
       "files": [
         {
           "path": "components/vol-cube-explorer/vol-cube-explorer.tsx",
@@ -120,7 +535,8 @@
         "@finstack/json-viewer",
         "@finstack/finstack-codec",
         "@finstack/decimal-input",
-        "@finstack/enum-field"
+        "@finstack/enum-field",
+        "@finstack/vol-cube-slice"
       ],
       "dependencies": ["react@19.2.8"],
       "categories": ["Individual Components"],
@@ -129,7 +545,358 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "transition-matrix-heatmap",
+      "type": "registry:component",
+      "title": "Transition matrix heatmap",
+      "description": "Display of a native rating transition matrix, its regularized generator and projected cumulative default probabilities, as heatmaps and a term-structure figure or as tables.",
+      "docs": "Display-only view of the results returned by useMigrationMatrix (models.credit.migration.TransitionMatrix.fromLabeled) and useMigrationProjection (GeneratorMatrix.fromTransitionMatrix, then models.credit.migration.project per horizon). Labels and the default state come from the matrix's RatingScale. The transition and generator matrices are heatmaps (origin by destination, scale order); probabilities use the colour domain [0, 1] and the generator the extent of its intensities, centred on zero when the negative diagonal and positive off-diagonals straddle it. The generator's round-trip error and L1 regularization are stamped beside it; cumulative default probabilities are drawn per origin state against the requested horizons. A view control switches every section to tables. A projection error (for example a round-trip tolerance Rust rejects) is shown inline while the matrix stays visible. Values are decimals as Rust returned them; nothing is computed. Accepts matrix, loading, error, projection, projectionLoading, projectionError, initialView, formatValue and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/transition-matrix-heatmap/transition-matrix-heatmap.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/transition-matrix-heatmap/transition-matrix-heatmap.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-chart",
+        "@finstack/finstack-table",
+        "@finstack/enum-field",
+        "@finstack/native-display"
+      ],
+      "dependencies": [
+        "@tanstack/charts@0.18.0",
+        "@tanstack/react-table@9.2.4",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "merton-calculator",
+      "type": "registry:component",
+      "title": "Merton calculator",
+      "description": "Calculator of a native models.credit.MertonModel report: the generated MertonModel form or a KMV equity calibration, horizons and CDS terms, then the returned term structure, spreads, implied equity and master-scale grades.",
+      "docs": "Edits a Merton structural-credit request: horizons, CDS maturity and recovery, and the model either with the schema form over the generated MertonModel contract (native validation through the caller's validate callback, usually useMertonModelValidator) or as a KMV equity calibration (equity value and volatility, short- and long-term debt, rate, payout, calibration maturity). Calculate passes the request to the caller (usually the useMertonReport request). The returned report is shown as Rust returned it: CDS par spread and implied equity value and volatility tiles, a term-structure table (default probability, distance to default, implied and debt spreads, master-scale grade and central PD per horizon) and the canonical model parameters with the KMV default point of an equity calibration. A measure Rust rejects for the model (such as the debt spread of a first-passage barrier) shows its native error beside the rest. Values are decimals with no units inferred. Accepts defaultRequest, validate, onSubmit, report, loading, error, formatValue and density props.",
+      "files": [
+        {
+          "path": "components/merton-calculator/merton-calculator.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/merton-calculator/merton-calculator.tsx"
+        },
+        {
+          "path": "components/merton-calculator/merton.ts",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/merton-calculator/merton.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/schema-form",
+        "@finstack/decimal-input",
+        "@finstack/enum-field",
+        "@finstack/field-frame",
+        "@finstack/contract-merton-model",
+        "@finstack/finstack-codec",
+        "@finstack/native-display",
+        "button",
+        "input"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/models/1/merton_model.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "credit-scorecard",
+      "type": "registry:component",
+      "title": "Credit scorecard",
+      "description": "Scorecard of a native models.credit.scoring model: the generated input-ratio form of Altman Z, Z', Z'' and EM, Ohlson O or Zmijewski, then the returned score, zone, implied PD and default master-scale grade.",
+      "docs": "Edits the input ratios of one accounting-based credit model (Altman Z-Score, Z'-Score, Z''-Score or EM-Score, Ohlson O-Score, Zmijewski probit). The fields, their order and their help text come from the generated input contract of the selected model (altman_z_score_input, altman_z_prime_input, altman_z_double_prime_input for both Z'' and EM, ohlson_o_score_input, zmijewski_input); each model keeps its own entries when another is selected. Score passes the Rust CreditScoreRequest (the model tag and its ratios) to the caller (usually the useCreditScore request); typed text becomes numbers as entered and an empty field is sent as NaN for Rust to reject. The returned score, zone and implied PD are shown as Rust returned them, with the grade and central PD Rust assigns the implied PD on the default PD master scale, or no grade when the model returns no implied PD (the Altman models). Nothing is computed or classified here. Accepts defaultModel, defaultInputs, onSubmit, score, loading, error, formatValue and density props.",
+      "files": [
+        {
+          "path": "components/credit-scorecard/credit-scorecard.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/credit-scorecard/credit-scorecard.tsx"
+        },
+        {
+          "path": "components/credit-scorecard/scoring.ts",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/credit-scorecard/scoring.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/decimal-input",
+        "@finstack/enum-field",
+        "@finstack/contract-altman-z-score-input",
+        "@finstack/contract-altman-z-prime-input",
+        "@finstack/contract-altman-z-double-prime-input",
+        "@finstack/contract-ohlson-o-score-input",
+        "@finstack/contract-zmijewski-input",
+        "@finstack/native-display",
+        "button"
+      ],
+      "dependencies": ["finstack-quant-wasm@0.11.0", "react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/models/1/altman_z_double_prime_input.schema.json",
+          "https://finstack_quant.dev/schemas/models/1/altman_z_prime_input.schema.json",
+          "https://finstack_quant.dev/schemas/models/1/altman_z_score_input.schema.json",
+          "https://finstack_quant.dev/schemas/models/1/ohlson_o_score_input.schema.json",
+          "https://finstack_quant.dev/schemas/models/1/zmijewski_input.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "portfolio-risk-report",
+      "type": "registry:component",
+      "title": "Portfolio risk report",
+      "description": "Report of native models.factor.risk results: portfolio VaR and ES, component-VaR bars, VaR and ES contributions, the risk budget, the tail stress attribution and a book's factor contributions as returned.",
+      "docs": "Presents the Rust PositionRiskReport the worker positionRisk returns (usually through usePositionRisk): portfolio VaR, ES, confidence, method, position count and the Euler residual stamp (none for a historical decomposition); bars of each returned component VaR; the VaR contributions (component, relative, marginal and incremental VaR) and ES contributions tables; the risk budget (has_breach, total_overbudget and per-position actual and target component VaR, utilization and excess) when one was requested; and, for a historical source, the tail stress attribution (VaR threshold, tail scenario count, per-position tail contributions in Rust's largest-driver-first order and the tail scenarios worst first). Values are as returned: losses negative, in the units of the supplied weights or P&L, shares as fractions; nothing is summed, flagged or re-sorted. With factors (usually from useFactorRisk) it adds a Factor contributions section: total and residual risk under the returned measure, risk by factor (absolute, relative and marginal), risk by position and factor, any residual risk by position, and the portfolio.computeFactorSensitivities matrix it decomposed in the book's base currency; the factor chain's native error shows in that section. Either part renders without the other. Accepts report, factors, factorsError, loading, error, formatValue and density props.",
+      "files": [
+        {
+          "path": "components/portfolio-risk-report/portfolio-risk-report.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/portfolio-risk-report/portfolio-risk-report.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/finstack-chart",
+        "@finstack/native-display"
+      ],
+      "dependencies": [
+        "@tanstack/charts@0.18.0",
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/models/1/position_risk_report.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-migration-matrix",
+      "type": "registry:hook",
+      "title": "useMigrationMatrix",
+      "description": "Builds a native rating transition matrix from labelled rows through the WASM worker.",
+      "docs": "models.credit.migration.TransitionMatrix.fromLabeled over the supplied labels (rows and columns share one order; the last label is the absorbing default state), rows and horizon in years, then toRows, defaultProbabilities, horizon and the labels and default state of the matrix's RatingScale. Every handle is freed, including the scale the getter returns. Rows that do not sum to one, a non-absorbing default row or a non-positive horizon return the native validation error unchanged. Keyed on the complete request and worker session. Requires the shared Finstack/Query provider.",
+      "files": [
+        {
+          "path": "hooks/use-migration-matrix/use-migration-matrix.ts",
+          "type": "registry:hook",
+          "target": "hooks/models/use-migration-matrix/use-migration-matrix.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-migration-projection",
+      "type": "registry:hook",
+      "title": "useMigrationProjection",
+      "description": "Estimates a native generator from a labelled transition matrix and projects default probabilities to explicit horizons through the WASM worker.",
+      "docs": "models.credit.migration.TransitionMatrix.fromLabeled, GeneratorMatrix.fromTransitionMatrix (an omitted roundTripTol stays unset so Rust applies its default) and models.credit.migration.project once per requested horizon. Returns the generator's rows, roundTripError and regularizationL1, and each projected matrix's horizon and default probabilities in request order. Every handle is freed. A round trip beyond the tolerance or an invalid horizon returns the native error unchanged. Keyed on the complete request and worker session. Requires the shared Finstack/Query provider.",
+      "files": [
+        {
+          "path": "hooks/use-migration-projection/use-migration-projection.ts",
+          "type": "registry:hook",
+          "target": "hooks/models/use-migration-projection/use-migration-projection.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-merton-report",
+      "type": "registry:hook",
+      "title": "useMertonReport",
+      "description": "Runs native models.credit.mertonReport, graded on the default PD master scale, through the WASM worker.",
+      "docs": "models.credit.mertonReport: one native call taking a MertonReportRequest (canonical MertonModel JSON, or an equity source Rust calibrates to the KMV default point) and returning the full MertonReport, graded on the default PD master scale. A measure Rust rejects for the model carries its message beside the rest; a rejected request is the hook error.",
+      "files": [
+        {
+          "path": "hooks/use-merton-report/use-merton-report.ts",
+          "type": "registry:hook",
+          "target": "hooks/models/use-merton-report/use-merton-report.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-merton-model-validator",
+      "type": "registry:hook",
+      "title": "useMertonModelValidator",
+      "description": "Validates MertonModel JSON natively through the WASM worker and returns its canonical form.",
+      "docs": "models.credit.MertonModel.fromJson then toJson; the handle is freed. Superseded revisions reject. Connect it to the merton-calculator validate prop. Requires the shared Finstack provider.",
+      "files": [
+        {
+          "path": "hooks/use-merton-model-validator/use-merton-model-validator.ts",
+          "type": "registry:hook",
+          "target": "hooks/models/use-merton-model-validator/use-merton-model-validator.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-credit-score",
+      "type": "registry:hook",
+      "title": "useCreditScore",
+      "description": "Scores a firm with a native models.credit.scoring model graded on the default PD master scale through the WASM worker.",
+      "docs": "Calls models.credit.scoring.creditScoreReport with the Rust CreditScoreRequest (model tag altman_z_score, altman_z_prime, altman_z_double_prime, altman_em_score, ohlson_o_score or zmijewski_score, and its input ratios); Rust scores the model and grades its implied PD on the default PD master scale, returning no grade for a model without an implied PD. Keyed on the complete request (non-finite ratios stay distinct) and worker session; native errors are returned unchanged. Requires the shared Finstack/Query provider.",
+      "files": [
+        {
+          "path": "hooks/use-credit-score/use-credit-score.ts",
+          "type": "registry:hook",
+          "target": "hooks/models/use-credit-score/use-credit-score.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-position-risk",
+      "type": "registry:hook",
+      "title": "usePositionRisk",
+      "description": "Decomposes position VaR and ES with native models.factor.risk, evaluates a risk budget and attributes tail stress through the WASM worker.",
+      "docs": "models.factor.risk.positionRiskReport of a Rust PositionRiskRequest: the parametric or historical VaR/ES decomposition, the risk budget when one is requested and, for a historical source, the tail stress attribution. Omitted confidence, incremental flag and utilization threshold are left to Rust; a rejected budget fails the whole report. Keyed on the complete request (non-finite values stay distinct) and worker session; native errors are returned unchanged. Requires the shared Finstack/Query provider.",
+      "files": [
+        {
+          "path": "hooks/use-position-risk/use-position-risk.ts",
+          "type": "registry:hook",
+          "target": "hooks/models/use-position-risk/use-position-risk.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-factor-risk",
+      "type": "registry:hook",
+      "title": "useFactorRisk",
+      "description": "Computes a host-supplied book's native factor sensitivities and decomposes them under a factor covariance through the WASM worker.",
+      "docs": "portfolio.computeFactorSensitivities(portfolio, factorsJson, market, asOf, bumpConfigJson) over the worker's cached Portfolio and MarketContext handles, then models.factor.risk.decomposeFactors of the returned matrix's JSON, the covariance JSON and the optional risk-measure JSON. Omitted bump config and risk measure are left to Rust (1 bp / 1 % per factor type; variance). Returns { sensitivities, decomposition } as Rust returned them, or the first native error. Keyed on the complete request and worker session. Requires the shared Finstack/Query provider.",
+      "files": [
+        {
+          "path": "hooks/use-factor-risk/use-factor-risk.ts",
+          "type": "registry:hook",
+          "target": "hooks/models/use-factor-risk/use-factor-risk.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
         ]
       }
     }

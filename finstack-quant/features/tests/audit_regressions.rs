@@ -1,6 +1,6 @@
 //! Economic invariants and boundary regressions from the features audit.
 use finstack_quant_features::*;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 fn keys(n: usize) -> (Vec<String>, Vec<String>) {
     (
@@ -123,21 +123,25 @@ fn invalid_parameters_fail_before_any_window_is_ready() {
             ("cap_weights", json!({"max_abs":0})),
             ("clip", json!({"lower":2,"upper":1})),
         ] {
-            assert!(transform_cross_sectional(
-                &values,
-                &time,
-                op.parse().expect("valid operation"),
-                Some(&params)
-            )
-            .is_err());
-            assert!(transform_cross_sectional_grouped(
-                &values,
-                &time,
-                &time,
-                op.parse().expect("valid operation"),
-                Some(&params)
-            )
-            .is_err());
+            assert!(
+                transform_cross_sectional(
+                    &values,
+                    &time,
+                    op.parse().expect("valid operation"),
+                    Some(&params)
+                )
+                .is_err()
+            );
+            assert!(
+                transform_cross_sectional_grouped(
+                    &values,
+                    &time,
+                    &time,
+                    op.parse().expect("valid operation"),
+                    Some(&params)
+                )
+                .is_err()
+            );
         }
     }
 }
@@ -307,13 +311,15 @@ fn final_weight_caps_preserve_neutrality_and_reject_infeasible_allocations() {
     close(result.iter().map(|v| v.unwrap()).sum(), 0.);
     close(result.iter().map(|v| v.unwrap().abs()).sum(), 1.);
     assert!(result.iter().all(|v| v.unwrap().abs() <= 0.3));
-    assert!(transform_cross_sectional(
-        &[Some(-1.), Some(1.)],
-        &time[..2],
-        CrossSectionalOp::CapWeights,
-        Some(&params)
-    )
-    .is_err());
+    assert!(
+        transform_cross_sectional(
+            &[Some(-1.), Some(1.)],
+            &time[..2],
+            CrossSectionalOp::CapWeights,
+            Some(&params)
+        )
+        .is_err()
+    );
     assert_eq!(
         transform_cross_sectional(
             &[Some(2.); 4],

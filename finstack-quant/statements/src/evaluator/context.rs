@@ -6,10 +6,10 @@
 //! graph.
 
 use crate::error::{Error, Result};
-use crate::evaluator::results::EvalWarning;
 use crate::evaluator::PeriodHistory;
+use crate::evaluator::results::EvalWarning;
 use crate::types::NodeId;
-use finstack_quant_core::dates::{PeriodId, PeriodKind};
+use finstack_quant_core::dates::{Period, PeriodId, PeriodKind};
 use indexmap::IndexMap;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -84,6 +84,9 @@ impl EvaluationContext {
     ///
     /// # Arguments
     /// * `period_id` - Period currently being evaluated
+    /// * `periods` - The model's periods with their dates, in timeline order.
+    ///   Calendar-window functions such as `ttm` read them to find a window's
+    ///   periods; with an empty slice those functions return `NaN`.
     /// * `node_to_column` - Mapping from node identifiers to their column index
     /// * `named_maps` - Prior period results keyed by node name, available for
     ///   lag, rolling-window, and forecast lookups. Historical-only node names
@@ -101,18 +104,20 @@ impl EvaluationContext {
     /// let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
     /// let mut columns = IndexMap::new();
     /// columns.insert(NodeId::new("revenue"), 0);
-    /// let ctx = EvaluationContext::new(period, Arc::new(columns), Arc::new(IndexMap::new()));
+    /// let ctx = EvaluationContext::new(period, &[], Arc::new(columns), Arc::new(IndexMap::new()));
     /// assert_eq!(ctx.period_id, period);
     /// # Ok(())
     /// # }
     /// ```
     pub fn new(
         period_id: PeriodId,
+        periods: &[Period],
         node_to_column: Arc<IndexMap<NodeId, usize>>,
         named_maps: Arc<IndexMap<PeriodId, IndexMap<String, f64>>>,
     ) -> Self {
         let history = Arc::new(PeriodHistory::from_named_maps(
             node_to_column,
+            periods,
             named_maps.as_ref(),
         ));
         Self::new_with_history(period_id, history, Arc::new(IndexMap::new()))
@@ -380,6 +385,7 @@ mod tests {
 
         let ctx = EvaluationContext::new(
             PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            &[],
             Arc::new(node_to_column),
             Arc::new(IndexMap::new()),
         );
@@ -394,6 +400,7 @@ mod tests {
 
         let mut ctx = EvaluationContext::new(
             PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            &[],
             Arc::new(node_to_column),
             Arc::new(IndexMap::new()),
         );
@@ -417,6 +424,7 @@ mod tests {
 
         let ctx = EvaluationContext::new(
             PeriodId::quarter(2025, 2).expect("valid period fixture"),
+            &[],
             Arc::new(node_to_column),
             Arc::new(historical),
         );
@@ -443,6 +451,7 @@ mod tests {
 
         let ctx = EvaluationContext::new(
             PeriodId::quarter(2025, 2).expect("valid period fixture"),
+            &[],
             Arc::new(node_to_column),
             Arc::new(historical),
         );

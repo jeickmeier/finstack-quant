@@ -1,5 +1,6 @@
+import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
-import { relative } from "node:path";
+import { relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isDeepStrictEqual } from "node:util";
 import prettier from "prettier";
@@ -7,16 +8,22 @@ import prettier from "prettier";
 /** `--check` compares a fresh regeneration with the committed fixture instead of writing. */
 export const checking = process.argv.includes("--check");
 
+/** Hex SHA-256 of a file's bytes or text, as fixture source records store it. */
+export const sha256 = (content) =>
+  createHash("sha256").update(content).digest("hex");
+
 const packageRoot = fileURLToPath(new URL("..", import.meta.url));
+const repositoryRoot = resolve(packageRoot, "..");
 const generator = relative(packageRoot, process.argv[1] ?? "");
 const toPath = (target) =>
   target instanceof URL ? fileURLToPath(target) : target;
 
 /**
  * Write a JSON fixture formatted like the rest of the package, or under
- * `--check` compare the committed file with this regeneration, ignoring
- * formatting and key order, and name the first differing value and the
- * generator to rerun.
+ * `--check` first verify that every source file the committed fixture records
+ * still hashes to its recorded digest, then compare the committed file with
+ * this regeneration, ignoring formatting and key order, and name the first
+ * differing value and the generator to rerun.
  */
 export async function emit(target, text) {
   const file = toPath(target);
@@ -44,11 +51,63 @@ export async function emit(target, text) {
       `${name} is missing or not JSON (${error.message}); run \`mise run ui-fixtures\` (${generator}).`,
     );
   }
+  for (const source of sourceRecords(committed)) {
+    const current = await readFile(resolve(repositoryRoot, source.path)).then(
+      sha256,
+      () => null,
+    );
+    if (current !== source.sha256)
+      throw new Error(
+        `${source.path} ${current === null ? "is missing" : "changed"} since ${generator} wrote ${name}; run \`mise run ui-fixtures\` in the same commit.`,
+      );
+  }
   const first = firstDifference(committed, fresh);
   if (first === null) return;
   throw new Error(
     `${name} drifted from a fresh regeneration at ${first}; review the native change, then run \`mise run ui-fixtures\` (${generator}) in the same commit.`,
   );
+}
+
+/**
+ * Write a generated source file formatted by prettier, or under `--check`
+ * require the committed file to equal that text.
+ */
+export async function emitSource(target, text) {
+  const file = toPath(target);
+  const formatted = await prettier.format(text, { filepath: file });
+  if (!checking) {
+    await writeFile(file, formatted);
+    return;
+  }
+  const committed = await readFile(file, "utf8").catch(() => null);
+  if (committed !== formatted)
+    throw new Error(
+      `${relative(packageRoot, file)} is stale; run \`mise run ui-fixtures\` (${generator}) in the same commit.`,
+    );
+}
+
+/**
+ * The source records of a fixture: `{ path | source, sha256 }` objects and
+ * `{ <x>Source, <x>Sha256 }` field pairs, with repository-relative paths.
+ */
+function sourceRecords(value, records = []) {
+  if (Array.isArray(value)) {
+    for (const item of value) sourceRecords(item, records);
+  } else if (value && typeof value === "object") {
+    for (const [key, child] of Object.entries(value)) {
+      const prefix = /^(\w*?)(?:sha256|Sha256)$/.exec(key)?.[1];
+      const path =
+        prefix === undefined
+          ? undefined
+          : prefix
+            ? value[`${prefix}Source`]
+            : (value.path ?? value.source);
+      if (typeof child === "string" && typeof path === "string")
+        records.push({ path, sha256: child });
+      else sourceRecords(child, records);
+    }
+  }
+  return records;
 }
 
 function firstDifference(committed, fresh, path = "$") {

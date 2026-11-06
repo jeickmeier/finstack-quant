@@ -290,6 +290,31 @@ class PortfolioAttribution:
         """
         ...
 
+    def pct_of_total_by_bucket(self) -> list[dict[str, Any]]:
+        """
+        Every base-currency money bucket with its share of total P&L, in field order.
+
+        Lists the eleven factor buckets (``fx_translation_pnl`` included) and
+        ``residual``, the amounts :meth:`reconciliation_check` adds up, so a
+        report reads the buckets from Rust instead of naming them.
+        ``total_pnl`` is the headline value, not a bucket, and the
+        native-currency :attr:`by_position` detail is not listed.
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            One record per bucket: ``field`` (the attribute's wire name),
+            ``amount`` (``{"amount": str, "currency": str}`` in the base
+            currency) and ``pct_of_total`` (signed percentage points, or
+            ``None`` when ``total_pnl`` is effectively zero, within half a unit
+            of the base currency's default output scale).
+
+        Notes
+        -----
+        This method does not raise.
+        """
+        ...
+
     def explain(self) -> str:
         """
         Human-readable explanation tree of the portfolio-level buckets.

@@ -39,7 +39,7 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
-    calendar_by_id_strict, BusinessDayConvention, Date, DayCount, StubKind, Tenor,
+    BusinessDayConvention, Date, DayCount, StubKind, Tenor, calendar_by_id_strict,
 };
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -269,18 +269,16 @@ impl TermLoan {
             cash_fraction,
             pik_fraction,
         } = self.coupon_type
-        {
-            if cash_fraction < rust_decimal::Decimal::ZERO
+            && (cash_fraction < rust_decimal::Decimal::ZERO
                 || pik_fraction < rust_decimal::Decimal::ZERO
                 || cash_fraction > rust_decimal::Decimal::ONE
                 || pik_fraction > rust_decimal::Decimal::ONE
                 || (cash_fraction + pik_fraction - rust_decimal::Decimal::ONE).abs()
-                    > rust_decimal::Decimal::new(1, 9)
-            {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "{context} coupon split fractions must be in [0, 1] and sum to one"
-                )));
-            }
+                    > rust_decimal::Decimal::new(1, 9))
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{context} coupon split fractions must be in [0, 1] and sum to one"
+            )));
         }
         match &self.upfront_fee {
             Some(UpfrontFee::Amount(fee)) => self.validate_money(*fee, "upfront_fee", false)?,
@@ -312,15 +310,14 @@ impl TermLoan {
                         "{context} call prices must be positive and finite"
                     )));
                 }
-                if let super::spec::LoanCallType::MakeWhole(spec) = &call.call_type {
-                    if !(spec.spread_bp.is_finite() && spec.spread_bp >= 0.0)
-                        || spec.reference_curve_id.as_str().trim().is_empty()
-                    {
-                        return Err(finstack_quant_core::Error::Validation(format!(
-                            "{context} call_schedule make_whole spread_bp must be finite and \
+                if let super::spec::LoanCallType::MakeWhole(spec) = &call.call_type
+                    && (!(spec.spread_bp.is_finite() && spec.spread_bp >= 0.0)
+                        || spec.reference_curve_id.as_str().trim().is_empty())
+                {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "{context} call_schedule make_whole spread_bp must be finite and \
                              non-negative with a non-empty reference_curve_id"
-                        )));
-                    }
+                    )));
                 }
             }
             if schedule
@@ -820,6 +817,20 @@ impl TermLoan {
 }
 
 impl finstack_quant_valuations_core::instruments::Instrument for TermLoan {
+    fn cashflow_export_terms(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<
+        finstack_quant_valuations_core::instruments::cashflow_export::CashflowExportTerms,
+    > {
+        use finstack_quant_cashflows::CashflowProvider;
+        finstack_quant_valuations_core::instruments::cashflow_export::CashflowExportTerms::from_schedule(
+                self.cashflow_schedule(market, as_of)?,
+            )
+            .with_schedule_balances()
+    }
+
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::TermLoan,
         crate::FIXED_INCOME
@@ -968,7 +979,8 @@ impl finstack_quant_covenants::InstrumentMutator for TermLoan {
         _as_of: Date,
     ) -> finstack_quant_core::Result<()> {
         Err(finstack_quant_core::Error::Validation(format!(
-            "Term loan '{}' cannot execute a collateral requirement without a typed collateral agreement", self.id.as_str()
+            "Term loan '{}' cannot execute a collateral requirement without a typed collateral agreement",
+            self.id.as_str()
         )))
     }
 

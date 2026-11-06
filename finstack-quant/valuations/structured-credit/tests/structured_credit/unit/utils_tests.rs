@@ -4,7 +4,7 @@
 //! - Rating factor tables and lookups
 
 use finstack_quant_core::types::CreditRating;
-use finstack_quant_models::credit::{moodys_warf_factor, RatingFactorTable};
+use finstack_quant_models::credit::{RatingFactorTable, moodys_warf_factor};
 
 // Rating Factor Tests
 

@@ -236,7 +236,10 @@ impl RealEstateAsset {
                 if !amount.is_finite() {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "RealEstateAsset '{}' capex_schedule[{}] amount on {} must be finite, got {}",
-                        self.id.as_str(), i, date, amount
+                        self.id.as_str(),
+                        i,
+                        date,
+                        amount
                     )));
                 }
                 // Sign-perspective gate (INVARIANTS.md §3.2): capex_schedule
@@ -270,59 +273,59 @@ impl RealEstateAsset {
                 }
             }
         }
-        if let Some(dr) = self.discount_rate {
-            if !dr.is_finite() {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "RealEstateAsset '{}' discount_rate must be finite, got {}",
-                    self.id.as_str(),
-                    dr
-                )));
-            }
+        if let Some(dr) = self.discount_rate
+            && !dr.is_finite()
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "RealEstateAsset '{}' discount_rate must be finite, got {}",
+                self.id.as_str(),
+                dr
+            )));
         }
-        if let Some(cr) = self.cap_rate {
-            if !cr.is_finite() || cr <= 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "RealEstateAsset '{}' cap_rate must be finite and positive, got {}",
-                    self.id.as_str(),
-                    cr
-                )));
-            }
+        if let Some(cr) = self.cap_rate
+            && (!cr.is_finite() || cr <= 0.0)
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "RealEstateAsset '{}' cap_rate must be finite and positive, got {}",
+                self.id.as_str(),
+                cr
+            )));
         }
-        if let Some(tcr) = self.terminal_cap_rate {
-            if !tcr.is_finite() || tcr <= 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "RealEstateAsset '{}' terminal_cap_rate must be finite and positive, got {}",
-                    self.id.as_str(),
-                    tcr
-                )));
-            }
+        if let Some(tcr) = self.terminal_cap_rate
+            && (!tcr.is_finite() || tcr <= 0.0)
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "RealEstateAsset '{}' terminal_cap_rate must be finite and positive, got {}",
+                self.id.as_str(),
+                tcr
+            )));
         }
-        if let Some(g) = self.terminal_growth_rate {
-            if !g.is_finite() || !(-1.0..=0.20).contains(&g) {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "RealEstateAsset '{}' terminal_growth_rate must be in [-1.0, 0.20], got {}",
-                    self.id.as_str(),
-                    g
-                )));
-            }
+        if let Some(g) = self.terminal_growth_rate
+            && (!g.is_finite() || !(-1.0..=0.20).contains(&g))
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "RealEstateAsset '{}' terminal_growth_rate must be in [-1.0, 0.20], got {}",
+                self.id.as_str(),
+                g
+            )));
         }
-        if let Some(pct) = self.disposition_cost_decimal {
-            if !pct.is_finite() || !(0.0..1.0).contains(&pct) {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "RealEstateAsset '{}' disposition_cost_decimal must be in [0.0, 1.0), got {}",
-                    self.id.as_str(),
-                    pct
-                )));
-            }
+        if let Some(pct) = self.disposition_cost_decimal
+            && (!pct.is_finite() || !(0.0..1.0).contains(&pct))
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "RealEstateAsset '{}' disposition_cost_decimal must be in [0.0, 1.0), got {}",
+                self.id.as_str(),
+                pct
+            )));
         }
-        if let Some(noi) = self.stabilized_noi {
-            if !noi.is_finite() {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "RealEstateAsset '{}' stabilized_noi must be finite, got {}",
-                    self.id.as_str(),
-                    noi
-                )));
-            }
+        if let Some(noi) = self.stabilized_noi
+            && !noi.is_finite()
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "RealEstateAsset '{}' stabilized_noi must be finite, got {}",
+                self.id.as_str(),
+                noi
+            )));
         }
         for (label, items) in [
             ("acquisition_costs", &self.acquisition_costs),

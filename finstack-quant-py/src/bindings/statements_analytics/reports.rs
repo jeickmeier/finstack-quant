@@ -9,7 +9,7 @@
 use crate::bindings::core::table::envelope_to_pandas;
 use crate::bindings::extract::extract_results_ref;
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
-use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, ColumnSchema};
+use crate::bindings::pandas_utils::{ColumnSchema, serde_rows_to_dataframe_with_schema};
 use crate::bindings::statements::parse_period_id;
 use crate::errors::core_to_py;
 use finstack_quant_core::dates::PeriodId;
@@ -168,12 +168,15 @@ impl_repr_html_via_dataframe!(PyCreditAssessment);
 ///     ``total_debt``, ``interest_expense`` and ``free_cash_flow`` nodes.
 /// period : str
 ///     Period identifier for the assessment (``"2025Q4"``, ``"2025M03"``,
-///     ``"FY2025"``). This is a ``PeriodId``, not a date.
+///     ``"FY2025"``). This is a ``PeriodId``, not a date, and it must be a
+///     period of ``results`` in the model's own frequency: ``"2025"`` is the
+///     annual period, not the last quarter of a quarterly model.
 ///
 /// Returns
 /// -------
 /// CreditAssessment
-///     Point-in-time ratios at ``period`` plus the ascending ``series``.
+///     Point-in-time ratios at ``period`` plus the ``series`` over every
+///     period of ``results.periods`` up to ``period``, in timeline order.
 ///     Ratios are ``None`` when their inputs have mixed scalar/money
 ///     representations, different currencies, or non-finite arithmetic.
 ///     Trailing-year ratios require all annual, semiannual, quarterly or monthly
@@ -184,8 +187,8 @@ impl_repr_html_via_dataframe!(PyCreditAssessment);
 /// Raises
 /// ------
 /// ValueError
-///     If ``period`` is not a valid period identifier or ``results`` is
-///     malformed JSON.
+///     If ``period`` is not a valid period identifier, is not one of
+///     ``results.periods``, or ``results`` is malformed JSON.
 ///
 /// Examples
 /// --------
@@ -202,7 +205,8 @@ fn credit_assessment(results: &Bound<'_, PyAny>, period: &str) -> PyResult<PyCre
     let results = extract_results_ref(results)?;
     let period = parse_period_id(period)?;
     Ok(PyCreditAssessment {
-        inner: CreditAssessment::compute(&results, period),
+        inner: CreditAssessment::compute(&results, period)
+            .map_err(crate::errors::statements_to_py)?,
     })
 }
 

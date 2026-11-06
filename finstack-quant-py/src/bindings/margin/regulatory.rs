@@ -5,24 +5,24 @@
 //! free function to get a typed result with a per-component breakdown.
 
 use super::frame::{opt_str, records, req_bool, req_date, req_f64, req_str, sensitivity_rows};
-use super::types::{extract_netting_set_id, PyNettingSetId};
+use super::types::{PyNettingSetId, extract_netting_set_id};
 use crate::bindings::core::table::envelope_to_pandas;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::parse_label;
 use crate::bindings::module_utils::parse_currency;
 use crate::bindings::pandas_utils::{
-    serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,
-    serde_to_py, ColumnSchema,
+    ColumnSchema, serde_object_to_single_row_dataframe_with_schema,
+    serde_rows_to_dataframe_with_schema, serde_to_py,
 };
 use crate::errors::{core_to_py, display_to_py};
 use finstack_quant_margin::regulatory::{
     frtb::{
-        frtb_sba_charge as frtb_sba_charge_rs, CorrelationScenario, DrcPosition, FrtbRiskClass,
-        FrtbSbaEngine, FrtbSbaResult, FrtbSensitivities,
+        CorrelationScenario, DrcPosition, FrtbRiskClass, FrtbSbaEngine, FrtbSbaResult,
+        FrtbSensitivities, frtb_sba_charge as frtb_sba_charge_rs,
     },
     sa_ccr::{
-        saccr_ead as saccr_ead_rs, EadResult, SaCcrAssetClass, SaCcrEngine, SaCcrNettingSetConfig,
-        SaCcrOptionType, SaCcrSupervisoryCategory, SaCcrTrade,
+        EadResult, SaCcrAssetClass, SaCcrEngine, SaCcrNettingSetConfig, SaCcrOptionType,
+        SaCcrSupervisoryCategory, SaCcrTrade, saccr_ead as saccr_ead_rs,
     },
 };
 use pyo3::prelude::*;
@@ -39,11 +39,7 @@ fn serde_label<T: serde::Serialize + std::fmt::Debug>(value: T) -> String {
 }
 
 fn py_bool(value: bool) -> &'static str {
-    if value {
-        "True"
-    } else {
-        "False"
-    }
+    if value { "True" } else { "False" }
 }
 
 /// FRTB sensitivity portfolio for the Sensitivity-Based Approach.

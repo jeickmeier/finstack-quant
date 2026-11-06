@@ -1,7 +1,7 @@
 //! Economic factor isolation and coupon-window carry regressions.
 use finstack_quant_attribution::{
-    attribute_pnl, attribute_pnl_metrics_based, default_waterfall_order, AttributionFactor,
-    AttributionMethod, AttributionRequest,
+    AttributionFactor, AttributionMethod, AttributionRequest, attribute_pnl,
+    attribute_pnl_metrics_based, default_waterfall_order,
 };
 use finstack_quant_core::{
     config::FinstackConfig,
@@ -17,11 +17,11 @@ use finstack_quant_core::{
 };
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::{
+    instruments::Instrument,
+    instruments::PricingOptions,
     instruments::fixed_income::{
         convertible::ConvertibleBond, inflation_linked_bond::InflationLinkedBond,
     },
-    instruments::Instrument,
-    instruments::PricingOptions,
     metrics::MetricId,
 };
 use std::sync::Arc;

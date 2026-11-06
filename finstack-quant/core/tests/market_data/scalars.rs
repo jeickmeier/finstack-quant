@@ -61,10 +61,12 @@ fn dividend_schedule_builds_and_filters() {
         .build()
         .expect("valid dividend schedule");
 
-    assert!(schedule
-        .get_events()
-        .windows(2)
-        .all(|pair| pair[0].date <= pair[1].date));
+    assert!(
+        schedule
+            .get_events()
+            .windows(2)
+            .all(|pair| pair[0].date <= pair[1].date)
+    );
 }
 
 #[test]
@@ -118,9 +120,9 @@ fn inflation_index_rejects_pre_history_lookups() {
 // Moved from phase2_strictness.rs: finite-value deserialization.
 mod finite_deserialization {
     use finstack_quant_core::market_data::scalars::MarketScalar;
+    use serde::Deserialize;
     use serde::de::value::Error as ValueError;
     use serde::de::{self, DeserializeSeed, EnumAccess, IntoDeserializer, VariantAccess, Visitor};
-    use serde::Deserialize;
 
     struct UnitlessScalarDeserializer(f64);
 

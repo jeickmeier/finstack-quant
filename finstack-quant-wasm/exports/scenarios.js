@@ -20,6 +20,7 @@ export const scenarios = {
   rateBindingSpecValidate: wasm.rateBindingSpecValidate,
   scenarioSpecRequiresInstruments: wasm.scenarioSpecRequiresInstruments,
   scenarioSpecMutatesInstruments: wasm.scenarioSpecMutatesInstruments,
+  applicationReportEffectiveAsOf: wasm.applicationReportEffectiveAsOf,
   horizonResultExplainText: wasm.horizonResultExplainText,
   horizonResultFactorContribution: wasm.horizonResultFactorContribution,
   schema,

@@ -1,6 +1,6 @@
 //! Node specification and types.
 
-use crate::types::AmountOrScalar;
+use crate::types::{AmountOrScalar, ForecastParameters};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::PeriodId;
 use indexmap::IndexMap;
@@ -82,6 +82,12 @@ pub struct NodeSpec {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value_type: Option<NodeValueType>,
 
+    /// How this line rolls up to a coarser reporting frequency. A rollup uses
+    /// its own per-line method first, then this; a line declaring nothing is
+    /// summed. Tags never choose a method.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rollup: Option<RollupMethod>,
+
     /// Additional metadata
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub meta: IndexMap<String, serde_json::Value>,
@@ -105,6 +111,7 @@ impl NodeSpec {
             where_text: None,
             tags: Vec::new(),
             value_type: None,
+            rollup: None,
             meta: IndexMap::new(),
         }
     }
@@ -148,19 +155,25 @@ impl NodeSpec {
         self
     }
 
+    /// Date from which the explicit observation for `period` is visible: its
+    /// availability date, or the period's exclusive end when none is set.
+    pub(crate) fn explicit_value_available_on(
+        &self,
+        period: &finstack_quant_core::dates::Period,
+    ) -> finstack_quant_core::dates::Date {
+        self.availability_dates
+            .get(&period.id)
+            .copied()
+            .unwrap_or(period.end)
+    }
+
     /// Return whether an explicit observation is visible at the cutoff.
     pub(crate) fn explicit_value_is_visible(
         &self,
         period: &finstack_quant_core::dates::Period,
         cutoff: Option<finstack_quant_core::dates::Date>,
     ) -> bool {
-        cutoff.is_none_or(|as_of| {
-            self.availability_dates
-                .get(&period.id)
-                .copied()
-                .unwrap_or(period.end)
-                <= as_of
-        })
+        cutoff.is_none_or(|as_of| self.explicit_value_available_on(period) <= as_of)
     }
 
     /// Set the formula text.
@@ -192,6 +205,35 @@ impl NodeSpec {
         self.tags = tags;
         self
     }
+
+    /// Declare how this line rolls up to a coarser reporting frequency.
+    ///
+    /// # Arguments
+    /// * `rollup` - `Sum` for flows, `PeriodEnd` for balances and trailing
+    ///   metrics, `Formula` for ratios; `Formula` needs a formula on this node
+    #[must_use = "builder methods take self by value and return the modified value"]
+    pub fn with_rollup(mut self, rollup: RollupMethod) -> Self {
+        self.rollup = Some(rollup);
+        self
+    }
+}
+
+/// How one node's values combine over the source periods of a target period.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum RollupMethod {
+    /// Sum the source periods: flows such as revenue, expenses and cash flows.
+    /// A missing source value leaves the target value missing.
+    Sum,
+    /// Take the last source period's value: balances such as cash, debt and
+    /// equity, and trailing metrics such as last-twelve-month EBITDA.
+    PeriodEnd,
+    /// Re-evaluate the node's formula (and `where` clause) on the rolled-up
+    /// values: ratios such as margins, leverage and coverage. Time-series
+    /// functions then run at the target frequency, so `lag(x, 1)` is the
+    /// prior target period.
+    Formula,
 }
 
 /// Node computation type.
@@ -383,21 +425,65 @@ impl ForecastSpec {
         }
     }
 
-    /// Validate the parameter map against the method's accepted keys and
-    /// value types without running the forecast.
+    /// Read the parameter map as the typed parameters of [`Self::method`].
     ///
-    /// Rejects parameter names the method does not understand and values of
-    /// the wrong JSON type (for example a string where a number is required),
-    /// so a typo fails at construction time rather than at evaluation. Value
-    /// ranges (positive `season_length`, non-negative `std_dev`, enough
-    /// history) are still enforced when the forecast runs.
+    /// This is the form every forecast method runs on. Value ranges (positive
+    /// `season_length`, non-negative `std_dev`, enough history) and
+    /// conditional rules (`half_life` only with the exponential shape) are
+    /// checked when the forecast runs, not here.
     ///
     /// # Errors
     ///
-    /// Returns a forecast error naming the offending key and the accepted
-    /// keys or expected type.
+    /// Returns a forecast error naming the offending key when a parameter is
+    /// unknown to the method, missing, `null`, or of the wrong JSON type (for
+    /// example a string where a number is required).
+    pub fn parameters(&self) -> crate::error::Result<ForecastParameters> {
+        fn read<T: serde::de::DeserializeOwned>(spec: &ForecastSpec) -> crate::error::Result<T> {
+            let method = spec.method;
+            if let Some((key, _)) = spec.params.iter().find(|(_, value)| value.is_null()) {
+                return Err(crate::error::Error::forecast(format!(
+                    "{method:?} forecast parameter '{key}' is null; omit it instead"
+                )));
+            }
+            let params: serde_json::Map<String, serde_json::Value> = spec
+                .params
+                .iter()
+                .map(|(key, value)| (key.clone(), value.clone()))
+                .collect();
+            serde_path_to_error::deserialize(serde_json::Value::Object(params)).map_err(|error| {
+                let path = error.path().to_string();
+                let inner = error.into_inner();
+                crate::error::Error::forecast(if path == "." {
+                    format!("Invalid {method:?} forecast parameters: {inner}")
+                } else {
+                    format!("Invalid {method:?} forecast parameter '{path}': {inner}")
+                })
+            })
+        }
+
+        Ok(match self.method {
+            ForecastMethod::ForwardFill => ForecastParameters::ForwardFill(read(self)?),
+            ForecastMethod::GrowthPct => ForecastParameters::GrowthPct(read(self)?),
+            ForecastMethod::CurvePct => ForecastParameters::CurvePct(read(self)?),
+            ForecastMethod::Normal => ForecastParameters::Normal(read(self)?),
+            ForecastMethod::LogNormal => ForecastParameters::LogNormal(read(self)?),
+            ForecastMethod::Override => ForecastParameters::Override(read(self)?),
+            ForecastMethod::TimeSeries => ForecastParameters::TimeSeries(read(self)?),
+            ForecastMethod::Seasonal => ForecastParameters::Seasonal(read(self)?),
+            ForecastMethod::FadeToTarget => ForecastParameters::FadeToTarget(read(self)?),
+            ForecastMethod::MeanReverting => ForecastParameters::MeanReverting(read(self)?),
+            ForecastMethod::Bootstrap => ForecastParameters::Bootstrap(read(self)?),
+        })
+    }
+
+    /// Check that the parameter map reads as the typed parameters of
+    /// [`Self::method`], without running the forecast.
+    ///
+    /// # Errors
+    ///
+    /// Returns the error of [`Self::parameters`].
     pub fn validate(&self) -> crate::error::Result<()> {
-        crate::forecast::validate_params(self.method, &self.params)
+        self.parameters().map(drop)
     }
 
     /// Create a linear fade-to-target forecast.

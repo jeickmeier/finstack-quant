@@ -2,13 +2,13 @@
 
 use crate::fx_option::FxOption;
 use crate::shared::{
-    collect_fx_option_inputs, collect_fx_option_inputs_no_vol, FxOptionInputRequest,
-    FxOptionInputs, FxOptionInputsNoVol,
+    FxOptionInputRequest, FxOptionInputs, FxOptionInputsNoVol, collect_fx_option_inputs,
+    collect_fx_option_inputs_no_vol,
 };
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 use finstack_quant_models::closed_form::{bs_greeks_unchecked, bs_price_unchecked};
 use finstack_quant_models::types::OptionType;
 
@@ -94,10 +94,10 @@ pub(crate) fn implied_vol(
     }
     if spot <= 0.0 || inst.strike <= 0.0 || inst.notional.amount() <= 0.0 {
         return Err(finstack_quant_core::Error::Validation(format!(
-                "Implied vol requires spot > 0, strike > 0, and notional > 0; got spot={spot}, strike={}, notional={}",
-                inst.strike,
-                inst.notional.amount()
-            )));
+            "Implied vol requires spot > 0, strike > 0, and notional > 0; got spot={spot}, strike={}, notional={}",
+            inst.strike,
+            inst.notional.amount()
+        )));
     }
 
     let target_unit = target_price / inst.notional.amount();

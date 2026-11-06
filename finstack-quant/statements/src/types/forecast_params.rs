@@ -1,0 +1,367 @@
+//! Typed parameter contract of every forecast method.
+//!
+//! [`ForecastSpec`](super::ForecastSpec) stores its parameters as a free-form
+//! map, which suits long-lived model documents; [`ForecastSpec::parameters`]
+//! reads that map into [`ForecastParameters`], the form every forecast method
+//! runs on and the published schema describes. Conditional rules, such as
+//! `half_life` being legal only with the exponential shape, stay with the
+//! method and are reported when the forecast is evaluated.
+//!
+//! [`ForecastSpec::parameters`]: super::ForecastSpec::parameters
+
+use indexmap::IndexMap;
+use serde::{Deserialize, Deserializer, Serialize};
+
+use super::SeasonalMode;
+
+/// One forecast method with its typed parameters.
+///
+/// Serializes as `{ "method": ..., "params": { ... } }`, the wire shape of
+/// [`ForecastSpec`](super::ForecastSpec).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(
+    tag = "method",
+    content = "params",
+    rename_all = "snake_case",
+    deny_unknown_fields
+)]
+pub enum ForecastParameters {
+    /// Carry the last value forward.
+    ForwardFill(BoundsParams),
+    /// Compound one growth rate per period.
+    GrowthPct(GrowthPctParams),
+    /// Compound a different growth rate each period.
+    CurvePct(CurvePctParams),
+    /// Sample an additive random walk.
+    Normal(DistributionParams),
+    /// Sample a multiplicative random walk for positive values.
+    LogNormal(DistributionParams),
+    /// Set exact values for chosen periods, carrying forward between them.
+    Override(OverrideParams),
+    /// Project from a historical series.
+    TimeSeries(TimeSeriesParams),
+    /// Project a repeating pattern from a historical series.
+    Seasonal(SeasonalParams),
+    /// Sample a mean-reverting AR(1) process.
+    MeanReverting(MeanRevertingParams),
+    /// Resample changes from a historical series.
+    Bootstrap(BootstrapParams),
+    /// Glide toward a target level over the forecast horizon.
+    FadeToTarget(FadeToTargetParams),
+}
+
+impl ForecastParameters {
+    /// The `(min, max)` bounds clamped onto generated values.
+    pub(crate) fn bounds(&self) -> (Option<f64>, Option<f64>) {
+        match self {
+            Self::ForwardFill(p) => (p.min, p.max),
+            Self::GrowthPct(p) => (p.min, p.max),
+            Self::CurvePct(p) => (p.min, p.max),
+            Self::Normal(p) | Self::LogNormal(p) => (p.min, p.max),
+            Self::Override(p) => (p.min, p.max),
+            Self::TimeSeries(p) => (p.min, p.max),
+            Self::Seasonal(p) => (p.min, p.max),
+            Self::MeanReverting(p) => (p.min, p.max),
+            Self::Bootstrap(p) => (p.min, p.max),
+            Self::FadeToTarget(p) => (p.min, p.max),
+        }
+    }
+
+    /// The random seed of a stochastic method; `None` for deterministic methods.
+    pub(crate) fn seed_mut(&mut self) -> Option<&mut u64> {
+        match self {
+            Self::Normal(p) | Self::LogNormal(p) => Some(&mut p.seed),
+            Self::MeanReverting(p) => Some(&mut p.seed),
+            Self::Bootstrap(p) => Some(&mut p.seed),
+            Self::ForwardFill(_)
+            | Self::GrowthPct(_)
+            | Self::CurvePct(_)
+            | Self::Override(_)
+            | Self::TimeSeries(_)
+            | Self::Seasonal(_)
+            | Self::FadeToTarget(_) => None,
+        }
+    }
+}
+
+/// Read a seed written as an integer or as an integer-valued float such as `42.0`.
+///
+/// A float at or above 2^64 is rejected rather than saturated to `u64::MAX`.
+fn deserialize_seed<'de, D: Deserializer<'de>>(deserializer: D) -> Result<u64, D::Error> {
+    struct SeedVisitor;
+
+    impl serde::de::Visitor<'_> for SeedVisitor {
+        type Value = u64;
+
+        fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str("a non-negative integer representable as u64")
+        }
+
+        fn visit_u64<E: serde::de::Error>(self, value: u64) -> Result<u64, E> {
+            Ok(value)
+        }
+
+        fn visit_i64<E: serde::de::Error>(self, value: i64) -> Result<u64, E> {
+            u64::try_from(value)
+                .map_err(|_| E::invalid_value(serde::de::Unexpected::Signed(value), &self))
+        }
+
+        fn visit_f64<E: serde::de::Error>(self, value: f64) -> Result<u64, E> {
+            if value.is_finite() && value.fract() == 0.0 && value >= 0.0 && value < u64::MAX as f64
+            {
+                Ok(value as u64)
+            } else {
+                Err(E::invalid_value(serde::de::Unexpected::Float(value), &self))
+            }
+        }
+    }
+
+    deserializer.deserialize_any(SeedVisitor)
+}
+
+/// Parameters of a method with only the cross-cutting bounds.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct BoundsParams {
+    /// Lower bound clamped onto generated values, in the line's base units.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min: Option<f64>,
+    /// Upper bound clamped onto generated values, in the line's base units.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max: Option<f64>,
+}
+
+/// Parameters of [`ForecastParameters::GrowthPct`].
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct GrowthPctParams {
+    /// Growth per period as a decimal: 0.03 = 3%.
+    pub rate: f64,
+    /// Lower bound clamped onto generated values, in the line's base units.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min: Option<f64>,
+    /// Upper bound clamped onto generated values, in the line's base units.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max: Option<f64>,
+}
+
+/// Parameters of [`ForecastParameters::CurvePct`].
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct CurvePctParams {
+    /// Growth rate per forecast period as decimals, one per period in order.
+    pub curve: Vec<f64>,
+    /// Lower bound clamped onto generated values, in the line's base units.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min: Option<f64>,
+    /// Upper bound clamped onto generated values, in the line's base units.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max: Option<f64>,
+}
+
+/// Parameters of [`ForecastParameters::Override`].
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct OverrideParams {
+    /// Exact levels by period id, in the line's base units; other periods carry forward.
+    pub overrides: IndexMap<String, f64>,
+    /// Lower bound clamped onto generated values, in the line's base units.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min: Option<f64>,
+    /// Upper bound clamped onto generated values, in the line's base units.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max: Option<f64>,
+}
+
+/// Parameters of [`ForecastParameters::Normal`] and [`ForecastParameters::LogNormal`].
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct DistributionParams {
+    /// Mean shock per period, as the method applies it.
+    pub mean: f64,
+    /// Standard deviation of the shock per period; non-negative.
+    pub std_dev: f64,
+    /// Random seed; the same seed reproduces the same path.
+    #[serde(deserialize_with = "deserialize_seed")]
+    pub seed: u64,
+    /// Node whose shocks this one correlates with; Monte Carlo evaluation only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub correlation_with: Option<String>,
+    /// Correlation with `correlation_with`, in [-1, 1]; Monte Carlo evaluation only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub correlation: Option<f64>,
+    /// Lower bound clamped onto generated values, in the line's base units.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min: Option<f64>,
+    /// Upper bound clamped onto generated values, in the line's base units.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max: Option<f64>,
+}
+
+/// Parameters of [`ForecastParameters::MeanReverting`].
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct MeanRevertingParams {
+    /// Long-run level the process reverts to, in the line's base units.
+    pub long_run_mean: f64,
+    /// Fraction of the gap closed each period, a decimal in (0, 1].
+    pub reversion_speed: f64,
+    /// Standard deviation of the shock per period; non-negative.
+    pub std_dev: f64,
+    /// Random seed; the same seed reproduces the same path.
+    #[serde(deserialize_with = "deserialize_seed")]
+    pub seed: u64,
+    /// Node whose shocks this one correlates with; Monte Carlo evaluation only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub correlation_with: Option<String>,
+    /// Correlation with `correlation_with`, in [-1, 1]; Monte Carlo evaluation only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub correlation: Option<f64>,
+    /// Lower bound clamped onto generated values, in the line's base units.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min: Option<f64>,
+    /// Upper bound clamped onto generated values, in the line's base units.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max: Option<f64>,
+}
+
+/// What a bootstrap resamples from its historical series.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum ForecastBootstrapMode {
+    /// Period-over-period growth rates, compounded; needs a positive series.
+    #[default]
+    Growth,
+    /// Additive level changes; works for a series crossing zero.
+    Diff,
+}
+
+/// Parameters of [`ForecastParameters::Bootstrap`].
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct BootstrapParams {
+    /// At least 2 observations in the line's base units, oldest first.
+    pub historical: Vec<f64>,
+    /// What to resample; defaults to growth rates.
+    #[serde(default)]
+    pub mode: ForecastBootstrapMode,
+    /// Random seed; the same seed reproduces the same path.
+    #[serde(deserialize_with = "deserialize_seed")]
+    pub seed: u64,
+    /// Lower bound clamped onto generated values, in the line's base units.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min: Option<f64>,
+    /// Upper bound clamped onto generated values, in the line's base units.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max: Option<f64>,
+}
+
+/// Trend model of a time-series forecast.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum ForecastTrendMethod {
+    /// Least-squares linear trend.
+    #[default]
+    Linear,
+    /// Holt exponential smoothing; requires `alpha` and `beta`.
+    Exponential,
+    /// Moving average; requires `window`.
+    MovingAverage,
+}
+
+/// Parameters of [`ForecastParameters::TimeSeries`].
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct TimeSeriesParams {
+    /// Observations in the line's base units, oldest first.
+    pub historical: Vec<f64>,
+    /// Trend model; defaults to linear.
+    #[serde(default)]
+    pub method: ForecastTrendMethod,
+    /// Level smoothing in (0, 1]; required for the exponential method.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alpha: Option<f64>,
+    /// Trend smoothing in (0, 1]; required for the exponential method.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub beta: Option<f64>,
+    /// Trend damping in (0, 1]; legal only with the exponential method.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub phi: Option<f64>,
+    /// Averaging window in periods; required for the moving-average method.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub window: Option<u64>,
+    /// Lower bound clamped onto generated values, in the line's base units.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min: Option<f64>,
+    /// Upper bound clamped onto generated values, in the line's base units.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max: Option<f64>,
+}
+
+/// Parameters of [`ForecastParameters::Seasonal`].
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct SeasonalParams {
+    /// Observations in the line's base units, oldest first; at least two full cycles.
+    pub historical: Vec<f64>,
+    /// Periods per seasonal cycle.
+    pub season_length: u64,
+    /// How the seasonal pattern combines with the trend.
+    pub mode: SeasonalMode,
+    /// Trend growth per period as a decimal: 0.03 = 3%; defaults to none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub growth: Option<f64>,
+    /// Lower bound clamped onto generated values, in the line's base units.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min: Option<f64>,
+    /// Upper bound clamped onto generated values, in the line's base units.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max: Option<f64>,
+}
+
+/// Path of a fade to target.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum ForecastFadeShape {
+    /// Equal steps, reaching the target at the final period.
+    #[default]
+    Linear,
+    /// Constant compound growth; base and target must be non-zero with the same sign.
+    Geometric,
+    /// Half-life decay toward the target; requires `half_life`.
+    Exponential,
+}
+
+/// Parameters of [`ForecastParameters::FadeToTarget`].
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct FadeToTargetParams {
+    /// Terminal level, in the line's base units.
+    pub target: f64,
+    /// Path to the target; defaults to linear.
+    #[serde(default)]
+    pub shape: ForecastFadeShape,
+    /// Periods to close half the gap; required for, and legal only with, the exponential shape.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub half_life: Option<f64>,
+    /// Lower bound clamped onto generated values, in the line's base units.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min: Option<f64>,
+    /// Upper bound clamped onto generated values, in the line's base units.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max: Option<f64>,
+}

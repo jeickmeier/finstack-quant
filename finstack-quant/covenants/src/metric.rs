@@ -131,8 +131,10 @@ mod tests {
             "Validation error: Metric 'debt_to_ebitda' must be a finite JSON number"
         );
         let error = HashMapMetricSource::from_json("[1,2]").expect_err("array must be rejected");
-        assert!(error
-            .to_string()
-            .starts_with("Validation error: Invalid metric map JSON:"));
+        assert!(
+            error
+                .to_string()
+                .starts_with("Validation error: Invalid metric map JSON:")
+        );
     }
 }

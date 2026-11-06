@@ -6,14 +6,14 @@
 
 use crate::metrics::risk::RiskFactorType;
 use crate::recalibration::{
-    provider_missing, HazardRecalibrationAction, HazardRecalibrationRequest, QuoteBump,
-    RecalibrationProvider,
+    HazardRecalibrationAction, HazardRecalibrationRequest, QuoteBump, RecalibrationProvider,
+    provider_missing,
 };
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::Result;
 use std::cmp::Ordering;
 use std::sync::Arc;
 

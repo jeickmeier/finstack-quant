@@ -12,3 +12,5 @@ mod performance_smoke;
 #[cfg(feature = "json-schema")]
 #[path = "schema_contract.rs"]
 mod schema_contract;
+#[path = "support.rs"]
+mod support;

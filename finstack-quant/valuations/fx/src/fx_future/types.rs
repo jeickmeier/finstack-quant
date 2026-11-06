@@ -4,7 +4,7 @@
 //! It does not include forward/futures convexity from stochastic domestic
 //! rates, foreign rates, or their correlations with FX.
 
-use crate::shared::{covered_interest_parity_forward, FxForwardRateRequest};
+use crate::shared::{FxForwardRateRequest, covered_interest_parity_forward};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;

@@ -5,8 +5,8 @@
 
 use super::super::common::*;
 use finstack_quant_core::{currency::Currency, market_data::context::MarketContext, money::Money};
-use finstack_quant_valuations::instruments::fx::fx_spot::FxSpot;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::fx::fx_spot::FxSpot;
 
 #[test]
 fn test_quote_amount_basic() {

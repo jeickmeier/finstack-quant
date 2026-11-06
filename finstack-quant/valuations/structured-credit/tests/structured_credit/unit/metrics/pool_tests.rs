@@ -16,8 +16,8 @@ use finstack_quant_core::types::CreditRating;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    calculate_pool_stats, AssetPool, CdrCalculator, CloWarfCalculator, CprCalculator, DealType,
-    PoolAsset, StructuredCredit, Tranche, TrancheStructure,
+    AssetPool, CdrCalculator, CloWarfCalculator, CprCalculator, DealType, PoolAsset,
+    StructuredCredit, Tranche, TrancheStructure, calculate_pool_stats, pool_report,
 };
 use std::sync::Arc;
 use time::Month;
@@ -79,12 +79,12 @@ fn test_pool_stats_weighted_spread_and_coupon() {
     // from WAS (no rate × 10⁴ fallback): only L1's 400bps contributes.
     let expected_was = 400.0;
     assert!(
-        (stats.weighted_avg_spread_bp - expected_was).abs() < 1e-6,
+        (stats.weighted_avg_spread_bp.expect("spread balance") - expected_was).abs() < 1e-6,
         "Weighted avg spread should match balance-weighted spreads over \
          assets that carry a spread"
     );
     assert!(
-        stats.wac > 0.0,
+        stats.wac.expect("fixed-rate balance") > 0.0,
         "Weighted avg coupon should be positive for fixed/floating assets"
     );
 }
@@ -163,6 +163,49 @@ fn test_clo_warf_calculator_matches_weighted_average_factors() {
         (warf - expected).abs() < 1e-10,
         "Expected WARF {expected}, got {warf}"
     );
+}
+
+#[test]
+fn test_pool_report_warf_equals_the_clo_warf_metric() {
+    let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
+    let bond = |id: &str, balance: f64| {
+        PoolAsset::fixed_rate_bond(
+            id,
+            Money::new(balance, Currency::USD).expect("valid money fixture"),
+            0.06,
+            maturity_date(),
+            DayCount::Thirty360,
+        )
+    };
+    pool.assets
+        .push(bond("BB", 500.0).with_rating(CreditRating::BB));
+    pool.assets.push(bond("UNRATED", 300.0));
+    let mut defaulted = bond("DEFAULTED", 200.0).with_rating(CreditRating::CCC);
+    defaulted.defaulted = true;
+    defaulted.default_date = Some(as_of());
+    defaulted.recovery_amount = Some(Money::new(50.0, Currency::USD).expect("valid money fixture"));
+    pool.assets.push(defaulted);
+    let report = pool_report(&pool, as_of()).expect("report");
+
+    let instrument = StructuredCredit::new_standard(
+        DealType::Clo,
+        finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
+            id: "TEST_POOL_REPORT_WARF".into(),
+            pool,
+            tranches: tranche_structure(),
+            closing_date: as_of(),
+            maturity: maturity_date(),
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: None,
+        },
+    )
+    .expect("valid structured-credit dates");
+    let metric = CloWarfCalculator
+        .calculate(&mut metric_context(instrument))
+        .unwrap();
+
+    assert_eq!(report.warf, Some(metric));
+    assert_eq!(metric, (500.0 * 1350.0 + 300.0 * 3650.0) / 800.0);
 }
 
 #[test]

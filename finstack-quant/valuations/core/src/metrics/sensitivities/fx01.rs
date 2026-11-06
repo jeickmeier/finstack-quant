@@ -21,8 +21,8 @@
 //! together by `+1%` (then `−1%`) in the same reprice. The result is the
 //! joint sensitivity to a simultaneous 1% move across all pairs.
 
-use finstack_quant_core::market_data::bumps::MarketBump;
 use finstack_quant_core::Result;
+use finstack_quant_core::market_data::bumps::MarketBump;
 
 use crate::metrics::{MetricCalculator, MetricContext};
 

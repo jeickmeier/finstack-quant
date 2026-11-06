@@ -1,21 +1,51 @@
 {
   "$defs": {
+    "CoverageTestBreach": {
+      "description": "When one coverage test first failed over a simulation.",
+      "properties": {
+        "first_breach": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "First payment date this simulation found the test failing; a later cure\ndoes not clear it. `None` when it never failed."
+        },
+        "test_id": {
+          "description": "Id of the test: `CoverageTestDiagnostic::test_id` for a test the\nwaterfall carries (`OC_<tranche>`), or `OC_<tranche>_trigger` /\n`IC_<tranche>_trigger` for a tranche's own `oc_trigger` / `ic_trigger`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "test_id"
+      ],
+      "type": "object"
+    },
     "CoverageTestDiagnostic": {
       "description": "One coverage test as the waterfall executor evaluated it in a period.",
       "properties": {
         "cushion": {
-          "description": "`ratio − trigger_level`; negative while the test fails.",
+          "description": "`ratio − trigger_level`; negative while the test fails. `None` when `ratio`\nis, for the same reason.",
           "format": "double",
-          "type": "number"
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "passing": {
           "description": "Whether the test passed in this period.",
           "type": "boolean"
         },
         "ratio": {
-          "description": "Ratio the executor computed (OC: collateral ÷ notes; IC: interest ÷ due).",
+          "description": "Ratio the executor computed (OC: collateral ÷ notes; IC: interest ÷ due).\n`None` when the test has no claim outstanding: the notes it covers are\nretired (OC) or owe no interest (IC), so the denominator is zero and no\nratio exists. Such a test passes.",
           "format": "double",
-          "type": "number"
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "test_id": {
           "description": "`CoverageTestSpec::id` of the test.",
@@ -29,10 +59,186 @@
       },
       "required": [
         "test_id",
-        "ratio",
         "trigger_level",
-        "cushion",
         "passing"
+      ],
+      "type": "object"
+    },
+    "DiversionRecord": {
+      "additionalProperties": false,
+      "description": "Record of a diverted payment from one tier to another recipient.",
+      "properties": {
+        "amount": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Cash diverted, in the deal currency."
+        },
+        "reason": {
+          "description": "Failing coverage tests that caused the diversion, for display.",
+          "type": "string"
+        },
+        "source_tier": {
+          "description": "`WaterfallTier::id` of the coverage-test tier that diverted the cash.",
+          "type": "string"
+        },
+        "target_tranche": {
+          "description": "`Recipient::id` that received the cash, or `principal_account` when a\n`Reinvest` test retained it as principal proceeds.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_tier",
+        "target_tranche",
+        "amount",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "ManagementFeeType": {
+      "description": "Type of management fee",
+      "oneOf": [
+        {
+          "const": "senior",
+          "description": "Senior variant.",
+          "type": "string"
+        },
+        {
+          "const": "subordinated",
+          "description": "Subordinated variant.",
+          "type": "string"
+        },
+        {
+          "const": "incentive",
+          "description": "Incentive variant.",
+          "type": "string"
+        }
+      ]
+    },
+    "NonWaterfallPayment": {
+      "description": "Cash paid to one tranche outside the waterfall.",
+      "properties": {
+        "incentive_fee": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Manager incentive fee withheld from the cash before it reached an\nequity class; zero otherwise. Already counted in the period's\n`fees_paid`, and not part of what the tranche received."
+        },
+        "interest": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Part booked to the tranche's interest flows."
+        },
+        "payment_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Date the tranche received the cash. A recovery settling after the last\nperiod carries its own later date here."
+        },
+        "principal": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Part booked to the tranche's principal flows, net of `incentive_fee`."
+        },
+        "source": {
+          "$ref": "#/$defs/NonWaterfallSource",
+          "description": "Where the cash came from."
+        },
+        "tranche_id": {
+          "description": "Id of the tranche paid (`Tranche::id`), equity classes included.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "payment_date",
+        "tranche_id",
+        "source",
+        "interest",
+        "principal",
+        "incentive_fee"
+      ],
+      "type": "object"
+    },
+    "NonWaterfallSource": {
+      "description": "Where cash paid to a tranche outside the waterfall came from.",
+      "oneOf": [
+        {
+          "const": "reserve_interest",
+          "description": "Reserve-account interest routed straight to a named tranche\n(`ReserveInterestDestination::Tranche`).",
+          "type": "string"
+        },
+        {
+          "const": "redemption",
+          "description": "A deal call or clean-up call redemption, including the surplus paid to\nthe most junior class after every note is redeemed.",
+          "type": "string"
+        },
+        {
+          "const": "spread_account_release",
+          "description": "Excess-spread account and retained interest released at deal end.",
+          "type": "string"
+        },
+        {
+          "const": "principal_account_release",
+          "description": "Controlled-accumulation funding account and retained principal released\nat deal end.",
+          "type": "string"
+        },
+        {
+          "const": "reserve_account_release",
+          "description": "Reserve account released at deal end.",
+          "type": "string"
+        },
+        {
+          "const": "recovery_release",
+          "description": "A recovery claim still pending at deal end, settled at its lagged date.",
+          "type": "string"
+        }
+      ]
+    },
+    "PaymentRecord": {
+      "additionalProperties": false,
+      "description": "One recipient's payment as the waterfall executor made it.",
+      "properties": {
+        "diverted": {
+          "description": "Whether a failing coverage test diverted this payment here.",
+          "type": "boolean"
+        },
+        "is_principal": {
+          "description": "Whether this payment is capital: it retires the tranche's balance and\nbooks to its principal flows rather than its interest flows.",
+          "type": "boolean"
+        },
+        "paid_amount": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Cash actually paid, in the deal currency."
+        },
+        "priority": {
+          "description": "`WaterfallTier::priority` of that tier (lower runs first).",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "recipient": {
+          "$ref": "#/$defs/RecipientType",
+          "description": "Who was paid. An equity class is paid as `RecipientType::Equity`, every\nother class as `RecipientType::Tranche` with its id."
+        },
+        "recipient_id": {
+          "description": "`Recipient::id` within the tier.",
+          "type": "string"
+        },
+        "requested_amount": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Amount the recipient's calculation asked for, in the deal currency."
+        },
+        "shortfall": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "`requested_amount` less `paid_amount`."
+        },
+        "tier_id": {
+          "description": "`WaterfallTier::id` of the tier that made the payment.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tier_id",
+        "recipient_id",
+        "priority",
+        "recipient",
+        "requested_amount",
+        "paid_amount",
+        "shortfall",
+        "diverted",
+        "is_principal"
       ],
       "type": "object"
     },
@@ -46,6 +252,13 @@
           },
           "type": "array"
         },
+        "credit_enhancement": {
+          "description": "Every tranche's credit enhancement on this period's end-of-period\nbalances, in `TrancheStructure` order. The step-down trigger\n`MinCreditEnhancement` reads the senior tranche's value from the same\nfunction on the next payment date, before that date's principal is paid,\nso with no losses or draws in between it tests this period's number.",
+          "items": {
+            "$ref": "#/$defs/TrancheCreditEnhancement"
+          },
+          "type": "array"
+        },
         "defaults": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Par that defaulted (charged off) this period."
@@ -55,7 +268,7 @@
           "description": "Delinquent collateral balance at period end (delinquency model)."
         },
         "excess_spread": {
-          "description": "Annualized excess spread realized this period (decimal).",
+          "description": "Excess spread realized this period, annualized, as a decimal of the\nopening pool balance (`0.02` is 2% a year): `(I − D − F − L) ÷ P × 12 ÷ m`.\n`I` is `interest_collections`, `D` the debt coupons due this period, `F`\nthe service-provider and manager fees paid through the waterfall (not\nspecial-servicing fees, already out of `I`), `L` the period's defaults less\npool recoveries, floored at zero, `P` the pool balance before this period's\nflows and `m` the months in the period. The early-amortization excess-spread\ntest reads this number. Zero when `P` is zero and on a settlement record,\nwhere no waterfall ran.",
           "format": "double",
           "type": "number"
         },
@@ -70,6 +283,13 @@
         "interest_collections": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Interest collected from the pool (including servicer advances)."
+        },
+        "non_waterfall_payments": {
+          "description": "Cash paid to tranches outside the waterfall: reserve interest routed to\na tranche, and, on the deal's last period, its redemption and terminal\nreleases. Together with `waterfall.payment_records` this is every\ntranche's cash: per tranche and date, the two sum to the tranche's\n`cashflows`, and to its `interest_flows` plus `principal_flows`.",
+          "items": {
+            "$ref": "#/$defs/NonWaterfallPayment"
+          },
+          "type": "array"
         },
         "payment_date": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
@@ -109,28 +329,38 @@
           "description": "Excess-spread account balance at period end."
         },
         "wac": {
-          "description": "Weighted-average coupon (annual decimal) of the performing fixed-rate\ncollateral at period end: the same population as `AssetPool::wac`.",
+          "description": "Weighted-average coupon (annual decimal) of the performing fixed-rate\ncollateral at period end: the same population as `AssetPool::wac`. `None`\nwhen no performing fixed-rate balance remains.",
           "format": "double",
-          "type": "number"
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "warf": {
-          "description": "Balance-weighted Moody's rating factor of the collateral.",
+          "description": "Balance-weighted Moody's rating factor of the performing collateral. `None`\nwhen no performing balance remains.",
           "format": "double",
-          "type": "number"
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "waterfall": {
+          "$ref": "#/$defs/WaterfallDistribution",
+          "description": "How this period's waterfall ran: who was paid, how much, and what was\nleft. Its recipient-keyed totals are not serialized; `payment_records`\ncarries the same cash."
         },
         "weighted_avg_spread_bp": {
-          "description": "Balance-weighted spread of the floating-rate collateral (basis points).",
+          "description": "Balance-weighted spread of the performing floating-rate collateral (basis\npoints). `None` when no performing floating-rate balance remains.",
           "format": "double",
-          "type": "number"
+          "type": [
+            "number",
+            "null"
+          ]
         }
       },
       "required": [
         "payment_date",
         "pool_balance",
         "pool_factor",
-        "wac",
-        "weighted_avg_spread_bp",
-        "warf",
         "interest_collections",
         "principal_collections",
         "defaults",
@@ -143,7 +373,207 @@
         "delinquent_balance",
         "servicer_advances_outstanding",
         "excess_spread",
-        "coverage_tests"
+        "coverage_tests",
+        "waterfall",
+        "non_waterfall_payments",
+        "credit_enhancement"
+      ],
+      "type": "object"
+    },
+    "RecipientType": {
+      "description": "Recipient of waterfall payments",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Service provider (trustee, admin, rating agency, etc.)",
+          "properties": {
+            "service_provider": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "service_provider"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Manager fee (type indicates senior/subordinated/incentive)",
+          "properties": {
+            "manager_fee": {
+              "$ref": "#/$defs/ManagementFeeType"
+            }
+          },
+          "required": [
+            "manager_fee"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Tranche payment",
+          "properties": {
+            "tranche": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "tranche"
+          ],
+          "type": "object"
+        },
+        {
+          "const": "equity",
+          "description": "Equity/residual distribution",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Reserve account (credit enhancement replenishment)",
+          "properties": {
+            "reserve_account": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "reserve_account"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "TrancheCreditEnhancement": {
+      "description": "One tranche's credit enhancement at a period's end.",
+      "properties": {
+        "credit_enhancement": {
+          "description": "Share of the collateral beneath this tranche, as a decimal (`0.30` is\n30%): `(C − N) ÷ C`, where `C` is the collateral balance plus the\ncontrolled-accumulation funding account and `N` the balances of this\ntranche and every tranche paid ahead of it (`payment_priority` at or\nbelow its own). Deferred interest is not in `N`. Negative when the notes\nexceed the collateral, and zero when there is no collateral. Pari-passu\nclasses rank by `payment_priority`, so each is enhanced only by those\nranked after it; an equity class's value is the collateral left above\nthe whole structure.",
+          "format": "double",
+          "type": "number"
+        },
+        "tranche_id": {
+          "description": "Id of the tranche (`Tranche::id`).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tranche_id",
+        "credit_enhancement"
+      ],
+      "type": "object"
+    },
+    "WaterfallDistribution": {
+      "additionalProperties": false,
+      "description": "Result of waterfall distribution",
+      "properties": {
+        "coverage_tests": {
+          "description": "Coverage test results as `(test id, ratio, passed)`. The ratio is\n`None` when the test has no claim outstanding (a zero denominator);\nsuch a test passes.",
+          "items": {
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "format": "double",
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              {
+                "type": "boolean"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "diverted_amounts": {
+          "default": [],
+          "description": "Detailed diverted payment records.",
+          "items": {
+            "$ref": "#/$defs/DiversionRecord"
+          },
+          "type": "array"
+        },
+        "diverted_cash": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Total diverted cash"
+        },
+        "had_diversions": {
+          "description": "Whether any diversions occurred",
+          "type": "boolean"
+        },
+        "payment_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Payment date"
+        },
+        "payment_records": {
+          "description": "Detailed payment records",
+          "items": {
+            "$ref": "#/$defs/PaymentRecord"
+          },
+          "type": "array"
+        },
+        "principal_used_for_interest": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Principal proceeds spent on fee or interest tiers whose\n[`FundingSource`] is `InterestThenPrincipal`. Already netted out of\n`remaining_principal`; reported so the principal account's use is\nvisible."
+        },
+        "recovery_proceeds": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "default": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "description": "Recovery proceeds included in this period's available cash.\nTracked separately from principal collections for trustee report reconciliation."
+        },
+        "remaining_cash": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Remaining undistributed cash"
+        },
+        "remaining_interest": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Undistributed interest retained for subsequent interest-waterfall periods."
+        },
+        "remaining_principal": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Undistributed principal retained for reinvestment or debt repayment."
+        },
+        "tier_allocations": {
+          "description": "Tier-level allocations",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "total_available": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Total available cash at start"
+        }
+      },
+      "required": [
+        "payment_date",
+        "total_available",
+        "tier_allocations",
+        "payment_records",
+        "coverage_tests",
+        "diverted_cash",
+        "remaining_cash",
+        "remaining_interest",
+        "remaining_principal",
+        "principal_used_for_interest",
+        "had_diversions"
       ],
       "type": "object"
     }
@@ -162,6 +592,7 @@
         "currency": "USD"
       },
       "early_amortization_date": null,
+      "first_breaches": [],
       "periods": [],
       "reserve_balance_path": [],
       "reserve_interest_paid": [],
@@ -197,9 +628,16 @@
       "default": null,
       "description": "Payment date on which an early-amortization event (or a coverage-test\nacceleration) ended the revolving period, when one fired."
     },
+    "first_breaches": {
+      "description": "First failure of each coverage test, one entry per test sorted by\n`test_id`. Covers every test the waterfall carries (each also on\n`periods[i].coverage_tests`) and every tranche `oc_trigger` /\n`ic_trigger`, whatever its consequence (only a breached `DivertCashFlow`\ntrigger is on `coverage_tests`, for the periods it is in breach). A deal\nwith no coverage test has no entries, and a test the waterfall carries is\nlisted only if a period evaluated it, so a settlement with no waterfall run\nlists none of those.",
+      "items": {
+        "$ref": "#/$defs/CoverageTestBreach"
+      },
+      "type": "array"
+    },
     "periods": {
       "default": [],
-      "description": "Per-period deal accounting, in payment order.",
+      "description": "Per-period deal accounting, in payment order. A deal with no payment\nperiod left that still settles cash (a fully defaulted pool with\nrecoveries pending, or a funded reserve) has one record, holding that\nsettlement in `non_waterfall_payments`.",
       "items": {
         "$ref": "#/$defs/PeriodDiagnostics"
       },
@@ -275,7 +713,8 @@
     "draws_from_reserve",
     "draws_from_principal",
     "unfunded_draws",
-    "reserve_replenished"
+    "reserve_replenished",
+    "first_breaches"
   ],
   "title": "SimulationDiagnostics",
   "type": "object"

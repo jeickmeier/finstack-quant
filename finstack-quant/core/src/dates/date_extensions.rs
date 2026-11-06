@@ -5,7 +5,7 @@
 //! and business day arithmetic. All methods are allocation-free.
 
 use crate::dates::calendar::business_days::{
-    adjustment_failed, seek_business_day, BusinessDayConvention,
+    BusinessDayConvention, adjustment_failed, seek_business_day,
 };
 use crate::dates::periods::FiscalConfig;
 use time::{Date, Duration, Month};
@@ -412,8 +412,8 @@ mod tests {
 
     #[test]
     fn test_add_business_days_with_holidays() {
-        use crate::dates::calendar::TARGET2;
         use crate::dates::HolidayCalendar;
+        use crate::dates::calendar::TARGET2;
 
         let cal = TARGET2;
 

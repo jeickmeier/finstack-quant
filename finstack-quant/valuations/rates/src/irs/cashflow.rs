@@ -14,6 +14,7 @@
 //! Compounded floating-leg schedules in this module emit accrual-end dates;
 //! the pricer applies floating-leg payment lag when discounting those flows.
 
+use finstack_quant_core::Result;
 #[cfg(test)]
 use finstack_quant_core::dates::BusinessDayConvention;
 use finstack_quant_core::dates::{Date, DateExt, StubKind, TenorUnit};
@@ -22,14 +23,13 @@ use finstack_quant_core::market_data::fixings::fixing_series_id;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 use rust_decimal::Decimal;
 
 use crate::irs::InterestRateSwap;
 use finstack_quant_cashflows::builder::{
-    build_periods, merge_cashflow_schedules, CashFlowSchedule, CouponType, FloatingCouponSpec,
-    FloatingLegCompounding, FloatingRateFallback, FloatingRateSpec, Notional, PrincipalExchange,
-    RollRule, ScheduleParams, SchedulePeriod,
+    CashFlowSchedule, CouponType, FloatingCouponSpec, FloatingLegCompounding, FloatingRateFallback,
+    FloatingRateSpec, Notional, PrincipalExchange, RollRule, ScheduleParams, SchedulePeriod,
+    build_periods, merge_cashflow_schedules,
 };
 use finstack_quant_valuations_core::instruments::pricing::overnight_conventions::builder_overnight_method;
 use finstack_quant_valuations_core::instruments::{FloatLegSpec, PayReceive};
@@ -375,32 +375,31 @@ pub(crate) fn float_leg_schedule_with_curves_as_of(
         FloatingLegCompounding::CompoundedInArrears { .. }
             | FloatingLegCompounding::CompoundedWithObservationShift { .. }
             | FloatingLegCompounding::CompoundedWithRateCutoff { .. }
-    ) {
-        if let Some(market) = curves {
-            let disc = market.get_discount(irs.fixed_leg.discount_curve_id.as_ref())?;
-            let proj = if irs.is_single_curve_ois() {
-                market.get_forward(float.forward_curve_id.as_str()).ok()
-            } else {
-                Some(market.get_forward(float.forward_curve_id.as_str())?)
-            };
-            let fixings = finstack_quant_core::market_data::fixings::get_fixing_series(
-                market,
-                float.forward_curve_id.as_str(),
-            )
-            .ok();
-            let valuation_date = as_of.unwrap_or_else(|| {
-                proj.as_ref()
-                    .map(|c| c.base_date())
-                    .unwrap_or_else(|| disc.base_date())
-            });
-            return projected_compounded_float_leg_schedule(
-                irs,
-                disc.as_ref(),
-                proj.as_deref(),
-                valuation_date,
-                fixings,
-            );
-        }
+    ) && let Some(market) = curves
+    {
+        let disc = market.get_discount(irs.fixed_leg.discount_curve_id.as_ref())?;
+        let proj = if irs.is_single_curve_ois() {
+            market.get_forward(float.forward_curve_id.as_str()).ok()
+        } else {
+            Some(market.get_forward(float.forward_curve_id.as_str())?)
+        };
+        let fixings = finstack_quant_core::market_data::fixings::get_fixing_series(
+            market,
+            float.forward_curve_id.as_str(),
+        )
+        .ok();
+        let valuation_date = as_of.unwrap_or_else(|| {
+            proj.as_ref()
+                .map(|c| c.base_date())
+                .unwrap_or_else(|| disc.base_date())
+        });
+        return projected_compounded_float_leg_schedule(
+            irs,
+            disc.as_ref(),
+            proj.as_deref(),
+            valuation_date,
+            fixings,
+        );
     }
 
     let mut float_b = CashFlowSchedule::builder();

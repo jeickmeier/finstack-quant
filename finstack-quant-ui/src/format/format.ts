@@ -7,14 +7,6 @@ export type RoundingStamp = Pick<
   ValuationResultWire["meta"]["rounding"],
   "mode" | "output_scale_by_currency"
 >;
-/** Presentation conventions explicitly documented by core.Rate; no field classification. */
-export type RateUnit = "decimal" | "percent" | "bp";
-/** A caller's source-backed choice of wire and display conventions. */
-export interface RatePresentation {
-  source: string;
-  wire: RateUnit;
-  display: RateUnit;
-}
 /** Existing native date operations, called in the worker or an initialized WASM host. */
 export type DateApi = Pick<CoreNamespace, "createDate" | "dateFromEpochDays">;
 
@@ -26,15 +18,21 @@ export function formatRaw(
 }
 /** Group exact decimal digits for the registry's en-US display; no numeric conversion. */
 export function groupDecimal(value: string): string {
+  // finstack-arith: expands exponent notation to digits; value unchanged
   const normalized = /[eE]/.test(value) ? new Big(value).toFixed() : value;
   const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(normalized);
   if (!match) throw new TypeError("Expected a decimal string");
   const [, sign, integer, fraction] = match;
   return (
+    // finstack-arith: concatenates the sign and grouped digits as strings
     sign +
     new Intl.NumberFormat("en-US").format(BigInt(integer)) +
     (fraction === undefined ? "" : `.${fraction}`)
   );
+}
+/** Every digit of a native number; non-finite values keep their `NaN` / `Infinity` text. */
+export function formatExact(value: number): string {
+  return Number.isFinite(value) ? groupDecimal(String(value)) : String(value);
 }
 /** Native `core.Currency` / `core.Money` surface used for prepared display formatting; injected, never imported at render time. */
 export type MoneyApi = Pick<CoreNamespace, "Currency" | "Money">;
@@ -78,65 +76,18 @@ export function formatMoney(
   }
 }
 /**
- * Convert presentation units exactly using the published core.Rate convention.
- * @param value - Decimal text; fractional precision never passes through Number.
- * @param from - Explicit source unit: decimal, percent or basis points.
- * @param to - Explicit destination display unit.
- * @returns Exact decimal text; equivalent units return the original spelling.
+ * Display a supplied decimal fraction as percent digits.
+ * @param value - A decimal fraction as Rust returned it, such as `0.25`.
+ * @returns Exact percent digits with no sign appended, such as `25`.
  */
-export function convertRate(
-  value: string,
-  from: RateUnit,
-  to: RateUnit,
-): string {
-  if (from === to) return value;
-  // core.Rate documents decimal=1, percent=100, bp=10000. This is display scaling only.
-  const powers = { decimal: 0, percent: 2, bp: 4 };
-  if (!Object.hasOwn(powers, from) || !Object.hasOwn(powers, to))
-    throw new TypeError("Unsupported rate presentation unit");
-  const shift = powers[to] - powers[from];
-  const fraction = /^-?\d+(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(value);
-  if (!fraction)
-    throw new TypeError("Expected decimal text for rate presentation");
-  return new Big(value)
-    .times(`1e${shift}`)
-    .toFixed(
-      Math.max(
-        0,
-        (fraction[1]?.length ?? 0) - Number(fraction[2] ?? 0) - shift,
-      ),
-    );
-}
-/** Display an explicitly contracted rate, or preserve raw text with unavailable units. */
-export function formatRate(
-  value: string | number,
-  presentation?: RatePresentation,
-): { text: string; unit: RateUnit | null } {
-  if (!presentation) return { text: String(value), unit: null };
-  if (!presentation.source.trim())
-    throw new TypeError("Rate presentation requires its canonical source");
-  return {
-    text: convertRate(
-      typeof value === "number" ? new Big(value).toFixed() : value,
-      presentation.wire,
-      presentation.display,
-    ),
-    unit: presentation.display,
-  };
-}
-/** Adapt edited display text back to wire units; missing metadata leaves it untouched. */
-export function rateToWire(
-  value: string,
-  presentation?: RatePresentation,
-): string {
-  if (!presentation) return value;
-  if (!presentation.source.trim())
-    throw new TypeError("Rate presentation requires its canonical source");
-  return convertRate(value, presentation.display, presentation.wire);
+export function formatPercent(value: number): string {
+  // finstack-arith: display scaling of a supplied fraction; never returned to Rust
+  return new Big(value).times(100).toFixed();
 }
 /** Add a plus sign only when the caller explicitly requests a supplied signed value. */
 export function formatSigned(value: string | number | bigint): string {
   const text = String(value);
+  // finstack-arith: reads the sign of a supplied value to prefix a plus
   return new Big(text).gt(0) ? `+${text}` : text;
 }
 /**
@@ -158,63 +109,44 @@ export function epochToIso(days: number, dates: DateApi): string {
   const [year, month, day] = dates.dateFromEpochDays(days);
   const y =
     year < 0
-      ? `-${String(-year).padStart(4, "0")}`
+      ? // finstack-arith: prints the magnitude of a negative ISO year
+        `-${String(-year).padStart(4, "0")}`
       : String(year).padStart(4, "0");
   return `${y}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
-const pureTenor = /^\d+(?:\.\d+)?[my]$/;
-const labelToken = /(^-)?(\d+(?:\.\d+)?)([my](?![A-Za-z]))?|\D+/g;
 const labelCollator = new Intl.Collator("en-US", { numeric: true });
-// Text runs ignore case so that case never outranks a later numeric run.
+// Text runs ignore case so that case never outranks a later numeric value.
 const runCollator = new Intl.Collator("en-US", { sensitivity: "base" });
-/**
- * Split a label into number and text runs. A `-` at the very start of the label signs
- * its first number; any other `-` is text.
- * A number followed by `m` or `y` and then no letter is a tenor in years: `Ny` is N and
- * `Nm` is N/12, as parse_key_rate_label reads them and as vega writes `{expiry}y` rows.
- */
-function labelTokens(label: string): (number | string)[] {
-  return [...label.matchAll(labelToken)].map(([text, sign, digits, unit]) =>
-    digits === undefined
-      ? text
-      : (sign ? -1 : 1) * (Number(digits) / (unit === "m" ? 12 : 1)),
-  );
+/** A coordinate label with Rust's `MetricCoordinate`, which orders it on its axis. */
+export interface AxisCoordinate {
+  label: string;
+  group: string;
+  value?: number | null;
 }
 /**
- * Order bucket and coordinate labels by maturity for display.
- * @param left - Label such as `3m`, `10y`, `SURF::0.25y` (a vega row), a curve id or a
- * strike such as `1.05`, exactly as returned.
- * @param right - Label compared with `left`.
- * @returns A negative, zero or positive number for `Array.prototype.sort`. Whole-label
- * `Nm` and `Ny` tenors come first. Labels then compare run by run: numbers by value
- * (a tenor run in years, months being N/12, so `12m` and `1y` tie), text with
- * case-insensitive en-US collation, a number before text, and a label whose runs end
- * first sorts first. Ties
- * fall back to en-US numeric collation of the full label, then code-unit order,
- * whatever the host locale.
+ * Order coordinates for display by the values Rust supplied.
+ * @param left - Coordinate label with its native group and value, as returned.
+ * @param right - Coordinate compared with `left`.
+ * @returns A negative, zero or positive number for `Array.prototype.sort`: by group
+ * with case-insensitive en-US collation, then by value with a number before none,
+ * then the label by en-US numeric collation and code-unit order, whatever the host
+ * locale. `12m` and `1y` tie on value, so the label decides.
  */
-export function compareTenorLabels(left: string, right: string): number {
-  const leftTenor = pureTenor.test(left);
-  if (leftTenor !== pureTenor.test(right)) return leftTenor ? -1 : 1;
-  const leftTokens = labelTokens(left);
-  const rightTokens = labelTokens(right);
-  for (let index = 0; index < leftTokens.length; index++) {
-    const a = leftTokens[index];
-    const b = rightTokens[index];
-    if (b === undefined) return 1;
-    const order =
-      typeof a === "number"
-        ? typeof b === "number"
-          ? a - b
-          : -1
-        : typeof b === "number"
-          ? 1
-          : runCollator.compare(a, b);
-    if (order) return order;
+export function compareCoordinates(
+  left: AxisCoordinate,
+  right: AxisCoordinate,
+): number {
+  const group = runCollator.compare(left.group, right.group);
+  if (group) return group;
+  const a = left.value ?? null;
+  const b = right.value ?? null;
+  if (a !== b) {
+    if (a === null) return 1;
+    if (b === null) return -1;
+    return a < b ? -1 : 1;
   }
-  if (rightTokens.length > leftTokens.length) return -1;
   return (
-    labelCollator.compare(left, right) ||
-    (left < right ? -1 : left > right ? 1 : 0)
+    labelCollator.compare(left.label, right.label) ||
+    (left.label < right.label ? -1 : left.label > right.label ? 1 : 0)
   );
 }

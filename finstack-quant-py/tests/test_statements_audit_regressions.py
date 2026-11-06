@@ -52,6 +52,7 @@ def test_normalization_preserves_currency_and_rejects_foreign_adjustment() -> No
     payload["adjustments"][0]["value"]["node_id"] = "usd"
     normalized = s.normalize(result, s.NormalizationConfig.from_json(json.dumps(payload)))[0]
     assert (normalized.value_type, normalized.currency, normalized.final_value) == ("monetary", "USD", 110.0)
+    assert normalized.adjustments[0].adjusted_value == normalized.final_value
     restored = pickle.loads(pickle.dumps(normalized))  # noqa: S301 - locally constructed fixture
     assert (restored.currency, restored.final_value) == ("USD", 110.0)
 

@@ -1,24 +1,24 @@
 //! Convertible pricing pipeline and public pricing helpers.
 
-use finstack_quant_core::dates::{adjust, Date, DateExt, DayCount};
+use finstack_quant_core::InputError;
+use finstack_quant_core::dates::{Date, DateExt, DayCount, adjust};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurfaceAxis};
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::PriceId;
-use finstack_quant_core::InputError;
 use finstack_quant_core::{Error, Result};
 
 use crate::convertible::{
-    market_inputs::resolve_dividend_yield, ConvertibleBond, ConvertibleGreeks,
+    ConvertibleBond, ConvertibleGreeks, market_inputs::resolve_dividend_yield,
 };
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_valuations_core::instruments::{ConversionEvent, ConversionPolicy};
 use finstack_quant_valuations_core::instruments::{GreekBumps, Instrument};
 use finstack_quant_valuations_core::metrics::bump_discount_curve_parallel;
 
-use super::credit_tree::{terminal_payoff, CreditTreeEngine, CreditTreeMarketInputs};
+use super::credit_tree::{CreditTreeEngine, CreditTreeMarketInputs, terminal_payoff};
 use super::valuator::ConvertibleBondValuator;
 
 /// Compute the conversion value for any conversion policy given the spot price.
@@ -272,6 +272,63 @@ pub(super) struct PricingInputs {
     spot_id: PriceId,
     /// Original spot scalar from market context, preserved for type-safe bumping.
     spot_scalar: MarketScalar,
+}
+
+impl PricingInputs {
+    /// `market` with the bond's share price at `spot`, keeping its scalar variant.
+    pub(super) fn market_at_spot(
+        &self,
+        market: &MarketContext,
+        spot: f64,
+    ) -> Result<MarketContext> {
+        let scalar = match &self.spot_scalar {
+            MarketScalar::Price(money) => MarketScalar::Price(Money::new(spot, money.currency())?),
+            MarketScalar::Unitless(_) => MarketScalar::Unitless(spot),
+        };
+        Ok(market.clone().insert_price(self.spot_id.as_str(), scalar))
+    }
+}
+
+/// Prices at either side of a central-difference bump of the share price.
+pub(super) struct SpotBumpPrices {
+    /// Bump width in share price, half the distance between the two prices.
+    spot_bump: f64,
+    /// Value with the share price up by the bump.
+    price_up: f64,
+    /// Value with the share price down by the bump.
+    price_down: f64,
+}
+
+impl SpotBumpPrices {
+    /// Central-difference delta: `(P(S+h) - P(S-h)) / (2h)`.
+    pub(super) fn delta(&self) -> f64 {
+        (self.price_up - self.price_down) / (2.0 * self.spot_bump)
+    }
+}
+
+/// Reprice `bond` either side of a relative bump of share price `spot`, or
+/// `None` when the share price is zero and has no relative bump. Only the spot
+/// identity and scalar variant of `inputs` are read, so they may come from a
+/// market at another share price.
+pub(super) fn spot_bump_prices(
+    bond: &ConvertibleBond,
+    market: &MarketContext,
+    inputs: &PricingInputs,
+    spot: f64,
+    bump_pct: f64,
+    as_of: Date,
+) -> Result<Option<SpotBumpPrices>> {
+    let spot_bump = bump_pct * spot;
+    if spot_bump <= 0.0 {
+        return Ok(None);
+    }
+    let market_up = inputs.market_at_spot(market, spot + spot_bump)?;
+    let market_down = inputs.market_at_spot(market, spot - spot_bump)?;
+    Ok(Some(SpotBumpPrices {
+        spot_bump,
+        price_up: price_convertible_bond(bond, &market_up, as_of)?.amount(),
+        price_down: price_convertible_bond(bond, &market_down, as_of)?.amount(),
+    }))
 }
 
 /// Resolve an already-exercised contract without recreating its debt or options.
@@ -632,29 +689,10 @@ pub fn calculate_convertible_greeks(
     };
 
     // ---- Delta & Gamma: bump equity spot (central differences) ----
-    let h_spot = bump_pct * inputs.spot;
-    if h_spot > 0.0 {
-        let bump_scalar = |amount: f64| -> finstack_quant_core::Result<MarketScalar> {
-            Ok(match &inputs.spot_scalar {
-                MarketScalar::Price(money) => MarketScalar::Price(
-                    finstack_quant_core::money::Money::new(amount, money.currency())?,
-                ),
-                MarketScalar::Unitless(_) => MarketScalar::Unitless(amount),
-            })
-        };
-
-        let market_up = market
-            .clone()
-            .insert_price(inputs.spot_id.as_str(), bump_scalar(inputs.spot + h_spot)?);
-        let market_down = market
-            .clone()
-            .insert_price(inputs.spot_id.as_str(), bump_scalar(inputs.spot - h_spot)?);
-
-        let price_up = price_convertible_bond(bond, &market_up, as_of)?.amount();
-        let price_down = price_convertible_bond(bond, &market_down, as_of)?.amount();
-
-        greeks.delta = (price_up - price_down) / (2.0 * h_spot);
-        greeks.gamma = (price_up - 2.0 * greeks.price + price_down) / (h_spot * h_spot);
+    if let Some(bump) = spot_bump_prices(bond, market, &inputs, inputs.spot, bump_pct, as_of)? {
+        greeks.delta = bump.delta();
+        greeks.gamma = (bump.price_up - 2.0 * greeks.price + bump.price_down)
+            / (bump.spot_bump * bump.spot_bump);
     }
 
     // ---- Vega: bump volatility (B1: central differences) ----
@@ -710,23 +748,23 @@ pub fn calculate_convertible_greeks(
 
     // ---- Theta: 1-day roll (forward difference), reported per calendar day ----
     {
-        if inputs.time_to_maturity > 1.0 / 365.25 {
-            if let Some(next_day) = as_of.next_day() {
-                // `roll_forward(1)` realizes one day of forwards on every
-                // curve (discount curves renormalize by DF(1d), hazard
-                // curves preserve hazard rates via conditional survival), so
-                // theta = price(rolled, t+1d) - price(t) captures both carry
-                // and roll-down. See module documentation
-                // (realized-forward roll semantics).
-                //
-                // A roll fails when a curve is too sparse to retain ≥ 2 knots
-                // after the shift; that error propagates rather than
-                // repricing on a market still anchored at `t`.
-                let rolled_market = market.roll_forward(1)?;
-                let fwd_price = price_convertible_bond(bond, &rolled_market, next_day)?;
-                // Theta = P(t+1d) - P(t), reported as change per calendar day.
-                greeks.theta = fwd_price.amount() - greeks.price;
-            }
+        if inputs.time_to_maturity > 1.0 / 365.25
+            && let Some(next_day) = as_of.next_day()
+        {
+            // `roll_forward(1)` realizes one day of forwards on every
+            // curve (discount curves renormalize by DF(1d), hazard
+            // curves preserve hazard rates via conditional survival), so
+            // theta = price(rolled, t+1d) - price(t) captures both carry
+            // and roll-down. See module documentation
+            // (realized-forward roll semantics).
+            //
+            // A roll fails when a curve is too sparse to retain ≥ 2 knots
+            // after the shift; that error propagates rather than
+            // repricing on a market still anchored at `t`.
+            let rolled_market = market.roll_forward(1)?;
+            let fwd_price = price_convertible_bond(bond, &rolled_market, next_day)?;
+            // Theta = P(t+1d) - P(t), reported as change per calendar day.
+            greeks.theta = fwd_price.amount() - greeks.price;
         }
     }
 

@@ -4,14 +4,14 @@
 //! to parallel shifts in interest rates, accounting for the change in
 //! prepayment behavior as rates change.
 
-use crate::mbs_passthrough::pricer::price_mbs;
 use crate::mbs_passthrough::AgencyMbsPassthrough;
+use crate::mbs_passthrough::pricer::price_mbs;
 use finstack_quant_cashflows::builder::PrepaymentModelSpec;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DateExt, DayCountContext};
 use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_core::Result;
 
 use super::PREPAY_RATE_SENSITIVITY;
 

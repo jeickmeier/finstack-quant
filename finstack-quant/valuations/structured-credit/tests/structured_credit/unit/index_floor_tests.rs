@@ -8,8 +8,8 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
 use finstack_quant_valuations_structured_credit::structured_credit::{
-    tranche_oas, AssetPool, DealType, OasConfig, PoolAsset, StructuredCredit, Tranche,
-    TrancheStructure,
+    AssetPool, DealType, OasConfig, PoolAsset, StructuredCredit, Tranche, TrancheStructure,
+    tranche_oas,
 };
 use time::Month;
 

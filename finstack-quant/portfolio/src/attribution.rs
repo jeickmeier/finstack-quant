@@ -3,6 +3,7 @@
 //! Aggregates instrument-level attribution across all positions in a portfolio,
 //! with currency conversion to portfolio base currency.
 
+use crate::Portfolio;
 use crate::error::{Error, Result};
 use crate::evaluation::try_map_positions;
 use crate::evaluation::{EvaluationProfile, PortfolioEvaluationPlan, PositionExecution};
@@ -10,19 +11,18 @@ use crate::types::PositionId;
 use crate::valuation::{
     PortfolioValuation, PortfolioValuationOptions, PositionValue, RequestedMetrics,
 };
-use crate::Portfolio;
 use finstack_quant_attribution::{
+    AttributionMethod, AttributionRequest, PnlAttribution, PnlBucket, PnlBucketShare,
     attribute_pnl_metrics_based, default_attribution_metrics, translate_to_target_currency,
-    AttributionMethod, AttributionRequest, PnlAttribution,
 };
-use finstack_quant_core::config::FinstackConfig;
+use finstack_quant_core::config::{FinstackConfig, RoundingContext, ZeroKind};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::composite::CompositeInstrument;
 use finstack_quant_valuations::instruments::json_loader::instrument_json_of;
-use finstack_quant_valuations::instruments::Instrument;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -699,15 +699,32 @@ pub fn attribute_portfolio_pnl(
 }
 
 impl PortfolioAttribution {
+    /// Whether `total_pnl` is effectively zero under the default
+    /// [`RoundingContext`] (half a unit of the base currency's output scale),
+    /// so no bucket has a defined share of it. [`Self::explain`] and
+    /// [`Self::pct_of_total_by_bucket`] share this rule.
+    fn total_is_effectively_zero(&self) -> bool {
+        RoundingContext::default().is_effectively_zero(
+            self.total_pnl.amount(),
+            ZeroKind::Money(self.total_pnl.currency()),
+        )
+    }
+
     /// Generate explanation tree for portfolio attribution.
+    ///
+    /// Each bucket line shows its amount and its share of `total_pnl`; the
+    /// share prints as `0.0%` when `total_pnl` is effectively zero under the
+    /// same rule as [`Self::pct_of_total_by_bucket`], which returns `None`
+    /// shares there.
     pub fn explain(&self) -> String {
         let mut lines = Vec::new();
+        let total_is_zero = self.total_is_effectively_zero();
 
         let fmt = |amount: &Money, total: &Money| -> String {
-            let pct = if total.amount().abs() > 1e-10 {
-                (amount.amount() / total.amount()) * 100.0
-            } else {
+            let pct = if total_is_zero {
                 0.0
+            } else {
+                (amount.amount() / total.amount()) * 100.0
             };
             format!("{} ({:.1}%)", amount, pct)
         };
@@ -754,6 +771,81 @@ impl PortfolioAttribution {
         ));
 
         lines.join("\n")
+    }
+
+    /// Every base-currency money bucket with its share of total P&L, in the
+    /// struct's field order.
+    ///
+    /// Lists the eleven factor buckets and `residual`, the same twelve
+    /// amounts [`Self::reconciliation_check`] adds up, so a report reads the
+    /// buckets from Rust instead of naming them and a bucket added to this
+    /// struct cannot silently go missing. `total_pnl` is the headline value,
+    /// not a bucket; `by_position` holds native-currency detail and is not
+    /// listed. Each share is `amount / total_pnl * 100`.
+    ///
+    /// # Returns
+    ///
+    /// Twelve [`PnlBucketShare`] records whose `field` is this struct's wire
+    /// field name; `pct_of_total` is `None` on every record when `total_pnl`
+    /// is effectively zero under the default [`RoundingContext`] (half a unit
+    /// of the base currency's output scale), because a share of zero is
+    /// undefined.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_attribution::PnlBucket;
+    /// use finstack_quant_core::{currency::Currency, money::Money};
+    /// use finstack_quant_portfolio::attribution::PortfolioAttribution;
+    /// use indexmap::IndexMap;
+    ///
+    /// let usd = |amount: i64| Money::from((amount, Currency::USD));
+    /// let attribution = PortfolioAttribution {
+    ///     total_pnl: usd(200),
+    ///     carry: usd(50),
+    ///     rates_curves_pnl: usd(150),
+    ///     credit_curves_pnl: usd(0),
+    ///     inflation_curves_pnl: usd(0),
+    ///     correlations_pnl: usd(0),
+    ///     fx_pnl: usd(0),
+    ///     fx_translation_pnl: usd(0),
+    ///     cross_factor_pnl: usd(0),
+    ///     vol_pnl: usd(0),
+    ///     model_params_pnl: usd(0),
+    ///     market_scalars_pnl: usd(0),
+    ///     residual: usd(0),
+    ///     by_position: IndexMap::new(),
+    ///     result_invalid: false,
+    /// };
+    /// let buckets = attribution.pct_of_total_by_bucket();
+    /// assert_eq!(buckets[0].field, PnlBucket::Carry);
+    /// assert_eq!(buckets[0].pct_of_total, Some(25.0));
+    /// ```
+    #[must_use]
+    pub fn pct_of_total_by_bucket(&self) -> Vec<PnlBucketShare> {
+        let total = self.total_pnl.amount();
+        let total_is_zero = self.total_is_effectively_zero();
+        [
+            (PnlBucket::Carry, &self.carry),
+            (PnlBucket::RatesCurvesPnl, &self.rates_curves_pnl),
+            (PnlBucket::CreditCurvesPnl, &self.credit_curves_pnl),
+            (PnlBucket::InflationCurvesPnl, &self.inflation_curves_pnl),
+            (PnlBucket::CorrelationsPnl, &self.correlations_pnl),
+            (PnlBucket::FxPnl, &self.fx_pnl),
+            (PnlBucket::FxTranslationPnl, &self.fx_translation_pnl),
+            (PnlBucket::CrossFactorPnl, &self.cross_factor_pnl),
+            (PnlBucket::VolPnl, &self.vol_pnl),
+            (PnlBucket::ModelParamsPnl, &self.model_params_pnl),
+            (PnlBucket::MarketScalarsPnl, &self.market_scalars_pnl),
+            (PnlBucket::Residual, &self.residual),
+        ]
+        .into_iter()
+        .map(|(field, amount)| PnlBucketShare {
+            field,
+            amount: *amount,
+            pct_of_total: (!total_is_zero).then(|| amount.amount() / total * 100.0),
+        })
+        .collect()
     }
 
     /// Check that the sum of all factor P&L buckets plus FX translation
@@ -817,8 +909,8 @@ mod tests {
     use finstack_quant_valuations::results::ValuationResult;
     use std::any::Any;
     use std::sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     };
     use time::macros::date;
 
@@ -907,11 +999,13 @@ mod tests {
         assert!((pv_t1.amount() - 30.0).abs() < 1.0e-9);
         assert!(position.waterfall_steps.is_empty() && position.sensitivity_steps.is_empty());
         assert_eq!(position.total_pnl.amount(), 10.0);
-        assert!(position
-            .meta
-            .notes
-            .iter()
-            .any(|note| note.contains("frozen primitive")));
+        assert!(
+            position
+                .meta
+                .notes
+                .iter()
+                .any(|note| note.contains("frozen primitive"))
+        );
         Ok(())
     }
 
@@ -1610,6 +1704,112 @@ mod tests {
         let zero_rendered = zero_total.explain();
         assert!(zero_rendered.contains("Carry: USD 5.00 (0.0%)"));
         assert!(zero_rendered.contains("Residual: USD -5.00 (0.0%)"));
+    }
+
+    /// A total below half a cent is zero for the explain text exactly as it is
+    /// for the bucket shares, so the table and the text never disagree.
+    #[test]
+    fn explain_and_bucket_shares_share_the_zero_total_rule() {
+        let usd = |amount: f64| Money::new(amount, Currency::USD).expect("finite amount");
+        let zero = usd(0.0);
+        let attribution = PortfolioAttribution {
+            total_pnl: usd(0.003),
+            carry: usd(0.002),
+            rates_curves_pnl: usd(0.001),
+            credit_curves_pnl: zero,
+            inflation_curves_pnl: zero,
+            correlations_pnl: zero,
+            fx_pnl: zero,
+            fx_translation_pnl: zero,
+            cross_factor_pnl: zero,
+            vol_pnl: zero,
+            model_params_pnl: zero,
+            market_scalars_pnl: zero,
+            residual: zero,
+            by_position: IndexMap::new(),
+            result_invalid: false,
+        };
+        assert!(
+            attribution.total_pnl.amount() > 0.0,
+            "0.003 is kept, not rounded away"
+        );
+        assert!(
+            attribution
+                .pct_of_total_by_bucket()
+                .iter()
+                .all(|bucket| bucket.pct_of_total.is_none())
+        );
+        let explained = attribution.explain();
+        assert!(explained.contains("Carry: USD"), "{explained}");
+        assert!(
+            explained
+                .lines()
+                .skip(1)
+                .all(|line| line.ends_with("(0.0%)")),
+            "{explained}"
+        );
+    }
+
+    /// A new `Money` field on `PortfolioAttribution` must be listed as a
+    /// bucket or named here as the headline value, so it cannot vanish from
+    /// reports; the listed buckets are exactly what reconciliation adds up.
+    #[test]
+    fn pct_of_total_by_bucket_lists_every_money_field_but_the_total() {
+        let usd = |amount: i64| Money::from((amount, Currency::USD));
+        let mut attribution = PortfolioAttribution {
+            total_pnl: usd(200),
+            carry: usd(20),
+            rates_curves_pnl: usd(-50),
+            credit_curves_pnl: usd(10),
+            inflation_curves_pnl: usd(5),
+            correlations_pnl: usd(15),
+            fx_pnl: usd(25),
+            fx_translation_pnl: usd(160),
+            cross_factor_pnl: usd(0),
+            vol_pnl: usd(5),
+            model_params_pnl: usd(5),
+            market_scalars_pnl: usd(3),
+            residual: usd(2),
+            by_position: IndexMap::new(),
+            result_invalid: false,
+        };
+
+        let wire = serde_json::to_value(&attribution).expect("serializes");
+        let mut money_fields: Vec<&str> = wire
+            .as_object()
+            .expect("object")
+            .iter()
+            .filter(|(_, value)| serde_json::from_value::<Money>((*value).clone()).is_ok())
+            .map(|(key, _)| key.as_str())
+            .filter(|key| *key != "total_pnl")
+            .collect();
+        money_fields.sort_unstable();
+        let buckets = attribution.pct_of_total_by_bucket();
+        let mut listed: Vec<&str> = buckets.iter().map(|bucket| bucket.field.as_str()).collect();
+        listed.sort_unstable();
+        assert_eq!(listed, money_fields);
+
+        let rates = &buckets[1];
+        assert_eq!(rates.field, PnlBucket::RatesCurvesPnl);
+        assert_eq!(rates.amount, usd(-50));
+        assert_eq!(rates.pct_of_total, Some(-25.0));
+        let translation = buckets
+            .iter()
+            .find(|bucket| bucket.field == PnlBucket::FxTranslationPnl)
+            .expect("fx translation is a bucket");
+        assert_eq!(translation.pct_of_total, Some(80.0));
+        // The buckets are the amounts reconciliation sums: they net to the total.
+        let listed_sum: f64 = buckets.iter().map(|bucket| bucket.amount.amount()).sum();
+        assert!((listed_sum - 200.0).abs() < 1e-9);
+        assert!(attribution.reconciliation_check(1e-9).is_reconciled);
+
+        attribution.total_pnl = usd(0);
+        assert!(
+            attribution
+                .pct_of_total_by_bucket()
+                .iter()
+                .all(|bucket| bucket.pct_of_total.is_none())
+        );
     }
 
     #[test]

@@ -34,7 +34,9 @@ impl MetricId {
     /// Jump-to-default amount.
     ///
     /// Immediate P&L impact of an instantaneous default event under the
-    /// instrument's loss and settlement convention.
+    /// instrument's loss and settlement convention. On a hazard-priced bond or
+    /// loan it is the value on default less current value for the whole notional,
+    /// from the holder's perspective; it is an error on one not hazard-priced.
     ///
     /// Units: currency.
     pub const JumpToDefault: Self = Self(Cow::Borrowed("jump_to_default"));
@@ -57,6 +59,10 @@ impl MetricId {
     pub const ExpectedLoss: Self = Self(Cow::Borrowed("expected_loss"));
 
     /// PV change per +1% (0.01 absolute) recovery-rate move.
+    ///
+    /// On a hazard-priced bond or loan the hazard curve is re-bootstrapped to its
+    /// par spreads when it carries a recipe, as for a CDS, and held otherwise. It
+    /// is an error on one not hazard-priced.
     ///
     /// Units: currency.
     pub const Recovery01: Self = Self(Cow::Borrowed("recovery01"));

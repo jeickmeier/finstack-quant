@@ -1,22 +1,11 @@
-import { createRequire } from "node:module";
-import { readFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
-import { checking, emit } from "../../../scripts/fixture-output.mjs";
-const native = createRequire(import.meta.url)(
-  "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
+import { checking, emit, sha256 } from "../../../scripts/fixture-output.mjs";
+import { native, readRepoText } from "../../../scripts/fixture-inputs.mjs";
 const instrumentSource =
     "finstack-quant/valuations/tests/instruments/json_examples/structured_credit.json",
   marketSource =
     "finstack-quant-ui/tests/valuations/instruments/pricing-market.json";
-const instrumentJson = await readFile(
-    new URL(`../../../../${instrumentSource}`, import.meta.url),
-    "utf8",
-  ),
-  marketJson = await readFile(
-    new URL(`../../../../${marketSource}`, import.meta.url),
-    "utf8",
-  );
+const instrumentJson = await readRepoText(instrumentSource),
+  marketJson = await readRepoText(marketSource);
 const instrument = JSON.parse(instrumentJson),
   factor = structuredClone(instrument);
 factor.instrument.spec.tranches.tranches[0].current_balance.amount = "50000000";
@@ -44,6 +33,7 @@ const cases = [instrument, factor].map((input, index) => {
       name: index ? "factor-adjusted" : "original",
       instrument: JSON.parse(instrumentJson),
       table,
+      units: native.scenarioTableFieldUnits(table.currency),
     };
   } finally {
     deal.free();
@@ -53,9 +43,9 @@ await emit(
   new URL("./cases.json", import.meta.url),
   JSON.stringify({
     instrumentSource,
-    instrumentSha256: createHash("sha256").update(instrumentJson).digest("hex"),
+    instrumentSha256: sha256(instrumentJson),
     marketSource,
-    marketSha256: createHash("sha256").update(marketJson).digest("hex"),
+    marketSha256: sha256(marketJson),
     asOf,
     trancheId,
     grid,
@@ -69,3 +59,424 @@ if (!checking)
       prices: c.table.cells.map((cell) => cell.price),
     })),
   );
+// Tranche analytics: the fixed-rate CLONOTES-A above (discount margin fails
+// natively) and the floating SENIOR note of the CLO mezzanine regression golden,
+// whose market is its calibration envelope's final_market.
+const goldenSource =
+  "finstack-quant/valuations/tests/golden/data/pricing/regression_goldens/structured_credit/clo_mezzanine_base_case.json";
+const goldenText = await readRepoText(goldenSource);
+const golden = JSON.parse(goldenText);
+const calibrated = native.calibrate(JSON.stringify(golden.market.envelope))
+  .result.final_market;
+/** Native exception as the worker transfers it: name, kind and message. */
+function failure(call) {
+  try {
+    return { value: call() };
+  } catch (error) {
+    return {
+      error: { name: error.name, kind: error.kind, message: error.message },
+    };
+  }
+}
+const trancheMetricIds = ["dv01", "default01", "prepayment01", "severity01"];
+const trancheCases = [
+  {
+    name: "fixed",
+    source: instrumentSource,
+    sha256: sha256(instrumentJson),
+    instrument,
+    market: JSON.parse(marketJson),
+    asOf,
+    trancheId,
+    marketPricePct: 100,
+  },
+  {
+    name: "floating",
+    source: goldenSource,
+    sha256: sha256(goldenText),
+    instrument: golden.instrument,
+    market: calibrated,
+    asOf: golden.metadata.valuation_date,
+    trancheId: "SENIOR",
+    marketPricePct: 25,
+  },
+].map(({ instrument, market, ...entry }) => {
+  const instrumentJson = native.validateInstrumentJson(
+    JSON.stringify(instrument),
+  );
+  const marketText = JSON.stringify(market);
+  const deal = native.StructuredCredit.fromJson(instrumentJson);
+  const { trancheId, asOf, marketPricePct } = entry;
+  try {
+    return {
+      ...entry,
+      instrument: JSON.parse(instrumentJson),
+      market,
+      metrics: trancheMetricIds,
+      results: {
+        // No price and no metric ids: Rust's default target.
+        defaultMetrics: failure(() =>
+          native.trancheMetrics(deal, trancheId, marketText, asOf),
+        ),
+        metrics: failure(() =>
+          native.trancheMetrics(
+            deal,
+            trancheId,
+            marketText,
+            asOf,
+            marketPricePct,
+            trancheMetricIds,
+          ),
+        ),
+        metricUnits: failure(() => native.trancheMetricFieldUnits("USD")),
+        solveUnits: failure(() => native.trancheSolveFieldUnits()),
+        breakevenCdr: failure(() =>
+          native.trancheBreakevenCdr(deal, trancheId, marketText, asOf),
+        ),
+        discountMargin: failure(() =>
+          native.trancheDiscountMargin(
+            deal,
+            trancheId,
+            marketText,
+            asOf,
+            marketPricePct,
+          ),
+        ),
+        oas: failure(() =>
+          native.trancheOas(deal, trancheId, marketText, asOf, marketPricePct),
+        ),
+        schedule: failure(() => {
+          const cashflows = deal.trancheCashflows(trancheId, marketText, asOf);
+          return {
+            cashflows,
+            table: native.trancheCashflowsTable(cashflows),
+          };
+        }),
+      },
+    };
+  } finally {
+    deal.free();
+  }
+});
+await emit(
+  new URL("./tranche-analytics.json", import.meta.url),
+  JSON.stringify({ cases: trancheCases }),
+);
+if (!checking)
+  console.log(
+    trancheCases.map((c) => ({
+      name: c.name,
+      results: Object.fromEntries(
+        Object.entries(c.results).map(([key, result]) => [
+          key,
+          result.error ? result.error.message : "ok",
+        ]),
+      ),
+    })),
+  );
+// Deal entry: every family Rust lists, built from Rust's example of it, with the
+// tranches a selector lists and the proof it simulates on the UI market; then a pool
+// whose deal type contradicts the family, which Rust refuses.
+const standardFamilies = native.standardDealFamilies();
+const dealGrid = {
+  cprs: [0, 0.1],
+  cdrs: [0, 0.05],
+  severities: [0.4],
+  recovery_lag: null,
+};
+const dealCases = standardFamilies.map((entry) => {
+  const params = entry.example;
+  const deal = native.StructuredCredit.newStandard(
+    entry.deal_type,
+    JSON.stringify(params),
+  );
+  try {
+    const instrumentJson = deal.toJson();
+    const tranches = deal.tranches;
+    return {
+      family: entry.deal_type,
+      profileId: entry.profile_id,
+      params,
+      instrumentJson,
+      tranches,
+      table: native.trancheScenarioTable(
+        deal,
+        tranches.tranches[0].id,
+        marketJson,
+        params.closing_date,
+        JSON.stringify(dealGrid),
+      ),
+    };
+  } finally {
+    deal.free();
+  }
+});
+await emit(
+  new URL("./standard-deals.json", import.meta.url),
+  JSON.stringify({
+    marketSource,
+    marketSha256: sha256(marketJson),
+    asOf: standardFamilies[0].example.closing_date,
+    grid: dealGrid,
+    cases: dealCases,
+  }),
+);
+// Pool report: a pool with real obligors, industries and ratings (the CLO mezzanine
+// golden), the example CLO, whose one asset carries no attributes, and an empty pool.
+const emptyPool = structuredClone(golden.instrument);
+emptyPool.instrument.spec.pool.assets = [];
+const poolCases = [
+  {
+    name: "golden",
+    instrument: golden.instrument,
+    asOf: golden.metadata.valuation_date,
+  },
+  { name: "unattributed", instrument, asOf },
+  {
+    name: "empty",
+    instrument: emptyPool,
+    asOf: golden.metadata.valuation_date,
+  },
+].map((entry) => {
+  const instrumentJson = native.validateInstrumentJson(
+    JSON.stringify(entry.instrument),
+  );
+  const deal = native.StructuredCredit.fromJson(instrumentJson);
+  try {
+    const report = native.poolReport(deal.pool, entry.asOf);
+    return {
+      name: entry.name,
+      instrument: JSON.parse(instrumentJson),
+      asOf: entry.asOf,
+      report,
+      units: native.poolReportFieldUnits(report.total_balance.currency),
+    };
+  } finally {
+    deal.free();
+  }
+});
+await emit(
+  new URL("./pool-report.json", import.meta.url),
+  JSON.stringify({ goldenSource, instrumentSource, cases: poolCases }),
+);
+// Waterfall report on the UI market: the example CLO cut to one year with an OC test
+// it fails, so cash diverts each period and recoveries settle after the last, and the
+// same deal with no assets and a funded reserve, whose one period is its settlement.
+const diverting = structuredClone(instrument);
+diverting.instrument.spec.maturity = "2025-01-01";
+diverting.instrument.spec.coverage_triggers = [
+  {
+    id: `OC_${trancheId}`,
+    kind: "oc",
+    tranche_id: trancheId,
+    trigger_level: 2,
+  },
+];
+const settlement = structuredClone(instrument);
+settlement.instrument.spec.pool.assets = [];
+settlement.instrument.spec.pool.reserve_account.amount = "1000000";
+const waterfallCases = [
+  { name: "diverting", input: diverting },
+  { name: "settlement", input: settlement },
+].map(({ name, input }) => {
+  const instrumentJson = native.validateInstrumentJson(JSON.stringify(input));
+  const deal = native.StructuredCredit.fromJson(instrumentJson);
+  try {
+    return {
+      name,
+      instrument: JSON.parse(instrumentJson),
+      run: deal.runSimulation(marketJson, asOf),
+    };
+  } finally {
+    deal.free();
+  }
+});
+await emit(
+  new URL("./waterfall-report.json", import.meta.url),
+  JSON.stringify({
+    instrumentSource,
+    marketSource,
+    marketSha256: sha256(marketJson),
+    asOf,
+    cases: waterfallCases,
+  }),
+);
+// Coverage and enhancement charts on the UI market: the example CLO cut to three years
+// with three classes. OC_SENIOR passes, breaches and cures; OC_MEZZ passes then stays in
+// breach, diverting cash; IC_SENIOR never fails; the equity class's oc_trigger traps
+// excess spread instead of diverting, so it has a first breach and no coverage_tests
+// row. The same deal cut to its first payment date has one period; the example cut to
+// one year has no tests; the no-asset deal settles in one period with no waterfall run.
+// The small senior note retires early, so its OC and IC tests then have no claim
+// outstanding and Rust reports no ratio or cushion, while they still pass.
+const chartMoney = (amount) => ({ amount: String(amount), currency: "USD" });
+const chartTranche = (base, id, seniority, attach, detach, amount, rate) => ({
+  ...structuredClone(base),
+  id,
+  seniority,
+  attach_pct: attach,
+  detach_pct: detach,
+  original_balance: chartMoney(amount),
+  current_balance: chartMoney(amount),
+  coupon: { fixed: { rate } },
+});
+const covered = structuredClone(instrument);
+{
+  const spec = covered.instrument.spec;
+  const base = spec.tranches.tranches[0];
+  spec.maturity = "2027-01-01";
+  spec.prepayment_spec = { curve: "constant", cpr: 0.03 };
+  spec.default_spec = { curve: "constant", cdr: 0.06 };
+  spec.recovery_spec = { rate: 0.5, recovery_lag: 0 };
+  spec.tranches.tranches = [
+    chartTranche(base, "SENIOR", "senior", 30, 100, 70000000, 0.05),
+    chartTranche(base, "MEZZ", "mezzanine", 15, 30, 15000000, 0.08),
+    {
+      ...chartTranche(base, "EQUITY", "equity", 0, 15, 15000000, 0),
+      oc_trigger: {
+        trigger_level: 0.95,
+        cure_level: null,
+        breach_date: null,
+        consequence: "trap_excess_spread",
+      },
+    },
+  ];
+  spec.coverage_triggers = [
+    { id: "OC_SENIOR", kind: "oc", tranche_id: "SENIOR", trigger_level: 1.415 },
+    { id: "OC_MEZZ", kind: "oc", tranche_id: "MEZZ", trigger_level: 1.16 },
+    { id: "IC_SENIOR", kind: "ic", tranche_id: "SENIOR", trigger_level: 1.05 },
+  ];
+}
+const untested = structuredClone(instrument);
+untested.instrument.spec.maturity = "2025-01-01";
+const onePeriod = structuredClone(covered);
+onePeriod.instrument.spec.maturity = "2024-04-01";
+const retiredSenior = structuredClone(covered);
+{
+  const { tranches } = retiredSenior.instrument.spec.tranches;
+  const base = tranches[0];
+  tranches[0] = chartTranche(base, "SENIOR", "senior", 95, 100, 5000000, 0.05);
+  tranches[1] = chartTranche(base, "MEZZ", "mezzanine", 15, 95, 80000000, 0.08);
+  retiredSenior.instrument.spec.coverage_triggers = [
+    { id: "OC_SENIOR", kind: "oc", tranche_id: "SENIOR", trigger_level: 1.1 },
+    { id: "IC_SENIOR", kind: "ic", tranche_id: "SENIOR", trigger_level: 1.05 },
+    { id: "OC_MEZZ", kind: "oc", tranche_id: "MEZZ", trigger_level: 1.01 },
+  ];
+}
+const chartCases = [
+  { name: "covered", input: covered },
+  { name: "untested", input: untested },
+  { name: "settlement", input: settlement },
+  { name: "one-period", input: onePeriod },
+  { name: "retired-senior", input: retiredSenior },
+].map(({ name, input }) => {
+  const instrumentJson = native.validateInstrumentJson(JSON.stringify(input));
+  const deal = native.StructuredCredit.fromJson(instrumentJson);
+  try {
+    return {
+      name,
+      instrument: JSON.parse(instrumentJson),
+      run: deal.runSimulation(marketJson, asOf),
+    };
+  } finally {
+    deal.free();
+  }
+});
+await emit(
+  new URL("./deal-charts.json", import.meta.url),
+  JSON.stringify({
+    instrumentSource,
+    marketSource,
+    marketSha256: sha256(marketJson),
+    asOf,
+    units: native.simulationFieldUnits("USD"),
+    cases: chartCases,
+  }),
+);
+// Equity tranche card on the UI market: a three-class deal to the pool's maturity whose
+// equity class is paid, at Rust's par default and at a discount. Then the two ways there
+// is no IRR, a class that receives nothing because the notes' coupons absorb all cash,
+// and nothing invested, at a zero price and at a zero balance; a class that receives
+// little, which still has one; and the deals Rust refuses, one with no equity tranche
+// (the example), one with no assets and no reserve, and a negative price.
+const equityDeal = structuredClone(instrument);
+{
+  const spec = equityDeal.instrument.spec;
+  const base = spec.tranches.tranches[0];
+  spec.prepayment_spec = { curve: "constant", cpr: 0.1 };
+  spec.default_spec = { curve: "constant", cdr: 0.01 };
+  spec.recovery_spec = { rate: 0.5, recovery_lag: 0 };
+  spec.tranches.tranches = [
+    chartTranche(base, "SENIOR", "senior", 30, 100, 70000000, 0.05),
+    chartTranche(base, "MEZZ", "mezzanine", 15, 30, 15000000, 0.08),
+    chartTranche(base, "EQUITY", "equity", 0, 15, 15000000, 0),
+  ];
+}
+const edited = (edit) => {
+  const deal = structuredClone(equityDeal);
+  edit(deal.instrument.spec);
+  return deal;
+};
+const equityCases = [
+  { name: "paying", input: equityDeal, purchasePricePct: null },
+  { name: "discounted", input: equityDeal, purchasePricePct: 60 },
+  { name: "negative-price", input: equityDeal, purchasePricePct: -1 },
+  { name: "zero-price", input: equityDeal, purchasePricePct: 0 },
+  {
+    name: "starved",
+    input: edited((spec) => {
+      spec.tranches.tranches[0].coupon = { fixed: { rate: 0.6 } };
+      spec.tranches.tranches[1].coupon = { fixed: { rate: 0.6 } };
+    }),
+    purchasePricePct: null,
+  },
+  {
+    name: "zero-balance",
+    input: edited((spec) => {
+      spec.tranches.tranches[2].current_balance = chartMoney(0);
+    }),
+    purchasePricePct: null,
+  },
+  {
+    name: "wiped-out",
+    input: edited((spec) => {
+      spec.default_spec = { curve: "constant", cdr: 0.9 };
+      spec.recovery_spec = { rate: 0, recovery_lag: 0 };
+    }),
+    purchasePricePct: null,
+  },
+  { name: "no-equity", input: instrument, purchasePricePct: null },
+  {
+    name: "no-assets",
+    input: edited((spec) => {
+      spec.pool.assets = [];
+    }),
+    purchasePricePct: null,
+  },
+].map(({ name, input, purchasePricePct }) => {
+  const instrumentJson = native.validateInstrumentJson(JSON.stringify(input));
+  const deal = native.StructuredCredit.fromJson(instrumentJson);
+  try {
+    return {
+      name,
+      instrument: JSON.parse(instrumentJson),
+      purchasePricePct,
+      result: failure(() =>
+        deal.equityMetrics(marketJson, asOf, purchasePricePct),
+      ),
+    };
+  } finally {
+    deal.free();
+  }
+});
+await emit(
+  new URL("./equity-tranche.json", import.meta.url),
+  JSON.stringify({
+    instrumentSource,
+    marketSource,
+    marketSha256: sha256(marketJson),
+    asOf,
+    units: native.equityMetricsFieldUnits("USD"),
+    cases: equityCases,
+  }),
+);

@@ -1,4 +1,4 @@
-use finstack_quant_core::math::random::{poisson_inverse_cdf, Pcg64Rng, RandomNumberGenerator};
+use finstack_quant_core::math::random::{Pcg64Rng, RandomNumberGenerator, poisson_inverse_cdf};
 use finstack_quant_core::{Error, Result};
 
 use super::{AssetDynamics, MertonModel};

@@ -859,9 +859,10 @@ fn test_price_rejects_one_independent_estimator_including_an_antithetic_pair() {
                     1.0,
                 )
                 .expect_err("one independent estimator cannot define a confidence interval");
-            assert!(err
-                .to_string()
-                .contains("at least 2 independent estimators"));
+            assert!(
+                err.to_string()
+                    .contains("at least 2 independent estimators")
+            );
         }
     }
 
@@ -883,9 +884,10 @@ fn test_price_rejects_one_independent_estimator_including_an_antithetic_pair() {
             ProcessParams::new("test"),
         )
         .expect_err("capture must enforce the same independent sample requirement");
-    assert!(err
-        .to_string()
-        .contains("at least 2 independent estimators"));
+    assert!(
+        err.to_string()
+            .contains("at least 2 independent estimators")
+    );
 }
 
 #[test]

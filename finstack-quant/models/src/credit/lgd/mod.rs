@@ -52,49 +52,28 @@ pub fn seniority_recovery_stats(
     })
 }
 
-/// Compute workout net recovery, LGD, and recovery rate from collateral specs.
+/// List the seniority recovery calibration IDs the embedded credit registry holds.
 ///
-/// Each collateral tuple is `(type_name, book_value, haircut)`.
-///
-/// # Arguments
-///
-/// * `ead` - Exposure at default in the same monetary units as collateral book
-///   values. It must be valid for the selected workout model.
-/// * `collateral` - Owned collateral specifications of `(type_name, book_value,
-///   haircut)`, where `haircut` is a decimal fraction deducted from value.
-/// * `direct_cost_pct` - Direct workout costs as a decimal fraction of EAD.
-/// * `indirect_cost_pct` - Indirect workout costs as a decimal fraction of EAD.
-/// * `time_to_resolution_years` - Expected workout horizon in years.
-/// * `discount_rate` - Annual decimal rate used to discount recoveries over the
-///   workout horizon.
+/// Each ID is accepted unchanged as the `calibration_id` of
+/// [`seniority_recovery_stats`] and [`SeniorityCalibration::from_registry_id`].
+/// The registry's default calibration comes first, followed by the others in
+/// registry order, so a caller that offers a choice can start from the first.
 ///
 /// # Errors
-/// Returns an error if any collateral type or model input is invalid.
-pub fn workout_lgd(
-    ead: f64,
-    collateral: Vec<(String, f64, f64)>,
-    direct_cost_pct: f64,
-    indirect_cost_pct: f64,
-    time_to_resolution_years: f64,
-    discount_rate: f64,
-) -> finstack_quant_core::Result<WorkoutLgdResult> {
-    let pieces = collateral
-        .into_iter()
-        .map(|(type_name, value, haircut)| {
-            let collateral_type = serde_parse::<WorkoutCollateralType>(&type_name)?;
-            CollateralPiece::new(collateral_type, value, haircut)
-        })
-        .collect::<finstack_quant_core::Result<Vec<_>>>()?;
-
-    let costs = WorkoutCosts::new(direct_cost_pct, indirect_cost_pct)?;
-    let model = WorkoutLgd::builder()
-        .collateral_pieces(pieces)
-        .workout_years(time_to_resolution_years)
-        .discount_rate(discount_rate)
-        .costs(costs)
-        .build()?;
-
-    model.evaluate(ead)
+///
+/// Returns a validation error if the embedded registry is malformed.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_models::credit::lgd::seniority_calibration_ids;
+///
+/// let ids = seniority_calibration_ids()?;
+/// assert_eq!(ids[0], "moodys_recovery_1982_2023");
+/// # Ok::<(), finstack_quant_core::Error>(())
+/// ```
+pub fn seniority_calibration_ids() -> finstack_quant_core::Result<Vec<String>> {
+    Ok(crate::credit::registry::embedded_registry()?.seniority_calibration_ids())
 }
 
 #[cfg(test)]
@@ -105,6 +84,15 @@ mod tests {
     fn seniority_recovery_stats_accepts_binding_strings() {
         let stats = seniority_recovery_stats("senior_secured", "sp_recovery_historical").unwrap();
         assert!((stats.mean() - 0.53).abs() < 1e-12);
+    }
+
+    #[test]
+    fn seniority_calibration_ids_lists_the_default_first_and_each_resolves() {
+        let ids = seniority_calibration_ids().unwrap();
+        assert_eq!(ids, ["moodys_recovery_1982_2023", "sp_recovery_historical"]);
+        for id in &ids {
+            assert!(seniority_recovery_stats("senior_secured", id).is_ok());
+        }
     }
 
     #[test]
@@ -126,15 +114,17 @@ mod tests {
             net_recovery,
             lgd,
             recovery_rate,
-        } = workout_lgd(
-            100.0,
-            vec![("real_estate".to_string(), 80.0, 0.30)],
-            0.05,
-            0.03,
-            2.0,
-            0.05,
-        )
-        .unwrap();
+        } = WorkoutLgd::builder()
+            .collateral(
+                CollateralPiece::new(WorkoutCollateralType::RealEstate, 80.0, 0.30).unwrap(),
+            )
+            .workout_years(2.0)
+            .discount_rate(0.05)
+            .costs(WorkoutCosts::new(0.05, 0.03).unwrap())
+            .build()
+            .unwrap()
+            .evaluate(100.0)
+            .unwrap();
 
         // net = (gross − costs·EAD) · DF = (56 − 8) / 1.05² — workout costs
         // are discounted alongside recoveries per the Basel workout-LGD
@@ -147,14 +137,12 @@ mod tests {
 
     #[test]
     fn workout_lgd_rejects_noncanonical_collateral_type() {
-        assert!(workout_lgd(
-            100.0,
-            vec![("real-estate".to_string(), 80.0, 0.30)],
-            0.05,
-            0.03,
-            2.0,
-            0.05,
-        )
-        .is_err());
+        let json = serde_json::json!({
+            "collateral": [{"collateral_type": "real-estate", "book_value": 80.0, "haircut": 0.30}],
+            "workout_years": 2.0,
+            "discount_rate": 0.05,
+            "costs": {"direct_cost_rate": 0.05, "indirect_cost_rate": 0.03},
+        });
+        assert!(serde_json::from_value::<WorkoutLgd>(json).is_err());
     }
 }

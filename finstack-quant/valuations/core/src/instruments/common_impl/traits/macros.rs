@@ -35,7 +35,7 @@
 /// ```
 #[macro_export]
 macro_rules! impl_instrument_base {
-    ($key:expr, $family:expr) => {
+    ($key:expr_2021, $family:expr_2021) => {
         fn id(&self) -> &str {
             self.id.as_str()
         }
@@ -166,7 +166,7 @@ macro_rules! validate_on_deserialize {
 /// waterfall policy is intentionally empty for now.
 #[macro_export]
 macro_rules! impl_empty_cashflow_provider {
-    ($ty:ty, $representation:expr) => {
+    ($ty:ty, $representation:expr_2021) => {
         $crate::impl_empty_cashflow_provider!(
             $ty,
             $representation,
@@ -174,7 +174,7 @@ macro_rules! impl_empty_cashflow_provider {
             finstack_quant_core::dates::DayCount::Act365F
         );
     };
-    ($ty:ty, $representation:expr, $notional:expr, $day_count:expr) => {
+    ($ty:ty, $representation:expr_2021, $notional:expr_2021, $day_count:expr_2021) => {
         impl $crate::__private::finstack_quant_cashflows::CashflowScheduleSource for $ty {
             fn notional(
                 &self,

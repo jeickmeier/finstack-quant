@@ -24,8 +24,24 @@ export function scenarioOptions(
 }
 /** Exact native scenario table or structured failure. */
 export function useScenarioTable(request: ScenarioRequest | null) {
-  return useWorkerQuery((worker) => ({
-    ...scenarioOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    scenarioOptions(worker.client, worker.session, request),
+  );
+}
+/** Native units of a scenario table's cells for its currency. Null disables the call. */
+export function useScenarioTableFieldUnits(currency: string | null) {
+  return useWorkerQuery((worker) =>
+    workerQueryOptions({
+      client: worker.client,
+      queryKey: [
+        "finstack",
+        worker.session,
+        "scenarioTableFieldUnits",
+        currency,
+      ] as const,
+      ready: currency !== null,
+      missing: "Scenario table units require a currency and ready worker",
+      queryFn: (ready) => ready.call("scenarioTableFieldUnits", currency!),
+    }),
+  );
 }

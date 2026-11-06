@@ -722,12 +722,16 @@ mod tests {
     #[test]
     fn config_extensions_validate_programmatic_insertion() {
         let mut extensions = ConfigExtensions::default();
-        assert!(extensions
-            .insert("calibration.config.v1", serde_json::json!({}))
-            .is_ok());
-        assert!(extensions
-            .insert("not namespaced", serde_json::json!({}))
-            .is_err());
+        assert!(
+            extensions
+                .insert("calibration.config.v1", serde_json::json!({}))
+                .is_ok()
+        );
+        assert!(
+            extensions
+                .insert("not namespaced", serde_json::json!({}))
+                .is_err()
+        );
         assert!(extensions.get("not namespaced").is_none());
     }
 

@@ -1,16 +1,16 @@
 //! Bond price, yield, spread, duration, and risk metric calculations.
 //!
+use crate::bond::Bond;
+use crate::bond::CashflowSpec;
 use crate::bond::pricing::quote_conversions::{
     asset_swap_forward_components, asw_leg_schedule, fixed_leg_annuity,
     floating_leg_pv_and_annuity, par_rate_and_annuity_from_discount, settlement_asw_components,
 };
 use crate::bond::pricing::settlement::QuoteDateContext;
-use crate::bond::Bond;
-use crate::bond::CashflowSpec;
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::{
-    calendar_by_id_strict, BusinessDayConvention, Date, DayCount, StubKind, Tenor,
+    BusinessDayConvention, Date, DayCount, StubKind, Tenor, calendar_by_id_strict,
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
@@ -510,108 +510,101 @@ impl MetricCalculator for AssetSwapMarketCalculator {
         let params = bond.cashflow_spec.schedule();
         let frequency = params.frequency;
         let quote_ctx = QuoteDateContext::new(bond, &context.curves, context.as_of)?;
-        if let Some(clean_px) = quoted_clean_price_pct {
-            if let Some(workout) = workout {
-                let workout_maturity = workout
-                    .flows
-                    .last()
-                    .map(|(date, _)| *date)
-                    .unwrap_or(maturity);
-                if workout_maturity < maturity {
-                    let effective_date = asw_effective_date(
-                        bond.issue_date,
-                        quote_ctx.quote_date,
-                        workout_maturity,
-                        frequency,
-                    )?;
-                    let fixed_schedule = asw_leg_schedule(
+        if let Some(clean_px) = quoted_clean_price_pct
+            && let Some(workout) = workout
+        {
+            let workout_maturity = workout
+                .flows
+                .last()
+                .map(|(date, _)| *date)
+                .unwrap_or(maturity);
+            if workout_maturity < maturity {
+                let effective_date = asw_effective_date(
+                    bond.issue_date,
+                    quote_ctx.quote_date,
+                    workout_maturity,
+                    frequency,
+                )?;
+                let fixed_schedule = asw_leg_schedule(
+                    effective_date,
+                    workout_maturity,
+                    frequency,
+                    StubKind::ShortBack,
+                    Some((
+                        params.business_day_convention,
+                        calendar_by_id_strict(&params.calendar_id)?,
+                    )),
+                )?;
+                if fixed_schedule.len() < 2 {
+                    return Err(finstack_quant_core::Error::Validation(
+                        "ASW market calculation requires at least two fixed-leg schedule dates"
+                            .to_string(),
+                    ));
+                }
+                let dc_fixed = day_count;
+                let df_settlement = disc.df_on_date(quote_ctx.quote_date)?;
+                if let Some(fwd_id) = asw_forward_curve_id.as_ref() {
+                    let fwd = context.curves.get_forward(fwd_id)?;
+                    let (float_day_count, float_frequency) = asw_float_leg_conventions(&fwd)?;
+                    let float_schedule = asw_leg_schedule(
                         effective_date,
                         workout_maturity,
-                        frequency,
+                        float_frequency,
                         StubKind::ShortBack,
-                        Some((
-                            params.business_day_convention,
-                            calendar_by_id_strict(&params.calendar_id)?,
-                        )),
+                        None,
                     )?;
-                    if fixed_schedule.len() < 2 {
+                    // Seasoned workout swap: the floating leg has its own
+                    // conventions and schedule, and fixes started periods.
+                    let fixed_ann = fixed_leg_annuity(
+                        disc.as_ref(),
+                        dc_fixed,
+                        Some(frequency),
+                        &fixed_schedule,
+                    )? / df_settlement;
+                    let (float_pv, float_ann) = floating_leg_pv_and_annuity(
+                        disc.as_ref(),
+                        fwd.as_ref(),
+                        float_day_count,
+                        &float_schedule,
+                        0.0,
+                        Some((context.curves.as_ref(), context.as_of)),
+                    )?;
+                    let (float_pv, float_ann) =
+                        (float_pv / df_settlement, float_ann / df_settlement);
+                    if float_ann.abs() < 1e-12 {
                         return Err(finstack_quant_core::Error::Validation(
-                            "ASW market calculation requires at least two fixed-leg schedule dates"
+                                "ASW market calculation is undefined for near-zero floating-leg annuity"
+                                    .to_string(),
+                            ));
+                    }
+                    return Ok((coupon * fixed_ann + 1.0 - clean_px / 100.0 - float_pv) / float_ann);
+                } else {
+                    let (par_rate, ann) = par_rate_and_annuity_from_discount(
+                        disc.as_ref(),
+                        dc_fixed,
+                        Some(frequency),
+                        &fixed_schedule,
+                    )?;
+                    let ann = ann / df_settlement;
+                    if ann.abs() < 1e-12 {
+                        return Err(finstack_quant_core::Error::Validation(
+                            "ASW market calculation is undefined for near-zero fixed-leg annuity"
                                 .to_string(),
                         ));
                     }
-                    let dc_fixed = day_count;
-                    let df_settlement = disc.df_on_date(quote_ctx.quote_date)?;
-                    if let Some(fwd_id) = asw_forward_curve_id.as_ref() {
-                        let fwd = context.curves.get_forward(fwd_id)?;
-                        let (float_day_count, float_frequency) = asw_float_leg_conventions(&fwd)?;
-                        let float_schedule = asw_leg_schedule(
-                            effective_date,
-                            workout_maturity,
-                            float_frequency,
-                            StubKind::ShortBack,
-                            None,
-                        )?;
-                        // Seasoned workout swap: the floating leg has its own
-                        // conventions and schedule, and fixes started periods.
-                        let fixed_ann = fixed_leg_annuity(
-                            disc.as_ref(),
-                            dc_fixed,
-                            Some(frequency),
-                            &fixed_schedule,
-                        )? / df_settlement;
-                        let (float_pv, float_ann) = floating_leg_pv_and_annuity(
-                            disc.as_ref(),
-                            fwd.as_ref(),
-                            float_day_count,
-                            &float_schedule,
-                            0.0,
-                            Some((context.curves.as_ref(), context.as_of)),
-                        )?;
-                        let (float_pv, float_ann) =
-                            (float_pv / df_settlement, float_ann / df_settlement);
-                        if float_ann.abs() < 1e-12 {
-                            return Err(finstack_quant_core::Error::Validation(
+                    // Upfront is amortized over the floating-leg annuity
+                    // (par-par derivation), proxied on the same schedule
+                    // with the discount curve's day count.
+                    let float_ann =
+                        fixed_leg_annuity(disc.as_ref(), disc.day_count(), None, &fixed_schedule)?
+                            / df_settlement;
+                    if float_ann.abs() < 1e-12 {
+                        return Err(finstack_quant_core::Error::Validation(
                                 "ASW market calculation is undefined for near-zero floating-leg annuity"
                                     .to_string(),
                             ));
-                        }
-                        return Ok(
-                            (coupon * fixed_ann + 1.0 - clean_px / 100.0 - float_pv) / float_ann
-                        );
-                    } else {
-                        let (par_rate, ann) = par_rate_and_annuity_from_discount(
-                            disc.as_ref(),
-                            dc_fixed,
-                            Some(frequency),
-                            &fixed_schedule,
-                        )?;
-                        let ann = ann / df_settlement;
-                        if ann.abs() < 1e-12 {
-                            return Err(finstack_quant_core::Error::Validation(
-                                "ASW market calculation is undefined for near-zero fixed-leg annuity"
-                                    .to_string(),
-                            ));
-                        }
-                        // Upfront is amortized over the floating-leg annuity
-                        // (par-par derivation), proxied on the same schedule
-                        // with the discount curve's day count.
-                        let float_ann = fixed_leg_annuity(
-                            disc.as_ref(),
-                            disc.day_count(),
-                            None,
-                            &fixed_schedule,
-                        )? / df_settlement;
-                        if float_ann.abs() < 1e-12 {
-                            return Err(finstack_quant_core::Error::Validation(
-                                "ASW market calculation is undefined for near-zero floating-leg annuity"
-                                    .to_string(),
-                            ));
-                        }
-                        return Ok(
-                            ((coupon - par_rate) * ann + (1.0 - clean_px / 100.0)) / float_ann
-                        );
                     }
+                    return Ok(((coupon - par_rate) * ann + (1.0 - clean_px / 100.0)) / float_ann);
                 }
             }
         }

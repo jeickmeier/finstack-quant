@@ -12,7 +12,7 @@
 //! References: ISDA CDS Standard Model conventions (Big Bang Protocol,
 //! April 2009); CME IMM date rules.
 
-use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
+use finstack_quant_cashflows::builder::{BuildPeriodsParams, build_periods};
 use finstack_quant_cashflows::builder::{CashFlowSchedule, ScheduleParams};
 use finstack_quant_cashflows::builder::{CouponType, FixedCouponSpec, RollRule};
 use finstack_quant_core::cashflow::CFKind;
@@ -199,9 +199,11 @@ fn imm_coupons_accrue_through_off_grid_maturity() {
             end
         );
         if coupons.len() > 2 {
-            assert!(coupons[1..coupons.len() - 1]
-                .iter()
-                .all(|flow| flow.kind == CFKind::Fixed));
+            assert!(
+                coupons[1..coupons.len() - 1]
+                    .iter()
+                    .all(|flow| flow.kind == CFKind::Fixed)
+            );
         }
     }
 }
@@ -298,10 +300,12 @@ fn cds_effective_frequency_controls_day_counts_and_coupon_kinds() {
             params.stub = StubKind::LongFront;
             let schedule = fixed_schedule(start, end, params.clone(), None);
             assert!((coupon_total(&schedule) - coupon_total(&reference)).abs() < 1e-8);
-            assert!(!schedule
-                .get_flows()
-                .iter()
-                .any(|flow| flow.kind == CFKind::Stub));
+            assert!(
+                !schedule
+                    .get_flows()
+                    .iter()
+                    .any(|flow| flow.kind == CFKind::Stub)
+            );
             let periods =
                 build_periods(BuildPeriodsParams::from_schedule(&params, start, end, None))
                     .expect("effective quarterly periods");

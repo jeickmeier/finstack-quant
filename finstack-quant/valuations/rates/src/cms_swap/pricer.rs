@@ -20,11 +20,11 @@
 use crate::cms_swap::types::CmsSwap;
 #[cfg(test)]
 use crate::cms_swap::types::FundingLeg;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError,
@@ -249,7 +249,7 @@ impl CmsSwapReplicationPricer {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<f64> {
-        use crate::cms_option::replication_pricer::{replicated_cms_optionlet, CmsOptionletInputs};
+        use crate::cms_option::replication_pricer::{CmsOptionletInputs, replicated_cms_optionlet};
         use finstack_quant_models::types::OptionType;
 
         let discount_curve = market.get_discount(inst.discount_curve_id.as_ref())?;
@@ -552,7 +552,7 @@ pub(super) fn cms_embedded_option_value(
     use finstack_quant_models::types::OptionType;
     use finstack_quant_models::volatility::VolatilityConvention;
     use finstack_quant_valuations_core::instruments::common_impl::vol_resolution::{
-        validate_sigma, ResolvedVolatility,
+        ResolvedVolatility, validate_sigma,
     };
     if time_to_fixing <= 0.0 {
         return Ok(match option_type {
@@ -843,22 +843,26 @@ mod tests {
         }
         let surface = builder.build().expect("vol surface");
 
-        assert!(cms_embedded_option_value(
-            -0.005,
-            -0.005,
-            &surface,
-            1.0,
-            finstack_quant_models::types::OptionType::Call
-        )
-        .is_err());
-        assert!(cms_embedded_option_value(
-            -0.005,
-            0.02,
-            &surface,
-            1.0,
-            finstack_quant_models::types::OptionType::Put
-        )
-        .is_err());
+        assert!(
+            cms_embedded_option_value(
+                -0.005,
+                -0.005,
+                &surface,
+                1.0,
+                finstack_quant_models::types::OptionType::Call
+            )
+            .is_err()
+        );
+        assert!(
+            cms_embedded_option_value(
+                -0.005,
+                0.02,
+                &surface,
+                1.0,
+                finstack_quant_models::types::OptionType::Put
+            )
+            .is_err()
+        );
     }
 
     /// Build a 1-period CMS swap fixing 1Y out (so the embedded option has
@@ -1303,7 +1307,7 @@ mod tests {
     #[test]
     fn cms_products_reject_tenor_axis_surfaces() {
         use crate::cms_option::{
-            pricer::CmsOptionPricer, replication_pricer::CmsReplicationPricer, CmsOption,
+            CmsOption, pricer::CmsOptionPricer, replication_pricer::CmsReplicationPricer,
         };
         use finstack_quant_core::market_data::surfaces::{VolSurface, VolSurfaceAxis};
         let as_of = date(2025, 1, 1);

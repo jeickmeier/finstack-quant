@@ -6,11 +6,11 @@ use finstack_quant_core::FxHashMap;
 use finstack_quant_core::{
     currency::Currency,
     market_data::context::MarketContext,
-    money::{fx::FxMatrix, Money},
+    money::{Money, fx::FxMatrix},
     types::InstrumentId,
 };
-use finstack_quant_valuations::instruments::fx::fx_spot::FxSpot;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::fx::fx_spot::FxSpot;
 use std::sync::Arc;
 
 #[test]

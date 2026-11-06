@@ -10,7 +10,7 @@
 use crate::AttributionInputs;
 use finstack_quant_core::schema::SchemaArtifact;
 
-use crate::{AttributionEnvelope, AttributionResultEnvelope};
+use crate::{AttributionEnvelope, AttributionResultEnvelope, PnlBucketShare};
 
 /// A canonical attribution result: a small carry-only P&L decomposition.
 ///
@@ -56,6 +56,18 @@ fn attribution_result_examples() -> finstack_quant_core::Result<Vec<serde_json::
         ))
     })?;
     Ok(vec![value])
+}
+
+/// The carry bucket of the example attribution result.
+fn pnl_bucket_share_examples() -> finstack_quant_core::Result<Vec<serde_json::Value>> {
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::money::Money;
+
+    finstack_quant_core::schema::example(&PnlBucketShare {
+        field: crate::PnlBucket::Carry,
+        amount: Money::from((12500_i64, Currency::USD)),
+        pct_of_total: Some(100.0),
+    })
 }
 
 /// The shared inputs of the example attribution run: empty market snapshots
@@ -160,4 +172,14 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
     )
     .with_summary("Attributed P&L by effect and grouping, with policy stamps.")
     .with_examples(attribution_result_examples),
+    finstack_quant_core::schema_artifact!(
+        PnlBucketShare,
+        "attribution",
+        "pnl_bucket_share",
+        Output,
+        "One money bucket of a P&L attribution with its share of total P&L",
+        title = "Finstack Quant P&L Bucket Share"
+    )
+    .with_summary("A P&L bucket's field name, amount and share of total.")
+    .with_examples(pnl_bucket_share_examples),
 ];

@@ -772,6 +772,75 @@ def _diversified_pool() -> AssetPool:
     ])
 
 
+def test_standard_deal_families_build_what_they_list() -> None:
+    from finstack_quant.valuations.instruments import standard_deal_families
+
+    families = standard_deal_families()
+    assert [(family["deal_type"], family["profile_id"]) for family in families] == [
+        ("abs", "abs_auto_standard"),
+        ("clo", "clo_standard"),
+        ("cmbs", "cmbs_standard"),
+        ("rmbs", "rmbs_standard"),
+    ]
+    for family in families:
+        params = StandardDealParams.from_json(json.dumps(family["example"]))
+        assert StructuredCredit.new_standard(family["deal_type"], params).id == f"{family['deal_type'].upper()}-EXAMPLE"
+    clo = StandardDealParams.from_json(json.dumps(families[1]["example"]))
+    with pytest.raises(ValueError, match="contradicts the abs family"):
+        StructuredCredit.new_standard("abs", clo)
+
+
+def test_absent_values_are_none_not_zero_or_infinity() -> None:
+    """A retired note has no ratio; nothing invested has no MOIC; an empty pool has no averages."""
+    from finstack_quant.valuations.instruments import (
+        AssetPool,
+        EquityMetrics,
+        SimulationDiagnostics,
+        calculate_pool_stats,
+        pool_report,
+    )
+
+    empty = AssetPool("P", "clo", USD)
+    assert [
+        empty.wac(),
+        empty.weighted_avg_spread_bp(),
+        empty.weighted_avg_maturity(CLOSE),
+        empty.diversity_score(),
+    ] == [
+        None,
+        None,
+        None,
+        None,
+    ]
+    stats = calculate_pool_stats(empty, CLOSE)
+    assert [stats.wac, stats.weighted_avg_spread_bp, stats.weighted_avg_maturity, stats.diversity_score] == [
+        None,
+        None,
+        None,
+        None,
+    ]
+    assert pool_report(empty, CLOSE).warf is None
+
+    metrics = EquityMetrics.from_json(
+        '{"tranche_id": "E", "currency": "USD", "invested": 0.0, "irr": null,'
+        ' "moic": null, "nav_pct": 90.0, "cash_on_cash": [["2025-01-15", null]]}'
+    )
+    assert metrics.moic is None
+    assert metrics.cash_on_cash[0][1] is None
+    assert metrics.to_dataframe()["cash_on_cash"].isna().all()
+
+    # The UI's retired-senior fixture: Rust's own record of a note paid off mid-deal.
+    charts = Path(__file__).parents[2] / "finstack-quant-ui/tests/valuations/scenario-table/deal-charts.json"
+    retired = next(case for case in json.loads(charts.read_text())["cases"] if case["name"] == "retired-senior")
+    diagnostics = SimulationDiagnostics.from_json(json.dumps(retired["run"]["diagnostics"]))
+    frame = diagnostics.coverage_tests_dataframe()
+    senior = frame[frame["test_id"] == "OC_SENIOR"]
+    assert senior["ratio"].isna().any()
+    assert senior["ratio"].notna().any()
+    assert (senior["ratio"].isna() == senior["cushion"].isna()).all()
+    assert senior["passing"].all()
+
+
 def test_asset_pool_exposes_the_rust_collateral_analytics() -> None:
     """VALB-005: pool balances, WAC/WAS/WAM, diversity and lookups come from Rust."""
     from finstack_quant.valuations.instruments import PoolStats, calculate_pool_stats
@@ -781,7 +850,8 @@ def test_asset_pool_exposes_the_rust_collateral_analytics() -> None:
     assert pool.performing_balance().amount == pytest.approx(80_000_000.0)
     # Defaulted collateral is excluded from the coupon average.
     assert pool.wac() == pytest.approx(0.07)
-    assert pool.weighted_avg_spread_bp() == 0.0
+    # All fixed-rate: no spread-bearing collateral, so no average, not zero.
+    assert pool.weighted_avg_spread_bp() is None
     assert pool.weighted_avg_maturity(CLOSE) == pytest.approx(8.0, abs=0.02)
     assert pool.diversity_score() > 0.0
     assert [a.id for a in pool.assets_by_obligor("OB-2")] == ["L2", "L3"]
@@ -863,3 +933,98 @@ def test_recovery_only_configuration_is_reported_and_fully_disabled(recovery: di
         disabled = disabled.disable_stochastic()
     assert deal.is_stochastic
     assert deal.stochastic_recovery_spec == recovery
+
+
+def test_period_detail_reconciles_with_tranche_flows_on_a_called_deal() -> None:
+    """The 2028 call redeems outside the waterfall; the period record still adds up."""
+    run = _clo().run_simulation(_market(), CLOSE).to_dict()
+    periods = run["diagnostics"]["periods"]
+    assert run["diagnostics"]["periods"][-1]["non_waterfall_payments"]
+    assert {p["source"] for p in periods[-1]["non_waterfall_payments"]} == {"redemption"}
+    recipients = {"A": {"tranche": "A"}, "B": {"tranche": "B"}, "E": "equity"}
+    for tranche_id, recipient in recipients.items():
+        flows = run["tranches"][tranche_id]
+        booked: dict[str, float] = {}
+        for date, amount in flows["interest_flows"] + flows["principal_flows"]:
+            booked[date] = booked.get(date, 0.0) + float(amount["amount"])
+        reported: dict[str, float] = {}
+        for period in periods:
+            date = period["payment_date"]
+            for record in period["waterfall"]["payment_records"]:
+                if record["recipient"] == recipient:
+                    reported[date] = reported.get(date, 0.0) + float(record["paid_amount"]["amount"])
+            for payment in period["non_waterfall_payments"]:
+                if payment["tranche_id"] == tranche_id:
+                    cash = float(payment["interest"]["amount"]) + float(payment["principal"]["amount"])
+                    reported[payment["payment_date"]] = reported.get(payment["payment_date"], 0.0) + cash
+        for date in booked.keys() | reported.keys():
+            assert reported.get(date, 0.0) == pytest.approx(booked.get(date, 0.0), abs=1e-6), (tranche_id, date)
+
+
+def test_first_breaches_and_credit_enhancement_come_from_run_simulation() -> None:
+    diagnostics = _clo().run_simulation(_market(), CLOSE).diagnostics
+    assert [entry["test_id"] for entry in diagnostics.first_breaches] == ["OC_A"]
+    failing = [
+        period["payment_date"]
+        for period in diagnostics.periods
+        if any(not test["passing"] for test in period["coverage_tests"])
+    ]
+    assert diagnostics.first_breaches[0]["first_breach"] == (failing[0] if failing else None)
+    first = diagnostics.periods[0]["credit_enhancement"]
+    assert [entry["tranche_id"] for entry in first] == ["A", "B", "E"]
+    assert first[0]["credit_enhancement"] > first[1]["credit_enhancement"] > first[2]["credit_enhancement"]
+
+
+def test_pool_report_is_one_native_call_over_the_pool_analytics() -> None:
+    """Concentration, WARF and statistics of a hand-checkable pool."""
+    from finstack_quant.valuations.instruments import (
+        PoolConcentrationEntry,
+        PoolReport,
+        PoolStats,
+        calculate_pool_stats,
+        pool_report,
+    )
+
+    rows = [
+        ("A", 300.0, "X", "Tech", "BB", False),
+        ("B", 300.0, "Y", "Tech", "B", False),
+        ("C", 100.0, "X", "Retail", "BB", False),
+        ("D", 200.0, "Z", "Retail", "CCC", True),
+        ("E", 100.0, None, None, None, False),
+    ]
+    spec = PoolAsset.fixed_rate_bond("T", usd(1.0), 0.05, MATURITY, DayCount.ACT_360).to_dict()
+    assets = [
+        {
+            **spec,
+            "id": id_,
+            "balance": {"amount": str(balance), "currency": "USD"},
+            "obligor_id": obligor,
+            "industry": industry,
+            "rating": rating,
+            "defaulted": defaulted,
+        }
+        for id_, balance, obligor, industry, rating, defaulted in rows
+    ]
+    pool = AssetPool("P", "clo", USD).with_assets(json.dumps(assets))
+
+    report = pool_report(pool, CLOSE)
+
+    assert isinstance(report, PoolReport)
+    assert report.total_balance.amount == 1000.0
+    assert isinstance(report.stats, PoolStats)
+    assert report.stats.to_dict() == calculate_pool_stats(pool, CLOSE).to_dict()
+    assert report.warf == pytest.approx((400 * 1350 + 300 * 2720 + 100 * 3650) / 800)
+
+    assert all(isinstance(row, PoolConcentrationEntry) for row in report.by_obligor)
+    assert [row.key for row in report.by_obligor] == ["X", "Y", "Z", None]
+    assert [row.balance_pct for row in report.by_obligor] == [40.0, 30.0, 20.0, 10.0]
+    assert [row.asset_count for row in report.by_obligor] == [2, 1, 1, 1]
+    assert report.by_obligor[0].balance.amount == 400.0
+    assert [row.key for row in report.by_rating] == ["BB", "B", "CCC", None]
+
+    frame = report.to_dataframe()
+    assert list(frame.columns) == ["dimension", "key", "balance", "currency", "balance_pct", "asset_count"]
+    assert frame.groupby("dimension")["balance_pct"].sum().tolist() == pytest.approx([100.0, 100.0, 100.0])
+
+    assert PoolReport.from_json(report.to_json()).to_dict() == report.to_dict()
+    assert pickle.loads(pickle.dumps(report)).to_dict() == report.to_dict()  # noqa: S301

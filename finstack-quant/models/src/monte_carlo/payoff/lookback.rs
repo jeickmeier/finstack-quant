@@ -836,7 +836,7 @@ mod tests {
         type TrackedPayoff = Box<dyn FnMut(&mut PathState) -> f64>;
         let mut payoffs: Vec<TrackedPayoff> = Vec::new();
         macro_rules! track {
-            ($payoff:expr) => {{
+            ($payoff:expr_2021) => {{
                 let mut payoff = $payoff;
                 payoffs.push(Box::new(move |state: &mut PathState| {
                     if state.step == 0 {

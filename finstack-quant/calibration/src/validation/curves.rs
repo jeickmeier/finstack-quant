@@ -1,11 +1,11 @@
 //! Curve validators (discount/forward/hazard/inflation/base-correlation).
 
+use crate::validation::ValidationConfig;
 use crate::validation::points::{
     DF_ARBI_POINTS, DF_BOUNDS_POINTS, DF_MONO_POINTS, FWD_ARBI_POINTS, FWD_BOUNDS_POINTS,
     HAZARD_ARBI_POINTS, HAZARD_BOUNDS_POINTS, HAZARD_MONO_POINTS, INFL_ARBI_POINTS,
     INFL_BOUNDS_POINTS, INFL_MONO_POINTS,
 };
-use crate::validation::ValidationConfig;
 use finstack_quant_core::market_data::term_structures::{
     BaseCorrelationCurve, DiscountCurve, ForwardCurve, HazardCurve, InflationCurve,
 };

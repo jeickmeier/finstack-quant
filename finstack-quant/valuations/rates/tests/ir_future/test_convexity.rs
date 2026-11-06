@@ -28,10 +28,12 @@ fn test_strict_convexity_error() {
 
     // Should fail because strict mode requires explicit adjustment or vol surface
     assert!(result.is_err());
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("Missing vol_surface_id"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Missing vol_surface_id")
+    );
 }
 
 #[test]

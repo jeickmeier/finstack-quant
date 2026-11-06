@@ -21,11 +21,11 @@
 //! // 2-state generator (AAA defaults at rate 0.01/yr)
 //! let scale = RatingScale::custom(vec!["AAA".to_string(), "D".to_string()])
 //!     .expect("valid scale");
-//! let gen = GeneratorMatrix::new(scale.clone(), &[-0.01, 0.01, 0.0, 0.0])
+//! let generator = GeneratorMatrix::new(scale.clone(), &[-0.01, 0.01, 0.0, 0.0])
 //!     .expect("valid generator");
 //!
 //! // 5-year transition matrix
-//! let p5 = project(&gen, 5.0).expect("projection succeeded");
+//! let p5 = project(&generator, 5.0).expect("projection succeeded");
 //! let pd = p5.probability("AAA", "D").unwrap();
 //! assert!(pd > 0.0 && pd < 1.0);
 //! ```
@@ -55,4 +55,4 @@ pub use generator::GeneratorMatrix;
 pub use matrix::TransitionMatrix;
 pub use projection::project;
 pub use scale::RatingScale;
-pub use simulation::{default_rate, MigrationSimulator, RatingPath};
+pub use simulation::{MigrationSimulator, RatingPath, default_rate};

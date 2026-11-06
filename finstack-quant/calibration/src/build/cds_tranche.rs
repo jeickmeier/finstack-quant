@@ -1,14 +1,14 @@
 //! Builders for CDS Tranche instruments from market quotes.
 
+use crate::build::BuildCtx;
 use crate::build::cds::cds_accrual_start;
 use crate::build::helpers::resolve_spot_date;
-use crate::build::BuildCtx;
 use crate::quotes::CdsTrancheQuote;
 use finstack_quant_cashflows::builder::RollRule;
 use finstack_quant_cashflows::builder::ScheduleParams;
 use finstack_quant_core::dates::calendar_by_id_strict;
 use finstack_quant_core::dates::{
-    adjust, next_cds_date, BusinessDayConvention, DateExt, DayCount, Tenor,
+    BusinessDayConvention, DateExt, DayCount, Tenor, adjust, next_cds_date,
 };
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -180,9 +180,9 @@ mod tests {
     use super::*;
     use crate::quotes::CdsTrancheQuote;
     use crate::quotes::QuoteId;
-    use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::dates::{adjust, Date};
     use finstack_quant_core::FxHashMap;
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::{Date, adjust};
     use finstack_quant_valuations_core::market::conventions::ids::{
         CdsConventionKey, CdsDocClause,
     };

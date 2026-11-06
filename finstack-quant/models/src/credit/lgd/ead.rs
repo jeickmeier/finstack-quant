@@ -210,10 +210,10 @@ mod tests {
     fn serde_uses_checked_credit_conversion_and_exposure_construction() {
         for value in [-0.1, 1.1] {
             assert!(CreditConversionFactor::new(value).is_err());
-            assert!(serde_json::from_value::<CreditConversionFactor>(
-                serde_json::json!({"ccf": value})
-            )
-            .is_err());
+            assert!(
+                serde_json::from_value::<CreditConversionFactor>(serde_json::json!({"ccf": value}))
+                    .is_err()
+            );
         }
         for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
             assert!(CreditConversionFactor::new(value).is_err());

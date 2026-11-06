@@ -28,6 +28,7 @@ async function show(type: string, defaultJson?: string) {
       validate={validate}
       onSubmit={() => {}}
       onValidated={accepted}
+      priceDriverFields={native.priceDriverFields()}
     />,
   );
   return accepted;

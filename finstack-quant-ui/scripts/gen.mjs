@@ -97,6 +97,54 @@ export async function generate(repo = repoRoot) {
           "check_suite_spec",
           "rollup_spec",
           "scenario_set",
+          "scenario_spec",
+          "scenario_diff",
+          "scenario_grid",
+          "standard_deal_params",
+          "oas_config",
+          "table_envelope",
+          "covenant_report",
+          "dated_covenant_reports",
+          "covenant_engine",
+          "covenant_template",
+          "covenant_forecast_config",
+          "future_breach",
+          "portfolio_result",
+          "scenario_pnl_batch_item",
+          "scenario_revalue_view",
+          "portfolio_margin_result",
+          "simm_sensitivities_json",
+          "im_result",
+          "vm_result",
+          "csa_spec",
+          "merton_model",
+          "forecast_parameters",
+          "arbitrage_report",
+          "altman_z_score_input",
+          "altman_z_prime_input",
+          "altman_z_double_prime_input",
+          "ohlson_o_score_input",
+          "zmijewski_input",
+          "workout_lgd",
+          "seniority_calibration",
+          "recovery_claim",
+          "credit_assessment",
+          "capital_structure_summary",
+          "capital_structure_summary_config",
+          "relative_value_report",
+          "relative_value_report_config",
+          "dcf_options",
+          "dcf_sensitivity_result",
+          "lbo_config",
+          "lbo_result",
+          "sensitivity_result",
+          "variance_config",
+          "bridge_chart",
+          "forecast_metrics",
+          "monte_carlo_config",
+          "monte_carlo_results",
+          "normalization_config",
+          "normalization_result",
         ].some((name) => entry.$id.endsWith(`/${name}.schema.json`)),
     )
     .sort((a, b) => a.$id.localeCompare(b.$id));
@@ -207,11 +255,12 @@ export async function generate(repo = repoRoot) {
             value.startsWith("#/$defs/")
           ) {
             const id = value.slice("#/$defs/".length).split("/")[0];
-            if (localNames.has(id)) {
-              next[key] =
-                `#/$defs/${localNames.get(id)}${value.slice(`#/$defs/${id}`.length)}`;
-              continue;
-            }
+            if (localNames.has(id))
+              // A bare ref: the compiler renames a ref with sibling keywords
+              // per use, and only the definition's own name is declared below.
+              return {
+                $ref: `#/$defs/${localNames.get(id)}${value.slice(`#/$defs/${id}`.length)}`,
+              };
           }
           next[key] = retarget(value);
         }
@@ -220,7 +269,8 @@ export async function generate(repo = repoRoot) {
       const defs = Object.fromEntries(
         [...localNames].map(([key, title]) => [
           title,
-          retarget(typeInput.$defs[key]),
+          // The root compile names a local ref by its title; keep it the part's name.
+          { ...retarget(typeInput.$defs[key]), title },
         ]),
       );
       typeInput = retarget({ ...typeInput, $defs: {} });
@@ -340,6 +390,7 @@ export async function generate(repo = repoRoot) {
     "day_count",
     "business_day_convention",
     "tenor",
+    "bond_quote_input",
   ]) {
     const entry = [...contracts.values()].find((entry) =>
       entry.source.endsWith(`/common/1/${name}.schema.json`),

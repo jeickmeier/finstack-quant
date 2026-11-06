@@ -79,6 +79,37 @@
       }
     },
     {
+      "name": "table-envelope",
+      "type": "registry:ui",
+      "title": "Table envelope",
+      "description": "Presents a native column-oriented TableEnvelope in its own column and row order, with labelFor headers, exact numeric digits and null cells as an em dash.",
+      "docs": "Display-only table-envelope primitive. Import the installed finstack theme. Pass the TableEnvelope a Rust table function returned (for example statements_analytics.plSummaryReport or Performance#summary) and a caption. Columns and rows keep their native order; numeric columns are right-aligned with every supplied digit; nothing is sorted, grouped, totalled, rounded or converted. missingCell, when supplied, is shown for a null or NaN cell. No worker or workbench is required.",
+      "files": [
+        {
+          "path": "table/table-envelope/table-envelope.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/shared/table/table-envelope/table-envelope.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/contract-table-envelope"
+      ],
+      "dependencies": ["@tanstack/react-table@9.2.4"],
+      "categories": ["Primitive Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
       "name": "enum-field",
       "type": "registry:ui",
       "title": "Enum field",
@@ -101,6 +132,36 @@
       ],
       "categories": ["Primitive Components"],
       "meta": { "version": "0.2.0", "wasmVersion": "0.11.0", "schemaIds": [] }
+    },
+    {
+      "name": "native-display",
+      "type": "registry:ui",
+      "title": "Native display",
+      "description": "Shared report sections, label/value pairs, outcome states, a free-text field and display helpers for values Rust returned.",
+      "docs": "Presentation helpers shared by registry components: ReportSection, Pairs, Outcome (native error, working and empty states), TextField, UndefinedValue, and the typedNumber, shownValue, passThrough, utc and yesNo helpers. Values are shown as Rust returned them; empty typed numbers become NaN so Rust rejects them. Import the installed finstack theme; no worker or workbench is required.",
+      "files": [
+        {
+          "path": "primitives/native-display/native-display.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/shared/primitives/native-display/native-display.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/field-frame",
+        "input"
+      ],
+      "dependencies": ["react@19.2.8"],
+      "categories": ["Primitive Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     },
     {
       "name": "json-viewer",
@@ -129,7 +190,7 @@
       "type": "registry:ui",
       "title": "ID combobox",
       "description": "Free-text identifier input with virtualized supplied suggestions.",
-      "docs": "Controlled id-combobox primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required. Composes the stock shadcn Combobox with controlled free text, supplied filtered suggestions and TanStack list virtualization; IDs are never inferred.",
+      "docs": "Controlled id-combobox primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required. Composes the stock shadcn Combobox with controlled free text, supplied filtered suggestions and TanStack list virtualization; typed text is the value and survives Tab, blur and Escape; IDs are never inferred.",
       "files": [
         {
           "path": "primitives/id-combobox/id-combobox.tsx",
@@ -279,7 +340,8 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
-          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
         ]
       }
     },
@@ -357,6 +419,41 @@
           "target": "workers/services/valuations.ts"
         },
         {
+          "path": "file/services/cashflows.ts",
+          "type": "registry:file",
+          "target": "workers/services/cashflows.ts"
+        },
+        {
+          "path": "file/services/covenants.ts",
+          "type": "registry:file",
+          "target": "workers/services/covenants.ts"
+        },
+        {
+          "path": "file/services/scenarios.ts",
+          "type": "registry:file",
+          "target": "workers/services/scenarios.ts"
+        },
+        {
+          "path": "file/services/attribution.ts",
+          "type": "registry:file",
+          "target": "workers/services/attribution.ts"
+        },
+        {
+          "path": "file/services/analytics.ts",
+          "type": "registry:file",
+          "target": "workers/services/analytics.ts"
+        },
+        {
+          "path": "file/services/portfolio.ts",
+          "type": "registry:file",
+          "target": "workers/services/portfolio.ts"
+        },
+        {
+          "path": "file/services/margin.ts",
+          "type": "registry:file",
+          "target": "workers/services/margin.ts"
+        },
+        {
           "path": "file/services/calibration.ts",
           "type": "registry:file",
           "target": "workers/services/calibration.ts"
@@ -380,7 +477,8 @@
       "registryDependencies": [
         "@finstack/finstack-host",
         "@finstack/finstack-format",
-        "@finstack/contract-market-context-state"
+        "@finstack/contract-market-context-state",
+        "@finstack/analytics-report-types"
       ],
       "dependencies": ["finstack-quant-wasm@0.11.0", "comlink@4.4.2"],
       "categories": [],
@@ -389,7 +487,8 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
-          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
         ]
       }
     }

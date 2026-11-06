@@ -10,7 +10,7 @@ use super::super::process::heston::HestonProcess;
 use super::super::traits::Discretization;
 #[cfg(test)]
 use super::qe_common::qe_step_variance;
-use super::qe_common::{qe_regime, qe_regime_with_exp, KAPPA_DT_EXPANSION_EPS};
+use super::qe_common::{KAPPA_DT_EXPANSION_EPS, qe_regime, qe_regime_with_exp};
 
 /// Integrated variance approximation method.
 ///
@@ -289,10 +289,10 @@ impl Discretization<HestonProcess> for QeHeston {
         // spot leg can form the exact conditional MGF of v_{t+Δt} for the
         // martingale-exact K0* correction (Andersen 2008, §4.2).
         let z_v = z[1]; // Independent shock for variance
-                        // Reuse the precomputed `e^{-κΔt}` when this step's `dt` matches the
-                        // prepared one (exact bit match → identical value); otherwise fall back
-                        // to the inline transcendental so unprepared/non-uniform grids stay
-                        // bit-identical.
+        // Reuse the precomputed `e^{-κΔt}` when this step's `dt` matches the
+        // prepared one (exact bit match → identical value); otherwise fall back
+        // to the inline transcendental so unprepared/non-uniform grids stay
+        // bit-identical.
         let regime = match self.prepared {
             Some(c) if c.dt.to_bits() == dt.to_bits() => qe_regime_with_exp(
                 v_t,

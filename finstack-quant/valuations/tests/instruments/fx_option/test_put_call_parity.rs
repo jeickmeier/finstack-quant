@@ -9,8 +9,8 @@
 use super::helpers::*;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::dates::DayCountContext;
-use finstack_quant_valuations::instruments::fx::fx_option::FxOption;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::fx::fx_option::FxOption;
 use time::macros::date;
 
 fn parity_rhs(call: &FxOption, strike: f64, params: MarketParams, as_of: Date) -> f64 {

@@ -286,10 +286,10 @@ fn best_branch_failures(
 fn branch_schema(branch: &Value, base: &Value) -> Option<Value> {
     let mut schema = branch.clone();
     let object = schema.as_object_mut()?;
-    if !object.contains_key("$defs") {
-        if let Some(defs) = base.get("$defs") {
-            object.insert("$defs".to_string(), defs.clone());
-        }
+    if !object.contains_key("$defs")
+        && let Some(defs) = base.get("$defs")
+    {
+        object.insert("$defs".to_string(), defs.clone());
     }
     Some(schema)
 }

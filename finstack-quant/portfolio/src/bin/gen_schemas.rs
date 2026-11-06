@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use finstack_quant_core::schema::{run_schema_generator, SchemaGenerationCommand};
+use finstack_quant_core::schema::{SchemaGenerationCommand, run_schema_generator};
 use finstack_quant_portfolio::schema::ARTIFACTS;
 
 fn main() {

@@ -41,6 +41,46 @@ impl MetricId {
     /// Minimum XIRR across exit paths (guarantee check).
     pub const XirrToWorst: Self = Self(Cow::Borrowed("xirr_to_worst"));
 
+    // Loan Metrics
+
+    /// Loan yield to first call, as a decimal.
+    pub const Ytc: Self = Self(Cow::Borrowed("ytc"));
+
+    /// Loan yield to a two-year horizon, as a decimal.
+    pub const Yt2y: Self = Self(Cow::Borrowed("yt2y"));
+
+    /// Loan yield to a three-year horizon, as a decimal.
+    pub const Yt3y: Self = Self(Cow::Borrowed("yt3y"));
+
+    /// Loan yield to a four-year horizon, as a decimal.
+    pub const Yt4y: Self = Self(Cow::Borrowed("yt4y"));
+
+    /// Loan cash-cost all-in rate (cash interest plus fees over time-weighted
+    /// outstanding), as an annual decimal.
+    pub const AllInRate: Self = Self(Cow::Borrowed("all_in_rate"));
+
+    /// Effective interest rate that amortizes a loan's OID and fees, as a decimal.
+    pub const OidEirRate: Self = Self(Cow::Borrowed("oid_eir_rate"));
+
+    /// Total OID and fee amortization of a loan under its effective interest
+    /// rate, in the facility currency.
+    pub const OidEirAmortization: Self = Self(Cow::Borrowed("oid_eir_amortization"));
+
+    // Convertible Metrics
+
+    /// Convertible conversion value over notional (`1.0` is par).
+    pub const Parity: Self = Self(Cow::Borrowed("parity"));
+
+    /// Convertible price over conversion value, less one, as a decimal.
+    pub const ConversionPremium: Self = Self(Cow::Borrowed("conversion_premium"));
+
+    /// Immediate conversion value of a convertible position, in currency.
+    pub const ConversionValue: Self = Self(Cow::Borrowed("conversion_value"));
+
+    /// Value of a convertible's coupons and principal with no conversion or
+    /// exercise rights, in currency.
+    pub const BondFloor: Self = Self(Cow::Borrowed("bond_floor"));
+
     /// Macaulay duration
     pub const DurationMac: Self = Self(Cow::Borrowed("duration_mac"));
 
@@ -92,6 +132,17 @@ impl MetricId {
 
     /// I-spread - Yield over interpolated swap curve
     pub const ISpread: Self = Self(Cow::Borrowed("i_spread"));
+
+    /// G-spread: yield over the par yield of a named government discount curve.
+    ///
+    /// A working convention, pending the desk's benchmark decision: the same
+    /// yield and horizon as [`Self::ISpread`], with the par rate read from the
+    /// curve the bond names in `model_config.government_curve_id`. The par rate
+    /// interpolates that curve at the horizon; no on-the-run bond is selected.
+    /// No named curve is an error, never a fallback to the discount curve.
+    ///
+    /// Units: decimal spread (0.01 = 100 bp).
+    pub const GSpread: Self = Self(Cow::Borrowed("g_spread"));
 
     /// Discount margin for floating-rate bonds (decimal; 0.01 = 100 bp)
     pub const DiscountMargin: Self = Self(Cow::Borrowed("discount_margin"));

@@ -11,11 +11,11 @@ use finstack_quant_margin::calculators::im::{ClearingHouseImCalculator, SimmCalc
 use finstack_quant_margin::calculators::{ImCalculator, VmCalculator};
 use finstack_quant_margin::types::{ImMethodology, NettingSetId, SimmSensitivities};
 
+use crate::Portfolio;
 use crate::margin::netting_set::NettingSet;
 use crate::margin::results::{NettingSetMargin, PortfolioMarginResult};
 use crate::position::{Position, PositionUnit};
 use crate::types::PositionId;
-use crate::Portfolio;
 use crate::{Error, Result};
 
 /// Calculate portfolio margin requirements by netting set.
@@ -193,17 +193,15 @@ fn build_netting_sets(portfolio: &Portfolio) -> Result<(NettingSets<'_>, Members
 
     let mut csa_owners = FxHashMap::default();
     for ns in netting_sets.values() {
-        if let Some(spec) = &ns.margin_spec {
-            if let Some((owner, existing)) =
+        if let Some(spec) = &ns.margin_spec
+            && let Some((owner, existing)) =
                 csa_owners.insert(spec.csa.id.clone(), (ns.id.counterparty_id(), &spec.csa))
-            {
-                if owner != ns.id.counterparty_id() || existing != &spec.csa {
-                    return Err(Error::invalid_input(format!(
-                        "CSA '{}' has conflicting terms or different counterparties",
-                        spec.csa.id
-                    )));
-                }
-            }
+            && (owner != ns.id.counterparty_id() || existing != &spec.csa)
+        {
+            return Err(Error::invalid_input(format!(
+                "CSA '{}' has conflicting terms or different counterparties",
+                spec.csa.id
+            )));
         }
     }
     Ok((netting_sets, members))
@@ -298,10 +296,10 @@ impl MarginRun<'_> {
     /// Calculate sensitivities for a single position.
     fn calculate_position_sensitivities(&self, position: &Position) -> Result<SimmSensitivities> {
         if let Some(marginable) = position.instrument.as_marginable() {
-            if let Some(spec) = marginable.margin_spec() {
-                if spec.get_im_methodology() != Some(ImMethodology::Simm) {
-                    return Ok(SimmSensitivities::new(self.base_currency));
-                }
+            if let Some(spec) = marginable.margin_spec()
+                && spec.get_im_methodology() != Some(ImMethodology::Simm)
+            {
+                return Ok(SimmSensitivities::new(self.base_currency));
             }
             let sens = marginable
                 .simm_sensitivities(self.market, self.as_of)
@@ -437,15 +435,30 @@ impl MarginRun<'_> {
                     if let Some(sensitivities) = sensitivities {
                         let days = target_mpor.unwrap_or(self.simm_calculator.mpor_days());
                         let calculator = self.simm_calculator.clone().with_mpor(days);
-                        let (total, breakdown) = calculator.calculate_from_sensitivities_parts(sensitivities, self.base_currency)?;
-                        (Money::new(total, self.base_currency)?, Some((sensitivities.clone(), breakdown)))
-                    } else { (Money::from((0_i64, self.base_currency)), None) }
+                        let (total, breakdown) = calculator.calculate_from_sensitivities_parts(
+                            sensitivities,
+                            self.base_currency,
+                        )?;
+                        (
+                            Money::new(total, self.base_currency)?,
+                            Some((sensitivities.clone(), breakdown)),
+                        )
+                    } else {
+                        (Money::from((0_i64, self.base_currency)), None)
+                    }
                 }
-                ImMethodology::Schedule => (self.calculate_schedule_im(netting_set, target_mpor)?, None),
-                ImMethodology::ClearingHouse => (self.calculate_clearing_im(netting_set, target_mpor, &mut degraded_positions)?, None),
-                other => return Err(Error::invalid_input(format!(
-                    "Portfolio OTC margin does not support configured IM methodology {other:?}; supply its dedicated collateral/model engine"
-                ))),
+                ImMethodology::Schedule => {
+                    (self.calculate_schedule_im(netting_set, target_mpor)?, None)
+                }
+                ImMethodology::ClearingHouse => (
+                    self.calculate_clearing_im(netting_set, target_mpor, &mut degraded_positions)?,
+                    None,
+                ),
+                other => {
+                    return Err(Error::invalid_input(format!(
+                        "Portfolio OTC margin does not support configured IM methodology {other:?}; supply its dedicated collateral/model engine"
+                    )));
+                }
             }
         };
         let im_methodology = method;
@@ -510,7 +523,7 @@ impl MarginRun<'_> {
                 other => {
                     return Err(Error::invalid_input(format!(
                         "No approved schedule classification for {other:?}"
-                    )))
+                    )));
                 }
             };
             let notional = exposure.checked_mul_f64(position.scale_factor().abs())?;
@@ -614,15 +627,15 @@ impl MarginRun<'_> {
                 .map_err(|e| {
                     Error::valuation(position.position_id.clone(), e.kind(), e.to_string())
                 })?;
-            if let PositionUnit::Notional(Some(notional_currency)) = position.unit {
-                if notional_currency != unit_mtm.currency() {
-                    return Err(Error::invalid_input(format!(
-                        "minor 18: position '{}' notional currency {} does not match VM currency {}",
-                        position.position_id,
-                        notional_currency,
-                        unit_mtm.currency()
-                    )));
-                }
+            if let PositionUnit::Notional(Some(notional_currency)) = position.unit
+                && notional_currency != unit_mtm.currency()
+            {
+                return Err(Error::invalid_input(format!(
+                    "minor 18: position '{}' notional currency {} does not match VM currency {}",
+                    position.position_id,
+                    notional_currency,
+                    unit_mtm.currency()
+                )));
             }
             Ok(position.scale_value(unit_mtm)?)
         } else {
@@ -640,13 +653,13 @@ impl MarginRun<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::position::{Position, PositionUnit};
-    use crate::types::{Entity, DUMMY_ENTITY_ID};
     use crate::Portfolio;
+    use crate::position::{Position, PositionUnit};
+    use crate::types::{DUMMY_ENTITY_ID, Entity};
     use finstack_quant_core::types::Attributes;
+    use finstack_quant_margin::Marginable;
     use finstack_quant_margin::calculators::im::ClearingHouseImCalculator;
     use finstack_quant_margin::types::{CsaSpec, OtcMarginSpec, VmParameters};
-    use finstack_quant_margin::Marginable;
     use finstack_quant_valuations::instruments::{Instrument, MarketDependencies};
     use finstack_quant_valuations::pricer::InstrumentType;
     use std::any::Any;
@@ -958,9 +971,11 @@ mod tests {
             }
             let portfolio = builder.build().unwrap();
             let error = build_netting_sets(&portfolio).expect_err("conflicting CSA");
-            assert!(error
-                .to_string()
-                .contains("Conflicting margin specifications"));
+            assert!(
+                error
+                    .to_string()
+                    .contains("Conflicting margin specifications")
+            );
         }
     }
 

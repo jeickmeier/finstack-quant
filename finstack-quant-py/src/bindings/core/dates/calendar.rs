@@ -4,8 +4,8 @@ use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::macros::{label_enum, typed_or_label};
 use crate::errors::core_to_py;
 use finstack_quant_core::dates::{
-    adjust, available_calendars, calendar_by_id_strict, canonical_calendar_id,
-    BusinessDayConvention, CalendarMetadata, HolidayCalendar,
+    BusinessDayConvention, CalendarMetadata, HolidayCalendar, adjust, available_calendars,
+    calendar_by_id_strict, canonical_calendar_id,
 };
 use pyo3::prelude::*;
 use pyo3::types::PyModule;

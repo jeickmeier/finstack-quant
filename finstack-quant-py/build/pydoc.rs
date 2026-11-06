@@ -184,10 +184,10 @@ fn extract(source: &str) -> Result<(Docs, Vec<String>), String> {
         }
     };
 
-    if let Some(first) = lines.first() {
-        if let Some(text) = docstring(first)? {
-            record("__module__".to_string(), text);
-        }
+    if let Some(first) = lines.first()
+        && let Some(text) = docstring(first)?
+    {
+        record("__module__".to_string(), text);
     }
 
     // Enclosing scopes: (header indent, class qualified name, or `None` inside a function).
@@ -208,14 +208,13 @@ fn extract(source: &str) -> Result<(Docs, Vec<String>), String> {
             Some((_, Some(class))) => format!("{class}.{name}"),
             _ => name,
         };
-        if opens_block && !in_function {
-            if let Some(next) = lines.get(index + 1) {
-                if next.indent > line.indent {
-                    if let Some(text) = docstring(next)? {
-                        record(qualified.clone(), text);
-                    }
-                }
-            }
+        if opens_block
+            && !in_function
+            && let Some(next) = lines.get(index + 1)
+            && next.indent > line.indent
+            && let Some(text) = docstring(next)?
+        {
+            record(qualified.clone(), text);
         }
         if opens_block {
             scopes.push((line.indent, is_class.then_some(qualified)));

@@ -156,26 +156,38 @@ mod tests {
         );
         // R = 1.0 is rejected (zero LGD degenerates protection legs), matching
         // the shared validator used by ProtectionLegSpec.
-        assert!(CreditParams::new("ACME", 1.0, "ACME-CDS")
-            .validate()
-            .is_err());
-        assert!(CreditParams::new("ACME", -0.1, "ACME-CDS")
-            .validate()
-            .is_err());
-        assert!(CreditParams::new("ACME", f64::NAN, "ACME-CDS")
-            .validate()
-            .is_err());
+        assert!(
+            CreditParams::new("ACME", 1.0, "ACME-CDS")
+                .validate()
+                .is_err()
+        );
+        assert!(
+            CreditParams::new("ACME", -0.1, "ACME-CDS")
+                .validate()
+                .is_err()
+        );
+        assert!(
+            CreditParams::new("ACME", f64::NAN, "ACME-CDS")
+                .validate()
+                .is_err()
+        );
         // Valid mid-range recovery is accepted.
-        assert!(CreditParams::new("ACME", 0.4, "ACME-CDS")
-            .validate()
-            .is_ok());
+        assert!(
+            CreditParams::new("ACME", 0.4, "ACME-CDS")
+                .validate()
+                .is_ok()
+        );
         // The shared corporate/sovereign presets are within bounds.
-        assert!(CreditParams::corporate_standard("CORP", "CORP-CDS")
-            .validate()
-            .is_ok());
-        assert!(CreditParams::sovereign_standard("UST", "UST-CDS")
-            .validate()
-            .is_ok());
+        assert!(
+            CreditParams::corporate_standard("CORP", "CORP-CDS")
+                .validate()
+                .is_ok()
+        );
+        assert!(
+            CreditParams::sovereign_standard("UST", "UST-CDS")
+                .validate()
+                .is_ok()
+        );
         // A struct-literal spec that bypassed `new` is still checkable.
         let bad = CreditParams {
             reference_entity: "X".to_string(),

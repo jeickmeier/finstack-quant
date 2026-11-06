@@ -216,6 +216,26 @@
             "values"
           ],
           "type": "object"
+        },
+        {
+          "description": "Non-null boolean column.",
+          "properties": {
+            "type": {
+              "const": "boolean",
+              "type": "string"
+            },
+            "values": {
+              "items": {
+                "type": "boolean"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "type",
+            "values"
+          ],
+          "type": "object"
         }
       ]
     },

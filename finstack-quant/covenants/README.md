@@ -205,23 +205,22 @@ or a leverage ratio on negative EBITDA.
 
 ## Templates
 
-`templates` validates its thresholds (finite, non-negative) and returns
+`templates::covenant_template` takes a `CovenantTemplate` (serde-tagged by
+`kind`), validates its thresholds (finite, non-negative) and returns
 `Result<Vec<CovenantSpec>>` ready to feed a `CovenantEngine`:
 
-| Function | Signature | Package |
+| `kind` | Thresholds | Package |
 |----------|-----------|---------|
-| `lbo_standard` | `(initial_leverage, interest_coverage, fixed_charge_coverage, max_capex)` | Maintenance leverage + coverage + capex |
-| `cov_lite` | `(max_leverage, max_senior_leverage)` | Incurrence-only total and senior leverage |
-| `real_estate` | `(min_dscr, min_debt_yield, max_ltv)` | DSCR with 30-day cure and full cash sweep, plus labeled `min_debt_yield` / `max_ltv` custom tests |
-| `project_finance` | `(min_dscr, distribution_lockup_dscr, min_liquidity, max_net_leverage)` | Two labeled DSCR tests (default vs. distribution lock-up), liquidity reserve, net leverage |
+| `lbo_standard` | `initial_leverage`, `interest_coverage`, `fixed_charge_coverage`, `max_capex` | Maintenance leverage + coverage + capex |
+| `cov_lite` | `max_leverage`, `max_senior_leverage` | Incurrence-only total and senior leverage |
+| `real_estate` | `min_dscr`, `min_debt_yield`, `max_ltv` | DSCR with 30-day cure and full cash sweep, plus labeled `min_debt_yield` / `max_ltv` custom tests |
+| `project_finance` | `min_dscr`, `distribution_lockup_dscr`, `min_liquidity`, `max_net_leverage` | Two labeled DSCR tests (default vs. distribution lock-up), liquidity reserve, net leverage |
 
 ## JSON surface
 
 `json` is the serde-first boundary used by the language bindings:
 `evaluate_engine`, the validators (`validate_covenant_spec_json`,
-`validate_covenant_report_json`, `validate_covenant_engine_json`), and JSON
-template builders (`lbo_standard_json`, `cov_lite_json`, `real_estate_json`,
-`project_finance_json`).
+`validate_covenant_report_json`, `validate_covenant_engine_json`).
 
 Inbound JSON denies unknown fields and runs domain validation on top of the
 schema: non-negative cure periods, finite thresholds, valid waiver dates,
@@ -260,16 +259,17 @@ non-overlapping windows, and valid threshold schedules.
 - **Python** — `finstack_quant.covenants`: typed `Covenant`, `CovenantType`,
   `CovenantSpec`, `ThresholdSchedule`, `CovenantWaiver`, `SpringingCondition`,
   `CovenantConsequence`, `CovenantEngine` (`evaluate` / `evaluate_and_track` /
-  `evaluate_series`), `CovenantBreach`, `CovenantReport`; typed templates
-  `lbo_standard` / `cov_lite` / `real_estate` / `project_finance`;
+  `evaluate_series`), `CovenantBreach`, `CovenantReport`; `CovenantTemplate`
+  (`CovenantTemplate.lbo_standard(...)` and the other variants) and
+  `covenant_template`;
   DataFrame-backed `forecast_covenant` / `forecast_breaches` with
   `CovenantForecastConfig`, `CovenantForecast`, `FutureBreach`; plus the JSON
-  surface (`evaluate_engine`, the three `validate_covenant_*_json` functions,
-  and the `*_json` template twins).
+  surface (`evaluate_engine` and the three `validate_covenant_*_json`
+  functions).
 - **WASM** — `covenants` namespace in
   `finstack-quant-wasm/exports/covenants.js`: `evaluateEngine`, the
-  `validate*Json` validators, and `lboStandardJson` / `covLiteJson` /
-  `realEstateJson` / `projectFinanceJson`.
+  `validate*Json` validators, and `covenantTemplate` over a `CovenantTemplate`
+  object.
 
 ## Verification
 

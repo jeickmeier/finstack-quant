@@ -7,9 +7,9 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, PriceId};
 use finstack_quant_models::types::{ExerciseStyle, OptionType};
+use finstack_quant_valuations::instruments::SettlementType;
 use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
-use finstack_quant_valuations::instruments::SettlementType;
 
 // Equity Option Builder
 

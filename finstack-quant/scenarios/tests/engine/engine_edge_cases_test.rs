@@ -1,7 +1,7 @@
 //! Tests for engine edge cases and error handling.
 
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{build_periods, Date};
+use finstack_quant_core::dates::{Date, build_periods};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -12,7 +12,7 @@ use finstack_quant_scenarios::{
 };
 use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_statements::types::{AmountOrScalar, NodeSpec, NodeType};
-use indexmap::{indexmap, IndexMap};
+use indexmap::{IndexMap, indexmap};
 use time::Month;
 
 #[test]
@@ -173,6 +173,42 @@ fn test_scenario_composition_different_priorities() {
         }
         _ => panic!("Expected EquityPricePct"),
     }
+}
+
+#[test]
+fn test_scenario_composition_keeps_priority_and_descriptions() {
+    let spec = |id: &str, description: Option<&str>, priority: i32| ScenarioSpec {
+        id: id.into(),
+        name: None,
+        description: description.map(Into::into),
+        operations: Vec::new(),
+        priority,
+        resolution_mode: Default::default(),
+        hazard_bump_mode: Default::default(),
+    };
+
+    let composed = ScenarioSpec::compose(vec![
+        spec("credit", Some("Credit spreads widen"), 7),
+        spec("plain", None, 5),
+        spec("rates", Some("Rates up 100bp"), 3),
+    ])
+    .expect("compose should succeed");
+    // The composed spec sorts where its first-running input did, and keeps
+    // every present description in execution (priority) order.
+    assert_eq!(composed.priority, 3);
+    assert_eq!(
+        composed.description.as_deref(),
+        Some("Rates up 100bp + Credit spreads widen")
+    );
+
+    let undescribed =
+        ScenarioSpec::compose(vec![spec("a", None, -2), spec("b", None, 4)]).expect("compose");
+    assert_eq!(undescribed.priority, -2);
+    assert_eq!(undescribed.description, None);
+
+    let empty = ScenarioSpec::compose(Vec::new()).expect("empty compose");
+    assert_eq!(empty.priority, 0);
+    assert_eq!(empty.description, None);
 }
 
 #[test]

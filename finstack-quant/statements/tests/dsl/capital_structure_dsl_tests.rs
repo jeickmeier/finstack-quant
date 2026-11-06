@@ -5,7 +5,7 @@ use finstack_quant_core::dates::{Date, PeriodId};
 use finstack_quant_core::money::Money;
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::capital_structure::CapitalStructureCashflows;
-use finstack_quant_statements::dsl::{parse_formula, StmtExpr};
+use finstack_quant_statements::dsl::{StmtExpr, parse_formula};
 use finstack_quant_statements::evaluator::EvaluationContext;
 use finstack_quant_statements::types::AmountOrScalar;
 use indexmap::IndexMap;
@@ -106,6 +106,7 @@ fn test_context_get_cs_value_interest_total() {
 
     let mut context = EvaluationContext::new(
         period_id,
+        &[],
         std::sync::Arc::new(node_to_column),
         std::sync::Arc::new(historical),
     );
@@ -167,6 +168,7 @@ fn test_context_get_cs_value_principal_instrument() {
 
     let mut context = EvaluationContext::new(
         period_id,
+        &[],
         std::sync::Arc::new(node_to_column),
         std::sync::Arc::new(historical),
     );
@@ -206,6 +208,7 @@ fn test_context_get_cs_value_no_cs_error() {
 
     let context = EvaluationContext::new(
         period_id,
+        &[],
         std::sync::Arc::new(node_to_column),
         std::sync::Arc::new(historical),
     );
@@ -213,10 +216,12 @@ fn test_context_get_cs_value_no_cs_error() {
     // No capital structure defined - should error
     let result = context.get_cs_value("interest_expense", "total");
     assert!(result.is_err());
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("No capital structure"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("No capital structure")
+    );
 }
 
 #[test]
@@ -227,6 +232,7 @@ fn test_context_get_cs_value_invalid_component() {
 
     let mut context = EvaluationContext::new(
         period_id,
+        &[],
         std::sync::Arc::new(node_to_column),
         std::sync::Arc::new(historical),
     );
@@ -235,10 +241,12 @@ fn test_context_get_cs_value_invalid_component() {
     // Invalid component - should error
     let result = context.get_cs_value("invalid_component", "total");
     assert!(result.is_err());
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("Unknown capital structure component"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Unknown capital structure component")
+    );
 }
 
 /// Test full model evaluation with capital structure (mock cashflows)
@@ -404,11 +412,11 @@ fn test_compile_multiple_instruments() {
 
 #[test]
 fn test_aggregate_period_flows() {
-    use finstack_quant_core::dates::{build_periods, Date};
+    use finstack_quant_core::dates::{Date, build_periods};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::types::{CurveId, InstrumentId};
-    use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
     use finstack_quant_valuations::instruments::Instrument;
+    use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 
     use std::sync::Arc;
     use time::Month;
@@ -608,13 +616,16 @@ fn test_capital_structure_cashflows_accessors() {
     );
 
     // Test missing instrument
-    assert!(cs
-        .get_component("interest_expense", "NONEXISTENT", &period)
-        .is_err());
-    assert!(cs
-        .get_component("principal_payment", "NONEXISTENT", &period)
-        .is_err());
-    assert!(cs
-        .get_component("debt_balance", "NONEXISTENT", &period)
-        .is_err());
+    assert!(
+        cs.get_component("interest_expense", "NONEXISTENT", &period)
+            .is_err()
+    );
+    assert!(
+        cs.get_component("principal_payment", "NONEXISTENT", &period)
+            .is_err()
+    );
+    assert!(
+        cs.get_component("debt_balance", "NONEXISTENT", &period)
+            .is_err()
+    );
 }

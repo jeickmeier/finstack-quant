@@ -1,4 +1,4 @@
-//! Canonical example payloads for the result and component artifacts.
+//! Canonical example payloads for the input, result and component artifacts.
 //!
 //! Conventions, catalog rows and metric metadata are read from the registries
 //! compiled into the library; instrument payloads reuse each instrument's own
@@ -6,12 +6,12 @@
 //! round-tripped through the contract type so a payload the type rejects cannot
 //! be published.
 
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::schema::{example, example_from_json};
-use finstack_quant_core::Result;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::instruments::fixed_income::structured_credit;
 use crate::market::conventions::ConventionRegistry;
@@ -158,10 +158,28 @@ pub(super) fn oas_result() -> Result<Vec<Value>> {
     })
 }
 
+/// The default OAS configuration: the values `OasConfig::default()` supplies
+/// when a caller omits the configuration.
+pub(super) fn oas_config() -> Result<Vec<Value>> {
+    example(&structured_credit::OasConfig::default())
+}
+
+/// One CPR against two CDRs at one severity, inheriting the deal's recovery
+/// lag: the grid behind the `scenario_table` example.
+pub(super) fn scenario_grid() -> Result<Vec<Value>> {
+    example_from_json::<structured_credit::ScenarioGrid>(json!({
+        "cprs": [0.15],
+        "cdrs": [0.02, 0.06],
+        "severities": [0.4],
+        "recovery_lag": null
+    }))
+}
+
 /// A two-cell prepayment/default grid for one mezzanine tranche.
 pub(super) fn scenario_table() -> Result<Vec<Value>> {
     example_from_json::<structured_credit::ScenarioTable>(json!({
         "tranche_id": "B",
+        "currency": "USD",
         "cells": [
             {"cpr": 0.15, "cdr": 0.02, "severity": 0.4, "price": 99.1, "wal": 5.8, "writedown": 0.0},
             {"cpr": 0.15, "cdr": 0.06, "severity": 0.4, "price": 93.4, "wal": 6.3, "writedown": 0.035}
@@ -211,6 +229,53 @@ pub(super) fn listed_product_coverage() -> Result<Vec<Value>> {
     example(row)
 }
 
+/// A one-year ladder of a US dollar envelope.
+pub(super) fn currency_ladder() -> Result<Vec<Value>> {
+    example(&crate::instruments::cashflow_export::CurrencyLadder {
+        currency: Currency::USD,
+        rows: vec![
+            finstack_quant_cashflows::aggregation::CalendarYearLadderRow {
+                year: 2025,
+                non_principal: 21_250.0,
+                principal: 0.0,
+                pv: 20_801.625,
+            },
+        ],
+    })
+}
+
+/// The tranche solvers' units.
+pub(super) fn tranche_solve_field_units() -> Result<Vec<Value>> {
+    example(&crate::pricer::tranche_solve_field_units())
+}
+
+/// The units of a USD scenario table's cells.
+pub(super) fn scenario_table_field_units() -> Result<Vec<Value>> {
+    example(&crate::pricer::scenario_table_field_units(Currency::USD))
+}
+
+/// The units of a USD equity tranche's metrics.
+pub(super) fn equity_metrics_field_units() -> Result<Vec<Value>> {
+    example(&crate::pricer::equity_metrics_field_units(Currency::USD))
+}
+
+/// The units of a USD simulation's charted series.
+pub(super) fn simulation_field_units() -> Result<Vec<Value>> {
+    example(&crate::pricer::simulation_field_units(Currency::USD))
+}
+
+/// The unit of a tranche's CS01.
+pub(super) fn metric_field_unit() -> Result<Vec<Value>> {
+    let units = crate::pricer::tranche_metric_field_units(Currency::USD);
+    let unit = units
+        .iter()
+        .find(|unit| unit.field == "cs01")
+        .ok_or_else(|| {
+            finstack_quant_core::Error::Internal("cs01 has no field unit".to_string())
+        })?;
+    example(unit)
+}
+
 /// The interpretation of a bucketed DV01 key.
 pub(super) fn metric_metadata() -> Result<Vec<Value>> {
     let rows = crate::pricer::metric_metadata(&["bucketed_dv01::USD-OIS::10y".to_string()])?;
@@ -226,11 +291,11 @@ pub(super) fn equity_metrics() -> Result<Vec<Value>> {
         currency: Currency::USD,
         invested: 40_000_000.0,
         irr: Some(0.142),
-        moic: 1.85,
+        moic: Some(1.85),
         nav_pct: 62.5,
         cash_on_cash: vec![
-            (date(2025, time::Month::April, 15)?, 0.045),
-            (date(2025, time::Month::July, 15)?, 0.047),
+            (date(2025, time::Month::April, 15)?, Some(0.045)),
+            (date(2025, time::Month::July, 15)?, Some(0.047)),
         ],
     })
 }
@@ -242,6 +307,80 @@ pub(super) fn pool_stats() -> Result<Vec<Value>> {
         &deal.pool,
         deal.closing_date,
     )?)
+}
+
+/// The workout ladder of the example callable bond at 108 clean on a flat curve.
+pub(super) fn bond_workout_ladder() -> Result<Vec<Value>> {
+    use crate::instruments::fixed_income::bond::Bond;
+    use crate::instruments::fixed_income::bond::pricing::quote_conversions;
+    use crate::instruments::pricing_overrides::InstrumentPricingOverrides;
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+
+    let as_of = date(2025, time::Month::January, 15)?;
+    let mut bond = Bond::example_callable()?;
+    bond.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(108.0);
+    let curve = DiscountCurve::builder(bond.discount_curve_id.as_str())
+        .base_date(as_of)
+        .knots([(0.0, 1.0), (10.0, 0.70)])
+        .build()?;
+    let market = MarketContext::new().insert(curve);
+    example(&quote_conversions::bond_workout_ladder(
+        &bond, &market, as_of,
+    )?)
+}
+
+/// The quote set of the example bond at 98.5 clean on a sloping curve.
+pub(super) fn bond_quote_set() -> Result<Vec<Value>> {
+    use crate::instruments::fixed_income::bond::Bond;
+    use crate::instruments::fixed_income::bond::pricing::quote_conversions;
+    use crate::instruments::{BondQuoteInput, PricingOptions};
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+
+    let bond = Bond::example()?;
+    let as_of = bond.issue_date;
+    let curve = DiscountCurve::builder(bond.discount_curve_id.as_str())
+        .base_date(as_of)
+        .knots([(0.0, 1.0), (10.0, 0.70)])
+        .build()?;
+    let market = MarketContext::new().insert(curve);
+    example(&quote_conversions::compute_quotes(
+        &bond,
+        &market,
+        as_of,
+        BondQuoteInput::CleanPricePct(98.5),
+        PricingOptions::default(),
+    )?)
+}
+
+/// A quote of each form: a price, a yield and a spread.
+pub(super) fn bond_quote_input() -> Result<Vec<Value>> {
+    use crate::instruments::BondQuoteInput;
+
+    [
+        BondQuoteInput::CleanPricePct(98.5),
+        BondQuoteInput::Ytm(0.055),
+        BondQuoteInput::ZSpread(0.012),
+    ]
+    .iter()
+    .map(|input| Ok(example(input)?.remove(0)))
+    .collect()
+}
+
+/// Report on the canonical example CLO pool at its closing date.
+pub(super) fn pool_report() -> Result<Vec<Value>> {
+    let deal = structured_credit::StructuredCredit::example()?;
+    example(&structured_credit::pool_report(
+        &deal.pool,
+        deal.closing_date,
+    )?)
+}
+
+/// The units of a USD pool report.
+pub(super) fn pool_report_field_units() -> Result<Vec<Value>> {
+    example(&crate::pricer::pool_report_field_units(Currency::USD))
 }
 
 /// One quarterly interest payment on a senior floating-rate tranche.
@@ -296,7 +435,8 @@ fn simulation_diagnostics_value() -> Value {
         "unfunded_draws": zero,
         "reserve_replenished": zero,
         "early_amortization_date": null,
-        "tranche_draws": []
+        "tranche_draws": [],
+        "first_breaches": []
     })
 }
 
@@ -318,6 +458,12 @@ pub(super) fn standard_deal_params() -> Result<Vec<Value>> {
     })
 }
 
+/// The first family `standard_deal_families` lists.
+pub(super) fn standard_deal_family() -> Result<Vec<Value>> {
+    let families = structured_credit::standard_deal_families()?;
+    example(&families[0])
+}
+
 /// One simulation run carrying the senior tranche's quarterly payment.
 pub(super) fn simulation_run() -> Result<Vec<Value>> {
     example_from_json::<structured_credit::SimulationRun>(json!({
@@ -330,6 +476,48 @@ pub(super) fn simulation_run() -> Result<Vec<Value>> {
 pub(super) fn market_dependencies() -> Result<Vec<Value>> {
     use crate::instruments::Instrument;
     example(&crate::instruments::fixed_income::bond::Bond::example()?.market_dependencies()?)
+}
+
+/// A row in each regime of a convertible with a conversion price of 100.
+pub(super) fn convertible_spot_ladder() -> Result<Vec<Value>> {
+    use crate::instruments::fixed_income::convertible::{
+        ConvertibleRegime, ConvertibleSpotLadder, ConvertibleSpotRow,
+    };
+    let row = |spot: f64, is_market_spot, price: f64, delta: f64, regime| ConvertibleSpotRow {
+        spot,
+        is_market_spot,
+        price,
+        delta: Some(delta),
+        hedge_ratio: Some(delta / 10_000.0),
+        regime: Some(regime),
+        conversion_value: spot * 10_000.0,
+        parity: spot / 100.0,
+        conversion_premium: Some(price / (spot * 10_000.0) - 1.0),
+        bond_floor: 818_730.75,
+    };
+    example(&ConvertibleSpotLadder {
+        instrument_id: "CB-EXAMPLE".to_string(),
+        as_of: date(2025, time::Month::January, 1)?,
+        currency: finstack_quant_core::currency::Currency::USD,
+        market_spot: 100.0,
+        rows: vec![
+            row(50.0, false, 874_656.14, 3_347.45, ConvertibleRegime::Busted),
+            row(
+                100.0,
+                true,
+                1_158_348.78,
+                7_368.0,
+                ConvertibleRegime::Balanced,
+            ),
+            row(
+                150.0,
+                false,
+                1_571_793.63,
+                8_921.0,
+                ConvertibleRegime::EquitySensitive,
+            ),
+        ],
+    })
 }
 
 pub(super) fn convertible_greeks() -> Result<Vec<Value>> {

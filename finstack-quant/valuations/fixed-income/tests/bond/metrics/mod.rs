@@ -8,6 +8,7 @@
 //! - `duration`: Macaulay and modified duration
 //! - `convexity`: Bond convexity
 //! - `spreads`: Z-spread and I-spread
+//! - `g_spread`: Yield over a named government curve
 //! - `asw`: Asset swap spreads (par, market, forward variants)
 //! - `dm`: Discount margin for FRNs
 //! - `cs01`: Credit spread sensitivity
@@ -24,13 +25,16 @@ mod bucketed_dv01;
 mod convexity;
 mod dm;
 mod duration;
+mod g_spread;
 mod japanese_simple_yield;
 mod moosmuller_ytm;
 mod oas;
 mod prices;
 mod quote_engine;
+mod quote_set;
 mod spreads;
 mod theta;
 mod wal;
+mod workout_ladder;
 mod ytm;
 mod ytw;

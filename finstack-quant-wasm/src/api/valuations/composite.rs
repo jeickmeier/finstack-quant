@@ -9,7 +9,7 @@
 use crate::utils::input::{from_js_json, js_f64, js_string, js_uint, json_text, opt_json_text};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_valuations::instruments::composite::{
-    history, history_from_spec, CompositeInstrument, CompositeMarketObservation, CompositeSpec,
+    CompositeInstrument, CompositeMarketObservation, CompositeSpec, history, history_from_spec,
 };
 use finstack_quant_valuations::metrics::MetricId;
 use wasm_bindgen::prelude::*;

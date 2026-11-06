@@ -72,7 +72,10 @@ fn cmbs(pool: AssetPool, maturity: Date) -> StructuredCredit {
         finstack_quant_valuations_structured_credit::structured_credit::DealType::Cmbs,
         finstack_quant_valuations_structured_credit::structured_credit::StandardDealParams {
             id: "CMBS-TERM".into(),
-            pool,
+            pool: AssetPool {
+                deal_type: DealType::Cmbs,
+                ..pool
+            },
             tranches,
             closing_date: close(),
             maturity,

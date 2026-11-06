@@ -1,0 +1,678 @@
+{
+  "request": {
+    "metrics": ["dv01", "bucketed_dv01"]
+  },
+  "spec": {
+    "id": "HOST-PARITY",
+    "name": null,
+    "base_currency": "USD",
+    "as_of": "2025-01-15",
+    "entities": {
+      "FUND": {
+        "id": "FUND",
+        "name": null
+      }
+    },
+    "positions": [
+      {
+        "position_id": "POS-0",
+        "entity_id": "FUND",
+        "instrument_id": "DEP-0",
+        "instrument_spec": {
+          "type": "deposit",
+          "spec": {
+            "id": "DEP-0",
+            "notional": {
+              "amount": "1000000",
+              "currency": "USD"
+            },
+            "start_date": "2025-01-15",
+            "maturity": "2025-07-15",
+            "day_count": "act_360",
+            "fixed_rate": "0.04",
+            "discount_curve_id": "USD-OIS",
+            "attributes": {},
+            "business_day_convention": "modified_following",
+            "calendar_id": null
+          }
+        },
+        "quantity": 1,
+        "unit": "units"
+      },
+      {
+        "position_id": "POS-1",
+        "entity_id": "FUND",
+        "instrument_id": "DEP-1",
+        "instrument_spec": {
+          "type": "deposit",
+          "spec": {
+            "id": "DEP-1",
+            "notional": {
+              "amount": "2000000",
+              "currency": "USD"
+            },
+            "start_date": "2025-01-15",
+            "maturity": "2025-07-15",
+            "day_count": "act_360",
+            "fixed_rate": "0.04",
+            "discount_curve_id": "USD-OIS",
+            "attributes": {},
+            "business_day_convention": "modified_following",
+            "calendar_id": null
+          }
+        },
+        "quantity": 1,
+        "unit": "units"
+      }
+    ]
+  },
+  "report": {
+    "positionIds": ["POS-0", "POS-1"],
+    "entityIds": ["FUND"],
+    "valuation": {
+      "as_of": "2025-01-15",
+      "position_values": {
+        "POS-0": {
+          "position_id": "POS-0",
+          "entity_id": "FUND",
+          "value_native": {
+            "amount": "1000075.940270303",
+            "currency": "USD"
+          },
+          "value_base": {
+            "amount": "1000075.940270303",
+            "currency": "USD"
+          },
+          "metric_scale": 1,
+          "risk_metrics_complete": true,
+          "valuation_result": {
+            "schema_version": 1,
+            "instrument_id": "DEP-0",
+            "as_of": "2025-01-15",
+            "value": {
+              "amount": "1000075.9402703035310711316556",
+              "currency": "USD"
+            },
+            "measures": {
+              "dv01": -49.59280692145694,
+              "bucketed_dv01": -49.592806920350995,
+              "bucketed_dv01::USD-OIS::10y": 0,
+              "bucketed_dv01::USD-OIS::15y": 0,
+              "bucketed_dv01::USD-OIS::1y": 0,
+              "bucketed_dv01::USD-OIS::20y": 0,
+              "bucketed_dv01::USD-OIS::2y": 0,
+              "bucketed_dv01::USD-OIS::30y": 0,
+              "bucketed_dv01::USD-OIS::3m": -0.815224222955294,
+              "bucketed_dv01::USD-OIS::3y": 0,
+              "bucketed_dv01::USD-OIS::5y": 0,
+              "bucketed_dv01::USD-OIS::6m": -48.7775826973957,
+              "bucketed_dv01::USD-OIS::7y": 0
+            },
+            "meta": {
+              "numeric_mode": "f64",
+              "rounding": {
+                "mode": "bankers",
+                "ingest_scale_by_currency": {},
+                "output_scale_by_currency": {},
+                "tolerances": {
+                  "generic_epsilon": 1e-10
+                },
+                "version": 1
+              },
+              "fx_policy_applied": null,
+              "version": "0.11.0"
+            },
+            "covenants": null,
+            "provenance": {
+              "model": "discounting",
+              "requested_as_of": "2025-01-15",
+              "market_dependencies": {
+                "curves": {
+                  "discount_curves": ["USD-OIS"],
+                  "forward_curves": [],
+                  "credit_curves": [],
+                  "inflation_curves": []
+                },
+                "market_scalar_ids": [],
+                "volatility_dependencies": [],
+                "fx_pairs": [],
+                "series_ids": []
+              },
+              "sensitivity_bumps": {
+                "rate_bump_bp": 1,
+                "credit_spread_bump_bp": 1,
+                "spot_bump_decimal": 0.01,
+                "vol_bump_decimal": 0.01
+              }
+            }
+          }
+        },
+        "POS-1": {
+          "position_id": "POS-1",
+          "entity_id": "FUND",
+          "value_native": {
+            "amount": "2000151.880540607",
+            "currency": "USD"
+          },
+          "value_base": {
+            "amount": "2000151.880540607",
+            "currency": "USD"
+          },
+          "metric_scale": 1,
+          "risk_metrics_complete": true,
+          "valuation_result": {
+            "schema_version": 1,
+            "instrument_id": "DEP-1",
+            "as_of": "2025-01-15",
+            "value": {
+              "amount": "2000151.8805406070621422633111",
+              "currency": "USD"
+            },
+            "measures": {
+              "dv01": -99.18561384291388,
+              "bucketed_dv01": -99.18561384070199,
+              "bucketed_dv01::USD-OIS::10y": 0,
+              "bucketed_dv01::USD-OIS::15y": 0,
+              "bucketed_dv01::USD-OIS::1y": 0,
+              "bucketed_dv01::USD-OIS::20y": 0,
+              "bucketed_dv01::USD-OIS::2y": 0,
+              "bucketed_dv01::USD-OIS::30y": 0,
+              "bucketed_dv01::USD-OIS::3m": -1.630448445910588,
+              "bucketed_dv01::USD-OIS::3y": 0,
+              "bucketed_dv01::USD-OIS::5y": 0,
+              "bucketed_dv01::USD-OIS::6m": -97.5551653947914,
+              "bucketed_dv01::USD-OIS::7y": 0
+            },
+            "meta": {
+              "numeric_mode": "f64",
+              "rounding": {
+                "mode": "bankers",
+                "ingest_scale_by_currency": {},
+                "output_scale_by_currency": {},
+                "tolerances": {
+                  "generic_epsilon": 1e-10
+                },
+                "version": 1
+              },
+              "fx_policy_applied": null,
+              "version": "0.11.0"
+            },
+            "covenants": null,
+            "provenance": {
+              "model": "discounting",
+              "requested_as_of": "2025-01-15",
+              "market_dependencies": {
+                "curves": {
+                  "discount_curves": ["USD-OIS"],
+                  "forward_curves": [],
+                  "credit_curves": [],
+                  "inflation_curves": []
+                },
+                "market_scalar_ids": [],
+                "volatility_dependencies": [],
+                "fx_pairs": [],
+                "series_ids": []
+              },
+              "sensitivity_bumps": {
+                "rate_bump_bp": 1,
+                "credit_spread_bump_bp": 1,
+                "spot_bump_decimal": 0.01,
+                "vol_bump_decimal": 0.01
+              }
+            }
+          }
+        }
+      },
+      "total_base_currency": {
+        "amount": "3000227.82081091",
+        "currency": "USD"
+      },
+      "by_entity": {
+        "FUND": {
+          "amount": "3000227.82081091",
+          "currency": "USD"
+        }
+      },
+      "fx_collapse_policy": "cashflow_date"
+    },
+    "metrics": {
+      "aggregated": {
+        "dv01": {
+          "metric_id": "dv01",
+          "total": -148.77842076437082,
+          "by_entity": {
+            "FUND": -148.77842076437082
+          }
+        },
+        "bucketed_dv01": {
+          "metric_id": "bucketed_dv01",
+          "total": -148.77842076105298,
+          "by_entity": {
+            "FUND": -148.77842076105298
+          }
+        },
+        "bucketed_dv01::USD-OIS::10y": {
+          "metric_id": "bucketed_dv01::USD-OIS::10y",
+          "total": 0,
+          "by_entity": {
+            "FUND": 0
+          }
+        },
+        "bucketed_dv01::USD-OIS::15y": {
+          "metric_id": "bucketed_dv01::USD-OIS::15y",
+          "total": 0,
+          "by_entity": {
+            "FUND": 0
+          }
+        },
+        "bucketed_dv01::USD-OIS::1y": {
+          "metric_id": "bucketed_dv01::USD-OIS::1y",
+          "total": 0,
+          "by_entity": {
+            "FUND": 0
+          }
+        },
+        "bucketed_dv01::USD-OIS::20y": {
+          "metric_id": "bucketed_dv01::USD-OIS::20y",
+          "total": 0,
+          "by_entity": {
+            "FUND": 0
+          }
+        },
+        "bucketed_dv01::USD-OIS::2y": {
+          "metric_id": "bucketed_dv01::USD-OIS::2y",
+          "total": 0,
+          "by_entity": {
+            "FUND": 0
+          }
+        },
+        "bucketed_dv01::USD-OIS::30y": {
+          "metric_id": "bucketed_dv01::USD-OIS::30y",
+          "total": 0,
+          "by_entity": {
+            "FUND": 0
+          }
+        },
+        "bucketed_dv01::USD-OIS::3m": {
+          "metric_id": "bucketed_dv01::USD-OIS::3m",
+          "total": -2.445672668865882,
+          "by_entity": {
+            "FUND": -2.445672668865882
+          }
+        },
+        "bucketed_dv01::USD-OIS::3y": {
+          "metric_id": "bucketed_dv01::USD-OIS::3y",
+          "total": 0,
+          "by_entity": {
+            "FUND": 0
+          }
+        },
+        "bucketed_dv01::USD-OIS::5y": {
+          "metric_id": "bucketed_dv01::USD-OIS::5y",
+          "total": 0,
+          "by_entity": {
+            "FUND": 0
+          }
+        },
+        "bucketed_dv01::USD-OIS::6m": {
+          "metric_id": "bucketed_dv01::USD-OIS::6m",
+          "total": -146.3327480921871,
+          "by_entity": {
+            "FUND": -146.3327480921871
+          }
+        },
+        "bucketed_dv01::USD-OIS::7y": {
+          "metric_id": "bucketed_dv01::USD-OIS::7y",
+          "total": 0,
+          "by_entity": {
+            "FUND": 0
+          }
+        }
+      },
+      "by_position": {
+        "POS-0": {
+          "currency": "USD",
+          "metrics": {
+            "dv01": -49.59280692145694,
+            "bucketed_dv01": -49.592806920350995,
+            "bucketed_dv01::USD-OIS::10y": 0,
+            "bucketed_dv01::USD-OIS::15y": 0,
+            "bucketed_dv01::USD-OIS::1y": 0,
+            "bucketed_dv01::USD-OIS::20y": 0,
+            "bucketed_dv01::USD-OIS::2y": 0,
+            "bucketed_dv01::USD-OIS::30y": 0,
+            "bucketed_dv01::USD-OIS::3m": -0.815224222955294,
+            "bucketed_dv01::USD-OIS::3y": 0,
+            "bucketed_dv01::USD-OIS::5y": 0,
+            "bucketed_dv01::USD-OIS::6m": -48.7775826973957,
+            "bucketed_dv01::USD-OIS::7y": 0
+          }
+        },
+        "POS-1": {
+          "currency": "USD",
+          "metrics": {
+            "dv01": -99.18561384291388,
+            "bucketed_dv01": -99.18561384070199,
+            "bucketed_dv01::USD-OIS::10y": 0,
+            "bucketed_dv01::USD-OIS::15y": 0,
+            "bucketed_dv01::USD-OIS::1y": 0,
+            "bucketed_dv01::USD-OIS::20y": 0,
+            "bucketed_dv01::USD-OIS::2y": 0,
+            "bucketed_dv01::USD-OIS::30y": 0,
+            "bucketed_dv01::USD-OIS::3m": -1.630448445910588,
+            "bucketed_dv01::USD-OIS::3y": 0,
+            "bucketed_dv01::USD-OIS::5y": 0,
+            "bucketed_dv01::USD-OIS::6m": -97.5551653947914,
+            "bucketed_dv01::USD-OIS::7y": 0
+          }
+        }
+      }
+    }
+  },
+  "series": {
+    "base": "bucketed_dv01",
+    "entries": [
+      {
+        "components": ["USD-OIS", "10y"],
+        "total": 0,
+        "by_entity": {
+          "FUND": 0
+        }
+      },
+      {
+        "components": ["USD-OIS", "15y"],
+        "total": 0,
+        "by_entity": {
+          "FUND": 0
+        }
+      },
+      {
+        "components": ["USD-OIS", "1y"],
+        "total": 0,
+        "by_entity": {
+          "FUND": 0
+        }
+      },
+      {
+        "components": ["USD-OIS", "20y"],
+        "total": 0,
+        "by_entity": {
+          "FUND": 0
+        }
+      },
+      {
+        "components": ["USD-OIS", "2y"],
+        "total": 0,
+        "by_entity": {
+          "FUND": 0
+        }
+      },
+      {
+        "components": ["USD-OIS", "30y"],
+        "total": 0,
+        "by_entity": {
+          "FUND": 0
+        }
+      },
+      {
+        "components": ["USD-OIS", "3m"],
+        "total": -2.445672668865882,
+        "by_entity": {
+          "FUND": -2.445672668865882
+        }
+      },
+      {
+        "components": ["USD-OIS", "3y"],
+        "total": 0,
+        "by_entity": {
+          "FUND": 0
+        }
+      },
+      {
+        "components": ["USD-OIS", "5y"],
+        "total": 0,
+        "by_entity": {
+          "FUND": 0
+        }
+      },
+      {
+        "components": ["USD-OIS", "6m"],
+        "total": -146.3327480921871,
+        "by_entity": {
+          "FUND": -146.3327480921871
+        }
+      },
+      {
+        "components": ["USD-OIS", "7y"],
+        "total": 0,
+        "by_entity": {
+          "FUND": 0
+        }
+      }
+    ]
+  },
+  "metadata": [
+    {
+      "key": "dv01",
+      "metric": "dv01",
+      "components": [],
+      "coordinates": [],
+      "unit": "currency",
+      "group": "Sensitivity",
+      "bucketed": false
+    },
+    {
+      "key": "bucketed_dv01",
+      "metric": "bucketed_dv01",
+      "components": [],
+      "coordinates": [],
+      "unit": "currency",
+      "group": "Sensitivity",
+      "bucketed": false
+    },
+    {
+      "key": "bucketed_dv01::USD-OIS::10y",
+      "metric": "bucketed_dv01",
+      "components": ["USD-OIS", "10y"],
+      "coordinates": [
+        {
+          "group": "USD-OIS",
+          "value": null
+        },
+        {
+          "group": "",
+          "value": 10
+        }
+      ],
+      "unit": "currency",
+      "group": "Sensitivity",
+      "bucketed": true
+    },
+    {
+      "key": "bucketed_dv01::USD-OIS::15y",
+      "metric": "bucketed_dv01",
+      "components": ["USD-OIS", "15y"],
+      "coordinates": [
+        {
+          "group": "USD-OIS",
+          "value": null
+        },
+        {
+          "group": "",
+          "value": 15
+        }
+      ],
+      "unit": "currency",
+      "group": "Sensitivity",
+      "bucketed": true
+    },
+    {
+      "key": "bucketed_dv01::USD-OIS::1y",
+      "metric": "bucketed_dv01",
+      "components": ["USD-OIS", "1y"],
+      "coordinates": [
+        {
+          "group": "USD-OIS",
+          "value": null
+        },
+        {
+          "group": "",
+          "value": 1
+        }
+      ],
+      "unit": "currency",
+      "group": "Sensitivity",
+      "bucketed": true
+    },
+    {
+      "key": "bucketed_dv01::USD-OIS::20y",
+      "metric": "bucketed_dv01",
+      "components": ["USD-OIS", "20y"],
+      "coordinates": [
+        {
+          "group": "USD-OIS",
+          "value": null
+        },
+        {
+          "group": "",
+          "value": 20
+        }
+      ],
+      "unit": "currency",
+      "group": "Sensitivity",
+      "bucketed": true
+    },
+    {
+      "key": "bucketed_dv01::USD-OIS::2y",
+      "metric": "bucketed_dv01",
+      "components": ["USD-OIS", "2y"],
+      "coordinates": [
+        {
+          "group": "USD-OIS",
+          "value": null
+        },
+        {
+          "group": "",
+          "value": 2
+        }
+      ],
+      "unit": "currency",
+      "group": "Sensitivity",
+      "bucketed": true
+    },
+    {
+      "key": "bucketed_dv01::USD-OIS::30y",
+      "metric": "bucketed_dv01",
+      "components": ["USD-OIS", "30y"],
+      "coordinates": [
+        {
+          "group": "USD-OIS",
+          "value": null
+        },
+        {
+          "group": "",
+          "value": 30
+        }
+      ],
+      "unit": "currency",
+      "group": "Sensitivity",
+      "bucketed": true
+    },
+    {
+      "key": "bucketed_dv01::USD-OIS::3m",
+      "metric": "bucketed_dv01",
+      "components": ["USD-OIS", "3m"],
+      "coordinates": [
+        {
+          "group": "USD-OIS",
+          "value": null
+        },
+        {
+          "group": "",
+          "value": 0.25
+        }
+      ],
+      "unit": "currency",
+      "group": "Sensitivity",
+      "bucketed": true
+    },
+    {
+      "key": "bucketed_dv01::USD-OIS::3y",
+      "metric": "bucketed_dv01",
+      "components": ["USD-OIS", "3y"],
+      "coordinates": [
+        {
+          "group": "USD-OIS",
+          "value": null
+        },
+        {
+          "group": "",
+          "value": 3
+        }
+      ],
+      "unit": "currency",
+      "group": "Sensitivity",
+      "bucketed": true
+    },
+    {
+      "key": "bucketed_dv01::USD-OIS::5y",
+      "metric": "bucketed_dv01",
+      "components": ["USD-OIS", "5y"],
+      "coordinates": [
+        {
+          "group": "USD-OIS",
+          "value": null
+        },
+        {
+          "group": "",
+          "value": 5
+        }
+      ],
+      "unit": "currency",
+      "group": "Sensitivity",
+      "bucketed": true
+    },
+    {
+      "key": "bucketed_dv01::USD-OIS::6m",
+      "metric": "bucketed_dv01",
+      "components": ["USD-OIS", "6m"],
+      "coordinates": [
+        {
+          "group": "USD-OIS",
+          "value": null
+        },
+        {
+          "group": "",
+          "value": 0.5
+        }
+      ],
+      "unit": "currency",
+      "group": "Sensitivity",
+      "bucketed": true
+    },
+    {
+      "key": "bucketed_dv01::USD-OIS::7y",
+      "metric": "bucketed_dv01",
+      "components": ["USD-OIS", "7y"],
+      "coordinates": [
+        {
+          "group": "USD-OIS",
+          "value": null
+        },
+        {
+          "group": "",
+          "value": 7
+        }
+      ],
+      "unit": "currency",
+      "group": "Sensitivity",
+      "bucketed": true
+    }
+  ],
+  "expected": {
+    "valuation_position_value_base": 2000151.880540607,
+    "valuation_entity_value": 3000227.82081091,
+    "metrics_total_dv01": -148.77842076437082,
+    "metrics_position_dv01": -99.18561384291388
+  }
+}

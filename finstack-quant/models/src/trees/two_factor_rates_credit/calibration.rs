@@ -253,6 +253,13 @@ impl RatesCreditTree {
 
         candidate.validate_correlation_feasibility(dt)?;
 
+        candidate.rate_terms = node_terms_table(&candidate.calibrated_rates, |step, rate| {
+            candidate.rate_node_terms(step, rate, dt)
+        });
+        candidate.hazard_terms = node_terms_table(&candidate.calibrated_hazards, |step, hazard| {
+            candidate.hazard_node_terms(step, hazard, dt)
+        });
+
         *self = candidate;
         Ok(())
     }

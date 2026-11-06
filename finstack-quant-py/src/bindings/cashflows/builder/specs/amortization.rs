@@ -8,8 +8,8 @@ use pyo3::prelude::*;
 
 use super::DateMoneyRows;
 use super::*;
-use crate::bindings::core::currency::extract_currency;
 use crate::bindings::core::currency::PyCurrency;
+use crate::bindings::core::currency::extract_currency;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::repr_support::enum_repr_from_serde as enum_repr;

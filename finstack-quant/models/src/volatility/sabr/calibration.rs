@@ -149,7 +149,10 @@ fn validate_quote_fit(
         .fold(0.0_f64, f64::max);
     if !outcome.max_relative_quote_error.is_finite() || outcome.max_relative_quote_error > tolerance
     {
-        return Err(Error::Validation(format!("SABR final maximum relative quote error {} exceeds tolerance {tolerance}; quote errors {:?}", outcome.max_relative_quote_error, outcome.quote_errors)));
+        return Err(Error::Validation(format!(
+            "SABR final maximum relative quote error {} exceeds tolerance {tolerance}; quote errors {:?}",
+            outcome.max_relative_quote_error, outcome.quote_errors
+        )));
     }
     Ok(outcome)
 }
@@ -1129,10 +1132,12 @@ mod acceptance_tests {
 
         // Interpolation supplies an approximate ATM target, so pinning it perturbs
         // the original exact smile. Require explicit acceptance of that quote error.
-        assert!(SabrCalibrator::new()
-            .with_atm_pinning(true)
-            .calibrate(forward, &strikes, &market_vols, expiry, 0.5)
-            .is_err());
+        assert!(
+            SabrCalibrator::new()
+                .with_atm_pinning(true)
+                .calibrate(forward, &strikes, &market_vols, expiry, 0.5)
+                .is_err()
+        );
         let calibrated_atm = SabrCalibrator::new()
             .find_atm_vol(forward, &strikes, &market_vols)
             .expect("interpolated ATM quote");

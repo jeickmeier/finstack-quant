@@ -9,4 +9,4 @@ pub(crate) mod amortization;
 pub(crate) mod simulation;
 pub(crate) mod validation;
 
-pub use validation::{validate_tiers, ValidationError};
+pub use validation::{ValidationError, validate_tiers};

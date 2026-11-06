@@ -104,9 +104,11 @@ fn hazard_cap_round_trips_through_json_and_rebuilds() {
         .knots([(1.0, 0.02)])
         .build()
         .expect("default cap");
-    assert!(!serde_json::to_string(&default_cap)
-        .expect("serialize")
-        .contains("max_hazard_rate"));
+    assert!(
+        !serde_json::to_string(&default_cap)
+            .expect("serialize")
+            .contains("max_hazard_rate")
+    );
 }
 
 #[test]
@@ -474,12 +476,16 @@ fn tenor_hazard_down_bumps_reject_negative_rates() {
         .knots([(1.0, 0.01), (3.0, 0.015), (5.0, 0.02)])
         .build()
         .unwrap();
-    assert!(curve
-        .with_tenor_hazard_rate_bumps_bp(&[(3.0, -200.0)])
-        .is_err());
-    assert!(curve
-        .with_tenor_hazard_rate_bumps_bp(&[(3.0, -100.0), (3.0, -100.0)])
-        .is_err());
+    assert!(
+        curve
+            .with_tenor_hazard_rate_bumps_bp(&[(3.0, -200.0)])
+            .is_err()
+    );
+    assert!(
+        curve
+            .with_tenor_hazard_rate_bumps_bp(&[(3.0, -100.0), (3.0, -100.0)])
+            .is_err()
+    );
     assert_eq!(curve.hazard_rate(3.0), 0.015);
     let zero = curve
         .with_tenor_hazard_rate_bumps_bp(&[(1.0, -100.0)])

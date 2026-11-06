@@ -10,11 +10,11 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_models::types::{ExerciseStyle, OptionType};
-use finstack_quant_valuations::instruments::commodity::commodity_spot_option::CommoditySpotOption;
-use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_valuations::instruments::CommodityUnderlyingParams;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::SettlementType;
+use finstack_quant_valuations::instruments::commodity::commodity_spot_option::CommoditySpotOption;
+use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_valuations::metrics::{MetricContext, MetricId};
 use finstack_quant_valuations::pricer::STANDARD;
 use finstack_quant_valuations_test_support::commodity_curves::flat_price_curve;
@@ -431,8 +431,8 @@ fn test_commodity_spot_option_dv01_and_bucketed_dv01() -> finstack_quant_core::R
 }
 
 #[test]
-fn commodity_spot_option_zero_vol_delta_matches_resolved_forward_payoff(
-) -> finstack_quant_core::Result<()> {
+fn commodity_spot_option_zero_vol_delta_matches_resolved_forward_payoff()
+-> finstack_quant_core::Result<()> {
     use finstack_quant_valuations::instruments::{GreekBumps, OptionGreeksProvider};
     for kind in [OptionType::Call, OptionType::Put] {
         for f in [80.0, 100.0, 120.0] {
@@ -522,8 +522,8 @@ fn commodity_spot_option_zero_vol_delta_matches_resolved_forward_payoff(
 
 #[test]
 fn resolved_delivery_greeks_are_independent_of_selected_optional_model() {
-    use finstack_quant_valuations::instruments::commodity::commodity_spot_option::CommoditySpotOptionExercise;
     use finstack_quant_valuations::instruments::PricingOptions;
+    use finstack_quant_valuations::instruments::commodity::commodity_spot_option::CommoditySpotOptionExercise;
     use finstack_quant_valuations::pricer::ModelKey;
     let (mut option, market, as_of) = atm_commodity_spot_option(OptionType::Call);
     let delivery = as_of + time::Duration::days(10);

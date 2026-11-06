@@ -3,14 +3,14 @@
 //! Provides a robust yield-to-maturity solver using Brent's method with
 //! intelligent initial guesses.
 
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Tenor;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 
 use super::quote_conversions::{
-    bond_flow_times, flow_times, price_from_ytm_timed, YieldCompounding,
+    YieldCompounding, bond_flow_times, flow_times, price_from_ytm_timed,
 };
 
 /// Specification for yield-to-maturity calculations
@@ -360,19 +360,21 @@ mod tests {
             }
         }
         // Raw flows have no actual coupon boundaries to select denominators.
-        assert!(solve_ytm(
-            &[(date!(2025 - 06 - 05), notional)],
-            as_of,
-            notional,
-            YtmPricingSpec {
-                day_count: DayCount::Act365L,
-                frequency,
+        assert!(
+            solve_ytm(
+                &[(date!(2025 - 06 - 05), notional)],
+                as_of,
                 notional,
-                coupon_rate: 0.0,
-                compounding: YieldCompounding::Street,
-            },
-        )
-        .is_err());
+                YtmPricingSpec {
+                    day_count: DayCount::Act365L,
+                    frequency,
+                    notional,
+                    coupon_rate: 0.0,
+                    compounding: YieldCompounding::Street,
+                },
+            )
+            .is_err()
+        );
     }
 
     /// ACT/ACT ICMA needs a reference coupon period for any span that is not a

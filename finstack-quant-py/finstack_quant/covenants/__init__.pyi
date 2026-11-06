@@ -3,8 +3,8 @@ Typed covenant definitions, engine evaluation, templates and forecasting.
 
 Bindings for ``finstack-quant-covenants``. Define covenants with
 :class:`CovenantType` / :class:`Covenant` / :class:`CovenantSpec` (or take a
-standard package from :func:`lbo_standard`, :func:`cov_lite`,
-:func:`real_estate`, :func:`project_finance`), collect them in a
+standard package with :func:`covenant_template` from a
+:class:`CovenantTemplate`), collect them in a
 :class:`CovenantEngine`, and evaluate against a ``dict`` of metric values
 into typed :class:`CovenantReport` results. Step-down schedules
 (:class:`ThresholdSchedule`), waivers (:class:`CovenantWaiver`) and springing
@@ -23,8 +23,7 @@ a missing required metric raises ``KeyError``. Net-debt tests also require
 positive earnings, selected by ``denominator_metric_id`` (default ``ebitda``).
 
 The JSON surface shared with WASM is kept: the ``validate_covenant_*_json``
-validators, ``evaluate_engine`` on an engine document, and the ``*_json``
-template twins that return a JSON array of specs.
+validators and ``evaluate_engine`` on an engine document.
 
 Examples
 --------
@@ -51,10 +50,8 @@ from finstack_quant.covenants._spec import (
 from finstack_quant.covenants._engine import (
     CovenantBreach as CovenantBreach,
     CovenantEngine as CovenantEngine,
-    cov_lite as cov_lite,
-    lbo_standard as lbo_standard,
-    project_finance as project_finance,
-    real_estate as real_estate,
+    CovenantTemplate as CovenantTemplate,
+    covenant_template as covenant_template,
     reports_to_dataframe as reports_to_dataframe,
 )
 from finstack_quant.covenants._report import CovenantReport as CovenantReport
@@ -76,23 +73,17 @@ __all__ = [
     "CovenantForecastConfig",
     "CovenantReport",
     "CovenantSpec",
+    "CovenantTemplate",
     "CovenantType",
     "CovenantWaiver",
     "FutureBreach",
     "SpringingCondition",
     "ThresholdSchedule",
     "breaches_to_dataframe",
-    "cov_lite",
-    "cov_lite_json",
+    "covenant_template",
     "evaluate_engine",
     "forecast_breaches",
     "forecast_covenant",
-    "lbo_standard",
-    "lbo_standard_json",
-    "project_finance",
-    "project_finance_json",
-    "real_estate",
-    "real_estate_json",
     "reports_to_dataframe",
     "validate_covenant_engine_json",
     "validate_covenant_report_json",
@@ -108,8 +99,7 @@ def validate_covenant_spec_json(spec_json: str) -> str:
     Parameters
     ----------
     spec_json : str
-        JSON-encoded ``CovenantSpec`` (for example ``CovenantSpec.to_json()``
-        or one element of a ``*_json`` template).
+        JSON-encoded ``CovenantSpec`` (for example ``CovenantSpec.to_json()``).
 
     Returns
     -------
@@ -126,9 +116,9 @@ def validate_covenant_spec_json(spec_json: str) -> str:
     Examples
     --------
     >>> import json
-    >>> from finstack_quant.covenants import lbo_standard_json, validate_covenant_spec_json
-    >>> spec = json.loads(lbo_standard_json(5.0, 1.5, 1.2, 10_000_000.0))[0]
-    >>> canonical = json.loads(validate_covenant_spec_json(json.dumps(spec)))
+    >>> from finstack_quant.covenants import CovenantTemplate, covenant_template, validate_covenant_spec_json
+    >>> spec = covenant_template(CovenantTemplate.lbo_standard(5.0, 1.5, 1.2, 10_000_000.0))[0]
+    >>> canonical = json.loads(validate_covenant_spec_json(spec.to_json()))
     >>> list(canonical)
     ['covenant', 'metric_id']
     >>> list(canonical["covenant"])[:3]
@@ -198,9 +188,10 @@ def validate_covenant_engine_json(engine_json: str) -> str:
     Examples
     --------
     >>> import json
-    >>> from finstack_quant.covenants import cov_lite_json, validate_covenant_engine_json
-    >>> engine = {"specs": json.loads(cov_lite_json(7.0, 4.5))}
-    >>> list(json.loads(validate_covenant_engine_json(json.dumps(engine))))
+    >>> from finstack_quant.covenants import CovenantEngine, CovenantTemplate, covenant_template
+    >>> from finstack_quant.covenants import validate_covenant_engine_json
+    >>> engine = CovenantEngine.from_specs(covenant_template(CovenantTemplate.cov_lite(7.0, 4.5)))
+    >>> list(json.loads(validate_covenant_engine_json(engine.to_json())))
     ['breach_history', 'specs', 'waivers', 'windows']
     """
 
@@ -243,149 +234,11 @@ def evaluate_engine(engine_json: str, metrics: dict[str, float] | str, as_of: Da
 
     Examples
     --------
-    >>> from finstack_quant.covenants import evaluate_engine, lbo_standard_json
-    >>> engine = '{"specs": ' + lbo_standard_json(5.0, 1.5, 1.2, 10_000_000.0) + "}"
+    >>> from finstack_quant.covenants import CovenantEngine, CovenantTemplate, covenant_template, evaluate_engine
+    >>> specs = covenant_template(CovenantTemplate.lbo_standard(5.0, 1.5, 1.2, 10_000_000.0))
+    >>> engine = CovenantEngine.from_specs(specs).to_json()
     >>> metrics = {"debt_to_ebitda": 4.0, "interest_coverage": 3.0, "fixed_charge_coverage": 1.5, "capex": 5_000_000.0}
     >>> reports = evaluate_engine(engine, metrics, "2026-03-31")
     >>> reports["max_debt_ebitda"].passed, list(reports)[0]
     (True, 'max_debt_ebitda')
-    """
-
-def lbo_standard_json(
-    initial_leverage: float,
-    interest_coverage: float,
-    fixed_charge_coverage: float,
-    max_capex: float,
-) -> str:
-    """
-    Standard leveraged-buyout covenant package as JSON (twin of :func:`lbo_standard`).
-
-    Parameters
-    ----------
-    initial_leverage : float
-        Maximum gross Debt/EBITDA in turns (``6.0`` for 6.0x).
-    interest_coverage : float
-        Minimum interest coverage ratio in turns.
-    fixed_charge_coverage : float
-        Minimum fixed-charge coverage ratio in turns.
-    max_capex : float
-        Maximum annual capex as a reporting-currency amount.
-
-    Returns
-    -------
-    str
-        JSON array of four ``CovenantSpec`` objects; wrap as
-        ``{"specs": [...]}`` for an engine document.
-
-    Raises
-    ------
-    ValueError
-        If any input is NaN, infinite or negative.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.covenants import lbo_standard_json
-    >>> len(json.loads(lbo_standard_json(5.0, 1.5, 1.2, 10_000_000.0)))
-    4
-    """
-
-def cov_lite_json(max_leverage: float, max_senior_leverage: float) -> str:
-    """
-    Covenant-lite package as JSON (twin of :func:`cov_lite`).
-
-    Parameters
-    ----------
-    max_leverage : float
-        Maximum total Debt/EBITDA in turns.
-    max_senior_leverage : float
-        Maximum senior Debt/EBITDA in turns.
-
-    Returns
-    -------
-    str
-        JSON array of three incurrence ``CovenantSpec`` objects.
-
-    Raises
-    ------
-    ValueError
-        If any input is NaN, infinite or negative.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.covenants import cov_lite_json
-    >>> len(json.loads(cov_lite_json(7.0, 4.5)))
-    3
-    """
-
-def real_estate_json(min_dscr: float, min_debt_yield: float, max_ltv: float) -> str:
-    """
-    Real-estate covenant package as JSON (twin of :func:`real_estate`).
-
-    Parameters
-    ----------
-    min_dscr : float
-        Minimum debt-service coverage ratio in turns.
-    min_debt_yield : float
-        Minimum debt yield as a decimal fraction (``0.08`` for 8%); encoded
-        as a custom minimum covenant on metric ``debt_yield``.
-    max_ltv : float
-        Maximum loan-to-value as a decimal fraction (``0.75`` for 75%);
-        encoded as a custom maximum covenant on metric ``ltv``.
-
-    Returns
-    -------
-    str
-        JSON array of three ``CovenantSpec`` objects.
-
-    Raises
-    ------
-    ValueError
-        If any input is NaN, infinite or negative.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.covenants import real_estate_json
-    >>> len(json.loads(real_estate_json(1.25, 0.08, 0.75)))
-    3
-    """
-
-def project_finance_json(
-    min_dscr: float,
-    distribution_lockup_dscr: float,
-    min_liquidity: float,
-    max_net_leverage: float,
-) -> str:
-    """
-    Project-finance covenant package as JSON (twin of :func:`project_finance`).
-
-    Parameters
-    ----------
-    min_dscr : float
-        Minimum DSCR in turns whose breach leads to default.
-    distribution_lockup_dscr : float
-        Higher DSCR in turns below which distributions are blocked.
-    min_liquidity : float
-        Minimum debt-service reserve as a reporting-currency amount.
-    max_net_leverage : float
-        Maximum net Debt/EBITDA in turns.
-
-    Returns
-    -------
-    str
-        JSON array of four ``CovenantSpec`` objects.
-
-    Raises
-    ------
-    ValueError
-        If any input is NaN, infinite or negative.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.covenants import project_finance_json
-    >>> len(json.loads(project_finance_json(1.30, 1.10, 5_000_000.0, 5.0)))
-    4
     """

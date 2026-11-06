@@ -10,28 +10,20 @@
 
 use crate::api::core::periods::JsFiscalConfig;
 use crate::utils::input::{
-    js_f64_matrix, js_f64_seq, js_opt_bool, js_opt_f64, js_opt_string, js_opt_uint, js_string,
-    js_string_seq, js_uint, json_text,
+    from_js_json, js_f64_matrix, js_f64_seq, js_opt_bool, js_opt_f64, js_opt_string, js_opt_uint,
+    js_string, js_uint, json_text,
 };
 use crate::utils::{
-    date_to_iso, parse_iso_date, parse_iso_dates, to_js_err, to_js_rows_numeric, to_js_value,
-    to_js_value_numeric,
+    date_to_iso, parse_iso_date, to_js_err, to_js_rows_numeric, to_js_value, to_js_value_numeric,
 };
 use finstack_quant_analytics::{
-    CagrDayCount, DatedSeries, Performance, ReturnKind, RollingGreeks, DEFAULT_ANNUALIZE,
-    DEFAULT_CONFIDENCE, DEFAULT_DRAWDOWN_COUNT, DEFAULT_FREQUENCY, DEFAULT_MAR,
-    DEFAULT_PERIODIC_FREQUENCY, DEFAULT_RISK_FREE_RATE, DEFAULT_ROLLING_WINDOW,
+    CagrDayCount, DEFAULT_ANNUALIZE, DEFAULT_CONFIDENCE, DEFAULT_DRAWDOWN_COUNT, DEFAULT_MAR,
+    DEFAULT_PERIODIC_FREQUENCY, DEFAULT_RISK_FREE_RATE, DEFAULT_ROLLING_WINDOW, DatedSeries,
+    Performance, PerformancePanel, ReturnKind, RollingGreeks,
 };
-use finstack_quant_core::dates::{calendar_by_id_strict, HolidayCalendar, PeriodKind};
+use finstack_quant_core::dates::{HolidayCalendar, PeriodKind, calendar_by_id_strict};
 use js_sys::{Array, Float64Array, Reflect};
 use wasm_bindgen::prelude::*;
-
-struct PanelInputs {
-    dates: Vec<finstack_quant_core::dates::Date>,
-    values: Vec<Vec<f64>>,
-    ticker_names: Vec<String>,
-    frequency: PeriodKind,
-}
 
 /// Parse a canonical frequency label, or use the Rust default when omitted.
 fn parse_frequency(frequency: Option<&str>, default: PeriodKind) -> Result<PeriodKind, JsValue> {
@@ -75,25 +67,6 @@ fn resolve_optional_calendar(
         .map(calendar_by_id_strict)
         .transpose()
         .map_err(to_js_err)
-}
-
-fn parse_dates(dates: JsValue) -> Result<Vec<finstack_quant_core::dates::Date>, JsValue> {
-    let strs = js_string_seq(&dates, "dates")?;
-    parse_iso_dates(&strs)
-}
-
-fn parse_panel_inputs(
-    dates: JsValue,
-    values: JsValue,
-    ticker_names: JsValue,
-    frequency: Option<String>,
-) -> Result<PanelInputs, JsValue> {
-    Ok(PanelInputs {
-        dates: parse_dates(dates)?,
-        values: js_f64_matrix(&values, "values")?,
-        ticker_names: js_string_seq(&ticker_names, "tickerNames")?,
-        frequency: parse_frequency(frequency.as_deref(), DEFAULT_FREQUENCY)?,
-    })
 }
 
 /// Serialize a `Vec<f64>` as a JavaScript `Float64Array`.
@@ -173,72 +146,28 @@ pub struct JsPerformance {
 
 #[wasm_bindgen(js_class = Performance)]
 impl JsPerformance {
-    /// Construct from a ticker-major, column-oriented price matrix. The outer
-    /// element selects a ticker, and each inner series is aligned to `dates`.
+    /// Construct from a dated price or return panel (the Rust
+    /// `PerformancePanel`).
+    ///
+    /// # Arguments
+    ///
+    /// * `panel` - `PerformancePanel` object or JSON text: strictly ascending
+    ///   ISO-8601 `dates`, ticker-major `series` (`series[i][t]` is ticker `i`
+    ///   at `dates[t]`; a leading or trailing gap is `null`), `kind`
+    ///   (`"prices"` for strictly positive prices or `"returns"` for simple
+    ///   decimal returns), unique `ticker_names`, an optional
+    ///   `benchmark_ticker` (the first ticker when omitted) and an optional
+    ///   `frequency` token (daily when omitted).
+    ///
     /// # Errors
     ///
-    /// Rejects malformed dates or matrices, invalid prices, unsupported
-    /// frequencies, a non-string benchmark ticker (kind `invalid_type`), and an
-    /// unknown benchmark ticker (kind `not_found`).
-    /// @param dates - ISO-8601 observation dates in ascending order, with one entry per value in each inner price series.
-    /// @param prices - Ticker-major, column-oriented matrix where `prices[tickerIdx][dateIdx]` is the price for `tickerIdx` at `dates[dateIdx]`.
-    /// @param ticker_names - Ticker labels aligned with the outer elements of `prices`.
-    /// @param benchmark_ticker - Optional ticker label to use as the benchmark return series.
-    /// @param frequency - Optional observation frequency token; defaults to daily.
+    /// Rejects a malformed panel or unknown field (kind `validation`), a
+    /// non-finite number (kind `invalid_type`), invalid series or dates
+    /// (kind `validation`) and an unknown benchmark ticker (kind `not_found`).
     #[wasm_bindgen(constructor)]
-    pub fn new(
-        dates: JsValue,
-        prices: JsValue,
-        ticker_names: JsValue,
-        benchmark_ticker: Option<JsValue>,
-        frequency: Option<JsValue>,
-    ) -> Result<JsPerformance, JsValue> {
-        let benchmark_ticker = js_opt_string(benchmark_ticker.as_ref(), "benchmarkTicker")?;
-        let frequency = js_opt_string(frequency.as_ref(), "frequency")?;
-        let panel = parse_panel_inputs(dates, prices, ticker_names, frequency)?;
-        let inner = Performance::new(
-            panel.dates,
-            panel.values,
-            panel.ticker_names,
-            benchmark_ticker.as_deref(),
-            panel.frequency,
-        )
-        .map_err(to_js_err)?;
-        Ok(JsPerformance { inner })
-    }
-
-    /// Construct from a ticker-major, column-oriented return matrix. The outer
-    /// element selects a ticker, and each inner series is aligned to `dates`.
-    /// # Errors
-    ///
-    /// Rejects malformed dates or matrices, unsupported frequencies, a non-string
-    /// benchmark ticker (kind `invalid_type`), and an unknown benchmark ticker
-    /// (kind `not_found`).
-    /// @param dates - ISO-8601 observation dates in ascending order, with one entry per value in each inner return series.
-    /// @param returns - Ticker-major, column-oriented simple decimal return matrix where `returns[tickerIdx][dateIdx]` is the return for `tickerIdx` at `dates[dateIdx]`.
-    /// @param ticker_names - Ticker labels aligned with the outer elements of `returns`.
-    /// @param benchmark_ticker - Optional ticker label to use as the benchmark return series.
-    /// @param frequency - Optional observation frequency token; defaults to daily.
-    /// @returns A `Performance` handle over the supplied return panel.
-    #[wasm_bindgen(js_name = fromReturns)]
-    pub fn from_returns(
-        dates: JsValue,
-        returns: JsValue,
-        ticker_names: JsValue,
-        benchmark_ticker: Option<JsValue>,
-        frequency: Option<JsValue>,
-    ) -> Result<JsPerformance, JsValue> {
-        let benchmark_ticker = js_opt_string(benchmark_ticker.as_ref(), "benchmarkTicker")?;
-        let frequency = js_opt_string(frequency.as_ref(), "frequency")?;
-        let panel = parse_panel_inputs(dates, returns, ticker_names, frequency)?;
-        let inner = Performance::from_returns(
-            panel.dates,
-            panel.values,
-            panel.ticker_names,
-            benchmark_ticker.as_deref(),
-            panel.frequency,
-        )
-        .map_err(to_js_err)?;
+    pub fn new(panel: JsValue) -> Result<JsPerformance, JsValue> {
+        let panel: PerformancePanel = from_js_json(&panel, "panel")?;
+        let inner = Performance::new(&panel).map_err(to_js_err)?;
         Ok(JsPerformance { inner })
     }
 
@@ -938,7 +867,7 @@ impl JsPerformance {
     ///
     /// Rejects a degenerate pair or a matrix that cannot be repaired to a
     /// valid correlation matrix.
-    /// @returns `{ matrix, repaired }`: the square correlation matrix as nested Float64Array rows in `getTickerNames()` order, and `true` when Higham repair was applied.
+    /// @returns `{ matrix, repaired }`: the square correlation matrix as nested Float64Array rows in `getTickerNames()` order, with a diagonal of exactly 1 and every coefficient inside [-1, 1], and `true` when Higham repair was applied.
     #[wasm_bindgen(js_name = correlationMatrix)]
     pub fn correlation_matrix(&self) -> Result<JsValue, JsValue> {
         let (matrix, repaired) = self.inner.correlation_matrix().map_err(to_js_err)?;
@@ -1240,19 +1169,25 @@ impl JsPerformance {
     /// # Arguments
     ///
     /// * `ref_date` - ISO-8601 date on which MTD, QTD, YTD, and FYTD windows end.
+    ///   Omitted or `null` is the last active date; the result's `ref_date` states
+    ///   the date used.
     /// * `fiscal_config` - Optional `FiscalConfig` handle for FYTD. Omitted or
     ///   `null` is the calendar year (`FiscalConfig::default`).
     ///
     /// # Errors
     ///
-    /// Rejects an invalid ISO `ref_date` or a result that cannot be serialized
-    /// to JavaScript.
-    /// @returns Per-ticker `{ mtd, qtd, ytd, fytd }` numeric arrays of lookback returns as decimal fractions; `fytd` is never null.
+    /// Rejects an invalid ISO `ref_date`, an omitted one while no dates are active,
+    /// or a result that cannot be serialized to JavaScript.
+    /// @returns The window end `ref_date` and per-ticker `{ mtd, qtd, ytd, fytd }` numeric arrays of lookback returns as decimal fractions; `fytd` is never null.
     #[wasm_bindgen(js_name = lookbackReturns)]
-    pub fn lookback_returns(&self, ref_date: JsValue) -> Result<JsValue, JsValue> {
-        let ref_date: &str = &js_string(&ref_date, "refDate")?;
-        let d = parse_iso_date(ref_date)?;
-        to_js_value(&self.inner.lookback_returns(d, None))
+    pub fn lookback_returns(&self, ref_date: Option<JsValue>) -> Result<JsValue, JsValue> {
+        let ref_date = crate::utils::wire::js_opt_date(ref_date.as_ref(), "refDate")?;
+        to_js_value(
+            &self
+                .inner
+                .lookback_returns(ref_date, None)
+                .map_err(to_js_err)?,
+        )
     }
 
     /// Lookback returns for an explicit fiscal calendar.
@@ -1262,20 +1197,24 @@ impl JsPerformance {
     ///
     /// # Errors
     ///
-    /// Rejects an invalid ISO `ref_date` or a result that cannot be serialized
-    /// to JavaScript.
-    /// @param ref_date - ISO-8601 date on which MTD, QTD, YTD, and FYTD windows end.
+    /// Rejects an invalid ISO `ref_date`, an omitted one while no dates are active,
+    /// or a result that cannot be serialized to JavaScript.
+    /// @param ref_date - ISO-8601 date on which MTD, QTD, YTD, and FYTD windows end; omitted or `null` is the last active date.
     /// @param fiscal_config - FiscalConfig handle whose start sets the FYTD window.
-    /// @returns Per-ticker `{ mtd, qtd, ytd, fytd }` numeric arrays of lookback returns as decimal fractions.
+    /// @returns The window end `ref_date` and per-ticker `{ mtd, qtd, ytd, fytd }` numeric arrays of lookback returns as decimal fractions.
     #[wasm_bindgen(js_name = lookbackReturnsWithFiscalConfig)]
     pub fn lookback_returns_with_fiscal_config(
         &self,
-        ref_date: JsValue,
+        ref_date: Option<JsValue>,
         fiscal_config: &JsFiscalConfig,
     ) -> Result<JsValue, JsValue> {
-        let ref_date: &str = &js_string(&ref_date, "refDate")?;
-        let d = parse_iso_date(ref_date)?;
-        to_js_value(&self.inner.lookback_returns(d, Some(fiscal_config.inner)))
+        let ref_date = crate::utils::wire::js_opt_date(ref_date.as_ref(), "refDate")?;
+        to_js_value(
+            &self
+                .inner
+                .lookback_returns(ref_date, Some(fiscal_config.inner))
+                .map_err(to_js_err)?,
+        )
     }
 
     /// Aggregated period statistics for one asset at the given frequency.

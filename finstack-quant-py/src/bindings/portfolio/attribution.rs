@@ -5,8 +5,8 @@ use crate::bindings::core::money::PyMoney;
 use crate::bindings::extract::{extract_market_ref, extract_portfolio_ref};
 use crate::bindings::module_utils::py_to_json_string;
 use crate::bindings::pandas_utils::{
-    serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,
-    ColumnSchema,
+    ColumnSchema, serde_object_to_single_row_dataframe_with_schema,
+    serde_rows_to_dataframe_with_schema,
 };
 use crate::errors::{display_to_py, portfolio_to_py, serde_json_to_py};
 use pyo3::prelude::*;
@@ -207,6 +207,12 @@ impl PyPortfolioAttribution {
             .chain(WIDE_COLUMNS)
             .collect();
         serde_rows_to_dataframe_with_schema(py, &rows, &columns)
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.portfolio._attribution", "PortfolioAttribution.pct_of_total_by_bucket")]
+    #[pyo3(text_signature = "($self)")]
+    fn pct_of_total_by_bucket<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.pct_of_total_by_bucket())
     }
 
     /// Human-readable explanation tree of the portfolio-level buckets with

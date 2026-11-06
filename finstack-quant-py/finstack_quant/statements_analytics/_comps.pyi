@@ -477,7 +477,7 @@ class PeerSet:
     """
     def __init__(self, subject: Any, peers: list[Any], period_basis: str) -> None: ...
     @staticmethod
-    def from_universe(subject: Any, universe: list[Any], filter: PeerFilter, period_basis: str) -> PeerSet:
+    def from_universe(subject: Any, universe: list[Any], filter: PeerFilter, period_basis: str) -> tuple[PeerSet, int]:
         """
         Build a peer set from a universe by applying a ``PeerFilter``.
 
@@ -500,8 +500,9 @@ class PeerSet:
             ``"ltm"``, ``"ntm"`` or a custom label (required).
         Returns
         -------
-        PeerSet
-            Build a peer set from a universe by applying a ``PeerFilter``. The subject is never included in the peers even when it passes.
+        tuple[PeerSet, int]
+            The peer set and the number of universe members the filter dropped;
+            a member with the subject's id is not counted.
 
         Examples
         --------

@@ -12,9 +12,9 @@ pub(crate) mod weighted_average_cost;
 
 pub(crate) use weighted_average_cost::ApproxWeightedAverageCostCalculator;
 
-use crate::revolving_credit::types::DrawRepaySpec;
 use crate::revolving_credit::RevolvingCredit;
 use crate::revolving_credit::RevolvingCreditPricer;
+use crate::revolving_credit::types::DrawRepaySpec;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
@@ -68,22 +68,25 @@ pub(crate) fn register_revolving_credit_metrics(
                 crate::revolving_credit::RevolvingCredit,
             >::hazard_when_credit_curve()),
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
+            (Recovery01, exposure::Recovery01Calculator),
+            (JumpToDefault, exposure::JumpToDefaultCalculator),
             // Quote metrics on the settlement schedule (LSTA convention: a
             // quote applies to the drawn balance plus accrued).
             (DiscountMargin, quotes::DiscountMarginCalculator),
             (Ytm, quotes::YtmCalculator),
+            (AllInRate, quotes::AllInRateCalculator),
+            (OidEirAmortization, oid_eir::OidEirAmortizationCalculator),
+            (OidEirRate, oid_eir::OidEirRateCalculator),
         ],
         custom: [
             ("utilization_rate", UtilizationRateCalculator),
             ("available_capacity", AvailableCapacityCalculator),
             ("weighted_average_cost", ApproxWeightedAverageCostCalculator),
             ("draw_option_cost", DrawOptionCostCalculator),
-            ("all_in_rate", quotes::AllInRateCalculator),
             ("accrued_interest", quotes::AccruedInterestCalculator),
             ("price_from_dm", quotes::PriceFromDmCalculator),
             ("exposure_at_default", exposure::ExposureAtDefaultCalculator),
             ("expected_loss", exposure::ExpectedLossCalculator),
-            ("oid_eir_amortization", oid_eir::OidEirAmortizationCalculator),
         ]
     }
 

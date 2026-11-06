@@ -291,7 +291,9 @@ fn asset_swap_projection_rate(
 ///
 /// * `bond` - Bond supplying the yield compounding frequency and the proxy
 ///   fixed-leg conventions.
-/// * `disc` - The bond's discount curve, used as the swap curve proxy.
+/// * `disc` - The curve whose par rate the spread is measured over: the bond's
+///   discount curve as the swap proxy for I-spread, the named government curve
+///   for G-spread.
 /// * `quote_date` - Settlement/quote date where the proxy leg starts.
 /// * `horizon` - Workout or maturity date where the proxy leg ends.
 ///
@@ -300,7 +302,7 @@ fn asset_swap_projection_rate(
 /// Returns an error when a swap calibration quote references a rate index
 /// with no registered fixed-leg conventions, or when the proxy fixed leg has
 /// fewer than two schedule dates or a near-zero annuity.
-pub(crate) fn i_spread_par_rate(
+pub(crate) fn curve_par_rate(
     bond: &Bond,
     disc: &DiscountCurve,
     quote_date: Date,
@@ -324,7 +326,8 @@ pub(crate) fn i_spread_par_rate(
         .collect();
     if dates.len() < 2 {
         return Err(finstack_quant_core::Error::Validation(
-            "I-spread calculation requires at least two fixed-leg schedule dates".to_string(),
+            "Par-rate spread calculation requires at least two fixed-leg schedule dates"
+                .to_string(),
         ));
     }
     let (par_swap_rate, annuity) =
@@ -336,10 +339,23 @@ pub(crate) fn i_spread_par_rate(
         )?;
     if annuity.abs() < 1e-12 {
         return Err(finstack_quant_core::Error::Validation(
-            "I-spread calculation is undefined for near-zero fixed-leg annuity".to_string(),
+            "Par-rate spread calculation is undefined for near-zero fixed-leg annuity".to_string(),
         ));
     }
     Ok(par_swap_rate)
+}
+
+/// Date an I-spread or G-spread par rate runs to from the quote date: the exit
+/// date of a workout path, or contractual maturity when the bond has none,
+/// even when its final payment rolls past maturity.
+///
+/// # Arguments
+///
+/// * `bond` - Bond whose contractual maturity is the horizon without a workout.
+/// * `workout_exit` - Last payment date of the workout path, `None` when the
+///   bond has no exercise rights to work out to.
+pub(crate) fn i_spread_horizon(bond: &Bond, workout_exit: Option<Date>) -> Date {
+    workout_exit.unwrap_or(bond.maturity)
 }
 
 /// Interpolate the curve's swap calibration quotes at `maturity`, restating
@@ -432,10 +448,10 @@ pub(crate) fn settlement_asw_components(
         .filter(|flow| flow.date > settlement && flow.kind != CFKind::Pik)
     {
         if flow.kind.is_interest_like() {
-            if let Some(rule) = &ex_coupon {
-                if rule.is_ex_coupon(flow.date, settlement)? {
-                    continue;
-                }
+            if let Some(rule) = &ex_coupon
+                && rule.is_ex_coupon(flow.date, settlement)?
+            {
+                continue;
             }
             coupon_pv += flow.amount.amount() * disc.df_on_date(flow.date)?
                 / df_settlement

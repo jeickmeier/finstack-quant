@@ -4,9 +4,9 @@
 //!
 //! Curve dates are ISO-8601 strings (`"YYYY-MM-DD"`), as for `DiscountCurve`.
 
+use crate::api::core::curve_args::TimePoint;
 use crate::api::core::curve_args::flat_pairs;
 use crate::api::core::curve_args::js_time_point;
-use crate::api::core::curve_args::TimePoint;
 use crate::api::core::market_hazard::JsHazardCurve;
 use crate::utils::input::{from_js_json, js_f64, js_f64_seq, js_string, js_uint};
 use crate::utils::{date_to_iso, parse_iso_date, to_js_err};

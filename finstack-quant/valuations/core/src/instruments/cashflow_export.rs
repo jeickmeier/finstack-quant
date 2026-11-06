@@ -32,9 +32,16 @@
 //! index-linked bonds supply index ratios and
 //! prepaying pools supply their paydown states.
 //!
+//! `beginning_balance` and `ending_balance` are populated for bonds, term loans
+//! and revolving credit facilities, row by row from the schedule's own balance
+//! path, and for agency MBS pools, period by period from the pool state. Every
+//! other instrument exports `null`: swap and option legs carry a reference
+//! notional rather than an outstanding balance, inflation-linked principal is
+//! indexed rather than replayed, and a bond with custom flows and no issue date
+//! has no path to replay.
+//!
 //! **CMO tranche pool state** is intentionally exported as `null`: the waterfall
 //! engine does not yet expose a stable per-tranche balance hook for this path.
-//! Consumers should not treat `null` as missing data for non-CMO instruments.
 
 use finstack_quant_cashflows::aggregation::credit_adjusted_cashflow_pvs;
 use finstack_quant_core::cashflow::CFKind;
@@ -50,6 +57,7 @@ use serde::Serialize;
 
 use crate::instruments::Instrument;
 use crate::pricer::{ModelKey, PricerKey};
+use finstack_quant_cashflows::aggregation::{CalendarYearLadderRow, calendar_year_ladder};
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use std::collections::HashMap;
 
@@ -92,6 +100,60 @@ pub struct InstrumentCashflowEnvelope {
     /// exporter returns an error instead of emitting a non-reconciling
     /// envelope, so every successful response carries `true`.
     pub reconciles_with_base_value: bool,
+}
+
+/// One row currency's calendar-year ladder from an [`InstrumentCashflowEnvelope`].
+#[derive(Debug, Clone, PartialEq, Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct CurrencyLadder {
+    /// Row currency every figure of `rows` is stated in.
+    pub currency: Currency,
+    /// Calendar-year non-principal, principal and native PV totals, by ascending year.
+    pub rows: Vec<CalendarYearLadderRow>,
+}
+
+impl InstrumentCashflowEnvelope {
+    /// Calendar-year ladders of this envelope, one per row currency.
+    ///
+    /// Currencies never mix: a ladder sums only the flows settling in its currency.
+    /// The ladders follow the first appearance of each currency in `flows`, and
+    /// each one reads [`CashflowRow::native_pv`], the row-currency PV before FX
+    /// conversion and any scenario price shock, because a ladder's PVs are in the
+    /// units of its amounts.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when an amount or native
+    /// PV is non-finite.
+    pub fn calendar_year_ladder_by_currency(
+        &self,
+    ) -> finstack_quant_core::Result<Vec<CurrencyLadder>> {
+        let mut groups: Vec<(Currency, Vec<&CashflowRow>)> = Vec::new();
+        for flow in &self.flows {
+            match groups
+                .iter_mut()
+                .find(|(currency, _)| *currency == flow.currency)
+            {
+                Some((_, rows)) => rows.push(flow),
+                None => groups.push((flow.currency, vec![flow])),
+            }
+        }
+        groups
+            .into_iter()
+            .map(|(currency, flows)| {
+                let dates: Vec<Date> = flows.iter().map(|flow| flow.date).collect();
+                let kinds: Vec<String> = flows.iter().map(|flow| flow.kind.to_string()).collect();
+                let kinds: Vec<&str> = kinds.iter().map(String::as_str).collect();
+                let amounts: Vec<f64> = flows.iter().map(|flow| flow.amount).collect();
+                let pvs: Vec<f64> = flows.iter().map(|flow| flow.native_pv).collect();
+                Ok(CurrencyLadder {
+                    currency,
+                    rows: calendar_year_ladder(&dates, &kinds, &amounts, &pvs)?,
+                })
+            })
+            .collect()
+    }
 }
 
 /// Single-row enriched cashflow view.
@@ -174,10 +236,17 @@ pub struct CashflowRow {
     /// Single Monthly Mortality for the period (populated for agency MBS).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prepayment_smm: Option<f64>,
-    /// Beginning pool balance for the period (agency MBS only).
+    /// Outstanding principal before this row, in row currency, for bonds, term
+    /// loans and revolving credit facilities: a coupon row keeps it, a principal
+    /// row (amortization, PIK, sweep, draw, repayment) moves it, and an issue
+    /// funding row starts from zero. For agency MBS it is the pool balance at the
+    /// start of the period, shared by every row of that period. Absent for other
+    /// instruments and for a schedule with no issue date.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub beginning_balance: Option<f64>,
-    /// Ending pool balance for the period (agency MBS only).
+    /// Outstanding principal after this row, in row currency, on the same basis
+    /// as `beginning_balance`. For agency MBS it is the pool balance at the end
+    /// of the period.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ending_balance: Option<f64>,
     /// Present value in row currency, before FX conversion and before any
@@ -344,6 +413,7 @@ pub struct CashflowExportTerms {
     /// Inflation index ratio per flow date for index-linked flows; a date
     /// without a ratio exports an empty cell.
     pub index_ratios: Option<HashMap<Date, f64>>,
+    flow_balances: Option<Vec<(f64, f64)>>,
 }
 
 impl CashflowExportTerms {
@@ -362,7 +432,37 @@ impl CashflowExportTerms {
             reporting_currency: None,
             pool_states: None,
             index_ratios: None,
+            flow_balances: None,
         }
+    }
+
+    /// Export the balance path of `schedule` on each row, for an instrument
+    /// whose notional is an outstanding principal balance.
+    ///
+    /// A schedule with no issue date, such as custom flows, cannot replay
+    /// balances and leaves the balance columns empty.
+    ///
+    /// # Errors
+    ///
+    /// Propagates currency mismatches or decimal overflow from balance replay.
+    pub fn with_schedule_balances(mut self) -> Result<Self> {
+        if self.schedule.get_meta().issue_date.is_some() {
+            self.flow_balances = Some(
+                self.schedule
+                    .balances_by_flow()?
+                    .into_iter()
+                    .map(|(before, after)| (before.amount(), after.amount()))
+                    .collect(),
+            );
+        }
+        Ok(self)
+    }
+
+    /// Outstanding principal `(before, after)` per flow, aligned with
+    /// `schedule`; `None` unless [`Self::with_schedule_balances`] replayed them.
+    #[must_use]
+    pub fn get_flow_balances(&self) -> Option<&[(f64, f64)]> {
+        self.flow_balances.as_deref()
     }
 }
 
@@ -564,6 +664,19 @@ fn envelope_for_priced(
             crate::instruments::common_impl::helpers::apply_scenario_raw_value(instrument, base_pv);
 
         let mbs_row = mbs_state.as_ref().and_then(|m| m.get(&flow.date));
+        let row_balance = terms
+            .flow_balances
+            .as_ref()
+            .map(|balances| {
+                balances.get(row_index).copied().ok_or_else(|| {
+                    Error::Validation(format!(
+                        "cashflow export: {} flow balances for {} flows",
+                        balances.len(),
+                        schedule.get_flows().len()
+                    ))
+                })
+            })
+            .transpose()?;
 
         // A missing inflation index ratio is indistinguishable from a data
         // outage when it lands in the export as a blank cell, so log loudly
@@ -601,8 +714,12 @@ fn envelope_for_priced(
             conditional_default_prob,
             inflation_index_ratio,
             prepayment_smm: mbs_row.map(|s| s.smm),
-            beginning_balance: mbs_row.map(|s| s.beginning_balance),
-            ending_balance: mbs_row.map(|s| s.ending_balance),
+            beginning_balance: mbs_row
+                .map(|s| s.beginning_balance)
+                .or(row_balance.map(|(before, _)| before)),
+            ending_balance: mbs_row
+                .map(|s| s.ending_balance)
+                .or(row_balance.map(|(_, after)| after)),
             native_pv,
             fx_rate,
             pv,
@@ -698,7 +815,76 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::sum_pvs;
+    use super::{InstrumentCashflowEnvelope, sum_pvs};
+    use finstack_quant_core::currency::Currency;
+
+    fn flow(
+        date: &str,
+        currency: &str,
+        kind: &str,
+        amount: f64,
+        native_pv: f64,
+    ) -> serde_json::Value {
+        serde_json::json!({
+            "date": date,
+            "amount": amount,
+            "currency": currency,
+            "kind": kind,
+            "accrual_factor": 0.0,
+            "year_fraction": 1.0,
+            "rate": null,
+            "discount_factor": 1.0,
+            "discount_curve_id": "USD-OIS",
+            "native_pv": native_pv,
+            "pv": native_pv * 2.0,
+        })
+    }
+
+    fn envelope(flows: Vec<serde_json::Value>) -> InstrumentCashflowEnvelope {
+        serde_json::from_value(serde_json::json!({
+            "instrument_id": "X",
+            "currency": "USD",
+            "model": "discounting",
+            "as_of": "2025-01-15",
+            "discount_curve_id": "USD-OIS",
+            "flows": flows,
+            "total_pv": 0.0,
+            "reconciles_with_base_value": true,
+        }))
+        .expect("valid envelope")
+    }
+
+    #[test]
+    fn ladder_splits_by_row_currency_in_first_appearance_order_on_native_pv() {
+        let ladders = envelope(vec![
+            flow("2026-01-15", "EUR", "fixed", 10.0, 9.0),
+            flow("2026-06-15", "USD", "fixed", 20.0, 18.0),
+            flow("2027-01-15", "EUR", "notional", 100.0, 80.0),
+            flow("2026-09-15", "EUR", "fixed", 5.0, 4.0),
+        ])
+        .calendar_year_ladder_by_currency()
+        .expect("ladders");
+
+        assert_eq!(
+            ladders.iter().map(|l| l.currency).collect::<Vec<_>>(),
+            [Currency::EUR, Currency::USD]
+        );
+        let eur = &ladders[0].rows;
+        assert_eq!(eur.iter().map(|r| r.year).collect::<Vec<_>>(), [2026, 2027]);
+        assert_eq!(eur[0].non_principal, 15.0);
+        // Native PV, never the reporting-currency `pv` column.
+        assert_eq!(eur[0].pv, 13.0);
+        assert_eq!(eur[1].principal, 100.0);
+        assert_eq!(ladders[1].rows[0].pv, 18.0);
+    }
+
+    #[test]
+    fn ladder_of_no_flows_is_empty() {
+        let ladders = envelope(vec![])
+            .calendar_year_ladder_by_currency()
+            .expect("ladders");
+        assert!(ladders.is_empty());
+    }
 
     #[test]
     fn total_pv_uses_compensated_summation_for_mixed_sign_flows() {

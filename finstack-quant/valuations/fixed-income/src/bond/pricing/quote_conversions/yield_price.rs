@@ -1,9 +1,10 @@
-use super::types::YieldCompounding;
 use super::ExitCandidate;
+use super::types::YieldCompounding;
+use super::workout_ladder::WorkoutExitKind;
+use crate::bond::Bond;
 use crate::bond::pricing::settlement::QuoteDateContext;
 use crate::bond::pricing::tree::BondValuator;
-use crate::bond::pricing::ytm_solver::{solve_bond_ytm, YtmPricingSpec};
-use crate::bond::Bond;
+use crate::bond::pricing::ytm_solver::{YtmPricingSpec, solve_bond_ytm};
 use finstack_quant_cashflows::accrual::AccrualIndex;
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::cashflow::CFKind;
@@ -507,20 +508,6 @@ impl<'a> RedemptionBasis<'a> {
         })
     }
 
-    /// Outstanding principal after every balance event on or before `date`
-    /// (amortization, PIK, later draws and repayments).
-    fn outstanding_at(&self, date: Date) -> f64 {
-        let index = self
-            .outstanding_by_date
-            .partition_point(|(event_date, _)| *event_date <= date);
-        if index == 0 {
-            self.schedule.get_notional().initial.amount()
-        } else {
-            self.outstanding_by_date[index - 1].1.amount()
-        }
-        .max(0.0)
-    }
-
     /// Resolve the principal struck by an exercise right and any contractual
     /// redemption that the exercise proceeds replace on the same date.
     ///
@@ -534,7 +521,11 @@ impl<'a> RedemptionBasis<'a> {
         exercise_date: Date,
         maturity: Date,
     ) -> (f64, f64) {
-        let after_events = self.outstanding_at(exercise_date);
+        let after_events = finstack_quant_cashflows::builder::outstanding_on(
+            &self.outstanding_by_date,
+            exercise_date,
+            self.schedule.get_notional().initial.amount(),
+        );
         let (principal_redeemed, replaced_redemption) = if exercise_date == maturity {
             self.schedule
                 .get_flows()
@@ -563,21 +554,54 @@ impl<'a> RedemptionBasis<'a> {
             replaced_redemption,
         )
     }
+
+    /// Principal the contractual final redemption repays, and its price as
+    /// percent of the balance outstanding immediately before it.
+    fn maturity_redemption(&self, maturity: Date) -> ExitRedemption {
+        let (outstanding, _) = self.exercise_principal_and_replaced_redemption(maturity, maturity);
+        let clean_amount: f64 = self
+            .schedule
+            .get_flows()
+            .iter()
+            .filter(|flow| {
+                flow.get_balance_date() == maturity
+                    && flow.kind == CFKind::Notional
+                    && flow.amount.amount() > 0.0
+            })
+            .map(|flow| flow.amount.amount())
+            .sum();
+        ExitRedemption {
+            clean_amount,
+            price_pct: if outstanding > 0.0 {
+                clean_amount / outstanding * 100.0
+            } else {
+                100.0
+            },
+        }
+    }
 }
 
-/// Resolve the dirty exercise-date cash amount for one workout candidate.
+/// Clean cash one workout exit redeems, before any accrued interest.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ExitRedemption {
+    /// Clean redemption in the bond's currency, make-whole premium included.
+    pub(crate) clean_amount: f64,
+    /// `clean_amount` as percent of the principal redeemed.
+    pub(crate) price_pct: f64,
+}
+
+/// Resolve what one exercise candidate pays.
 ///
-/// Issuer calls retain the deterministic make-whole term and use the same
-/// reference-curve valuation as the tree pricer. Put candidates have no
-/// make-whole term. The returned amount is net of any contractual maturity
-/// redemption already present in the truncated flow path.
-pub(crate) fn exercise_redemption_amount(
+/// Returns the clean redemption alongside the dirty cash amount that the
+/// candidate's path receives on the exercise date, which is net of any
+/// contractual maturity redemption already present in the truncated flow path.
+fn exercise_redemption(
     bond: &Bond,
     curves: &MarketContext,
     flows: &[(Date, Money)],
     basis: &RedemptionBasis<'_>,
     candidate: &ExitCandidate,
-) -> finstack_quant_core::Result<f64> {
+) -> finstack_quant_core::Result<(ExitRedemption, f64)> {
     let (outstanding, replaced_redemption) =
         basis.exercise_principal_and_replaced_redemption(candidate.date, bond.maturity);
     let accrued = basis.accrual_index.accrued_at(candidate.date)?;
@@ -595,7 +619,31 @@ pub(crate) fn exercise_redemption_amount(
     } else {
         floor_price
     };
-    Ok(clean_redemption + accrued - replaced_redemption)
+    let redemption = ExitRedemption {
+        clean_amount: clean_redemption,
+        price_pct: if outstanding > 0.0 {
+            clean_redemption / outstanding * 100.0
+        } else {
+            candidate.price_pct_of_par
+        },
+    };
+    Ok((redemption, clean_redemption + accrued - replaced_redemption))
+}
+
+/// Resolve the dirty exercise-date cash amount for one workout candidate.
+///
+/// Issuer calls retain the deterministic make-whole term and use the same
+/// reference-curve valuation as the tree pricer. Put candidates have no
+/// make-whole term. The returned amount is net of any contractual maturity
+/// redemption already present in the truncated flow path.
+pub(crate) fn exercise_redemption_amount(
+    bond: &Bond,
+    curves: &MarketContext,
+    flows: &[(Date, Money)],
+    basis: &RedemptionBasis<'_>,
+    candidate: &ExitCandidate,
+) -> finstack_quant_core::Result<f64> {
+    exercise_redemption(bond, curves, flows, basis, candidate).map(|(_, cash)| cash)
 }
 
 /// Enumerate call/put exit candidates for yield-to-worst analysis.
@@ -629,7 +677,7 @@ pub(crate) fn enumerate_exit_paths(
 
     let push_period_candidates = |candidates: &mut Vec<ExitCandidate>,
                                   option: &crate::bond::CallPut,
-                                  retain_make_whole: bool| {
+                                  kind: WorkoutExitKind| {
         let mut exercise_dates = vec![option.start, option.end];
         exercise_dates.extend(
             flows
@@ -643,9 +691,10 @@ pub(crate) fn enumerate_exit_paths(
         for exercise_date in exercise_dates {
             if exercise_date >= as_of && exercise_date <= bond.maturity {
                 candidates.push(ExitCandidate {
+                    kind,
                     date: exercise_date,
                     price_pct_of_par: option.price_pct_of_par,
-                    make_whole: if retain_make_whole {
+                    make_whole: if kind == WorkoutExitKind::Call {
                         option.make_whole.clone()
                     } else {
                         None
@@ -656,10 +705,10 @@ pub(crate) fn enumerate_exit_paths(
     };
 
     for c in &cp.calls {
-        push_period_candidates(&mut call_candidates, c, true);
+        push_period_candidates(&mut call_candidates, c, WorkoutExitKind::Call);
     }
     for p in &cp.puts {
-        push_period_candidates(&mut put_candidates, p, false);
+        push_period_candidates(&mut put_candidates, p, WorkoutExitKind::Put);
     }
 
     // Adjacent call windows can share boundary dates while carrying different
@@ -683,6 +732,17 @@ pub(crate) fn enumerate_exit_paths(
     call_candidates
 }
 
+/// One admissible exit and the holder cashflows received if it is taken.
+#[derive(Debug, Clone)]
+pub(crate) struct WorkoutCandidatePath {
+    /// The exit: its kind, date and contractual terms.
+    pub(crate) exit: ExitCandidate,
+    /// What the exit redeems.
+    pub(crate) redemption: ExitRedemption,
+    /// Holder cashflows up to and including the exit.
+    pub(crate) flows: Vec<(Date, Money)>,
+}
+
 /// Build every exercise and rolled-maturity cashflow path from one quote-date
 /// entitlement set.
 fn workout_cashflow_paths(
@@ -691,7 +751,7 @@ fn workout_cashflow_paths(
     flows: &[(Date, Money)],
     quote_date: Date,
     schedule: &CashFlowSchedule,
-) -> finstack_quant_core::Result<Vec<Vec<(Date, Money)>>> {
+) -> finstack_quant_core::Result<Vec<WorkoutCandidatePath>> {
     let has_quote_date_exercise = bond.call_put.as_ref().is_some_and(|option_schedule| {
         option_schedule
             .calls
@@ -722,6 +782,7 @@ fn workout_cashflow_paths(
         .max()
         .map_or(bond.maturity, |last| last.max(bond.maturity));
     candidates.push(ExitCandidate {
+        kind: WorkoutExitKind::Maturity,
         date: maturity_candidate,
         price_pct_of_par: 0.0,
         make_whole: None,
@@ -738,16 +799,27 @@ fn workout_cashflow_paths(
                     && *date <= candidate.date
             })
             .collect();
-        let redemption = if candidate.price_pct_of_par > 0.0 {
-            exercise_redemption_amount(bond, curves, path_flows, &basis, &candidate)?
+        let (redemption, exit_cash) = if candidate.kind == WorkoutExitKind::Maturity {
+            // The contractual redemption is already in the truncated flows.
+            (basis.maturity_redemption(bond.maturity), 0.0)
+        } else if candidate.price_pct_of_par > 0.0 {
+            exercise_redemption(bond, curves, path_flows, &basis, &candidate)?
         } else {
-            0.0
+            let nothing = ExitRedemption {
+                clean_amount: 0.0,
+                price_pct: 0.0,
+            };
+            (nothing, 0.0)
         };
         path.push((
             candidate.date,
-            Money::new(redemption, bond.notional.currency())?,
+            Money::new(exit_cash, bond.notional.currency())?,
         ));
-        paths.push(path);
+        paths.push(WorkoutCandidatePath {
+            exit: candidate,
+            redemption,
+            flows: path,
+        });
     }
 
     Ok(paths)
@@ -820,6 +892,53 @@ fn solve_workout_path_yield(
     )
 }
 
+/// One workout path with the yield that equates it to the target price.
+#[derive(Debug, Clone)]
+pub(crate) struct SolvedWorkoutExit {
+    /// The exit and its cashflow path.
+    pub(crate) path: WorkoutCandidatePath,
+    /// Street yield of the path, in walk order `f64::INFINITY` or
+    /// `f64::NEG_INFINITY` when the exit is immediate and has no future cash.
+    pub(crate) yield_rate: f64,
+}
+
+/// Solve every call/put/maturity exit for one flow set and pick the worst.
+///
+/// This is the single walk behind yield-to-worst and the workout ladder. The
+/// second value is the index of the worst exit: the first strict minimum in
+/// walk order, or `None` when no exit has a yield below positive infinity.
+///
+/// # Arguments
+///
+/// * `bond` - The bond whose exits are solved, return floor already lowered.
+/// * `curves` - Market context supplying any make-whole reference curves.
+/// * `flows` - Holder-view cashflows (coupons + principal).
+/// * `as_of` - Quote date every path is timed from.
+/// * `dirty_price_target` - Dirty price each path is solved to.
+/// * `schedule` - Full cashflow schedule used for outstanding principal and
+///   same-day maturity-redemption replacement.
+pub(crate) fn solve_workout_exits(
+    bond: &Bond,
+    curves: &MarketContext,
+    flows: &[(Date, Money)],
+    as_of: Date,
+    dirty_price_target: Money,
+    schedule: &CashFlowSchedule,
+) -> finstack_quant_core::Result<(Vec<SolvedWorkoutExit>, Option<usize>)> {
+    let mut best_yield = f64::INFINITY;
+    let mut worst = None;
+    let mut exits = Vec::new();
+    for path in workout_cashflow_paths(bond, curves, flows, as_of, schedule)? {
+        let yield_rate = solve_workout_path_yield(bond, &path.flows, as_of, dirty_price_target)?;
+        if yield_rate < best_yield {
+            best_yield = yield_rate;
+            worst = Some(exits.len());
+        }
+        exits.push(SolvedWorkoutExit { path, yield_rate });
+    }
+    Ok((exits, worst))
+}
+
 /// Solve yield-to-worst over all call/put/maturity candidates for a given flow set.
 ///
 /// Returns the worst (minimum) yield and the corresponding truncated cashflow path.
@@ -849,17 +968,12 @@ pub(crate) fn solve_ytw_from_flows(
     dirty_price_target: Money,
     schedule: &CashFlowSchedule,
 ) -> finstack_quant_core::Result<(f64, Vec<(Date, Money)>)> {
-    let mut best_yield = f64::INFINITY;
-    let mut best_flows: Vec<(Date, Money)> = Vec::new();
-    for path in workout_cashflow_paths(bond, curves, flows, as_of, schedule)? {
-        let y = solve_workout_path_yield(bond, &path, as_of, dirty_price_target)?;
-        if y < best_yield {
-            best_yield = y;
-            best_flows = path;
-        }
-    }
-
-    Ok((best_yield, best_flows))
+    let (mut exits, worst) =
+        solve_workout_exits(bond, curves, flows, as_of, dirty_price_target, schedule)?;
+    Ok(worst.map_or((f64::INFINITY, Vec::new()), |index| {
+        let exit = exits.swap_remove(index);
+        (exit.yield_rate, exit.path.flows)
+    }))
 }
 
 /// Convert a Street yield-to-worst quote into settlement dirty price.
@@ -917,7 +1031,7 @@ pub fn price_from_ytw(
     let mut best_price: Option<f64> = None;
     for path in paths {
         let price =
-            price_workout_path_from_yield(&effective_bond, &path, quote_ctx.quote_date, ytw)?;
+            price_workout_path_from_yield(&effective_bond, &path.flows, quote_ctx.quote_date, ytw)?;
         best_price = Some(best_price.map_or(price, |current| current.min(price)));
     }
     best_price.ok_or_else(|| {
@@ -952,7 +1066,7 @@ pub(crate) fn price_from_i_spread(
     as_of: Date,
     i_spread: f64,
 ) -> finstack_quant_core::Result<f64> {
-    use super::i_spread_par_rate;
+    use super::curve_par_rate;
 
     let disc = curves.get_discount(&bond.discount_curve_id)?;
     let effective_bond = bond.effective_for_pricing(curves, as_of)?;
@@ -964,7 +1078,7 @@ pub(crate) fn price_from_i_spread(
         .as_ref()
         .is_some_and(|cp| cp.has_options())
     {
-        let par = i_spread_par_rate(bond, disc.as_ref(), quote_date, bond.maturity)?;
+        let par = curve_par_rate(bond, disc.as_ref(), quote_date, bond.maturity)?;
         return price_from_ytm(bond, &flows, quote_date, i_spread + par);
     }
 
@@ -972,10 +1086,14 @@ pub(crate) fn price_from_i_spread(
     let paths = workout_cashflow_paths(&effective_bond, curves, &flows, quote_date, &schedule)?;
     let mut candidates = Vec::with_capacity(paths.len());
     for path in paths {
-        let horizon = path.last().map_or(bond.maturity, |(date, _)| *date);
-        let par = i_spread_par_rate(bond, disc.as_ref(), quote_date, horizon)?;
-        let price =
-            price_workout_path_from_yield(&effective_bond, &path, quote_date, i_spread + par)?;
+        let horizon = path.flows.last().map_or(bond.maturity, |(date, _)| *date);
+        let par = curve_par_rate(bond, disc.as_ref(), quote_date, horizon)?;
+        let price = price_workout_path_from_yield(
+            &effective_bond,
+            &path.flows,
+            quote_date,
+            i_spread + par,
+        )?;
         candidates.push((price, horizon));
     }
     candidates.sort_by(|a, b| a.0.total_cmp(&b.0));
@@ -1107,12 +1225,16 @@ mod tests {
             .collect();
 
         assert_eq!(calls.len(), 2);
-        assert!(calls
-            .iter()
-            .any(|spec| spec.reference_curve_id.as_str() == "REF-A"));
-        assert!(calls
-            .iter()
-            .any(|spec| spec.reference_curve_id.as_str() == "REF-B"));
+        assert!(
+            calls
+                .iter()
+                .any(|spec| spec.reference_curve_id.as_str() == "REF-A")
+        );
+        assert!(
+            calls
+                .iter()
+                .any(|spec| spec.reference_curve_id.as_str() == "REF-B")
+        );
         assert_eq!(puts.len(), 1);
         assert_eq!(puts[0].price_pct_of_par, 101.0);
     }
@@ -1379,9 +1501,11 @@ mod tests {
         )
         .expect("same-day YTW solve");
         assert!((solved - target_ytw).abs() < 1e-10);
-        assert!(selected_path
-            .iter()
-            .any(|(date, amount)| *date == as_of && amount.amount() > 0.0));
+        assert!(
+            selected_path
+                .iter()
+                .any(|(date, amount)| *date == as_of && amount.amount() > 0.0)
+        );
     }
 
     #[test]
@@ -1420,10 +1544,12 @@ mod tests {
             .effective_for_pricing(&market, as_of)
             .expect("lowered floor");
         assert!(effective.return_floor.is_none());
-        assert!(effective
-            .call_put
-            .as_ref()
-            .is_some_and(CallPutSchedule::has_options));
+        assert!(
+            effective
+                .call_put
+                .as_ref()
+                .is_some_and(CallPutSchedule::has_options)
+        );
         let quote_ctx = QuoteDateContext::new(&effective, &market, as_of).expect("quote context");
         let flows = quote_ctx
             .entitled_flows(&effective, &market, as_of)
@@ -1435,7 +1561,8 @@ mod tests {
             workout_cashflow_paths(&effective, &market, &flows, quote_ctx.quote_date, &schedule)
                 .expect("lowered workout paths");
         assert!(paths.iter().any(|path| {
-            path.iter()
+            path.flows
+                .iter()
                 .map(|(date, _)| *date)
                 .max()
                 .is_some_and(|date| date <= exercise_date.next_day().expect("following date"))
@@ -1443,8 +1570,13 @@ mod tests {
         let manual_min = paths
             .iter()
             .map(|path| {
-                price_workout_path_from_yield(&effective, path, quote_ctx.quote_date, target_ytw)
-                    .expect("path price")
+                price_workout_path_from_yield(
+                    &effective,
+                    &path.flows,
+                    quote_ctx.quote_date,
+                    target_ytw,
+                )
+                .expect("path price")
             })
             .fold(f64::INFINITY, f64::min);
 

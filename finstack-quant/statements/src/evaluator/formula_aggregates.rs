@@ -1,12 +1,12 @@
 //! Formula-evaluation helpers for statement expressions.
 //!
+use super::EvaluationContext;
 use super::formula::{
     collect_expression_range_values, collect_expression_values_sorted,
     collect_expression_window_values, eval_error, evaluate_non_negative_integer_arg, require_args,
     require_min_args,
 };
 use super::results::EvalWarning;
-use super::EvaluationContext;
 use crate::error::Result;
 use finstack_quant_core::dates::{PeriodId, PeriodKind};
 use finstack_quant_core::expr::{Expr, Function};
@@ -271,17 +271,21 @@ pub(crate) fn evaluate_period_aggregate_function(
         }
         Function::Ttm => {
             require_args("ttm", args, 1, node_id)?;
-            let window = context.period_kind.periods_per_year() as usize;
-            // Evaluate precisely the calendar slots, excluding intervening
-            // observations at other frequencies and refusing missing periods.
-            let mut values = Vec::with_capacity(window);
-            for offset in (0..window).rev() {
-                let Some(period) =
-                    super::formula_timeseries::offset_period(context, -(offset as i32))
-                else {
-                    return Ok(f64::NAN);
-                };
-                let value = if offset == 0 {
+            // The window is twelve calendar months of model periods; see
+            // `ltm_window` for the daily (calendar- or business-day) rule.
+            let Ok(window) = finstack_quant_core::dates::ltm_window(
+                context.period_id,
+                context.history.model_periods(),
+            ) else {
+                return Ok(f64::NAN);
+            };
+            if !window.is_complete() {
+                return Ok(f64::NAN);
+            }
+            // Evaluate precisely the window's slots and refuse unevaluated ones.
+            let mut values = Vec::with_capacity(window.slots.len());
+            for period in window.slots {
+                let value = if period == context.period_id {
                     super::formula::evaluate_formula(&args[0], context, node_id)?
                 } else {
                     if !context.history.contains_key(&period)

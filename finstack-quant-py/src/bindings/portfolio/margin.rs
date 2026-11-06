@@ -11,7 +11,7 @@ use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::{extract_market_ref, extract_portfolio_ref};
 use crate::bindings::margin::im::PySimmSensitivities;
 use crate::bindings::margin::types::{PyImCollateralResult, PyImMethodology, PyNettingSetId};
-use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, ColumnSchema};
+use crate::bindings::pandas_utils::{ColumnSchema, serde_rows_to_dataframe_with_schema};
 use crate::errors::portfolio_to_py;
 use finstack_quant_portfolio::{margin::NettingSetMargin, margin::PortfolioMarginResult};
 

@@ -13,7 +13,7 @@ use crate::loan_terms::{
     CommitmentStep, FeeStep, LetterOfCreditSpec, MarginStep, OidEirSpec, ScheduledFee, UpfrontFee,
 };
 use finstack_quant_cashflows::builder::RateSpec;
-use finstack_quant_cashflows::builder::{evaluate_fee_tiers, FeeTier, FloatingRateSpec};
+use finstack_quant_cashflows::builder::{FeeTier, FloatingRateSpec, evaluate_fee_tiers};
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::validation;
 use finstack_quant_valuations_core::impl_instrument_base;
@@ -78,8 +78,8 @@ pub struct RevolvingCredit {
     #[serde(default)]
     pub scheduled_fees: Vec<ScheduledFee>,
 
-    /// Effective-interest-rate reporting switch for the
-    /// `oid_eir_amortization` metric. `None` (the default) reports with fees
+    /// Effective-interest-rate reporting switch for the `oid_eir_rate` and
+    /// `oid_eir_amortization` metrics. `None` (the default) reports with fees
     /// included, the same as `Some(OidEirSpec::default())`.
     #[builder(default)]
     #[serde(default)]
@@ -1186,6 +1186,20 @@ impl RevolvingCredit {
 
 // Implement the Instrument trait
 impl finstack_quant_valuations_core::instruments::Instrument for RevolvingCredit {
+    fn cashflow_export_terms(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<
+        finstack_quant_valuations_core::instruments::cashflow_export::CashflowExportTerms,
+    > {
+        use finstack_quant_cashflows::CashflowProvider;
+        finstack_quant_valuations_core::instruments::cashflow_export::CashflowExportTerms::from_schedule(
+                self.cashflow_schedule(market, as_of)?,
+            )
+            .with_schedule_balances()
+    }
+
     impl_instrument_base!(
         finstack_quant_valuations_core::pricer::InstrumentType::RevolvingCredit,
         crate::FIXED_INCOME
@@ -1386,11 +1400,13 @@ mod dependency_tests {
             amount: Money::from((1_000_000_i64, Currency::USD)),
             is_draw: true,
         }]);
-        assert!(facility
-            .validate()
-            .expect_err("post-maturity draw must fail")
-            .to_string()
-            .contains("maturity"));
+        assert!(
+            facility
+                .validate()
+                .expect_err("post-maturity draw must fail")
+                .to_string()
+                .contains("maturity")
+        );
     }
 
     #[test]

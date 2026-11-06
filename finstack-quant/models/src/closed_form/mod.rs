@@ -149,6 +149,7 @@ mod asian;
 mod bachelier;
 mod barrier;
 mod black;
+mod calculation;
 mod dispatch;
 mod forward;
 mod heston;
@@ -166,22 +167,26 @@ pub use bachelier::{
     bachelier_price_with_annuity, bachelier_put, bachelier_vega,
 };
 pub use barrier::{
-    barrier_price, barrier_rebate, barrier_touch_probability, expired_barrier_payoff, BarrierParams,
+    BarrierParams, barrier_price, barrier_rebate, barrier_touch_probability, expired_barrier_payoff,
 };
 pub use black::{
     black_call, black_delta_call, black_delta_put, black_gamma, black_put, black_vega, d1_d2,
     d1_d2_black76,
 };
+pub use calculation::{
+    OptionCalculation, OptionCalculationResult, OptionGreeks, OptionModel, OptionSolve,
+    option_calculation,
+};
 pub use dispatch::{
-    asian_option_price, barrier_option_price, lookback_option_price, quanto_option_price,
-    DEFAULT_ASIAN_AVERAGING, DEFAULT_LOOKBACK_STRIKE_TYPE,
+    DEFAULT_ASIAN_AVERAGING, DEFAULT_LOOKBACK_STRIKE_TYPE, asian_option_price,
+    barrier_option_price, lookback_option_price, quanto_option_price,
 };
 pub use forward::{
-    bachelier_greeks, bachelier_price, black76_greeks, black76_price, black_shifted_price,
-    black_shifted_vega, ForwardGreeks,
+    ForwardGreeks, bachelier_greeks, bachelier_price, black_shifted_price, black_shifted_vega,
+    black76_greeks, black76_price,
 };
 pub use heston::{
-    heston_call_price_fourier, heston_price, HestonFourierSettings, HestonPricingParams,
+    HestonFourierSettings, HestonPricingParams, heston_call_price_fourier, heston_price,
 };
 #[cfg(test)]
 pub(crate) use heston::{heston_call_prices_fourier, heston_put_price_fourier};
@@ -192,6 +197,6 @@ pub use lookback::{
 };
 pub use quanto::quanto_price;
 pub use vanilla::{
-    bs_greeks, bs_greeks_unchecked, bs_price, bs_price_unchecked, checked_closed_form_value,
-    vanilla_expiry_payoff, BsGreeks, DEFAULT_THETA_DAYS_PER_YEAR, ONE_PERCENT,
+    BsGreeks, DEFAULT_THETA_DAYS_PER_YEAR, ONE_PERCENT, bs_greeks, bs_greeks_unchecked, bs_price,
+    bs_price_unchecked, checked_closed_form_value, vanilla_expiry_payoff,
 };

@@ -688,11 +688,13 @@ mod tests {
                         },
                     };
                     assert!(model.validate().is_err());
-                    assert!(ParametricCurve::builder("INVALID")
-                        .base_date(base_date())
-                        .model(model)
-                        .build()
-                        .is_err());
+                    assert!(
+                        ParametricCurve::builder("INVALID")
+                            .base_date(base_date())
+                            .model(model)
+                            .build()
+                            .is_err()
+                    );
                 }
             }
         }

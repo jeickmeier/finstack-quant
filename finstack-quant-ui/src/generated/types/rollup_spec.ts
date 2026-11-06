@@ -18,8 +18,11 @@ export interface RollupSpecWire {
    */
   frequency: "daily" | "quarterly" | "monthly" | "weekly" | "semi_annual" | "annual";
   /**
-   * Rollup method per node id. Nodes not listed are summed, so list
-   * balances as `period_end` and ratios as `formula`.
+   * Rollup method per node id, overriding the node's own declaration. A
+   * node not listed uses its declared [`NodeSpec::rollup`], and sums when
+   * it declares none.
+   *
+   * [`NodeSpec::rollup`]: crate::types::NodeSpec::rollup
    */
   methods?: {
     [k: string]: D_3Fa8D82393Fc10F6839B;

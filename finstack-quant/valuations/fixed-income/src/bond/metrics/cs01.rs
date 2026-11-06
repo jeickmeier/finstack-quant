@@ -45,12 +45,32 @@
 //! [`ZSpreadCalculator`]: crate::bond::ZSpreadCalculator
 
 use super::risk_view::{active_model_consumes_credit, with_bond_risk_view};
-use crate::bond::pricing::quote_conversions::BondZSpreadPricingKernel;
 use crate::bond::Bond;
+use crate::bond::pricing::quote_conversions::BondZSpreadPricingKernel;
 use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::metrics::sensitivities::cs01::require_hazard_replay;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 use std::borrow::Cow;
+
+/// Fail before the risk view's OAS pin when the bond's hazard curve has no
+/// calibration recipe. Generic CS01 raises this same error, but only after the
+/// pin has solved OAS on the tree. A curve the market does not hold is left to
+/// the generic path to report.
+fn require_credit_curve_replay(
+    context: &MetricContext,
+    operation: &str,
+) -> finstack_quant_core::Result<()> {
+    let bond: &Bond = context.instrument_as()?;
+    let curves = bond.market_dependencies()?.curves;
+    let Some(hazard_id) = curves.credit_curves.first() else {
+        return Ok(());
+    };
+    match context.curves.get_hazard(hazard_id.as_str()) {
+        Ok(hazard) => require_hazard_replay(hazard.as_ref(), operation),
+        Err(_) => Ok(()),
+    }
+}
 
 pub(super) fn z_spread_bumped_pvs(
     context: &MetricContext,
@@ -131,7 +151,7 @@ fn oas_bumped_pvs(context: &MetricContext) -> finstack_quant_core::Result<(f64, 
         None => {
             return Err(finstack_quant_valuations_core::metrics::metric_not_found(
                 MetricId::Oas,
-            ))
+            ));
         }
     };
     if !base_oas.is_finite() {
@@ -176,6 +196,7 @@ impl MetricCalculator for BondCs01Calculator {
         };
 
         if uses_credit {
+            require_credit_curve_replay(context, "quote-space CS01")?;
             return with_bond_risk_view(context, |ctx| {
                 finstack_quant_valuations_core::metrics::sensitivities::cs01::GenericParallelCs01
                     .calculate(ctx)
@@ -246,6 +267,7 @@ impl MetricCalculator for BondBucketedCs01Calculator {
         };
 
         if uses_credit {
+            require_credit_curve_replay(context, "quote-space bucketed CS01")?;
             return with_bond_risk_view(context, |ctx| {
                 finstack_quant_valuations_core::metrics::sensitivities::cs01::GenericBucketedCs01
                     .calculate(ctx)
@@ -280,16 +302,17 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::StubKind;
     use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::HazardCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::Rate;
     use finstack_quant_valuations_core::instruments::PricingOptions;
     use finstack_quant_valuations_core::metrics::MetricRegistry;
     use finstack_quant_valuations_core::pricer::{
-        expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry, PricingError,
+        InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry, PricingError, expect_inst,
     };
     use finstack_quant_valuations_core::results::ValuationResult;
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use time::macros::date;
 
     struct OasSensitiveTreePricer {
@@ -503,5 +526,116 @@ mod tests {
             3,
             "base PV plus Z-spread base and bump must use the selected pricer"
         );
+    }
+
+    struct CountingRatesCreditPricer {
+        calls: Arc<AtomicUsize>,
+    }
+
+    impl Pricer for CountingRatesCreditPricer {
+        fn key(&self) -> PricerKey {
+            PricerKey::new(InstrumentType::Bond, ModelKey::RatesCredit)
+        }
+
+        fn price_dyn(
+            &self,
+            instrument: &dyn Instrument,
+            _market: &MarketContext,
+            as_of: finstack_quant_core::dates::Date,
+        ) -> std::result::Result<ValuationResult, PricingError> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            Ok(ValuationResult::stamped(
+                instrument.id(),
+                as_of,
+                Money::new(1_000.0, Currency::USD).expect("valid money fixture"),
+            ))
+        }
+    }
+
+    /// A hazard curve built from rates has no recipe to replay, so quote-space
+    /// CS01 fails the same way it always has, but before the risk view's OAS
+    /// solve reprices the tree: the base PV is the only pricer call.
+    #[test]
+    fn unreplayable_hazard_fails_cs01_before_the_oas_pin() {
+        let as_of = date!(2025 - 01 - 15);
+        let mut bond = Bond::fixed(
+            "CS01-NO-RECIPE",
+            Money::from((1_000_i64, Currency::USD)),
+            Rate::from_decimal(0.04).expect("valid rate fixture"),
+            as_of,
+            date!(2030 - 01 - 15),
+            StubKind::ShortFront,
+            "USD-OIS",
+        )
+        .expect("valid bond");
+        bond.settlement_convention = None;
+        bond.credit_curve_id = Some("ISSUER-HZD".into());
+        bond.call_put = Some(CallPutSchedule {
+            calls: vec![CallPut {
+                start: date!(2028 - 01 - 15),
+                end: date!(2028 - 01 - 15),
+                price_pct_of_par: 100.0,
+                make_whole: None,
+            }],
+            puts: Vec::new(),
+        });
+        bond.instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price_pct = Some(98.0);
+        let hazard = HazardCurve::builder("ISSUER-HZD")
+            .base_date(as_of)
+            .knots([(0.0, 0.02), (10.0, 0.02)])
+            .recovery_rate(0.4)
+            .build()
+            .expect("hazard curve");
+        let market = MarketContext::new().insert(hazard);
+
+        for (metric, calculator, operation) in [
+            (
+                MetricId::Cs01,
+                Arc::new(BondCs01Calculator) as Arc<dyn MetricCalculator>,
+                "quote-space CS01",
+            ),
+            (
+                MetricId::BucketedCs01,
+                Arc::new(BondBucketedCs01Calculator) as Arc<dyn MetricCalculator>,
+                "quote-space bucketed CS01",
+            ),
+        ] {
+            let pricer_calls = Arc::new(AtomicUsize::new(0));
+            let mut pricers = PricerRegistry::new();
+            pricers
+                .register(CountingRatesCreditPricer {
+                    calls: Arc::clone(&pricer_calls),
+                })
+                .expect("unique custom pricer");
+            let mut metrics = MetricRegistry::new();
+            metrics
+                .register_metric(metric.clone(), calculator, &[InstrumentType::Bond])
+                .expect("unique custom CS01 metric");
+
+            let error = bond
+                .price_with_metrics(
+                    &market,
+                    as_of,
+                    &[metric],
+                    PricingOptions::default()
+                        .with_model(ModelKey::RatesCredit)
+                        .with_registry(Arc::new(pricers))
+                        .with_metric_registry(Arc::new(metrics)),
+                )
+                .expect_err("no recipe to replay");
+
+            let expected = format!(
+                "{operation} requires a lossless calibration recipe for hazard curve \
+                 'ISSUER-HZD' (a curve produced by the calibration pipeline, not one built \
+                 directly from hazard rates)"
+            );
+            assert!(
+                error.to_string().contains(&expected),
+                "unexpected error: {error}"
+            );
+            assert_eq!(pricer_calls.load(Ordering::SeqCst), 1, "{operation}");
+        }
     }
 }

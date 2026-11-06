@@ -6,9 +6,9 @@ use finstack_quant_models::monte_carlo::estimate::independent_estimator_stats;
 
 use super::config::StochasticPricerConfig;
 use crate::structured_credit::pricing::simulation_engine::{
-    prepare_deal_simulation, simulate_prepared, InstrumentPathFlowSource, PathShocks,
-    PerNameDefaultEngine, PerNamePeriodInput, PeriodPoolShock, PreparedDealSimulation,
-    PreparedInstrumentSchedules, StochasticPathFlowSource,
+    InstrumentPathFlowSource, PathShocks, PerNameDefaultEngine, PerNamePeriodInput,
+    PeriodPoolShock, PreparedDealSimulation, PreparedInstrumentSchedules, StochasticPathFlowSource,
+    prepare_deal_simulation, simulate_prepared,
 };
 use crate::structured_credit::types::{
     StructuredCredit, Tranche, TrancheCashflows, TrancheSeniority,
@@ -753,11 +753,7 @@ impl StochasticPricer {
         let independent: Vec<f64> = (0..factor_path.len())
             .map(|_| {
                 let draw = rng.next_std_normal();
-                if negate {
-                    -draw
-                } else {
-                    draw
-                }
+                if negate { -draw } else { draw }
             })
             .collect();
         let evolved_independent = Self::evolved_factors(&independent, prepared.factor_kappa);
@@ -2044,7 +2040,7 @@ mod per_name_copula_tests {
     fn clo_deal(n_assets: usize) -> StructuredCredit {
         let total = 100_000_000.0;
         let per_asset = total / n_assets as f64;
-        let mut pool = AssetPool::new("CLO-POOL", DealType::Clo, Currency::USD);
+        let mut pool = AssetPool::new("CLO-POOL", DealType::Abs, Currency::USD);
         for i in 0..n_assets {
             pool.assets.push(PoolAsset::fixed_rate_bond(
                 format!("L{i}"),

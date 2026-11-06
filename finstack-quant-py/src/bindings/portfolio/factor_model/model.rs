@@ -15,7 +15,7 @@ use crate::bindings::portfolio::sensitivity::PySensitivityMatrix;
 use crate::errors::{portfolio_to_py, serde_json_to_py};
 
 use super::assignment::PyFactorAssignmentReport;
-use super::whatif::{parse_position_changes, PyStressPnl, PyStressResult, PyWhatIfResult};
+use super::whatif::{PyStressPnl, PyStressResult, PyWhatIfResult, parse_position_changes};
 use crate::bindings::models::factor::risk::PyRiskDecomposition;
 
 /// Convert ``(factor_id, shift)`` pairs into Rust factor stresses.
@@ -69,12 +69,13 @@ impl PyFactorModel {
     #[staticmethod]
     #[pyo3(text_signature = "(config)")]
     fn from_config(py: Python<'_>, config: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let config: FactorModelConfig = if let Ok(typed) = config.cast::<PyFactorModelConfig>() {
-            typed.borrow().inner.clone()
-        } else {
-            let json: String = config.extract()?;
-            py.detach(move || serde_json::from_str(&json))
-                .map_err(|e| serde_json_to_py(e, "invalid FactorModelConfig JSON"))?
+        let config: FactorModelConfig = match config.cast::<PyFactorModelConfig>() {
+            Ok(typed) => typed.borrow().inner.clone(),
+            _ => {
+                let json: String = config.extract()?;
+                py.detach(move || serde_json::from_str(&json))
+                    .map_err(|e| serde_json_to_py(e, "invalid FactorModelConfig JSON"))?
+            }
         };
         let inner = py
             .detach(move || FactorModel::from_config(config))

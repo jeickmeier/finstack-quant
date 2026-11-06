@@ -56,22 +56,26 @@ typed_or_label!(
 /// Accept `Mapping[str, str]` or `Sequence[tuple[str, str]]`, preserving
 /// insertion order.
 pub(super) fn extract_attrs(obj: &Bound<'_, PyAny>) -> PyResult<IndexMap<String, String>> {
-    let pairs: Vec<(String, String)> = if let Ok(dict) = obj.cast::<PyDict>() {
-        dict.iter()
+    let pairs: Vec<(String, String)> = match obj.cast::<PyDict>() {
+        Ok(dict) => dict
+            .iter()
             .map(|(k, v)| Ok((k.extract::<String>()?, v.extract::<String>()?)))
-            .collect::<PyResult<Vec<_>>>()?
-    } else if obj.hasattr("items")? {
-        obj.call_method0("items")?
-            .try_iter()?
-            .map(|item| item?.extract::<(String, String)>())
-            .collect::<PyResult<Vec<_>>>()?
-    } else {
-        obj.extract().map_err(|_| {
-            crate::errors::value_error(format!(
+            .collect::<PyResult<Vec<_>>>()?,
+        _ => {
+            if obj.hasattr("items")? {
+                obj.call_method0("items")?
+                    .try_iter()?
+                    .map(|item| item?.extract::<(String, String)>())
+                    .collect::<PyResult<Vec<_>>>()?
+            } else {
+                obj.extract().map_err(|_| {
+                    crate::errors::value_error(format!(
                 "attrs must be a mapping of str -> str or a sequence of (key, value) pairs; got {}",
                 obj.get_type()
             ))
-        })?
+                })?
+            }
+        }
     };
     let mut map = IndexMap::with_capacity(pairs.len());
     for (k, v) in pairs {

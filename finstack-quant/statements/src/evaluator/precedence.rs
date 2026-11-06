@@ -2,7 +2,16 @@
 
 use crate::error::{Error, Result};
 use crate::types::{NodeSpec, NodeType};
-use finstack_quant_core::dates::PeriodId;
+use finstack_quant_core::dates::{Date, PeriodId};
+
+/// An explicit actual hidden by the as-of visibility cutoff.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct HiddenObservation {
+    /// Date from which the observation is visible.
+    pub(crate) available_on: Date,
+    /// Visibility cutoff of the evaluation.
+    pub(crate) as_of: Date,
+}
 
 /// Resolve the value for a node in a specific period using precedence rules.
 ///
@@ -17,21 +26,21 @@ use finstack_quant_core::dates::PeriodId;
 /// * `node_spec` - Node metadata that includes values, forecast config, and formula text
 /// * `period_id` - Period being evaluated
 /// * `is_actual_period` - Flag indicating whether the period is classified as actuals (forecasts are skipped)
-/// * `allow_explicit_values` - `false` hides explicit values (as-of evaluation of
-///   not-yet-available actuals) while still allowing forecast/formula fallbacks
+/// * `hidden` - `Some` hides explicit values (as-of evaluation of a
+///   not-yet-available actual) while still allowing forecast/formula
+///   fallbacks; its dates explain the hiding when no fallback exists
 pub(crate) fn resolve_node_value(
     node_spec: &NodeSpec,
     period_id: &PeriodId,
     is_actual_period: bool,
-    allow_explicit_values: bool,
+    hidden: Option<HiddenObservation>,
 ) -> Result<NodeValueSource> {
     // 1. Check for explicit value (highest precedence)
-    if allow_explicit_values {
-        if let Some(values) = &node_spec.values {
-            if let Some(amount_or_scalar) = values.get(period_id) {
-                return Ok(NodeValueSource::Value(amount_or_scalar.value()));
-            }
-        }
+    if hidden.is_none()
+        && let Some(values) = &node_spec.values
+        && let Some(amount_or_scalar) = values.get(period_id)
+    {
+        return Ok(NodeValueSource::Value(amount_or_scalar.value()));
     }
 
     // 2. Check for forecast (only in forecast periods, not actuals)
@@ -47,16 +56,22 @@ pub(crate) fn resolve_node_value(
     // 4. No resolution method available
     match node_spec.node_type {
         NodeType::Value => {
-            let message = if allow_explicit_values {
-                format!(
+            let message = match hidden {
+                None => format!(
                     "Value node '{}' has no value for period {}",
                     node_spec.node_id, period_id
-                )
-            } else {
-                format!(
-                    "Value node '{}' has no value visible under the active as_of policy for period {}",
-                    node_spec.node_id, period_id
-                )
+                ),
+                Some(HiddenObservation {
+                    available_on,
+                    as_of,
+                }) => format!(
+                    "Value node '{}' has no value visible under the active as_of policy for \
+                     period {period_id}: its actual is available on {available_on}, after \
+                     as_of {as_of} (an actual becomes visible on its availability date, by \
+                     default the period's exclusive end); use an as_of on or after \
+                     {available_on} or set the node's availability_dates",
+                    node_spec.node_id
+                ),
             };
             Err(Error::eval(message))
         }
@@ -112,7 +127,7 @@ mod tests {
             &node,
             &PeriodId::quarter(2025, 1).expect("valid period fixture"),
             true,
-            true,
+            None,
         )
         .unwrap();
 
@@ -128,7 +143,7 @@ mod tests {
             &node,
             &PeriodId::quarter(2025, 1).expect("valid period fixture"),
             true,
-            true,
+            None,
         )
         .unwrap();
 
@@ -144,7 +159,7 @@ mod tests {
             &node,
             &PeriodId::quarter(2025, 1).expect("valid period fixture"),
             true,
-            true,
+            None,
         );
 
         // Should error because no value provided
@@ -159,14 +174,19 @@ mod tests {
             &node,
             &PeriodId::quarter(2025, 1).expect("valid period fixture"),
             true,
-            false,
+            Some(HiddenObservation {
+                available_on: Date::from_calendar_date(2025, time::Month::April, 1).unwrap(),
+                as_of: Date::from_calendar_date(2025, time::Month::March, 31).unwrap(),
+            }),
         )
         .expect_err("hidden value node must error");
 
+        let message = err.to_string();
         assert!(
-            err.to_string()
-                .contains("has no value visible under the active as_of policy for period"),
-            "got: {err}"
+            message
+                .contains("has no value visible under the active as_of policy for period 2025Q1")
+                && message.contains("available on 2025-04-01, after as_of 2025-03-31"),
+            "got: {message}"
         );
     }
 
@@ -186,7 +206,7 @@ mod tests {
             &node,
             &PeriodId::quarter(2025, 3).expect("valid period fixture"),
             false,
-            true,
+            None,
         )
         .unwrap();
         assert_eq!(source, NodeValueSource::Forecast);
@@ -208,7 +228,7 @@ mod tests {
             &node,
             &PeriodId::quarter(2025, 1).expect("valid period fixture"),
             true,
-            true,
+            None,
         )
         .unwrap();
         assert!(source.is_formula());

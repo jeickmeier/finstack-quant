@@ -19,9 +19,21 @@
       "worker": "none"
     },
     {
+      "name": "table-envelope",
+      "type": "registry:ui",
+      "docs": "Display-only table-envelope primitive. Import the installed finstack theme. Pass the TableEnvelope a Rust table function returned (for example statements_analytics.plSummaryReport or Performance#summary) and a caption. Columns and rows keep their native order; numeric columns are right-aligned with every supplied digit; nothing is sorted, grouped, totalled, rounded or converted. missingCell, when supplied, is shown for a null or NaN cell. No worker or workbench is required.",
+      "worker": "none"
+    },
+    {
       "name": "enum-field",
       "type": "registry:ui",
       "docs": "Controlled enum-field primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "worker": "none"
+    },
+    {
+      "name": "native-display",
+      "type": "registry:ui",
+      "docs": "Presentation helpers shared by registry components: ReportSection, Pairs, Outcome (native error, working and empty states), TextField, UndefinedValue, and the typedNumber, shownValue, passThrough, utc and yesNo helpers. Values are shown as Rust returned them; empty typed numbers become NaN so Rust rejects them. Import the installed finstack theme; no worker or workbench is required.",
       "worker": "none"
     },
     {
@@ -33,7 +45,7 @@
     {
       "name": "id-combobox",
       "type": "registry:ui",
-      "docs": "Controlled id-combobox primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required. Composes the stock shadcn Combobox with controlled free text, supplied filtered suggestions and TanStack list virtualization; IDs are never inferred.",
+      "docs": "Controlled id-combobox primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required. Composes the stock shadcn Combobox with controlled free text, supplied filtered suggestions and TanStack list virtualization; typed text is the value and survives Tab, blur and Escape; IDs are never inferred.",
       "worker": "none"
     },
     {
@@ -55,6 +67,12 @@
       "worker": "none"
     },
     {
+      "name": "curve-query",
+      "type": "registry:component",
+      "docs": "Reads one stored curve or surface at supplied points: discount factor and continuously compounded zero rate, plus continuously compounded forward rates over year-fraction intervals, of a discount curve; the forward rate of a forward curve; survival probability and hazard rate of a hazard curve; volatility of a stored surface at an expiry and strike. Curve points are years from the base date or ISO dates, which pass through as entered for Rust to convert with the curve day count. A point Rust rejects shows its native error in its own cell; an id the market does not hold is the whole error. Look up passes the lookup to the caller (usually, with the market, the useCurveQuery request). Mount it in market-context-browser through renderObject with curveQueryTarget, which names the queryable target of a browser entry. Accepts target, defaultPoints, defaultForwards, onSubmit, result, loading, error, formatValue and density props.",
+      "worker": "none"
+    },
+    {
       "name": "decimal-input",
       "type": "registry:ui",
       "docs": "Controlled decimal-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
@@ -64,12 +82,6 @@
       "name": "money-input",
       "type": "registry:ui",
       "docs": "Controlled money-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
-      "worker": "none"
-    },
-    {
-      "name": "rate-input",
-      "type": "registry:ui",
-      "docs": "Controlled rate-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
       "worker": "none"
     },
     {
@@ -123,7 +135,7 @@
     {
       "name": "market-context-form",
       "type": "registry:component",
-      "docs": "Complete market editor using generated schema/meta and native validation. Edit curves, FX entries, prices, stored surfaces, SABR cubes and FX ATM/RR/BF quotes; other data stays read-only and is retained. Import canonical JSON or a calibration envelope final_market. Supply useMarketValidator and receive complete canonical JSON on submit.",
+      "docs": "Complete market editor using generated schema/meta and native validation. Edit curves, FX entries, prices, stored surfaces, SABR cubes and FX ATM/RR/BF quotes; other data stays read-only and is retained. Import market JSON (Import market JSON) or the final_market of a calibration result envelope (Import calibration result), each through the generated MarketContextState contract. Supply useMarketValidator and receive complete canonical JSON on submit.",
       "worker": "none"
     },
     {
@@ -160,6 +172,42 @@
       "name": "curve-link-example",
       "type": "registry:component",
       "docs": "Stored discount curve table and chart share accepted semantic selection. Explicit row/cell addresses preserve original data and render identity; caller activation callbacks update detail only. No WASM or financial calculations.",
+      "worker": "none"
+    },
+    {
+      "name": "metric-values-table",
+      "type": "registry:component",
+      "docs": "The table the metric-id cards share. Draws useMetricValues rows in the supplied order with labelFor labels; an id Rust rejects shows its native error in its own row and leaves the others, and a whole-request error replaces the table. Unit and group are what metricMetadata declares; a unit it leaves unknown says not declared, and values are never rescaled. applicableMetrics keeps the supplied ids Rust lists for an instrument type (metricsForInstrument). Accepts label, rows, metadata, loading, error, formatValue, density and note props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "bond-credit-card",
+      "type": "registry:component",
+      "docs": "Shows z_spread, i_spread, g_spread, oas, asw_par, asw_market, discount_margin, embedded_option_value, duration_mod, duration_mac, convexity, dv01, cs01, recovery01, jump_to_default, theta, theta_carry, theta_roll_down, carry_total, coupon_income, pull_to_par, roll_down, funding_cost, theta_period_days and breakeven. applicableMetrics keeps those Rust lists for the instrument type; pass the result to useMetricValues and useMetricMetadata. An id Rust rejects (g_spread with no government curve named, recovery01 and jump_to_default off a hazard curve, breakeven with no config, oas with no quote) shows its native error in its own row and leaves the others; a malformed instrument or market is the whole error. With onOverridesChange it offers the schema's form for theta_period and breakeven_config over the supplied MetricPricingOverrides, keeping the fields it does not edit: pass the applied JSON as the request's metricPricingOverrides. Accepts rows, metadata, loading, error, formatValue, density, overrides and onOverridesChange props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "loan-yield-card",
+      "type": "registry:component",
+      "docs": "Shows the metric ids a loan analyst reads together: ytm, ytw, ytc, yt2y, yt3y, yt4y, discount_margin, all_in_rate, oid_eir_rate, oid_eir_amortization, embedded_option_value, recovery01 and jump_to_default. applicableMetrics from metric-values-table keeps those Rust lists for the instrument type (metricsForInstrument); pass the result to useMetricValues, which prices each id on its own call because one failing id fails a whole native request, and useMetricMetadata for units and groups. An id Rust rejects (embedded_option_value without the tree model, discount_margin on a fixed loan or on a callable loan without a quote, recovery01 and jump_to_default without a credit curve under the tree model) shows its native error in its own row and leaves the others; a malformed instrument or market is the whole error. Unit shows what metricMetadata declares and says not declared otherwise; values are never rescaled. Accepts rows, metadata, loading, error, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "yield-workout-ladder",
+      "type": "registry:component",
+      "docs": "Answers which call date is the worst workout and what the yield to each is. Present a native valuations.instruments.bondWorkoutLadder result (useBondWorkoutLadder): the one price every exit is solved at, then one row per exit in Rust's date order with its redemption, yield, I-spread and the mark on the row is_worst names, the exit the ytw metric selects. Pass metricMetadata of workoutLadderMetrics for the yield and spread units. A null yield shows as no yield, never zero. A bond with exercise rights needs quoted_clean_price_pct; the native error is shown as returned. Nothing is compared, sorted or derived. Accepts ladder, metadata, loading, error, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "convertible-card",
+      "type": "registry:component",
+      "docs": "Answers how a convertible moves with its stock. Present a native valuations.instruments.convertibleSpotLadder result (useConvertibleSpotLadder) as a chart of price, conversion value and floor with each regime Rust returned, a chart of parity and premium, and a row per share price with delta, hedge ratio, regime, parity and premium, with metric ids through metric-values-table. The share prices are the ones entered through onSpotsChange or Rust's default ladder. Pass metricMetadata of ladderMetrics for the column units. A null hedge ratio, regime or premium shows as undefined. Nothing is classified, compared or derived. Accepts ladder, ladderMetadata, ladderLoading, ladderError, onSpotsChange, rows, metadata, loading, error, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "quote-converter",
+      "type": "registry:component",
+      "docs": "Answers what a bond's other quotes are given any one of them. Offers the quote kinds of the BondQuoteInput schema and presents a native valuations.instruments.computeQuotes result (useComputeQuotes) in Rust's field order. Pass native bondQuoteSetFieldUnits (useBondQuoteSetFieldUnits) for the units. A null field shows as no value, never zero. A quote that cannot be solved, a kind the bond does not have or one metric of the set failing, shows the native error as returned. Nothing is converted or compared. Accepts defaultInput, onSubmit, quotes, units, loading, error, formatValue and density props; no worker or query provider required.",
       "worker": "none"
     },
     {
@@ -207,13 +255,13 @@
     {
       "name": "pricing-params-form",
       "type": "registry:component",
-      "docs": "Standalone controlled pricing parameters. Supply native groups from useModels/useMetrics. Metric pricing overrides are edited from their schema and emitted as compact JSON. Market history text and omitted versus empty metric selection are preserved. JSON validation checks syntax only; native pricing owns financial validation.",
+      "docs": "Standalone controlled pricing parameters. Supply native groups from useModels and useMetrics(instrumentType). Selected metrics the type does not offer are reported, never dropped. Metric pricing overrides are edited from their schema and emitted as compact JSON. Market history text and omitted versus empty metric selection are preserved. JSON validation checks syntax only; native pricing owns financial validation.",
       "worker": "none"
     },
     {
       "name": "cashflow-viewer",
       "type": "registry:component",
-      "docs": "Supplied native cashflow JSON table with row-currency amounts and reporting-currency PV. Lossless numeric tokens; Rust supplies totals and reconciliation. Original JSON remains available for exact copy/download. Accepts text, loading and error props; no worker or query provider required.",
+      "docs": "Table of the supplied native cashflow envelope object with row-currency amounts and reporting-currency PV, validated against the Rust schema. Rust supplies totals and reconciliation. Principal before and after columns show the supplied beginning_balance and ending_balance (per row for bonds, term loans and revolvers, per period for agency MBS), hidden only when no row carries one; nothing is accumulated. An optional ladder prop (the native cashflows.calendarYearLadder rows per row currency, as useCashflowLadder returns them) adds a Schedule / Annual ladder toggle with one table per currency in native PV. Envelope JSON (a host serialization of the object) is available for copy/download. Accepts cashflows, ladder, loading and error props; no worker or query provider required.",
       "worker": "none"
     },
     {
@@ -231,13 +279,49 @@
     {
       "name": "scenario-heatmap",
       "type": "registry:component",
-      "docs": "Display returned ScenarioTable prices at original CPR/CDR coordinates, with an explicitly controlled severity and priceDomain straddling the canonical par reference 100. Prices are clean settlement percentages of current tranche balance per Rust ScenarioCell.price. Optional shared linking, callbacks, tooltip body, annotations and complete figure exports. No valuation, rebasing or WAL/writedown overlay.",
+      "docs": "Display one returned ScenarioTable measure at original CPR/CDR coordinates, with explicitly controlled severity and measure. The measures, axes and their units come from native scenarioTableFieldUnits. Price centres its colour on the canonical par reference 100 over an optional priceDomain, else the returned prices' reach about par; WAL and writedown run low to high over the table. Optional shared linking, callbacks, tooltip body, annotations and complete figure exports. No valuation or rebasing.",
+      "worker": "none"
+    },
+    {
+      "name": "pool-report",
+      "type": "registry:component",
+      "docs": "Present a native valuations.instruments.poolReport result: total balance, WARF and PoolStats tiles, then concentration tables by obligor, industry and rating in Rust's row order. Every unit comes from native poolReportFieldUnits for the report's currency. A null key means the attribute is missing on those assets and shows as such, and a null statistic, an average over an empty population, shows as missing and never as zero. Nothing is summed, sorted, grouped or rescaled. No worker is required.",
+      "worker": "none"
+    },
+    {
+      "name": "waterfall-report",
+      "type": "registry:component",
+      "docs": "Present a native StructuredCredit.runSimulation result: one row per SimulationDiagnostics.periods entry in Rust's order with WaterfallDistribution's total available, recovery proceeds, diverted cash, carried interest and principal, whether a coverage test failed, and how many payments went outside the waterfall. Expanding a period shows the principal used for interest, its tier allocations and payment records in execution order, its diversions and its non-waterfall payments with their own dates. A settlement-only deal has one row, whose release is in that row's non-waterfall payments, and a note says so. The non-waterfall column is a count; the caption names the deal currency Rust states on each amount, and each amount shows every digit. Nothing is summed, joined by date, sorted or classified. No worker is required.",
+      "worker": "none"
+    },
+    {
+      "name": "coverage-test-chart",
+      "type": "registry:component",
+      "docs": "Present a native StructuredCredit.runSimulation result: SimulationDiagnostics.first_breaches in Rust's order, one test selected at a time, its ratio, trigger_level, cushion and passing flag on the dates Rust recorded it, and its first breach date, which a later cure does not clear. Dots are not connected because a tranche trigger can be absent between dates. A test recorded on fewer dates than the deal has periods states the counts, and one with no coverage_tests row is listed without a chart. A null ratio or cushion is Rust's no claim outstanding: the table and tooltip say so and no dot is drawn. Below, waterfall.diverted_cash by date and the diverted_amounts records with Rust's reason; a diversion belongs to a waterfall tier, so it is not attributed to the selected test. Units come from native simulationFieldUnits. No test evaluated, or one period, renders a stated condition rather than a chart. Nothing is computed, joined by date, sorted or classified. No worker is required.",
+      "worker": "none"
+    },
+    {
+      "name": "credit-enhancement-chart",
+      "type": "registry:component",
+      "docs": "Present a native StructuredCredit.runSimulation result: PeriodDiagnostics.credit_enhancement, each tranche's decimal share of the collateral beneath it at period end, one line per tranche, and PeriodDiagnostics.excess_spread, realized that period and annualized as a decimal of the opening pool balance (pool interest less debt coupons due, service-provider and manager fees paid through the waterfall and net charge-offs; not the static abs_excess_spread metric). A table below holds the same values with every digit. Units come from native simulationFieldUnits. A deal with one period is listed instead of charted. Nothing is computed, grouped, joined by date, sorted or classified. No worker is required.",
+      "worker": "none"
+    },
+    {
+      "name": "equity-tranche-card",
+      "type": "registry:component",
+      "docs": "Present a native StructuredCredit.equityMetrics result beside a purchase price input. Rust measures the deal's first equity-seniority tranche: invested is its current balance times the price, par when the price is blank; irr is the annual XIRR (ACT/365F, decimal) of -invested on the valuation date against every later distribution, interest and principal; moic is total distributions over invested; nav_pct is those distributions discounted to the valuation date on the deal's discount curve, as a percent of current balance, and does not move with the price; cash_on_cash is each distribution as an unannualized decimal share of invested. Units come from native equityMetricsFieldUnits. A deal with no equity tranche shows Rust's error as returned. A null irr is stated as no rate solving and never drawn as zero: Rust returns it when nothing is invested or the tranche receives no distribution, while one that receives little still has an IRR near -1. A null moic or cash-on-cash share is stated as nothing invested, and a returned zero is drawn as zero. Nothing is computed, rescaled or classified. No worker is required.",
+      "worker": "none"
+    },
+    {
+      "name": "tranche-analytics",
+      "type": "registry:component",
+      "docs": "Present native valuations.instruments results for one tranche as supplied: the TrancheMetrics fields in Rust declaration order (unset optional fields hidden) with the unit each Rust field documents, any requested registry metrics raw, trancheBreakevenCdr and trancheDiscountMargin as decimals, and the trancheOas result. The clean price is a controlled exact-decimal input, percent of current balance; no price is assumed, and discount margin and OAS stay idle without one. OAS runs only through onSolveOas. With onOasConfigChange, an OAS configuration disclosure edits the generated OasConfig contract, starting from its Rust example (OasConfig::default()), and hands complete JSON to the host on apply. With schedule, the native TrancheCashflows totals and the TrancheCashflows::to_table projection (one row per date; Rust joins and sums the per-kind flows) show as returned. Nothing is computed, rescaled or defaulted. No worker is required.",
       "worker": "none"
     },
     {
       "name": "pricing-workbench",
       "type": "registry:block",
-      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and optional structured-credit scenarios. Host owns routes and domain inputs.",
+      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and structured-credit deal entry (a registry family plus StandardDealParams starting from Rust's example, through StructuredCredit.newStandard), a pool report over native poolReport, a waterfall report, coverage tests and credit enhancement with excess spread over the deal's runSimulation, an equity tranche card over native equityMetrics, a tranche selector over the deal's native tranches, tranche analytics (with an applied OasConfig) and scenarios over an editable ScenarioGrid seeded from the host grid or Rust's example. A priced bond adds an Analytics tab with bond-credit-card, yield-workout-ladder and quote-converter, each opening on its own over the completed request; a priced term loan adds one with loan-yield-card. Host owns routes and domain inputs; the structured-credit seeds are optional.",
       "worker": "host"
     },
     {
@@ -265,9 +349,177 @@
       "worker": "none"
     },
     {
+      "name": "covenant-engine-editor",
+      "type": "registry:component",
+      "docs": "Composes schema-form over the generated covenant_engine contract (started from defaultJson; Rust publishes no example, so it otherwise starts empty). When loadTemplate is supplied, a second schema form over the generated covenant_template contract picks a Rust package (cov_lite, lbo_standard, real_estate or project_finance) and its thresholds, which start empty; Load template passes the structurally checked CovenantTemplate to covenants.covenantTemplate and replaces the engine with the returned specs, and a rejected template shows the native error in that form. Every metric_id and denominator_metric_id (top-level and windowed specs) is an id-combobox: free text with metricIds as suggestions. A Covenant metrics table lists each spec's metric id and whether metricIds contains it, before any evaluation; an unset metric id is listed as read by Rust's conventional metric for the covenant type and is not checked. Validation, templates and every term are native: connect validate to useCovenantEngineValidator, loadTemplate to useCovenantTemplate and onSubmit to the useEvaluateCovenants request. Accepts defaultJson, validate, onSubmit, loadTemplate, metricIds, disabled and density props.",
+      "worker": "none"
+    },
+    {
+      "name": "covenant-breach-forecast",
+      "type": "registry:component",
+      "docs": "Composes schema-form over the generated covenant_forecast_config contract (started from defaultConfigJson; Rust publishes no example and an empty config takes Rust's deterministic maintenance-scope defaults; Rust validates the config when it forecasts, so the form checks structure only and a uint64 random_seed stays exact) and a finstack-table of native FutureBreach rows (statements_analytics.forecastBreaches) in the order supplied, which Rust sorts by breach date, then covenant id: date, covenant, Rust's test description, projected value, threshold, headroom and breach probability with every supplied digit (a host may inject formatValue), an unset value as a dash. Deterministic forecasts list breached dates with probability 1; a stochastic config also lists dates whose probability reaches its breach_probability_threshold. Connect onSubmit to the useForecastBreaches request. Accepts defaultConfigJson, onSubmit, breaches, loading, error, formatValue and density props. No worker is required.",
+      "worker": "none"
+    },
+    {
+      "name": "covenant-compliance",
+      "type": "registry:component",
+      "docs": "Present native DatedCovenantReports rows (statements_analytics.evaluateCovenants over statement results, or CovenantEngine#evaluateSeries over dated rows) as a grid: one column per test date in the order supplied, one row per covenant instance key in first-appearance order, each cell the returned verdict as Passed or Failed, or a dash when Rust returned no report for that covenant on that date. A date header button selects the date (the latest initially) and its reports render below through covenant-report. Nothing is computed, sorted or inferred. No worker is required.",
+      "worker": "none"
+    },
+    {
       "name": "covenant-report",
       "type": "registry:component",
-      "docs": "Optional original valuation covenant payload rendered losslessly; no verdict or financial headroom is inferred.",
+      "docs": "Present native CovenantReport values keyed by covenant instance key (CovenantEngine#evaluate, one DatedCovenantReports row, or a valuation result's covenants) as a typed table in the order supplied: Rust's test description, actual value, threshold and headroom with every supplied digit (a host may inject formatValue), the passed verdict as Passed or Failed, and details; a field Rust leaves unset shows as a dash. The complete reports stay available as JSON in a Covenants disclosure. No verdict, headroom or threshold is computed. No worker is required.",
+      "worker": "none"
+    },
+    {
+      "name": "market-scenario-builder",
+      "type": "registry:component",
+      "docs": "Composes schema-form over the generated scenario_spec contract (started from defaultJson, else the Rust schema example), with IdCombobox on the operation curve_id, discount_curve_id, vol_surface_id, surface_id and ids fields: free text with the supplied market ids as suggestions, never filtered by kind. When templates is supplied, a picker lists scenarios.listBuiltinTemplateMetadata (useListBuiltinTemplateMetadata) with the selected template's returned description, severity, event date, asset classes and tags; Load template replaces the document with scenarios.buildFromTemplate or, for a chosen component, buildTemplateComponent, and Compose with scenario merges the current scenario and the template through scenarios.composeScenarios (Rust's priority order, id and hazard-bump-mode rule). Template ids are placeholders the user maps to market ids. Add parallel shift and Add roll append a curve_parallel_bp or time_roll_forward OperationSpec to the working spec as entered; a blank size is NaN and a blank roll mode is omitted, so Rust rejects or defaults them when it validates the spec. Validation is native (connect validate to useScenarioSpecValidator); onSpecChange receives the canonical spec, or null while an edit is pending or rejected, and the canonical spec is shown as JSON. Every failure is the native error. Accepts defaultJson, validate, onSpecChange, curveIds, templates, templatesError, buildFromTemplate, buildTemplateComponent, composeScenarios, disabled and density props.",
+      "worker": "none"
+    },
+    {
+      "name": "market-scenario-report",
+      "type": "registry:component",
+      "docs": "Display-only view of the ApplicationReport returned by scenarios.applyScenario: operation and effect counters, every applied shock, the time roll with its returned per-instrument and total carry, every warning variant shown generically by kind and fields, the ResultsMeta stamp and the report JSON. Values are shown as returned; nothing is summed or converted. Accepts report, loading and error props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "horizon-return-report",
+      "type": "registry:component",
+      "docs": "Display-only view of the HorizonReport returned by scenarios.computeHorizonReturn (useHorizonReturn): total and annualized return and each factor contribution as the decimal fractions Rust computed (an undefined value, such as the annualized return without a time roll, reads \"not defined\", never zero), the horizon in calendar days, the exact initial and terminal values, the Rust explain text (scenarios.horizonResultExplainText), the attribution through pnl-attribution-report and the scenario application report through market-scenario-report in a disclosure. Nothing is computed here. Accepts report, explain, loading, error and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "pnl-attribution-report",
+      "type": "registry:component",
+      "docs": "Display-only view of a PnlAttribution as returned (by attribution.attributePnl / attributePnlMany, or inside scenarios.computeHorizonReturn): total, mark-to-market and endpoint values, every factor bucket as exact money with a signed bar chart of the returned amounts, the waterfall drawn only from Rust's waterfall_steps (pv_before to pv_after per step; nothing when the method returns none), the residual with the returned residual_pct and tolerances, notes, the policy stamp and the JSON. A required buckets prop takes Rust's pnlAttributionPctOfTotalByBucket, which names the buckets, their amounts and shares; optional explain and residualWithinTolerance props take pnlAttributionExplainText and pnlAttributionResidualWithinTolerance; without residualWithinTolerance no verdict is shown. Nothing is summed, differenced or converted. Accepts attribution, buckets, loading, error and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "performance-report",
+      "type": "registry:component",
+      "docs": "Display-only view of the report returned by usePerformanceReport (analytics.Performance over a host-supplied panel). A ticker control selects the per-ticker sections. Lookback tiles show MTD, QTD, YTD and FYTD to the returned reference date; the summary is the returned TableEnvelope; cumulative returns (every ticker), drawdown, rolling series, monthly returns (heatmap) and annual returns are drawn against each ticker's own active dates; drawdown episodes are listed largest first. Values are the decimal fractions and ratios Rust returns, with no units inferred; non-finite values are left out of figures and shown as returned elsewhere. The monthly colour domain is the caller's, else the extent of the returned values. Accepts report, loading, error, initialTicker, monthlyDomain, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "benchmark-report",
+      "type": "registry:component",
+      "docs": "Display-only view of the report returned by useBenchmarkReport (analytics.Performance against a named benchmark over a host-supplied panel). A fund control selects the ticker, defaulting to the first ticker that is not the benchmark. Key-value tables show the fund's greeks (alpha, beta, R squared, adjusted R squared, observations), its beta estimate with standard error and confidence bounds, and its tracking error, information ratio, Treynor, M squared, up and down capture, capture ratio and batting average. Cumulative outperformance and drawdown difference are drawn against the fund's own active dates, rolling alpha and beta against the returned window-end dates; the multi-factor regression (alpha, one beta per factor, R squared, adjusted R squared, residual volatility, observations) or its native error is shown when a factor panel was supplied. Values are the decimal fractions and ratios Rust returns, with no units inferred; non-finite values are left out of figures and shown as returned elsewhere. Accepts report, loading, error, initialTicker, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "correlation-heatmap",
+      "type": "registry:component",
+      "docs": "Presents one native analytics.Performance correlationMatrix result as returned: a diverging heatmap over the fixed correlation range [-1, 0, 1] and a table of every coefficient, rows and columns in Rust's ticker order, with a Repaired stamp shown only when Rust's repaired flag says it projected the raw estimate to the nearest valid correlation matrix (Higham); the flag is Rust's, never inferred here. Rust returns a unit diagonal and every coefficient inside [-1, 1]. Connect useCorrelationMatrix. Accepts report, loading, error, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "portfolio-summary",
+      "type": "registry:component",
+      "docs": "Display-only view of the valuation returned by useValuePortfolio (portfolio.valuePortfolio). Shows total_base_currency, the valuation date, fx_collapse_policy as the text Rust stamped, by_entity values in entity registration order (Portfolio#entityIds) and degraded_positions with each risk_error. Amounts are the exact returned money; nothing is summed or converted. Accepts report ({entityIds, valuation}), loading, error and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "positions-table",
+      "type": "registry:component",
+      "docs": "Display-only view of the valuation returned by useValuePortfolio. Rows follow Portfolio#positionIds (spec order), never the position_values key order: entity, instrument, native and base values, the FX rate Rust applied, risk completeness and inapplicable_metrics (metrics on the requested menu the instrument has no calculator for). Activating a row shows that position's returned valuation_result with valuation-summary and measures-grid; pass Rust metricMetadata (useMetricMetadata) for measure labels. Accepts report ({positionIds, valuation}), metadata, initialPosition, loading, error and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "portfolio-metrics",
+      "type": "registry:component",
+      "docs": "Display-only view of the metrics returned by useValuePortfolio (portfolio.aggregateMetrics) and a series from usePortfolioMetricsSeries (portfolio.portfolioMetricsSeries). The series is charted per first key component (the curve) with buckets in the order Rust returned them, which is lexical (10y, 15y, 1y, ...); no tenor sort is applied while tenor ordering is an open owner decision. Aggregated rows show each total with by-entity columns in entity registration order; the position table shows that position's raw metrics with its native currency. unaggregated_metrics, skipped_metrics and degraded_positions are listed as returned. Accepts report ({positionIds, entityIds, metrics}), series, metadata, initialPosition, formatValue, loading, error and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "scenario-pnl-table",
+      "type": "registry:component",
+      "docs": "Display-only view of the batch returned by useScenarioPnlBatch (portfolio.scenarioPnlBatch): rows in Portfolio#positionIds (spec) order, never the by_position key order, plus any position a scenario added in returned key order; one column per scenario in batch order with the exact returned by_position money; a total row from each scenario's returned pnl.total (base currency); a bar chart of those totals; and each scenario's ApplicationReport through market-scenario-report in a disclosure. Nothing is summed or differenced. Accepts report ({positionIds, items}), loading, error and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "portfolio-margin-report",
+      "type": "registry:component",
+      "docs": "Display-only view of the PortfolioMarginResult returned by usePortfolioMargin (portfolio.portfolioMargin): the total margin with an always-shown Indicative badge, every returned total (initial, variation, required and segregated IM collateral, IM transfer) as exact base-currency money, positions_without_margin and total_positions as the counts Rust returns, netting sets in returned order (id, methodology, position count, IM, VM, total and the returned is_approximate flag), IM collateral by CSA in the netting sets' CSA order (then any other returned CSA), degraded positions with Rust's messages, and for the selected netting set its im_breakdown and SIMM sensitivities through simm-sensitivity-table. Amounts are shown as returned, including a -0 variation margin; nothing is summed, netted or converted. Accepts result, loading, error and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "portfolio-attribution-report",
+      "type": "registry:component",
+      "docs": "Display-only view of what useAttributePortfolioPnl returns (portfolio.attributePortfolioPnl with Rust's helpers): total_pnl as exact base-currency money; the reconciliation verdict, the gap between total_pnl and its buckets and the tolerance only from portfolioAttributionReconciliationCheck, with result_invalid as returned; every bucket from portfolioAttributionPctOfTotalByBucket as a table with its share and a signed bar chart (pnl-attribution-report's PnlFactorBuckets); a row per by_position entry in returned order with its currency, total P&L and one column per book bucket filled from that position's own pnlAttributionPctOfTotalByBucket; the selected row's PnlAttribution through pnl-attribution-report with its explain text and residual check; portfolioAttributionExplainText and the JSON. Positions are in each instrument's currency and exclude FX translation, so they do not add up to the book; nothing is summed, differenced or converted. Accepts report, loading, error and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "portfolio-returns",
+      "type": "registry:component",
+      "docs": "Three forms, each presenting one native result: the geometric link of sub-period returns over a horizon (portfolio.twrrLinked: cumulative, annualised, is_annualised and num_periods as returned; when Rust's is_annualised is false the annualised figure is the cumulative one and the form says so), one period's Modified-Dietz return from its beginning and ending values and flows weighted by the fraction of the period remaining (portfolio.twrrModifiedDietz, a decimal for the period, not annualised; a contribution is positive) and the money-weighted return of dated investor flows (portfolio.mwrXirr, an annualised decimal on Act/365F; a contribution is negative, and the net flows must change sign once). Connect useTwrrLinked, useTwrrModifiedDietz and useMwrXirr. The forms start from defaultInputs and edit their own copies; nothing is defaulted, and the horizon and flow fractions are the host's numbers, never derived from dates here. An empty field is submitted as NaN, which Rust rejects. Each form shows its own native error. Accepts defaultInputs, onSubmitLinked, onSubmitDietz, onSubmitXirr, linked, dietz, xirr, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "brinson-report",
+      "type": "registry:component",
+      "docs": "Presents one native portfolio.brinsonLinked result as returned: the compounded portfolio and benchmark returns, a table of each sector's Carino-linked allocation, selection, interaction and total with Rust's linked total of each effect in the footer, a bar chart of the sectors' returned linked totals (never stacked) and, for every period in order, its portfolio, benchmark and excess returns and its sector effects with the returned period totals. Every figure is a decimal of return; nothing is summed, differenced or linked here, and the compounded active return is not shown because Rust returns only its two sides. Connect useBrinsonLinked. periodLabels are the host's names of the periods in order; omitted shows each period's position. Accepts report, periodLabels, loading, error, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "exposure-report",
+      "type": "registry:component",
+      "docs": "Presents one native portfolio.primitiveExposures result (PortfolioPrimitiveExposureReport) as returned: a table of each primitive's net and gross quantity and value in the base currency, ordered by primitive id as Rust returns them, with a grouped bar chart of the two values (plotted, never stacked); each requested additive metric's net and gross amount per primitive, metric ids shown as returned; and the position-aware primitive paths with their position-scaled quantity and value. With sensitivities it adds a Factor sensitivities section: the portfolio.computeFactorSensitivities matrix (positions by factors, in the base currency) as returned, with its own loading and native error. Rust returns both net and gross; nothing is summed, netted, converted or re-sorted here. Connect usePrimitiveExposures and useFactorSensitivities. Accepts report, loading, error, sensitivities, sensitivitiesLoading, sensitivitiesError, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "portfolio-workbench",
+      "type": "registry:block",
+      "docs": "Tabs over the portfolio components, with no native call of its own. Positions: portfolio-summary and positions-table of useValuePortfolio (portfolio.valuePortfolio, then aggregateMetrics) with Rust metricMetadata of every returned measure id. Risk: portfolio-metrics of the same report, charting the usePortfolioMetricsSeries series of seriesBase when one is supplied, then exposure-report of usePrimitiveExposures (portfolio.primitiveExposures of the book over marketJson with exposures.metrics, omitted being quantity and value only) and, when exposures.factorsJson is supplied, useFactorSensitivities (portfolio.computeFactorSensitivities on asOf with any exposures.bumpConfigJson), then, when correlation is supplied, correlation-heatmap of useCorrelationMatrix (analytics.Performance correlationMatrix of the host's return panel, with Rust's repaired stamp). Scenarios (only when scenarioJsons are supplied): scenario-pnl-table of useScenarioPnlBatch (portfolio.scenarioPnlBatch). Attribution (only when attribution is supplied): portfolio-attribution-report of useAttributePortfolioPnl (portfolio.attributePortfolioPnl from marketJson on asOf to attribution.marketT1Json on attribution.asOfT1, with Rust's explain, reconciliation at attribution.reconciliationTolerance and buckets) under the method the user picks; every Rust method is offered, none preselected, waterfall in useDefaultWaterfallOrder's order, and a method that fails on the book shows its native error. Returns (only when returns is supplied): portfolio-returns of useTwrrLinked, useTwrrModifiedDietz and useMwrXirr (portfolio.twrrLinked, twrrModifiedDietz and mwrXirr) over the host's returns.linked (sub-period decimal returns and horizonYears in 365-day years), returns.dietz (one TwrrPeriod) and returns.xirr (dated investor flows), computed when the tab opens and again for each form the user resubmits. Brinson (only when brinson is supplied): brinson-report of useBrinsonLinked (portfolio.brinsonLinked) over the host's brinson.periods (chronological SectorPeriod rows, each side's weights summing to one) named by any brinson.periodLabels, computed when the tab opens. Margin: portfolio-margin-report of usePortfolioMargin (portfolio.portfolioMargin) on asOf with any currentImCollateral. Book: PortfolioSpec JSON that usePortfolioSpecValidator validates natively before every tab values it. The exposure, Scenarios, Attribution, Returns, Brinson and Margin calls run only when their tab first opens. Host-supplied props: defaultSpecJson (PortfolioSpec; remount for a different book), marketJson (MarketContextState), asOf (ISO margin date, never read from the spec), metrics (omitted is Rust's standard set), seriesBase, exposures (additive metric ids and factor definitions, none of them defaulted), correlation (a return or price panel, never derived from the book), scenarioJsons (never parsed), attribution (the closing MarketContextState marketT1Json, which needs any FIXING: series a seasoned floating leg fixes before its asOfT1, that ISO date and a base-currency reconciliationTolerance; Rust has no default for any of them), returns (performance data, none of it defaulted or derived from the book), brinson (sector weights and returns per period, none of them defaulted or derived from the book), currentImCollateral (omitted is none held) and density. Nothing is summed, netted or converted; native errors show as returned. Requires FinstackQueryProvider.",
+      "worker": "host"
+    },
+    {
+      "name": "simm-sensitivity-table",
+      "type": "registry:component",
+      "docs": "Display-only view of a SimmSensitivitiesJson document (for example the canonical text useSimmSensitivitiesValidator returns, parsed). Sections follow the SIMM risk classes (interest rate, credit qualifying, credit non-qualifying, equity, commodity, FX); each holds the class's delta and vega tuples in input order, with columns named after the Rust tuple positions, and the curvature entries whose risk_class is that class. Empty fields are omitted. Nothing is summed, netted, regrouped or converted; amounts are in the set's base currency, which is shown. Accepts sensitivities, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "simm-report",
+      "type": "registry:component",
+      "docs": "Display-only view of the ImResult returned by useSimmIm (margin.SimmCalculator#calculateFromSensitivities). The headline is the returned amount with methodology, as_of, mpor_days and the detail's mpor_scale. An Indicative badge is always shown, beside the returned approximation flag: the result is for indicative funding and capacity analysis, not for reconciling a counterparty margin call. The breakdown lists the returned component amounts as exact money in returned key order; the drill-down shows the returned risk_class_margins and, for a selected component, its buckets (k, signed_sum) and weighted sensitivities (risk weight, concentration factor). Nothing is aggregated. Accepts result, loading, error, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "simm-calculator",
+      "type": "registry:component",
+      "docs": "Composes schema-form over the generated simm_sensitivities_json contract (started from defaultJson, else the Rust schema example), a date-input for the calculation date, simm-sensitivity-table over the natively validated canonical set and simm-report over the returned ImResult. Validation and calculation are caller callbacks: connect validate to useSimmSensitivitiesValidator and onSubmit plus result, loading and error to useSimmIm. Rust accepts only USD-based sets; another base currency surfaces the native error in the report. Accepts defaultJson, asOf, onAsOfChange, validate, onSubmit, result, loading, error, formatValue and density props.",
+      "worker": "none"
+    },
+    {
+      "name": "csa-editor",
+      "type": "registry:component",
+      "docs": "Composes schema-form over the generated csa_spec contract (started from defaultJson, else the Rust schema example). When loadPreset is supplied, a preset bar loads the Rust USD or EUR regulatory CSA (margin.csaSpecUsdRegulatory, csaSpecEurRegulatory) or regulatory terms for a typed currency, CSA id and collateral curve (margin.csaSpecRegulatory); the inputs start empty and a rejected preset shows the native error. Validation, presets and every term are native: connect validate to useCsaValidator, loadPreset to useCsaPreset and onSubmit to the useVm, useMarginCalls or useMarginCallDates request. Accepts defaultJson, validate, onSubmit, loadPreset and density props.",
+      "worker": "none"
+    },
+    {
+      "name": "margin-call-table",
+      "type": "registry:component",
+      "docs": "Display-only view of what useVm, useMarginCalls and useMarginCallDates return. The variation margin section shows the Rust call decision (margin.vmResultRequiresCall) as a badge, the Rust net margin (margin.vmResultNetMargin: post minus collect, positive when the desk posts) in the result's currency, the date and settlement date, and the VmResult money terms (gross exposure, threshold, independent amount, net exposure, collateral balance, unrounded call, MTA, rounding increment, post and collect amounts) as exact money. The margin calls section lists VmCalculator#generateMarginCalls in returned order; the call dates section lists VmCalculator#marginCallDates. Nothing is netted, thresholded or rounded. Accepts vm, calls, callDates, loading, error, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "liability-management-card",
+      "type": "registry:component",
+      "docs": "Two components, one form each. ExchangeOfferCard, the holder's view: hold-out PV, new instrument PV, consent fee, equity sweetener and offer structure, with the returned tender total, NPV pickup, breakeven recovery and tender_recommended, which is Rust's field and never compared here; the hurdle Rust applies shows beside it as supplied. LiabilityManagementCard, the issuer's view: structure, notional, participation, EBITDA and a price input that Rust reads as a price, an extension fee or a transferred-asset fraction by structure, with the returned cost, par retired, discount capture, holder impact and, for a positive EBITDA, the leverage block. Amounts use one unit you choose, with no currency conversion; percentages are fractions. An empty amount is sent as NaN for Rust to reject and an empty EBITDA stays unset. Each analysis shows its own native error. Each accepts defaultTerms, onSubmit, state, formatValue and density props (ExchangeOfferCard also hurdle), typed by the worker's ExchangeOfferRequest and LmeRequest contracts; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "recovery-waterfall",
+      "type": "registry:component",
+      "docs": "Three components, one form each. RecoveryWaterfall: an estate value and claims (id, a free-text seniority label, integer priority, principal, accrued, penalties, an optional collateral value and its haircut), with Rust's allocations in its priority-then-entry order (total claim, collateral and general recovery, total recovery, recovery rate and deficiency per claim) and the estate's total distributed, undistributed estate and apr_satisfied. WorkoutLgdCard: EAD, direct and indirect cost fractions, years to resolution, a discount rate and collateral pieces whose types come from the generated WorkoutCollateralType contract, with the returned net recovery, LGD and recovery rate. SeniorityRecoveryCard: a class from the generated SeniorityClass contract and a calibration from the supplied calibrationIds (Rust's seniorityCalibrationIds, default first), with the Beta distribution's mean, standard deviation, variance, shape parameters, mode and mean LGD. Nothing is summed, divided or ranked here; amounts use one unit you choose and rates are fractions. An empty amount is sent as NaN for Rust to reject, an empty collateral value is an unsecured claim, and each analysis shows its own native error, including a class a calibration lacks. Each accepts defaultTerms (SeniorityRecoveryCard: defaultSeniority and calibrationIds), onSubmit, state, formatValue and density props, typed by the worker's RecoveryWaterfallRequest, WorkoutLgdRequest and SeniorityRecoveryRequest contracts; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "option-calculator",
+      "type": "registry:component",
+      "docs": "Edits the terms of a European option under Black-Scholes (spot, strike, rate, dividend yield, expiry), Black-76 (forward, strike, discount factor, expiry) or Bachelier (forward, strike, expiry), with a volatility to price or a price to invert. Calculate passes the request to the caller (usually the useOptionCalculator request); typed text becomes numbers as entered and an empty field is sent as NaN for Rust to reject. The returned price or implied volatility and the Greeks at that volatility are shown as Rust returned them, with the conventions the facade documents: Black-76 prices are discounted, Bachelier prices undiscounted; Black-Scholes vega and rhos are per 1% move and theta per day, forward-Greek vega per unit of volatility. The request and result are Rust's OptionCalculation and OptionCalculationResult wire values; the labels follow the last submitted request. A price Rust cannot invert or Greeks it rejects (at zero volatility under Black-Scholes) is the whole error. Accepts defaultRequest, onSubmit, result, loading, error, formatValue and density props.",
       "worker": "none"
     },
     {
@@ -279,14 +531,50 @@
     {
       "name": "fx-surface-chart",
       "type": "registry:component",
-      "docs": "Raw FX quotes and native evaluated Black volatility, sharing surface table/slices/selection/exports. Supply original coordinates with explicit quote/base forwards and an explicit color domain. Missing forwards show only raw quotes; no curve choice or local conversion occurs. Requires FinstackQueryProvider. Quote editing uses market-context-form and use-market-validator.",
+      "docs": "Raw FX quotes and native evaluated Black volatility, sharing surface table/slices/selection/exports. Supply original coordinates with explicit quote/base forwards and an explicit color domain. Missing forwards show only raw quotes; no curve choice or local conversion occurs. The strike grid materializes the quotes natively (models.volatility.materializeFxDeltaSurface) from an editable spot (domestic per unit of foreign) and continuously compounded domestic and foreign decimal rates, seeded only from initialSpot, initialDomesticRate and initialForeignRate. Requires FinstackQueryProvider. Quote editing uses market-context-form and use-market-validator.",
+      "worker": "host"
+    },
+    {
+      "name": "vol-cube-slice",
+      "type": "registry:component",
+      "docs": "Slices a canonical cube at explicit absolute strikes (initialStrikes, one editable field each, in the given order) through models.volatility.materializeCube{Tenor,Expiry}Slice in the selected convention (\"normal\" or \"lognormal\"), rendered by the shared surface view with an explicit color extent per convention. The node smile comes from SabrSmile at the selected expiry/tenor node: normal volatility when beta < 1e-4, Black otherwise, as the facade documents; the arbitrage check needs an explicit continuously compounded decimal rate (initialRate, never defaulted) and the repaired line appears only when repairIterations is supplied. Strike ordering and domain are validated natively. Requires FinstackQueryProvider.",
+      "worker": "host"
+    },
+    {
+      "name": "surface-arbitrage-badge",
+      "type": "registry:component",
+      "docs": "Runs models.volatility.checkSurface (through useCheckSurface) on a canonical stored surface with a host-supplied Rust ArbitrageCheckConfig (forward_prices one to broadcast or one per expiry, in the surface strike units, never inferred; optional tolerance and check switches). The badge shows Passed, the violation count, Not checked (the native error, such as a normal-quoted, shifted-Black or tenor-axis surface Rust does not check) or Forwards not supplied (no config, so no request is made). The popover lists the returned counts by type and severity and every violation (type, severity, expiry, adjacent expiry, strike, magnitude in total variance, suggested fix, description) in the order Rust returned them. Requires FinstackQueryProvider.",
       "worker": "host"
     },
     {
       "name": "vol-cube-explorer",
       "type": "registry:component",
-      "docs": "Checked native volatility cube exploration. Supply canonical cube state, initial absolute strike and explicit normal or Black/lognormal convention, plus color extents for both output units. Original SABR parameters, forwards and shifts remain separate from evaluated samples. Requires FinstackQueryProvider; editing uses market-context-form and native validation.",
+      "docs": "Checked native volatility cube exploration. Supply canonical cube state, initial absolute strike and explicit normal or Black/lognormal convention, plus color extents for both output units. Original SABR parameters, forwards and shifts remain separate from evaluated samples. Supplying slice (explicit initialStrikes, optional initialRate and repairIterations) adds vol-cube-slice. Requires FinstackQueryProvider; editing uses market-context-form and native validation.",
       "worker": "host"
+    },
+    {
+      "name": "transition-matrix-heatmap",
+      "type": "registry:component",
+      "docs": "Display-only view of the results returned by useMigrationMatrix (models.credit.migration.TransitionMatrix.fromLabeled) and useMigrationProjection (GeneratorMatrix.fromTransitionMatrix, then models.credit.migration.project per horizon). Labels and the default state come from the matrix's RatingScale. The transition and generator matrices are heatmaps (origin by destination, scale order); probabilities use the colour domain [0, 1] and the generator the extent of its intensities, centred on zero when the negative diagonal and positive off-diagonals straddle it. The generator's round-trip error and L1 regularization are stamped beside it; cumulative default probabilities are drawn per origin state against the requested horizons. A view control switches every section to tables. A projection error (for example a round-trip tolerance Rust rejects) is shown inline while the matrix stays visible. Values are decimals as Rust returned them; nothing is computed. Accepts matrix, loading, error, projection, projectionLoading, projectionError, initialView, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "merton-calculator",
+      "type": "registry:component",
+      "docs": "Edits a Merton structural-credit request: horizons, CDS maturity and recovery, and the model either with the schema form over the generated MertonModel contract (native validation through the caller's validate callback, usually useMertonModelValidator) or as a KMV equity calibration (equity value and volatility, short- and long-term debt, rate, payout, calibration maturity). Calculate passes the request to the caller (usually the useMertonReport request). The returned report is shown as Rust returned it: CDS par spread and implied equity value and volatility tiles, a term-structure table (default probability, distance to default, implied and debt spreads, master-scale grade and central PD per horizon) and the canonical model parameters with the KMV default point of an equity calibration. A measure Rust rejects for the model (such as the debt spread of a first-passage barrier) shows its native error beside the rest. Values are decimals with no units inferred. Accepts defaultRequest, validate, onSubmit, report, loading, error, formatValue and density props.",
+      "worker": "none"
+    },
+    {
+      "name": "credit-scorecard",
+      "type": "registry:component",
+      "docs": "Edits the input ratios of one accounting-based credit model (Altman Z-Score, Z'-Score, Z''-Score or EM-Score, Ohlson O-Score, Zmijewski probit). The fields, their order and their help text come from the generated input contract of the selected model (altman_z_score_input, altman_z_prime_input, altman_z_double_prime_input for both Z'' and EM, ohlson_o_score_input, zmijewski_input); each model keeps its own entries when another is selected. Score passes the Rust CreditScoreRequest (the model tag and its ratios) to the caller (usually the useCreditScore request); typed text becomes numbers as entered and an empty field is sent as NaN for Rust to reject. The returned score, zone and implied PD are shown as Rust returned them, with the grade and central PD Rust assigns the implied PD on the default PD master scale, or no grade when the model returns no implied PD (the Altman models). Nothing is computed or classified here. Accepts defaultModel, defaultInputs, onSubmit, score, loading, error, formatValue and density props.",
+      "worker": "none"
+    },
+    {
+      "name": "portfolio-risk-report",
+      "type": "registry:component",
+      "docs": "Presents the Rust PositionRiskReport the worker positionRisk returns (usually through usePositionRisk): portfolio VaR, ES, confidence, method, position count and the Euler residual stamp (none for a historical decomposition); bars of each returned component VaR; the VaR contributions (component, relative, marginal and incremental VaR) and ES contributions tables; the risk budget (has_breach, total_overbudget and per-position actual and target component VaR, utilization and excess) when one was requested; and, for a historical source, the tail stress attribution (VaR threshold, tail scenario count, per-position tail contributions in Rust's largest-driver-first order and the tail scenarios worst first). Values are as returned: losses negative, in the units of the supplied weights or P&L, shares as fractions; nothing is summed, flagged or re-sorted. With factors (usually from useFactorRisk) it adds a Factor contributions section: total and residual risk under the returned measure, risk by factor (absolute, relative and marginal), risk by position and factor, any residual risk by position, and the portfolio.computeFactorSensitivities matrix it decomposed in the book's base currency; the factor chain's native error shows in that section. Either part renders without the other. Accepts report, factors, factorsError, loading, error, formatValue and density props.",
+      "worker": "none"
     },
     {
       "name": "financial-model-editor",
@@ -297,7 +585,7 @@
     {
       "name": "statement-grid",
       "type": "registry:component",
-      "docs": "Display schema-checked StatementResult values in a report-style table with historical and forecast columns, accounting presentation, and optional inline editing of explicit cells. Exact native values, nonfinite sentinels, metadata, and the full result remain available. Editing is delegated to the host workbench for native validation and evaluation.",
+      "docs": "Display schema-checked StatementResult values in a report-style table with historical and forecast columns, accounting presentation, and optional inline editing of explicit cells. Each cell shows the evaluation layer Rust recorded in node_sources (value, forecast, formula or where mask) as a glyph with a legend and accessible text; results without node_sources, such as rollups, show no marker. Exact native values, nonfinite sentinels, metadata, and the full result remain available. Editing is delegated to the host workbench for native validation and evaluation.",
       "worker": "none"
     },
     {
@@ -325,9 +613,105 @@
       "worker": "host"
     },
     {
+      "name": "variance-table",
+      "type": "registry:component",
+      "docs": "Present a native VarianceReport (for example ScenarioDiff.variance) as is: rows in native order, baseline and comparison columns under their native labels, abs_var as the variance and pct_var as a percent of the fraction Rust returns, with an unset pct_var (baseline effectively zero) shown as n/m. Metric labels default to labelFor; a host may inject metricLabel and formatValue. It sorts, totals and computes nothing. No worker is required.",
+      "worker": "none"
+    },
+    {
+      "name": "credit-assessment-report",
+      "type": "registry:component",
+      "docs": "Present a native CreditAssessment (statements_analytics.creditAssessment) as returned: tiles for leverage ratio, interest coverage and free cash flow at the assessed period, a line chart of the two ratios over the returned series (periods Rust returns without a value are left out of the chart and listed), and the series table with a dash for each missing value. A native P&L summary TableEnvelope (statements_analytics.plSummaryReport) renders below it through table-envelope when supplied. Free cash flow carries the host's model currency when one is passed; nothing is calculated, sorted or inferred. Accepts assessment, plSummary, currency, formatValue, loading, error, plSummaryLoading, plSummaryError and density props. No worker is required.",
+      "worker": "none"
+    },
+    {
+      "name": "tornado-chart",
+      "type": "registry:component",
+      "docs": "Present native TornadoEntry rows (for example DcfSensitivityResult.entries or generateTornadoEntries output) as returned: one band per parameter in Rust's order, a bar from zero to each returned downside and upside delta, and a table of the same values. Deltas Rust returns as non-finite are left out of the chart and shown in the table. Parameter labels default to labelFor; a host may inject parameterLabel and formatValue. It sorts, sums and computes nothing. Accepts entries, valueLabel, caption, parameterLabel, formatValue and density props. No worker is required.",
+      "worker": "none"
+    },
+    {
+      "name": "dcf-report",
+      "type": "registry:component",
+      "docs": "Present a native CorporateValuationResult (statements_analytics.evaluateDcf) as returned: enterprise value, equity value and per-share value tiles; the enterprise-to-equity bridge fields (net debt, valuation discount, diluted shares) and the equity bridge inputs Rust used, in Rust's order; the explicit forecast periods with their free cash flow, discount years, discount factor and present value, and the explicit present value; the undiscounted terminal value, its discount years and present value, and the WACC. A supplied DcfSensitivityResult (statements_analytics.dcfSensitivity) adds the baseline enterprise value, the effective WACC and terminal-growth shocks with their clamp flags, and a tornado-chart of the returned deltas. Monetary amounts keep Rust's exact decimal text; nothing is summed, discounted or rearranged. Accepts result, sensitivity, loading, error, sensitivityLoading, sensitivityError, sensitivityNote, formatValue and density props. No worker is required.",
+      "worker": "none"
+    },
+    {
+      "name": "dcf-assumptions-form",
+      "type": "registry:component",
+      "docs": "Edit the evaluateDcf assumptions: WACC as a decimal, the TerminalValueSpec variant (Gordon growth, exit multiple or H-model, the one hand-written Rust wire union) and its fields, the UFCF node and the exit-multiple metric node as id-comboboxes over the supplied model node ids, an optional net-debt override, and the remaining DcfOptions in the schema form over the generated contract. A cleared required number is sent as NaN, never 0; an empty optional value and empty options stay unset so Rust applies its defaults. The facade has no standalone DcfOptions parse, so the options are checked structurally here and validated by Rust (unknown keys included) when the model is valued. Calculate passes the submission to the caller (usually the useEvaluateDcf and useDcfSensitivity requests). A host may hold the WACC field text through wacc and onWaccChange, so a rate can be set without remounting the rest of the form. Accepts defaultAssumptions, nodeIds, wacc, onWaccChange, onSubmit, submitLabel, disabled and density props.",
+      "worker": "none"
+    },
+    {
+      "name": "lbo-report",
+      "type": "registry:component",
+      "docs": "Edit an LboConfig with the schema form over the generated lbo_config contract, every string *_node field as an id-combobox over the supplied model node ids. The facade has no standalone LboConfig parse, so the config is checked structurally here and validated by Rust (unknown keys included) when it is evaluated; Evaluate LBO passes the JSON to the caller (usually the useEvaluateLbo request). The native LboResult (statements_analytics.evaluateLbo) is shown as returned: equity check, exit equity proceeds and MOIC tiles, the sources and uses (debt, equity check, totals, entry enterprise value, the balanced flag), the entry and exit metrics, enterprise values and exit net debt, and the statement-check-report of the LBO checks when the config maps them. Returns are MOIC only: IRR is not part of the native result (Rust points to portfolio.mwrXirr). Nothing is calculated. Accepts defaultConfig, nodeIds, onSubmit, result, loading, error, formatValue and density props.",
+      "worker": "none"
+    },
+    {
+      "name": "statement-sensitivity",
+      "type": "registry:component",
+      "docs": "Edit a sensitivity run: the SensitivityMode (the wire values read from the generated sensitivity_result contract), the target metric as an id-combobox, the tornado period, and each varied node and period with comma-separated percentage moves. Each parameter's base value is read from the supplied evaluated result (a missing or non-finite cell is sent as NaN, never defaulted) and sent with the moves as the Rust ParameterSpec pct_range of the submitted SensitivityConfig; an empty move is NaN, so Rust rejects it. Run sensitivity passes the run to the caller (usually the useRunSensitivity request). The native tornado is shown through tornado-chart, parameter keys (node@period) labelled by node and period, and the target metric at the tornado period in the baseline and every returned scenario in Rust's order. A full-grid run has no tornado; the scenarios are still shown. Nothing is calculated. Accepts result, nodeIds, periods, defaultValues, onSubmit, data, loading, error, disabled and density props.",
+      "worker": "none"
+    },
+    {
+      "name": "goal-seek-form",
+      "type": "registry:component",
+      "docs": "Edit statements_analytics.goalSeek arguments: target node and driver node as id-comboboxes over the supplied node ids, target and driver periods, the target value, and an optional lower and upper search bracket in the driver's units (both empty leave the bracket unset so Rust uses its own; a cleared number is sent as NaN, never 0). Solve passes the arguments to the caller (usually the useGoalSeek request); the native GoalSeekResult is shown as returned: solved value, residual, tolerance, evaluations and the converged flag. When onApply is supplied, Apply to model is a second, explicit action that hands the returned model (the input model with the solved driver written in) to the caller, such as the statements workbench's commit; there is no undo, and applyBlocked disables it with a reason. Nothing is calculated or defaulted. Accepts nodeIds, periods, defaultValues, onSubmit, result, loading, error, onApply, applyBlocked, disabled and density props.",
+      "worker": "none"
+    },
+    {
+      "name": "variance-bridge-chart",
+      "type": "registry:component",
+      "docs": "Present a native BridgeChart (statements_analytics.varianceBridge) as returned: a bar from zero to the baseline value, one signed bar from zero per driver contribution in Rust's order, a bar for Rust's unexplained residual and one for the comparison value, coloured by kind, with the same values in a table. Nothing is accumulated or positioned cumulatively: Rust's contributions are raw deltas in driver units, which need not sum to the target's variance, so this is not a waterfall. Non-finite values are left out of the chart and shown in the table. Node labels default to labelFor; a host may inject metricLabel and formatValue. Accepts bridge, metricLabel, formatValue and density props. No worker is required.",
+      "worker": "none"
+    },
+    {
+      "name": "forecast-backtest",
+      "type": "registry:component",
+      "docs": "Show a native ForecastMetrics (statements_analytics.backtestForecast) as returned: one tile per field in the generated forecast_metrics contract's order, labelled through labelFor with the first paragraph of Rust's description (MAPE and sMAPE are percentages in Rust). A null or non-finite metric, such as MAPE when every actual is zero, shows as n/m. Nothing is calculated. Accepts metrics, caption, loading, error and density props. No worker is required.",
+      "worker": "none"
+    },
+    {
+      "name": "statement-monte-carlo",
+      "type": "registry:component",
+      "docs": "Edit a MonteCarloConfig with the schema form over the generated monte_carlo_config contract (path count, the uint64 seed kept as an exact integer, percentiles and include path data; the form starts empty, Rust's example is not preloaded); Simulate passes the structurally valid JSON to the caller (usually the useEvaluateMonteCarlo request), and Rust validates it. The native MonteCarloResults (statements.Evaluator.evaluateMonteCarlo) are shown as returned: for the chosen metric (the first returned by default), a fan of bands between the returned percentiles paired from the outside in, with the unpaired middle percentile as a line, over the forecast periods, the percentile table (percentiles shown as percents of Rust's fractions), the breach probability Rust reports for a threshold (statements.monteCarloBreachProbability; null when the results carry no path data) and the simulation warnings in a collapsed list. Nothing is simulated, interpolated or summed. Accepts defaultConfig, onSubmit, results, loading, error, defaultBreach, onBreach, breachProbability, breachLoading, breachError, formatValue and density props.",
+      "worker": "none"
+    },
+    {
+      "name": "wacc-calculator",
+      "type": "registry:component",
+      "docs": "Answers what a company's blended cost of capital is. Five decimal inputs, the two capital weights separate, and one native statements_analytics.wacc rate (useWacc) shown as returned. Weights that do not sum to one, a tax rate outside [0, 1] or an empty field show the native error; nothing is blended, defaulted or checked here. onApply renders a button that passes the rate shown, on the user's click only and never after an edit since it was calculated. Accepts defaultInputs, onSubmit, rate, loading, error, onApply, applyLabel, formatValue, disabled and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "normalization-editor",
+      "type": "registry:component",
+      "docs": "Answers what adjusted EBITDA is and how each add-back gets there. Edits a NormalizationConfig with the schema form over the generated normalization_config contract (target, percentage and cap-base nodes as id-comboboxes over the supplied node ids; fixed per-period amounts, percentages of a node and caps as Rust declares them), validated natively (useNormalizationConfigValidator; a duplicate id is Rust's error). Normalize passes the canonical config to the caller (usually the useNormalize request). The native statements.normalize results are shown as returned, above the form: for a chosen period, a bridge from the reported base through each adjustment in declaration order to the final value, each step drawn from the previous step's adjusted_value (the base for the first) to its own, coloured by Rust's is_capped, and a table of every adjustment's capped amount by period with the raw amount beside a capped one. A missing node, a non-finite base or a negative cap shows the native error. Nothing is summed, capped or classified here. Accepts defaultConfig, nodeIds, validate, onSubmit, results, loading, error, formatValue and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "capital-structure-report",
+      "type": "registry:component",
+      "docs": "Answers how much debt sits ahead of each tranche and what leverage and coverage look like through it. Edits a CapitalStructureSummaryConfig with the schema form over the generated capital_structure_summary_config contract (the reporting period as a select over the supplied periodIds; the EBITDA and optional cash nodes as id-comboboxes over the supplied nodeIds); Summarize passes the structurally valid config to the caller (usually the useCapitalStructureSummary request) and Rust validates it. The native statements_analytics.capitalStructureSummary result is shown as returned, above the form: total debt, cash, net debt, LTM EBITDA with the LTM periods Rust found of those it requires, and total and net leverage and total coverage; the debt stack in Rust's rank-then-declaration order (kind, payment class, rank, balance, share of debt, cumulative debt, leverage and interest coverage through the class, LTM interest, maturity); and the maturity wall by year of final maturity as a bar chart. A ratio Rust returns as null (a short LTM window, non-positive EBITDA or debt), or a live NaN, shows as Undefined; a negative net debt or net leverage shows as returned. A model with no capital structure or a node the results lack shows the native error. Nothing is summed, netted or divided here. Accepts defaultConfig, nodeIds, periodIds, onSubmit, summary, loading, error, formatRatio, formatShare and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "relative-value-table",
+      "type": "registry:component",
+      "docs": "Answers how a name compares with its peers. Takes the host-supplied subject and universe (CompanyMetrics serde documents; Rust rejects a misspelt key) and edits a RelativeValueReportConfig with the schema form over the generated relative_value_report_config contract: the PeerFilter (every field optional; GICS sectors, industries, countries, ratings, tags and selectors are free text, since Rust declares no list of them), the period basis, the scoring dimensions and the multiple columns, whose choices come from the contract. Compare passes the subject, universe and structurally valid config JSON to the caller (usually the useRelativeValueReport request) and Rust validates them. The native statements_analytics.relativeValueReport result is shown as returned, above the form: the subject, period basis, peer and excluded counts and the composite score and confidence, or Rust's reason for no composite; the comps table with the subject first, marked from Rust's is_subject, and one column per multiple; per multiple, the subject value, percentile, z-score and peer statistics, with a bar per multiple drawn at Rust's percentile; per dimension, its weight, direction, subject values, percentile, z-score, signal (positive meaning cheap), regression and peer statistics, Rust's exclusion reason when the composite leaves it out, and a scatter of Rust's points with the subject marked from each point's is_subject and the line drawn through Rust's fitted values. A null or a live NaN shows as Undefined and -0 as 0. Nothing is computed here. Accepts subject, universe, defaultConfig, onSubmit, report, loading, error, formatNumber, formatPercentile and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
+      "name": "statement-export",
+      "type": "registry:component",
+      "docs": "Answers what the statement numbers are as a file a spreadsheet can open. Presents a native statements.statementResultToTableWide or statementResultToTableLong TableEnvelope (useStatementResultTable) in Rust's order, with a wide or long switch the host follows. Download CSV writes exactly those cells: RFC 4180 quoting, native column names as the header, every number as its plain String form. A cell Rust holds with no value shows as undefined and is an empty field. Nothing is computed. Accepts layout, onLayoutChange, table, loading, error and density props; no worker or query provider required.",
+      "worker": "none"
+    },
+    {
       "name": "statements-workbench",
       "type": "registry:block",
-      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics, and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
+      "docs": "Open on complete host-supplied financial statements with report-style inline editing, a table and CSV export of the shown result, selectable periods, configurable native forecast methods, service-supplied roll forward with a native review since the last roll forward (variance, a variance bridge and a forecast backtest over the newly reported periods, offering only nodes present before and after), formula-backed calculated metrics with the active period's native credit assessment and P&L summary and, in a disclosure, a native normalization of the reported result (adjusted EBITDA: a NormalizationConfig editor and statements.normalize's base-to-adjusted bridge) and, in another, the native debt stack (statements_analytics.capitalStructureSummary: leverage and coverage through each payment class and the maturity wall; a model with no capital structure shows Rust's error), a native DCF valuation with its enterprise-value tornado, a native WACC calculator that sets the DCF WACC field on the user's click, and a native LBO in Valuation, a native Monte Carlo of the stochastic forecasts with its percentile fan and breach probability in Monte Carlo, covenant compliance in Covenants (a covenant engine from defaultCovenantEngineJson or a Rust package template, tested by statements_analytics.evaluateCovenants at the end of every result period, with a metric the model lacks returned as Rust's not_found error, and a native breach forecast, statements_analytics.forecastBreaches, under a submitted CovenantForecastConfig), and checks. Scenarios override driver values and whole forecast specs and run natively, with the capital structure priced from the host market when one is supplied; each scenario shows its native lineage, and the active period's deltas against a chosen baseline (its parent by default) come from statements_analytics.scenarioDiff. Below the scenarios, a native sensitivity run ranks driver moves with a tornado, and a native goal seek solves for a driver value on Solve; applying the solved model is a separate, explicit action with no undo. The Annual view rolls results up natively: flows sum, balances take the year end and ratios are recalculated, with per-line methods editable. The schema editor and JSON import are in Advanced. density prop (compact default) sets SurfaceContext and data-density on the root; data-theme is inherited from the host. Host owns data ingestion and persistence. Requires FinstackQueryProvider.",
       "worker": "host"
     }
   ],
@@ -353,7 +737,27 @@
       "type": "registry:file"
     },
     {
+      "name": "use-curve-query",
+      "type": "registry:hook"
+    },
+    {
       "name": "use-market-validator",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-convertible-spot-ladder",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-bond-workout-ladder",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-compute-quotes",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-metric-values",
       "type": "registry:hook"
     },
     {
@@ -369,7 +773,19 @@
       "type": "registry:hook"
     },
     {
+      "name": "use-cashflow-ladder",
+      "type": "registry:hook"
+    },
+    {
       "name": "use-scenario-table",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-deal-report",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-tranche-analytics",
       "type": "registry:hook"
     },
     {
@@ -377,11 +793,207 @@
       "type": "registry:hook"
     },
     {
+      "name": "use-covenant-engine-validator",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-covenant-template",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-evaluate-covenants",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-forecast-breaches",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-apply-market-scenario",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-horizon-return",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-scenario-spec-validator",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-list-builtin-template-metadata",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-build-from-template",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-build-template-component",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-compose-scenarios",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-attribute-pnl-many",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-default-waterfall-order",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-performance-report",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-benchmark-report",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-correlation-matrix",
+      "type": "registry:hook"
+    },
+    {
+      "name": "analytics-report-presentation",
+      "type": "registry:lib"
+    },
+    {
+      "name": "analytics-report-types",
+      "type": "registry:lib"
+    },
+    {
+      "name": "use-value-portfolio",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-portfolio-metrics-series",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-portfolio-spec-validator",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-scenario-pnl-batch",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-apply-scenario-and-revalue",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-portfolio-margin",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-attribute-portfolio-pnl",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-portfolio-returns",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-brinson-linked",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-exposure-report",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-simm-im",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-simm-sensitivities-validator",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-csa-validator",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-csa-preset",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-vm",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-margin-calls",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-margin-call-dates",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-liability-management",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-recovery-waterfall",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-option-calculator",
+      "type": "registry:hook"
+    },
+    {
       "name": "use-fx-delta-samples",
       "type": "registry:hook"
     },
     {
+      "name": "use-fx-strike-surface",
+      "type": "registry:hook"
+    },
+    {
       "name": "use-cube-samples",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-cube-slice",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-cube-smile",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-check-surface",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-migration-matrix",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-migration-projection",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-merton-report",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-merton-model-validator",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-credit-score",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-position-risk",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-factor-risk",
       "type": "registry:hook"
     },
     {
@@ -421,6 +1033,86 @@
       "type": "registry:hook"
     },
     {
+      "name": "use-diff-statement-scenarios",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-trace-statement-scenario",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-credit-assessment",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-statement-result-table",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-wacc",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-normalize",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-capital-structure-summary",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-relative-value-report",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-normalization-config-validator",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-pl-summary-report",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-evaluate-dcf",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-dcf-sensitivity",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-evaluate-lbo",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-run-sensitivity",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-goal-seek",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-run-variance",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-variance-bridge",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-backtest-forecast",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-evaluate-monte-carlo",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-monte-carlo-breach-probability",
+      "type": "registry:hook"
+    },
+    {
       "name": "finstack-fixtures",
       "type": "registry:lib"
     },
@@ -442,6 +1134,42 @@
     },
     {
       "name": "contract-calibration",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-oas-config",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-scenario-grid",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-standard-deal-params",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-covenant-engine",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-covenant-forecast-config",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-covenant-report",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-covenant-template",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-dated-covenant-reports",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-future-breach",
       "type": "registry:lib"
     },
     {
@@ -757,7 +1485,79 @@
       "type": "registry:lib"
     },
     {
+      "name": "contract-csa-spec",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-im-result",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-simm-sensitivities-json",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-vm-result",
+      "type": "registry:lib"
+    },
+    {
       "name": "contract-market-context-state",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-altman-z-double-prime-input",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-altman-z-prime-input",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-altman-z-score-input",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-arbitrage-report",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-merton-model",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-ohlson-o-score-input",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-recovery-claim",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-seniority-calibration",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-workout-lgd",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-zmijewski-input",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-portfolio-margin-result",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-portfolio-result",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-scenario-pnl-batch-item",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-scenario-revalue-view",
       "type": "registry:lib"
     },
     {
@@ -769,7 +1569,67 @@
       "type": "registry:lib"
     },
     {
+      "name": "contract-scenario-spec",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-bridge-chart",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-capital-structure-summary-config",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-capital-structure-summary",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-credit-assessment",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-dcf-options",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-dcf-sensitivity-result",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-forecast-metrics",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-lbo-config",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-lbo-result",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-relative-value-report-config",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-relative-value-report",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-scenario-diff",
+      "type": "registry:lib"
+    },
+    {
       "name": "contract-scenario-set",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-sensitivity-result",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-variance-config",
       "type": "registry:lib"
     },
     {
@@ -781,11 +1641,35 @@
       "type": "registry:lib"
     },
     {
+      "name": "contract-forecast-parameters",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-monte-carlo-config",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-monte-carlo-results",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-normalization-config",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-normalization-result",
+      "type": "registry:lib"
+    },
+    {
       "name": "contract-rollup-spec",
       "type": "registry:lib"
     },
     {
       "name": "contract-statement-result",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-table-envelope",
       "type": "registry:lib"
     },
     {
@@ -808,11 +1692,15 @@
   "provenance": [
     {
       "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-      "sha256": "258d9b9fe1903364892bdac6ed0fd14bc9448de6bd156925132a7083be06f71c"
+      "sha256": "8a60765d749cd9b6aa9889c70475eeb9787646aee8845e6ca1a710052d793619"
     },
     {
       "path": "finstack-quant-ui/tests/core/market-browser/cases.json",
       "sha256": "87b45db4b2e5180dcdbd7b4ca1f92e767ed56ffd9a108c9b1b8dd40ded0d89aa"
+    },
+    {
+      "path": "finstack-quant-ui/tests/core/curve-query/cases.json",
+      "sha256": "19d4893bfa09d59477fd258f6dde63ce33a771b1a3112c5a9200a4ecbe0ff35d"
     },
     {
       "path": "finstack-quant-ui/tests/core/cubes/cases.json",
@@ -824,15 +1712,151 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/cases.json",
-      "sha256": "a22ca4c5dc62aa36a5f4e7387d634374c3edd3bcfbf9f830114e9294147880ec"
+      "sha256": "c07365a93cb4634ffe67678fc3365848b072acc4fe83d9e15fdfd540a2c9f628"
+    },
+    {
+      "path": "finstack-quant-ui/tests/valuations/scenario-table/tranche-analytics.json",
+      "sha256": "7a99d56e01adf878a52ba9c1caf99c6d3a1a9bce255da975ee5759c06e18c868"
+    },
+    {
+      "path": "finstack-quant-ui/tests/valuations/scenario-table/pool-report.json",
+      "sha256": "e25bb7832f6f54005486131223e7f1960aa6583b7df035b53bf9c633f24b4e96"
+    },
+    {
+      "path": "finstack-quant-ui/tests/valuations/scenario-table/waterfall-report.json",
+      "sha256": "ba193a6d3cd1fcaed764404b5c17d03d21804a8b1c9bfeed49395a42bf50724f"
+    },
+    {
+      "path": "finstack-quant-ui/tests/valuations/scenario-table/deal-charts.json",
+      "sha256": "4b36a8f8d4b7ac574160a546cbf2d7deb00d84f171f9f9b77245724126153b96"
+    },
+    {
+      "path": "finstack-quant-ui/tests/valuations/scenario-table/equity-tranche.json",
+      "sha256": "2ca9cd3bd326590f747061ff8ec92f7d3bd4e842648e2a9db4e0452e6f3ef786"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/cashflows/cases.json",
-      "sha256": "0e8b2e340f9ed6292519d003f16c0d31e1abf5f6fab42c59509fe4a18b9c665f"
+      "sha256": "e6d0e78af8e951494574ebf379f85a09ae878155b91479e48e4d2b275b2a6e39"
+    },
+    {
+      "path": "finstack-quant-ui/tests/valuations/loan-yield/cases.json",
+      "sha256": "fbeb0d1a7ffc1a05810b850c135ffc2ca098e7c6705347ddf2928157e02ebde6"
+    },
+    {
+      "path": "finstack-quant-ui/tests/valuations/bond-credit/cases.json",
+      "sha256": "3762c12398f7d46330aee268809ace86c04643fc05f13e39baa1a1764eb1f6ed"
+    },
+    {
+      "path": "finstack-quant-ui/tests/valuations/convertible/cases.json",
+      "sha256": "0581ebe9d47cfba12f7ff2dd4997ff65b3d643550dac1a9da846a379b9a2633b"
+    },
+    {
+      "path": "finstack-quant-ui/tests/valuations/workout-ladder/cases.json",
+      "sha256": "dfcfa85972586a4906e5a46aa411ca77086bd0bc6a4e634e73d2cf0194e0a43f"
+    },
+    {
+      "path": "finstack-quant-ui/tests/valuations/quote-converter/cases.json",
+      "sha256": "9d9080ad43aaf5f687d12cdee9b48f120ecb6b38469d7576d49d469c1734ee8b"
+    },
+    {
+      "path": "finstack-quant-ui/tests/scenarios/application/cases.json",
+      "sha256": "c16e96d42ea3b6948ac8f1da5ab220788f0cd0dc9cafcf392ad6168400ce17c0"
+    },
+    {
+      "path": "finstack-quant-ui/tests/scenarios/horizon/cases.json",
+      "sha256": "dc7c6b5b981f232e9dd0dc68936b29ee61f960dd0f50ef08cdad0903ba24a87e"
+    },
+    {
+      "path": "finstack-quant-ui/tests/scenarios/templates/cases.json",
+      "sha256": "9255a56f85624c940c289373f42e38c99b95a355b3215794ba4f70251406f631"
+    },
+    {
+      "path": "finstack-quant-ui/tests/attribution/cases.json",
+      "sha256": "4b2b46be098e6a6601960b82724367c028eaa27401607d5febe39c6b8729b660"
+    },
+    {
+      "path": "finstack-quant-ui/tests/analytics/explicit.json",
+      "sha256": "b1ce0b385893a290b0537ad8106a11d7d81cb157caa428f024c38815c25f9e04"
+    },
+    {
+      "path": "finstack-quant-ui/tests/analytics/benchmark.json",
+      "sha256": "7ce2ee5e91bc8247025f018ded85e84af54aad2a106e5c8b84ca60851a3d4ed0"
+    },
+    {
+      "path": "finstack-quant-ui/tests/analytics/correlation/cases.json",
+      "sha256": "e9817100ee6cf2dca6c102bbb49581fbaa52e0b3ecaa86697df583f43f541c65"
+    },
+    {
+      "path": "finstack-quant-ui/tests/models/credit/migration.json",
+      "sha256": "71f1850a9c2cf9019088541839885698df210aa89ec8bb8bae153c68da2b48e8"
+    },
+    {
+      "path": "finstack-quant-ui/tests/models/credit/merton.json",
+      "sha256": "df2c9c9525f842227bc207a537e9230a43dd4a69b1354a8e29208952b7631a4f"
+    },
+    {
+      "path": "finstack-quant-ui/tests/models/credit/scorecard.json",
+      "sha256": "d73f7ac4c2343c994bd48ea33a5355ef902654114823a7073a63e08ee05a507b"
+    },
+    {
+      "path": "finstack-quant-ui/tests/models/risk/cases.json",
+      "sha256": "e25c752bbf2af2d251b6f05ddad67e7d59f3ee7dd6c696ad52242fdafe87a6ca"
+    },
+    {
+      "path": "finstack-quant-ui/tests/models/options/cases.json",
+      "sha256": "cfa7d8042c7ecf9c37ce1ee16cc484f928bad0fa62cf6a31876ba6d13e060d5c"
+    },
+    {
+      "path": "finstack-quant-ui/tests/models/liability-management/cases.json",
+      "sha256": "df3eb94bb57ac8e9041beb3f0b96f38e98a2a0da740e21ed1d99eedb58d5ac69"
+    },
+    {
+      "path": "finstack-quant-ui/tests/models/recovery/cases.json",
+      "sha256": "051a38c43bce582f4ed62efce2e3a5afb81abd10f300e24f76b22f4c3d2e4fb9"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/margin/simm.json",
+      "sha256": "14bb83029ea43f4f60a5fe925f8850558b10a024406339dcbf293a2edda386e0"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/margin/vm.json",
+      "sha256": "59a6c331fbb048496e01bed09d924910c5538f5711efa208e5afa81b0c159152"
+    },
+    {
+      "path": "finstack-quant-ui/tests/portfolio/gallery.json",
+      "sha256": "5d04da339ddf0ff56748d1abf9860652bb0f1a61988351a152a7003badc96cde"
+    },
+    {
+      "path": "finstack-quant-ui/tests/portfolio/scenario-pnl.json",
+      "sha256": "d803505d3192eb99918c7ce6b7b6949f76e99c7059f6b107e1cf0054ecaf6137"
+    },
+    {
+      "path": "finstack-quant-ui/tests/portfolio/margin/cases.json",
+      "sha256": "99a20d53501df2235088de008c35124cc339f9741b9e160338de66b4e2c67a50"
+    },
+    {
+      "path": "finstack-quant-ui/tests/portfolio/workbench/cases.json",
+      "sha256": "bb28cd8ca7af71c8e78e2f28a29acb0080b7a0d7771be55e9447418ac0e68d32"
+    },
+    {
+      "path": "finstack-quant-ui/tests/portfolio/exposures/cases.json",
+      "sha256": "cd165ac1ebe391a7eb0dc71431eb7f5dd2e3d9603d6b273b53e44d7da72bec72"
+    },
+    {
+      "path": "finstack-quant-ui/tests/portfolio/attribution/cases.json",
+      "sha256": "cee3bf16d5ea2022b1f67e1e83f8924d5b818c1492cb91c618e0154ca8c201c4"
+    },
+    {
+      "path": "finstack-quant-ui/tests/portfolio/returns/cases.json",
+      "sha256": "342cb9c4a9c6280db0853a5b9e41de5917b121cbc8a6b3ff790a4c33b2d7b875"
+    },
+    {
+      "path": "finstack-quant-ui/tests/portfolio/brinson/cases.json",
+      "sha256": "24f4ab947a953af2f0b81272c052513ac694c2119d7762e36cf9b5e7cde6a119"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/details/cases.json",
-      "sha256": "59f8dbca57a419bc8d97b2f449bd6817d02b9eca0df10aa8c6639fced065eefe"
+      "sha256": "b4c994050555b30b53868e427db417281f053425e987a5230f6684b96b00eb08"
     },
     {
       "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",
@@ -844,31 +1868,139 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-model.json",
-      "sha256": "31672706059cd54c41f6828b05277425997e608d3b4f70c60bf7a3518e3745c1"
+      "sha256": "55df45de7744674a22ba8277dfc7334e68942999f88d23408298327b7fc475f5"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-checks.json",
-      "sha256": "e995ed7ad473fd7f2a3563cccb0b8f103a52901790f0b94bf8433ca5bf7bb2c4"
+      "sha256": "5d6b62d74046ac0eb1285859d824c261cd2d387b8b1918bbe14ff3bc6c2181b2"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-result.json",
-      "sha256": "9a61c094f492c6890a85e43d3e56aacde794bc0d8bd87c93784b250b4bff6847"
+      "sha256": "ae9dc90e674b42b4cab0d2006c0d5628ee0fe7b9e08d2431d979d7a08bf89802"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-check-report.json",
       "sha256": "36f2c7475ea85b8f3101f649330243ff9d94c4c8d4d98b13c3178ddb6e655722"
     },
     {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-pl-summary.json",
+      "sha256": "ae0b624dc30e44539a907b91c25f18a8503ef58bd1e60c8d95e2ee28b2ed0b62"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-credit-assessment.json",
+      "sha256": "f54fb7eec15ae6e5a843366bdc5b49f5ca95635adc0d04fbe714a297916732ed"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-dcf-assumptions.json",
+      "sha256": "83de4737b547e30539d43d16e5570c6ce38bde43348cf50f18716f492ebba580"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-dcf.json",
+      "sha256": "a20a4c17e60379df312e0267eaf1f7543a674570f46a89bfc7226703eacf4cfb"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-dcf-sensitivity.json",
+      "sha256": "089dfac66922bb8abb11bcab8e4fa88a67436ae100733ae09828cb9cad8cbf89"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-lbo-config.json",
+      "sha256": "f8dd984ea23d9ff130ef0cf8eb49c2f4fda28f4e4f399cf9b7b0d69872b5f681"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-lbo.json",
+      "sha256": "59dcff00879cc8da72f28bb28bab2a41d31c5301dbf020bfea91399aafa823a4"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-sensitivity-run.json",
+      "sha256": "82f0502ca28c5ced000de03587db2e29eeff8e0aa6507309a500909ac20dd865"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-sensitivity.json",
+      "sha256": "87d3c91f7136c36ada698ce5e602e6a1782b8abb76d499a59a4ac1d753591b49"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-goal-seek-run.json",
+      "sha256": "211d3158caa5f15dacc2a404b5bd28e8be32bd8424d6d58fc296f13bada57f11"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-goal-seek.json",
+      "sha256": "79cc93c5b3e7f5c891f92108ca343d7ba67cc22ccaeb23e57b60f7c3f5845361"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-bridge.json",
+      "sha256": "4235f93e6d83edea9dd48c24640b4a203531659ed2b67022ed096166111fd86f"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-backtest.json",
+      "sha256": "6d5fae1ccb18362f231df2dbaf6ad4b29a8488f5b779777c6260df5ab784ea21"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-monte-carlo-config.json",
+      "sha256": "1d6a3005e1cde3f95aafba6b5407bd3c1dc0b1b0639ce3f1878bdacc08588793"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-monte-carlo.json",
+      "sha256": "50fa244f436b35d1392fe3252e494e4139d3abe74826210f0d31a280d0f9f251"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-monte-carlo-breach.json",
+      "sha256": "dec0fb4c2eb53c935fe5b8a247c4f8e0b84baa8f923828d1c4ebb048b9c6abb5"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-scenarios.json",
+      "sha256": "d41ea1aba2c86012f561aeb72f7bdaf35f6496b7a8f695710eede96f8c8ec982"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/statements/analyst-scenario-diff.json",
+      "sha256": "b0944c409c3d2275d23f6c9b7bccb9ba6fabf33f2b6846a93ca231177d0b3588"
+    },
+    {
       "path": "finstack-quant-ui/src/fixtures/statements/roll-forward-2025Q2.json",
-      "sha256": "9590ef050c757480ec4e3c03e6512be17d124939f4018eb1d10d19a6c6bfd1c6"
+      "sha256": "23f166e4727cf0b8d9d062581094462764708189d35780c117213b7b5bae7ae8"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/roll-forward-2025Q3.json",
-      "sha256": "7968499bd6ce525be29dc38e4fc5a6a520e4a411f12bf151299df851a76d99f6"
+      "sha256": "a4dc0e72c088fa798480fd2791e3d39d1ec03707cca06eeee6b2afd3053f4259"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/roll-forward-2025Q4.json",
-      "sha256": "fdd3e7bc000eb686c86b7f236a3be50c2f3bc4a595ce6589cbd798f1e3b8ffe0"
+      "sha256": "978de34f77ec215aa5f9014affc187fca6dc899bad1c45a5a78ef1c3194c093f"
+    },
+    {
+      "path": "finstack-quant-ui/tests/statements/wacc/cases.json",
+      "sha256": "bbafcdd8be7910fbfa1677cfe92bf5cabdcb33b36abe11c105706ee9b45d1986"
+    },
+    {
+      "path": "finstack-quant-ui/tests/statements/normalization/cases.json",
+      "sha256": "95b78aca6e160a2ad11a82bfd0795bd3bfaf46c1b2acab3fcb144ad3dd601cac"
+    },
+    {
+      "path": "finstack-quant-ui/tests/statements/capital-structure/cases.json",
+      "sha256": "53fc36bfc36be000b14d7dc85331506ecffec6f7fd92491c22614979fefe3a99"
+    },
+    {
+      "path": "finstack-quant-ui/tests/statements/relative-value/cases.json",
+      "sha256": "b5832fff8381235b9c59eab609f8ae68423621a18138ba2f02fe75e293b01a40"
+    },
+    {
+      "path": "finstack-quant-ui/tests/statements/export/cases.json",
+      "sha256": "7a9648b76d87423d757bdae647855708476ce957398298fcf9733fc507eff507"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/covenants/analyst-covenant-series.json",
+      "sha256": "935031d6a641f06aeb4aab35c03a00f02db3506dd0310192ef51dd9fa0c4b298"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/covenants/analyst-covenants.json",
+      "sha256": "3d7aa1a9f985846d4e9b921ffc2590f61a14df31051968ed3df42006da1d1bb9"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/covenants/analyst-forecast-config.json",
+      "sha256": "3d22875ec75b92c4ba9ea8c9158f0d27459ec0bdc918bddf473711f174ec079e"
+    },
+    {
+      "path": "finstack-quant-ui/src/fixtures/covenants/analyst-breach-forecast.json",
+      "sha256": "01f0595f02dfe75fac819d6659ecd75d62e3d9a083b9b0e205b441093e0c495b"
     }
   ]
 }

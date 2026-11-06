@@ -77,9 +77,9 @@
 //! ```
 
 use finstack_quant_core::rating_scales::ScorecardScale;
+use finstack_quant_statements::Result;
 use finstack_quant_statements::evaluator::StatementResult;
 use finstack_quant_statements::types::FinancialModelSpec;
-use finstack_quant_statements::Result;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
@@ -365,13 +365,13 @@ impl CreditScorecardExtension {
             .map(|score| self.determine_rating(score, &config.rating_scale))
             .transpose()?;
 
-        if let (Some(min_rating), Some(rating)) = (&config.min_rating, &rating) {
-            if !self.meets_minimum_rating(rating, min_rating, &config.rating_scale)? {
-                warnings.push(format!(
-                    "Credit rating {} is below minimum required {}",
-                    rating, min_rating
-                ));
-            }
+        if let (Some(min_rating), Some(rating)) = (&config.min_rating, &rating)
+            && !self.meets_minimum_rating(rating, min_rating, &config.rating_scale)?
+        {
+            warnings.push(format!(
+                "Credit rating {} is below minimum required {}",
+                rating, min_rating
+            ));
         }
 
         let (status, message) = if errors.is_empty() {
@@ -395,18 +395,20 @@ impl CreditScorecardExtension {
         data.insert("total_score".into(), serde_json::json!(total_score));
         data.insert(
             "metric_scores".into(),
-            serde_json::json!(scores
-                .iter()
-                .map(|s| {
-                    serde_json::json!({
-                        "metric": s.metric_name,
-                        "value": s.value,
-                        "score": s.score,
-                        "weight": s.weight,
-                        "weighted_score": s.score * s.weight,
+            serde_json::json!(
+                scores
+                    .iter()
+                    .map(|s| {
+                        serde_json::json!({
+                            "metric": s.metric_name,
+                            "value": s.value,
+                            "score": s.score,
+                            "weight": s.weight,
+                            "weighted_score": s.score * s.weight,
+                        })
                     })
-                })
-                .collect::<Vec<_>>()),
+                    .collect::<Vec<_>>()
+            ),
         );
         data.insert(
             "rating_scale".into(),
@@ -474,6 +476,7 @@ impl CreditScorecardExtension {
 
         let mut eval_context = finstack_quant_statements::evaluator::EvaluationContext::new(
             target_period.id,
+            &model.periods,
             std::sync::Arc::new(node_to_column),
             std::sync::Arc::new(historical_results),
         );
@@ -483,10 +486,10 @@ impl CreditScorecardExtension {
         }
 
         for (node_id, node_values) in &results.nodes {
-            if let Some(value) = node_values.get(&target_period.id) {
-                if eval_context.node_to_column.contains_key(node_id.as_str()) {
-                    eval_context.set_value(node_id, *value)?;
-                }
+            if let Some(value) = node_values.get(&target_period.id)
+                && eval_context.node_to_column.contains_key(node_id.as_str())
+            {
+                eval_context.set_value(node_id, *value)?;
             }
         }
 

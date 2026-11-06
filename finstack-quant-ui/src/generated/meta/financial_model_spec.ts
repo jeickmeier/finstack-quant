@@ -3712,6 +3712,21 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_65b0652ed08913529246/properties/government_curve_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ModelConfig/properties/government_curve_id",
+    "description": "Optional government discount curve identifier for the bond `g_spread` metric.\n\nThe metric subtracts this curve's par yield from the bond's yield. It\nenters no price, and `g_spread` is an error when it is unset."
+  },
+  {
+    "path": "#/$defs/d_65b0652ed08913529246/properties/government_curve_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ModelConfig/properties/government_curve_id/anyOf/0",
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Id"
+  },
+  {
+    "path": "#/$defs/d_65b0652ed08913529246/properties/government_curve_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ModelConfig/properties/government_curve_id/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_65b0652ed08913529246/properties/hazard_mean_reversion",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ModelConfig/properties/hazard_mean_reversion",
     "description": "Mean-reversion speed of the hazard factor (κ_λ) on the rates-credit\nlattice, annualised.\n\n`None` and `0.0` both mean no reversion. Capped by\n[`KAPPA_MAX`](finstack_quant_models::trees::two_factor_rates_credit::KAPPA_MAX),\nabove which the binomial lattice's conditional variance collapses far\nenough to distort option values. Requires `credit_curve_id`.\n\nNote that mean reversion narrows the feasible correlation range: it\nskews the per-node marginal transition probabilities away from ½, and\ntwo Bernoulli marginals admit only correlations inside their Fréchet\nbounds. At `KAPPA_MAX` on both factors over a five-year lattice the\nfeasible `|ρ|` can fall to around `0.12`. Calibration rejects an\nunattainable correlation and reports the lattice-wide maximum, which is\nalso available up front from\n[`RatesCreditTree::max_feasible_correlation`](finstack_quant_models::trees::two_factor_rates_credit::RatesCreditTree::max_feasible_correlation).",
@@ -4020,7 +4035,7 @@ export default [
   {
     "path": "#/$defs/d_6be6b905ad3884deeab6",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MertonModel",
-    "description": "Merton structural credit model.\n\nModels a firm's equity as a call option on its assets, where default\noccurs when asset value falls below the debt barrier.\n\n# Fields\n\n- `asset_value` (V_0): Current market value of the firm's assets.\n- `asset_vol` (sigma_V): Annualized volatility of asset returns.\n- `debt_barrier` (B): Face value of debt / default point.\n- `risk_free_rate` (r): Continuous risk-free rate.\n- `payout_rate` (q): Continuous dividend / payout yield on assets.\n- `barrier_type`: Terminal or first-passage barrier monitoring.\n- `dynamics`: Asset return dynamics specification.\n\n# Wire format\n\nDeserialization is routed through [`MertonModel::new_with_dynamics`] via\n`RawMertonModel`, so a model loaded from JSON satisfies exactly the same\ninvariants as one built in Rust. The serialized field set is unchanged."
+    "description": "Merton structural credit model.\n\nModels a firm's equity as a call option on its assets, where default\noccurs when asset value falls below the debt barrier.\n\n# Fields\n\n- `asset_value` (V_0): Current market value of the firm's assets.\n- `asset_vol` (sigma_V): Annualized volatility of asset returns.\n- `debt_barrier` (B): Face value of debt / default point.\n- `risk_free_rate` (r): Continuous risk-free rate.\n- `payout_rate` (q): Continuous dividend / payout yield on assets.\n- `barrier_type`: Terminal or first-passage barrier monitoring.\n- `dynamics`: Asset return dynamics specification.\n\n# Wire format\n\nDeserialization is routed through [`MertonModel::new_with_dynamics`] via\n`RawMertonModel`, so a model loaded from JSON satisfies exactly the same\ninvariants as one built in Rust. Unknown fields are rejected."
   },
   {
     "path": "#/$defs/d_6be6b905ad3884deeab6/properties/asset_value",
@@ -4499,7 +4514,7 @@ export default [
     "path": "#/$defs/d_756aabf913f51b821a96/properties/oid_eir",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RevolvingCredit/properties/oid_eir",
     "default": null,
-    "description": "Effective-interest-rate reporting switch for the\n`oid_eir_amortization` metric. `None` (the default) reports with fees\nincluded, the same as `Some(OidEirSpec::default())`."
+    "description": "Effective-interest-rate reporting switch for the `oid_eir_rate` and\n`oid_eir_amortization` metrics. `None` (the default) reports with fees\nincluded, the same as `Some(OidEirSpec::default())`."
   },
   {
     "path": "#/$defs/d_756aabf913f51b821a96/properties/oid_eir/anyOf/0",
@@ -5137,6 +5152,21 @@ export default [
     "description": "Node computation type",
     "ref": "#/$defs/NodeType",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/NodeType"
+  },
+  {
+    "path": "#/$defs/d_7b4cd44901322286925a/properties/rollup",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/NodeSpec/properties/rollup",
+    "description": "How this line rolls up to a coarser reporting frequency. A rollup uses\nits own per-line method first, then this; a line declaring nothing is\nsummed. Tags never choose a method."
+  },
+  {
+    "path": "#/$defs/d_7b4cd44901322286925a/properties/rollup/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/NodeSpec/properties/rollup/anyOf/0",
+    "ref": "#/$defs/RollupMethod",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RollupMethod"
+  },
+  {
+    "path": "#/$defs/d_7b4cd44901322286925a/properties/rollup/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/NodeSpec/properties/rollup/anyOf/1"
   },
   {
     "path": "#/$defs/d_7b4cd44901322286925a/properties/tags",
@@ -8575,6 +8605,29 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CallPutSchedule/properties/puts/items",
     "ref": "#/$defs/CallPut",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CallPut"
+  },
+  {
+    "path": "#/$defs/d_fc17544530079d46d05e",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RollupMethod",
+    "description": "How one node's values combine over the source periods of a target period."
+  },
+  {
+    "path": "#/$defs/d_fc17544530079d46d05e/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RollupMethod/oneOf/0",
+    "const": "sum",
+    "description": "Sum the source periods: flows such as revenue, expenses and cash flows.\nA missing source value leaves the target value missing."
+  },
+  {
+    "path": "#/$defs/d_fc17544530079d46d05e/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RollupMethod/oneOf/1",
+    "const": "period_end",
+    "description": "Take the last source period's value: balances such as cash, debt and\nequity, and trailing metrics such as last-twelve-month EBITDA."
+  },
+  {
+    "path": "#/$defs/d_fc17544530079d46d05e/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RollupMethod/oneOf/2",
+    "const": "formula",
+    "description": "Re-evaluate the node's formula (and `where` clause) on the rolled-up\nvalues: ratios such as margins, leverage and coverage. Time-series\nfunctions then run at the target frequency, so `lag(x, 1)` is the\nprior target period."
   },
   {
     "path": "#/$defs/d_fedf13c6253774f430cb",

@@ -14,7 +14,7 @@
 #[path = "support/fixtures.rs"]
 mod fixtures;
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use finstack_quant_cashflows::accrual::{AccrualConfig, AccrualIndex};
 use finstack_quant_cashflows::builder::{
     AmortizationSpec, CashFlowSchedule, CouponType, FixedCouponSpec, ScheduleParams,

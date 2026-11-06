@@ -1,7 +1,7 @@
 //! Tests for FX shocks and rate bindings.
 
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{build_periods, Date};
+use finstack_quant_core::dates::{Date, build_periods};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::Compounding;
@@ -12,7 +12,7 @@ use finstack_quant_scenarios::{
 };
 use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_statements::types::{AmountOrScalar, NodeSpec, NodeType};
-use indexmap::{indexmap, IndexMap};
+use indexmap::{IndexMap, indexmap};
 use std::sync::Arc;
 use time::Month;
 

@@ -1,27 +1,23 @@
-import { readFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
-import { createRequire } from "node:module";
 import { serializeHost } from "../../../src/codec.mjs";
 import { emit } from "../../../scripts/fixture-output.mjs";
-const repository = new URL("../../../../", import.meta.url);
-const native = createRequire(import.meta.url)(
-  "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
-const read = async (path) =>
-  JSON.parse(await readFile(new URL(path, repository), "utf8"));
+import {
+  native,
+  readRepoJson,
+  sourceRecord,
+} from "../../../scripts/fixture-inputs.mjs";
 const manifestPath =
   "finstack-quant-ui/tests/valuations/instruments/pricing-cases.json";
 const commodityPath =
   "finstack-quant/valuations/tests/fixtures/valuation_binding_regressions.json";
 const bondPath = "finstack-quant-ui/src/fixtures/results/bond.json";
-const manifest = await read(manifestPath);
+const manifest = await readRepoJson(manifestPath);
 // Pinned inputs: only the JSON files each case is built from. The manifest's
 // request fields and patches are covered by `--check`; binding sources are not
 // pinned because the test re-prices every case through the native package.
 const sources = new Set([commodityPath, bondPath]);
 async function source(source) {
   sources.add(source.path);
-  let value = await read(source.path);
+  let value = await readRepoJson(source.path);
   for (const key of source.pointer) value = value[key];
   return value;
 }
@@ -44,14 +40,14 @@ for (const type of [
 ]) {
   let instrument, market, asOf, model;
   if (type === "commodity_spot_option") {
-    const fixture = await read(commodityPath);
+    const fixture = await readRepoJson(commodityPath);
     instrument = fixture.commodity;
     market = fixture.market;
     instrument.instrument.spec.instrument_pricing_overrides.model_config.mc_paths = 64;
     asOf = "2025-01-02";
     model = "monte_carlo_schwartz_smith";
   } else if (type === "bond") {
-    const fixture = await read(bondPath);
+    const fixture = await readRepoJson(bondPath);
     instrument = JSON.parse(fixture.request.instrumentJson);
     market = JSON.parse(fixture.request.marketJson);
     asOf = fixture.request.asOf;
@@ -103,7 +99,13 @@ for (const type of [
     resultJson: native.valuationResultToJson(serializeHost(result)),
   });
 }
-const specs = JSON.parse(native.lboStandardJson(5, 1.5, 1.2, 10000000));
+const specs = native.covenantTemplate({
+  kind: "lbo_standard",
+  initial_leverage: 5,
+  interest_coverage: 1.5,
+  fixed_charge_coverage: 1.2,
+  max_capex: 10000000,
+});
 const covenantRequest = {
   engineJson: JSON.stringify({
     specs: [specs[0]],
@@ -122,14 +124,7 @@ const reports = native.evaluateEngine(
 const output = {
   description:
     "Actual native results. Decode resultJson through the canonical wire codec, which yields the facade transport (bigint for schema int64/uint64 fields); tests compare with a fresh native call.",
-  sources: await Promise.all(
-    [...sources].map(async (path) => ({
-      path,
-      sha256: createHash("sha256")
-        .update(await readFile(new URL(path, repository)))
-        .digest("hex"),
-    })),
-  ),
+  sources: await Promise.all([...sources].map(sourceRecord)),
   cases,
   covenantRequest,
   covenantReportsJson: serializeHost(reports),

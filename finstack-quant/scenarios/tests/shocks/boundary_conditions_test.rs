@@ -1,7 +1,7 @@
 //! Tests for boundary conditions and edge values.
 
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{build_periods, Date};
+use finstack_quant_core::dates::{Date, build_periods};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;

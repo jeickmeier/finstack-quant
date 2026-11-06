@@ -5,7 +5,7 @@
 use super::*;
 use crate::api::engine::calibrate_from_json;
 use crate::recalibration::CachedRecalibrationProvider;
-use finstack_quant_core::dates::{adjust, calendar_by_id_strict, DateExt, Tenor};
+use finstack_quant_core::dates::{DateExt, Tenor, adjust, calendar_by_id_strict};
 use finstack_quant_core::market_data::term_structures::{
     RateCalibrationMethod, RateCalibrationPillar, ValidationMode,
 };
@@ -16,7 +16,7 @@ use finstack_quant_valuations_core::recalibration::{
     RateMarketRecalibrationRequest, RecalibrationProvider,
 };
 use finstack_quant_valuations_rates::irs::{ConventionSwapParams, InterestRateSwap};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 fn calibrate(input: &str) -> std::result::Result<Arc<MarketContext>, Box<dyn std::error::Error>> {
     let result = calibrate_from_json(input)?;
@@ -51,8 +51,8 @@ fn joint_swap_fixture() -> std::result::Result<Value, Box<dyn std::error::Error>
 }
 
 #[test]
-fn linked_rate_replay_reprices_bumped_swaps_with_bumped_discounting(
-) -> std::result::Result<(), Box<dyn std::error::Error>> {
+fn linked_rate_replay_reprices_bumped_swaps_with_bumped_discounting()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
     let mut input = joint_swap_fixture()?;
     let source = calibrate(&input.to_string())?;
     for quote in input["market_data"]
@@ -124,8 +124,8 @@ fn linked_rate_replay_reprices_bumped_swaps_with_bumped_discounting(
 }
 
 #[test]
-fn single_ois_quote_replay_composes_and_preserves_zero_shock_identity(
-) -> std::result::Result<(), Box<dyn std::error::Error>> {
+fn single_ois_quote_replay_composes_and_preserves_zero_shock_identity()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
     let source = calibrate(include_str!(
         "../../examples/market_bootstrap/01_usd_discount.json"
     ))?;
@@ -174,8 +174,8 @@ fn single_ois_quote_replay_composes_and_preserves_zero_shock_identity(
 }
 
 #[test]
-fn linked_rate_quote_replay_composes_both_curve_recipes(
-) -> std::result::Result<(), Box<dyn std::error::Error>> {
+fn linked_rate_quote_replay_composes_both_curve_recipes()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
     let source = calibrate(&joint_swap_fixture()?.to_string())?;
     let provider = CachedRecalibrationProvider::default();
     let bump = |market: Arc<MarketContext>, bp: f64| {
@@ -260,8 +260,8 @@ fn discount_floor_fixture(
 }
 
 #[test]
-fn discount_replay_preserves_absent_forward_floor_in_negative_rate_market(
-) -> std::result::Result<(), Box<dyn std::error::Error>> {
+fn discount_replay_preserves_absent_forward_floor_in_negative_rate_market()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
     let (source, recipe) = discount_floor_fixture(-0.015, None)?;
     let replay = bump_discount_curve_from_rate_calibration(
         &source,
@@ -283,8 +283,8 @@ fn discount_replay_preserves_absent_forward_floor_in_negative_rate_market(
 }
 
 #[test]
-fn discount_replay_preserves_and_enforces_positive_forward_floor(
-) -> std::result::Result<(), Box<dyn std::error::Error>> {
+fn discount_replay_preserves_and_enforces_positive_forward_floor()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
     let (source, recipe) = discount_floor_fixture(0.03, Some(0.01))?;
     let replay = bump_discount_curve_from_rate_calibration(
         &source,

@@ -709,6 +709,7 @@ class ScenarioTable:
     >>> from finstack_quant.valuations.instruments import ScenarioTable
     >>> payload = json.dumps({
     ...     "tranche_id": "A",
+    ...     "currency": "USD",
     ...     "cells": [{"cpr": 0.06, "cdr": 0.02, "severity": 0.6, "price": 98.2, "wal": 4.1, "writedown": 0.0}],
     ... })
     >>> table = ScenarioTable.from_json(payload)
@@ -742,6 +743,7 @@ class ScenarioTable:
         >>> from finstack_quant.valuations.instruments import ScenarioTable
         >>> payload = {
         ...     "tranche_id": "A",
+        ...     "currency": "USD",
         ...     "cells": [{"cpr": 0.06, "cdr": 0.02, "severity": 0.6, "price": 98.2, "wal": 4.1, "writedown": 0.0}],
         ... }
         >>> table = ScenarioTable.from_json(json.dumps(payload))
@@ -784,14 +786,31 @@ class ScenarioTable:
         ...
 
     @property
+    def currency(self) -> str:
+        """
+        ISO-4217 code of the tranche's currency, which each cell's ``writedown``
+        is denominated in.
+
+        Returns
+        -------
+        str
+            The ISO-4217 currency code.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
     def cells(self) -> list[dict[str, float]]:
         """
         Evaluated cells, in CPR-major, then CDR, then severity order.
 
         Each cell is a dict with keys ``cpr`` (annual decimal), ``cdr``
         (annual decimal), ``severity`` (decimal), ``price`` (percentage of
-        original balance), ``wal`` (years), and ``writedown`` (currency
-        units).
+        current balance), ``wal`` (years), and ``writedown`` (units of
+        ``currency``). :func:`scenario_table_field_units` states these units.
 
         Returns
         -------

@@ -7,8 +7,8 @@
 //! - Margin funding cost
 //! - Haircut sensitivity (Haircut01)
 
-use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
+use finstack_quant_core::money::Money;
 use tracing::warn;
 
 /// Reject implicit cross-currency arithmetic between two [`Money`] operands.

@@ -260,9 +260,7 @@ export type BarrierCrossing = "discrete" | "brownian_bridge";
  */
 export type CalibrationParameter = "debt_barrier" | "asset_vol";
 /**
- * Quote input for the bond quote engine.
- *
- * All spreads are expressed in **decimal** (`0.01 = 100bp`).
+ * The one market quote a bond's quote set is solved from: a price, a yield or a spread.
  */
 export type BondQuoteInput =
   | {
@@ -378,7 +376,6 @@ export type MertonBarrierType =
          * Growth rate of the default barrier over time.
          */
         barrier_growth_rate: number;
-        [k: string]: unknown;
       };
     };
 /**
@@ -402,7 +399,6 @@ export type AssetDynamics =
          * Volatility of log-jump size.
          */
         jump_vol: number;
-        [k: string]: unknown;
       };
     }
   | {
@@ -420,7 +416,6 @@ export type AssetDynamics =
          * Mean recovery rate at default.
          */
         mean_recovery: number;
-        [k: string]: unknown;
       };
     };
 /**
@@ -3409,9 +3404,10 @@ export type ShiftMode = "shift_of_subordinate" | "senior_share";
  * - cumulative loss is a fraction of the *original* pool balance;
  * - the OC ratio is `current pool balance ÷ rated (non-equity) note balance`;
  * - credit enhancement is the senior cushion `(pool − senior note) ÷ pool`,
- *   where the senior note is the *single* most-senior tranche by payment
- *   priority — for pari-passu senior classes (e.g. A-1/A-2) only the
- *   lowest-priority one is taken as the reference.
+ *   where the senior note is the tranche with the lowest `payment_priority`.
+ *   `TrancheStructure` gives every tranche a distinct priority, so for
+ *   same-seniority senior classes (e.g. A-1/A-2) this is the first one in
+ *   input order: A-1 is subtracted and A-2, ranked behind it, is not.
  *
  * `MaxDelinquency` reads the delinquent share of the pool, which is zero
  * unless the deal carries a `credit_model.delinquency` model.
@@ -3757,6 +3753,10 @@ export type BasketAssetType = "equity" | "bond" | "etf" | "cash" | "commodity" |
  */
 export type FxConversionPolicy = "cashflow_date" | "period_end" | "period_average";
 /**
+ * How the holder leaves the bond on a [`BondWorkoutRow`]'s date.
+ */
+export type WorkoutExitKind = "call" | "put" | "maturity";
+/**
  * Classifies captured cashflows by economic meaning.
  *
  * These tags are diagnostic metadata only. They do not change pricing logic by
@@ -3948,6 +3948,15 @@ export type SchemaVersion = number;
  */
 export type InstrumentSchema = "finstack_quant.instrument/1";
 /**
+ * Which of bond or stock drives a convertible's value at a share price.
+ *
+ * Classified by [`ConvertibleSpotRow::hedge_ratio`] on the market bands of 40 and
+ * 80 delta. Managers do not agree on the cutoffs: these are the bands Putnam and
+ * Lord Abbett publish, and MSCI uses thirds. See
+ * `docs/REFERENCES.md#convertible-delta-bands`.
+ */
+export type ConvertibleRegime = "busted" | "balanced" | "equity_sensitive";
+/**
  * Stage of persisted artifact loading that produced a diagnostic.
  */
 export type LoadPhase = "parse" | "version" | "structure" | "semantic" | "canonicalize" | "hash" | "build";
@@ -3972,6 +3981,16 @@ export type PathSamplingMethod =
         seed: number;
       };
     };
+/**
+ * Where cash paid to a tranche outside the waterfall came from.
+ */
+export type NonWaterfallSource =
+  | "reserve_interest"
+  | "redemption"
+  | "spread_account_release"
+  | "principal_account_release"
+  | "reserve_account_release"
+  | "recovery_release";
 /**
  * Strongly-typed instrument classification for pricer dispatch.
  *
@@ -4634,6 +4653,13 @@ export interface ModelConfig {
    */
   call_friction_cents?: number | null;
   /**
+   * Optional government discount curve identifier for the bond `g_spread` metric.
+   *
+   * The metric subtracts this curve's par yield from the bond's yield. It
+   * enters no price, and `g_spread` is an error when it is unset.
+   */
+  government_curve_id?: Id | null;
+  /**
    * Mean-reversion speed of the hazard factor (κ_λ) on the rates-credit
    * lattice, annualised.
    *
@@ -5008,7 +5034,7 @@ export interface EndogenousHazardSpec {
  *
  * Deserialization is routed through [`MertonModel::new_with_dynamics`] via
  * `RawMertonModel`, so a model loaded from JSON satisfies exactly the same
- * invariants as one built in Rust. The serialized field set is unchanged.
+ * invariants as one built in Rust. Unknown fields are rejected.
  */
 export interface MertonModel {
   /**
@@ -5044,7 +5070,6 @@ export interface MertonModel {
    * Continuously compounded risk-free rate `r`, as a decimal fraction.
    */
   risk_free_rate: number;
-  [k: string]: unknown;
 }
 /**
  * Hard threshold toggle configuration.
@@ -7294,8 +7319,8 @@ export interface RevolvingCredit {
    */
   metric_pricing_overrides?: MetricPricingOverrides;
   /**
-   * Effective-interest-rate reporting switch for the
-   * `oid_eir_amortization` metric. `None` (the default) reports with fees
+   * Effective-interest-rate reporting switch for the `oid_eir_rate` and
+   * `oid_eir_amortization` metrics. `None` (the default) reports with fees
    * included, the same as `Some(OidEirSpec::default())`.
    */
   oid_eir?: OidEirSpec | null;
@@ -17621,6 +17646,154 @@ export interface BasketPricingConfig {
   fx_policy: FxConversionPolicy;
 }
 /**
+ * Every price, yield and spread quote of a bond, solved from any one of them.
+ */
+export interface BondQuoteSet {
+  /**
+   * Asset swap market spread (decimal). `None` under the same rule as
+   * `asw_par`, including on a plain floating-rate note, which the `asw_market`
+   * metric alone would still value.
+   */
+  asw_market?: number | null;
+  /**
+   * Asset swap par spread (decimal). `None` unless the bond has a fixed coupon
+   * and no custom cashflows, or custom cashflows with a floating specification.
+   */
+  asw_par?: number | null;
+  /**
+   * Clean price in the bond's currency, for its whole notional.
+   */
+  clean_price_currency: number;
+  /**
+   * Clean price as percentage of par (`99.5` = 99.5%, the quote convention).
+   */
+  clean_price_pct: number;
+  /**
+   * Dirty price at the quote date in the bond's currency, for its whole
+   * notional: clean price plus accrued interest to the quote date.
+   */
+  dirty_price_currency: number;
+  /**
+   * Discount margin (decimal). `None` unless the bond has floating coupons.
+   */
+  discount_margin?: number | null;
+  /**
+   * I-spread (decimal): the yield less the swap par rate. On a bond with
+   * exercise rights the yield and horizon are the worst exit's.
+   */
+  i_spread?: number | null;
+  /**
+   * Japanese simple yield (単利, decimal). `None` unless the coupon is fixed.
+   */
+  japanese_simple_yield?: number | null;
+  /**
+   * Moosmüller yield to maturity (decimal): simple interest to the next
+   * coupon, then periodic compounding.
+   */
+  moosmuller_ytm?: number | null;
+  /**
+   * Option-adjusted spread (decimal), from the bond's tree model.
+   */
+  oas?: number | null;
+  /**
+   * Street yield to maturity (decimal), compounded at the coupon frequency.
+   */
+  ytm?: number | null;
+  /**
+   * Yield to worst across every call, put and maturity exit (decimal).
+   */
+  ytw?: number | null;
+  /**
+   * Z-spread over the discount curve (decimal). On a bond with exercise
+   * rights it discounts the worst exit's flows.
+   */
+  z_spread?: number | null;
+}
+/**
+ * Yield and I-spread to every call, put and maturity exit of a bond, with the worst marked.
+ */
+export interface BondWorkoutLadder {
+  /**
+   * Valuation date.
+   */
+  as_of: DateWire;
+  /**
+   * Clean price every row is solved at, as percent of the original notional:
+   * the quoted clean price, or for a bond with no exercise rights and no quote
+   * the model price at the quote date.
+   */
+  clean_price_pct: number;
+  /**
+   * `clean_price_pct` plus accrued interest at the quote date, in the bond's
+   * currency. Exits are alternatives for one price, so the rows share it.
+   */
+  dirty_price: Money;
+  /**
+   * Identifier of the bond.
+   */
+  instrument_id: string;
+  /**
+   * Settlement date of the quote; every yield is timed from it.
+   */
+  quote_date: DateWire;
+  /**
+   * One row per candidate exit, in date order. Adjacent call windows that share
+   * a boundary date each keep a row; a put and a call on one date each keep
+   * theirs. A bond with no exercise rights has one maturity row.
+   */
+  rows: BondWorkoutRow[];
+}
+/**
+ * One admissible exit of a bond: a row of a [`BondWorkoutLadder`].
+ */
+export interface BondWorkoutRow {
+  /**
+   * Exit date. A maturity row carries the business-day-adjusted final payment
+   * date when that is later than the contractual maturity.
+   */
+  date: DateWire;
+  /**
+   * `yield_rate` less the swap par rate from the quote date, as a decimal, the
+   * convention of the `i_spread` metric. The par rate runs to `date` when the
+   * bond has an exit other than maturity, and to contractual maturity when it
+   * has none, which differs from `date` if the final payment rolls. `None` when
+   * `yield_rate` is `None`.
+   */
+  i_spread?: number | null;
+  /**
+   * Whether this is the worst exit, the one the `ytw` metric selects. At most
+   * one row is marked; none is when no exit has a yield and each pays at least
+   * the price at once.
+   */
+  is_worst: boolean;
+  /**
+   * Whether the exit is a call, a put or maturity.
+   */
+  kind: WorkoutExitKind;
+  /**
+   * Whether the redemption is a make-whole price off a reference curve.
+   */
+  make_whole: boolean;
+  /**
+   * Clean cash the exit redeems, in the bond's currency; accrued interest is
+   * paid on top.
+   */
+  redemption_amount: Money;
+  /**
+   * Clean redemption as percent of the principal outstanding at the exit
+   * (`103.0` = 103%). A make-whole call shows its make-whole price, which can
+   * exceed the contractual strike.
+   */
+  redemption_price_pct: number;
+  /**
+   * Street yield to this exit as a decimal, compounded at the coupon
+   * frequency, timed from the quote date. `None` when the path has no finite
+   * yield: an exit on the quote date, or same-day cash at or above the price. A
+   * worst row can be `None`, where the `ytw` metric is negative infinity.
+   */
+  yield_rate?: number | null;
+}
+/**
  * Asset-backed facility borrowing base, availability and advance-rate test.
  */
 export interface BorrowingBaseReport {
@@ -17637,6 +17810,29 @@ export interface BorrowingBaseReport {
    * concentration limits.
    */
   eligible_collateral: Money;
+}
+/**
+ * Calendar-year non-principal / principal / PV totals for one reporting year.
+ */
+export interface CalendarYearLadderRow {
+  /**
+   * Sum of amounts that are not [`CFKind::is_principal_like`] in that year,
+   * in the flow's native units (interest, fees, recovery, and unknown-kind
+   * flows are not mixed in: unknown labels are rejected).
+   */
+  non_principal: number;
+  /**
+   * Sum of [`CFKind::is_principal_like`] amounts in that year.
+   */
+  principal: number;
+  /**
+   * Sum of present values in that year, in the same units as `non_principal`.
+   */
+  pv: number;
+  /**
+   * Calendar year of the grouped cashflows (Gregorian, as on `Date::year`).
+   */
+  year: number;
 }
 /**
  * Single-row enriched cashflow view.
@@ -17671,7 +17867,12 @@ export interface CashflowRow {
    */
   amount: number;
   /**
-   * Beginning pool balance for the period (agency MBS only).
+   * Outstanding principal before this row, in row currency, for bonds, term
+   * loans and revolving credit facilities: a coupon row keeps it, a principal
+   * row (amortization, PIK, sweep, draw, repayment) moves it, and an issue
+   * funding row starts from zero. For agency MBS it is the pool balance at the
+   * start of the period, shared by every row of that period. Absent for other
+   * instruments and for a schedule with no issue date.
    */
   beginning_balance?: number | null;
   /**
@@ -17695,7 +17896,9 @@ export interface CashflowRow {
    */
   discount_factor: number;
   /**
-   * Ending pool balance for the period (agency MBS only).
+   * Outstanding principal after this row, in row currency, on the same basis
+   * as `beginning_balance`. For agency MBS it is the pool balance at the end
+   * of the period.
    */
   ending_balance?: number | null;
   /**
@@ -18840,21 +19043,120 @@ export interface ConvertibleGreeks {
   [k: string]: unknown;
 }
 /**
+ * Price, delta, parity, conversion premium, regime and bond floor of a convertible at a ladder of share prices.
+ */
+export interface ConvertibleSpotLadder {
+  /**
+   * Valuation date.
+   */
+  as_of: DateWire;
+  /**
+   * Currency of the bond, which every money field is in.
+   */
+  currency: Currency;
+  /**
+   * Identifier of the bond.
+   */
+  instrument_id: string;
+  /**
+   * Share price the market holds.
+   */
+  market_spot: number;
+  /**
+   * One row per share price, in ascending order.
+   */
+  rows: ConvertibleSpotRow[];
+}
+/**
+ * A convertible at one share price: a row of a [`ConvertibleSpotLadder`].
+ */
+export interface ConvertibleSpotRow {
+  /**
+   * Value of the coupons and principal with no conversion or exercise rights, the
+   * `bond_floor` metric in currency. It does not depend on the share price, so every
+   * row holds the same number.
+   */
+  bond_floor: number;
+  /**
+   * [`price`](Self::price) over conversion value, less one, as a decimal; the
+   * `conversion_premium` metric. `null` when conversion value is not positive or the
+   * ratio is not finite.
+   */
+  conversion_premium?: number | null;
+  /**
+   * Immediate conversion value of the position in currency, the `conversion_value` metric.
+   */
+  conversion_value: number;
+  /**
+   * Change in [`price`](Self::price) per unit of share price, by central difference
+   * with the bond's spot bump, the `delta` metric's definition. `null` if not finite.
+   */
+  delta?: number | null;
+  /**
+   * [`delta`](Self::delta) as a share of the effective conversion ratio, the decimal
+   * the regime bands read. `null` on a mandatory-variable bond, whose share count
+   * moves with the stock, if the ratio is not positive, or if the delta is `null`.
+   */
+  hedge_ratio?: number | null;
+  /**
+   * Whether [`spot`](Self::spot) is the share price the market holds.
+   */
+  is_market_spot: boolean;
+  /**
+   * Conversion value over notional, the `parity` metric (`1.0` is par, not one dollar).
+   */
+  parity: number;
+  /**
+   * Tree value of the whole position in [`currency`](ConvertibleSpotLadder::currency),
+   * the PV of the bond priced on this share price.
+   */
+  price: number;
+  /**
+   * Regime of this row; `null` where [`hedge_ratio`](Self::hedge_ratio) is.
+   */
+  regime?: ConvertibleRegime | null;
+  /**
+   * Share price of this row, in the bond's currency.
+   */
+  spot: number;
+}
+/**
+ * When one coverage test first failed over a simulation.
+ */
+export interface CoverageTestBreach {
+  /**
+   * First payment date this simulation found the test failing; a later cure
+   * does not clear it. `None` when it never failed.
+   */
+  first_breach?: DateWire | null;
+  /**
+   * Id of the test: `CoverageTestDiagnostic::test_id` for a test the
+   * waterfall carries (`OC_<tranche>`), or `OC_<tranche>_trigger` /
+   * `IC_<tranche>_trigger` for a tranche's own `oc_trigger` / `ic_trigger`.
+   */
+  test_id: string;
+  [k: string]: unknown;
+}
+/**
  * One coverage test as the waterfall executor evaluated it in a period.
  */
 export interface CoverageTestDiagnostic {
   /**
-   * `ratio − trigger_level`; negative while the test fails.
+   * `ratio − trigger_level`; negative while the test fails. `None` when `ratio`
+   * is, for the same reason.
    */
-  cushion: number;
+  cushion?: number | null;
   /**
    * Whether the test passed in this period.
    */
   passing: boolean;
   /**
    * Ratio the executor computed (OC: collateral ÷ notes; IC: interest ÷ due).
+   * `None` when the test has no claim outstanding: the notes it covers are
+   * retired (OC) or owe no interest (IC), so the denominator is zero and no
+   * ratio exists. Such a test passes.
    */
-  ratio: number;
+  ratio?: number | null;
   /**
    * `CoverageTestSpec::id` of the test.
    */
@@ -18864,6 +19166,19 @@ export interface CoverageTestDiagnostic {
    */
   trigger_level: number;
   [k: string]: unknown;
+}
+/**
+ * One row currency's calendar-year non-principal, principal and native PV ladder.
+ */
+export interface CurrencyLadder {
+  /**
+   * Row currency every figure of `rows` is stated in.
+   */
+  currency: Currency;
+  /**
+   * Calendar-year non-principal, principal and native PV totals, by ascending year.
+   */
+  rows: CalendarYearLadderRow[];
 }
 /**
  * One structured finding emitted while loading a persisted contract.
@@ -18917,6 +19232,28 @@ export interface Diagnostic {
    * Whether the finding is fatal or recoverable.
    */
   severity: Severity;
+}
+/**
+ * Record of a diverted payment from one tier to another recipient.
+ */
+export interface DiversionRecord {
+  /**
+   * Cash diverted, in the deal currency.
+   */
+  amount: Money;
+  /**
+   * Failing coverage tests that caused the diversion, for display.
+   */
+  reason: string;
+  /**
+   * `WaterfallTier::id` of the coverage-test tier that diverted the cash.
+   */
+  source_tier: string;
+  /**
+   * `Recipient::id` that received the cash, or `principal_account` when a
+   * `Reinvest` test retained it as principal proceeds.
+   */
+  target_tranche: string;
 }
 /**
  * Revolving-credit Monte Carlo value with per-path details.
@@ -19268,9 +19605,11 @@ export interface ThreeFactorPathData {
  */
 export interface EquityMetrics {
   /**
-   * Each distribution as a fraction of `invested`, by payment date.
+   * Each distribution as a decimal fraction of `invested`, by payment date and
+   * not annualized; the fractions sum to `moic`. The share is `None` when
+   * nothing is invested.
    */
-  cash_on_cash: [string, number][];
+  cash_on_cash: [string, number | null][];
   /**
    * ISO-4217 code of the currency the amounts are denominated in.
    */
@@ -19281,22 +19620,73 @@ export interface EquityMetrics {
   invested: number;
   /**
    * Annualized IRR of `−invested` on the valuation date against every
-   * projected distribution (XIRR); `None` when no rate solves.
+   * projected distribution (XIRR, ACT/365F), as a decimal; `None` when no rate
+   * solves, as when nothing is invested or no distribution is projected.
    */
   irr?: number | null;
   /**
-   * Multiple on invested capital: total distributions ÷ `invested`.
+   * Multiple on invested capital: total distributions ÷ `invested`, interest
+   * and principal together. `None` when nothing is invested; a class that
+   * receives nothing on a positive investment has a true `0.0`.
    */
-  moic: number;
+  moic?: number | null;
   /**
-   * Present value of the distributions on the deal's discount curve, as a
-   * percent of the equity's current balance.
+   * Present value at the valuation date of the distributions on the deal's
+   * discount curve, as a percent of the equity's current balance (`62.5` =
+   * 62.5%). It does not depend on the purchase price.
    */
   nav_pct: number;
   /**
    * Identifier of the equity tranche.
    */
   tranche_id: string;
+}
+/**
+ * The display units of an equity tranche's invested amount, IRR, MOIC, NAV and cash-on-cash.
+ */
+export interface EquityMetricsFieldUnits {
+  /**
+   * Unit of each `EquityMetrics::cash_on_cash` value.
+   */
+  cash_on_cash: MetricFieldUnit;
+  /**
+   * Unit of `EquityMetrics::invested`.
+   */
+  invested: MetricFieldUnit;
+  /**
+   * Unit of `EquityMetrics::irr`.
+   */
+  irr: MetricFieldUnit;
+  /**
+   * Unit of `EquityMetrics::moic`.
+   */
+  moic: MetricFieldUnit;
+  /**
+   * Unit of `EquityMetrics::nav_pct`.
+   */
+  nav_pct: MetricFieldUnit;
+  /**
+   * Unit of the `purchase_price_pct` argument of `calculate_equity_metrics`,
+   * and what omitting it means.
+   */
+  purchase_price: MetricFieldUnit;
+}
+/**
+ * The display unit of one scalar field of a result struct.
+ */
+export interface MetricFieldUnit {
+  /**
+   * Wire name of the field.
+   */
+  field: string;
+  /**
+   * Unit text as the field documents it, such as `USD per bp` or `years`.
+   */
+  label: string;
+  /**
+   * Canonical Rust field the unit is documented on.
+   */
+  source: string;
 }
 /**
  * Projected cashflows of an asset-backed facility and its residual.
@@ -19344,7 +19734,21 @@ export interface SimulationDiagnostics {
    */
   early_amortization_date?: DateWire | null;
   /**
-   * Per-period deal accounting, in payment order.
+   * First failure of each coverage test, one entry per test sorted by
+   * `test_id`. Covers every test the waterfall carries (each also on
+   * `periods[i].coverage_tests`) and every tranche `oc_trigger` /
+   * `ic_trigger`, whatever its consequence (only a breached `DivertCashFlow`
+   * trigger is on `coverage_tests`, for the periods it is in breach). A deal
+   * with no coverage test has no entries, and a test the waterfall carries is
+   * listed only if a period evaluated it, so a settlement with no waterfall run
+   * lists none of those.
+   */
+  first_breaches: CoverageTestBreach[];
+  /**
+   * Per-period deal accounting, in payment order. A deal with no payment
+   * period left that still settles cash (a fully defaulted pool with
+   * recoveries pending, or a funded reserve) has one record, holding that
+   * settlement in `non_waterfall_payments`.
    */
   periods?: PeriodDiagnostics[];
   /**
@@ -19382,6 +19786,14 @@ export interface PeriodDiagnostics {
    */
   coverage_tests: CoverageTestDiagnostic[];
   /**
+   * Every tranche's credit enhancement on this period's end-of-period
+   * balances, in `TrancheStructure` order. The step-down trigger
+   * `MinCreditEnhancement` reads the senior tranche's value from the same
+   * function on the next payment date, before that date's principal is paid,
+   * so with no losses or draws in between it tests this period's number.
+   */
+  credit_enhancement: TrancheCreditEnhancement[];
+  /**
    * Par that defaulted (charged off) this period.
    */
   defaults: Money;
@@ -19390,7 +19802,15 @@ export interface PeriodDiagnostics {
    */
   delinquent_balance: Money;
   /**
-   * Annualized excess spread realized this period (decimal).
+   * Excess spread realized this period, annualized, as a decimal of the
+   * opening pool balance (`0.02` is 2% a year): `(I − D − F − L) ÷ P × 12 ÷ m`.
+   * `I` is `interest_collections`, `D` the debt coupons due this period, `F`
+   * the service-provider and manager fees paid through the waterfall (not
+   * special-servicing fees, already out of `I`), `L` the period's defaults less
+   * pool recoveries, floored at zero, `P` the pool balance before this period's
+   * flows and `m` the months in the period. The early-amortization excess-spread
+   * test reads this number. Zero when `P` is zero and on a settlement record,
+   * where no waterfall ran.
    */
   excess_spread: number;
   /**
@@ -19405,6 +19825,14 @@ export interface PeriodDiagnostics {
    * Interest collected from the pool (including servicer advances).
    */
   interest_collections: Money;
+  /**
+   * Cash paid to tranches outside the waterfall: reserve interest routed to
+   * a tranche, and, on the deal's last period, its redemption and terminal
+   * releases. Together with `waterfall.payment_records` this is every
+   * tranche's cash: per tranche and date, the two sum to the tranche's
+   * `cashflows`, and to its `interest_flows` plus `principal_flows`.
+   */
+  non_waterfall_payments: NonWaterfallPayment[];
   /**
    * Payment date of the period.
    */
@@ -19445,18 +19873,188 @@ export interface PeriodDiagnostics {
   spread_account: Money;
   /**
    * Weighted-average coupon (annual decimal) of the performing fixed-rate
-   * collateral at period end: the same population as `AssetPool::wac`.
+   * collateral at period end: the same population as `AssetPool::wac`. `None`
+   * when no performing fixed-rate balance remains.
    */
-  wac: number;
+  wac?: number | null;
   /**
-   * Balance-weighted Moody's rating factor of the collateral.
+   * Balance-weighted Moody's rating factor of the performing collateral. `None`
+   * when no performing balance remains.
    */
-  warf: number;
+  warf?: number | null;
   /**
-   * Balance-weighted spread of the floating-rate collateral (basis points).
+   * How this period's waterfall ran: who was paid, how much, and what was
+   * left. Its recipient-keyed totals are not serialized; `payment_records`
+   * carries the same cash.
    */
-  weighted_avg_spread_bp: number;
+  waterfall: WaterfallDistribution;
+  /**
+   * Balance-weighted spread of the performing floating-rate collateral (basis
+   * points). `None` when no performing floating-rate balance remains.
+   */
+  weighted_avg_spread_bp?: number | null;
   [k: string]: unknown;
+}
+/**
+ * One tranche's credit enhancement at a period's end.
+ */
+export interface TrancheCreditEnhancement {
+  /**
+   * Share of the collateral beneath this tranche, as a decimal (`0.30` is
+   * 30%): `(C − N) ÷ C`, where `C` is the collateral balance plus the
+   * controlled-accumulation funding account and `N` the balances of this
+   * tranche and every tranche paid ahead of it (`payment_priority` at or
+   * below its own). Deferred interest is not in `N`. Negative when the notes
+   * exceed the collateral, and zero when there is no collateral. Pari-passu
+   * classes rank by `payment_priority`, so each is enhanced only by those
+   * ranked after it; an equity class's value is the collateral left above
+   * the whole structure.
+   */
+  credit_enhancement: number;
+  /**
+   * Id of the tranche (`Tranche::id`).
+   */
+  tranche_id: string;
+  [k: string]: unknown;
+}
+/**
+ * Cash paid to one tranche outside the waterfall.
+ */
+export interface NonWaterfallPayment {
+  /**
+   * Manager incentive fee withheld from the cash before it reached an
+   * equity class; zero otherwise. Already counted in the period's
+   * `fees_paid`, and not part of what the tranche received.
+   */
+  incentive_fee: Money;
+  /**
+   * Part booked to the tranche's interest flows.
+   */
+  interest: Money;
+  /**
+   * Date the tranche received the cash. A recovery settling after the last
+   * period carries its own later date here.
+   */
+  payment_date: DateWire;
+  /**
+   * Part booked to the tranche's principal flows, net of `incentive_fee`.
+   */
+  principal: Money;
+  /**
+   * Where the cash came from.
+   */
+  source: NonWaterfallSource;
+  /**
+   * Id of the tranche paid (`Tranche::id`), equity classes included.
+   */
+  tranche_id: string;
+  [k: string]: unknown;
+}
+/**
+ * Result of waterfall distribution
+ */
+export interface WaterfallDistribution {
+  /**
+   * Coverage test results as `(test id, ratio, passed)`. The ratio is
+   * `None` when the test has no claim outstanding (a zero denominator);
+   * such a test passes.
+   */
+  coverage_tests: [string, number | null, boolean][];
+  /**
+   * Detailed diverted payment records.
+   */
+  diverted_amounts?: DiversionRecord[];
+  /**
+   * Total diverted cash
+   */
+  diverted_cash: Money;
+  /**
+   * Whether any diversions occurred
+   */
+  had_diversions: boolean;
+  /**
+   * Payment date
+   */
+  payment_date: DateWire;
+  /**
+   * Detailed payment records
+   */
+  payment_records: PaymentRecord[];
+  /**
+   * Principal proceeds spent on fee or interest tiers whose
+   * [`FundingSource`] is `InterestThenPrincipal`. Already netted out of
+   * `remaining_principal`; reported so the principal account's use is
+   * visible.
+   */
+  principal_used_for_interest: Money;
+  /**
+   * Recovery proceeds included in this period's available cash.
+   * Tracked separately from principal collections for trustee report reconciliation.
+   */
+  recovery_proceeds?: Money;
+  /**
+   * Remaining undistributed cash
+   */
+  remaining_cash: Money;
+  /**
+   * Undistributed interest retained for subsequent interest-waterfall periods.
+   */
+  remaining_interest: Money;
+  /**
+   * Undistributed principal retained for reinvestment or debt repayment.
+   */
+  remaining_principal: Money;
+  /**
+   * Tier-level allocations
+   */
+  tier_allocations: [string, Money][];
+  /**
+   * Total available cash at start
+   */
+  total_available: Money;
+}
+/**
+ * One recipient's payment as the waterfall executor made it.
+ */
+export interface PaymentRecord {
+  /**
+   * Whether a failing coverage test diverted this payment here.
+   */
+  diverted: boolean;
+  /**
+   * Whether this payment is capital: it retires the tranche's balance and
+   * books to its principal flows rather than its interest flows.
+   */
+  is_principal: boolean;
+  /**
+   * Cash actually paid, in the deal currency.
+   */
+  paid_amount: Money;
+  /**
+   * `WaterfallTier::priority` of that tier (lower runs first).
+   */
+  priority: number;
+  /**
+   * Who was paid. An equity class is paid as `RecipientType::Equity`, every
+   * other class as `RecipientType::Tranche` with its id.
+   */
+  recipient: RecipientType;
+  /**
+   * `Recipient::id` within the tier.
+   */
+  recipient_id: string;
+  /**
+   * Amount the recipient's calculation asked for, in the deal currency.
+   */
+  requested_amount: Money;
+  /**
+   * `requested_amount` less `paid_amount`.
+   */
+  shortfall: Money;
+  /**
+   * `WaterfallTier::id` of the tier that made the payment.
+   */
+  tier_id: string;
 }
 /**
  * Result containing tranche-specific cashflows and metadata.
@@ -19867,6 +20465,24 @@ export interface PathStatistics {
   pik_exercise_rate: number;
 }
 /**
+ * Where one coordinate label sits on its axis.
+ *
+ * A host sorts by `group` and then by `value`, so maturity and strike order
+ * is not recovered by parsing label text.
+ */
+export interface MetricCoordinate {
+  /**
+   * Text the value is scoped by: the `{surface}::` of a vega row, empty for
+   * a bare tenor or strike, and the whole label when it carries no number.
+   */
+  group: string;
+  /**
+   * Tenor in years (`3m` is 0.25, per [`parse_key_rate_label`]) or the
+   * decimal strike; `None` when the label carries no number.
+   */
+  value?: number | null;
+}
+/**
  * Canonical per-key metric interpretation for host presentation.
  */
 export interface MetricMetadata {
@@ -19879,7 +20495,13 @@ export interface MetricMetadata {
    */
   components: string[];
   /**
-   * Native display group; absent for a non-standard base metric.
+   * How each entry of `components` orders along its axis, aligned with it.
+   */
+  coordinates: MetricCoordinate[];
+  /**
+   * Native display group, the same name [`metrics_for_instrument`] lists the
+   * base metric under; absent for a base metric the standard registry does
+   * not hold.
    */
   group?: string | null;
   /**
@@ -19891,9 +20513,53 @@ export interface MetricMetadata {
    */
   metric: string;
   /**
-   * Native unit family; custom or calculator-dependent units remain unknown.
+   * Native unit family; undeclared custom and calculator-dependent units are unknown.
    */
   unit: MetricUnit;
+}
+/**
+ * Structured-credit OAS solver configuration: paths, stochastic dimensions and seed.
+ */
+export interface OasConfig {
+  /**
+   * Credit factor loading for the lognormal default/prepayment shocks.
+   */
+  credit_loading: number;
+  /**
+   * Hull-White 1F mean reversion `κ`, per year.
+   */
+  hw1f_mean_reversion: number;
+  /**
+   * Hull-White 1F short-rate volatility `σ`, absolute annual decimal
+   * (`0.01` = 100 bp).
+   */
+  hw1f_sigma: number;
+  /**
+   * Number of Monte-Carlo scenarios (forced to 1 when neither dimension is
+   * stochastic, since every scenario is then identical).
+   */
+  num_paths: number;
+  /**
+   * Rate-dependent prepayment sensitivity `β`.
+   */
+  prepay_beta: number;
+  /**
+   * RNG seed (deterministic, reproducible results).
+   */
+  seed: number;
+  /**
+   * Couple a systematic stochastic-credit factor (correlated default/prepay stress).
+   */
+  stochastic_credit: boolean;
+  /**
+   * Couple a stochastic Hull-White short-rate path (rate paths + rate-dependent
+   * prepayment, stochastic discounting).
+   */
+  stochastic_rates: boolean;
+  /**
+   * Brent solver tolerance.
+   */
+  tolerance: number;
 }
 /**
  * Structured-credit option-adjusted spread and its solver diagnostics.
@@ -19923,7 +20589,75 @@ export interface OasResult {
   [k: string]: unknown;
 }
 /**
- * Collateral-pool statistics: WAC, spread, maturity, diversity and concentration.
+ * Balance held by one obligor, industry or rating, as a row of a [`PoolReport`]
+ * concentration table.
+ */
+export interface PoolConcentrationEntry {
+  /**
+   * Number of asset rows grouped, zero-balance rows included.
+   */
+  asset_count: number;
+  /**
+   * Current balance of the row's assets, defaulted assets included, in the
+   * pool's base currency.
+   */
+  balance: Money;
+  /**
+   * `balance` in percent points of [`PoolReport::total_balance`] (`20.0` =
+   * 20%), the convention of `ConcentrationLimit::max_pct` and
+   * `PoolStats::defaulted_balance_pct`, so a share compares to a limit
+   * directly. The rows of one table sum to `100.0`; `0.0` when the pool
+   * balance is not positive.
+   */
+  balance_pct: number;
+  /**
+   * Obligor id, industry or rating wire form (`"BB+"`) this row groups, or
+   * `null` for the assets that carry no value on the dimension. A null key
+   * cannot collide with a real name.
+   */
+  key?: string | null;
+}
+/**
+ * Collateral-pool statistics, WARF and concentration by obligor, industry and rating.
+ */
+export interface PoolReport {
+  /**
+   * Balance per `PoolAsset::industry`.
+   */
+  by_industry: PoolConcentrationEntry[];
+  /**
+   * Balance per `PoolAsset::obligor_id`.
+   */
+  by_obligor: PoolConcentrationEntry[];
+  /**
+   * Balance per `PoolAsset::rating` wire form. An asset with no rating is in
+   * the null-key row, not in an explicit `"NR"` row, although WARF weights
+   * both with the `NR` factor.
+   */
+  by_rating: PoolConcentrationEntry[];
+  /**
+   * [`calculate_pool_stats`] of the same rows. Its fields mix units: `wac` is
+   * a decimal, `weighted_avg_spread_bp` basis points and
+   * `defaulted_balance_pct` percent points.
+   */
+  stats: PoolStats;
+  /**
+   * Current balance of every asset row, defaulted assets included, in the
+   * pool's base currency: the denominator of each `balance_pct`.
+   */
+  total_balance: Money;
+  /**
+   * Moody's weighted-average rating factor, the number `CloWarfCalculator`
+   * and `PeriodDiagnostics::warf` report: weighted by balance over the
+   * performing rows only (defaulted and non-positive-balance rows are out of
+   * both numerator and denominator). An unrated asset takes the Moody's table
+   * factor for `NR`. `None` when no performing balance remains; the
+   * `clo_warf` metric, which must return a number, reports `0.0` there.
+   */
+  warf?: number | null;
+}
+/**
+ * AssetPool-level performance statistics
  */
 export interface PoolStats {
   /**
@@ -19933,15 +20667,18 @@ export interface PoolStats {
    */
   defaulted_balance_pct: number;
   /**
-   * Diversity score (Moody's methodology)
+   * Diversity score (Moody's methodology) of the assets that name an obligor;
+   * `None` when none does. See [`AssetPool::diversity_score`].
    */
-  diversity_score: number;
+  diversity_score?: number | null;
   /**
-   * Number of industries
+   * Number of distinct `PoolAsset::industry` values. Assets naming no industry
+   * are not counted.
    */
   num_industries: number;
   /**
-   * Number of obligors
+   * Number of distinct `PoolAsset::obligor_id` values. Assets naming no obligor
+   * are not counted.
    */
   num_obligors: number;
   /**
@@ -19951,22 +20688,46 @@ export interface PoolStats {
   undrawn_commitment?: number;
   /**
    * Weighted-average coupon (annual decimal) of the performing fixed-rate
-   * collateral; see [`AssetPool::wac`].
+   * collateral; `None` when there is none. See [`AssetPool::wac`].
    */
-  wac: number;
+  wac?: number | null;
   /**
-   * Weighted average maturity (WAM) in years.
+   * Weighted average maturity (WAM) in years; `None` when the pool balance is
+   * zero.
    *
    * For weighted average life, which weights principal cashflows rather
    * than maturities, use the `wal` metric.
    */
-  weighted_avg_maturity: number;
+  weighted_avg_maturity?: number | null;
   /**
    * Weighted-average spread in basis points of the performing collateral
-   * that carries an explicit `spread_bp`; see
+   * that carries an explicit `spread_bp`; `None` when there is none. See
    * [`AssetPool::weighted_avg_spread_bp`].
    */
-  weighted_avg_spread_bp: number;
+  weighted_avg_spread_bp?: number | null;
+}
+/**
+ * The display units of the collateral-pool report fields.
+ */
+export interface PoolReportFieldUnits {
+  /**
+   * Unit of the numeric fields of each `by_obligor`, `by_industry` and
+   * `by_rating` row, in the order `PoolConcentrationEntry` declares them.
+   */
+  concentration: MetricFieldUnit[];
+  /**
+   * Unit of every `PoolReport::stats` field, in the order `PoolStats`
+   * declares them.
+   */
+  stats: MetricFieldUnit[];
+  /**
+   * Unit of `PoolReport::total_balance`.
+   */
+  total_balance: MetricFieldUnit;
+  /**
+   * Unit of `PoolReport::warf`.
+   */
+  warf: MetricFieldUnit;
 }
 /**
  * Market conventions of one interest-rate index.
@@ -20054,9 +20815,32 @@ export interface ScenarioCell {
    */
   wal: number;
   /**
-   * Total principal writedown in currency units.
+   * Total principal writedown, in units of [`ScenarioTable::currency`].
    */
   writedown: number;
+}
+/**
+ * Structured-credit CPR x CDR x severity grid swept by the tranche scenario table.
+ */
+export interface ScenarioGrid {
+  /**
+   * Annual CDR values (decimal) to sweep.
+   */
+  cdrs: number[];
+  /**
+   * Annual CPR values (decimal) to sweep.
+   */
+  cprs: number[];
+  /**
+   * Recovery lag (months) applied in every scenario. When `None`, the deal's
+   * own recovery lag is used; set it to override (e.g. `Some(0)` for
+   * immediate recoveries).
+   */
+  recovery_lag?: number | null;
+  /**
+   * Loss severities (decimal); recovery = `1 - severity`.
+   */
+  severities: number[];
 }
 /**
  * Structured-credit scenario grid results for one tranche.
@@ -20067,9 +20851,48 @@ export interface ScenarioTable {
    */
   cells: ScenarioCell[];
   /**
+   * Currency of the tranche, which each cell's `writedown` is denominated in.
+   */
+  currency: Currency;
+  /**
    * Identifier of the tranche evaluated.
    */
   tranche_id: string;
+}
+/**
+ * The display units of a scenario table's axes and measures.
+ */
+export interface ScenarioTableFieldUnits {
+  /**
+   * Unit of each swept `ScenarioCell` input, in the order the struct declares them.
+   */
+  axes: MetricFieldUnit[];
+  /**
+   * Unit of each measure `ScenarioCell` reports, in the order the struct declares them.
+   */
+  measures: MetricFieldUnit[];
+}
+/**
+ * The display units of a simulation's coverage, diversion, enhancement and excess-spread series.
+ */
+export interface SimulationFieldUnits {
+  /**
+   * Unit of each numeric `CoverageTestDiagnostic` field, in the order the
+   * struct declares them.
+   */
+  coverage_tests: MetricFieldUnit[];
+  /**
+   * Unit of `TrancheCreditEnhancement::credit_enhancement`.
+   */
+  credit_enhancement: MetricFieldUnit;
+  /**
+   * Unit of `WaterfallDistribution::diverted_cash` and of each diversion's amount.
+   */
+  diverted_cash: MetricFieldUnit;
+  /**
+   * Unit of `PeriodDiagnostics::excess_spread`.
+   */
+  excess_spread: MetricFieldUnit;
 }
 /**
  * Tranche cashflows and deal accounting from one deterministic simulation.
@@ -20086,6 +20909,27 @@ export interface SimulationRun {
     [k: string]: TrancheCashflows;
   };
   [k: string]: unknown;
+}
+/**
+ * One deal family the standard structured-credit constructor accepts, with its registry profile and an example of its inputs.
+ */
+export interface StandardDealFamily {
+  /**
+   * The `deal_type` argument of [`StructuredCredit::new_standard`].
+   */
+  deal_type: DealType;
+  /**
+   * Complete [`StandardDealParams`] that `new_standard` accepts for this family,
+   * with its `id`, tranche ids and `pool.deal_type` naming the family. Its schema
+   * is `standard_deal_params`, not repeated here.
+   */
+  example: {
+    [k: string]: unknown;
+  };
+  /**
+   * Registry profile that family's deal takes its assumptions from.
+   */
+  profile_id: string;
 }
 /**
  * Inputs for the standard structured-credit registry constructor.
@@ -20267,6 +21111,23 @@ export interface TrancheMetrics {
    * Z-spread to the assumed call at `target_price_pct` (basis points).
    */
   z_spread_to_call_bp?: number | null;
+}
+/**
+ * The display units of the tranche break-even CDR, discount margin and OAS results.
+ */
+export interface TrancheSolveFieldUnits {
+  /**
+   * Unit of the value `tranche_breakeven_cdr` returns.
+   */
+  breakeven_cdr: MetricFieldUnit;
+  /**
+   * Unit of the value `tranche_discount_margin` returns.
+   */
+  discount_margin: MetricFieldUnit;
+  /**
+   * Unit of every `OasResult` field, in the order the struct declares them.
+   */
+  oas: MetricFieldUnit[];
 }
 /**
  * Bounded structured diagnostics emitted by persisted-contract validation.

@@ -140,9 +140,11 @@ fn test_sabr_calibration() {
 
     // These arbitrary quotes are not a SABR smile: tight quote acceptance must
     // fail, while an explicitly budgeted approximate fit remains available.
-    assert!(SabrCalibrator::new()
-        .calibrate(forward, &strikes, &market_vols, time_to_expiry, beta)
-        .is_err());
+    assert!(
+        SabrCalibrator::new()
+            .calibrate(forward, &strikes, &market_vols, time_to_expiry, beta)
+            .is_err()
+    );
     let calibrator = SabrCalibrator::new()
         .with_tolerance(0.05)
         .with_max_iterations(2000);
@@ -720,9 +722,11 @@ fn test_sabr_validate_inputs_covers_standard_and_shifted_branches() {
     let shifted_rate_err = shifted
         .validate_inputs(-0.03, -0.02, 1.0)
         .expect_err("effective non-positive shifted rates should fail");
-    assert!(shifted_rate_err
-        .to_string()
-        .contains("effective rates must be positive"));
+    assert!(
+        shifted_rate_err
+            .to_string()
+            .contains("effective rates must be positive")
+    );
 }
 
 #[test]

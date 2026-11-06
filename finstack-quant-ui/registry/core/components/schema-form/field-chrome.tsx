@@ -76,9 +76,11 @@ export function nullableFieldChrome(
           variant="outline"
           size="sm"
           onClick={() =>
+            // Adding reveals the blank term; it does not edit it.
             form.setFieldValue(
               path,
               initialValue(module.schema, nonNull ?? props.location),
+              { dontUpdateMeta: true },
             )
           }
         >

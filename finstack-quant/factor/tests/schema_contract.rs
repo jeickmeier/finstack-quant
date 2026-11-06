@@ -1,8 +1,8 @@
 //! JSON Schema contract tests for factor-model configuration envelopes.
 
-use finstack_quant_factor::schema::ARTIFACTS;
 use finstack_quant_factor::FactorModelConfigEnvelope;
-use serde_json::{json, Value};
+use finstack_quant_factor::schema::ARTIFACTS;
+use serde_json::{Value, json};
 
 /// Render through the registry: only that path applies the packager, the
 /// single-branch-union collapse and examples, which is what is checked in.
@@ -204,10 +204,12 @@ fn checked_in_schema_keeps_meaningful_nested_validation() {
         .filter_map(|variant| variant.get("const").and_then(Value::as_str))
         .collect();
     assert_eq!(bump_units, ["rate_bp", "percent", "fraction", "factor"]);
-    assert!(schema
-        .pointer("/$defs/MatchingConfig/oneOf")
-        .and_then(Value::as_array)
-        .is_some_and(|variants| variants.len() >= 4));
+    assert!(
+        schema
+            .pointer("/$defs/MatchingConfig/oneOf")
+            .and_then(Value::as_array)
+            .is_some_and(|variants| variants.len() >= 4)
+    );
     assert_eq!(
         schema.pointer("/properties/config/$ref"),
         Some(&json!("#/$defs/FactorModelConfig"))

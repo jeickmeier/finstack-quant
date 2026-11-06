@@ -9,7 +9,7 @@ use finstack_quant_attribution::{
 use finstack_quant_core::config::ResultsMeta;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 use time::macros::date;
 
@@ -135,6 +135,7 @@ fn attribution_schema_inventory_is_exact() {
             "attribution.schema.json",
             "attribution_inputs.schema.json",
             "attribution_result.schema.json",
+            "pnl_bucket_share.schema.json",
         ]
     );
 }

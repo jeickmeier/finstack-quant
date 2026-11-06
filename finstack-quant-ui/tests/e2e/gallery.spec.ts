@@ -20,8 +20,9 @@ async function open(
   density = "compact",
   extra: Record<string, string> = {},
 ) {
+  // Focus mode shows the whole item, uncropped.
   await page.goto(
-    `/registry-gallery?${new URLSearchParams({ item: name, theme, density, ...extra })}`,
+    `/registry-gallery?${new URLSearchParams({ item: name, theme, density, focus: "1", ...extra })}`,
   );
   await page.waitForLoadState("networkidle");
   const item = page.locator(`[data-item="${name}"]`);
@@ -50,6 +51,8 @@ async function open(
   expect(pageErrors.get(page)).toEqual([]);
   return item;
 }
+// Axe runs in all four modes; these two cover both themes and both densities in pixels.
+const screenshotModes = ["light-compact", "dark-comfortable"];
 for (const item of inventory.visual)
   for (const theme of ["light", "dark"])
     for (const density of ["compact", "comfortable"]) {
@@ -72,6 +75,7 @@ for (const item of inventory.visual)
             }));
         }, item.name);
         expect(violations).toEqual([]);
+        if (!screenshotModes.includes(`${theme}-${density}`)) return;
         await expect(preview).toHaveScreenshot(
           `${item.name}-${theme}-${density}.png`,
           {
@@ -106,6 +110,168 @@ test("shifted cube", async ({ page }) => {
     variant: "shifted",
   });
   await expect(item).toHaveScreenshot("shifted-cube.png");
+});
+test("positions-table selected swap", async ({ page }) => {
+  const item = await open(page, "positions-table", "light", "comfortable");
+  await item.getByRole("row", { name: /IRS-1/ }).click();
+  const swap = item.getByRole("region", {
+    name: "Position IRS-1",
+    exact: true,
+  });
+  await expect(swap.getByText("IRS-5Y-USD-STD").first()).toBeVisible();
+  await expect(swap).toHaveScreenshot("positions-table-swap.png");
+});
+test("curve-query selected surface", async ({ page }) => {
+  const item = await open(page, "curve-query", "light", "comfortable");
+  await item.getByRole("button", { name: /^Inspect EQ-VOL, / }).click();
+  const lookup = item.getByRole("region", {
+    name: "Point lookup for EQ-VOL",
+  });
+  await expect(lookup.getByRole("table")).toBeVisible();
+  await expect(lookup).toHaveScreenshot("curve-query-surface.png");
+});
+test("waterfall-report period detail", async ({ page }) => {
+  const item = await open(page, "waterfall-report", "light", "comfortable");
+  const report = item.getByRole("region", { name: "Waterfall report" });
+  await report.getByRole("button", { expanded: false }).first().click();
+  await expect(
+    report.getByRole("table", { name: "Payment records" }),
+  ).toBeVisible();
+  await expect(report).toHaveScreenshot("waterfall-report-period-detail.png");
+});
+test("coverage-test-chart a trigger with no ratio by date", async ({
+  page,
+}) => {
+  const item = await open(page, "coverage-test-chart", "light", "comfortable");
+  const report = item.getByRole("region", { name: "Coverage tests" });
+  await report.getByRole("combobox", { name: "Test" }).click();
+  await page.getByRole("option", { name: "OC_EQUITY_trigger" }).click();
+  await expect(
+    report.getByText(/^Recorded on 0 of \d+ dates\.$/),
+  ).toBeVisible();
+  await expect(
+    report.getByText("First breach 2026-07-01", { exact: false }),
+  ).toBeVisible();
+});
+test("relative-value-table regression and a narrower peer filter", async ({
+  page,
+}) => {
+  const item = await open(page, "relative-value-table", "light", "comfortable");
+  const regression = item.getByRole("region", { name: "Spread vs leverage" });
+  await expect(
+    regression.getByRole("img", { name: /OAS bp on Leverage/ }),
+  ).toBeVisible();
+  // Screen on the utilities instead: two peers, too few for the regression.
+  const sector = item.getByRole("textbox", { name: "Gics sectors 1" });
+  await sector.fill("Utilities");
+  await item.getByRole("button", { name: "Compare" }).click();
+  await expect(
+    item
+      .getByRole("table", { name: "Comparable companies, LTM" })
+      .getByRole("rowheader"),
+  ).toHaveText(["NORTHWINDSubject", "DOGWOOD", "IRONWOOD"]);
+  await expect(
+    regression.getByText(/Excluded from the composite: Regression unusable/),
+  ).toBeVisible();
+});
+test("portfolio-margin-report selected netting set", async ({ page }) => {
+  const item = await open(
+    page,
+    "portfolio-margin-report",
+    "light",
+    "comfortable",
+  );
+  await item
+    .getByRole("row", { name: /bilateral · CSA USD-REGULATORY-CSA/ })
+    .click();
+  const set = item.getByRole("region", {
+    name: "Netting set USD-REGULATORY-CSA · CSA USD-REGULATORY-CSA",
+    exact: true,
+  });
+  await expect(set.getByRole("table", { name: "IR delta" })).toBeVisible();
+  await expect(set).toHaveScreenshot("portfolio-margin-report-netting-set.png");
+});
+test("csa-editor loads a Rust preset and its initial margin terms", async ({
+  page,
+}) => {
+  const item = await open(page, "csa-editor", "light", "comfortable");
+  await item.getByRole("button", { name: "EUR regulatory" }).click();
+  await expect(item.getByLabel("Id", { exact: true })).toHaveValue(
+    "EUR-REGULATORY-CSA",
+  );
+  const im = item.getByRole("group", { name: "Im params" });
+  await expect(im).toBeVisible();
+  await expect(im).toHaveScreenshot("csa-editor-im-params.png");
+});
+test("dcf-assumptions-form options", async ({ page }) => {
+  const item = await open(page, "dcf-assumptions-form", "light", "comfortable");
+  await item.getByText("DCF options", { exact: true }).click();
+  const options = item.locator("details").filter({ hasText: "DCF options" });
+  await expect(
+    options.getByRole("button", { name: "Add exit multiple bump" }),
+  ).toBeVisible();
+  await options
+    .getByRole("button", { name: "Add exit multiple metric node" })
+    .click();
+  await expect(
+    options.getByRole("combobox", { name: "Exit multiple metric node" }),
+  ).toBeVisible();
+  await expect(options).toHaveScreenshot("dcf-assumptions-form-options.png");
+});
+test("statement-monte-carlo results", async ({ page }) => {
+  const item = await open(
+    page,
+    "statement-monte-carlo",
+    "light",
+    "comfortable",
+  );
+  const results = item.getByRole("group", {
+    name: "Returned Monte Carlo results",
+  });
+  await expect(
+    results.getByRole("table", {
+      name: "Leverage percentiles by forecast period",
+    }),
+  ).toBeVisible();
+  await expect(
+    results.getByRole("region", { name: "Breach probability" }),
+  ).toContainText("16.5%");
+});
+test("portfolio-risk-report historical stress attribution", async ({
+  page,
+}) => {
+  const item = await open(
+    page,
+    "portfolio-risk-report",
+    "light",
+    "comfortable",
+    {
+      variant: "historical",
+    },
+  );
+  const stress = item.getByRole("region", {
+    name: "Stress attribution",
+    exact: true,
+  });
+  await expect(stress.getByRole("table").first()).toBeVisible();
+  await expect(stress).toHaveScreenshot("portfolio-risk-report-stress.png");
+});
+test("simm-calculator validated set and initial margin", async ({ page }) => {
+  const item = await open(page, "simm-calculator", "light", "comfortable");
+  const sensitivities = item.getByRole("region", {
+    name: "SIMM sensitivities",
+    exact: true,
+  });
+  await expect(
+    sensitivities.getByRole("region", { name: "Interest rate" }),
+  ).toBeVisible();
+  const report = item.getByRole("region", {
+    name: "SIMM initial margin",
+    exact: true,
+  });
+  await expect(report.getByLabel("Initial margin")).toHaveText(
+    "USD 13,958,205.61533609",
+  );
 });
 test("every nonvisual item imports without initializing WASM", async ({
   page,

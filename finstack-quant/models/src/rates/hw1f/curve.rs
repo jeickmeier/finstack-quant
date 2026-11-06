@@ -35,10 +35,10 @@
 //! Brigo & Mercurio (2006) *Interest Rate Models — Theory and Practice*
 //! §3.3.1 (HW1F affine bond price, eqs. 3.39–3.40); Hull & White (1990). `docs/REFERENCES.md#brigo-mercurio-2006-interest-rate-models` `docs/REFERENCES.md#hull-white-1990-pricing-ird`
 
-use crate::monte_carlo::process::ou::{calibrate_theta_from_curve, HullWhite1FParams};
+use crate::monte_carlo::process::ou::{HullWhite1FParams, calibrate_theta_from_curve};
 use crate::rates::clock::ModelDiscountCurve;
 use crate::rates::hull_white::{
-    fd_instantaneous_forward, hw_b, hw_ln_a, HullWhiteCalibrationParams,
+    HullWhiteCalibrationParams, fd_instantaneous_forward, hw_b, hw_ln_a,
 };
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::traits::Discounting;

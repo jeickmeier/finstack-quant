@@ -1,11 +1,11 @@
-//! `CovenantEngine` handle and the typed covenant package templates.
+//! `CovenantEngine` handle and the covenant package templates.
 
-use crate::utils::input::{js_f64, json_text};
+use crate::utils::input::{from_js_json, json_text};
 use crate::utils::wire::{js_date, js_wire};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_covenants::{
-    templates, CovenantEngine, CovenantScope, CovenantSpec, CovenantWaiver, DatedMetrics,
-    HashMapMetricSource,
+    CovenantEngine, CovenantScope, CovenantSpec, CovenantWaiver, DatedMetrics, HashMapMetricSource,
+    templates,
 };
 use wasm_bindgen::prelude::*;
 
@@ -185,104 +185,13 @@ impl JsCovenantEngine {
     }
 }
 
-/// Standard leveraged-buyout covenant package.
+/// Build the covenant specs of one standard package.
 ///
-/// Typed twin of `lboStandardJson`: quarterly maximum Debt / EBITDA, minimum
-/// interest coverage and minimum fixed-charge coverage tests plus an annual
-/// maximum-capex test.
-///
-/// @param initial_leverage - Maximum debt-to-EBITDA threshold in turns (`5.0` means 5.0x).
-/// @param interest_coverage - Minimum interest-coverage threshold in turns.
-/// @param fixed_charge_coverage - Minimum fixed-charge-coverage threshold in turns.
-/// @param max_capex - Maximum annual capital expenditure in the reporting currency.
-/// @returns `CovenantSpec` wire objects, ready for `CovenantEngine.fromSpecs`.
-/// @throws If a threshold is not a number (kind `invalid_type`), or is NaN, infinite or negative (kind `validation`).
-#[wasm_bindgen(js_name = lboStandard)]
-pub fn lbo_standard(
-    initial_leverage: JsValue,
-    interest_coverage: JsValue,
-    fixed_charge_coverage: JsValue,
-    max_capex: JsValue,
-) -> Result<JsValue, JsValue> {
-    to_js_value(
-        &templates::lbo_standard(
-            js_f64(&initial_leverage, "initialLeverage")?,
-            js_f64(&interest_coverage, "interestCoverage")?,
-            js_f64(&fixed_charge_coverage, "fixedChargeCoverage")?,
-            js_f64(&max_capex, "maxCapex")?,
-        )
-        .map_err(to_js_err)?,
-    )
-}
-
-/// Covenant-lite package: incurrence-style total and senior leverage tests.
-///
-/// Typed twin of `covLiteJson`.
-///
-/// @param max_leverage - Maximum total debt-to-EBITDA leverage in turns.
-/// @param max_senior_leverage - Maximum senior-debt-to-EBITDA leverage in turns.
-/// @returns `CovenantSpec` wire objects, ready for `CovenantEngine.fromSpecs`.
-/// @throws If a threshold is not a number (kind `invalid_type`), or is NaN, infinite or negative (kind `validation`).
-#[wasm_bindgen(js_name = covLite)]
-pub fn cov_lite(max_leverage: JsValue, max_senior_leverage: JsValue) -> Result<JsValue, JsValue> {
-    to_js_value(
-        &templates::cov_lite(
-            js_f64(&max_leverage, "maxLeverage")?,
-            js_f64(&max_senior_leverage, "maxSeniorLeverage")?,
-        )
-        .map_err(to_js_err)?,
-    )
-}
-
-/// Real-estate covenant package: DSCR, debt yield and loan-to-value tests.
-///
-/// Typed twin of `realEstateJson`.
-///
-/// @param min_dscr - Minimum debt-service coverage ratio in turns.
-/// @param min_debt_yield - Minimum net-operating-income debt yield as a decimal (`0.08` = 8%).
-/// @param max_ltv - Maximum loan-to-value ratio as a decimal (`0.65` = 65%).
-/// @returns `CovenantSpec` wire objects, ready for `CovenantEngine.fromSpecs`.
-/// @throws If a threshold is not a number (kind `invalid_type`), or is NaN, infinite or negative (kind `validation`).
-#[wasm_bindgen(js_name = realEstate)]
-pub fn real_estate(
-    min_dscr: JsValue,
-    min_debt_yield: JsValue,
-    max_ltv: JsValue,
-) -> Result<JsValue, JsValue> {
-    to_js_value(
-        &templates::real_estate(
-            js_f64(&min_dscr, "minDscr")?,
-            js_f64(&min_debt_yield, "minDebtYield")?,
-            js_f64(&max_ltv, "maxLtv")?,
-        )
-        .map_err(to_js_err)?,
-    )
-}
-
-/// Project-finance covenant package: DSCR, distribution lock-up, liquidity and net leverage tests.
-///
-/// Typed twin of `projectFinanceJson`.
-///
-/// @param min_dscr - Minimum debt-service coverage ratio in turns.
-/// @param distribution_lockup_dscr - DSCR below which distributions are locked up, in turns.
-/// @param min_liquidity - Minimum liquidity reserve in the reporting currency.
-/// @param max_net_leverage - Maximum net-debt-to-EBITDA leverage in turns.
-/// @returns `CovenantSpec` wire objects, ready for `CovenantEngine.fromSpecs`.
-/// @throws If a threshold is not a number (kind `invalid_type`), or is NaN, infinite or negative (kind `validation`).
-#[wasm_bindgen(js_name = projectFinance)]
-pub fn project_finance(
-    min_dscr: JsValue,
-    distribution_lockup_dscr: JsValue,
-    min_liquidity: JsValue,
-    max_net_leverage: JsValue,
-) -> Result<JsValue, JsValue> {
-    to_js_value(
-        &templates::project_finance(
-            js_f64(&min_dscr, "minDscr")?,
-            js_f64(&distribution_lockup_dscr, "distributionLockupDscr")?,
-            js_f64(&min_liquidity, "minLiquidity")?,
-            js_f64(&max_net_leverage, "maxNetLeverage")?,
-        )
-        .map_err(to_js_err)?,
-    )
+/// @param template - `CovenantTemplate` object or JSON text: `kind` (`"lbo_standard"`, `"cov_lite"`, `"real_estate"` or `"project_finance"`) and that package's thresholds by Rust field name (ratios in turns, `min_debt_yield` and `max_ltv` as decimals, `max_capex` and `min_liquidity` in the reporting currency).
+/// @returns `CovenantSpec` wire objects in the package's documented order, ready for `CovenantEngine.fromSpecs`.
+/// @throws If the template is malformed, has an unknown kind or field, or a threshold is NaN, infinite or negative (kind `validation`).
+#[wasm_bindgen(js_name = covenantTemplate)]
+pub fn covenant_template(template: JsValue) -> Result<JsValue, JsValue> {
+    let template: templates::CovenantTemplate = from_js_json(&template, "template")?;
+    to_js_value(&templates::covenant_template(&template).map_err(to_js_err)?)
 }

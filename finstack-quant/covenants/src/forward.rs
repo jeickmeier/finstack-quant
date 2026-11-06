@@ -4,16 +4,16 @@
 //! this crate has no statements dependency.
 
 use crate::engine::{
-    headroom_for, is_covenant_breached, spec_metric_name, springing_condition_met, validate_metric,
-    validated_ratio_value, BoundKind, CovenantScope, CovenantSpec, CovenantType,
-    SpringingCondition,
+    BoundKind, CovenantScope, CovenantSpec, CovenantType, SpringingCondition, headroom_for,
+    is_covenant_breached, spec_metric_name, springing_condition_met, validate_metric,
+    validated_ratio_value,
 };
-use finstack_quant_core::dates::{Date, PeriodId};
-use finstack_quant_core::math::random::{Pcg64Rng, RandomNumberGenerator};
-use finstack_quant_core::math::special_functions::norm_cdf;
 use finstack_quant_core::Error;
 use finstack_quant_core::InputError;
 use finstack_quant_core::Result;
+use finstack_quant_core::dates::{Date, PeriodId};
+use finstack_quant_core::math::random::{Pcg64Rng, RandomNumberGenerator};
+use finstack_quant_core::math::special_functions::norm_cdf;
 use serde::{Deserialize, Serialize};
 
 /// Default RNG seed used when `random_seed` is `None` in Monte Carlo mode.
@@ -895,13 +895,15 @@ mod tests {
         let mut engine = crate::CovenantEngine::new();
         engine.add_spec(spec);
         let metrics = crate::HashMapMetricSource::from_pairs([("debt_to_ebitda", 4.0)]);
-        assert!(engine
-            .evaluate_and_track(
-                &metrics,
-                model.period_end_date(&period).unwrap(),
-                crate::CovenantScope::Maintenance
-            )
-            .is_err());
+        assert!(
+            engine
+                .evaluate_and_track(
+                    &metrics,
+                    model.period_end_date(&period).unwrap(),
+                    crate::CovenantScope::Maintenance
+                )
+                .is_err()
+        );
     }
 
     #[test]
@@ -928,10 +930,11 @@ mod tests {
             .expect("Forecast covenant should succeed in test");
 
         assert!(fc.headroom.iter().all(|h| h.is_some_and(|h| h > 0.0)));
-        assert!(fc
-            .breach_probability
-            .iter()
-            .all(|&p| (p - 0.0).abs() < 1e-12));
+        assert!(
+            fc.breach_probability
+                .iter()
+                .all(|&p| (p - 0.0).abs() < 1e-12)
+        );
         assert!(fc.first_breach_date.is_none());
     }
 
@@ -983,13 +986,10 @@ mod tests {
             f64::NAN,
         );
 
-        assert!(forecast_covenant_generic(
-            &spec,
-            &mts,
-            &periods,
-            CovenantForecastConfig::default()
-        )
-        .is_err());
+        assert!(
+            forecast_covenant_generic(&spec, &mts, &periods, CovenantForecastConfig::default())
+                .is_err()
+        );
     }
 
     #[test]
@@ -1084,13 +1084,10 @@ mod tests {
                 .with("debt_to_ebitda", p1, 3.0)
                 .with("debt_to_ebitda", p2, f64::NAN);
 
-        assert!(forecast_breaches_generic(
-            &engine,
-            &mts,
-            &[p1, p2],
-            CovenantForecastConfig::default()
-        )
-        .is_err());
+        assert!(
+            forecast_breaches_generic(&engine, &mts, &[p1, p2], CovenantForecastConfig::default())
+                .is_err()
+        );
     }
 
     #[test]
@@ -1124,22 +1121,24 @@ mod tests {
             .with("debt_to_ebitda", p2, 5.0)
             .with("interest_coverage", p1, 1.5);
 
-        assert!(forecast_breaches_generic(
-            &engine,
-            &mts,
-            &[p1, p2],
-            CovenantForecastConfig::default()
-        )
-        .is_err());
+        assert!(
+            forecast_breaches_generic(&engine, &mts, &[p1, p2], CovenantForecastConfig::default())
+                .is_err()
+        );
     }
 
     #[test]
     fn forecast_breaches_generic_skips_non_numeric_covenants() {
         use crate::engine::CovenantEngine;
-        use crate::templates;
+        use crate::templates::{CovenantTemplate, covenant_template};
 
         let mut engine = CovenantEngine::new();
-        for spec in templates::cov_lite(6.0, 4.0).unwrap() {
+        for spec in covenant_template(&CovenantTemplate::CovLite {
+            max_leverage: 6.0,
+            max_senior_leverage: 4.0,
+        })
+        .unwrap()
+        {
             engine.add_spec(spec);
         }
 

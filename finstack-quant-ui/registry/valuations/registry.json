@@ -2,6 +2,312 @@
   "$schema": "https://ui.shadcn.com/schema/registry.json",
   "items": [
     {
+      "name": "metric-values-table",
+      "type": "registry:component",
+      "title": "Metric values table",
+      "description": "Metric ids as Rust returned them, each with its own native error, its declared unit and its group.",
+      "docs": "The table the metric-id cards share. Draws useMetricValues rows in the supplied order with labelFor labels; an id Rust rejects shows its native error in its own row and leaves the others, and a whole-request error replaces the table. Unit and group are what metricMetadata declares; a unit it leaves unknown says not declared, and values are never rescaled. applicableMetrics keeps the supplied ids Rust lists for an instrument type (metricsForInstrument). Accepts label, rows, metadata, loading, error, formatValue, density and note props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/metric-values-table/metric-values-table.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/metric-values-table/metric-values-table.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "bond-credit-card",
+      "type": "registry:component",
+      "title": "Bond credit card",
+      "description": "Spreads, option value, durations, default risk, carry and breakeven of a bond by metric id, as Rust returned them, with each id's own native error.",
+      "docs": "Shows z_spread, i_spread, g_spread, oas, asw_par, asw_market, discount_margin, embedded_option_value, duration_mod, duration_mac, convexity, dv01, cs01, recovery01, jump_to_default, theta, theta_carry, theta_roll_down, carry_total, coupon_income, pull_to_par, roll_down, funding_cost, theta_period_days and breakeven. applicableMetrics keeps those Rust lists for the instrument type; pass the result to useMetricValues and useMetricMetadata. An id Rust rejects (g_spread with no government curve named, recovery01 and jump_to_default off a hazard curve, breakeven with no config, oas with no quote) shows its native error in its own row and leaves the others; a malformed instrument or market is the whole error. With onOverridesChange it offers the schema's form for theta_period and breakeven_config over the supplied MetricPricingOverrides, keeping the fields it does not edit: pass the applied JSON as the request's metricPricingOverrides. Accepts rows, metadata, loading, error, formatValue, density, overrides and onOverridesChange props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/bond-credit-card/bond-credit-card.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/bond-credit-card/bond-credit-card.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/metric-values-table",
+        "@finstack/pricing-params-form",
+        "@finstack/schema-form"
+      ],
+      "dependencies": ["react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "loan-yield-card",
+      "type": "registry:component",
+      "title": "Loan yield card",
+      "description": "Yields, discount margin, all-in rate, OID, the call value and default risk of a loan by metric id, as Rust returned them, with each id's own native error.",
+      "docs": "Shows the metric ids a loan analyst reads together: ytm, ytw, ytc, yt2y, yt3y, yt4y, discount_margin, all_in_rate, oid_eir_rate, oid_eir_amortization, embedded_option_value, recovery01 and jump_to_default. applicableMetrics from metric-values-table keeps those Rust lists for the instrument type (metricsForInstrument); pass the result to useMetricValues, which prices each id on its own call because one failing id fails a whole native request, and useMetricMetadata for units and groups. An id Rust rejects (embedded_option_value without the tree model, discount_margin on a fixed loan or on a callable loan without a quote, recovery01 and jump_to_default without a credit curve under the tree model) shows its native error in its own row and leaves the others; a malformed instrument or market is the whole error. Unit shows what metricMetadata declares and says not declared otherwise; values are never rescaled. Accepts rows, metadata, loading, error, formatValue and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/loan-yield-card/loan-yield-card.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/loan-yield-card/loan-yield-card.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/metric-values-table"
+      ],
+      "dependencies": ["react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "yield-workout-ladder",
+      "type": "registry:component",
+      "title": "Yield workout ladder",
+      "description": "Shows the yield and I-spread to every call, put and maturity exit of a bond, with the row Rust marks as the worst workout.",
+      "docs": "Answers which call date is the worst workout and what the yield to each is. Present a native valuations.instruments.bondWorkoutLadder result (useBondWorkoutLadder): the one price every exit is solved at, then one row per exit in Rust's date order with its redemption, yield, I-spread and the mark on the row is_worst names, the exit the ytw metric selects. Pass metricMetadata of workoutLadderMetrics for the yield and spread units. A null yield shows as no yield, never zero. A bond with exercise rights needs quoted_clean_price_pct; the native error is shown as returned. Nothing is compared, sorted or derived. Accepts ladder, metadata, loading, error, formatValue and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/yield-workout-ladder/yield-workout-ladder.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/yield-workout-ladder/yield-workout-ladder.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "convertible-card",
+      "type": "registry:component",
+      "title": "Convertible card",
+      "description": "Shows a convertible's price, parity, bond floor, conversion premium and regime by share price, and its metrics by id.",
+      "docs": "Answers how a convertible moves with its stock. Present a native valuations.instruments.convertibleSpotLadder result (useConvertibleSpotLadder) as a chart of price, conversion value and floor with each regime Rust returned, a chart of parity and premium, and a row per share price with delta, hedge ratio, regime, parity and premium, with metric ids through metric-values-table. The share prices are the ones entered through onSpotsChange or Rust's default ladder. Pass metricMetadata of ladderMetrics for the column units. A null hedge ratio, regime or premium shows as undefined. Nothing is classified, compared or derived. Accepts ladder, ladderMetadata, ladderLoading, ladderError, onSpotsChange, rows, metadata, loading, error, formatValue and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/convertible-card/convertible-card.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/convertible-card/convertible-card.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-chart",
+        "@finstack/finstack-table",
+        "@finstack/metric-values-table",
+        "@finstack/native-display",
+        "button",
+        "input"
+      ],
+      "dependencies": [
+        "@tanstack/charts@0.18.0",
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-convertible-spot-ladder",
+      "type": "registry:hook",
+      "title": "useConvertibleSpotLadder",
+      "description": "Values a convertible at a ladder of share prices through the WASM worker.",
+      "docs": "valuations.instruments.ConvertibleBond.fromJson then convertibleSpotLadder for the supplied instrument, market, date and share prices, the handle freed afterwards. Null means no request; null spots is Rust's default ladder. Requires FinstackQueryProvider. A share price Rust rejects, or missing market data, is the hook error.",
+      "files": [
+        {
+          "path": "hooks/use-convertible-spot-ladder/use-convertible-spot-ladder.ts",
+          "type": "registry:hook",
+          "target": "hooks/valuations/use-convertible-spot-ladder/use-convertible-spot-ladder.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-bond-workout-ladder",
+      "type": "registry:hook",
+      "title": "useBondWorkoutLadder",
+      "description": "Solves the yield and I-spread to every exit of a bond through the WASM worker.",
+      "docs": "valuations.instruments.Bond.fromJson then bondWorkoutLadder for the supplied instrument, market and date, the handle freed afterwards. Null means no request. Requires FinstackQueryProvider. A bond with exercise rights and no quoted clean price, or a missing curve, is the hook error.",
+      "files": [
+        {
+          "path": "hooks/use-bond-workout-ladder/use-bond-workout-ladder.ts",
+          "type": "registry:hook",
+          "target": "hooks/valuations/use-bond-workout-ladder/use-bond-workout-ladder.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "quote-converter",
+      "type": "registry:component",
+      "title": "Quote converter",
+      "description": "Enter any one quote of a bond and see the whole price, yield and spread set Rust returns for it.",
+      "docs": "Answers what a bond's other quotes are given any one of them. Offers the quote kinds of the BondQuoteInput schema and presents a native valuations.instruments.computeQuotes result (useComputeQuotes) in Rust's field order. Pass native bondQuoteSetFieldUnits (useBondQuoteSetFieldUnits) for the units. A null field shows as no value, never zero. A quote that cannot be solved, a kind the bond does not have or one metric of the set failing, shows the native error as returned. Nothing is converted or compared. Accepts defaultInput, onSubmit, quotes, units, loading, error, formatValue and density props; no worker or query provider required.",
+      "files": [
+        {
+          "path": "components/quote-converter/quote-converter.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/quote-converter/quote-converter.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/primitive-contracts",
+        "@finstack/decimal-input",
+        "@finstack/enum-field",
+        "@finstack/native-display",
+        "button"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-compute-quotes",
+      "type": "registry:hook",
+      "title": "useComputeQuotes",
+      "description": "Solves a bond's whole quote set from any one quote through the WASM worker.",
+      "docs": "valuations.instruments.Bond.fromJson then computeQuotes for the supplied instrument, market, date and quote, the handle freed afterwards. Null means no request. useBondQuoteSetFieldUnits calls bondQuoteSetFieldUnits for a currency; null disables it. Requires FinstackQueryProvider. A quote that cannot be solved, or a missing curve, is the hook error.",
+      "files": [
+        {
+          "path": "hooks/use-compute-quotes/use-compute-quotes.ts",
+          "type": "registry:hook",
+          "target": "hooks/valuations/use-compute-quotes/use-compute-quotes.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-metric-values",
+      "type": "registry:hook",
+      "title": "useMetricValues",
+      "description": "Prices each supplied metric id on its own call through the WASM worker, so one failing id leaves the others.",
+      "docs": "valuations.instruments.priceInstrumentWithMarket once per supplied metric id over the cached market handle, in the supplied order. Null means no request. Requires FinstackQueryProvider. Each id keeps its own native error; a malformed instrument or market is the hook error. Use it where a card must not go blank because one id cannot compute, since one failing id fails a whole native request.",
+      "files": [
+        {
+          "path": "hooks/use-metric-values/use-metric-values.ts",
+          "type": "registry:hook",
+          "target": "hooks/valuations/use-metric-values/use-metric-values.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
       "name": "metric-picker",
       "type": "registry:ui",
       "title": "Metric picker",
@@ -300,12 +606,17 @@
       "type": "registry:component",
       "title": "Pricing parameters form",
       "description": "Controlled pricing parameters: model, metrics, metric pricing overrides and market history.",
-      "docs": "Standalone controlled pricing parameters. Supply native groups from useModels/useMetrics. Metric pricing overrides are edited from their schema and emitted as compact JSON. Market history text and omitted versus empty metric selection are preserved. JSON validation checks syntax only; native pricing owns financial validation.",
+      "docs": "Standalone controlled pricing parameters. Supply native groups from useModels and useMetrics(instrumentType). Selected metrics the type does not offer are reported, never dropped. Metric pricing overrides are edited from their schema and emitted as compact JSON. Market history text and omitted versus empty metric selection are preserved. JSON validation checks syntax only; native pricing owns financial validation.",
       "files": [
         {
           "path": "components/pricing-params-form/pricing-params-form.tsx",
           "type": "registry:component",
           "target": "components/finstack/valuations/components/pricing-params-form/pricing-params-form.tsx"
+        },
+        {
+          "path": "components/pricing-params-form/metric-overrides.ts",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/pricing-params-form/metric-overrides.ts"
         }
       ],
       "registryDependencies": [
@@ -334,8 +645,8 @@
       "name": "cashflow-viewer",
       "type": "registry:component",
       "title": "Cashflow viewer",
-      "description": "Table of supplied native cashflow JSON with row-currency amounts, reporting-currency PV and exact JSON export.",
-      "docs": "Supplied native cashflow JSON table with row-currency amounts and reporting-currency PV. Lossless numeric tokens; Rust supplies totals and reconciliation. Original JSON remains available for exact copy/download. Accepts text, loading and error props; no worker or query provider required.",
+      "description": "Table of a supplied native cashflow envelope with row-currency amounts, reporting-currency PV, an optional native annual ladder per row currency and a JSON export.",
+      "docs": "Table of the supplied native cashflow envelope object with row-currency amounts and reporting-currency PV, validated against the Rust schema. Rust supplies totals and reconciliation. Principal before and after columns show the supplied beginning_balance and ending_balance (per row for bonds, term loans and revolvers, per period for agency MBS), hidden only when no row carries one; nothing is accumulated. An optional ladder prop (the native cashflows.calendarYearLadder rows per row currency, as useCashflowLadder returns them) adds a Schedule / Annual ladder toggle with one table per currency in native PV. Envelope JSON (a host serialization of the object) is available for copy/download. Accepts cashflows, ladder, loading and error props; no worker or query provider required.",
       "files": [
         {
           "path": "components/cashflow-viewer/cashflow-viewer.tsx",
@@ -354,9 +665,15 @@
         "table",
         "badge",
         "@finstack/contract-instrument-cashflow",
-        "@finstack/finstack-codec"
+        "@finstack/finstack-codec",
+        "@finstack/finstack-table",
+        "@finstack/enum-field"
       ],
-      "dependencies": ["react@19.2.8", "lossless-json@4.3.1"],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
       "categories": ["Individual Components"],
       "meta": {
         "version": "0.2.0",
@@ -420,6 +737,7 @@
         "version": "0.2.0",
         "wasmVersion": "0.11.0",
         "schemaIds": [
+          "https://finstack_quant.dev/schemas/covenants/1/covenant_report.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
       }
@@ -428,8 +746,8 @@
       "name": "scenario-heatmap",
       "type": "registry:component",
       "title": "Scenario heatmap",
-      "description": "Heatmap of a structured-credit scenario table: clean price by CPR and CDR at a controlled severity.",
-      "docs": "Display returned ScenarioTable prices at original CPR/CDR coordinates, with an explicitly controlled severity and priceDomain straddling the canonical par reference 100. Prices are clean settlement percentages of current tranche balance per Rust ScenarioCell.price. Optional shared linking, callbacks, tooltip body, annotations and complete figure exports. No valuation, rebasing or WAL/writedown overlay.",
+      "description": "Heatmap of a structured-credit scenario table: price, WAL or writedown by CPR and CDR at a controlled severity.",
+      "docs": "Display one returned ScenarioTable measure at original CPR/CDR coordinates, with explicitly controlled severity and measure. The measures, axes and their units come from native scenarioTableFieldUnits. Price centres its colour on the canonical par reference 100 over an optional priceDomain, else the returned prices' reach about par; WAL and writedown run low to high over the table. Optional shared linking, callbacks, tooltip body, annotations and complete figure exports. No valuation or rebasing.",
       "files": [
         {
           "path": "components/scenario-heatmap/scenario-heatmap.tsx",
@@ -456,11 +774,240 @@
       }
     },
     {
+      "name": "pool-report",
+      "type": "registry:component",
+      "title": "Pool report",
+      "description": "Displays a structured-credit collateral pool's native statistics, WARF and concentration by obligor, industry and rating.",
+      "docs": "Present a native valuations.instruments.poolReport result: total balance, WARF and PoolStats tiles, then concentration tables by obligor, industry and rating in Rust's row order. Every unit comes from native poolReportFieldUnits for the report's currency. A null key means the attribute is missing on those assets and shows as such, and a null statistic, an average over an empty population, shows as missing and never as zero. Nothing is summed, sorted, grouped or rescaled. No worker is required.",
+      "files": [
+        {
+          "path": "components/pool-report/pool-report.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/pool-report/pool-report.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/measure-value"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "react@19.2.8",
+        "finstack-quant-wasm@0.11.0"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "waterfall-report",
+      "type": "registry:component",
+      "title": "Waterfall report",
+      "description": "One row per simulated structured-credit period showing the waterfall's cash, with tier allocations, payment records, diversions and non-waterfall payments on expand.",
+      "docs": "Present a native StructuredCredit.runSimulation result: one row per SimulationDiagnostics.periods entry in Rust's order with WaterfallDistribution's total available, recovery proceeds, diverted cash, carried interest and principal, whether a coverage test failed, and how many payments went outside the waterfall. Expanding a period shows the principal used for interest, its tier allocations and payment records in execution order, its diversions and its non-waterfall payments with their own dates. A settlement-only deal has one row, whose release is in that row's non-waterfall payments, and a note says so. The non-waterfall column is a count; the caption names the deal currency Rust states on each amount, and each amount shows every digit. Nothing is summed, joined by date, sorted or classified. No worker is required.",
+      "files": [
+        {
+          "path": "components/waterfall-report/waterfall-report.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/waterfall-report/waterfall-report.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/native-display",
+        "button",
+        "table"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "react@19.2.8",
+        "finstack-quant-wasm@0.11.0"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "coverage-test-chart",
+      "type": "registry:component",
+      "title": "Coverage test chart",
+      "description": "One structured-credit coverage test by date: ratio against trigger, cushion and Rust's first breach date, with the deal's diverted cash.",
+      "docs": "Present a native StructuredCredit.runSimulation result: SimulationDiagnostics.first_breaches in Rust's order, one test selected at a time, its ratio, trigger_level, cushion and passing flag on the dates Rust recorded it, and its first breach date, which a later cure does not clear. Dots are not connected because a tranche trigger can be absent between dates. A test recorded on fewer dates than the deal has periods states the counts, and one with no coverage_tests row is listed without a chart. A null ratio or cushion is Rust's no claim outstanding: the table and tooltip say so and no dot is drawn. Below, waterfall.diverted_cash by date and the diverted_amounts records with Rust's reason; a diversion belongs to a waterfall tier, so it is not attributed to the selected test. Units come from native simulationFieldUnits. No test evaluated, or one period, renders a stated condition rather than a chart. Nothing is computed, joined by date, sorted or classified. No worker is required.",
+      "files": [
+        {
+          "path": "components/coverage-test-chart/coverage-test-chart.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/coverage-test-chart/coverage-test-chart.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-chart",
+        "@finstack/finstack-table",
+        "@finstack/enum-field",
+        "@finstack/native-display"
+      ],
+      "dependencies": [
+        "@tanstack/charts@0.18.0",
+        "@tanstack/react-table@9.2.4",
+        "d3-scale@4.0.2",
+        "@types/d3-scale@4.0.9",
+        "react@19.2.8",
+        "finstack-quant-wasm@0.11.0"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "credit-enhancement-chart",
+      "type": "registry:component",
+      "title": "Credit enhancement chart",
+      "description": "Structured-credit credit enhancement by tranche and realized excess spread by date, from Rust's simulation record.",
+      "docs": "Present a native StructuredCredit.runSimulation result: PeriodDiagnostics.credit_enhancement, each tranche's decimal share of the collateral beneath it at period end, one line per tranche, and PeriodDiagnostics.excess_spread, realized that period and annualized as a decimal of the opening pool balance (pool interest less debt coupons due, service-provider and manager fees paid through the waterfall and net charge-offs; not the static abs_excess_spread metric). A table below holds the same values with every digit. Units come from native simulationFieldUnits. A deal with one period is listed instead of charted. Nothing is computed, grouped, joined by date, sorted or classified. No worker is required.",
+      "files": [
+        {
+          "path": "components/credit-enhancement-chart/credit-enhancement-chart.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/credit-enhancement-chart/credit-enhancement-chart.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-chart",
+        "@finstack/finstack-table",
+        "@finstack/native-display"
+      ],
+      "dependencies": [
+        "@tanstack/charts@0.18.0",
+        "@tanstack/react-table@9.2.4",
+        "d3-scale@4.0.2",
+        "@types/d3-scale@4.0.9",
+        "react@19.2.8",
+        "finstack-quant-wasm@0.11.0"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "equity-tranche-card",
+      "type": "registry:component",
+      "title": "Equity tranche card",
+      "description": "Displays a structured-credit deal's equity tranche: invested amount, IRR, MOIC, NAV and cash-on-cash, from Rust's equity metrics.",
+      "docs": "Present a native StructuredCredit.equityMetrics result beside a purchase price input. Rust measures the deal's first equity-seniority tranche: invested is its current balance times the price, par when the price is blank; irr is the annual XIRR (ACT/365F, decimal) of -invested on the valuation date against every later distribution, interest and principal; moic is total distributions over invested; nav_pct is those distributions discounted to the valuation date on the deal's discount curve, as a percent of current balance, and does not move with the price; cash_on_cash is each distribution as an unannualized decimal share of invested. Units come from native equityMetricsFieldUnits. A deal with no equity tranche shows Rust's error as returned. A null irr is stated as no rate solving and never drawn as zero: Rust returns it when nothing is invested or the tranche receives no distribution, while one that receives little still has an IRR near -1. A null moic or cash-on-cash share is stated as nothing invested, and a returned zero is drawn as zero. Nothing is computed, rescaled or classified. No worker is required.",
+      "files": [
+        {
+          "path": "components/equity-tranche-card/equity-tranche-card.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/equity-tranche-card/equity-tranche-card.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/measure-value",
+        "@finstack/decimal-input"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "react@19.2.8",
+        "finstack-quant-wasm@0.11.0"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "tranche-analytics",
+      "type": "registry:component",
+      "title": "Tranche analytics",
+      "description": "Displays one structured-credit tranche's native metrics, break-even CDR, discount margin, OAS and cash flows by date, each with its own native error.",
+      "docs": "Present native valuations.instruments results for one tranche as supplied: the TrancheMetrics fields in Rust declaration order (unset optional fields hidden) with the unit each Rust field documents, any requested registry metrics raw, trancheBreakevenCdr and trancheDiscountMargin as decimals, and the trancheOas result. The clean price is a controlled exact-decimal input, percent of current balance; no price is assumed, and discount margin and OAS stay idle without one. OAS runs only through onSolveOas. With onOasConfigChange, an OAS configuration disclosure edits the generated OasConfig contract, starting from its Rust example (OasConfig::default()), and hands complete JSON to the host on apply. With schedule, the native TrancheCashflows totals and the TrancheCashflows::to_table projection (one row per date; Rust joins and sums the per-kind flows) show as returned. Nothing is computed, rescaled or defaulted. No worker is required.",
+      "files": [
+        {
+          "path": "components/tranche-analytics/tranche-analytics.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/tranche-analytics/tranche-analytics.tsx"
+        },
+        {
+          "path": "components/tranche-analytics/oas-config.ts",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/tranche-analytics/oas-config.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/table-envelope",
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
+        "@finstack/measure-value",
+        "@finstack/decimal-input",
+        "button",
+        "@finstack/schema-form",
+        "@finstack/contract-oas-config",
+        "@finstack/finstack-codec"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "react@19.2.8",
+        "finstack-quant-wasm@0.11.0"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/common/1/oas_config.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
       "name": "pricing-workbench",
       "type": "registry:block",
       "title": "Pricing workbench",
-      "description": "All-instrument pricing workbench: market browser and editor, calibration, valuation results, cashflows and scenarios.",
-      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and optional structured-credit scenarios. Host owns routes and domain inputs.",
+      "description": "All-instrument pricing workbench: market browser and editor, calibration, valuation results, cashflows, bond and loan analytics, tranche analytics and scenarios.",
+      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and structured-credit deal entry (a registry family plus StandardDealParams starting from Rust's example, through StructuredCredit.newStandard), a pool report over native poolReport, a waterfall report, coverage tests and credit enhancement with excess spread over the deal's runSimulation, an equity tranche card over native equityMetrics, a tranche selector over the deal's native tranches, tranche analytics (with an applied OasConfig) and scenarios over an editable ScenarioGrid seeded from the host grid or Rust's example. A priced bond adds an Analytics tab with bond-credit-card, yield-workout-ladder and quote-converter, each opening on its own over the completed request; a priced term loan adds one with loan-yield-card. Host owns routes and domain inputs; the structured-credit seeds are optional.",
       "files": [
         {
           "path": "blocks/pricing-workbench/pricing-workbench.tsx",
@@ -473,9 +1020,94 @@
           "target": "components/finstack/valuations/blocks/pricing-workbench/calibration-panel.tsx"
         },
         {
+          "path": "blocks/pricing-workbench/attribution-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/attribution-panel.tsx"
+        },
+        {
+          "path": "blocks/pricing-workbench/market-scenario-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/market-scenario-panel.tsx"
+        },
+        {
           "path": "blocks/pricing-workbench/scenario-panel.tsx",
           "type": "registry:block",
           "target": "components/finstack/valuations/blocks/pricing-workbench/scenario-panel.tsx"
+        },
+        {
+          "path": "blocks/pricing-workbench/scenario-grid.ts",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/scenario-grid.ts"
+        },
+        {
+          "path": "blocks/pricing-workbench/deal-preset-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/deal-preset-panel.tsx"
+        },
+        {
+          "path": "blocks/pricing-workbench/deal-preset-form.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/deal-preset-form.tsx"
+        },
+        {
+          "path": "blocks/pricing-workbench/lazy-section.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/lazy-section.tsx"
+        },
+        {
+          "path": "blocks/pricing-workbench/instrument-metrics.ts",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/instrument-metrics.ts"
+        },
+        {
+          "path": "blocks/pricing-workbench/bond-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/bond-panel.tsx"
+        },
+        {
+          "path": "blocks/pricing-workbench/convertible-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/convertible-panel.tsx"
+        },
+        {
+          "path": "blocks/pricing-workbench/loan-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/loan-panel.tsx"
+        },
+        {
+          "path": "blocks/pricing-workbench/structured-credit-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/structured-credit-panel.tsx"
+        },
+        {
+          "path": "blocks/pricing-workbench/pool-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/pool-panel.tsx"
+        },
+        {
+          "path": "blocks/pricing-workbench/waterfall-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/waterfall-panel.tsx"
+        },
+        {
+          "path": "blocks/pricing-workbench/coverage-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/coverage-panel.tsx"
+        },
+        {
+          "path": "blocks/pricing-workbench/enhancement-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/enhancement-panel.tsx"
+        },
+        {
+          "path": "blocks/pricing-workbench/equity-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/equity-panel.tsx"
+        },
+        {
+          "path": "blocks/pricing-workbench/tranche-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/tranche-panel.tsx"
         },
         {
           "path": "blocks/pricing-workbench/workbench-status.ts",
@@ -520,6 +1152,14 @@
         "@finstack/use-calibrate",
         "@finstack/use-scenario-table",
         "@finstack/scenario-heatmap",
+        "@finstack/use-tranche-analytics",
+        "@finstack/tranche-analytics",
+        "@finstack/use-deal-report",
+        "@finstack/pool-report",
+        "@finstack/waterfall-report",
+        "@finstack/coverage-test-chart",
+        "@finstack/credit-enhancement-chart",
+        "@finstack/equity-tranche-card",
         "button",
         "label",
         "popover",
@@ -527,7 +1167,40 @@
         "tabs",
         "textarea",
         "@finstack/use-cashflows",
-        "@finstack/finstack-worker"
+        "@finstack/use-cashflow-ladder",
+        "@finstack/finstack-worker",
+        "@finstack/schema-form",
+        "@finstack/contract-scenario-grid",
+        "@finstack/contract-standard-deal-params",
+        "@finstack/shared-schema-defs",
+        "@finstack/finstack-codec",
+        "@finstack/market-scenario-builder",
+        "@finstack/market-scenario-report",
+        "@finstack/use-scenario-spec-validator",
+        "@finstack/use-list-builtin-template-metadata",
+        "@finstack/use-build-from-template",
+        "@finstack/use-build-template-component",
+        "@finstack/bond-credit-card",
+        "@finstack/convertible-card",
+        "@finstack/loan-yield-card",
+        "@finstack/metric-values-table",
+        "@finstack/yield-workout-ladder",
+        "@finstack/quote-converter",
+        "@finstack/use-metric-values",
+        "@finstack/use-bond-workout-ladder",
+        "@finstack/use-convertible-spot-ladder",
+        "@finstack/use-compute-quotes",
+        "@finstack/primitive-contracts",
+        "@finstack/use-compose-scenarios",
+        "@finstack/use-apply-market-scenario",
+        "@finstack/horizon-return-report",
+        "@finstack/use-horizon-return",
+        "@finstack/enum-field",
+        "@finstack/pnl-attribution-report",
+        "@finstack/use-attribute-pnl-many",
+        "@finstack/use-default-waterfall-order",
+        "@finstack/vol-surface-chart",
+        "@finstack/surface-arbitrage-badge"
       ],
       "dependencies": ["@base-ui/react@1.8.0", "finstack-quant-wasm@0.11.0"],
       "categories": ["Blocks"],
@@ -536,6 +1209,10 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
+          "https://finstack_quant.dev/schemas/common/1/oas_config.schema.json",
+          "https://finstack_quant.dev/schemas/common/1/scenario_grid.schema.json",
+          "https://finstack_quant.dev/schemas/common/1/standard_deal_params.schema.json",
+          "https://finstack_quant.dev/schemas/covenants/1/covenant_report.schema.json",
           "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_asian_option.schema.json",
           "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_forward.schema.json",
           "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_future.schema.json",
@@ -615,8 +1292,11 @@
           "https://finstack_quant.dev/schemas/instrument/1/rates/xccy_swap.schema.json",
           "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json",
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/models/1/arbitrage_report.schema.json",
           "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json",
-          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
         ]
       }
     },
@@ -641,7 +1321,8 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
-          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
         ]
       }
     },
@@ -666,7 +1347,8 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
-          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
         ]
       }
     },
@@ -674,8 +1356,8 @@
       "name": "use-cashflows",
       "type": "registry:hook",
       "title": "useCashflows",
-      "description": "Fetches native cashflow JSON for a pricing request through the WASM worker.",
-      "docs": "Original native cashflow JSON with complete immutable request/session keys and native errors. Requires the shared Finstack/Query provider. No cashflow rows or financial logic are inferred.",
+      "description": "Fetches the native cashflow envelope for a pricing request through the WASM worker.",
+      "docs": "Native cashflow envelope object with complete immutable request/session keys and native errors. Requires the shared Finstack/Query provider. No cashflow rows or financial logic are inferred.",
       "files": [
         {
           "path": "hooks/use-cashflows/use-cashflows.ts",
@@ -691,7 +1373,34 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
-          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-cashflow-ladder",
+      "type": "registry:hook",
+      "title": "useCashflowLadder",
+      "description": "Fetches the native calendar-year cashflow ladder of a supplied cashflow envelope, one per row currency, through the WASM worker.",
+      "docs": "Native valuations.instruments.calendarYearLadderByCurrency rows for each row currency of the supplied envelope, in first-appearance order, over each flow's native PV (row currency, before FX conversion and any scenario price shock). Keyed on the complete envelope and worker session; native errors are returned unchanged. Requires the shared Finstack/Query provider. No sums or FX conversion are computed locally.",
+      "files": [
+        {
+          "path": "hooks/use-cashflow-ladder/use-cashflow-ladder.ts",
+          "type": "registry:hook",
+          "target": "hooks/valuations/use-cashflow-ladder/use-cashflow-ladder.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
         ]
       }
     },
@@ -699,8 +1408,8 @@
       "name": "use-scenario-table",
       "type": "registry:hook",
       "title": "useScenarioTable",
-      "description": "Fetches a native structured-credit tranche scenario table through the WASM worker.",
-      "docs": "Native structured-credit scenario table with immutable complete request/session keys. No locally computed prices.",
+      "description": "Fetches a native structured-credit tranche scenario table and its field units through the WASM worker.",
+      "docs": "Native structured-credit scenario table with immutable complete request/session keys, and scenarioTableFieldUnits for its currency. No locally computed values.",
       "files": [
         {
           "path": "hooks/use-scenario-table/use-scenario-table.ts",
@@ -716,7 +1425,60 @@
         "wasmVersion": "0.11.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
-          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-deal-report",
+      "type": "registry:hook",
+      "title": "useDealReport",
+      "description": "Fetches a structured-credit deal's native pool report and simulation and their units through the WASM worker.",
+      "docs": "usePoolReport calls valuations.instruments.poolReport over the deal's pool and usePoolReportFieldUnits calls poolReportFieldUnits for the report's currency, useDealSimulation calls StructuredCredit.runSimulation and useSimulationFieldUnits calls simulationFieldUnits for the deal currency, each keyed by its complete immutable request and the worker session; null disables a call. Native errors are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-deal-report/use-deal-report.ts",
+          "type": "registry:hook",
+          "target": "hooks/valuations/use-deal-report/use-deal-report.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-tranche-analytics",
+      "type": "registry:hook",
+      "title": "useTrancheAnalytics",
+      "description": "Fetches native structured-credit tranche metrics, OAS, discount margin and break-even CDR through the WASM worker.",
+      "docs": "Deal entry through the families, registry profile ids and example inputs of standardDealFamilies (useStandardDealFamilies) and StructuredCredit.newStandard (useNewStandardDeal), the deal's tranches getter (useDealTranches), its trancheCashflows with Rust's date table (useTrancheSchedule), and four query option builders and hooks over valuations.instruments.trancheMetrics, trancheOas, trancheDiscountMargin and trancheBreakevenCdr, each keyed by its complete immutable request and the worker session; null disables a call. An omitted metrics price or metric list is left to Rust; OAS and discount margin require an explicit clean price, and OAS uses Rust's default OasConfig. Native errors are returned unchanged.",
+      "files": [
+        {
+          "path": "hooks/use-tranche-analytics/use-tranche-analytics.ts",
+          "type": "registry:hook",
+          "target": "hooks/valuations/use-tranche-analytics/use-tranche-analytics.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
         ]
       }
     },
@@ -826,7 +1588,8 @@
           "https://finstack_quant.dev/schemas/instrument/1/rates/xccy_swap.schema.json",
           "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json",
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
-          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
         ]
       }
     }

@@ -114,17 +114,21 @@ fn prepared_evaluation_rejects_scalar_replacement_and_changed_declaration() {
             .into_iter()
             .collect(),
     );
-    assert!(evaluator
-        .evaluate_prepared(&model, &prepared)
-        .unwrap_err()
-        .to_string()
-        .contains("declares"));
+    assert!(
+        evaluator
+            .evaluate_prepared(&model, &prepared)
+            .unwrap_err()
+            .to_string()
+            .contains("declares")
+    );
     model.get_node_mut("a").unwrap().value_type = Some(NodeValueType::Scalar);
-    assert!(evaluator
-        .evaluate_prepared(&model, &prepared)
-        .unwrap_err()
-        .to_string()
-        .contains("declared value type"));
+    assert!(
+        evaluator
+            .evaluate_prepared(&model, &prepared)
+            .unwrap_err()
+            .to_string()
+            .contains("declared value type")
+    );
 }
 
 #[test]
@@ -151,11 +155,13 @@ fn accounting_identities_reject_foreign_currency_and_scalar_money_mix() {
     let foreign = money_model(Currency::EUR);
     let foreign_results = Evaluator::new().evaluate(&foreign).unwrap();
     for check in identities(None) {
-        assert!(check
-            .execute(&CheckContext::new(&foreign, &foreign_results))
-            .unwrap_err()
-            .to_string()
-            .contains("incompatible units"));
+        assert!(
+            check
+                .execute(&CheckContext::new(&foreign, &foreign_results))
+                .unwrap_err()
+                .to_string()
+                .contains("incompatible units")
+        );
     }
     let mut scalar = money_model(Currency::USD);
     let node = scalar.get_node_mut("b").unwrap();
@@ -167,11 +173,13 @@ fn accounting_identities_reject_foreign_currency_and_scalar_money_mix() {
     node.value_type = Some(NodeValueType::Scalar);
     let scalar_results = Evaluator::new().evaluate(&scalar).unwrap();
     for check in identities(None) {
-        assert!(check
-            .execute(&CheckContext::new(&scalar, &scalar_results))
-            .unwrap_err()
-            .to_string()
-            .contains("incompatible units"));
+        assert!(
+            check
+                .execute(&CheckContext::new(&scalar, &scalar_results))
+                .unwrap_err()
+                .to_string()
+                .contains("incompatible units")
+        );
     }
     let same = money_model(Currency::USD);
     let results = Evaluator::new().evaluate(&same).unwrap();
@@ -206,11 +214,13 @@ fn precomputed_identity_checks_reject_units_that_disagree_with_the_model() {
         let error = suite.run_model(&model, Some(&results)).unwrap_err();
         assert!(error.to_string().contains("result units"));
         for check in identities(None) {
-            assert!(check
-                .execute(&CheckContext::new(&model, &results))
-                .unwrap_err()
-                .to_string()
-                .contains("result units"));
+            assert!(
+                check
+                    .execute(&CheckContext::new(&model, &results))
+                    .unwrap_err()
+                    .to_string()
+                    .contains("result units")
+            );
         }
     }
 }
@@ -279,11 +289,13 @@ fn accounting_identities_reject_invalid_tolerance_overrides() {
     let results = Evaluator::new().evaluate(&model).unwrap();
     for tolerance in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -0.01] {
         for check in identities(Some(tolerance)) {
-            assert!(check
-                .execute(&CheckContext::new(&model, &results))
-                .unwrap_err()
-                .to_string()
-                .contains("finite and nonnegative"));
+            assert!(
+                check
+                    .execute(&CheckContext::new(&model, &results))
+                    .unwrap_err()
+                    .to_string()
+                    .contains("finite and nonnegative")
+            );
         }
     }
 }
@@ -308,27 +320,31 @@ fn check_configs_reject_invalid_numeric_policies_even_for_empty_suites() {
             },
         ] {
             assert!(config.validate().is_err());
-            assert!(CheckSuiteSpec {
-                name: "empty".into(),
-                description: None,
-                builtin_checks: Vec::new(),
-                formula_checks: Vec::new(),
-                config: config.clone(),
-            }
-            .resolve()
-            .is_err());
+            assert!(
+                CheckSuiteSpec {
+                    name: "empty".into(),
+                    description: None,
+                    builtin_checks: Vec::new(),
+                    formula_checks: Vec::new(),
+                    config: config.clone(),
+                }
+                .resolve()
+                .is_err()
+            );
             let suite = CheckSuite::builder("empty").config(config).build();
             assert!(suite.run(&model, &results).is_err());
         }
     }
-    assert!(CheckConfig {
-        default_tolerance: 0.0,
-        default_relative_tolerance: 0.0,
-        materiality_threshold: 0.0,
-        ..Default::default()
-    }
-    .validate()
-    .is_ok());
+    assert!(
+        CheckConfig {
+            default_tolerance: 0.0,
+            default_relative_tolerance: 0.0,
+            materiality_threshold: 0.0,
+            ..Default::default()
+        }
+        .validate()
+        .is_ok()
+    );
 }
 
 #[test]

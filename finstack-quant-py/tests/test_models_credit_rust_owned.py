@@ -41,10 +41,14 @@ def test_defaults_rust_leaves_to_the_caller_are_required() -> None:
     with pytest.raises(TypeError):
         model.to_hazard_curve("X", datetime.date(2025, 1, 15), [1.0, 5.0], 0.4)  # type: ignore[call-arg]
     with pytest.raises(TypeError):
-        liability_management.analyze_lme("tender_offer", 100.0, 0.9)  # type: ignore[call-arg]
+        liability_management.LmeTerms(lme_type="tender_offer", notional=100.0, repurchase_price_pct=0.9)  # type: ignore[call-arg]
     with pytest.raises(TypeError):
-        liability_management.analyze_exchange_offer(80.0, 90.0)  # type: ignore[call-arg]
-    lme = liability_management.analyze_lme("tender_offer", 100.0, 0.9, 1.0)
+        liability_management.ExchangeOffer(old_pv=80.0, new_pv=90.0)  # type: ignore[call-arg]
+    lme = liability_management.analyze_lme(
+        liability_management.LmeTerms(
+            lme_type="tender_offer", notional=100.0, repurchase_price_pct=0.9, opt_acceptance_pct=1.0
+        )
+    )
     assert lme.cost == pytest.approx(90.0)
 
 

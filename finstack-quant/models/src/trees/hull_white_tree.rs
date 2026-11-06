@@ -39,8 +39,8 @@
 
 use super::tree_framework::TreeDiscounting;
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_core::math::piecewise::PiecewiseConstantCurve;
 use finstack_quant_core::math::Compounding;
+use finstack_quant_core::math::piecewise::PiecewiseConstantCurve;
 use finstack_quant_core::validation;
 use finstack_quant_core::{Error, Result};
 

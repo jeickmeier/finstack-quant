@@ -7,7 +7,7 @@
 
 use crate::attribution::attribution_support::TestInstrument;
 use finstack_quant_attribution::attribute_pnl_metrics_based;
-use finstack_quant_core::config::{results_meta, FinstackConfig};
+use finstack_quant_core::config::{FinstackConfig, results_meta};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -40,9 +40,9 @@ fn build_flat_curve(
 fn test_default_metrics_attribute_long_bond_curve_twist() {
     use finstack_quant_attribution::{AttributionMethod, AttributionSpec};
     use finstack_quant_core::market_data::context::MarketContextState;
+    use finstack_quant_valuations::instruments::PricingOptions;
     use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
     use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
-    use finstack_quant_valuations::instruments::PricingOptions;
 
     let as_of = date!(2026 - 10 - 01);
     let bond = Bond::fixed(
@@ -306,7 +306,7 @@ fn test_convexity_formula_correctness() {
 #[test]
 fn test_metrics_based_convexity_reduces_residual() {
     use finstack_quant_core::market_data::diff::{
-        measure_discount_curve_shift, TenorSamplingMethod,
+        TenorSamplingMethod, measure_discount_curve_shift,
     };
 
     let as_of_t0 = date!(2025 - 01 - 15);
@@ -452,7 +452,7 @@ fn test_metrics_based_convexity_reduces_residual() {
 #[test]
 fn test_metrics_based_ir_convexity_uses_dollar_convention() {
     use finstack_quant_core::market_data::diff::{
-        measure_discount_curve_shift, TenorSamplingMethod,
+        TenorSamplingMethod, measure_discount_curve_shift,
     };
 
     let as_of_t0 = date!(2025 - 01 - 15);

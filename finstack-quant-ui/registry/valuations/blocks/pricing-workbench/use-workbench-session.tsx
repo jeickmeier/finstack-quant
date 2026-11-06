@@ -8,6 +8,7 @@ import {
 import { PricingParamsForm } from "@/components/finstack/valuations/components/pricing-params-form/pricing-params-form";
 import { marketModule } from "@/components/finstack/core/components/market-context-form/market";
 import { useCashflows } from "@/hooks/valuations/use-cashflows/use-cashflows";
+import { useCashflowLadder } from "@/hooks/valuations/use-cashflow-ladder/use-cashflow-ladder";
 import { useMarketValidator } from "@/hooks/core/use-market-validator/use-market-validator";
 import { useFinstack } from "@/hooks/shared/use-finstack/use-finstack";
 import { useInstrumentValidator } from "@/hooks/valuations/use-instrument-validator/use-instrument-validator";
@@ -16,6 +17,7 @@ import {
   useMetrics,
   useMetricMetadata,
   useMoneyFormat,
+  usePriceDriverFields,
   usePriceInstrument,
   type PriceRequest,
 } from "@/hooks/valuations/use-price-instrument/use-price-instrument";
@@ -94,6 +96,16 @@ export function useWorkbenchSession({
       );
   }, []);
   const [instrument, setInstrument] = useState<string | null>(null);
+  // A deal built from a preset; the instrument form remounts on it and stays the editor.
+  const [builtInstrumentJson, setBuiltInstrumentJson] = useState<string | null>(
+    null,
+  );
+  const loadInstrument = useCallback((json: string) => {
+    setInstrument(null);
+    setBuiltInstrumentJson(json);
+    // finstack-arith: remount revision counter, not a value
+    setInstrumentRevision((current) => current + 1);
+  }, []);
   const [params, setParams] = useState<PricingParams>(() => ({
     asOf: initial.asOf,
     model: initial.model,
@@ -110,12 +122,14 @@ export function useWorkbenchSession({
   const selectType = useCallback(
     (nextType: string) => {
       const example = exampleRequests?.[nextType];
+      setBuiltInstrumentJson(null);
       if (example) {
         setInstrument(null);
         setMarket(null);
         setMarketReady(false);
         setMarketDocument((current) => ({
           json: example.marketJson,
+          // finstack-arith: remount revision counter, not a value
           revision: current.revision + 1,
         }));
         setParams({
@@ -127,6 +141,7 @@ export function useWorkbenchSession({
         });
         setRequest(null);
         setCompleted(null);
+        // finstack-arith: remount revision counter, not a value
         setInstrumentRevision((current) => current + 1);
         setResultTab(exampleResultTabs?.[nextType] ?? defaultResultTab);
       }
@@ -167,6 +182,10 @@ export function useWorkbenchSession({
     },
     cashflowModel !== null,
   );
+  // The annual ladder aggregates exactly the envelope the viewer shows.
+  const cashflowLadder = useCashflowLadder(
+    cashflowModel === null ? null : cashflows.data,
+  );
   // A disabled query stays pending forever; only an active cashflow request can delay printing.
   const preparing =
     cashflows.isLoading ||
@@ -187,8 +206,9 @@ export function useWorkbenchSession({
   const worker = useFinstack();
   const validate = useInstrumentValidator();
   const validateMarket = useMarketValidator();
+  const priceDriverFields = usePriceDriverFields();
   const models = useModels(),
-    metrics = useMetrics();
+    metrics = useMetrics(type || null);
   const candidate = useMemo<PriceRequest | null>(
     () =>
       instrument &&
@@ -259,6 +279,7 @@ export function useWorkbenchSession({
   );
 
   return {
+    priceDriverFields: priceDriverFields.data,
     initial,
     initialType,
     type,
@@ -282,6 +303,8 @@ export function useWorkbenchSession({
     market,
     acceptMarket,
     setInstrument,
+    builtInstrumentJson,
+    loadInstrument,
     selectType,
     printSnapshot,
     startPrint,
@@ -290,6 +313,7 @@ export function useWorkbenchSession({
     measureMetadata,
     moneyFormat,
     cashflows,
+    cashflowLadder,
     cashflowModel,
     preparing,
     printMarket,

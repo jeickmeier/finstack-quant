@@ -1,0 +1,211 @@
+{
+  "$defs": {
+    "OptionModel": {
+      "description": "A closed-form model and the option terms it reads.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Black-Scholes-Merton on spot with continuous rate and dividend yield.",
+          "properties": {
+            "div_yield": {
+              "description": "Continuously compounded dividend yield or foreign rate as a decimal.",
+              "format": "double",
+              "type": "number"
+            },
+            "expiry": {
+              "description": "Time to expiry in years.",
+              "format": "double",
+              "type": "number"
+            },
+            "is_call": {
+              "description": "`true` for a call, `false` for a put.",
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "black_scholes",
+              "type": "string"
+            },
+            "rate": {
+              "description": "Continuously compounded domestic risk-free rate as a decimal.",
+              "format": "double",
+              "type": "number"
+            },
+            "spot": {
+              "description": "Underlying spot price, positive.",
+              "format": "double",
+              "type": "number"
+            },
+            "strike": {
+              "description": "Exercise price in the same units as `spot`, positive.",
+              "format": "double",
+              "type": "number"
+            },
+            "theta_days_per_year": {
+              "description": "Theta denominator in days per year; omitted uses\n[`DEFAULT_THETA_DAYS_PER_YEAR`].",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "spot",
+            "strike",
+            "rate",
+            "div_yield",
+            "expiry",
+            "is_call"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Black-76 on a forward, discounted by `df`.",
+          "properties": {
+            "df": {
+              "description": "Discount factor from valuation to payment, positive.",
+              "format": "double",
+              "type": "number"
+            },
+            "expiry": {
+              "description": "Time to expiry in years.",
+              "format": "double",
+              "type": "number"
+            },
+            "forward": {
+              "description": "Forward price or rate at expiry, positive.",
+              "format": "double",
+              "type": "number"
+            },
+            "is_call": {
+              "description": "`true` for a call, `false` for a put.",
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "black76",
+              "type": "string"
+            },
+            "strike": {
+              "description": "Exercise price in the forward's units, positive.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "forward",
+            "strike",
+            "df",
+            "expiry",
+            "is_call"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Bachelier (normal) on a forward, undiscounted.",
+          "properties": {
+            "expiry": {
+              "description": "Time to expiry in years.",
+              "format": "double",
+              "type": "number"
+            },
+            "forward": {
+              "description": "Forward price or rate at expiry; any sign.",
+              "format": "double",
+              "type": "number"
+            },
+            "is_call": {
+              "description": "`true` for a call, `false` for a put.",
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "bachelier",
+              "type": "string"
+            },
+            "strike": {
+              "description": "Exercise price in the forward's units; any sign.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "forward",
+            "strike",
+            "expiry",
+            "is_call"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "OptionSolve": {
+      "description": "What the calculation solves for.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Price the option at a volatility.",
+          "properties": {
+            "kind": {
+              "const": "price",
+              "type": "string"
+            },
+            "vol": {
+              "description": "Annualized volatility: a decimal Black vol for Black-Scholes and\nBlack-76, an absolute normal vol in the forward's units for\nBachelier.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "vol"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Invert a price to its implied volatility.",
+          "properties": {
+            "kind": {
+              "const": "implied_vol",
+              "type": "string"
+            },
+            "price": {
+              "description": "Option price per unit in the model's convention: discounted for\nBlack-Scholes and Black-76, undiscounted for Bachelier.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "price"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/option_calculation.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "One closed-form option calculation: a model with its terms and a price or implied-volatility solve.",
+  "properties": {
+    "model": {
+      "$ref": "#/$defs/OptionModel",
+      "description": "Closed-form model and option terms."
+    },
+    "solve": {
+      "$ref": "#/$defs/OptionSolve",
+      "description": "Price at a volatility, or implied volatility of a price."
+    }
+  },
+  "required": [
+    "model",
+    "solve"
+  ],
+  "title": "OptionCalculation",
+  "type": "object"
+}

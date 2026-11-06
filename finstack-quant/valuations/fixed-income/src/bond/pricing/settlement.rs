@@ -12,12 +12,12 @@
 //! - Accrued interest for market quotes is computed at the quote date.
 
 use finstack_quant_cashflows::builder::CashFlowSchedule;
+use finstack_quant_core::Result;
 use finstack_quant_core::cashflow::CFKind;
-use finstack_quant_core::dates::{adjust, Date, DateExt};
+use finstack_quant_core::dates::{Date, DateExt, adjust};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 
 use crate::bond::Bond;
 

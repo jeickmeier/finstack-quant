@@ -35,18 +35,17 @@ export function priceOptions(
 export function usePriceInstrument(request: PriceRequest, enabled = true) {
   return useWorkerQuery((worker) => ({
     ...priceOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && enabled,
+    enabled,
   }));
 }
 /** Registry options are immutable within one initialized worker session. */
 function useOptions<T>(
-  operation: "models" | "metrics" | "calendars",
+  operation: "models" | "calendars" | "priceDriverFields",
   fetch: (client: FinstackClient) => Promise<T>,
 ) {
   return useWorkerQuery((worker) => ({
     queryKey: ["finstack", worker.session, operation],
     queryFn: () => fetch(worker.client!),
-    enabled: worker.status === "ready",
     ...workerQueryPolicy,
   }));
 }
@@ -54,9 +53,14 @@ function useOptions<T>(
 export function useModels() {
   return useOptions("models", (client) => client.call("models"));
 }
-/** Metrics grouped by native category, without local classifications. */
-export function useMetrics() {
-  return useOptions("metrics", (client) => client.call("metrics"));
+/** Every metric Rust registers for one instrument type, by native group (those outside a group under "Instrument Specific"); null disables the query. */
+export function useMetrics(instrumentType: string | null) {
+  return useWorkerQuery((worker) => ({
+    queryKey: ["finstack", worker.session, "metrics", instrumentType] as const,
+    queryFn: () => worker.client!.call("metrics", instrumentType!),
+    enabled: instrumentType !== null,
+    ...workerQueryPolicy,
+  }));
 }
 /** Native display text for an exact amount under its returned rounding stamp; the request is snapshotted without mutation. */
 export function useMoneyFormat(request: MoneyFormatRequest | null) {
@@ -64,7 +68,7 @@ export function useMoneyFormat(request: MoneyFormatRequest | null) {
   return useWorkerQuery((worker) => ({
     queryKey: ["finstack", worker.session, "formatMoney", snapshot] as const,
     queryFn: () => worker.client!.call("formatMoney", snapshot!),
-    enabled: worker.status === "ready" && snapshot !== null,
+    enabled: snapshot !== null,
     ...workerQueryPolicy,
   }));
 }
@@ -74,9 +78,15 @@ export function useMetricMetadata(keys: readonly string[], enabled = true) {
   return useWorkerQuery((worker) => ({
     queryKey: ["finstack", worker.session, "metricMetadata", snapshot] as const,
     queryFn: () => worker.client!.call("metricMetadata", snapshot),
-    enabled: worker.status === "ready" && enabled,
+    enabled,
     ...workerQueryPolicy,
   }));
+}
+/** Native wire names of the mutually exclusive price-driving market quotes. */
+export function usePriceDriverFields() {
+  return useOptions("priceDriverFields", (client) =>
+    client.call("priceDriverFields"),
+  );
 }
 /** Canonical calendar identifiers from the native core registry. */
 export function useCalendars() {

@@ -515,3 +515,71 @@ def carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame) -
     0.0203
     """
     ...
+
+def brinson_linked(periods: str | list[list[dict[str, Any]]]) -> CarinoLinkedAttribution:
+    """
+    Attribute each period with Brinson-Fachler and Carino-link the results.
+
+    Binds Rust ``brinson_linked``: the multi-period Brinson-Fachler report in
+    one call, identical to ``carino_link([brinson_fachler(p) for p in periods])``.
+    The same input the WASM ``brinsonLinked`` takes.
+
+    Parameters
+    ----------
+    periods : str | list[list[dict]]
+        Chronological periods, each a list of ``SectorPeriod`` objects
+        (``sector``, ``portfolio_weight``, ``benchmark_weight``,
+        ``portfolio_return``, ``benchmark_return``), or the JSON of that
+        nested list. Weights are decimal fractions summing to one on each
+        side; returns are decimal period returns (``0.015`` is +1.5 %).
+        Every period lists the same sectors in the same order; a sector
+        absent on one side keeps a zero weight.
+
+    Returns
+    -------
+    CarinoLinkedAttribution
+        Per-period sector allocation, selection and interaction
+        (``periods``), linked effects by sector (``linked_sectors``) and by
+        effect (``linked_allocation``, ``linked_selection``,
+        ``linked_interaction``), and the compounded portfolio and benchmark
+        returns. The linked effects sum to the compounded active return.
+
+    Raises
+    ------
+    PortfolioError
+        If there are no periods, a period fails Brinson-Fachler (no sectors,
+        a non-finite input, or weights not summing to one; the message names
+        the zero-based period), the sector ordering changes between periods,
+        or a period return is at most ``-1``.
+    ValueError
+        If ``periods`` is malformed JSON or a row has an unknown field.
+
+    Sources
+    -------
+    See ``docs/REFERENCES.md#brinson-fachler-1985`` and
+    ``docs/REFERENCES.md#carino-1999``.
+
+    Examples
+    --------
+    >>> from finstack_quant.portfolio import brinson_linked
+    >>> def row(sector, wp, wb, rp, rb):
+    ...     return {
+    ...         "sector": sector,
+    ...         "portfolio_weight": wp,
+    ...         "benchmark_weight": wb,
+    ...         "portfolio_return": rp,
+    ...         "benchmark_return": rb,
+    ...     }
+    >>> periods = [
+    ...     [row("Tech", 0.7, 0.5, 0.10, 0.06), row("Energy", 0.3, 0.5, 0.04, 0.05)],
+    ...     [row("Tech", 0.6, 0.5, 0.02, 0.03), row("Energy", 0.4, 0.5, -0.01, 0.00)],
+    ... ]
+    >>> report = brinson_linked(periods)
+    >>> active = report.portfolio_return_compounded - report.benchmark_return_compounded
+    >>> linked = report.linked_allocation + report.linked_selection + report.linked_interaction
+    >>> abs(linked - active) < 1e-12
+    True
+    >>> [s["sector"] for s in report.linked_sectors]
+    ['Tech', 'Energy']
+    """
+    ...

@@ -9,7 +9,7 @@ use finstack_quant_valuations_core::instruments::BondQuoteInput;
 use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_quant_valuations_core::pricer::{
-    expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry, PricingError,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry, PricingError, expect_inst,
 };
 use finstack_quant_valuations_core::results::ValuationResult;
 use std::sync::{Arc, Mutex};
@@ -55,6 +55,49 @@ fn b11_quote_set_propagates_applicable_metric_failure() {
             && message.contains("deliberate yield failure"),
         "{message}"
     );
+}
+
+#[test]
+fn quote_set_reports_a_non_finite_metric_as_none() {
+    struct Fixed(f64);
+    impl MetricCalculator for Fixed {
+        fn calculate(&self, _: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+            Ok(self.0)
+        }
+    }
+    let bond = Bond::example().expect("bond");
+    let as_of = bond.issue_date;
+    let market = MarketContext::new().insert(
+        DiscountCurve::builder(bond.discount_curve_id.as_str())
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (20.0, 0.5)])
+            .build()
+            .expect("curve"),
+    );
+    let mut metrics = crate::FIXED_INCOME.metrics().clone();
+    for (id, value) in [
+        (MetricId::Ytw, f64::NEG_INFINITY),
+        (MetricId::JapaneseSimpleYield, f64::INFINITY),
+        (MetricId::MoosmullerYtm, f64::NAN),
+    ] {
+        metrics.replace_metric(id, Arc::new(Fixed(value)), &[InstrumentType::Bond]);
+    }
+    let quotes = compute_quotes(
+        &bond,
+        &market,
+        as_of,
+        BondQuoteInput::CleanPricePct(100.0),
+        PricingOptions::default().with_metric_registry(Arc::new(metrics)),
+    )
+    .expect("set");
+    assert_eq!(quotes.ytw, None);
+    assert_eq!(quotes.japanese_simple_yield, None);
+    assert_eq!(quotes.moosmuller_ytm, None);
+    assert!(quotes.ytm.is_some());
+    // JSON has no infinity: what crosses the wire reads back the same.
+    let wire = serde_json::to_string(&quotes).expect("to json");
+    let back: BondQuoteSet = serde_json::from_str(&wire).expect("from json");
+    assert_eq!(back, quotes);
 }
 
 struct LinearTreeOasPricer {
@@ -276,9 +319,11 @@ fn z_spread_input_rejects_option_bond_without_quoted_workout_price() {
 
     let direct_error = price_from_z_spread(&bond, &market, as_of, 0.01)
         .expect_err("direct Z-spread pricing must not ignore callability");
-    assert!(direct_error
-        .to_string()
-        .contains("requires an explicit quoted clean price"));
+    assert!(
+        direct_error
+            .to_string()
+            .contains("requires an explicit quoted clean price")
+    );
 
     let quote_error = compute_quotes(
         &bond,
@@ -289,9 +334,11 @@ fn z_spread_input_rejects_option_bond_without_quoted_workout_price() {
             .with_model(finstack_quant_valuations_core::pricer::ModelKey::Tree),
     )
     .expect_err("Z-spread quote normalization must not ignore callability");
-    assert!(quote_error
-        .to_string()
-        .contains("requires an explicit quoted clean price"));
+    assert!(
+        quote_error
+            .to_string()
+            .contains("requires an explicit quoted clean price")
+    );
 }
 
 #[test]

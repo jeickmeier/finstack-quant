@@ -2,11 +2,11 @@
 //!
 use super::TreePricer;
 use crate::bond::Bond;
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::DateExt;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::Compounding;
-use finstack_quant_core::Result;
 use finstack_quant_models::trees::hull_white_tree::HullWhiteTree;
 use finstack_quant_models::trees::tree_framework::{NodeState, TreeDiscounting, TreeValuator};
 use finstack_quant_models::trees::two_factor_rates_credit::RatesCreditTree;
@@ -701,16 +701,16 @@ impl BondValuator {
             }
 
             for (date, put_price) in &put_barriers_by_date {
-                if let Some(call_price) = call_barriers_by_date.get(date) {
-                    if *put_price > call_price + 1e-10 {
-                        return Err(finstack_quant_core::Error::Validation(format!(
-                            "Bond '{}' has incompatible call/put barriers on {}: holder put payoff {} exceeds issuer call payoff {}",
-                            bond.id.as_str(),
-                            date,
-                            put_price,
-                            call_price
-                        )));
-                    }
+                if let Some(call_price) = call_barriers_by_date.get(date)
+                    && *put_price > call_price + 1e-10
+                {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "Bond '{}' has incompatible call/put barriers on {}: holder put payoff {} exceeds issuer call payoff {}",
+                        bond.id.as_str(),
+                        date,
+                        put_price,
+                        call_price
+                    )));
                 }
             }
         }
@@ -1027,7 +1027,8 @@ impl BondValuator {
         if tree.get_config().rate_vol != 0.0 || tree.get_config().hazard_vol != 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "deterministic rates-credit bond rollback requires zero rate_vol and hazard_vol, got {} and {}",
-                tree.get_config().rate_vol, tree.get_config().hazard_vol
+                tree.get_config().rate_vol,
+                tree.get_config().hazard_vol
             )));
         }
         if !oas_bp.is_finite() {
@@ -1414,12 +1415,10 @@ mod tests {
                 date!(2025 - 04 - 10)
             ]
         );
-        assert!(BondValuator::exercise_candidates(
-            date!(2025 - 02 - 01),
-            date!(2025 - 01 - 01),
-            &[]
-        )
-        .is_empty());
+        assert!(
+            BondValuator::exercise_candidates(date!(2025 - 02 - 01), date!(2025 - 01 - 01), &[])
+                .is_empty()
+        );
     }
 
     #[test]

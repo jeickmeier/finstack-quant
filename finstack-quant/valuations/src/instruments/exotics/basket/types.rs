@@ -5,14 +5,14 @@
 //! pricing infrastructure.
 
 use crate::instruments::Instrument;
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::money::{fx::FxConversionPolicy, Money};
+use finstack_quant_core::money::{Money, fx::FxConversionPolicy};
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{InstrumentId, PriceId};
 use finstack_quant_core::validation;
-use finstack_quant_core::Result;
 
 use crate::instruments::json_loader::InstrumentJson;
 

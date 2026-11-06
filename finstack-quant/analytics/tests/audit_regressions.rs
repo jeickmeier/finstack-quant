@@ -1,6 +1,6 @@
 //! Numerical and boundary regressions for analytics kernels.
 use finstack_quant_analytics::{
-    max_drawdown, sharpe, sortino, volatility, CagrDayCount, Performance, ReturnKind,
+    CagrDayCount, Performance, ReturnKind, max_drawdown, sharpe, sortino, volatility,
 };
 use finstack_quant_core::dates::{Date, PeriodKind};
 use serde_json::json;
@@ -12,13 +12,13 @@ fn dates(n: usize) -> Vec<Date> {
 }
 
 fn panel(returns: Vec<f64>, frequency: PeriodKind) -> Performance {
-    Performance::from_returns(
+    Performance::new(&crate::support::returns_panel(
         dates(returns.len()),
         vec![returns],
         vec!["A".into()],
         None,
         frequency,
-    )
+    ))
     .unwrap()
 }
 
@@ -118,13 +118,13 @@ fn rolling_greeks_matches_fresh_windows_across_constant_benchmark_spans() {
             }
             let returns: Vec<f64> = (0..n).map(|i| (i % 7) as f64 * 0.001 - 0.003).collect();
             let grid = dates(n);
-            let mut perf = Performance::from_returns(
+            let mut perf = Performance::new(&crate::support::returns_panel(
                 grid.clone(),
                 vec![benchmark, returns],
                 vec!["B".into(), "P".into()],
                 None,
                 PeriodKind::Daily,
-            )
+            ))
             .unwrap();
             let rolling = perf.rolling_greeks(1, window, 0.02).unwrap();
             assert_eq!(rolling.dates, grid[window - 1..]);
@@ -148,7 +148,7 @@ fn rolling_greeks_matches_fresh_windows_across_constant_benchmark_spans() {
 
 #[test]
 fn rolling_greeks_reproduced_three_observation_window_is_undefined() {
-    let perf = Performance::from_returns(
+    let perf = Performance::new(&crate::support::returns_panel(
         dates(5),
         vec![
             vec![0.02, -0.03, 0.001, 0.001, 0.001],
@@ -157,7 +157,7 @@ fn rolling_greeks_reproduced_three_observation_window_is_undefined() {
         vec!["B".into(), "P".into()],
         None,
         PeriodKind::Daily,
-    )
+    ))
     .unwrap();
     let rolling = perf.rolling_greeks(1, 3, 0.0).unwrap();
     assert!(rolling.betas[2].is_nan());
@@ -173,13 +173,13 @@ fn rolling_greeks_preserves_small_nonzero_benchmark_variance() {
         benchmark[0] = 0.02;
         benchmark[1] = -0.03;
         let returns = benchmark.iter().map(|b| 2.0 * b).collect();
-        let perf = Performance::from_returns(
+        let perf = Performance::new(&crate::support::returns_panel(
             dates(benchmark.len()),
             vec![benchmark, returns],
             vec!["B".into(), "P".into()],
             None,
             PeriodKind::Daily,
-        )
+        ))
         .unwrap();
         let rolling = perf.rolling_greeks(1, 3, 0.0).unwrap();
         for (&beta, &alpha) in rolling.betas.iter().zip(&rolling.alphas) {
@@ -229,43 +229,50 @@ fn singleton_ratios_agree_across_entry_points() {
     let rolling = perf.rolling_sharpe(0, 1, 0.0).unwrap();
     assert_eq!(rolling.dates, dates(2));
     assert!(rolling.values.iter().all(|v| v.is_nan()));
-    assert!(perf
-        .rolling_sortino(0, 1, 0.0)
-        .unwrap()
-        .values
-        .iter()
-        .all(|v| v.is_nan()));
+    assert!(
+        perf.rolling_sortino(0, 1, 0.0)
+            .unwrap()
+            .values
+            .iter()
+            .all(|v| v.is_nan())
+    );
 }
 
 #[test]
 fn constructors_reject_duplicate_identity_and_unrepresentable_returns() {
     for prices in [vec![1e-300, 1e300], vec![1e300, 1e-300]] {
-        assert!(Performance::new(
-            dates(2),
-            vec![prices],
-            vec!["A".into()],
-            None,
-            PeriodKind::Daily
-        )
-        .is_err());
+        assert!(
+            Performance::new(&crate::support::prices_panel(
+                dates(2),
+                vec![prices],
+                vec!["A".into()],
+                None,
+                PeriodKind::Daily
+            ))
+            .is_err()
+        );
     }
     let names = vec!["A".into(), "A".into()];
-    assert!(Performance::from_returns(
-        dates(2),
-        vec![vec![0.01; 2]; 2],
-        names.clone(),
-        None,
-        PeriodKind::Daily
-    )
-    .is_err());
-    assert!(Performance::new(
-        dates(2),
-        vec![vec![100.0, 101.0]; 2],
-        names,
-        None,
-        PeriodKind::Daily
-    )
-    .is_err());
+    assert!(
+        Performance::new(&crate::support::returns_panel(
+            dates(2),
+            vec![vec![0.01; 2]; 2],
+            names.clone(),
+            None,
+            PeriodKind::Daily
+        ))
+        .is_err()
+    );
+    assert!(
+        Performance::new(&crate::support::prices_panel(
+            dates(2),
+            vec![vec![100.0, 101.0]; 2],
+            names,
+            None,
+            PeriodKind::Daily
+        ))
+        .is_err()
+    );
 }
 
 #[test]
@@ -298,7 +305,7 @@ fn restored_state_is_validated_and_caches_are_recomputed() {
 
 #[test]
 fn ragged_window_round_trip_preserves_alignment_and_initial_dates() {
-    let mut perf = Performance::from_returns(
+    let mut perf = Performance::new(&crate::support::returns_panel(
         dates(4),
         vec![
             vec![0.01, -0.1, 0.2, 0.01],
@@ -307,7 +314,7 @@ fn ragged_window_round_trip_preserves_alignment_and_initial_dates() {
         vec!["A".into(), "B".into()],
         Some("B"),
         PeriodKind::Daily,
-    )
+    ))
     .unwrap();
     perf.reset_date_range(dates(4)[1], dates(4)[2]);
     let restored: Performance =
@@ -325,13 +332,13 @@ fn ragged_window_round_trip_preserves_alignment_and_initial_dates() {
 #[test]
 fn initial_drawdown_uses_known_peak_date_in_full_and_windowed_panels() {
     let ds = dates(4);
-    let mut perf = Performance::new(
+    let mut perf = Performance::new(&crate::support::prices_panel(
         ds.clone(),
         vec![vec![100.0, 90.0, 100.0, 110.0]],
         vec!["A".into()],
         None,
         PeriodKind::Daily,
-    )
+    ))
     .unwrap();
     for windowed in [false, true] {
         if windowed {
@@ -391,13 +398,13 @@ fn cagr_annualizes_log_growth_before_reconstructing_terminal_wealth() {
     let grid: Vec<Date> = (2001..=2020)
         .map(|year| Date::from_calendar_date(year, Month::January, 1).unwrap())
         .collect();
-    let perf = Performance::from_returns(
+    let perf = Performance::new(&crate::support::returns_panel(
         grid,
         vec![vec![-0.9; 20]],
         vec!["A".into()],
         None,
         PeriodKind::Annual,
-    )
+    ))
     .unwrap();
     // The 20-year wealth is 1e-20, but the annual growth factor remains 0.1.
     let years = 7305.0 / 365.25;
@@ -407,7 +414,7 @@ fn cagr_annualizes_log_growth_before_reconstructing_terminal_wealth() {
         expected,
     );
 
-    let overflow = Performance::from_returns(
+    let overflow = Performance::new(&crate::support::returns_panel(
         vec![
             Date::from_calendar_date(2021, Month::January, 1).unwrap(),
             Date::from_calendar_date(2022, Month::January, 1).unwrap(),
@@ -416,7 +423,7 @@ fn cagr_annualizes_log_growth_before_reconstructing_terminal_wealth() {
         vec!["A".into()],
         None,
         PeriodKind::Annual,
-    )
+    ))
     .unwrap();
     let result = overflow.cagr(CagrDayCount::default(), None).unwrap()[0];
     let expected = 1e200_f64.powf(2.0 / (731.0 / 365.25));
@@ -427,19 +434,20 @@ fn cagr_annualizes_log_growth_before_reconstructing_terminal_wealth() {
 #[test]
 fn identical_paths_have_zero_relative_wealth_at_extreme_absolute_wealth() {
     for returns in [vec![-0.9; 20], vec![1e300; 4]] {
-        let perf = Performance::from_returns(
+        let perf = Performance::new(&crate::support::returns_panel(
             dates(returns.len()),
             vec![returns.clone(), returns],
             vec!["BENCH".into(), "PORT".into()],
             None,
             PeriodKind::Daily,
-        )
+        ))
         .unwrap();
-        assert!(perf
-            .cumulative_returns_outperformance()
-            .iter()
-            .flatten()
-            .all(|&relative| relative == 0.0));
+        assert!(
+            perf.cumulative_returns_outperformance()
+                .iter()
+                .flatten()
+                .all(|&relative| relative == 0.0)
+        );
     }
 }
 
@@ -563,13 +571,13 @@ fn fiscal_period_stats_matches_shared_boundary_groups() {
         let config =
             finstack_quant_core::dates::FiscalConfig::new(case.start_month, case.start_day)
                 .unwrap();
-        let mut perf = Performance::from_returns(
+        let mut perf = Performance::new(&crate::support::returns_panel(
             dates,
             vec![case.returns.clone()],
             vec!["FUND".into()],
             None,
             PeriodKind::Daily,
-        )
+        ))
         .unwrap();
         for trim in [false, true] {
             if trim {
@@ -612,13 +620,13 @@ fn fiscal_period_stats_matches_shared_boundary_groups() {
 
 #[test]
 fn aggregation_propagates_unrepresentable_boundaries() {
-    let perf = Performance::from_returns(
+    let perf = Performance::new(&crate::support::returns_panel(
         vec![Date::MAX.previous_day().unwrap(), Date::MAX],
         vec![vec![0.01, 0.02]],
         vec!["FUND".into()],
         None,
         PeriodKind::Daily,
-    )
+    ))
     .unwrap();
     for kind in [
         PeriodKind::Daily,
@@ -630,12 +638,13 @@ fn aggregation_propagates_unrepresentable_boundaries() {
     ] {
         assert!(perf.periodic_returns(kind).is_err());
         assert!(perf.period_stats(0, kind, None).is_err());
-        assert!(perf
-            .period_stats(
+        assert!(
+            perf.period_stats(
                 0,
                 kind,
                 Some(finstack_quant_core::dates::FiscalConfig::us_federal())
             )
-            .is_err());
+            .is_err()
+        );
     }
 }

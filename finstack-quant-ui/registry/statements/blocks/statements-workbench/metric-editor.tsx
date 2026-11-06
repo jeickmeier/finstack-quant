@@ -23,10 +23,9 @@ export function MetricEditor({
   const [name, setName] = useState("");
   const [formula, setFormula] = useState("");
   const [kind, setKind] = useState<"scalar" | "monetary">("scalar");
+  // The model's `meta.currency`, which Rust reads; no UI default when it is absent.
   const [currency, setCurrency] = useState(
-    typeof model.meta?.reporting_currency === "string"
-      ? model.meta.reporting_currency
-      : "USD",
+    typeof model.meta?.currency === "string" ? model.meta.currency : "",
   );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -51,6 +50,7 @@ export function MetricEditor({
         name: name.trim(),
         node_type: "calculated",
         tags: ["metric", ...(kind === "scalar" ? ["ratio"] : [])],
+        rollup: "formula",
         value_type:
           kind === "scalar"
             ? { type: "scalar" }
@@ -147,7 +147,7 @@ export function MetricEditor({
                   className="font-mono"
                   value={formula}
                   onChange={(event) => setFormula(event.target.value)}
-                  placeholder="debt_closing / ltm_ebitda"
+                  placeholder="total_debt / ltm_ebitda"
                 />
               )}
             </FieldFrame>

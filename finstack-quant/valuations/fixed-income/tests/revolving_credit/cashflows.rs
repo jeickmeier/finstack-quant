@@ -3,7 +3,7 @@
 use finstack_quant_cashflows::builder::CashFlowMeta;
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::{
-    schedule_from_classified_flows, CashflowProvider, ScheduleBuildOpts,
+    CashflowProvider, ScheduleBuildOpts, schedule_from_classified_flows,
 };
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::currency::Currency;

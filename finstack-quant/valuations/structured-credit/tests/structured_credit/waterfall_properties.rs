@@ -201,7 +201,7 @@ fn property_non_negative_distributions() {
     }
 
     // All distributions must be non-negative
-    for (recipient, amount) in &result.distributions {
+    for (recipient, amount) in &result.distributions().expect("distributions") {
         assert!(
             amount.amount() >= 0.0,
             "Recipient {:?} has negative distribution: {}",
@@ -346,13 +346,15 @@ fn property_pro_rata_weight_distribution() {
     );
 
     let dist1 = result
-        .distributions
+        .distributions()
+        .expect("distributions")
         .get(&RecipientType::ServiceProvider("Provider1".into()))
         .map(|m| m.amount())
         .unwrap_or(0.0);
 
     let dist2 = result
-        .distributions
+        .distributions()
+        .expect("distributions")
         .get(&RecipientType::ServiceProvider("Provider2".into()))
         .map(|m| m.amount())
         .unwrap_or(0.0);

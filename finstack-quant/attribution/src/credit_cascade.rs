@@ -24,20 +24,20 @@
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 
+use finstack_quant_core::Result;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::diff::{
-    measure_par_spread_shift, measure_scalar_absolute_shift, TenorSamplingMethod,
+    TenorSamplingMethod, measure_par_spread_shift, measure_scalar_absolute_shift,
 };
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, IssuerId};
-use finstack_quant_core::Result;
 use finstack_quant_factor::credit::hierarchy::{CreditFactorModel, IssuerBetaRow};
-use finstack_quant_factor::{bucket_factor_id, CREDIT_GENERIC_FACTOR_ID, ISSUER_ID_META_KEY};
+use finstack_quant_factor::{CREDIT_GENERIC_FACTOR_ID, ISSUER_ID_META_KEY, bucket_factor_id};
 
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::recalibration::{
-    provider_missing, HazardRecalibrationAction, HazardRecalibrationRequest, QuoteBump,
-    RecalibrationProvider,
+    HazardRecalibrationAction, HazardRecalibrationRequest, QuoteBump, RecalibrationProvider,
+    provider_missing,
 };
 use serde::{Deserialize, Serialize};
 
@@ -621,7 +621,7 @@ pub(crate) fn build_credit_factor_attribution(
                 cascade.issuer_id,
                 step_pnls.len(),
                 cascade.steps.len()
-            )))
+            )));
         }
     };
 
@@ -722,18 +722,18 @@ mod tests {
     use finstack_quant_core::market_data::term_structures::HazardCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::Attributes;
+    use finstack_quant_factor::MatchingConfig;
     use finstack_quant_factor::credit::hierarchy::{
         AdderVolSource, CreditCalibrationDiagnostics, CreditFactorModel, CreditHierarchySpec,
         DateRange, FactorCorrelationMatrix, GenericFactorSpec, HierarchyDimension, IssuerBetaMode,
         IssuerBetaPolicy, IssuerBetaRow, IssuerBetas, IssuerTags, LevelsAtAnchor, VolState,
     };
-    use finstack_quant_factor::MatchingConfig;
     use finstack_quant_factor::{
         FactorCovarianceMatrix, FactorDefinition, FactorId, FactorModelConfig, FactorType,
         MarketMapping,
     };
-    use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
     use finstack_quant_valuations::instruments::Instrument;
+    use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
     use time::Month;
 
     fn empty_factor_config() -> FactorModelConfig {

@@ -4,7 +4,7 @@ from datetime import date
 
 import pytest
 
-from finstack_quant.analytics import Performance
+from finstack_quant.analytics import Performance, PerformancePanel
 from finstack_quant.core.dates import PeriodKind
 from finstack_quant.statements import RollupSpec
 
@@ -13,11 +13,14 @@ CANONICAL = ["daily", "weekly", "monthly", "quarterly", "semi_annual", "annual"]
 
 
 def panel(frequency: str = "daily") -> Performance:
-    return Performance.from_returns_arrays(
-        [date(2025, 1, day) for day in range(1, 5)],
-        [[0.01, -0.02, 0.03, 0.005]],
-        ["FUND"],
-        frequency=frequency,
+    return Performance.from_panel(
+        PerformancePanel(
+            dates=[date(2025, 1, day) for day in range(1, 5)],
+            series=[[0.01, -0.02, 0.03, 0.005]],
+            kind="returns",
+            ticker_names=["FUND"],
+            frequency=frequency,
+        )
     )
 
 

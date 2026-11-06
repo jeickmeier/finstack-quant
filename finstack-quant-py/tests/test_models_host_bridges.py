@@ -79,7 +79,10 @@ def test_vol_horizon_validation_and_labels_come_from_rust() -> None:
 
 
 def test_position_component_var_raises_key_error_for_an_unknown_position() -> None:
-    decomposition = factor_risk.parametric_var_decomposition(["A", "B"], [1.0, 2.0], [[0.04, 0.01], [0.01, 0.09]])
+    decomposition = factor_risk.position_risk_report({
+        "position_ids": ["A", "B"],
+        "source": {"kind": "parametric", "weights": [1.0, 2.0], "covariance": [[0.04, 0.01], [0.01, 0.09]]},
+    }).decomposition
     assert factor_risk.position_component_var(decomposition, "A") == decomposition.var_contributions[0].component_var
     with pytest.raises(KeyError, match="missing"):
         factor_risk.position_component_var(decomposition, "missing")

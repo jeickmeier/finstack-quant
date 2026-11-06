@@ -1,8 +1,8 @@
 //! Production audit regressions against explicit quote conventions and formulas.
 use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurface};
 use finstack_quant_models::volatility::{
-    sabr::{SabrCalibrator, SabrParameters},
     VolSource,
+    sabr::{SabrCalibrator, SabrParameters},
 };
 use std::sync::Arc;
 
@@ -187,8 +187,21 @@ fn b2_clamped_cube_preserves_small_valid_quote() {
     use finstack_quant_models::volatility::{get_cube_vol, get_cube_vol_clamped};
     let p = SabrParameterData::new(0.0001, 1.0, 0.3, 0.0, None).expect("params");
     let cube = VolCube::from_grid("LOW", &[1.0], &[5.0], &[p], &[0.02]).expect("cube");
-    let checked = get_cube_vol(&cube, 1.0, 5.0, 0.02).expect("quote");
-    let clamped = get_cube_vol_clamped(&cube, 1.0, 5.0, 0.02);
+    let checked = get_cube_vol(
+        &cube,
+        1.0,
+        5.0,
+        0.02,
+        finstack_quant_models::volatility::VolatilityConvention::Lognormal,
+    )
+    .expect("quote");
+    let clamped = get_cube_vol_clamped(
+        &cube,
+        1.0,
+        5.0,
+        0.02,
+        finstack_quant_models::volatility::VolatilityConvention::Lognormal,
+    );
     assert!(
         (checked - clamped).abs() < 1e-14,
         "checked {checked}, clamped {clamped}"
@@ -201,7 +214,16 @@ fn b2_clamped_cube_never_fabricates_volatility_for_invalid_black_rates() {
     use finstack_quant_models::volatility::get_cube_vol_clamped;
     let p = SabrParameterData::new(0.008, 0.5, 0.3, 0.0, None).expect("params");
     let cube = VolCube::from_grid("INVALID", &[1.0], &[5.0], &[p], &[-0.01]).expect("cube");
-    assert!(get_cube_vol_clamped(&cube, 1.0, 5.0, -0.01).is_nan());
+    assert!(
+        get_cube_vol_clamped(
+            &cube,
+            1.0,
+            5.0,
+            -0.01,
+            finstack_quant_models::volatility::VolatilityConvention::Lognormal
+        )
+        .is_nan()
+    );
 }
 
 #[test]

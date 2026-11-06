@@ -9,7 +9,7 @@ mod fixtures;
 
 use std::hint::black_box;
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use finstack_quant_analytics::Performance;
 use finstack_quant_core::dates::PeriodKind;
 use fixtures::{perf_from_returns, perf_panel, synthetic_dates, synthetic_returns};
@@ -70,25 +70,25 @@ fn bench_performance(c: &mut Criterion) {
     c.bench_function("Performance::new 750x2 daily", |b| {
         b.iter(|| {
             black_box(
-                Performance::new(
+                Performance::new(&fixtures::prices_panel(
                     dates.clone(),
                     vec![prices_a.clone(), prices_b.clone()],
                     vec!["A".to_string(), "B".to_string()],
                     Some("B"),
                     PeriodKind::Daily,
-                )
+                ))
                 .expect("perf"),
             )
         });
     });
 
-    let perf = Performance::new(
+    let perf = Performance::new(&fixtures::prices_panel(
         dates,
         vec![prices_a, prices_b],
         vec!["A".to_string(), "B".to_string()],
         Some("B"),
         PeriodKind::Daily,
-    )
+    ))
     .expect("perf");
     c.bench_function("Performance::sharpe 750x2", |b| {
         b.iter(|| black_box(perf.sharpe(0.02)));

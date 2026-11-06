@@ -152,7 +152,7 @@ impl Registry {
         let namespace = registry.namespace;
         if namespace.is_empty() {
             return Err(Error::registry(
-                "Namespace cannot be empty. Provide a namespace identifier (e.g., 'fin', 'custom')."
+                "Namespace cannot be empty. Provide a namespace identifier (e.g., 'fin', 'custom').",
             ));
         }
 

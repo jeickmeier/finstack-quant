@@ -6,7 +6,7 @@ use crate::adjustments::{NormalizationConfig, NormalizationResult};
 use crate::checks::CheckSuiteSpec;
 use crate::evaluator::{MonteCarloConfig, MonteCarloResults, RollupSpec, StatementResult};
 use crate::registry::MetricRegistry;
-use crate::types::FinancialModelSpec;
+use crate::types::{FinancialModelSpec, ForecastParameters};
 
 /// Stable base URI for statements-owned schemas.
 pub const STATEMENTS_SCHEMA_BASE: &str = "https://finstack_quant.dev/schemas/statements/1/";
@@ -115,6 +115,14 @@ fn statement_result_examples() -> finstack_quant_core::Result<Vec<Value>> {
 }
 
 /// A suite with one built-in articulation check and one formula check.
+/// Fade a line to a target level, the shape every parameterized method takes.
+fn forecast_parameters_examples() -> finstack_quant_core::Result<Vec<Value>> {
+    finstack_quant_core::schema::example_from_json::<ForecastParameters>(serde_json::json!({
+        "method": "fade_to_target",
+        "params": { "target": 0.35, "shape": "linear" }
+    }))
+}
+
 fn check_suite_examples() -> finstack_quant_core::Result<Vec<Value>> {
     finstack_quant_core::schema::example_from_json::<crate::checks::CheckSuiteSpec>(
         serde_json::json!({
@@ -210,7 +218,8 @@ fn normalization_result_examples() -> finstack_quant_core::Result<Vec<Value>> {
                 "name": "Restructuring charges",
                 "raw_amount": 1_500_000.0,
                 "capped_amount": 1_500_000.0,
-                "is_capped": false
+                "is_capped": false,
+                "adjusted_value": 13_500_000.0
             }],
             "final_value": 13_500_000.0
         }),
@@ -231,6 +240,14 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         "Serializable check suite: built-in checks, formula checks and filtering configuration."
     )
     .with_examples(check_suite_examples),
+    finstack_quant_core::schema_artifact!(
+        ForecastParameters,
+        "statements",
+        "forecast_parameters",
+        Input,
+        "One forecast method with its typed parameters, in the wire shape of ForecastSpec."
+    )
+    .with_examples(forecast_parameters_examples),
     finstack_quant_core::schema_artifact!(
         FinancialModelSpec,
         "statements",

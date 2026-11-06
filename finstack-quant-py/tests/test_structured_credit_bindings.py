@@ -25,9 +25,11 @@ from tests.tests_typed_helpers import canonical_structured_credit_json
 SC_ENTRY_POINTS = (
     "tranche_breakeven_cdr",
     "tranche_discount_margin",
+    "tranche_metric_field_units",
     "tranche_metrics",
     "tranche_oas",
     "tranche_scenario_table",
+    "tranche_solve_field_units",
 )
 
 # Both stochastic dimensions off collapses the OAS to a single deterministic
@@ -100,7 +102,7 @@ def test_entry_point_reports_the_right_module(name: str) -> None:
 
 
 def test_wasm_parity_surface_is_matched() -> None:
-    """Python exposes exactly the five tranche analytics WASM binds as ``tranche*``."""
+    """Python exposes exactly the tranche functions WASM binds as ``tranche*``."""
     exported = {n for n in instruments.__all__ if n.startswith("tranche_")}
     assert exported == set(SC_ENTRY_POINTS), f"Python structured-credit surface diverged from WASM: {sorted(exported)}"
 

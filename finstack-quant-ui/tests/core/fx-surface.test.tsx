@@ -39,7 +39,7 @@ beforeAll(async () => {
   transport.call.mockImplementation(async (method, arg) =>
     unwrap(await worker.proxy[method as "sampleFxDelta"](arg)),
   );
-}, budget(30000));
+});
 afterAll(async () => worker?.close());
 afterEach(() => {
   cleanup();
@@ -123,5 +123,68 @@ it("selects an evaluated sample by its FX surface, expiry and strike key", async
   expect(screen.getByLabelText("key").textContent).toBe(
     JSON.stringify([fxQuotes.id, 1, 1.15]),
   );
+  cache.clear();
+});
+it("materializes the strike grid natively only from an explicit spot and both rates", async () => {
+  const cache = new QueryClient();
+  const calls = () =>
+    transport.call.mock.calls.filter(
+      ([method]) => method === "materializeFxSurface",
+    );
+  const view = (initial: {
+    initialSpot?: number;
+    initialDomesticRate?: number;
+    initialForeignRate?: number;
+  }) => (
+    <QueryClientProvider client={cache}>
+      <FxSurfaceChart surface={fxQuotes} colorDomain={[0, 0.3]} {...initial} />
+    </QueryClientProvider>
+  );
+  const unseeded = render(view({ initialSpot: 1.1 }));
+  expect(screen.getByText(/Enter a spot and both/)).toBeTruthy();
+  expect(calls()).toHaveLength(0);
+  unseeded.unmount();
+  render(
+    view({
+      initialSpot: 1.1,
+      initialDomesticRate: 0.04,
+      initialForeignRate: 0.03,
+    }),
+  );
+  const grid = await screen.findByRole("region", {
+    name: "EURUSD strike grid evaluated surface",
+  });
+  expect(calls()).toHaveLength(1);
+  expect(calls()[0]![1]).toEqual({
+    surface: fxQuotes,
+    spot: 1.1,
+    domesticRate: 0.04,
+    foreignRate: 0.03,
+  });
+  const native = unwrap(
+    await worker.proxy.materializeFxSurface(calls()[0]![1]),
+  );
+  const values = within(grid)
+    .getAllByRole("row")
+    .map((row) => [...row.querySelectorAll("td")])
+    .filter((cells) => cells.length === 3)
+    .map((cells) => Number(cells[2]!.textContent));
+  expect(values).toEqual(native.vols_row_major);
+  expect(within(grid).getByText(/no local interpolation/)).toBeTruthy();
+  fireEvent.change(
+    screen.getByLabelText("Spot (domestic per unit of foreign)"),
+    { target: { value: "-1" } },
+  );
+  await waitFor(() =>
+    expect(screen.getByRole("alert").textContent).toBe(
+      "Values must be positive",
+    ),
+  );
+  fireEvent.change(
+    screen.getByLabelText("Domestic rate (continuously compounded decimal)"),
+    { target: { value: "" } },
+  );
+  expect(screen.getByText(/Enter a spot and both/)).toBeTruthy();
+  expect(calls()).toHaveLength(2);
   cache.clear();
 });

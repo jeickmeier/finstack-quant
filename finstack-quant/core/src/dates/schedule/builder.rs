@@ -558,10 +558,10 @@ fn build_payment_and_fixing_dates(
     if payment_lag < 0 {
         return Err(InputError::NegativeScheduleLag { lag: payment_lag }.into());
     }
-    if let Some(lag) = fixing_lag {
-        if lag < 0 {
-            return Err(InputError::NegativeScheduleLag { lag }.into());
-        }
+    if let Some(lag) = fixing_lag
+        && lag < 0
+    {
+        return Err(InputError::NegativeScheduleLag { lag }.into());
     }
     let needs_calendar = payment_lag > 0 || fixing_lag.is_some_and(|lag| lag > 0);
     if needs_calendar && cal.is_none() {

@@ -11,8 +11,8 @@ use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsO
 use finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::AgencyMbsPassthrough;
 use finstack_quant_valuations::instruments::rates::cap_floor::OvernightCouponConvention;
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 /// Serialize `instrument`, drop the canonical top-level key when present,

@@ -83,8 +83,8 @@ fn positive_time_greeks_match_frozen_annuity_formulas_and_bumps() {
     };
     use finstack_quant_models::types::OptionType;
     use finstack_quant_models::volatility::sabr::SabrParameters;
-    use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
     use finstack_quant_valuations::instruments::VolatilityModel;
+    use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
     use rust_decimal::Decimal;
     use time::macros::date;
 
@@ -151,8 +151,10 @@ fn positive_time_greeks_match_frozen_annuity_formulas_and_bumps() {
                         ("vega", expected_vega),
                     ] {
                         let actual = result.measures.get(name).unwrap();
-                        assert!((actual-expected).abs() <= expected.abs().max(1.0)*1e-10,
-                            "{model:?}/{shift}/{days}/{offset}/{side:?} {name}: actual={actual}, expected={expected}");
+                        assert!(
+                            (actual - expected).abs() <= expected.abs().max(1.0) * 1e-10,
+                            "{model:?}/{shift}/{days}/{offset}/{side:?} {name}: actual={actual}, expected={expected}"
+                        );
                     }
                     let price = |forward: f64, volatility: f64| {
                         scale
@@ -191,8 +193,8 @@ fn positive_time_greeks_match_frozen_annuity_formulas_and_bumps() {
 #[test]
 fn zero_volatility_and_expired_greeks_have_explicit_finite_limits() {
     use finstack_quant_models::types::OptionType;
-    use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
     use finstack_quant_valuations::instruments::VolatilityModel;
+    use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
     use rust_decimal::Decimal;
     use time::macros::date;
     let as_of = date!(2025 - 01 - 02);

@@ -13,13 +13,16 @@ import pytest
 from finstack_quant import covenants
 
 
+def _specs(template: covenants.CovenantTemplate) -> list[dict[str, object]]:
+    return [json.loads(spec.to_json()) for spec in covenants.covenant_template(template)]
+
+
 def _engine_json(spec: dict[str, object]) -> str:
     return json.dumps({"specs": [spec], "breach_history": [], "windows": [], "waivers": []})
 
 
 def test_covenant_template_roundtrip_and_evaluate() -> None:
-    specs_json = covenants.lbo_standard_json(5.0, 1.5, 1.2, 10_000_000.0)
-    specs = json.loads(specs_json)
+    specs = _specs(covenants.CovenantTemplate.lbo_standard(5.0, 1.5, 1.2, 10_000_000.0))
 
     canonical_engine = covenants.validate_covenant_engine_json(_engine_json(specs[0]))
     reports = covenants.evaluate_engine(
@@ -40,7 +43,7 @@ def test_covenant_template_roundtrip_and_evaluate() -> None:
 
 def test_evaluate_engine_accepts_dict_metrics_and_specs_only_document() -> None:
     """`{"specs": [...]}` is a complete engine document and metrics may be a dict."""
-    specs = json.loads(covenants.lbo_standard_json(5.0, 1.5, 1.2, 10_000_000.0))
+    specs = _specs(covenants.CovenantTemplate.lbo_standard(5.0, 1.5, 1.2, 10_000_000.0))
     engine = json.dumps({"specs": specs})
     metrics = {
         "debt_to_ebitda": 4.0,
@@ -55,13 +58,13 @@ def test_evaluate_engine_accepts_dict_metrics_and_specs_only_document() -> None:
 
 
 def test_evaluate_engine_missing_metric_raises_key_error() -> None:
-    specs = json.loads(covenants.cov_lite_json(7.0, 4.5))
+    specs = _specs(covenants.CovenantTemplate.cov_lite(7.0, 4.5))
     with pytest.raises(KeyError, match="senior_leverage"):
         covenants.evaluate_engine(json.dumps({"specs": specs}), {"total_leverage": 5.0}, "2026-03-31")
 
 
 def test_evaluate_engine_report_dataframe_and_pickle() -> None:
-    spec = json.loads(covenants.lbo_standard_json(5.0, 1.5, 1.2, 10_000_000.0))[0]
+    spec = _specs(covenants.CovenantTemplate.lbo_standard(5.0, 1.5, 1.2, 10_000_000.0))[0]
     report = covenants.evaluate_engine(
         _engine_json(spec),
         json.dumps({"debt_to_ebitda": 5.5}),
@@ -134,7 +137,7 @@ def test_covenant_engine_rejects_unknown_fields() -> None:
 
 
 def test_threshold_schedule_validation_maps_to_value_error() -> None:
-    spec = json.loads(covenants.lbo_standard_json(5.0, 1.5, 1.2, 10_000_000.0))[0]
+    spec = _specs(covenants.CovenantTemplate.lbo_standard(5.0, 1.5, 1.2, 10_000_000.0))[0]
     spec["threshold_schedule"] = [
         ["2025-01-01", 5.0],
         ["2025-01-01", 4.5],
@@ -147,23 +150,42 @@ def test_threshold_schedule_validation_maps_to_value_error() -> None:
 @pytest.mark.parametrize("bad", [math.nan, math.inf, -1.0])
 def test_templates_reject_non_finite_and_negative_thresholds(bad: float) -> None:
     with pytest.raises(ValueError, match="finite and non-negative"):
-        covenants.lbo_standard_json(bad, 2.0, 1.1, 50.0)
+        covenants.covenant_template(covenants.CovenantTemplate.lbo_standard(bad, 2.0, 1.1, 50.0))
     with pytest.raises(ValueError, match="finite and non-negative"):
-        covenants.cov_lite(7.0, bad)
+        covenants.covenant_template(covenants.CovenantTemplate.cov_lite(7.0, bad))
 
 
-def test_typed_templates_match_json_twins() -> None:
-    typed = covenants.lbo_standard(6.0, 2.0, 1.1, 50.0)
-    raw = json.loads(covenants.lbo_standard_json(6.0, 2.0, 1.1, 50.0))
-    assert [json.loads(s.to_json()) for s in typed] == raw
-    assert [s.covenant.label for s in covenants.project_finance(1.2, 1.1, 10.0, 7.0)] == [
+def test_covenant_template_wire_form_and_packages() -> None:
+    template = covenants.CovenantTemplate.lbo_standard(6.0, 2.0, 1.1, 50.0)
+    assert template.kind == "lbo_standard"
+    assert json.loads(template.to_json()) == {
+        "kind": "lbo_standard",
+        "initial_leverage": 6.0,
+        "interest_coverage": 2.0,
+        "fixed_charge_coverage": 1.1,
+        "max_capex": 50.0,
+    }
+    assert covenants.CovenantTemplate.from_json(template.to_json()) == template
+    assert pickle.loads(pickle.dumps(template)) == template  # noqa: S301 - trusted in-process round trip
+    with pytest.raises(ValueError, match="unknown field"):
+        covenants.CovenantTemplate.from_json(
+            '{"kind": "cov_lite", "max_leverage": 7.0, "max_senior_leverage": 4.5, "x": 1}'
+        )
+    assert [
+        s.covenant.label
+        for s in covenants.covenant_template(covenants.CovenantTemplate.project_finance(1.2, 1.1, 10.0, 7.0))
+    ] == [
         "min_dscr_default",
         "min_dscr_lockup",
         "min_liquidity",
         "max_net_debt_ebitda",
     ]
-    assert [s.metric_id for s in covenants.real_estate(1.25, 0.08, 0.75)] == ["dscr", "debt_yield", "ltv"]
-    assert [s.covenant.scope for s in covenants.cov_lite(7.0, 4.5)] == ["incurrence"] * 3
+    assert [
+        s.metric_id for s in covenants.covenant_template(covenants.CovenantTemplate.real_estate(1.25, 0.08, 0.75))
+    ] == ["dscr", "debt_yield", "ltv"]
+    assert [s.covenant.scope for s in covenants.covenant_template(covenants.CovenantTemplate.cov_lite(7.0, 4.5))] == [
+        "incurrence"
+    ] * 3
 
 
 def test_typed_engine_matches_json_bridge() -> None:
@@ -245,7 +267,9 @@ def test_springing_condition_gates_evaluation() -> None:
 
 
 def test_evaluate_and_track_records_and_cures_breaches() -> None:
-    engine = covenants.CovenantEngine.from_specs(covenants.cov_lite(7.0, 4.5))
+    engine = covenants.CovenantEngine.from_specs(
+        covenants.covenant_template(covenants.CovenantTemplate.cov_lite(7.0, 4.5))
+    )
     engine.evaluate_and_track({"total_leverage": 7.5, "senior_leverage": 3.0}, "2026-03-31", "incurrence")
     breach = engine.breach_history[0]
     assert breach.covenant_id == "max_total_leverage"
@@ -258,7 +282,9 @@ def test_evaluate_and_track_records_and_cures_breaches() -> None:
 
 
 def test_evaluate_series_and_reports_to_dataframe() -> None:
-    engine = covenants.CovenantEngine.from_specs(covenants.cov_lite(7.0, 4.5))
+    engine = covenants.CovenantEngine.from_specs(
+        covenants.covenant_template(covenants.CovenantTemplate.cov_lite(7.0, 4.5))
+    )
     frame = pd.DataFrame(
         {"total_leverage": [6.0, 7.5], "senior_leverage": [3.0, 3.5]},
         index=pd.to_datetime(["2026-03-31", "2026-06-30"]),
@@ -337,7 +363,9 @@ def test_forecast_covenant_and_breaches_from_dataframe() -> None:
     with pytest.raises(KeyError, match="adjusted_leverage"):
         covenants.forecast_covenant(explicit, frame)
 
-    engine = covenants.CovenantEngine.from_specs(covenants.cov_lite(7.0, 4.5))
+    engine = covenants.CovenantEngine.from_specs(
+        covenants.covenant_template(covenants.CovenantTemplate.cov_lite(7.0, 4.5))
+    )
     projections = pd.DataFrame(
         {"total_leverage": [6.0, 7.5], "senior_leverage": [3.0, 5.0]},
         index=pd.to_datetime(["2026-03-31", "2026-06-30"]),
@@ -437,7 +465,9 @@ def test_invalid_trigger_and_inactive_forecast_cannot_create_false_decisions() -
 
 
 def test_forecast_scope_and_mc_boundaries() -> None:
-    engine = covenants.CovenantEngine.from_specs(covenants.cov_lite(7.0, 4.5))
+    engine = covenants.CovenantEngine.from_specs(
+        covenants.covenant_template(covenants.CovenantTemplate.cov_lite(7.0, 4.5))
+    )
     frame = pd.DataFrame({"total_leverage": [8.0], "senior_leverage": [5.0]}, index=pd.to_datetime(["2026-03-31"]))
     assert covenants.forecast_breaches(engine, frame) == []
     config = covenants.CovenantForecastConfig().with_scope("incurrence")
@@ -465,7 +495,7 @@ def test_json_metric_map_errors_come_from_the_rust_parser(metrics: str, message:
 
     The messages are the ones WASM ``evaluateEngine`` throws for the same input.
     """
-    specs = json.loads(covenants.lbo_standard_json(5.0, 1.5, 1.2, 10_000_000.0))
+    specs = _specs(covenants.CovenantTemplate.lbo_standard(5.0, 1.5, 1.2, 10_000_000.0))
     engine_json = _engine_json(specs[0])
     with pytest.raises(ValueError, match=r"^Validation error: ") as from_function:
         covenants.evaluate_engine(engine_json, metrics, "2026-03-31")

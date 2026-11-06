@@ -1,0 +1,18 @@
+{
+  "scenarios": {
+    "base": {},
+    "downside": {
+      "parent": "base",
+      "forecast_overrides": {
+        "revenue": { "method": "growth_pct", "params": { "rate": -0.02 } }
+      }
+    },
+    "severe": {
+      "parent": "downside",
+      "forecast_overrides": {
+        "revenue": { "method": "growth_pct", "params": { "rate": -0.06 } },
+        "opex": { "method": "growth_pct", "params": { "rate": 0.04 } }
+      }
+    }
+  }
+}

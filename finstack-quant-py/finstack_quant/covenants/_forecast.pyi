@@ -500,8 +500,14 @@ class FutureBreach:
     Examples
     --------
     >>> import pandas as pd
-    >>> from finstack_quant.covenants import CovenantEngine, CovenantForecastConfig, cov_lite, forecast_breaches
-    >>> engine = CovenantEngine.from_specs(cov_lite(7.0, 4.5))
+    >>> from finstack_quant.covenants import (
+    ...     CovenantEngine,
+    ...     CovenantForecastConfig,
+    ...     CovenantTemplate,
+    ...     covenant_template,
+    ...     forecast_breaches,
+    ... )
+    >>> engine = CovenantEngine.from_specs(covenant_template(CovenantTemplate.cov_lite(7.0, 4.5)))
     >>> frame = pd.DataFrame(
     ...     {"total_leverage": [6.0, 7.5], "senior_leverage": [3.0, 3.5]},
     ...     index=pd.to_datetime(["2026-03-31", "2026-06-30"]),
@@ -747,11 +753,12 @@ def forecast_breaches(
     >>> from finstack_quant.covenants import (
     ...     CovenantEngine,
     ...     CovenantForecastConfig,
+    ...     CovenantTemplate,
     ...     breaches_to_dataframe,
-    ...     cov_lite,
+    ...     covenant_template,
     ...     forecast_breaches,
     ... )
-    >>> engine = CovenantEngine.from_specs(cov_lite(7.0, 4.5))
+    >>> engine = CovenantEngine.from_specs(covenant_template(CovenantTemplate.cov_lite(7.0, 4.5)))
     >>> frame = pd.DataFrame(
     ...     {"total_leverage": [6.0, 7.5], "senior_leverage": [3.0, 5.0]},
     ...     index=pd.to_datetime(["2026-03-31", "2026-06-30"]),

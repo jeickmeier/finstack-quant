@@ -1,0 +1,90 @@
+{
+  "row_count": 24,
+  "columns": [
+    {
+      "name": "line_item",
+      "data": {
+        "type": "string",
+        "values": [
+          "revenue",
+          "revenue",
+          "revenue",
+          "revenue",
+          "cogs",
+          "cogs",
+          "cogs",
+          "cogs",
+          "gross_profit",
+          "gross_profit",
+          "gross_profit",
+          "gross_profit",
+          "opex",
+          "opex",
+          "opex",
+          "opex",
+          "ebitda",
+          "ebitda",
+          "ebitda",
+          "ebitda",
+          "net_income",
+          "net_income",
+          "net_income",
+          "net_income"
+        ]
+      },
+      "role": "dimension"
+    },
+    {
+      "name": "period",
+      "data": {
+        "type": "string",
+        "values": [
+          "2025Q1",
+          "2025Q2",
+          "2025Q3",
+          "2025Q4",
+          "2025Q1",
+          "2025Q2",
+          "2025Q3",
+          "2025Q4",
+          "2025Q1",
+          "2025Q2",
+          "2025Q3",
+          "2025Q4",
+          "2025Q1",
+          "2025Q2",
+          "2025Q3",
+          "2025Q4",
+          "2025Q1",
+          "2025Q2",
+          "2025Q3",
+          "2025Q4",
+          "2025Q1",
+          "2025Q2",
+          "2025Q3",
+          "2025Q4"
+        ]
+      },
+      "role": "index"
+    },
+    {
+      "name": "value",
+      "data": {
+        "type": "nullable_float64",
+        "values": [
+          208300000, 214549000, 222058214.99999997, 231384660.02999997,
+          70820000, 72410287.5, 74944647.5625, 78092322.760125, 137480000,
+          142138712.5, 147113567.43749997, 153292337.269875, 86100000, 87994200,
+          89930072.4, 91908533.99280001, 51380000, 54144512.5,
+          57183495.037499964, 61383803.27707498, 23100131.25, 25007247.5625,
+          27326928.097687475, 30285257.205054358
+        ]
+      },
+      "role": "measure"
+    }
+  ],
+  "metadata": {
+    "layout": "long",
+    "source": "pl_summary_report"
+  }
+}

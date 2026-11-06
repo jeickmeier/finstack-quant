@@ -111,6 +111,17 @@ impl JsBetaRecovery {
     }
 }
 
+/// Seniority recovery calibration IDs held by the embedded credit registry.
+/// @returns Exact calibration IDs, each accepted unchanged by `seniorityRecoveryStats`: the registry's default calibration first, then the others in registry order.
+///
+/// # Errors
+///
+/// Throws a `validation` error if the embedded registry is malformed.
+#[wasm_bindgen(js_name = seniorityCalibrationIds)]
+pub fn seniority_calibration_ids() -> Result<Vec<String>, JsValue> {
+    lgd::seniority_calibration_ids().map_err(to_js_err)
+}
+
 /// Historical Beta recovery distribution for a debt seniority class.
 /// @param seniority - Seniority class label such as `"senior_secured"`, `"senior_unsecured"` or `"subordinated"`.
 /// @param calibration_id - Exact registry methodology ID, such as `"moodys_recovery_1982_2023"` or `"sp_recovery_historical"`; aliases are rejected.
@@ -392,41 +403,6 @@ impl JsWorkoutLgdBuilder {
 pub fn collateral_piece_liquidation_value(piece: JsValue) -> Result<f64, JsValue> {
     let piece: CollateralPiece = from_js_json(&piece, "piece")?;
     Ok(piece.liquidation_value())
-}
-
-/// One-call workout LGD from collateral tuples and cost assumptions.
-/// @param ead - Exposure at default in monetary units; positive.
-/// @param collateral - Array of `[collateralType, bookValue, haircut]` tuples, such as `[["real_estate", 800000, 0.3]]`.
-/// @param direct_cost_pct - Direct workout costs as a fraction of EAD.
-/// @param indirect_cost_pct - Indirect workout costs as a fraction of EAD.
-/// @param time_to_resolution_years - Expected workout duration in years.
-/// @param discount_rate - Annual discount rate over the workout period, as a decimal.
-/// @returns The `WorkoutLgdResult` object (`net_recovery`, `lgd`, `recovery_rate`).
-///
-/// # Errors
-///
-/// Throws a `validation` error if any input is out of range or a collateral
-/// type is not recognized.
-#[wasm_bindgen(js_name = workoutLgd)]
-pub fn workout_lgd(
-    ead: JsValue,
-    collateral: JsValue,
-    direct_cost_pct: JsValue,
-    indirect_cost_pct: JsValue,
-    time_to_resolution_years: JsValue,
-    discount_rate: JsValue,
-) -> Result<JsValue, JsValue> {
-    let collateral: Vec<(String, f64, f64)> = from_js_json(&collateral, "collateral")?;
-    let result = lgd::workout_lgd(
-        js_f64(&ead, "ead")?,
-        collateral,
-        js_f64(&direct_cost_pct, "directCostPct")?,
-        js_f64(&indirect_cost_pct, "indirectCostPct")?,
-        js_f64(&time_to_resolution_years, "timeToResolutionYears")?,
-        js_f64(&discount_rate, "discountRate")?,
-    )
-    .map_err(to_js_err)?;
-    to_js_value(&result)
 }
 
 /// Downturn LGD adjustment: Frye-Jacobs style stress or a regulatory add-on with a floor.

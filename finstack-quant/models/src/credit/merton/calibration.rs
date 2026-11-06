@@ -407,10 +407,10 @@ impl MertonModel {
             if value == 0.0 {
                 return Ok(sigma);
             }
-            if let Some((prev_sigma, prev_value)) = previous {
-                if (prev_value < 0.0) != (value < 0.0) {
-                    brackets.push((prev_sigma, sigma));
-                }
+            if let Some((prev_sigma, prev_value)) = previous
+                && (prev_value < 0.0) != (value < 0.0)
+            {
+                brackets.push((prev_sigma, sigma));
             }
             previous = Some((sigma, value));
         }

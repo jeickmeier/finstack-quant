@@ -4944,7 +4944,7 @@
       "oneOf": [
         {
           "additionalProperties": false,
-          "description": "Fixed amount",
+          "description": "Fixed amount. A fee formula: validation rejects it for a tranche recipient,\nsince a note is owed only its coupon and the return of its balance.",
           "properties": {
             "fixed_amount": {
               "additionalProperties": false,
@@ -4978,7 +4978,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Percentage of collateral balance",
+          "description": "Percentage of collateral balance. A fee formula: validation rejects it for\na tranche recipient.",
           "properties": {
             "percentage_of_collateral": {
               "additionalProperties": false,
@@ -5029,7 +5029,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Percentage of the specially serviced collateral balance (CMBS special\nservicing fee): the balances of pool assets carrying a\n`special_servicing` spec.",
+          "description": "Percentage of the specially serviced collateral balance (CMBS special\nservicing fee): the balances of pool assets carrying a\n`special_servicing` spec. A fee formula: validation rejects it for a\ntranche recipient.",
           "properties": {
             "percentage_of_special_serviced": {
               "additionalProperties": false,
@@ -5159,12 +5159,12 @@
         },
         {
           "const": "residual_cash",
-          "description": "All remaining cash",
+          "description": "All remaining cash.\n\nFor the residual holder ([`RecipientType::Equity`]) this is uncapped. Paid\nto a debt class it is a turbo: principal paydown, capped at the balance the\nclass has left, with the excess passing to the next recipient or tier.",
           "type": "string"
         },
         {
           "additionalProperties": false,
-          "description": "Reserve account replenishment (up to target balance).\n\nThe current reserve balance is passed dynamically via `WaterfallContext`\nat execution time, not stored here, because the balance changes each period.",
+          "description": "Reserve account replenishment (up to target balance).\n\nThe current reserve balance is passed dynamically via `WaterfallContext`\nat execution time, not stored here, because the balance changes each period.\nValidation rejects it for a tranche recipient.",
           "properties": {
             "reserve_replenishment": {
               "additionalProperties": false,
@@ -5227,7 +5227,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Net-WAC carryover repayment: the tranche's carryover balance brought\ninto the period (`amount`, set by the engine each period from the\ninterest its available-funds cap withheld in earlier periods), paid\nfrom the cash reaching this recipient and recorded as interest on the\ntranche outside its capped claim.",
+          "description": "Net-WAC carryover repayment: the tranche's carryover balance brought\ninto the period (`amount`, set by the engine each period from the\ninterest its available-funds cap withheld in earlier periods), paid\nfrom the cash reaching this recipient and recorded as interest on the\ntranche outside its capped claim. A custom waterfall names the recipient\n`net_wac_carryover_<tranche_id>` and the tranche must accrue carryover\nunder `waterfall_rules.afc`.",
           "properties": {
             "net_wac_carryover": {
               "additionalProperties": false,
@@ -5255,7 +5255,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Manager incentive fee: `share` of the cash reaching this recipient\nthat lies above the equity hurdle. The hurdle is tested on the\n[`EquityHistory`] in the `WaterfallContext` plus every equity\ndistribution earlier in the same waterfall run plus this cash; the\ncash that lifts the equity IRR exactly to `hurdle_irr`\n([`EquityHistory::hurdle_shortfall`]) passes to equity untouched and\nthe manager shares only in the excess. Nothing is paid while the\nhurdle is unreachable, or when no equity history is supplied. The\nstandard template places one recipient in the principal tier ahead of\n`equity_principal` and one ahead of the residual.",
+          "description": "Manager incentive fee: `share` of the cash reaching this recipient\nthat lies above the equity hurdle. The hurdle is tested on the\n[`EquityHistory`] in the `WaterfallContext` plus every equity\ndistribution earlier in the same waterfall run plus this cash; the\ncash that lifts the equity IRR exactly to `hurdle_irr`\n([`EquityHistory::hurdle_shortfall`]) passes to equity untouched and\nthe manager shares only in the excess. Nothing is paid while the\nhurdle is unreachable, or when no equity history is supplied. The\nstandard template places one recipient in the principal tier ahead of\n`equity_principal` and one ahead of the residual. Validation rejects it\nfor a tranche recipient.",
           "properties": {
             "incentive_fee": {
               "additionalProperties": false,
@@ -6681,7 +6681,7 @@
             }
           ],
           "default": null,
-          "description": "Effective-interest-rate reporting switch for the\n`oid_eir_amortization` metric. `None` (the default) reports with fees\nincluded, the same as `Some(OidEirSpec::default())`."
+          "description": "Effective-interest-rate reporting switch for the `oid_eir_rate` and\n`oid_eir_amortization` metrics. `None` (the default) reports with fees\nincluded, the same as `Some(OidEirSpec::default())`."
         },
         "payment_lag_days": {
           "default": 0,
@@ -7068,7 +7068,7 @@
       "type": "object"
     },
     "StepDownTrigger": {
-      "description": "A single step-down performance trigger.\n\nEach variant is a per-period *health check* the deal must pass (in addition\nto seasoning past the step-down date) for principal to switch to pro-rata.\nAll configured triggers must pass simultaneously; while any is breached the\ndeal reverts to sequential, so the switch is re-evaluated every period.\n\nConventions (all evaluated on *current* balances each period):\n- cumulative loss is a fraction of the *original* pool balance;\n- the OC ratio is `current pool balance ÷ rated (non-equity) note balance`;\n- credit enhancement is the senior cushion `(pool − senior note) ÷ pool`,\n  where the senior note is the *single* most-senior tranche by payment\n  priority — for pari-passu senior classes (e.g. A-1/A-2) only the\n  lowest-priority one is taken as the reference.\n\n`MaxDelinquency` reads the delinquent share of the pool, which is zero\nunless the deal carries a `credit_model.delinquency` model.",
+      "description": "A single step-down performance trigger.\n\nEach variant is a per-period *health check* the deal must pass (in addition\nto seasoning past the step-down date) for principal to switch to pro-rata.\nAll configured triggers must pass simultaneously; while any is breached the\ndeal reverts to sequential, so the switch is re-evaluated every period.\n\nConventions (all evaluated on *current* balances each period):\n- cumulative loss is a fraction of the *original* pool balance;\n- the OC ratio is `current pool balance ÷ rated (non-equity) note balance`;\n- credit enhancement is the senior cushion `(pool − senior note) ÷ pool`,\n  where the senior note is the tranche with the lowest `payment_priority`.\n  `TrancheStructure` gives every tranche a distinct priority, so for\n  same-seniority senior classes (e.g. A-1/A-2) this is the first one in\n  input order: A-1 is subtracted and A-2, ranked behind it, is not.\n\n`MaxDelinquency` reads the delinquent share of the pool, which is zero\nunless the deal carries a `credit_model.delinquency` model.",
       "oneOf": [
         {
           "additionalProperties": false,

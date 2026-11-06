@@ -128,17 +128,17 @@ pub(super) fn resolve_period_waterfall<'w>(
 
     // Targeted OC amortization caps the notes' principal at the amount that
     // holds overcollateralization at the target on the post-collection pool.
-    if let Some(spec) = rules.and_then(|r| r.target_oc.as_ref()) {
-        if !flags.is_accumulating {
-            resolve::apply_target_oc(
-                period_waterfall.to_mut(),
-                spec,
-                state.pool_state.balances.iter().sum::<f64>()
-                    + state.principal_funding_account.amount(),
-                state.original_pool_balance.amount(),
-                &state.tranche_balances,
-            );
-        }
+    if let Some(spec) = rules.and_then(|r| r.target_oc.as_ref())
+        && !flags.is_accumulating
+    {
+        resolve::apply_target_oc(
+            period_waterfall.to_mut(),
+            spec,
+            state.pool_state.balances.iter().sum::<f64>()
+                + state.principal_funding_account.amount(),
+            state.original_pool_balance.amount(),
+            &state.tranche_balances,
+        );
     }
 
     // Net-WAC carryover: each capped tranche's recipient asks for the
@@ -183,10 +183,9 @@ pub(super) fn resolve_period_waterfall<'w>(
                     target_balance,
                     ..
                 } = &mut recipient.calculation
+                    && !amortizing.iter().any(|id| id == tranche_id)
                 {
-                    if !amortizing.iter().any(|id| id == tranche_id) {
-                        *target_balance = state.tranche_balances.get(tranche_id).copied();
-                    }
+                    *target_balance = state.tranche_balances.get(tranche_id).copied();
                 }
             }
         }

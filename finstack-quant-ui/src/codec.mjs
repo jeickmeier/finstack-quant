@@ -160,6 +160,21 @@ export function createWireCodec(source) {
     return validators.get(node);
   }
   const rootValidator = z.fromJSONSchema(structural);
+  /** Whether `value` carries every tag constant `branch` declares (and it declares one). */
+  function carriesTag(branch, value) {
+    if (typeof branch === "boolean" || !value || typeof value !== "object")
+      return false;
+    const resolved = branch.$ref
+      ? { ...schemaAt(schema, branch.$ref), ...branch }
+      : branch;
+    const tags = Object.entries(resolved.properties ?? {}).filter(
+      ([, property]) => property && Object.hasOwn(property, "const"),
+    );
+    return (
+      tags.length > 0 &&
+      tags.every(([key, property]) => value[key] === property.const)
+    );
+  }
   function walk(node, value, host, path) {
     if (typeof node === "boolean") return value;
     if (node.$ref) {
@@ -192,16 +207,30 @@ export function createWireCodec(source) {
     for (const keyword of ["oneOf", "anyOf"]) {
       if (!node[keyword]) continue;
       const matches = [];
+      // Failures of the branches whose tag constants the value carries.
+      const tagged = [];
       for (const branch of node[keyword]) {
         try {
           const converted = walk(branch, value, host, path);
           const check = validatorFor(branch).safeParse(shadow(converted));
           if (check.success) matches.push(converted);
+          else if (carriesTag(branch, value))
+            tagged.push(
+              new z.ZodError(
+                check.error.issues.map((issue) => ({
+                  ...issue,
+                  path: [...path, ...issue.path],
+                })),
+              ),
+            );
         } catch (error) {
           if (!(error instanceof z.ZodError || error instanceof TypeError))
             throw error;
+          if (carriesTag(branch, value)) tagged.push(error);
         }
       }
+      // A tagged value failing only its own branch reports that branch's issues.
+      if (!matches.length && tagged.length === 1) throw tagged[0];
       if (!matches.length || (keyword === "oneOf" && matches.length !== 1))
         throw wireError(path, `no unambiguous ${keyword} wire representation`);
       value = matches[0];

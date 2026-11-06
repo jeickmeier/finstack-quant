@@ -10119,6 +10119,21 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/government_curve_id",
+    "description": "Optional government discount curve identifier for the bond `g_spread` metric.\n\nThe metric subtracts this curve's par yield from the bond's yield. It\nenters no price, and `g_spread` is an error when it is unset."
+  },
+  {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/government_curve_id/anyOf/0",
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Id"
+  },
+  {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/government_curve_id/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/hazard_mean_reversion",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/hazard_mean_reversion",
     "description": "Mean-reversion speed of the hazard factor (κ_λ) on the rates-credit\nlattice, annualised.\n\n`None` and `0.0` both mean no reversion. Capped by\n[`KAPPA_MAX`](finstack_quant_models::trees::two_factor_rates_credit::KAPPA_MAX),\nabove which the binomial lattice's conditional variance collapses far\nenough to distort option values. Requires `credit_curve_id`.\n\nNote that mean reversion narrows the feasible correlation range: it\nskews the per-node marginal transition probabilities away from ½, and\ntwo Bernoulli marginals admit only correlations inside their Fréchet\nbounds. At `KAPPA_MAX` on both factors over a five-year lattice the\nfeasible `|ρ|` can fall to around `0.12`. Calibration rejects an\nunattainable correlation and reports the lattice-wide maximum, which is\nalso available up front from\n[`RatesCreditTree::max_feasible_correlation`](finstack_quant_models::trees::two_factor_rates_credit::RatesCreditTree::max_feasible_correlation).",
@@ -14511,7 +14526,7 @@ export default [
   {
     "path": "#/$defs/d_ee4323acfdb49e4fe15b",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonModel",
-    "description": "Merton structural credit model.\n\nModels a firm's equity as a call option on its assets, where default\noccurs when asset value falls below the debt barrier.\n\n# Fields\n\n- `asset_value` (V_0): Current market value of the firm's assets.\n- `asset_vol` (sigma_V): Annualized volatility of asset returns.\n- `debt_barrier` (B): Face value of debt / default point.\n- `risk_free_rate` (r): Continuous risk-free rate.\n- `payout_rate` (q): Continuous dividend / payout yield on assets.\n- `barrier_type`: Terminal or first-passage barrier monitoring.\n- `dynamics`: Asset return dynamics specification.\n\n# Wire format\n\nDeserialization is routed through [`MertonModel::new_with_dynamics`] via\n`RawMertonModel`, so a model loaded from JSON satisfies exactly the same\ninvariants as one built in Rust. The serialized field set is unchanged."
+    "description": "Merton structural credit model.\n\nModels a firm's equity as a call option on its assets, where default\noccurs when asset value falls below the debt barrier.\n\n# Fields\n\n- `asset_value` (V_0): Current market value of the firm's assets.\n- `asset_vol` (sigma_V): Annualized volatility of asset returns.\n- `debt_barrier` (B): Face value of debt / default point.\n- `risk_free_rate` (r): Continuous risk-free rate.\n- `payout_rate` (q): Continuous dividend / payout yield on assets.\n- `barrier_type`: Terminal or first-passage barrier monitoring.\n- `dynamics`: Asset return dynamics specification.\n\n# Wire format\n\nDeserialization is routed through [`MertonModel::new_with_dynamics`] via\n`RawMertonModel`, so a model loaded from JSON satisfies exactly the same\ninvariants as one built in Rust. Unknown fields are rejected."
   },
   {
     "path": "#/$defs/d_ee4323acfdb49e4fe15b/properties/asset_value",
@@ -23878,7 +23893,7 @@ export default [
   {
     "path": "#/$defs/PaymentCalculation/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PaymentCalculation/oneOf/0",
-    "description": "Fixed amount"
+    "description": "Fixed amount. A fee formula: validation rejects it for a tranche recipient,\nsince a note is owed only its coupon and the return of its balance."
   },
   {
     "path": "#/$defs/PaymentCalculation/oneOf/0/properties/fixed_amount",
@@ -23909,7 +23924,7 @@ export default [
   {
     "path": "#/$defs/PaymentCalculation/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PaymentCalculation/oneOf/1",
-    "description": "Percentage of collateral balance"
+    "description": "Percentage of collateral balance. A fee formula: validation rejects it for\na tranche recipient."
   },
   {
     "path": "#/$defs/PaymentCalculation/oneOf/1/properties/percentage_of_collateral",
@@ -23959,7 +23974,7 @@ export default [
   {
     "path": "#/$defs/PaymentCalculation/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PaymentCalculation/oneOf/2",
-    "description": "Percentage of the specially serviced collateral balance (CMBS special\nservicing fee): the balances of pool assets carrying a\n`special_servicing` spec."
+    "description": "Percentage of the specially serviced collateral balance (CMBS special\nservicing fee): the balances of pool assets carrying a\n`special_servicing` spec. A fee formula: validation rejects it for a\ntranche recipient."
   },
   {
     "path": "#/$defs/PaymentCalculation/oneOf/2/properties/percentage_of_special_serviced",
@@ -24083,12 +24098,12 @@ export default [
     "path": "#/$defs/PaymentCalculation/oneOf/5",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PaymentCalculation/oneOf/5",
     "const": "residual_cash",
-    "description": "All remaining cash"
+    "description": "All remaining cash.\n\nFor the residual holder ([`RecipientType::Equity`]) this is uncapped. Paid\nto a debt class it is a turbo: principal paydown, capped at the balance the\nclass has left, with the excess passing to the next recipient or tier."
   },
   {
     "path": "#/$defs/PaymentCalculation/oneOf/6",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PaymentCalculation/oneOf/6",
-    "description": "Reserve account replenishment (up to target balance).\n\nThe current reserve balance is passed dynamically via `WaterfallContext`\nat execution time, not stored here, because the balance changes each period."
+    "description": "Reserve account replenishment (up to target balance).\n\nThe current reserve balance is passed dynamically via `WaterfallContext`\nat execution time, not stored here, because the balance changes each period.\nValidation rejects it for a tranche recipient."
   },
   {
     "path": "#/$defs/PaymentCalculation/oneOf/6/properties/reserve_replenishment",
@@ -24139,7 +24154,7 @@ export default [
   {
     "path": "#/$defs/PaymentCalculation/oneOf/8",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PaymentCalculation/oneOf/8",
-    "description": "Net-WAC carryover repayment: the tranche's carryover balance brought\ninto the period (`amount`, set by the engine each period from the\ninterest its available-funds cap withheld in earlier periods), paid\nfrom the cash reaching this recipient and recorded as interest on the\ntranche outside its capped claim."
+    "description": "Net-WAC carryover repayment: the tranche's carryover balance brought\ninto the period (`amount`, set by the engine each period from the\ninterest its available-funds cap withheld in earlier periods), paid\nfrom the cash reaching this recipient and recorded as interest on the\ntranche outside its capped claim. A custom waterfall names the recipient\n`net_wac_carryover_<tranche_id>` and the tranche must accrue carryover\nunder `waterfall_rules.afc`."
   },
   {
     "path": "#/$defs/PaymentCalculation/oneOf/8/properties/net_wac_carryover",
@@ -24160,7 +24175,7 @@ export default [
   {
     "path": "#/$defs/PaymentCalculation/oneOf/9",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PaymentCalculation/oneOf/9",
-    "description": "Manager incentive fee: `share` of the cash reaching this recipient\nthat lies above the equity hurdle. The hurdle is tested on the\n[`EquityHistory`] in the `WaterfallContext` plus every equity\ndistribution earlier in the same waterfall run plus this cash; the\ncash that lifts the equity IRR exactly to `hurdle_irr`\n([`EquityHistory::hurdle_shortfall`]) passes to equity untouched and\nthe manager shares only in the excess. Nothing is paid while the\nhurdle is unreachable, or when no equity history is supplied. The\nstandard template places one recipient in the principal tier ahead of\n`equity_principal` and one ahead of the residual."
+    "description": "Manager incentive fee: `share` of the cash reaching this recipient\nthat lies above the equity hurdle. The hurdle is tested on the\n[`EquityHistory`] in the `WaterfallContext` plus every equity\ndistribution earlier in the same waterfall run plus this cash; the\ncash that lifts the equity IRR exactly to `hurdle_irr`\n([`EquityHistory::hurdle_shortfall`]) passes to equity untouched and\nthe manager shares only in the excess. Nothing is paid while the\nhurdle is unreachable, or when no equity history is supplied. The\nstandard template places one recipient in the principal tier ahead of\n`equity_principal` and one ahead of the residual. Validation rejects it\nfor a tranche recipient."
   },
   {
     "path": "#/$defs/PaymentCalculation/oneOf/9/properties/incentive_fee",
@@ -27508,7 +27523,7 @@ export default [
     "path": "#/$defs/RevolvingCredit/properties/oid_eir",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RevolvingCredit/properties/oid_eir",
     "default": null,
-    "description": "Effective-interest-rate reporting switch for the\n`oid_eir_amortization` metric. `None` (the default) reports with fees\nincluded, the same as `Some(OidEirSpec::default())`."
+    "description": "Effective-interest-rate reporting switch for the `oid_eir_rate` and\n`oid_eir_amortization` metrics. `None` (the default) reports with fees\nincluded, the same as `Some(OidEirSpec::default())`."
   },
   {
     "path": "#/$defs/RevolvingCredit/properties/oid_eir/anyOf/0",
@@ -28220,7 +28235,7 @@ export default [
   {
     "path": "#/$defs/StepDownTrigger",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StepDownTrigger",
-    "description": "A single step-down performance trigger.\n\nEach variant is a per-period *health check* the deal must pass (in addition\nto seasoning past the step-down date) for principal to switch to pro-rata.\nAll configured triggers must pass simultaneously; while any is breached the\ndeal reverts to sequential, so the switch is re-evaluated every period.\n\nConventions (all evaluated on *current* balances each period):\n- cumulative loss is a fraction of the *original* pool balance;\n- the OC ratio is `current pool balance ÷ rated (non-equity) note balance`;\n- credit enhancement is the senior cushion `(pool − senior note) ÷ pool`,\n  where the senior note is the *single* most-senior tranche by payment\n  priority — for pari-passu senior classes (e.g. A-1/A-2) only the\n  lowest-priority one is taken as the reference.\n\n`MaxDelinquency` reads the delinquent share of the pool, which is zero\nunless the deal carries a `credit_model.delinquency` model."
+    "description": "A single step-down performance trigger.\n\nEach variant is a per-period *health check* the deal must pass (in addition\nto seasoning past the step-down date) for principal to switch to pro-rata.\nAll configured triggers must pass simultaneously; while any is breached the\ndeal reverts to sequential, so the switch is re-evaluated every period.\n\nConventions (all evaluated on *current* balances each period):\n- cumulative loss is a fraction of the *original* pool balance;\n- the OC ratio is `current pool balance ÷ rated (non-equity) note balance`;\n- credit enhancement is the senior cushion `(pool − senior note) ÷ pool`,\n  where the senior note is the tranche with the lowest `payment_priority`.\n  `TrancheStructure` gives every tranche a distinct priority, so for\n  same-seniority senior classes (e.g. A-1/A-2) this is the first one in\n  input order: A-1 is subtracted and A-2, ranked behind it, is not.\n\n`MaxDelinquency` reads the delinquent share of the pool, which is zero\nunless the deal carries a `credit_model.delinquency` model."
   },
   {
     "path": "#/$defs/StepDownTrigger/oneOf/0",

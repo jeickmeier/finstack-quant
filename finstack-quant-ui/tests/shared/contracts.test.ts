@@ -110,8 +110,251 @@ describe("discovered canonical fixtures", () => {
       for (const example of schema.examples)
         expect(validator.parse(example)).toEqual(example);
     }
-    // Rust publishes no example for ScenarioSet; every other root carries one.
-    expect(withoutExamples).toEqual(["schemas/scenario_set.json"]);
+    // Rust publishes no example for CovenantEngine, CovenantForecastConfig,
+    // CovenantReport, CovenantTemplate, DatedCovenantReports, FutureBreach,
+    // the five credit-scoring inputs, ArbitrageReport, MertonModel, RecoveryClaim,
+    // WorkoutLgd, SeniorityCalibration, CreditAssessment,
+    // DcfOptions, DcfSensitivityResult, LboConfig, LboResult, ScenarioSet,
+    // ScenarioDiff, SensitivityResult, BridgeChart, ForecastMetrics,
+    // VarianceConfig, CapitalStructureSummary or RelativeValueReport, nor their
+    // configs; every other root carries one.
+    expect(withoutExamples).toEqual([
+      "schemas/covenant_engine.json",
+      "schemas/covenant_forecast_config.json",
+      "schemas/covenant_report.json",
+      "schemas/covenant_template.json",
+      "schemas/dated_covenant_reports.json",
+      "schemas/future_breach.json",
+      "schemas/altman_z_double_prime_input.json",
+      "schemas/altman_z_prime_input.json",
+      "schemas/altman_z_score_input.json",
+      "schemas/arbitrage_report.json",
+      "schemas/merton_model.json",
+      "schemas/ohlson_o_score_input.json",
+      "schemas/recovery_claim.json",
+      "schemas/seniority_calibration.json",
+      "schemas/workout_lgd.json",
+      "schemas/zmijewski_input.json",
+      "schemas/bridge_chart.json",
+      "schemas/capital_structure_summary_config.json",
+      "schemas/capital_structure_summary.json",
+      "schemas/credit_assessment.json",
+      "schemas/dcf_options.json",
+      "schemas/dcf_sensitivity_result.json",
+      "schemas/forecast_metrics.json",
+      "schemas/lbo_config.json",
+      "schemas/lbo_result.json",
+      "schemas/relative_value_report_config.json",
+      "schemas/relative_value_report.json",
+      "schemas/scenario_diff.json",
+      "schemas/scenario_set.json",
+      "schemas/sensitivity_result.json",
+      "schemas/variance_config.json",
+    ]);
+  });
+  it("accepts the captured native credit assessment under the generated CreditAssessment schema unchanged", async () => {
+    const generated = resolve(repo, "finstack-quant-ui/src/generated");
+    const schema = JSON.parse(
+      await readFile(
+        resolve(generated, "schemas/credit_assessment.json"),
+        "utf8",
+      ),
+    );
+    const captured = JSON.parse(
+      await readFile(
+        resolve(
+          repo,
+          "finstack-quant-ui/src/fixtures/statements/analyst-credit-assessment.json",
+        ),
+        "utf8",
+      ),
+    );
+    const validator = z.fromJSONSchema(converterSchema(schema));
+    expect(validator.parse(captured)).toEqual(captured);
+  });
+  it("accepts the captured native DCF sensitivity and the DCF options input under their generated schemas unchanged", async () => {
+    const generated = resolve(repo, "finstack-quant-ui/src/generated");
+    const fixture = async (name: string) =>
+      JSON.parse(
+        await readFile(
+          resolve(repo, "finstack-quant-ui/src/fixtures/statements", name),
+          "utf8",
+        ),
+      );
+    const schema = async (name: string) =>
+      z.fromJSONSchema(
+        converterSchema(
+          JSON.parse(await readFile(resolve(generated, name), "utf8")),
+        ),
+      );
+    const sensitivity = await fixture("analyst-dcf-sensitivity.json");
+    expect(
+      (await schema("schemas/dcf_sensitivity_result.json")).parse(sensitivity),
+    ).toEqual(sensitivity);
+    const { options } = await fixture("analyst-dcf-assumptions.json");
+    expect((await schema("schemas/dcf_options.json")).parse(options)).toEqual(
+      options,
+    );
+  });
+  it("accepts the LBO config input and the captured native LBO result under their generated schemas unchanged", async () => {
+    const generated = resolve(repo, "finstack-quant-ui/src/generated");
+    for (const [schemaName, fixtureName] of [
+      ["schemas/lbo_config.json", "analyst-lbo-config.json"],
+      ["schemas/lbo_result.json", "analyst-lbo.json"],
+    ]) {
+      const validator = z.fromJSONSchema(
+        converterSchema(
+          JSON.parse(await readFile(resolve(generated, schemaName), "utf8")),
+        ),
+      );
+      const fixture = JSON.parse(
+        await readFile(
+          resolve(
+            repo,
+            "finstack-quant-ui/src/fixtures/statements",
+            fixtureName,
+          ),
+          "utf8",
+        ),
+      );
+      expect(validator.parse(fixture)).toEqual(fixture);
+    }
+  });
+  it("accepts the captured native sensitivity result under the generated SensitivityResult schema unchanged", async () => {
+    const generated = resolve(repo, "finstack-quant-ui/src/generated");
+    const validator = z.fromJSONSchema(
+      converterSchema(
+        JSON.parse(
+          await readFile(
+            resolve(generated, "schemas/sensitivity_result.json"),
+            "utf8",
+          ),
+        ),
+      ),
+    );
+    const { result } = JSON.parse(
+      await readFile(
+        resolve(
+          repo,
+          "finstack-quant-ui/src/fixtures/statements/analyst-sensitivity.json",
+        ),
+        "utf8",
+      ),
+    );
+    expect(result.scenarios).toHaveLength(4);
+    expect(validator.parse(result)).toEqual(result);
+  });
+  it("accepts the captured native bridge and backtest under their generated schemas unchanged", async () => {
+    const generated = resolve(repo, "finstack-quant-ui/src/generated");
+    for (const [schemaName, fixtureName] of [
+      ["schemas/bridge_chart.json", "analyst-bridge.json"],
+      ["schemas/forecast_metrics.json", "analyst-backtest.json"],
+    ]) {
+      const validator = z.fromJSONSchema(
+        converterSchema(
+          JSON.parse(await readFile(resolve(generated, schemaName), "utf8")),
+        ),
+      );
+      const fixture = JSON.parse(
+        await readFile(
+          resolve(
+            repo,
+            "finstack-quant-ui/src/fixtures/statements",
+            fixtureName,
+          ),
+          "utf8",
+        ),
+      );
+      expect(validator.parse(fixture)).toEqual(fixture);
+    }
+  });
+  it("accepts the Monte Carlo config input and the captured native results under their generated schemas unchanged", async () => {
+    const generated = resolve(repo, "finstack-quant-ui/src/generated");
+    for (const [schemaName, fixtureName] of [
+      ["schemas/monte_carlo_config.json", "analyst-monte-carlo-config.json"],
+      ["schemas/monte_carlo_results.json", "analyst-monte-carlo.json"],
+    ]) {
+      const validator = z.fromJSONSchema(
+        converterSchema(
+          JSON.parse(await readFile(resolve(generated, schemaName), "utf8")),
+        ),
+      );
+      const fixture = JSON.parse(
+        await readFile(
+          resolve(
+            repo,
+            "finstack-quant-ui/src/fixtures/statements",
+            fixtureName,
+          ),
+          "utf8",
+        ),
+      );
+      expect(validator.parse(fixture)).toEqual(fixture);
+    }
+  });
+  it("accepts the captured native covenant series under the generated DatedCovenantReports and CovenantReport schemas unchanged", async () => {
+    const generated = resolve(repo, "finstack-quant-ui/src/generated");
+    const read = async (name: string) =>
+      JSON.parse(await readFile(resolve(generated, name), "utf8"));
+    const dated = z.fromJSONSchema(
+      converterSchema(await read("schemas/dated_covenant_reports.json")),
+    );
+    const report = z.fromJSONSchema(
+      converterSchema(await read("schemas/covenant_report.json")),
+    );
+    const series = JSON.parse(
+      await readFile(
+        resolve(
+          repo,
+          "finstack-quant-ui/src/fixtures/covenants/analyst-covenant-series.json",
+        ),
+        "utf8",
+      ),
+    );
+    expect(series).toHaveLength(8);
+    for (const row of series) {
+      expect(dated.parse(row)).toEqual(row);
+      for (const value of Object.values(row.reports))
+        expect(report.parse(value)).toEqual(value);
+    }
+  });
+  it("accepts the captured native scenario diffs under the generated ScenarioDiff schema unchanged", async () => {
+    const generated = resolve(repo, "finstack-quant-ui/src/generated");
+    const schema = JSON.parse(
+      await readFile(resolve(generated, "schemas/scenario_diff.json"), "utf8"),
+    );
+    const diffs = JSON.parse(
+      await readFile(
+        resolve(
+          repo,
+          "finstack-quant-ui/src/fixtures/statements/analyst-scenario-diff.json",
+        ),
+        "utf8",
+      ),
+    );
+    const validator = z.fromJSONSchema(converterSchema(schema));
+    expect(diffs).toHaveLength(2);
+    for (const diff of diffs) expect(validator.parse(diff)).toEqual(diff);
+  });
+  it("accepts the native scenario-table fixture grid under the generated ScenarioGrid schema unchanged", async () => {
+    const generated = resolve(repo, "finstack-quant-ui/src/generated");
+    const schema = JSON.parse(
+      await readFile(resolve(generated, "schemas/scenario_grid.json"), "utf8"),
+    );
+    const cases = JSON.parse(
+      await readFile(
+        resolve(
+          repo,
+          "finstack-quant-ui/tests/valuations/scenario-table/cases.json",
+        ),
+        "utf8",
+      ),
+    );
+    const validator = z.fromJSONSchema(converterSchema(schema));
+    expect(validator.parse(cases.grid)).toEqual(cases.grid);
+    expect(validator.safeParse({ ...cases.grid, cpr: [0.1] }).success).toBe(
+      false,
+    );
   });
   it("round-trips the analyst check suite through the generated CheckSuiteSpec codec", async () => {
     const text = await readFile(

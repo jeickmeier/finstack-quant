@@ -238,9 +238,11 @@ def test_clamped_cube_preserves_quote_and_invalid_domain() -> None:
     from finstack_quant.models.volatility import get_cube_vol, get_cube_vol_clamped
 
     low = VolCube("LOW", [1.0], [5.0], [SabrParameterData(0.0001, 1.0, 0.3, 0.0)], [0.02])
-    assert get_cube_vol_clamped(low, 1.0, 5.0, 0.02) == pytest.approx(get_cube_vol(low, 1.0, 5.0, 0.02), abs=1e-14)
+    assert get_cube_vol_clamped(low, 1.0, 5.0, 0.02, "lognormal") == pytest.approx(
+        get_cube_vol(low, 1.0, 5.0, 0.02, "lognormal"), abs=1e-14
+    )
     invalid = VolCube("INVALID", [1.0], [5.0], [SabrParameterData(0.008, 0.5, 0.3, 0.0)], [-0.01])
-    assert math.isnan(get_cube_vol_clamped(invalid, 1.0, 5.0, -0.01))
+    assert math.isnan(get_cube_vol_clamped(invalid, 1.0, 5.0, -0.01, "lognormal"))
 
 
 def test_hull_white_requires_a_quote_fit_budget() -> None:

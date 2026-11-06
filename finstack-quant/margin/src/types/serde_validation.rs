@@ -36,7 +36,7 @@ fn validate_maximum_u8(value: u8, maximum: u8, field: &str) -> Result<(), String
 }
 
 macro_rules! optional_f64_field {
-    ($module:ident, $field:literal, $minimum:expr, $maximum:expr) => {
+    ($module:ident, $field:literal, $minimum:expr_2021, $maximum:expr_2021) => {
         pub(super) mod $module {
             use super::*;
 
@@ -70,7 +70,7 @@ macro_rules! optional_f64_field {
 }
 
 macro_rules! f64_field {
-    ($module:ident, $field:literal, $minimum:expr, $maximum:expr) => {
+    ($module:ident, $field:literal, $minimum:expr_2021, $maximum:expr_2021) => {
         pub(super) mod $module {
             use super::*;
 

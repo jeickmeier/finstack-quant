@@ -5,6 +5,7 @@
 //! optional contract rate override.
 
 use finstack_quant_cashflows::builder::CashFlowSchedule;
+use finstack_quant_core::Result;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
@@ -13,7 +14,6 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::validation;
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::impl_instrument_base;
 use time::macros::date;
 
@@ -654,10 +654,12 @@ mod tests {
 
         let result = forward.validate();
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("must differ from quote_currency"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("must differ from quote_currency")
+        );
     }
 
     #[test]
@@ -682,10 +684,12 @@ mod tests {
 
         let result = forward.validate();
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("must match base_currency"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("must match base_currency")
+        );
     }
 
     #[test]
@@ -710,10 +714,12 @@ mod tests {
 
         let result = forward.validate();
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("contract_rate must be positive"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("contract_rate must be positive")
+        );
     }
 
     #[test]
@@ -738,10 +744,12 @@ mod tests {
 
         let result = forward.validate();
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("quoted_spot must be positive"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("quoted_spot must be positive")
+        );
     }
 
     #[test]

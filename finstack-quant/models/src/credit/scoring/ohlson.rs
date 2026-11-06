@@ -12,7 +12,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::types::{check_finite, CreditScoringError, ScoringResult, ScoringZone};
+use super::types::{CreditScoringError, ScoringResult, ScoringZone, check_finite};
 
 fn check_binary_indicator(field: &'static str, value: f64) -> Result<(), CreditScoringError> {
     check_finite(field, value)?;
@@ -43,8 +43,9 @@ const OHLSON_GREY_PD: f64 = OHLSON_OPTIMAL_CUTOFF_PD / 2.0;
 ///
 /// Ohlson, J. A. (1980). "Financial Ratios and the Probabilistic Prediction
 /// of Bankruptcy." *Journal of Accounting Research*, 18(1), 109-131. `docs/REFERENCES.md#ohlson-1980`
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct OhlsonOScoreInput {
     /// Ohlson's SIZE variable: `ln(Total Assets / GNP price-level index)`.
     ///

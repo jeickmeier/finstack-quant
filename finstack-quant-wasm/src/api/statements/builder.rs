@@ -18,7 +18,7 @@ use finstack_quant_statements::capital_structure::{
 };
 use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_statements::types::{
-    AmountOrScalar, FinancialStatementInstrument, ForecastSpec, NodeSpec,
+    AmountOrScalar, FinancialStatementInstrument, ForecastSpec, NodeSpec, RollupMethod,
 };
 use indexmap::IndexMap;
 use wasm_bindgen::prelude::*;
@@ -235,6 +235,24 @@ impl JsModelBuilder {
         Ok(())
     }
 
+    /// Declare how an existing line rolls up to a coarser reporting frequency.
+    ///
+    /// Twin of Python `ModelBuilder.rollup` (Rust `ModelBuilder::rollup`). Call
+    /// it after the method that creates the line; redefining the node discards
+    /// the declaration. A failed call leaves the builder usable.
+    ///
+    /// @param node_id - Existing node to declare the method on.
+    /// @param rollup - `"sum"` for flows, `"period_end"` for balances and trailing metrics, `"formula"` for ratios. A rollup rejects `"formula"` on a node without a formula, and a `RollupSpec` entry for the node overrides this declaration.
+    /// @throws Error with kind `validation` if `rollup` is not a recognized method, the node does not exist or the builder was consumed.
+    pub fn rollup(&mut self, node_id: JsValue, rollup: JsValue) -> Result<(), JsValue> {
+        let node_id = js_string(&node_id, "nodeId")?;
+        let method: RollupMethod = js_wire(&rollup, "rollup")?;
+        self.builder_mut()?
+            .rollup(&node_id, method)
+            .map_err(to_js_err)?;
+        Ok(())
+    }
+
     /// Add a calculated node defined by a DSL formula.
     ///
     /// Twin of Python `ModelBuilder.compute` (Rust `ModelBuilder::compute`).
@@ -288,7 +306,7 @@ impl JsModelBuilder {
     /// Twin of Python `ModelBuilder.forecast` (Rust `ModelBuilder::forecast`).
     ///
     /// @param node_id - Node whose forecast periods the spec fills.
-    /// @param forecast_spec - `ForecastSpec` (`method` plus `params`, e.g. `{ method: "growth_pct", params: { rate: 0.05 } }`; object or JSON).
+    /// @param forecast_spec - `ForecastSpec` (`method` plus `params`, e.g. `{ method: "growth_pct", params: { rate: 0.05 } }`; object or JSON). `params` must hold exactly the method's parameters: an unknown key, a missing or `null` parameter, or a value of the wrong JSON type fails `build()` with kind `validation`.
     /// @throws Error with kind `validation` if `forecastSpec` is malformed or the builder was consumed.
     pub fn forecast(&mut self, node_id: JsValue, forecast_spec: JsValue) -> Result<(), JsValue> {
         let node_id = js_string(&node_id, "nodeId")?;
@@ -715,7 +733,7 @@ impl JsMixedNodeBuilder {
     /// Twin of Python `MixedNodeBuilder.forecast` (Rust
     /// `MixedNodeBuilder::forecast`).
     ///
-    /// @param forecast_spec - `ForecastSpec` (`method` plus `params`, e.g. `{ method: "growth_pct", params: { rate: 0.05 } }`; object or JSON).
+    /// @param forecast_spec - `ForecastSpec` (`method` plus `params`, e.g. `{ method: "growth_pct", params: { rate: 0.05 } }`; object or JSON). `params` must hold exactly the method's parameters: an unknown key, a missing or `null` parameter, or a value of the wrong JSON type fails `build()` with kind `validation`.
     /// @throws Error with kind `validation` if `forecastSpec` is malformed or the builder was consumed.
     pub fn forecast(&mut self, forecast_spec: JsValue) -> Result<(), JsValue> {
         let spec: ForecastSpec = from_js_json(&forecast_spec, "forecastSpec")?;
@@ -746,6 +764,18 @@ impl JsMixedNodeBuilder {
     pub fn name(&mut self, name: JsValue) -> Result<(), JsValue> {
         let name = js_string(&name, "name")?;
         self.builder_mut()?.name(name);
+        Ok(())
+    }
+
+    /// Declare how this line rolls up to a coarser reporting frequency.
+    ///
+    /// Twin of Python `MixedNodeBuilder.rollup` (Rust `MixedNodeBuilder::rollup`).
+    ///
+    /// @param rollup - `"sum"` for flows, `"period_end"` for balances and trailing metrics, `"formula"` for ratios. A rollup rejects `"formula"` on a node without a formula, and a `RollupSpec` entry for the node overrides this declaration.
+    /// @throws Error with kind `validation` if `rollup` is not a recognized method or the builder was consumed.
+    pub fn rollup(&mut self, rollup: JsValue) -> Result<(), JsValue> {
+        let method: RollupMethod = js_wire(&rollup, "rollup")?;
+        self.builder_mut()?.rollup(method);
         Ok(())
     }
 

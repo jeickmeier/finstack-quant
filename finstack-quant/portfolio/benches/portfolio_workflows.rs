@@ -10,11 +10,11 @@ use bench_common::{
     base_date, create_attribution_portfolio, create_institutional_portfolio, create_market_context,
     create_t1_market_context,
 };
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_attribution::AttributionMethod;
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_portfolio::replay::{
-    replay_portfolio, ReplayConfig, ReplayErrorPolicy, ReplayMode, ReplayTimeline,
+    ReplayConfig, ReplayErrorPolicy, ReplayMode, ReplayTimeline, replay_portfolio,
 };
 use finstack_quant_portfolio::scenarios::{scenario_pnl, scenario_pnl_batch};
 use finstack_quant_portfolio::valuation::{PortfolioValuationOptions, RequestedMetrics};

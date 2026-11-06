@@ -1,9 +1,9 @@
 //! Principal history, exact repayment, and periodic fee regression cases.
 
-use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_cashflows::CashflowScheduleBuildSpec;
+use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::cashflow::CFKind;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 fn spec(initial: &str) -> Value {
     json!({
@@ -81,10 +81,12 @@ fn custom_principal_preserves_exact_cents_and_rejects_real_overpayment() {
         0.0,
     );
     value["notional"]["amort"]["custom_principal"]["items"][1][1]["amount"] = json!("0.21");
-    assert!(build(value)
-        .expect_err("one cent excess is not rounding noise")
-        .to_string()
-        .contains("exceeds outstanding principal"));
+    assert!(
+        build(value)
+            .expect_err("one cent excess is not rounding noise")
+            .to_string()
+            .contains("exceeds outstanding principal")
+    );
 }
 
 #[test]
@@ -107,10 +109,12 @@ fn explicit_amortization_uses_funding_on_its_effective_date() {
         let schedule = build(value.clone()).expect("repayment funded by same-date draw");
         schedule.validate().expect("valid resolved principal path");
         value["principal_events"] = json!([]);
-        assert!(build(value)
-            .expect_err("repayment must not exceed live principal")
-            .to_string()
-            .contains("exceeds outstanding principal"));
+        assert!(
+            build(value)
+                .expect_err("repayment must not exceed live principal")
+                .to_string()
+                .contains("exceeds outstanding principal")
+        );
     }
 }
 
@@ -165,10 +169,12 @@ fn periodic_fee_normalizes_basis_points_before_large_notional_multiplication() {
         .expect("fee");
     close(fee.amount.amount(), 2.5e25);
     value["fees"][0]["periodic_bp"]["bp"] = json!("100000000000000000000");
-    assert!(build(value)
-        .expect_err("unrepresentable final fee must return an error")
-        .to_string()
-        .contains("periodic fee amount exceeds Decimal range"));
+    assert!(
+        build(value)
+            .expect_err("unrepresentable final fee must return an error")
+            .to_string()
+            .contains("periodic fee amount exceeds Decimal range")
+    );
 }
 
 #[test]

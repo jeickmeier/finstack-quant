@@ -850,13 +850,15 @@ fn workload_is_bounded_before_allocation() {
     assert!(run(MAX_STORED_VALUES, 1, false).is_err());
     // 100 000 streams x 2 factors x 200 times is 40M values; the antithetic
     // partners double that past the 64M budget.
-    assert!(error_message(&{
-        let mut s = spec(multi_gbm(), &[100.0, 50.0], 199);
-        s.num_paths = MAX_CAPTURED_PATHS;
-        s.antithetic = true;
-        s
-    })
-    .contains("64000000"));
+    assert!(
+        error_message(&{
+            let mut s = spec(multi_gbm(), &[100.0, 50.0], 199);
+            s.num_paths = MAX_CAPTURED_PATHS;
+            s.antithetic = true;
+            s
+        })
+        .contains("64000000")
+    );
     assert!(run(3, 5, true).is_ok());
 }
 
@@ -1072,21 +1074,25 @@ fn json_spec_uses_defaults_and_rejects_unknown_fields() {
     let parse = |text: String| serde_json::from_str::<PathSimulationSpec>(&text);
     // Unknown key on the spec, on a parameter struct, and on a struct variant.
     assert!(parse(json(gbm, r#", "paths": 3"#)).is_err());
-    assert!(parse(json(
-        r#"{"type": "gbm", "r": 0.03, "q": 0.0, "sigma": 0.2, "vol": 0.2}"#,
-        ""
-    ))
-    .is_err());
+    assert!(
+        parse(json(
+            r#"{"type": "gbm", "r": 0.03, "q": 0.0, "sigma": 0.2, "vol": 0.2}"#,
+            ""
+        ))
+        .is_err()
+    );
     // Heston flattens its model block; the flat raw struct still denies extras.
     let heston = r#"{"type": "heston", "r": 0.03, "q": 0.0, "v0": 0.04, "kappa": 2.0,
         "theta": 0.04, "sigma_v": 0.3, "rho": -0.7"#;
     assert!(parse(json(&format!("{heston}}}"), "")).is_ok());
     assert!(parse(json(&format!(r#"{heston}, "sigma": 0.3}}"#), "")).is_err());
-    assert!(parse(json(
-        r#"{"type": "multi_brownian", "mus": [0.0], "sigmas": [0.1], "rho": 0.0}"#,
-        ""
-    ))
-    .is_err());
+    assert!(
+        parse(json(
+            r#"{"type": "multi_brownian", "mus": [0.0], "sigmas": [0.1], "rho": 0.0}"#,
+            ""
+        ))
+        .is_err()
+    );
     assert!(parse(json(r#"{"type": "local_vol"}"#, "")).is_err());
     assert!(parse(json(gbm, r#", "scheme": "exact""#)).is_err());
 

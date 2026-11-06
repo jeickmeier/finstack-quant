@@ -54,19 +54,19 @@ mod ops_roll;
 mod state_serde;
 mod stats;
 
-pub(crate) use curve_storage::for_each_context_curve;
 pub use curve_storage::CurveStorage;
+pub(crate) use curve_storage::for_each_context_curve;
 pub use stats::ContextStats;
 
 use std::sync::Arc;
 
-use crate::currency::Currency;
-use crate::dates::Date;
-use crate::money::fx::{FxMatrix, FxQuery};
-use crate::money::Money;
-use crate::types::CurveId;
 use crate::FxHashMap;
 use crate::InputError;
+use crate::currency::Currency;
+use crate::dates::Date;
+use crate::money::Money;
+use crate::money::fx::{FxMatrix, FxQuery};
+use crate::types::CurveId;
 
 use super::{
     dividends::DividendSchedule,
@@ -349,10 +349,10 @@ impl MarketContext {
 #[cfg(test)]
 mod tests {
     use super::MarketContext;
-    use crate::currency::Currency;
-    use crate::money::fx::{FxMatrix, SimpleFxProvider};
-    use crate::money::Money;
     use crate::InputError;
+    use crate::currency::Currency;
+    use crate::money::Money;
+    use crate::money::fx::{FxMatrix, SimpleFxProvider};
     use std::sync::Arc;
     use time::macros::date;
 

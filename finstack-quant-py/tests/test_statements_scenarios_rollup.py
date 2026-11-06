@@ -15,6 +15,8 @@ from finstack_quant.statements import (
     Evaluator,
     ForecastSpec,
     ModelBuilder,
+    NodeSpec,
+    NodeType,
     RollupSpec,
 )
 from finstack_quant.statements_analytics import (
@@ -164,3 +166,89 @@ def test_formula_check_reports_insufficient_data_instead_of_failing() -> None:
     (finding,) = report.findings_by_severity("warning")
     assert finding.period == "2025Q1"
     assert "insufficient data" in finding.message
+
+
+def _declared_model() -> object:
+    builder = ModelBuilder("declared")
+    builder.periods("2025Q1..Q4", None)
+    for node_id, node_type, rollup, tags, formula in [
+        ("revenue", NodeType.value(), None, ["income_statement"], None),
+        ("cash", NodeType.value(), "period_end", [], None),
+        ("tagged_balance", NodeType.value(), None, ["balance_sheet"], None),
+        ("margin", NodeType.calculated(), "formula", [], "cash / revenue"),
+    ]:
+        values = None
+        if formula is None:
+            values = list(zip(QUARTERS, [10.0, 20.0, 30.0, 40.0], strict=True))
+        builder.insert_node(NodeSpec(node_id, node_type, values=values, formula_text=formula, tags=tags, rollup=rollup))
+    return builder.build()
+
+
+def test_a_line_declares_its_rollup_method_on_the_node() -> None:
+    model = _declared_model()
+    assert model.get_node("cash").rollup == "period_end"
+    assert model.get_node("revenue").rollup is None
+    quarterly = Evaluator().evaluate(model)
+
+    annual = quarterly.rollup(model, RollupSpec("annual"))
+    assert annual.get("cash", "2025") == pytest.approx(40.0)
+    assert annual.get("margin", "2025") == pytest.approx(40.0 / 100.0)
+    # A tag decides nothing: this balance-tagged line declares no method, so it sums.
+    assert annual.get("tagged_balance", "2025") == pytest.approx(100.0)
+
+    # A spec entry overrides the declaration.
+    assert quarterly.rollup(model, RollupSpec("annual", {"cash": "sum"})).get("cash", "2025") == pytest.approx(100.0)
+
+    # declared_methods lists declarations only and rolls up to the same numbers.
+    listed = RollupSpec.declared_methods(model, "annual")
+    assert listed.methods == {"cash": "period_end", "margin": "formula"}
+    assert quarterly.rollup(model, listed).get("margin", "2025") == annual.get("margin", "2025")
+
+
+def test_builder_lines_roll_up_with_their_declared_method() -> None:
+    values = list(zip(QUARTERS, [10.0, 20.0, 30.0, 40.0], strict=True))
+    builder = ModelBuilder("builder-declared")
+    builder.periods("2025Q1..Q4", None)
+    builder.value("flow", values)
+    builder.value("balance", values).rollup("balance", "period_end")
+    builder.compute("ratio", "balance / flow").rollup("ratio", "formula")
+    mixed = builder.mixed("mixed_balance").values(values).rollup("period_end")
+    builder = mixed.build()
+    model = builder.mixed("mixed_flow").values(values).build().build()
+    assert model.get_node("mixed_balance").rollup == "period_end"
+
+    annual = Evaluator().evaluate(model).rollup(model, RollupSpec("annual"))
+    assert annual.get("flow", "2025") == pytest.approx(100.0)
+    assert annual.get("balance", "2025") == pytest.approx(40.0)
+    assert annual.get("ratio", "2025") == pytest.approx(0.4)
+    assert annual.get("mixed_balance", "2025") == pytest.approx(40.0)
+
+
+def test_builder_rollup_rejects_unknown_nodes_and_methods() -> None:
+    builder = ModelBuilder("rejects")
+    builder.periods("2025Q1..Q4", None)
+    with pytest.raises(ValueError, match="ghost"):
+        builder.rollup("ghost", "sum")
+    builder.value("cash", [(QUARTERS[0], 1.0)])
+    with pytest.raises(ValueError, match="closing"):
+        builder.rollup("cash", "closing")
+    with pytest.raises(ValueError, match="closing"):
+        builder.mixed("other").rollup("closing")
+
+
+def test_rollup_rejects_a_declared_formula_without_a_formula() -> None:
+    builder = ModelBuilder("no-formula")
+    builder.periods("2025Q1..Q4", None)
+    builder.insert_node(
+        NodeSpec(
+            "revenue",
+            NodeType.value(),
+            values=list(zip(QUARTERS, [1.0, 2.0, 3.0, 4.0], strict=True)),
+            rollup="formula",
+        )
+    )
+    model = builder.build()
+    with pytest.raises(ValueError, match="'revenue'"):
+        Evaluator().evaluate(model).rollup(model, RollupSpec("annual"))
+    with pytest.raises(ValueError, match="closing"):
+        NodeSpec("revenue", NodeType.value(), rollup="closing")

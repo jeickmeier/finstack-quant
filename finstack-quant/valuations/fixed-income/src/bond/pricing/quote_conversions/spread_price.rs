@@ -1,13 +1,13 @@
 use super::compute::clear_price_driving_overrides;
 use crate::bond::pricing::settlement::QuoteDateContext;
 use crate::bond::{Bond, CashflowSpec};
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::math::z_spread_discount_factor;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::pricer::ModelKey;
 
 /// Price from Z-spread added to zero rates in the bond's compounding convention.
@@ -166,6 +166,10 @@ pub fn price_from_dm(
 /// on the fixed-leg schedule with the discount curve's day count. Inverting:
 ///
 /// `price_pct = 1.0 + (coupon - par_rate) * fixed_annuity - ASW_mkt * float_annuity`.
+///
+/// A bond with exercise rights is rejected at every spread: the `asw_market`
+/// metric runs the swap to the worst exit, which depends on the price this solves
+/// for, while this inverse runs it to maturity.
 pub(super) fn price_from_asw_market(
     bond: &Bond,
     curves: &MarketContext,
@@ -177,6 +181,12 @@ pub(super) fn price_from_asw_market(
             "ASW market quotes require a plain fixed-coupon bond without custom cashflows"
                 .to_string(),
         ));
+    }
+    if bond.has_exercise_rights() {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "ASW market pricing for option-bearing bond '{}' requires an explicit quoted clean price to select a workout path; use OAS for model-based optional pricing",
+            bond.id.as_str()
+        )));
     }
     let (coupon_pv, float_pv, float_annuity) =
         super::annuity::settlement_asw_components(bond, curves, as_of)?;

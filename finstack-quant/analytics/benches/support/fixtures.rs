@@ -3,7 +3,7 @@
 //! No RNG crate and no clock. A seeded generator is required: these inputs
 //! feed the same code paths the correctness tests pin.
 
-use finstack_quant_analytics::Performance;
+use finstack_quant_analytics::{PanelSeriesKind, Performance, PerformancePanel};
 use finstack_quant_core::dates::{Date, PeriodKind};
 use time::Month;
 
@@ -38,13 +38,13 @@ pub fn synthetic_dates(n: usize) -> Vec<Date> {
 pub fn perf_from_returns(n: usize, seed: u64) -> Performance {
     let returns = synthetic_returns(n, seed);
     let dates = synthetic_dates(n);
-    Performance::from_returns(
+    Performance::new(&returns_panel(
         dates,
         vec![returns],
         vec!["X".to_string()],
         None,
         PeriodKind::Daily,
-    )
+    ))
     .expect("performance from returns")
 }
 
@@ -58,8 +58,14 @@ pub fn perf_panel(n_obs: usize, n_tickers: usize, seed: u64) -> Performance {
         columns.push(synthetic_returns(n_obs, seed.wrapping_add(i as u64)));
         names.push(format!("T{i}"));
     }
-    Performance::from_returns(dates, columns, names, Some("T0"), PeriodKind::Daily)
-        .expect("performance panel")
+    Performance::new(&returns_panel(
+        dates,
+        columns,
+        names,
+        Some("T0"),
+        PeriodKind::Daily,
+    ))
+    .expect("performance panel")
 }
 
 /// Symmetric unit-diagonal matrix that is indefinite for every `n >= 3`.
@@ -109,4 +115,38 @@ pub fn constrained_ls_inputs(n_assets: usize, n_factors: usize) -> (Vec<f64>, Ve
         weights.push(w);
     }
     (exposures, returns, weights)
+}
+
+/// A price panel from the five values a benchmark supplies.
+#[allow(dead_code)]
+pub fn prices_panel(
+    dates: Vec<Date>,
+    series: Vec<Vec<f64>>,
+    ticker_names: Vec<String>,
+    benchmark_ticker: Option<&str>,
+    frequency: PeriodKind,
+) -> PerformancePanel {
+    PerformancePanel {
+        dates,
+        series,
+        kind: PanelSeriesKind::Prices,
+        ticker_names,
+        benchmark_ticker: benchmark_ticker.map(str::to_owned),
+        frequency: Some(frequency),
+    }
+}
+
+/// A simple-return panel from the five values a benchmark supplies.
+#[allow(dead_code)]
+pub fn returns_panel(
+    dates: Vec<Date>,
+    series: Vec<Vec<f64>>,
+    ticker_names: Vec<String>,
+    benchmark_ticker: Option<&str>,
+    frequency: PeriodKind,
+) -> PerformancePanel {
+    PerformancePanel {
+        kind: PanelSeriesKind::Returns,
+        ..prices_panel(dates, series, ticker_names, benchmark_ticker, frequency)
+    }
 }

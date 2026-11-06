@@ -14,7 +14,12 @@ import {
   type SheetRoot,
 } from "./disclosure";
 import type { InstrumentModule } from "./schema";
-import { editValue, objectValue, structuralValidator } from "./schema-walk";
+import {
+  editValue,
+  objectValue,
+  structuralValidator,
+  withinPath,
+} from "./schema-walk";
 export type { InstrumentModule };
 export interface FieldFilter {
   allow?: readonly string[];
@@ -32,8 +37,8 @@ export type PromotedField = { path: string; node: ReactNode };
 export interface SchemaFormProps {
   /** Lazily import a generated contract module; the shared renderer follows its reachable schema. */
   module: InstrumentModule;
-  /** Initial working host values; changing this prop does not reset an active edit. Remount for another document. */
-  defaultValues?: Record<string, unknown>;
+  /** Initial working host values, usually a generated wire type; changing this prop does not reset an active edit. Remount for another document. */
+  defaultValues?: object;
   layout?: "basic" | "full";
   /** Canonical dotted field paths from the document root. Hidden fields retain their values. */
   fields?: FieldFilter;
@@ -61,7 +66,23 @@ export interface SchemaFormProps {
   /** Show “Set to null” before a nullable field is added. */
   explicitNull?: boolean;
 }
+/** TanStack's field name for an issue path from `structuralValidator`. */
+function fieldName(path: readonly PropertyKey[]): string {
+  return path.reduce<string>(
+    (name, segment) =>
+      typeof segment === "number"
+        ? `${name}[${segment}]`
+        : name
+          ? `${name}.${String(segment)}`
+          : String(segment),
+    "",
+  );
+}
 function useSchemaForm(props: SchemaFormProps) {
+  // An issue reaches the form only once an edit touches its path or submit is
+  // attempted, so every error presentation holds it alike. Submit never waits:
+  // the attempt lifts the hold before it validates.
+  const held = useRef<(name: string) => boolean>(() => false);
   const validator = useMemo(() => {
     const schema = structuralValidator(props.module);
     let snapshot: unknown;
@@ -84,9 +105,11 @@ function useSchemaForm(props: SchemaFormProps) {
         vendor: "finstack",
         validate(value: unknown) {
           const parsed = safeParse(value);
-          return parsed.success
-            ? { value: parsed.data }
-            : { issues: parsed.error.issues };
+          if (parsed.success) return { value: parsed.data };
+          const issues = parsed.error.issues.filter(
+            (issue) => !held.current(fieldName(issue.path)),
+          );
+          return issues.length ? { issues } : { value };
         },
       },
     };
@@ -156,6 +179,16 @@ function useSchemaForm(props: SchemaFormProps) {
       }
     },
   });
+  // An embedded editor has no Apply to attempt, so it shows its issues as they are.
+  // A union reports on the object holding an edited field, and a composite control
+  // edits the parent of the value at issue, so an edit counts in both directions.
+  held.current = (name) =>
+    props.actions !== false &&
+    form.state.submissionAttempts === 0 &&
+    !Object.entries(form.state.fieldMeta).some(
+      ([edited, meta]) =>
+        meta?.isDirty && (withinPath(edited, name) || withinPath(name, edited)),
+    );
   const values = useStore(form.store, (state) => state.values);
   useEffect(() => {
     const controller = new AbortController();
@@ -218,8 +251,11 @@ export function SchemaForm(props: SchemaFormProps) {
         event.stopPropagation();
         const snapshot = form.state.values;
         void form.handleSubmit().finally(() => {
-          if (form.state.values === snapshot)
-            setFocusAttempt((value) => value + 1);
+          if (form.state.values !== snapshot) return;
+          // TanStack returns before validating on a first attempt at a form it
+          // already knows is invalid, so lift the hold on the remaining issues here.
+          void form.validate("change");
+          setFocusAttempt((value) => value + 1);
         });
       }}
     >

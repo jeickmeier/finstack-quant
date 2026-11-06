@@ -418,8 +418,10 @@ def test_twrr_linked_returns_typed_result() -> None:
     _assert_contract(result, pf.LinkedReturn)
     assert result.cumulative == pytest.approx(expected["cumulative"])
     assert result.annualised == pytest.approx(expected["annualised"])
+    assert result.is_annualised is expected["is_annualised"] is True
     assert result.num_periods == 2
-    assert _frame_columns(result) == ["cumulative", "annualised", "num_periods"]
+    assert _frame_columns(result) == ["cumulative", "annualised", "is_annualised", "num_periods"]
+    assert pf.twrr_linked(returns, 0.5).is_annualised is False
 
 
 # ---------------------------------------------------------------------------

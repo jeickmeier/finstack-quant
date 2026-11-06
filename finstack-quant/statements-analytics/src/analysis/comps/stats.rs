@@ -4,11 +4,11 @@
 //! style. Provides descriptive statistics, percentile ranking, z-scores,
 //! and single-factor OLS regression for fair-value estimation.
 
-use finstack_quant_core::math::stats::{mean, quantile_sorted, OnlineCovariance, OnlineStats};
+use finstack_quant_core::math::stats::{OnlineCovariance, OnlineStats, mean, quantile_sorted};
 use serde::{Deserialize, Serialize};
 
 /// Descriptive statistics for a peer set metric.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PeerStats {
     /// Number of observations.
@@ -155,7 +155,7 @@ pub fn z_score(values: &[f64], value: f64) -> Option<f64> {
 }
 
 /// OLS regression result for fair-value estimation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct RegressionResult {
     /// Intercept (alpha).

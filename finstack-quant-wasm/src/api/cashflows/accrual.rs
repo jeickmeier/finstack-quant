@@ -5,8 +5,8 @@ use super::schedule::JsCashFlowSchedule;
 use crate::utils::wire::{js_date, js_opt_wire, js_wire};
 use crate::utils::{date_to_iso, to_js_err, to_js_value};
 use finstack_quant_cashflows::accrual::{
-    accrued_interest_amount as rust_accrued_interest_amount, AccrualConfig, AccrualIndex,
-    ExCouponRule,
+    AccrualConfig, AccrualIndex, ExCouponRule,
+    accrued_interest_amount as rust_accrued_interest_amount,
 };
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;

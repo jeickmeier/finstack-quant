@@ -271,6 +271,14 @@ export type SignConventionPolicy = "magnitude_positive" | "inflow_positive";
  */
 export type PeriodScope = "all_periods" | "actuals_only" | "forecast_only";
 /**
+ * Instrument type of a tranche in the debt stack.
+ */
+export type DebtInstrumentKind = "bond" | "convertible_bond" | "term_loan" | "revolving_credit";
+/**
+ * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
+ */
+export type DateWire = string;
+/**
  * CECL calculation methodology.
  *
  * [`CeclMethodology::PdLgdEad`] is the discounted PD-LGD-EAD integration;
@@ -320,13 +328,13 @@ export type CheckSeverity = "info" | "warning" | "error";
  */
 export type CompanyId = string;
 /**
+ * Why a [`RelativeValueReport`] has no composite score.
+ */
+export type CompositeExclusion = "no_dimensions" | "no_usable_dimension" | "non_finite_score";
+/**
  * Status of a corkscrew validation run.
  */
 export type CorkscrewStatus = "success" | "failed";
-/**
- * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
- */
-export type DateWire = string;
 /**
  * Terminal value calculation method for DCF.
  */
@@ -382,6 +390,20 @@ export type ExitMultipleBump =
   | {
       relative: number;
     };
+/**
+ * Why a configured dimension contributes no signal to the composite score.
+ *
+ * The conditions are tested in declaration order and the first that holds is
+ * reported.
+ */
+export type DimensionExclusion =
+  | "zero_weight"
+  | "no_subject_value"
+  | "no_peer_values"
+  | "no_dispersion"
+  | "no_subject_x"
+  | "regression_unusable"
+  | "no_residual_dispersion";
 /**
  * Method for computing downturn LGD from base (through-the-cycle) LGD.
  */
@@ -995,6 +1017,173 @@ export interface CapexReconciliation {
   [k: string]: unknown;
 }
 /**
+ * Debt stack by seniority at one period: leverage and coverage through each payment class, and the maturity wall.
+ */
+export interface CapitalStructureSummary {
+  /**
+   * Reporting period.
+   */
+  as_of: PeriodId;
+  /**
+   * Cash balance at the reporting period; `None` without a `cash_node`.
+   */
+  cash?: Money | null;
+  /**
+   * Currency every tranche and monetary node is in.
+   */
+  currency: Currency;
+  /**
+   * EBITDA summed over the LTM window; `None` when the window is short. It
+   * is reported when zero or negative, though the ratios are then `None`.
+   */
+  ltm_ebitda?: Money | null;
+  /**
+   * Periods of the window that are in the model and hold an EBITDA value.
+   */
+  ltm_periods_found: number;
+  /**
+   * Periods a full LTM window holds: 4 for quarters, 12 for months, and for a
+   * daily model the model's days in the trailing twelve months plus any
+   * calendar days of that year before the model's first day.
+   */
+  ltm_periods_required: number;
+  /**
+   * Non-zero balances by calendar year of final maturity, ascending. Uses the
+   * balance at the reporting period and ignores any scheduled amortization
+   * after it.
+   */
+  maturity_wall: MaturityWallBucket[];
+  /**
+   * `total_debt` less `cash`; `None` without a `cash_node`. Negative when
+   * cash exceeds debt.
+   */
+  net_debt?: Money | null;
+  /**
+   * `net_debt` over LTM EBITDA, in turns; `None` without a `cash_node` or
+   * when LTM EBITDA is partial or not positive. Negative when cash exceeds
+   * debt.
+   */
+  net_leverage?: number | null;
+  /**
+   * LTM EBITDA over the LTM interest of every tranche, in turns; `None` when
+   * LTM EBITDA is partial or not positive, or that interest is unavailable or
+   * not positive.
+   */
+  total_coverage?: number | null;
+  /**
+   * Sum of tranche balances at the reporting period.
+   */
+  total_debt: Money;
+  /**
+   * `total_debt` over LTM EBITDA, in turns; `None` when LTM EBITDA is
+   * partial or not positive.
+   */
+  total_leverage?: number | null;
+  /**
+   * Tranches by rank, then model declaration order.
+   */
+  tranches: CapitalStructureTranche[];
+}
+/**
+ * Outstanding balance falling due in one calendar year.
+ */
+export interface MaturityWallBucket {
+  /**
+   * Balance at the reporting period of the tranches maturing in `year`.
+   */
+  amount: Money;
+  /**
+   * `amount` over total debt as a decimal; `None` when total debt is not
+   * positive.
+   */
+  share_of_debt?: number | null;
+  /**
+   * Calendar year of the final maturities in this bucket.
+   */
+  year: number;
+}
+/**
+ * One debt instrument's row in a [`CapitalStructureSummary`].
+ *
+ * Tranches in one payment class are pari passu, so the figures "through this
+ * class" are the same on every tranche of the class: they count the whole
+ * class and every class senior to it.
+ */
+export interface CapitalStructureTranche {
+  /**
+   * Debt balance at the end of the reporting period. For a revolver this is
+   * the drawn balance, not the commitment.
+   */
+  balance: Money;
+  /**
+   * Total balance of this payment class and every class senior to it.
+   */
+  cumulative_debt: Money;
+  /**
+   * Instrument identifier in the capital structure.
+   */
+  id: string;
+  /**
+   * LTM EBITDA over the LTM interest of this class and every class senior to
+   * it, in turns; `None` when LTM EBITDA is partial or not positive, or that
+   * interest is unavailable or not positive.
+   */
+  interest_coverage?: number | null;
+  /**
+   * Instrument type.
+   */
+  kind: DebtInstrumentKind;
+  /**
+   * `cumulative_debt` over LTM EBITDA, in turns (`3.5` means 3.5x); `None`
+   * when LTM EBITDA is partial or not positive.
+   */
+  leverage?: number | null;
+  /**
+   * This tranche's cash plus PIK interest expense summed over the LTM window;
+   * `None` when the window is short or the instrument has no cashflows in
+   * one of its periods.
+   */
+  ltm_interest?: Money | null;
+  /**
+   * Final contractual maturity of the instrument.
+   */
+  maturity: DateWire;
+  /**
+   * Identifier of the payment class; `None` when the waterfall declares no
+   * payment classes.
+   */
+  payment_class?: string | null;
+  /**
+   * Seniority rank of the payment class; `0` is most senior. Every tranche
+   * has rank `0` when the waterfall declares no payment classes.
+   */
+  rank: number;
+  /**
+   * `balance` over total debt as a decimal (`0.25` means 25%); `None` when
+   * total debt is not positive.
+   */
+  share_of_debt?: number | null;
+}
+/**
+ * Reporting period and statement nodes for a capital structure summary.
+ */
+export interface CapitalStructureSummaryConfig {
+  /**
+   * Statement node holding the cash balance at the end of each period.
+   * Omitted, the summary has no cash, net debt or net leverage.
+   */
+  cash_node?: string | null;
+  /**
+   * Statement node holding EBITDA for each single period (not already
+   * trailing). Never inferred from a conventional name.
+   */
+  ebitda_node: string;
+  /**
+   * Reporting period: balances are read at it and the LTM window ends at it.
+   */
+  period: PeriodId;
+}
+/**
  * Configuration for CECL (US GAAP ASC 326) calculation.
  */
 export interface CeclConfig {
@@ -1380,6 +1569,10 @@ export interface FormulaCheckSpec {
  * All monetary values should be in the same currency before constructing
  * a `PeerSet`. Currency normalization is the caller's responsibility.
  * Ratios are plain scalars (e.g., `6.5` means 6.5x leverage).
+ *
+ * The serde document rejects unknown keys: a metric outside the named fields
+ * belongs in `custom`, so a misspelt named metric is an error rather than a
+ * silently missing value.
  */
 export interface CompanyMetrics {
   /**
@@ -1470,7 +1663,6 @@ export interface CompanyMetrics {
    * Yield to worst / yield to maturity.
    */
   yield_pct?: number | null;
-  [k: string]: unknown;
 }
 /**
  * Configuration for a single corkscrew account.
@@ -3412,10 +3604,14 @@ export interface ManagementFeeSpec {
 }
 /**
  * Parameter to vary in sensitivity analysis.
+ *
+ * The wire form carries exactly one of `perturbations` (absolute values) or
+ * `pct_range` (percentage moves of `base_value`, converted on deserialization
+ * as by [`Self::with_percentages`]); it always serializes the absolute values.
  */
 export interface ParameterSpec {
   /**
-   * Base value
+   * Base value in the node's units; `pct_range` moves are applied to it.
    */
   base_value: number;
   /**
@@ -3423,15 +3619,20 @@ export interface ParameterSpec {
    */
   node_id: string;
   /**
+   * Percentage moves of `base_value` (`10.0` is a 10% increase), each
+   * substituted as `base_value * (1 + pct / 100)`; give exactly one of
+   * `perturbations` and `pct_range`.
+   */
+  pct_range?: number[] | null;
+  /**
    * Period to vary
    */
   period_id: PeriodId;
   /**
-   * Absolute values to substitute for this node/period; use
-   * [`Self::with_percentages`] to construct shocks from percentage inputs.
+   * Absolute values to substitute for this node/period; give exactly one of
+   * `perturbations` and `pct_range`.
    */
-  perturbations: number[];
-  [k: string]: unknown;
+  perturbations?: number[] | null;
 }
 /**
  * Criteria for filtering companies into a peer set.
@@ -3440,19 +3641,19 @@ export interface PeerFilter {
   /**
    * ISO country codes to include (meta key: "country").
    */
-  countries: string[];
+  countries?: string[];
   /**
    * Excluded attribute tags (none may be present).
    */
-  excluded_tags: string[];
+  excluded_tags?: string[];
   /**
    * GICS industry codes to include (meta key: "gics_industry").
    */
-  gics_industries: string[];
+  gics_industries?: string[];
   /**
    * GICS sector codes to include (meta key: "gics_sector").
    */
-  gics_sectors: string[];
+  gics_sectors?: string[];
   /**
    * Market cap ceiling (inclusive).
    */
@@ -3464,16 +3665,15 @@ export interface PeerFilter {
   /**
    * Credit rating bands to include (meta key: "rating").
    */
-  ratings: string[];
+  ratings?: string[];
   /**
    * Required attribute tags (all must be present).
    */
-  required_tags: string[];
+  required_tags?: string[];
   /**
    * Arbitrary attribute selector strings (uses `Attributes::matches_selector`).
    */
-  selectors: string[];
-  [k: string]: unknown;
+  selectors?: string[];
 }
 /**
  * A set of comparable companies with their metrics.
@@ -3666,6 +3866,193 @@ export interface RegressionResult {
   [k: string]: unknown;
 }
 /**
+ * One company's row in the comps table.
+ */
+export interface RelativeValueCompany {
+  /**
+   * Company identifier.
+   */
+  id: CompanyId;
+  /**
+   * Whether this row is the subject.
+   */
+  is_subject: boolean;
+  /**
+   * One value per configured multiple, in config order; `None` when an input
+   * is missing, the denominator is not positive or the value is non-finite.
+   */
+  values: (number | null)[];
+}
+/**
+ * One configured scoring dimension, used by the composite or not.
+ */
+export interface RelativeValueDimension {
+  /**
+   * Rich/cheap sign convention of the Y metric.
+   */
+  direction: ScoreDirection;
+  /**
+   * Why the composite leaves this dimension out; `None` when it is used.
+   */
+  excluded_reason?: DimensionExclusion | null;
+  /**
+   * Dimension label.
+   */
+  label: string;
+  /**
+   * Statistics of Y over every peer that has it, including peers missing X;
+   * `None` when no peer has it.
+   */
+  peer_stats?: PeerStats | null;
+  /**
+   * Share of those peer Y values at or below the subject's, from 0 to 1.
+   */
+  percentile?: number | null;
+  /**
+   * Regression scatter: the subject first when it has both metrics, then
+   * every peer with both metrics in universe order. Empty without an X
+   * extractor.
+   */
+  points: RelativeValuePoint[];
+  /**
+   * Fit of Y on X over the peers that have both, evaluated at the subject:
+   * `fitted_value` is the subject's fitted Y and `residual` its actual less
+   * fitted, in Y units. `None` without an X extractor, without both subject
+   * metrics, or when it cannot be fitted. It can be present on an excluded
+   * dimension.
+   */
+  regression?: RegressionResult | null;
+  /**
+   * What this dimension contributes to the composite, positive meaning cheap:
+   * the standardized regression residual, or the z-score without an X
+   * extractor, with the sign set by `direction`. `None` when excluded.
+   */
+  signal?: number | null;
+  /**
+   * Subject's X metric; `None` without an X extractor or when missing or
+   * non-finite.
+   */
+  subject_x?: number | null;
+  /**
+   * Subject's Y metric; `None` when missing or non-finite.
+   */
+  subject_y?: number | null;
+  /**
+   * Configured weight, not normalized.
+   */
+  weight: number;
+  /**
+   * X metric extractor; `None` for a dimension scored on its peer
+   * distribution.
+   */
+  x?: MetricExtractor | null;
+  /**
+   * Y metric extractor.
+   */
+  y: MetricExtractor;
+  /**
+   * Subject's raw z-score within those peer Y values, before the direction
+   * convention is applied.
+   */
+  z_score?: number | null;
+}
+/**
+ * One company on a dimension's regression scatter.
+ */
+export interface RelativeValuePoint {
+  /**
+   * Company identifier.
+   */
+  company_id: CompanyId;
+  /**
+   * `intercept + slope * x` of the dimension's regression; `None` without a
+   * regression.
+   */
+  fitted_y?: number | null;
+  /**
+   * Whether this point is the subject's.
+   */
+  is_subject: boolean;
+  /**
+   * X metric.
+   */
+  x: number;
+  /**
+   * Y metric.
+   */
+  y: number;
+}
+/**
+ * One column of the comps table, summarised over the peers.
+ */
+export interface RelativeValueMultiple {
+  /**
+   * The multiple.
+   */
+  multiple: Multiple;
+  /**
+   * Statistics of the peers' computable values; `None` when no peer has one.
+   */
+  peer_stats?: PeerStats | null;
+  /**
+   * Share of those peer values at or below the subject's, from 0 to 1;
+   * `None` without a subject value or peer values.
+   */
+  percentile?: number | null;
+  /**
+   * Subject's value; `None` when it cannot be computed.
+   */
+  subject_value?: number | null;
+  /**
+   * Subject's z-score within those peer values; `None` without a subject
+   * value, with fewer than two peer values or when they do not differ.
+   */
+  z_score?: number | null;
+}
+/**
+ * Comps table, peer statistics, regression scatter and composite rich/cheap score of a subject against its filtered peers.
+ */
+export interface RelativeValueReport {
+  /**
+   * Comps table: the subject first, then the peers in universe order.
+   */
+  companies: RelativeValueCompany[];
+  /**
+   * Result of [`score_relative_value`] over the same peers and dimensions;
+   * `None` when `composite_excluded_reason` is set.
+   */
+  composite?: RelativeValueResult | null;
+  /**
+   * Why there is no composite; `None` when there is one.
+   */
+  composite_excluded_reason?: CompositeExclusion | null;
+  /**
+   * One entry per configured dimension, in config order, including excluded
+   * ones.
+   */
+  dimensions: RelativeValueDimension[];
+  /**
+   * Universe members the filter dropped, not counting the subject.
+   */
+  excluded_count: number;
+  /**
+   * One entry per configured multiple, in config order.
+   */
+  multiples: RelativeValueMultiple[];
+  /**
+   * Number of peers, excluding the subject.
+   */
+  peer_count: number;
+  /**
+   * Period basis from the config.
+   */
+  period_basis: PeriodBasis;
+  /**
+   * Subject company identifier.
+   */
+  subject_id: CompanyId;
+}
+/**
  * Composite relative value result.
  */
 export interface RelativeValueResult {
@@ -3696,6 +4083,59 @@ export interface RelativeValueResult {
    */
   peer_count: number;
   [k: string]: unknown;
+}
+/**
+ * Peer filter, period basis, scoring dimensions and multiple columns for a relative value report.
+ */
+export interface RelativeValueReportConfig {
+  /**
+   * Scoring dimensions, in the order the report returns them. May be empty
+   * when `multiples` is not.
+   */
+  dimensions: ScoringDimension[];
+  /**
+   * Screen applied to the universe. Omitted, every other company is a peer.
+   * Any [`PeerFilter`] field may be omitted, meaning no constraint on it; an
+   * unknown field is rejected.
+   */
+  filter?: PeerFilter;
+  /**
+   * Columns of the comps table, in the order the report returns them. May be
+   * empty when `dimensions` is not.
+   */
+  multiples: Multiple[];
+  /**
+   * Period basis the supplied metrics are stated on. It labels the report;
+   * the metrics are used as given.
+   */
+  period_basis: PeriodBasis;
+}
+/**
+ * Configuration for a single rich/cheap scoring dimension.
+ */
+export interface ScoringDimension {
+  /**
+   * Rich/cheap sign convention for the Y metric (default:
+   * [`ScoreDirection::HigherIsCheap`], i.e. spread-like).
+   */
+  direction?: ScoreDirection;
+  /**
+   * Human-readable label (e.g., "Spread vs Leverage").
+   */
+  label: string;
+  /**
+   * Finite, non-negative relative weight in the composite score; zero disables it.
+   */
+  weight: number;
+  /**
+   * Optional explanatory metric for single-factor regression.
+   * Omit it to score the dependent metric against its peer distribution.
+   */
+  x_extractor?: MetricExtractor | null;
+  /**
+   * How to extract the Y variable (dependent) from CompanyMetrics.
+   */
+  y_extractor: MetricExtractor;
 }
 /**
  * Definition for a single named scenario.
@@ -3943,33 +4383,6 @@ export interface ScorecardReport {
   [k: string]: unknown;
 }
 /**
- * Configuration for a single rich/cheap scoring dimension.
- */
-export interface ScoringDimension {
-  /**
-   * Rich/cheap sign convention for the Y metric (default:
-   * [`ScoreDirection::HigherIsCheap`], i.e. spread-like).
-   */
-  direction?: ScoreDirection;
-  /**
-   * Human-readable label (e.g., "Spread vs Leverage").
-   */
-  label: string;
-  /**
-   * Finite, non-negative relative weight in the composite score; zero disables it.
-   */
-  weight: number;
-  /**
-   * Optional explanatory metric for single-factor regression.
-   * Omit it to score the dependent metric against its peer distribution.
-   */
-  x_extractor?: MetricExtractor | null;
-  /**
-   * How to extract the Y variable (dependent) from CompanyMetrics.
-   */
-  y_extractor: MetricExtractor;
-}
-/**
  * Sensitivity analysis configuration.
  */
 export interface SensitivityConfig {
@@ -4082,6 +4495,36 @@ export interface VarianceConfig {
    * Periods to include in the variance report.
    */
   periods: PeriodId[];
+}
+/**
+ * Capital-structure inputs of a weighted-average cost of capital calculation.
+ */
+export interface WaccInputs {
+  /**
+   * **Pre-tax** cost of debt in decimal form: the marginal borrowing yield
+   * before the tax shield (`0.06` means `6%`).
+   */
+  cost_of_debt: number;
+  /**
+   * Required return on equity in decimal form, typically from CAPM
+   * (`0.115` means `11.5%`).
+   */
+  cost_of_equity: number;
+  /**
+   * Debt share of total capital as a decimal fraction (`0.4` means 40%
+   * debt-funded); non-negative, and sums with `equity_weight` to `1.0`.
+   */
+  debt_weight: number;
+  /**
+   * Equity share of total capital as a decimal fraction (`0.6` means 60%
+   * equity-funded); non-negative.
+   */
+  equity_weight: number;
+  /**
+   * Marginal corporate tax rate as a decimal fraction in `[0, 1]` (`0.25`
+   * means `25%`).
+   */
+  tax_rate: number;
 }
 /**
  * Probability-weighted ECL across macro scenarios with the per-scenario audit trail.

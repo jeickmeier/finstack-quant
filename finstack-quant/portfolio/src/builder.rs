@@ -36,11 +36,11 @@
 //! }
 //! ```
 
+use crate::Portfolio;
 use crate::book::{Book, BookId};
 use crate::error::{Error, Result};
 use crate::position::Position;
-use crate::types::{Entity, EntityId, DUMMY_ENTITY_ID};
-use crate::Portfolio;
+use crate::types::{DUMMY_ENTITY_ID, Entity, EntityId};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use indexmap::IndexMap;
@@ -203,10 +203,10 @@ impl PortfolioBuilder {
         let parent_id = book.parent_id.clone();
         self.books.insert(book_id.clone(), book);
 
-        if let Some(parent_id) = parent_id {
-            if let Some(parent) = self.books.get_mut(&parent_id) {
-                parent.add_child(book_id.clone());
-            }
+        if let Some(parent_id) = parent_id
+            && let Some(parent) = self.books.get_mut(&parent_id)
+        {
+            parent.add_child(book_id.clone());
         }
 
         let existing_children: Vec<_> = self

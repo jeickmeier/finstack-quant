@@ -12948,9 +12948,10 @@ export type ReserveTarget =
  * - cumulative loss is a fraction of the *original* pool balance;
  * - the OC ratio is `current pool balance ÷ rated (non-equity) note balance`;
  * - credit enhancement is the senior cushion `(pool − senior note) ÷ pool`,
- *   where the senior note is the *single* most-senior tranche by payment
- *   priority — for pari-passu senior classes (e.g. A-1/A-2) only the
- *   lowest-priority one is taken as the reference.
+ *   where the senior note is the tranche with the lowest `payment_priority`.
+ *   `TrancheStructure` gives every tranche a distinct priority, so for
+ *   same-seniority senior classes (e.g. A-1/A-2) this is the first one in
+ *   input order: A-1 is subtracted and A-2, ranked behind it, is not.
  *
  * `MaxDelinquency` reads the delinquent share of the pool, which is zero
  * unless the deal carries a `credit_model.delinquency` model.
@@ -15722,7 +15723,6 @@ export type D_46455Be5Cce6B8020E50 =
          * Volatility of log-jump size.
          */
         jump_vol: number;
-        [k: string]: unknown;
       };
     }
   | {
@@ -15740,7 +15740,6 @@ export type D_46455Be5Cce6B8020E50 =
          * Mean recovery rate at default.
          */
         mean_recovery: number;
-        [k: string]: unknown;
       };
     };
 /**
@@ -15823,7 +15822,6 @@ export type D_780B68Ee5D41351B65Ca =
          * Growth rate of the default barrier over time.
          */
         barrier_growth_rate: number;
-        [k: string]: unknown;
       };
     };
 /**
@@ -17466,6 +17464,13 @@ export interface D_572Ad1Befb7D94914652 {
    */
   call_friction_cents?: number | null;
   /**
+   * Optional government discount curve identifier for the bond `g_spread` metric.
+   *
+   * The metric subtracts this curve's par yield from the bond's yield. It
+   * enters no price, and `g_spread` is an error when it is unset.
+   */
+  government_curve_id?: D_94Cb251104De5Cf587B6 | null;
+  /**
    * Mean-reversion speed of the hazard factor (κ_λ) on the rates-credit
    * lattice, annualised.
    *
@@ -17965,7 +17970,6 @@ export interface DEe4323Acfdb49E4Fe15B {
            * Growth rate of the default barrier over time.
            */
           barrier_growth_rate: number;
-          [k: string]: unknown;
         };
       };
   /**
@@ -17992,7 +17996,6 @@ export interface DEe4323Acfdb49E4Fe15B {
            * Volatility of log-jump size.
            */
           jump_vol: number;
-          [k: string]: unknown;
         };
       }
     | {
@@ -18010,7 +18013,6 @@ export interface DEe4323Acfdb49E4Fe15B {
            * Mean recovery rate at default.
            */
           mean_recovery: number;
-          [k: string]: unknown;
         };
       };
   /**
@@ -18022,7 +18024,6 @@ export interface DEe4323Acfdb49E4Fe15B {
    * Continuously compounded risk-free rate `r`, as a decimal fraction.
    */
   risk_free_rate: number;
-  [k: string]: unknown;
 }
 /**
  * Hard threshold toggle configuration.
@@ -23827,8 +23828,8 @@ export interface RevolvingCredit {
   maturity: Date28;
   metric_pricing_overrides?: MetricPricingOverrides5;
   /**
-   * Effective-interest-rate reporting switch for the
-   * `oid_eir_amortization` metric. `None` (the default) reports with fees
+   * Effective-interest-rate reporting switch for the `oid_eir_rate` and
+   * `oid_eir_amortization` metrics. `None` (the default) reports with fees
    * included, the same as `Some(OidEirSpec::default())`.
    */
   oid_eir?: OidEirSpec | null;
@@ -58505,6 +58506,13 @@ export interface D_572Ad1Befb7D949146521 {
    */
   call_friction_cents?: number | null;
   /**
+   * Optional government discount curve identifier for the bond `g_spread` metric.
+   *
+   * The metric subtracts this curve's par yield from the bond's yield. It
+   * enters no price, and `g_spread` is an error when it is unset.
+   */
+  government_curve_id?: D_94Cb251104De5Cf587B6 | null;
+  /**
    * Mean-reversion speed of the hazard factor (κ_λ) on the rates-credit
    * lattice, annualised.
    *
@@ -58928,7 +58936,7 @@ export interface InstrumentPricingOverrides78 {
  *
  * Deserialization is routed through [`MertonModel::new_with_dynamics`] via
  * `RawMertonModel`, so a model loaded from JSON satisfies exactly the same
- * invariants as one built in Rust. The serialized field set is unchanged.
+ * invariants as one built in Rust. Unknown fields are rejected.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "d_ee4323acfdb49e4fe15b".
@@ -58956,7 +58964,6 @@ export interface DEe4323Acfdb49E4Fe15B1 {
            * Growth rate of the default barrier over time.
            */
           barrier_growth_rate: number;
-          [k: string]: unknown;
         };
       };
   /**
@@ -58983,7 +58990,6 @@ export interface DEe4323Acfdb49E4Fe15B1 {
            * Volatility of log-jump size.
            */
           jump_vol: number;
-          [k: string]: unknown;
         };
       }
     | {
@@ -59001,7 +59007,6 @@ export interface DEe4323Acfdb49E4Fe15B1 {
            * Mean recovery rate at default.
            */
           mean_recovery: number;
-          [k: string]: unknown;
         };
       };
   /**
@@ -59013,7 +59018,6 @@ export interface DEe4323Acfdb49E4Fe15B1 {
    * Continuously compounded risk-free rate `r`, as a decimal fraction.
    */
   risk_free_rate: number;
-  [k: string]: unknown;
 }
 /**
  * Scenario-only price and spread shocks.

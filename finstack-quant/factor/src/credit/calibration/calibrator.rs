@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
-use finstack_quant_core::types::IssuerId;
 use finstack_quant_core::Result;
+use finstack_quant_core::types::IssuerId;
 
 use super::assemble::{
     anchor_levels, assemble_factor_model_config, build_diagnostics, build_factor_histories,

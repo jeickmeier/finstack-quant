@@ -4,7 +4,7 @@
 //! ([`rate_bumped_market_with_hazard_replay`]), applied to the index curve in
 //! single-curve mode or to every live constituent curve in constituents mode.
 
-use crate::cds::metrics::dv01::{rate_bumped_market_with_hazard_replay, HazardReplay};
+use crate::cds::metrics::dv01::{HazardReplay, rate_bumped_market_with_hazard_replay};
 use crate::cds::metrics::{deal_quote_override, market_doc_clause};
 use crate::cds_index::{CdsIndex, IndexPricing};
 use finstack_quant_core::Result;

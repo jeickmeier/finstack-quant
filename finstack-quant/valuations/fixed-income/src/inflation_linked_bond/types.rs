@@ -1,5 +1,6 @@
 //! Inflation-Linked Bond (ILB) types and implementation.
 
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
@@ -11,10 +12,9 @@ use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::CalendarId;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::types::InstrumentId;
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::MarketDependencies;
-use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
+use rust_decimal::prelude::ToPrimitive;
 
 use finstack_quant_valuations_core::impl_instrument_base;
 
@@ -563,7 +563,7 @@ impl InflationLinkedBond {
     /// - ACT/365L settlement is after the contractual end of an unpaid coupon
     pub fn real_yield(&self, clean_price: f64, as_of: Date) -> Result<f64> {
         use crate::bond::pricing::quote_conversions::YieldCompounding;
-        use crate::bond::pricing::ytm_solver::{solve_ytm_timed, YtmPricingSpec};
+        use crate::bond::pricing::ytm_solver::{YtmPricingSpec, solve_ytm_timed};
 
         if !clean_price.is_finite() || clean_price <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -703,7 +703,7 @@ impl InflationLinkedBond {
     ///   `RealDuration` metric passes
     ///   `metric_pricing_overrides.bump_config.ytm_bump_bp`, defaulting to 1bp.
     pub fn real_duration(&self, as_of: Date, ytm_bump_bp: f64) -> Result<f64> {
-        use crate::bond::pricing::quote_conversions::{price_from_ytm_timed, YieldCompounding};
+        use crate::bond::pricing::quote_conversions::{YieldCompounding, price_from_ytm_timed};
 
         // Determine a base clean price to center the bump around
         let base_clean = self.quoted_clean_price_pct("Real duration")?;
@@ -979,9 +979,10 @@ mod tests {
                 .abs()
                 < 1e-12
         );
-        assert!(bond
-            .payment_index_ratio(payment, &market, as_of, true)
-            .is_err());
+        assert!(
+            bond.payment_index_ratio(payment, &market, as_of, true)
+                .is_err()
+        );
         bond.floor_vol_surface_id = Some("CPI-RATIO-VOL".into());
         for sigma in [0.0, 0.2] {
             let surface = VolSurface::builder("CPI-RATIO-VOL")
@@ -1152,7 +1153,7 @@ mod tests {
 
     #[test]
     fn real_duration_uses_dirty_model_price_denominator() {
-        use crate::bond::pricing::quote_conversions::{price_from_ytm_timed, YieldCompounding};
+        use crate::bond::pricing::quote_conversions::{YieldCompounding, price_from_ytm_timed};
 
         let issue = d(2024, Month::January, 15);
         let as_of = d(2024, Month::April, 15);
@@ -1217,7 +1218,7 @@ mod tests {
 
     #[test]
     fn act365l_real_yield_and_duration_retain_coupon_periods() {
-        use crate::bond::pricing::quote_conversions::{price_from_ytm_timed, YieldCompounding};
+        use crate::bond::pricing::quote_conversions::{YieldCompounding, price_from_ytm_timed};
 
         let notional = 1_000_000.0;
         let yield_rate: f64 = 0.031;
@@ -1290,9 +1291,11 @@ mod tests {
                     .filter(|&&(date, _, _)| date == payment)
                     .collect();
                 assert!(!matching.is_empty());
-                assert!(matching
-                    .iter()
-                    .all(|&&(_, actual_t, _)| (actual_t - t).abs() < 1e-12));
+                assert!(
+                    matching
+                        .iter()
+                        .all(|&&(_, actual_t, _)| (actual_t - t).abs() < 1e-12)
+                );
                 let actual_amount: f64 = matching.iter().map(|&&(_, _, cash)| cash.amount()).sum();
                 assert!((actual_amount - amount).abs() < 1e-7);
             }
@@ -1724,13 +1727,17 @@ mod tests {
                                 / std::f64::consts::TAU.sqrt();
                         }
                     }
-                    assert!((actual - expected).abs() < budget,
-                        "F={forward}, sigma={sigma}, grid={steps}, ratio={actual}, density={expected}");
+                    assert!(
+                        (actual - expected).abs() < budget,
+                        "F={forward}, sigma={sigma}, grid={steps}, ratio={actual}, density={expected}"
+                    );
                     references.push(expected);
                 }
-                assert!(references
-                    .windows(2)
-                    .all(|pair| (pair[0] - pair[1]).abs() < budget));
+                assert!(
+                    references
+                        .windows(2)
+                        .all(|pair| (pair[0] - pair[1]).abs() < budget)
+                );
             }
         }
     }

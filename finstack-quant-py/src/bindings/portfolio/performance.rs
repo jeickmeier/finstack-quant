@@ -45,6 +45,12 @@ impl PyLinkedReturn {
         self.inner.annualised
     }
 
+    /// Whether ``annualised`` was annualised: true for horizons of at least one year.
+    #[getter]
+    fn is_annualised(&self) -> bool {
+        self.inner.is_annualised
+    }
+
     /// Number of sub-periods linked.
     #[getter]
     fn num_periods(&self) -> usize {
@@ -53,19 +59,22 @@ impl PyLinkedReturn {
 
     /// Single-row :class:`pandas.DataFrame` view of the linked return.
     ///
-    /// Columns: ``cumulative``, ``annualised``, ``num_periods``.
+    /// Columns: ``cumulative``, ``annualised``, ``is_annualised``, ``num_periods``.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_object_to_single_row_dataframe_with_schema(
             py,
             &self.inner,
-            &["cumulative", "annualised", "num_periods"],
+            &["cumulative", "annualised", "is_annualised", "num_periods"],
         )
     }
 
     fn __repr__(&self) -> String {
         format!(
-            "LinkedReturn(cumulative={}, annualised={}, num_periods={})",
-            self.inner.cumulative, self.inner.annualised, self.inner.num_periods,
+            "LinkedReturn(cumulative={}, annualised={}, is_annualised={}, num_periods={})",
+            self.inner.cumulative,
+            self.inner.annualised,
+            self.inner.is_annualised,
+            self.inner.num_periods,
         )
     }
 }
@@ -112,20 +121,23 @@ fn twrr_modified_dietz(py: Python<'_>, period: &Bound<'_, PyAny>) -> PyResult<f6
 /// returns_json : str | dict | list | pandas.DataFrame
 ///     JSON array of sub-period returns as decimal fractions.
 /// horizon_years : float
-///     Full elapsed horizon in 365-day calendar years; values below one skip
-///     annualization (``annualised`` then mirrors ``cumulative``).
+///     Full elapsed horizon in 365-day calendar years; must be finite. Values
+///     below one, including zero and negative values, skip annualization
+///     (``annualised`` then mirrors ``cumulative``).
 ///
 /// Returns
 /// -------
 /// LinkedReturn
-///     Typed result with ``cumulative``, ``annualised`` and ``num_periods``.
+///     Typed result with ``cumulative``, ``annualised``, ``is_annualised``
+///     and ``num_periods``.
 ///     Use :meth:`to_json` for the raw wire string.
 ///
 /// Raises
 /// ------
 /// ValueError
-///     When any sub-period return is non-finite or at most -1, or the
-///     compounded growth factor is non-positive.
+///     When ``horizon_years`` is NaN or infinite, any sub-period return is
+///     non-finite or at most -1, or the compounded growth factor is
+///     non-positive.
 #[pyfunction]
 #[pyo3(text_signature = "(returns_json, horizon_years)")]
 fn twrr_linked(

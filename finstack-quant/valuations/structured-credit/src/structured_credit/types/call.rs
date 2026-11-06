@@ -139,12 +139,12 @@ impl CallAssumption {
                 self.price_pct
             )));
         }
-        if let CallScope::Tranche(id) = &self.scope {
-            if !tranche_ids.any(|candidate| candidate == id) {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "call_assumption names unknown debt tranche '{id}'"
-                )));
-            }
+        if let CallScope::Tranche(id) = &self.scope
+            && !tranche_ids.any(|candidate| candidate == id)
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "call_assumption names unknown debt tranche '{id}'"
+            )));
         }
         Ok(())
     }

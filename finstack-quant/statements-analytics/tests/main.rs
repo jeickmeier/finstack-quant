@@ -7,6 +7,8 @@
 mod analysis_boundary_regressions;
 #[path = "analysis_corporate.rs"]
 mod analysis_corporate;
+#[path = "analysis_covenants.rs"]
+mod analysis_covenants;
 #[path = "analysis_ecl.rs"]
 mod analysis_ecl;
 #[path = "analysis_goal_seek.rs"]
@@ -20,6 +22,8 @@ mod analysis_scenario_set;
 #[cfg(feature = "json-schema")]
 #[path = "analysis_schema_contract.rs"]
 mod analysis_schema_contract;
+#[path = "analysis_sensitivity.rs"]
+mod analysis_sensitivity;
 #[path = "checks_all.rs"]
 mod checks_all;
 #[path = "extensions_all.rs"]

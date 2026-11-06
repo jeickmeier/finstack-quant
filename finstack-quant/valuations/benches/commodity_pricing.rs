@@ -10,7 +10,7 @@
 
 #![allow(clippy::unwrap_used)]
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor, TenorUnit};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -20,6 +20,9 @@ use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
 use finstack_quant_models::types::{ExerciseStyle, OptionType};
+use finstack_quant_valuations::instruments::CommodityUnderlyingParams;
+use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::Position;
 use finstack_quant_valuations::instruments::commodity::commodity_asian_option::CommodityAsianOption;
 use finstack_quant_valuations::instruments::commodity::commodity_forward::CommodityForward;
 use finstack_quant_valuations::instruments::commodity::commodity_spot_option::CommoditySpotOption;
@@ -27,9 +30,6 @@ use finstack_quant_valuations::instruments::commodity::commodity_spread_option::
 use finstack_quant_valuations::instruments::commodity::commodity_swap::CommoditySwap;
 use finstack_quant_valuations::instruments::commodity::commodity_swaption::CommoditySwaption;
 use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
-use finstack_quant_valuations::instruments::CommodityUnderlyingParams;
-use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::Position;
 use finstack_quant_valuations::instruments::{PayReceive, PricingOptions, SettlementType};
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations_test_support::commodity_curves as commodity_curve_support;

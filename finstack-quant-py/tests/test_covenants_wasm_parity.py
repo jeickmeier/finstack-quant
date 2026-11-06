@@ -154,7 +154,7 @@ def _spec_modifiers() -> Any:
 
 
 def _engine_evaluate() -> Any:
-    engine = CovenantEngine.from_specs(covenants.cov_lite(7.0, 4.5))
+    engine = CovenantEngine.from_specs(covenants.covenant_template(covenants.CovenantTemplate.cov_lite(7.0, 4.5)))
     return {
         "pass": wire(engine.evaluate({"total_leverage": 5.0, "senior_leverage": 3.0}, "2026-03-31")),
         "breach": wire(engine.evaluate(json.dumps({"total_leverage": 7.5, "senior_leverage": 3.0}), "2026-03-31")),
@@ -241,10 +241,10 @@ CASES: dict[str, Callable[[], Any]] = {
     "covenant_modifiers": _covenant_modifiers,
     "spec_modifiers": _spec_modifiers,
     "templates": lambda: wire([
-        covenants.lbo_standard(5.0, 1.5, 1.2, 10_000_000),
-        covenants.cov_lite(7.0, 4.5),
-        covenants.real_estate(1.25, 0.08, 0.65),
-        covenants.project_finance(1.3, 1.15, 5_000_000, 4.0),
+        covenants.covenant_template(covenants.CovenantTemplate.lbo_standard(5.0, 1.5, 1.2, 10_000_000)),
+        covenants.covenant_template(covenants.CovenantTemplate.cov_lite(7.0, 4.5)),
+        covenants.covenant_template(covenants.CovenantTemplate.real_estate(1.25, 0.08, 0.65)),
+        covenants.covenant_template(covenants.CovenantTemplate.project_finance(1.3, 1.15, 5_000_000, 4.0)),
     ]),
     "engine_evaluate": _engine_evaluate,
     "engine_track_waive_and_round_trip": _engine_track,

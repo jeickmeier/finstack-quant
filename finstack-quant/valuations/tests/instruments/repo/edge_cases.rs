@@ -6,8 +6,8 @@ use finstack_quant_core::dates::{BusinessDayConvention, DayCount};
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
-use finstack_quant_valuations::instruments::rates::repo::{CollateralSpec, Repo, RepoType};
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::rates::repo::{CollateralSpec, Repo, RepoType};
 use rust_decimal::Decimal;
 
 #[test]

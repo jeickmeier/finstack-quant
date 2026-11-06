@@ -7,8 +7,8 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use crate::types::CurveId;
 use crate::FxHashMap;
+use crate::types::CurveId;
 
 use super::{CurveStorage, MarketContext};
 

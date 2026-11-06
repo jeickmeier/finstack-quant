@@ -25,11 +25,12 @@ use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::core_to_py;
 use finstack_quant_core::wire::serde_parse;
 use finstack_quant_models::closed_form::{
-    asian_option_price, bachelier_greeks, bachelier_price, barrier_option_price, black76_greeks,
-    black76_implied_vol, black76_price, black_shifted_price, black_shifted_vega, bs_greeks,
-    bs_implied_vol, bs_price, heston_price, lookback_option_price, quanto_option_price,
-    vanilla_expiry_payoff, BsGreeks, ForwardGreeks, HestonPricingParams, DEFAULT_ASIAN_AVERAGING,
-    DEFAULT_LOOKBACK_STRIKE_TYPE, DEFAULT_THETA_DAYS_PER_YEAR,
+    BsGreeks, DEFAULT_ASIAN_AVERAGING, DEFAULT_LOOKBACK_STRIKE_TYPE, DEFAULT_THETA_DAYS_PER_YEAR,
+    ForwardGreeks, HestonPricingParams, OptionCalculation, OptionCalculationResult, OptionGreeks,
+    asian_option_price, bachelier_greeks, bachelier_price, barrier_option_price,
+    black_shifted_price, black_shifted_vega, black76_greeks, black76_implied_vol, black76_price,
+    bs_greeks, bs_implied_vol, bs_price, heston_price, lookback_option_price, option_calculation,
+    quanto_option_price, vanilla_expiry_payoff,
 };
 use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
 use finstack_quant_models::types::OptionType;
@@ -200,6 +201,69 @@ wire_methods!(
     "ForwardGreeks",
     module = "finstack_quant.models._closed_form"
 );
+
+// OptionCalculationResult
+
+#[doc = pydoc!("finstack_quant.models._closed_form", "OptionCalculationResult")]
+#[pyclass(
+    name = "OptionCalculationResult",
+    module = "finstack_quant.models",
+    frozen,
+    eq,
+    from_py_object
+)]
+#[derive(Clone, PartialEq)]
+pub struct PyOptionCalculationResult {
+    pub(crate) inner: OptionCalculationResult,
+}
+
+#[pymethods]
+impl PyOptionCalculationResult {
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionCalculationResult.price")]
+    #[getter]
+    fn price(&self) -> f64 {
+        self.inner.price
+    }
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionCalculationResult.implied_vol")]
+    #[getter]
+    fn implied_vol(&self) -> f64 {
+        self.inner.implied_vol
+    }
+
+    #[doc = pydoc!("finstack_quant.models._closed_form", "OptionCalculationResult.greeks")]
+    #[getter]
+    fn greeks(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        match self.inner.greeks {
+            OptionGreeks::BlackScholes(greeks) => {
+                Ok(Py::new(py, PyBsGreeks::from_inner(greeks))?.into_any())
+            }
+            OptionGreeks::Forward(inner) => Ok(Py::new(py, PyForwardGreeks { inner })?.into_any()),
+        }
+    }
+
+    fn __repr__(&self) -> String {
+        repr_from_serde("OptionCalculationResult", &self.inner)
+    }
+}
+
+wire_methods!(
+    PyOptionCalculationResult,
+    OptionCalculationResult,
+    "OptionCalculationResult",
+    module = "finstack_quant.models._closed_form"
+);
+
+#[doc = pydoc!("finstack_quant.models._closed_form", "option_calculation")]
+#[pyfunction(name = "option_calculation")]
+#[pyo3(text_signature = "(request)")]
+fn option_calculation_wrapper(request: &Bound<'_, PyAny>) -> PyResult<PyOptionCalculationResult> {
+    let request: OptionCalculation =
+        crate::bindings::module_utils::spec_from_py(request.py(), request, "OptionCalculation")?;
+    Ok(PyOptionCalculationResult {
+        inner: option_calculation(&request).map_err(core_to_py)?,
+    })
+}
 
 // bs_price
 
@@ -587,6 +651,8 @@ fn heston_price_wrapper(
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyBsGreeks>()?;
     m.add_class::<PyForwardGreeks>()?;
+    m.add_class::<PyOptionCalculationResult>()?;
+    m.add_function(wrap_pyfunction!(option_calculation_wrapper, m)?)?;
     m.add_function(wrap_pyfunction!(bs_price_wrapper, m)?)?;
     m.add_function(wrap_pyfunction!(vanilla_expiry_payoff_wrapper, m)?)?;
     m.add_function(wrap_pyfunction!(bs_greeks_wrapper, m)?)?;

@@ -6,6 +6,8 @@ pub(crate) mod asw;
 pub(crate) mod dm;
 /// Embedded option value calculator
 pub(crate) mod embedded_option_value;
+/// G-spread (yield over a named government curve) calculator
+pub(crate) mod g_spread;
 /// I-spread (interpolated spread) calculator
 pub(crate) mod i_spread;
 /// Option-adjusted spread (OAS) calculator
@@ -21,14 +23,15 @@ pub(crate) mod ytw;
 /// Z-spread (zero-volatility spread) calculator
 pub(crate) mod z_spread;
 
+use crate::bond::Bond;
 use crate::bond::pricing::quote_conversions::japanese_simple_yield;
 use crate::bond::pricing::settlement::QuoteDateContext;
-use crate::bond::Bond;
 pub(crate) use asw::{AssetSwapMarketCalculator, AssetSwapParCalculator};
 pub use dm::DiscountMarginCalculator;
 pub(crate) use embedded_option_value::EmbeddedOptionValueCalculator;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
 use finstack_quant_valuations_core::metrics::MetricContext;
+pub(crate) use g_spread::GSpreadCalculator;
 pub(crate) use i_spread::ISpreadCalculator;
 pub(crate) use oas::OasCalculator;
 pub(crate) use prices::{CleanPriceCalculator, DirtyPriceCalculator};

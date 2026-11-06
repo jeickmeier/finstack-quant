@@ -1,7 +1,7 @@
 //! Pricing and metric helpers for interest-rate instruments.
 //!
-use crate::cap_floor::pricing::projection::{unpaid_caplets, UnpaidCaplet};
 use crate::cap_floor::pricing::CapletFloorletInputs;
+use crate::cap_floor::pricing::projection::{UnpaidCaplet, unpaid_caplets};
 use crate::cap_floor::{CapFloor, CapFloorVolType};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -35,7 +35,7 @@ pub(crate) fn resolve_caplet_volatility(
 > {
     use finstack_quant_models::volatility::VolatilityConvention;
     use finstack_quant_valuations_core::instruments::common_impl::vol_resolution::{
-        resolve_volatility, VolatilityRequest,
+        VolatilityRequest, resolve_volatility,
     };
     let convention = match cap_floor.vol_type {
         CapFloorVolType::Auto => None,

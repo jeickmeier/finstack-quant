@@ -111,5 +111,5 @@ pub use types::{
 pub use pricing::{
     path_generator::build_credit_spread_params,
     results::{EnhancedMonteCarloResult, PathResult},
-    unified::{RevolvingCreditPricer, DEFAULT_CREDIT_SPREAD_IMPLIED_VOL, DEFAULT_UTIL_CREDIT_CORR},
+    unified::{DEFAULT_CREDIT_SPREAD_IMPLIED_VOL, DEFAULT_UTIL_CREDIT_CORR, RevolvingCreditPricer},
 };

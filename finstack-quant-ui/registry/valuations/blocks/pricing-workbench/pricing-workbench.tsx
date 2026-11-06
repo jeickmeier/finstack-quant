@@ -1,5 +1,5 @@
 "use client";
-import type { ReactNode } from "react";
+import type { ComponentType, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { InstrumentForm } from "@/components/finstack/valuations/components/instrument-form/instrument-form";
@@ -15,12 +15,25 @@ import {
   VolCubeExplorer,
   type VolCubeExplorerProps,
 } from "@/components/finstack/models/components/vol-cube-explorer/vol-cube-explorer";
+import { VolSurfaceChart } from "@/components/finstack/core/components/vol-surface-chart/vol-surface-chart";
+import { SurfaceArbitrageBadge } from "@/components/finstack/models/components/surface-arbitrage-badge/surface-arbitrage-badge";
 import {
   FxSurfaceChart,
   type FxSurfaceChartProps,
 } from "@/components/finstack/models/components/fx-surface-chart/fx-surface-chart";
-import { ScenarioPanel } from "./scenario-panel";
+import { DealPresetPanel } from "./deal-preset-panel";
+import { StructuredCreditPanel } from "./structured-credit-panel";
+import { BondPanel } from "./bond-panel";
+import { ConvertiblePanel } from "./convertible-panel";
+import { LoanPanel } from "./loan-panel";
 import { CalibrationPanel } from "./calibration-panel";
+import {
+  MarketScenarioInputs,
+  MarketScenarioResults,
+  noComparison,
+  useMarketScenarioSession,
+} from "./market-scenario-panel";
+import { AttributionResults, useAttributionSession } from "./attribution-panel";
 import type { CalibrationFitChartProps } from "@/components/finstack/calibration/components/calibration-fit-chart/calibration-fit-chart";
 import { MeasuresGrid } from "@/components/finstack/valuations/components/measures-grid/measures-grid";
 import {
@@ -34,6 +47,20 @@ import { resolveModel } from "@/workers/finstack-contract";
 import type { MarketContextStateWire } from "@/lib/finstack/generated/types/market_context_state";
 import { useWorkbenchSession } from "./use-workbench-session";
 import { WorkbenchSettings } from "./workbench-settings";
+/** The analytics panel of a priced instrument type; a type absent here has no Analytics tab. */
+const analyticsPanels: Readonly<
+  Record<
+    string,
+    ComponentType<{
+      request: PriceRequest;
+      density?: "compact" | "comfortable";
+    }>
+  >
+> = {
+  bond: BondPanel,
+  convertible_bond: ConvertiblePanel,
+  term_loan: LoanPanel,
+};
 export function PricingWorkbench({
   defaultRequest,
   density = "compact",
@@ -48,6 +75,7 @@ export function PricingWorkbench({
   fxOptions,
   calibrationChartOptions,
   scenario,
+  marketScenario,
   brand,
 }: {
   /** Complete initial instrument request and canonical market snapshot. Remount to load another document. */
@@ -66,13 +94,28 @@ export function PricingWorkbench({
   /** Notify the host when a prepared instrument example is selected. */
   onInstrumentTypeChange?: (type: string) => void;
   defaultCalibrationJson?: string;
-  /** Explicit native tranche/grid inputs and display extent; offered while structured credit is selected and evaluated on its completed request only. */
+  /** Optional host seeds for the structured-credit tab, which is offered while structured credit is selected and evaluated on its completed request only. */
   scenario?: {
-    trancheId: string;
-    gridJson: string;
-    priceDomain: readonly [number, number];
+    /** Initially selected tranche; omitted means the first tranche the deal returns. */
+    trancheId?: string;
+    /** Initial native ScenarioGrid JSON; omitted means the schema's Rust example. */
+    gridJson?: string;
+    /** Display extent of the price heatmap; omitted means the returned prices about par. */
+    priceDomain?: readonly [number, number];
+    /** Registry metric ids valued on the tranche by trancheMetrics; omitted means none. */
+    trancheMetrics?: readonly string[];
   };
-  surfaceOptions?: MarketContextBrowserProps["surfaceOptions"];
+  /** Initial ScenarioSpec JSON for the "Market scenario" tab; it is applied only on request. Defaults to an empty scenario. */
+  marketScenario?: string;
+  /** Stored-surface view options. A returned `forwards` key adds the native static-arbitrage badge (null or empty: forwards not supplied); forwards are host-supplied, never inferred. */
+  surfaceOptions?(surface: MarketContextStateWire["surfaces"][number]):
+    | (NonNullable<
+        ReturnType<NonNullable<MarketContextBrowserProps["surfaceOptions"]>>
+      > & {
+        /** Forward prices in the surface's strike units: one to broadcast or one per expiry. */
+        forwards?: readonly number[] | null;
+      })
+    | undefined;
   cubeOptions?(
     cube: MarketContextStateWire["vol_cubes"][number],
   ): Omit<VolCubeExplorerProps, "cube"> | undefined;
@@ -110,6 +153,8 @@ export function PricingWorkbench({
     market,
     acceptMarket,
     setInstrument,
+    builtInstrumentJson,
+    loadInstrument,
     selectType,
     printSnapshot,
     startPrint,
@@ -117,6 +162,7 @@ export function PricingWorkbench({
     shown,
     measureMetadata,
     cashflows,
+    cashflowLadder,
     cashflowModel,
     preparing,
     printMarket,
@@ -140,6 +186,7 @@ export function PricingWorkbench({
     measureGridProps,
     pricingContext,
     completed,
+    priceDriverFields,
   } = useWorkbenchSession({
     defaultRequest,
     density,
@@ -149,6 +196,21 @@ export function PricingWorkbench({
     exampleResultTabs,
     onInstrumentTypeChange,
   });
+  const marketScenarioSession = useMarketScenarioSession(
+    marketScenario,
+    completed?.request ?? null,
+  );
+  const attributionSession = useAttributionSession(
+    completed?.request ?? null,
+    marketScenarioSession,
+  );
+  // The shocked valuation fills the existing comparison columns; no difference is computed.
+  const comparison = printSnapshot
+    ? noComparison
+    : marketScenarioSession.comparison;
+  const AnalyticsPanel = completed
+    ? analyticsPanels[completed.instrumentType]
+    : undefined;
   const dimensionalCount = dimensionalMeasureCount({
     result: shown?.result,
     metadata: measureMetadata.data,
@@ -225,6 +287,9 @@ export function PricingWorkbench({
                   <span className="finstack-kbd">2</span> Market
                 </TabsTrigger>
                 <TabsTrigger value="calibrate">Calibrate</TabsTrigger>
+                <TabsTrigger value="market-scenario">
+                  Market scenario
+                </TabsTrigger>
               </TabsList>
               <div className="finstack-workbench__context">
                 {pricingContext}
@@ -290,6 +355,9 @@ export function PricingWorkbench({
                 keepMounted
                 className="finstack-workbench__panel print:hidden"
               >
+                {type === "structured_credit" && (
+                  <DealPresetPanel onDeal={loadInstrument} />
+                )}
                 <InstrumentForm
                   key={instrumentRevision}
                   type={type}
@@ -298,7 +366,9 @@ export function PricingWorkbench({
                     exampleRequests ? Object.keys(exampleRequests) : undefined
                   }
                   showGeneratedExample={!exampleRequests}
+                  priceDriverFields={priceDriverFields}
                   defaultJson={
+                    builtInstrumentJson ??
                     exampleRequests?.[type]?.instrumentJson ??
                     ((defaultInstrumentType ?? initialType) === initialType
                       ? initial.instrumentJson
@@ -375,6 +445,29 @@ export function PricingWorkbench({
                               />
                             ) : undefined;
                           }
+                          if (field === "surfaces") {
+                            const surface = (printMarket ?? market.state)
+                                .surfaces[index]!,
+                              options = surfaceOptions?.(surface);
+                            if (!options || !("forwards" in options))
+                              return undefined;
+                            const { forwards, ...chart } = options;
+                            return (
+                              <div className="space-y-2">
+                                <SurfaceArbitrageBadge
+                                  key={surface.id}
+                                  surface={surface}
+                                  config={
+                                    forwards != null && forwards.length > 0
+                                      ? { forward_prices: [...forwards] }
+                                      : null
+                                  }
+                                  density={currentDensity}
+                                />
+                                <VolSurfaceChart surface={surface} {...chart} />
+                              </div>
+                            );
+                          }
                           if (field === "fx_delta_vol_surfaces") {
                             const surface = (printMarket ?? market.state)
                                 .fx_delta_vol_surfaces[index]!,
@@ -404,9 +497,21 @@ export function PricingWorkbench({
                     acceptMarket(json);
                     setMarketDocument((current) => ({
                       json,
+                      // finstack-arith: remount revision counter, not a value
                       revision: current.revision + 1,
                     }));
                   }}
+                />
+              </TabsContent>
+              <TabsContent
+                value="market-scenario"
+                className="finstack-workbench__panel print:hidden"
+              >
+                <MarketScenarioInputs
+                  session={marketScenarioSession}
+                  curveIds={market?.state.curves.map((curve) => curve.id) ?? []}
+                  priced={completed !== null}
+                  density={currentDensity}
                 />
               </TabsContent>
             </section>
@@ -432,6 +537,7 @@ export function PricingWorkbench({
                 <div className="finstack-workbench__summary-body">
                   <MeasuresGrid
                     {...measureGridProps}
+                    {...comparison}
                     content={printSnapshot ? "all" : "summary"}
                   />
                   {printSnapshot && shown && (
@@ -472,15 +578,25 @@ export function PricingWorkbench({
                     <TabsTrigger value="trace">
                       <span className="finstack-kbd">5</span> Trace
                     </TabsTrigger>
+                    <TabsTrigger value="market-scenario">
+                      Market scenario
+                    </TabsTrigger>
+                    <TabsTrigger value="pnl-explain">
+                      P&amp;L explain
+                    </TabsTrigger>
                     <TabsTrigger value="request">Request</TabsTrigger>
-                    {scenario && type === "structured_credit" && (
+                    {type === "structured_credit" && (
                       <TabsTrigger value="scenarios">Scenarios</TabsTrigger>
+                    )}
+                    {Object.hasOwn(analyticsPanels, type) && (
+                      <TabsTrigger value="analytics">Analytics</TabsTrigger>
                     )}
                   </TabsList>
                 </div>
                 <TabsContent value="measures" className="print:hidden">
                   <MeasuresGrid
                     {...measureGridProps}
+                    {...comparison}
                     content="measures"
                     excludeDimensional
                   />
@@ -499,6 +615,8 @@ export function PricingWorkbench({
                     <DimensionalMeasures
                       result={shown?.result}
                       metadata={measureMetadata.data}
+                      compareTo={comparison.compareTo}
+                      comparisonMetadata={comparison.comparisonMetadata}
                     />
                   )}
                 </TabsContent>
@@ -511,7 +629,9 @@ export function PricingWorkbench({
                   ) : shown ? (
                     <CashflowViewer
                       density={currentDensity}
-                      text={cashflows.data}
+                      cashflows={cashflows.data}
+                      ladder={cashflowLadder.data ?? null}
+                      ladderError={cashflowLadder.error?.message}
                       loading={
                         cashflows.isFetching ||
                         cashflows.workerStatus === "starting"
@@ -547,6 +667,18 @@ export function PricingWorkbench({
                     </p>
                   )}
                 </TabsContent>
+                <TabsContent value="market-scenario" className="print:hidden">
+                  <MarketScenarioResults
+                    session={marketScenarioSession}
+                    density={currentDensity}
+                  />
+                </TabsContent>
+                <TabsContent value="pnl-explain" className="print:hidden">
+                  <AttributionResults
+                    session={attributionSession}
+                    density={currentDensity}
+                  />
+                </TabsContent>
                 <TabsContent value="request" className="print:hidden">
                   <details
                     open={instrumentOpen}
@@ -566,30 +698,33 @@ export function PricingWorkbench({
                     text={completed ? JSON.stringify(completed.request) : null}
                   />
                 </TabsContent>
-                <TabsContent value="scenarios" className="print:hidden">
-                  {scenario &&
-                  completed?.instrumentType === "structured_credit" ? (
-                    <details
-                      onToggle={(event) =>
-                        setScenariosOpen(event.currentTarget.open)
-                      }
-                    >
-                      <summary>Scenario prices</summary>
-                      {scenariosOpen && (
-                        <ScenarioPanel
-                          request={{
-                            instrumentJson: completed.request.instrumentJson,
-                            marketJson: completed.request.marketJson,
-                            asOf: completed.request.asOf,
-                            trancheId: scenario.trancheId,
-                            gridJson: scenario.gridJson,
-                          }}
-                          priceDomain={scenario.priceDomain}
-                        />
-                      )}
-                    </details>
+                <TabsContent value="analytics" className="print:hidden">
+                  {AnalyticsPanel && completed ? (
+                    <AnalyticsPanel
+                      key={JSON.stringify(completed.request)}
+                      request={completed.request}
+                      density={currentDensity}
+                    />
                   ) : (
-                    <p>Scenario prices are unavailable for this instrument.</p>
+                    <p>Analytics are unavailable for this instrument.</p>
+                  )}
+                </TabsContent>
+                <TabsContent value="scenarios" className="print:hidden">
+                  {completed?.instrumentType === "structured_credit" ? (
+                    <StructuredCreditPanel
+                      key={completed.request.instrumentJson}
+                      request={{
+                        instrumentJson: completed.request.instrumentJson,
+                        marketJson: completed.request.marketJson,
+                        asOf: completed.request.asOf,
+                      }}
+                      seeds={scenario}
+                      scenariosOpen={scenariosOpen}
+                      onScenariosOpenChange={setScenariosOpen}
+                      density={currentDensity}
+                    />
+                  ) : (
+                    <p>Scenarios are unavailable for this instrument.</p>
                   )}
                 </TabsContent>
               </Tabs>

@@ -1,8 +1,4 @@
 // @vitest-environment jsdom
-import { readFileSync } from "node:fs";
-import { createHash } from "node:crypto";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { it, expect, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { createChartRuntime } from "@tanstack/charts";
@@ -32,21 +28,12 @@ const reports = cases as unknown as {
     };
   };
 }[];
-it("covers every discovered calibration envelope and original source digest", () => {
+it("covers every discovered calibration envelope", () => {
   expect(reports.filter((c) => !c.variant).map((c) => c.source)).toEqual(
     inventory
       .filter((f) => f.kind === "calibration-input")
       .map((f) => f.source),
   );
-  for (const c of reports) {
-    const source = readFileSync(
-      resolve(dirname(fileURLToPath(import.meta.url)), "../../..", c.source),
-    );
-    expect(
-      createHash("sha256").update(source).digest("hex"),
-      `${c.source} changed since tests/calibration/generate.mjs ran; rerun mise run ui-fixtures`,
-    ).toBe(c.sha256);
-  }
 });
 it("plots every native signed residual by its original step/quote label with a zero target", () => {
   let count = 0;

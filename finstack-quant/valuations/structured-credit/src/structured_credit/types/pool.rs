@@ -190,7 +190,8 @@ impl PoolAsset {
                     )))
                 }
                 finstack_quant_valuations_fixed_income::bond::CashflowSpec::Amortizing {
-                    base, ..
+                    base,
+                    ..
                 } => economics(base),
                 finstack_quant_valuations_fixed_income::bond::CashflowSpec::StepUp(_) => {
                     Err(finstack_quant_core::Error::Validation(
@@ -481,27 +482,31 @@ impl Default for ReinvestmentCriteria {
 }
 
 /// AssetPool-level performance statistics
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct PoolStats {
     /// Weighted-average coupon (annual decimal) of the performing fixed-rate
-    /// collateral; see [`AssetPool::wac`].
-    pub wac: f64,
+    /// collateral; `None` when there is none. See [`AssetPool::wac`].
+    pub wac: Option<f64>,
     /// Weighted-average spread in basis points of the performing collateral
-    /// that carries an explicit `spread_bp`; see
+    /// that carries an explicit `spread_bp`; `None` when there is none. See
     /// [`AssetPool::weighted_avg_spread_bp`].
-    pub weighted_avg_spread_bp: f64,
-    /// Weighted average maturity (WAM) in years.
+    pub weighted_avg_spread_bp: Option<f64>,
+    /// Weighted average maturity (WAM) in years; `None` when the pool balance is
+    /// zero.
     ///
     /// For weighted average life, which weights principal cashflows rather
     /// than maturities, use the `wal` metric.
-    pub weighted_avg_maturity: f64,
-    /// Diversity score (Moody's methodology)
-    pub diversity_score: f64,
-    /// Number of obligors
+    pub weighted_avg_maturity: Option<f64>,
+    /// Diversity score (Moody's methodology) of the assets that name an obligor;
+    /// `None` when none does. See [`AssetPool::diversity_score`].
+    pub diversity_score: Option<f64>,
+    /// Number of distinct `PoolAsset::obligor_id` values. Assets naming no obligor
+    /// are not counted.
     pub num_obligors: usize,
-    /// Number of industries
+    /// Number of distinct `PoolAsset::industry` values. Assets naming no industry
+    /// are not counted.
     pub num_industries: usize,
     /// Balance of assets currently carried as defaulted, in percent points
     /// of the current total pool balance (defaulted assets included in the
@@ -984,26 +989,24 @@ impl AssetPool {
                 self.reserve_account_rate
             )));
         }
-        if let Some(target) = self.reserve_target {
-            if target.currency() != self.currency || target.amount() < 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "reserve_target must be a non-negative {} amount, got {target}",
-                    self.currency
-                )));
-            }
+        if let Some(target) = self.reserve_target
+            && (target.currency() != self.currency || target.amount() < 0.0)
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "reserve_target must be a non-negative {} amount, got {target}",
+                self.currency
+            )));
         }
         if let ReserveInterestDestination::Tranche { tranche_id } =
             &self.reserve_interest_destination
-        {
-            if !tranches
+            && !tranches
                 .tranches
                 .iter()
                 .any(|t| t.id.as_str() == tranche_id)
-            {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "reserve_interest_destination names unknown tranche '{tranche_id}'"
-                )));
-            }
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "reserve_interest_destination names unknown tranche '{tranche_id}'"
+            )));
         }
         Ok(())
     }
@@ -1035,19 +1038,20 @@ impl AssetPool {
     /// Total pool balance
     pub fn total_balance(&self) -> finstack_quant_core::Result<Money> {
         self.validate_representation()?;
-        if let Some(instruments) = &self.instruments {
-            if self.assets.is_empty() && !instruments.is_empty() {
-                return instruments.total_balance(self.currency);
-            }
+        if let Some(instruments) = &self.instruments
+            && self.assets.is_empty()
+            && !instruments.is_empty()
+        {
+            return instruments.total_balance(self.currency);
         }
-        if let Some(lines) = &self.rep_lines {
-            if self.assets.is_empty() {
-                return lines
-                    .iter()
-                    .try_fold(Money::from((0_i64, self.currency)), |sum, line| {
-                        sum.checked_add(line.balance)
-                    });
-            }
+        if let Some(lines) = &self.rep_lines
+            && self.assets.is_empty()
+        {
+            return lines
+                .iter()
+                .try_fold(Money::from((0_i64, self.currency)), |sum, line| {
+                    sum.checked_add(line.balance)
+                });
         }
         self.assets
             .iter()
@@ -1133,9 +1137,9 @@ impl AssetPool {
     ///
     /// # Returns
     ///
-    /// The WAC as a decimal (`0.08` = 8%), or `0.0` when no performing
-    /// fixed-rate balance remains.
-    pub fn wac(&self) -> f64 {
+    /// The WAC as a decimal (`0.08` = 8%), or `None` when no performing
+    /// fixed-rate balance remains: a floating-only pool has no WAC.
+    pub fn wac(&self) -> Option<f64> {
         let is_fixed = |forward_curve_id: &Option<String>, spread_bp: Option<f64>| {
             forward_curve_id.is_none() || spread_bp.is_none()
         };
@@ -1160,11 +1164,7 @@ impl AssetPool {
             weighted += line.rate * balance;
             included += balance;
         }
-        if included > 0.0 {
-            weighted / included
-        } else {
-            0.0
-        }
+        (included > 0.0).then(|| weighted / included)
     }
 
     /// Calculate weighted average maturity (WAM)
@@ -1183,17 +1183,17 @@ impl AssetPool {
     ///
     /// # Returns
     ///
-    /// Balance-weighted remaining term in Act/365F years; `0.0` for an empty
-    /// pool.
+    /// Balance-weighted remaining term in Act/365F years; `None` when the pool
+    /// balance is zero.
     ///
     /// # Errors
     ///
     /// Returns an error when the pool balance cannot be summed (a row in a
     /// currency other than the pool's base currency).
-    pub fn weighted_avg_maturity(&self, as_of: Date) -> finstack_quant_core::Result<f64> {
+    pub fn weighted_avg_maturity(&self, as_of: Date) -> finstack_quant_core::Result<Option<f64>> {
         let total_balance = self.total_balance()?.amount();
         if total_balance == 0.0 {
-            return Ok(0.0);
+            return Ok(None);
         }
         let basis = crate::structured_credit::metrics::METRIC_TIME_BASIS;
         let mut weighted_sum = 0.0;
@@ -1208,21 +1208,26 @@ impl AssetPool {
             )?;
             weighted_sum += term * line.balance.amount();
         }
-        Ok(weighted_sum / total_balance)
+        Ok(Some(weighted_sum / total_balance))
     }
 
     /// Calculate diversity score (simplified Moody's approach)
     ///
     /// Obligor balances are summed in obligor-id order, so the score is the
     /// same bits on every build target and for any asset order.
-    pub fn diversity_score(&self) -> f64 {
-        let total_balance = match self.total_balance() {
-            Ok(b) => b.amount(),
-            Err(_) => return 0.0,
-        };
-
-        if total_balance == 0.0 {
-            return 0.0;
+    ///
+    /// # Returns
+    ///
+    /// The score over the assets that name an obligor, or `None` when the pool
+    /// balance is zero or no asset names an obligor, so no diversity is measured.
+    ///
+    /// # Errors
+    ///
+    /// Returns a currency-mismatch error when the pool balance cannot be summed
+    /// (a row in a currency other than the pool's base currency).
+    pub fn diversity_score(&self) -> finstack_quant_core::Result<Option<f64>> {
+        if self.total_balance()?.amount() == 0.0 {
+            return Ok(None);
         }
 
         // Group balances by obligor in key order: the two f64 sums below are
@@ -1241,11 +1246,7 @@ impl AssetPool {
         let sum_balances: f64 = obligor_balances.values().sum();
         let sum_squares: f64 = obligor_balances.values().map(|b| b * b).sum();
 
-        if sum_squares > 0.0 {
-            (sum_balances * sum_balances) / sum_squares
-        } else {
-            0.0
-        }
+        Ok((sum_squares > 0.0).then(|| (sum_balances * sum_balances) / sum_squares))
     }
 
     /// Base currency of the pool.
@@ -1261,13 +1262,13 @@ impl AssetPool {
                 actual,
             });
         }
-        if let Some(payment) = asset.contractual_payment {
-            if payment.currency() != self.currency {
-                return Err(finstack_quant_core::Error::CurrencyMismatch {
-                    expected: self.currency,
-                    actual: payment.currency(),
-                });
-            }
+        if let Some(payment) = asset.contractual_payment
+            && payment.currency() != self.currency
+        {
+            return Err(finstack_quant_core::Error::CurrencyMismatch {
+                expected: self.currency,
+                actual: payment.currency(),
+            });
         }
         Ok(())
     }
@@ -1298,8 +1299,8 @@ impl AssetPool {
     ///   spread (the old `rate × 10⁴` fallback inflated WAS one-sidedly).
     ///
     /// The denominator is the balance of the INCLUDED assets, so a pool of
-    /// only fixed-rate or defaulted assets returns 0.
-    pub fn weighted_avg_spread_bp(&self) -> f64 {
+    /// only fixed-rate or defaulted assets returns `None`.
+    pub fn weighted_avg_spread_bp(&self) -> Option<f64> {
         let mut weighted_spread = 0.0;
         let mut included_balance = 0.0;
         for asset in &self.assets {
@@ -1319,11 +1320,41 @@ impl AssetPool {
                 included_balance += line.balance.amount();
             }
         }
-        if included_balance == 0.0 {
-            return 0.0;
-        }
-        weighted_spread / included_balance
+        (included_balance != 0.0).then(|| weighted_spread / included_balance)
     }
+}
+
+/// Moody's weighted-average rating factor of `rows`, the only WARF formula in
+/// the crate: weighted by balance over the rows with a positive balance, with
+/// an unrated row taking the Moody's table factor for `NR`.
+///
+/// # Arguments
+///
+/// * `rows` - `(balance, rating)` of each performing row, in pool-currency
+///   units; the caller leaves defaulted rows out.
+///
+/// # Returns
+///
+/// The rating factor, or `None` when no row has a positive balance.
+///
+/// # Errors
+///
+/// Returns an error when the Moody's table has no factor for a counted rating.
+pub(crate) fn weighted_avg_rating_factor(
+    rows: impl IntoIterator<Item = (f64, Option<CreditRating>)>,
+) -> finstack_quant_core::Result<Option<f64>> {
+    let mut weighted = 0.0;
+    let mut total = 0.0;
+    for (balance, rating) in rows {
+        if balance <= 0.0 {
+            continue;
+        }
+        let factor =
+            finstack_quant_models::credit::moodys_warf_factor(rating.unwrap_or(CreditRating::NR))?;
+        weighted += balance * factor;
+        total += balance;
+    }
+    Ok((total > 0.0).then(|| weighted / total))
 }
 
 /// Calculate current pool statistics.
@@ -1378,7 +1409,7 @@ pub fn calculate_pool_stats(
         wac: pool.wac(),
         weighted_avg_spread_bp: pool.weighted_avg_spread_bp(),
         weighted_avg_maturity: pool.weighted_avg_maturity(as_of)?,
-        diversity_score: pool.diversity_score(),
+        diversity_score: pool.diversity_score()?,
         num_obligors: obligors.len(),
         num_industries: industries.len(),
         defaulted_balance_pct,
@@ -1440,7 +1471,10 @@ mod market_standards_tests {
         pool.assets.push(asset_a);
         pool.assets.push(asset_b);
 
-        let wam = pool.weighted_avg_maturity(as_of).expect("wam");
+        let wam = pool
+            .weighted_avg_maturity(as_of)
+            .expect("wam")
+            .expect("balance");
 
         // Both should be exactly 1.0
         assert!((wam - 1.0).abs() < 1e-10);

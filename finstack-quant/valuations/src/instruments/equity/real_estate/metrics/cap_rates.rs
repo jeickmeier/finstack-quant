@@ -1,6 +1,6 @@
 //! Real estate cap-rate style metrics.
 
-use crate::instruments::equity::real_estate::{pricer, RealEstateAsset};
+use crate::instruments::equity::real_estate::{RealEstateAsset, pricer};
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::Error;
 

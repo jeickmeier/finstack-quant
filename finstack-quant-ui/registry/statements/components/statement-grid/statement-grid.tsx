@@ -4,6 +4,7 @@ import type { StatementResult } from "finstack-quant-wasm";
 import type { FinancialModelSpecWire } from "@/lib/finstack/generated/types/financial_model_spec";
 import type { LinkedSelection } from "@/hooks/shared/use-linked-selection/use-linked-selection";
 import { serializeHost } from "@/lib/finstack/codec.mjs";
+import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { JsonViewer } from "@/components/finstack/shared/primitives/json-viewer/json-viewer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,9 +22,19 @@ import {
   reportStatementCell,
   statementCellKey,
   statementRows,
+  type StatementCellSource,
 } from "./projection";
 
 type Edit = { nodeId: string; periodId: string; draft: string };
+
+/** One glyph per native `CellSource`; the words come from `labelFor`, so colour never carries the meaning. */
+const sourceGlyphs: Record<StatementCellSource, string> = {
+  value: "■",
+  forecast: "↗",
+  formula: "ƒ",
+  where_masked: "∅",
+};
+const sourceOrder = Object.keys(sourceGlyphs) as StatementCellSource[];
 
 /** A report-style, period-aligned statement with optional inline edits of explicit values. */
 export function StatementGrid({
@@ -99,10 +110,18 @@ export function StatementGrid({
     monetaryCurrencies.size === 0
       ? "Ratios in native units"
       : `${monetaryCurrencies.size === 1 ? [...monetaryCurrencies][0] : "Monetary amounts"}${displayMode === "millions" ? " in millions" : monetaryCurrencies.size === 1 ? " · exact amounts" : " at exact values"}${hasScalar ? " · ratios in native units" : ""}`;
+  const sources = new Set(
+    rows.flatMap((row) =>
+      Object.values(row.cells).flatMap((cell) =>
+        cell.source ? [cell.source] : [],
+      ),
+    ),
+  );
   const groups: { label: string; count: number }[] = [];
   for (const period of model.periods) {
     const label = period.is_actual ? "Historical" : "Forecast";
     const last = groups.at(-1);
+    // finstack-arith: column span of the period group header
     if (last?.label === label) last.count += 1;
     else groups.push({ label, count: 1 });
   }
@@ -125,6 +144,21 @@ export function StatementGrid({
           {unitLabel}
         </span>
       </div>
+      {sources.size > 0 && (
+        <p className="flex flex-wrap gap-x-3 text-[11px] text-muted-foreground">
+          <span>Cell source:</span>
+          {sourceOrder
+            .filter((source) => sources.has(source))
+            .map((source) => (
+              <span key={source}>
+                <span aria-hidden="true" className="mr-1 font-mono">
+                  {sourceGlyphs[source]}
+                </span>
+                {labelFor(source)}
+              </span>
+            ))}
+        </p>
+      )}
       <Table className="min-w-max border-collapse border-y border-foreground/70 bg-card tabular-nums">
         <TableCaption className="sr-only">
           {title} by reporting period
@@ -211,6 +245,10 @@ export function StatementGrid({
                     node?.value_type?.type === "monetary"
                       ? node.value_type.currency
                       : null;
+                  const source = cell?.source;
+                  const sourceText = source
+                    ? `, ${labelFor(source).toLowerCase()} source`
+                    : "";
                   return (
                     <TableCell
                       key={period.id}
@@ -287,13 +325,9 @@ export function StatementGrid({
                           type="button"
                           variant="ghost"
                           size="sm"
-                          aria-label={`${row.name} ${period.id}${editable ? ", edit value" : ", inspect value"}`}
-                          title={
-                            editable
-                              ? `${cell?.text ?? "—"} · click to edit exact ${unit ?? "scalar"} value`
-                              : cell?.text
-                          }
-                          className={`w-full justify-end font-mono text-xs ${emphasized ? "font-semibold" : "font-normal"}`}
+                          aria-label={`${row.name} ${period.id}${sourceText}${editable ? ", edit value" : ", inspect value"}`}
+                          title={`${cell?.text ?? "—"}${source ? ` · ${labelFor(source)}` : ""}${editable ? ` · click to edit exact ${unit ?? "scalar"} value` : ""}`}
+                          className={`w-full justify-end gap-2 font-mono text-xs ${emphasized ? "font-semibold" : "font-normal"} ${source === "where_masked" ? "text-muted-foreground" : ""}`}
                           onClick={() => {
                             link?.select(key);
                             if (editable) {
@@ -311,6 +345,15 @@ export function StatementGrid({
                             }
                           }}
                         >
+                          {source && (
+                            <span
+                              aria-hidden="true"
+                              data-source={source}
+                              className="mr-auto text-[10px] font-normal text-muted-foreground"
+                            >
+                              {sourceGlyphs[source]}
+                            </span>
+                          )}
                           {reportStatementCell(cell, displayMode)}
                         </Button>
                       )}

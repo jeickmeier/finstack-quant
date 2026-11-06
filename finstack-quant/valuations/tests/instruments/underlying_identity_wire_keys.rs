@@ -7,6 +7,7 @@
 
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
+use finstack_quant_valuations::instruments::VolatilityDependency;
 use finstack_quant_valuations::instruments::commodity::commodity_asian_option::CommodityAsianOption;
 use finstack_quant_valuations::instruments::commodity::commodity_forward::CommodityForward;
 use finstack_quant_valuations::instruments::commodity::commodity_future::CommodityFuture;
@@ -27,9 +28,8 @@ use finstack_quant_valuations::instruments::fx::fx_future::FxFuture;
 use finstack_quant_valuations::instruments::fx::fx_spot::FxSpot;
 use finstack_quant_valuations::instruments::fx::ndf::Ndf;
 use finstack_quant_valuations::instruments::fx::quanto_option::QuantoOption;
-use finstack_quant_valuations::instruments::VolatilityDependency;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 /// Serialize `instrument`, insert `retired` with `value` into the object at

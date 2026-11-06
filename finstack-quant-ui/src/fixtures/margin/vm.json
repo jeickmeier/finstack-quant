@@ -1,0 +1,507 @@
+{
+  "description": "Native variation margin under margin.csaSpecUsdRegulatory() on 2024-06-17: the Rust CSA presets, the canonical CSA, three VmResults with Rust's call decision and net margin, a margin-call schedule over four exposures and the contractual call dates from 2024-06-14 to 2024-06-28.",
+  "presets": {
+    "usd": {
+      "id": "USD-REGULATORY-CSA",
+      "base_currency": "USD",
+      "calendar_id": "usny",
+      "vm_params": {
+        "threshold": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "mta": {
+          "amount": "500000",
+          "currency": "USD"
+        },
+        "rounding": {
+          "amount": "10000",
+          "currency": "USD"
+        },
+        "independent_amount": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "frequency": "daily",
+        "settlement_lag": 1
+      },
+      "im_params": {
+        "methodology": "simm",
+        "mpor_days": 10,
+        "threshold": {
+          "amount": "50000000",
+          "currency": "USD"
+        },
+        "mta": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "segregated": true
+      },
+      "eligible_collateral": {
+        "eligible": [
+          {
+            "asset_class": "cash",
+            "haircut": 0,
+            "fx_haircut_addon": 0.08
+          },
+          {
+            "asset_class": "government_bonds",
+            "min_rating": "AA-",
+            "maturity_constraints": {
+              "min_remaining_years": null,
+              "max_remaining_years": 1
+            },
+            "haircut": 0.005,
+            "fx_haircut_addon": 0.08
+          },
+          {
+            "asset_class": "government_bonds",
+            "min_rating": "AA-",
+            "maturity_constraints": {
+              "min_remaining_years": 1,
+              "max_remaining_years": 5
+            },
+            "haircut": 0.02,
+            "fx_haircut_addon": 0.08
+          },
+          {
+            "asset_class": "government_bonds",
+            "min_rating": "AA-",
+            "maturity_constraints": {
+              "min_remaining_years": 5,
+              "max_remaining_years": null
+            },
+            "haircut": 0.04,
+            "fx_haircut_addon": 0.08
+          }
+        ],
+        "rehypothecation_allowed": false
+      },
+      "call_timing": {
+        "notification_deadline_hours": 13,
+        "response_deadline_hours": 2,
+        "dispute_resolution_days": 1,
+        "delivery_grace_days": 0
+      },
+      "collateral_curve_id": "USD-OIS"
+    },
+    "eur": {
+      "id": "EUR-REGULATORY-CSA",
+      "base_currency": "EUR",
+      "calendar_id": "target2",
+      "vm_params": {
+        "threshold": {
+          "amount": "0",
+          "currency": "EUR"
+        },
+        "mta": {
+          "amount": "500000",
+          "currency": "EUR"
+        },
+        "rounding": {
+          "amount": "10000",
+          "currency": "EUR"
+        },
+        "independent_amount": {
+          "amount": "0",
+          "currency": "EUR"
+        },
+        "frequency": "daily",
+        "settlement_lag": 1
+      },
+      "im_params": {
+        "methodology": "simm",
+        "mpor_days": 10,
+        "threshold": {
+          "amount": "50000000",
+          "currency": "EUR"
+        },
+        "mta": {
+          "amount": "0",
+          "currency": "EUR"
+        },
+        "segregated": true
+      },
+      "eligible_collateral": {
+        "eligible": [
+          {
+            "asset_class": "cash",
+            "haircut": 0,
+            "fx_haircut_addon": 0.08
+          },
+          {
+            "asset_class": "government_bonds",
+            "min_rating": "AA-",
+            "maturity_constraints": {
+              "min_remaining_years": null,
+              "max_remaining_years": 1
+            },
+            "haircut": 0.005,
+            "fx_haircut_addon": 0.08
+          },
+          {
+            "asset_class": "government_bonds",
+            "min_rating": "AA-",
+            "maturity_constraints": {
+              "min_remaining_years": 1,
+              "max_remaining_years": 5
+            },
+            "haircut": 0.02,
+            "fx_haircut_addon": 0.08
+          },
+          {
+            "asset_class": "government_bonds",
+            "min_rating": "AA-",
+            "maturity_constraints": {
+              "min_remaining_years": 5,
+              "max_remaining_years": null
+            },
+            "haircut": 0.04,
+            "fx_haircut_addon": 0.08
+          }
+        ],
+        "rehypothecation_allowed": false
+      },
+      "call_timing": {
+        "notification_deadline_hours": 13,
+        "response_deadline_hours": 2,
+        "dispute_resolution_days": 1,
+        "delivery_grace_days": 0
+      },
+      "collateral_curve_id": "EUR-ESTR"
+    },
+    "gbp": {
+      "id": "CSA-GBP",
+      "base_currency": "GBP",
+      "calendar_id": "gblo",
+      "vm_params": {
+        "threshold": {
+          "amount": "0",
+          "currency": "GBP"
+        },
+        "mta": {
+          "amount": "500000",
+          "currency": "GBP"
+        },
+        "rounding": {
+          "amount": "10000",
+          "currency": "GBP"
+        },
+        "independent_amount": {
+          "amount": "0",
+          "currency": "GBP"
+        },
+        "frequency": "daily",
+        "settlement_lag": 1
+      },
+      "im_params": {
+        "methodology": "simm",
+        "mpor_days": 10,
+        "threshold": {
+          "amount": "50000000",
+          "currency": "GBP"
+        },
+        "mta": {
+          "amount": "0",
+          "currency": "GBP"
+        },
+        "segregated": true
+      },
+      "eligible_collateral": {
+        "eligible": [
+          {
+            "asset_class": "cash",
+            "haircut": 0,
+            "fx_haircut_addon": 0.08
+          },
+          {
+            "asset_class": "government_bonds",
+            "min_rating": "AA-",
+            "maturity_constraints": {
+              "min_remaining_years": null,
+              "max_remaining_years": 1
+            },
+            "haircut": 0.005,
+            "fx_haircut_addon": 0.08
+          },
+          {
+            "asset_class": "government_bonds",
+            "min_rating": "AA-",
+            "maturity_constraints": {
+              "min_remaining_years": 1,
+              "max_remaining_years": 5
+            },
+            "haircut": 0.02,
+            "fx_haircut_addon": 0.08
+          },
+          {
+            "asset_class": "government_bonds",
+            "min_rating": "AA-",
+            "maturity_constraints": {
+              "min_remaining_years": 5,
+              "max_remaining_years": null
+            },
+            "haircut": 0.04,
+            "fx_haircut_addon": 0.08
+          }
+        ],
+        "rehypothecation_allowed": false
+      },
+      "call_timing": {
+        "notification_deadline_hours": 13,
+        "response_deadline_hours": 2,
+        "dispute_resolution_days": 1,
+        "delivery_grace_days": 0
+      },
+      "collateral_curve_id": "GBP-SONIA"
+    }
+  },
+  "csaJson": "{\"id\":\"USD-REGULATORY-CSA\",\"base_currency\":\"USD\",\"calendar_id\":\"usny\",\"vm_params\":{\"threshold\":{\"amount\":\"0\",\"currency\":\"USD\"},\"mta\":{\"amount\":\"500000\",\"currency\":\"USD\"},\"rounding\":{\"amount\":\"10000\",\"currency\":\"USD\"},\"independent_amount\":{\"amount\":\"0\",\"currency\":\"USD\"},\"frequency\":\"daily\",\"settlement_lag\":1},\"im_params\":{\"methodology\":\"simm\",\"mpor_days\":10,\"threshold\":{\"amount\":\"50000000\",\"currency\":\"USD\"},\"mta\":{\"amount\":\"0\",\"currency\":\"USD\"},\"segregated\":true},\"eligible_collateral\":{\"eligible\":[{\"asset_class\":\"cash\",\"haircut\":0,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":null,\"max_remaining_years\":1},\"haircut\":0.005,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":1,\"max_remaining_years\":5},\"haircut\":0.02,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":5,\"max_remaining_years\":null},\"haircut\":0.04,\"fx_haircut_addon\":0.08}],\"rehypothecation_allowed\":false},\"call_timing\":{\"notification_deadline_hours\":13,\"response_deadline_hours\":2,\"dispute_resolution_days\":1,\"delivery_grace_days\":0},\"collateral_curve_id\":\"USD-OIS\"}",
+  "canonical": "{\"id\":\"USD-REGULATORY-CSA\",\"base_currency\":\"USD\",\"calendar_id\":\"usny\",\"vm_params\":{\"threshold\":{\"amount\":\"0\",\"currency\":\"USD\"},\"mta\":{\"amount\":\"500000\",\"currency\":\"USD\"},\"rounding\":{\"amount\":\"10000\",\"currency\":\"USD\"},\"independent_amount\":{\"amount\":\"0\",\"currency\":\"USD\"},\"frequency\":\"daily\",\"settlement_lag\":1},\"im_params\":{\"methodology\":\"simm\",\"mpor_days\":10,\"threshold\":{\"amount\":\"50000000\",\"currency\":\"USD\"},\"mta\":{\"amount\":\"0\",\"currency\":\"USD\"},\"segregated\":true},\"eligible_collateral\":{\"eligible\":[{\"asset_class\":\"cash\",\"haircut\":0,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":null,\"max_remaining_years\":1},\"haircut\":0.005,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":1,\"max_remaining_years\":5},\"haircut\":0.02,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":5,\"max_remaining_years\":null},\"haircut\":0.04,\"fx_haircut_addon\":0.08}],\"rehypothecation_allowed\":false},\"call_timing\":{\"notification_deadline_hours\":13,\"response_deadline_hours\":2,\"dispute_resolution_days\":1,\"delivery_grace_days\":0},\"collateral_curve_id\":\"USD-OIS\"}",
+  "vm": {
+    "collect": {
+      "request": {
+        "csaJson": "{\"id\":\"USD-REGULATORY-CSA\",\"base_currency\":\"USD\",\"calendar_id\":\"usny\",\"vm_params\":{\"threshold\":{\"amount\":\"0\",\"currency\":\"USD\"},\"mta\":{\"amount\":\"500000\",\"currency\":\"USD\"},\"rounding\":{\"amount\":\"10000\",\"currency\":\"USD\"},\"independent_amount\":{\"amount\":\"0\",\"currency\":\"USD\"},\"frequency\":\"daily\",\"settlement_lag\":1},\"im_params\":{\"methodology\":\"simm\",\"mpor_days\":10,\"threshold\":{\"amount\":\"50000000\",\"currency\":\"USD\"},\"mta\":{\"amount\":\"0\",\"currency\":\"USD\"},\"segregated\":true},\"eligible_collateral\":{\"eligible\":[{\"asset_class\":\"cash\",\"haircut\":0,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":null,\"max_remaining_years\":1},\"haircut\":0.005,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":1,\"max_remaining_years\":5},\"haircut\":0.02,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":5,\"max_remaining_years\":null},\"haircut\":0.04,\"fx_haircut_addon\":0.08}],\"rehypothecation_allowed\":false},\"call_timing\":{\"notification_deadline_hours\":13,\"response_deadline_hours\":2,\"dispute_resolution_days\":1,\"delivery_grace_days\":0},\"collateral_curve_id\":\"USD-OIS\"}",
+        "exposure": 1000000,
+        "postedCollateral": 0,
+        "asOf": "2024-06-17"
+      },
+      "report": {
+        "result": {
+          "date": "2024-06-17",
+          "gross_exposure": {
+            "amount": "1000000",
+            "currency": "USD"
+          },
+          "net_exposure": {
+            "amount": "1000000",
+            "currency": "USD"
+          },
+          "post_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "collect_amount": {
+            "amount": "1000000",
+            "currency": "USD"
+          },
+          "settlement_date": "2024-06-18",
+          "threshold": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "independent_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "collateral_balance": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "unrounded_call": {
+            "amount": "1000000",
+            "currency": "USD"
+          },
+          "mta": {
+            "amount": "500000",
+            "currency": "USD"
+          },
+          "rounding_increment": {
+            "amount": "10000",
+            "currency": "USD"
+          }
+        },
+        "requiresCall": true,
+        "netMargin": -1000000
+      }
+    },
+    "post": {
+      "request": {
+        "csaJson": "{\"id\":\"USD-REGULATORY-CSA\",\"base_currency\":\"USD\",\"calendar_id\":\"usny\",\"vm_params\":{\"threshold\":{\"amount\":\"0\",\"currency\":\"USD\"},\"mta\":{\"amount\":\"500000\",\"currency\":\"USD\"},\"rounding\":{\"amount\":\"10000\",\"currency\":\"USD\"},\"independent_amount\":{\"amount\":\"0\",\"currency\":\"USD\"},\"frequency\":\"daily\",\"settlement_lag\":1},\"im_params\":{\"methodology\":\"simm\",\"mpor_days\":10,\"threshold\":{\"amount\":\"50000000\",\"currency\":\"USD\"},\"mta\":{\"amount\":\"0\",\"currency\":\"USD\"},\"segregated\":true},\"eligible_collateral\":{\"eligible\":[{\"asset_class\":\"cash\",\"haircut\":0,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":null,\"max_remaining_years\":1},\"haircut\":0.005,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":1,\"max_remaining_years\":5},\"haircut\":0.02,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":5,\"max_remaining_years\":null},\"haircut\":0.04,\"fx_haircut_addon\":0.08}],\"rehypothecation_allowed\":false},\"call_timing\":{\"notification_deadline_hours\":13,\"response_deadline_hours\":2,\"dispute_resolution_days\":1,\"delivery_grace_days\":0},\"collateral_curve_id\":\"USD-OIS\"}",
+        "exposure": -750000,
+        "postedCollateral": 0,
+        "asOf": "2024-06-17"
+      },
+      "report": {
+        "result": {
+          "date": "2024-06-17",
+          "gross_exposure": {
+            "amount": "-750000",
+            "currency": "USD"
+          },
+          "net_exposure": {
+            "amount": "-750000",
+            "currency": "USD"
+          },
+          "post_amount": {
+            "amount": "750000",
+            "currency": "USD"
+          },
+          "collect_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "settlement_date": "2024-06-18",
+          "threshold": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "independent_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "collateral_balance": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "unrounded_call": {
+            "amount": "-750000",
+            "currency": "USD"
+          },
+          "mta": {
+            "amount": "500000",
+            "currency": "USD"
+          },
+          "rounding_increment": {
+            "amount": "10000",
+            "currency": "USD"
+          }
+        },
+        "requiresCall": true,
+        "netMargin": 750000
+      }
+    },
+    "below-mta": {
+      "request": {
+        "csaJson": "{\"id\":\"USD-REGULATORY-CSA\",\"base_currency\":\"USD\",\"calendar_id\":\"usny\",\"vm_params\":{\"threshold\":{\"amount\":\"0\",\"currency\":\"USD\"},\"mta\":{\"amount\":\"500000\",\"currency\":\"USD\"},\"rounding\":{\"amount\":\"10000\",\"currency\":\"USD\"},\"independent_amount\":{\"amount\":\"0\",\"currency\":\"USD\"},\"frequency\":\"daily\",\"settlement_lag\":1},\"im_params\":{\"methodology\":\"simm\",\"mpor_days\":10,\"threshold\":{\"amount\":\"50000000\",\"currency\":\"USD\"},\"mta\":{\"amount\":\"0\",\"currency\":\"USD\"},\"segregated\":true},\"eligible_collateral\":{\"eligible\":[{\"asset_class\":\"cash\",\"haircut\":0,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":null,\"max_remaining_years\":1},\"haircut\":0.005,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":1,\"max_remaining_years\":5},\"haircut\":0.02,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":5,\"max_remaining_years\":null},\"haircut\":0.04,\"fx_haircut_addon\":0.08}],\"rehypothecation_allowed\":false},\"call_timing\":{\"notification_deadline_hours\":13,\"response_deadline_hours\":2,\"dispute_resolution_days\":1,\"delivery_grace_days\":0},\"collateral_curve_id\":\"USD-OIS\"}",
+        "exposure": 100000,
+        "postedCollateral": 0,
+        "asOf": "2024-06-17"
+      },
+      "report": {
+        "result": {
+          "date": "2024-06-17",
+          "gross_exposure": {
+            "amount": "100000",
+            "currency": "USD"
+          },
+          "net_exposure": {
+            "amount": "100000",
+            "currency": "USD"
+          },
+          "post_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "collect_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "settlement_date": "2024-06-18",
+          "threshold": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "independent_amount": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "collateral_balance": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "unrounded_call": {
+            "amount": "100000",
+            "currency": "USD"
+          },
+          "mta": {
+            "amount": "500000",
+            "currency": "USD"
+          },
+          "rounding_increment": {
+            "amount": "10000",
+            "currency": "USD"
+          }
+        },
+        "requiresCall": false,
+        "netMargin": 0
+      }
+    }
+  },
+  "calls": {
+    "request": {
+      "csaJson": "{\"id\":\"USD-REGULATORY-CSA\",\"base_currency\":\"USD\",\"calendar_id\":\"usny\",\"vm_params\":{\"threshold\":{\"amount\":\"0\",\"currency\":\"USD\"},\"mta\":{\"amount\":\"500000\",\"currency\":\"USD\"},\"rounding\":{\"amount\":\"10000\",\"currency\":\"USD\"},\"independent_amount\":{\"amount\":\"0\",\"currency\":\"USD\"},\"frequency\":\"daily\",\"settlement_lag\":1},\"im_params\":{\"methodology\":\"simm\",\"mpor_days\":10,\"threshold\":{\"amount\":\"50000000\",\"currency\":\"USD\"},\"mta\":{\"amount\":\"0\",\"currency\":\"USD\"},\"segregated\":true},\"eligible_collateral\":{\"eligible\":[{\"asset_class\":\"cash\",\"haircut\":0,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":null,\"max_remaining_years\":1},\"haircut\":0.005,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":1,\"max_remaining_years\":5},\"haircut\":0.02,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":5,\"max_remaining_years\":null},\"haircut\":0.04,\"fx_haircut_addon\":0.08}],\"rehypothecation_allowed\":false},\"call_timing\":{\"notification_deadline_hours\":13,\"response_deadline_hours\":2,\"dispute_resolution_days\":1,\"delivery_grace_days\":0},\"collateral_curve_id\":\"USD-OIS\"}",
+      "exposures": [
+        ["2024-06-17", 1000000],
+        ["2024-06-18", 1200000],
+        ["2024-06-20", -500000],
+        ["2024-06-21", -450000]
+      ],
+      "initialCollateral": 0
+    },
+    "result": [
+      {
+        "call_date": "2024-06-17",
+        "settlement_date": "2024-06-18",
+        "call_type": "variation_margin_collect",
+        "amount": {
+          "amount": "1000000",
+          "currency": "USD"
+        },
+        "mtm_trigger": {
+          "amount": "1000000",
+          "currency": "USD"
+        },
+        "threshold": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "mta_applied": {
+          "amount": "500000",
+          "currency": "USD"
+        }
+      },
+      {
+        "call_date": "2024-06-20",
+        "settlement_date": "2024-06-21",
+        "call_type": "variation_margin_post",
+        "amount": {
+          "amount": "1500000",
+          "currency": "USD"
+        },
+        "mtm_trigger": {
+          "amount": "-500000",
+          "currency": "USD"
+        },
+        "threshold": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "mta_applied": {
+          "amount": "500000",
+          "currency": "USD"
+        }
+      }
+    ]
+  },
+  "callDates": {
+    "request": {
+      "csaJson": "{\"id\":\"USD-REGULATORY-CSA\",\"base_currency\":\"USD\",\"calendar_id\":\"usny\",\"vm_params\":{\"threshold\":{\"amount\":\"0\",\"currency\":\"USD\"},\"mta\":{\"amount\":\"500000\",\"currency\":\"USD\"},\"rounding\":{\"amount\":\"10000\",\"currency\":\"USD\"},\"independent_amount\":{\"amount\":\"0\",\"currency\":\"USD\"},\"frequency\":\"daily\",\"settlement_lag\":1},\"im_params\":{\"methodology\":\"simm\",\"mpor_days\":10,\"threshold\":{\"amount\":\"50000000\",\"currency\":\"USD\"},\"mta\":{\"amount\":\"0\",\"currency\":\"USD\"},\"segregated\":true},\"eligible_collateral\":{\"eligible\":[{\"asset_class\":\"cash\",\"haircut\":0,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":null,\"max_remaining_years\":1},\"haircut\":0.005,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":1,\"max_remaining_years\":5},\"haircut\":0.02,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":5,\"max_remaining_years\":null},\"haircut\":0.04,\"fx_haircut_addon\":0.08}],\"rehypothecation_allowed\":false},\"call_timing\":{\"notification_deadline_hours\":13,\"response_deadline_hours\":2,\"dispute_resolution_days\":1,\"delivery_grace_days\":0},\"collateral_curve_id\":\"USD-OIS\"}",
+      "start": "2024-06-14",
+      "end": "2024-06-28"
+    },
+    "result": [
+      "2024-06-14",
+      "2024-06-17",
+      "2024-06-18",
+      "2024-06-20",
+      "2024-06-21",
+      "2024-06-24",
+      "2024-06-25",
+      "2024-06-26",
+      "2024-06-27",
+      "2024-06-28"
+    ]
+  }
+}

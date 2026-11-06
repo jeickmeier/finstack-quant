@@ -16,12 +16,12 @@ mod fixtures;
 
 use std::hint::black_box;
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use finstack_quant_analytics::regression::constrained_least_squares;
 use finstack_quant_analytics::{Performance, ReturnKind};
 use finstack_quant_core::dates::PeriodKind;
 use finstack_quant_core::math::linalg::{
-    nearest_correlation, validate_correlation_matrix, NearestCorrelationOpts,
+    NearestCorrelationOpts, nearest_correlation, validate_correlation_matrix,
 };
 use fixtures::{
     constrained_ls_inputs, near_correlation_needs_repair, perf_from_returns, perf_panel,
@@ -61,13 +61,13 @@ fn scaling_from_returns(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
             b.iter(|| {
                 black_box(
-                    Performance::from_returns(
+                    Performance::new(&fixtures::returns_panel(
                         dates.clone(),
                         vec![rets.clone()],
                         vec!["X".to_string()],
                         None,
                         PeriodKind::Daily,
-                    )
+                    ))
                     .expect("from_returns"),
                 )
             });

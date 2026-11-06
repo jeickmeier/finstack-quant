@@ -24,8 +24,8 @@ fn money_market_maturity_separates_principal_from_interest_income() {
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::money::Money;
-    use finstack_quant_valuations::instruments::rates::repo::{CollateralSpec, Repo};
     use finstack_quant_valuations::instruments::Instrument;
+    use finstack_quant_valuations::instruments::rates::repo::{CollateralSpec, Repo};
 
     let principal = Money::from((1_000_000_i64, Currency::USD));
     let start = date!(2025 - 01 - 06);

@@ -265,11 +265,23 @@ def test_diagnostics_dataframe_preserves_join_order_values_and_empty_dtypes(empt
     def money(amount: float, currency: str = "USD") -> dict[str, str]:
         return {"amount": str(amount), "currency": currency}
 
+    # Rust's record of a period that moved no waterfall cash.
+    no_waterfall = {
+        "total_available": money(0.0),
+        "tier_allocations": [],
+        "payment_records": [],
+        "coverage_tests": [],
+        "diverted_amounts": [],
+        "diverted_cash": money(0.0),
+        "remaining_cash": money(0.0),
+        "had_diversions": False,
+        "remaining_interest": money(0.0),
+        "remaining_principal": money(0.0),
+        "principal_used_for_interest": money(0.0),
+        "recovery_proceeds": money(0.0),
+    }
     values = {
         "pool_factor": 0.8,
-        "wac": 0.06,
-        "weighted_avg_spread_bp": 125.0,
-        "warf": 250.0,
         "interest_collections": 2.0,
         "principal_collections": 3.0,
         "defaults": 4.0,
@@ -283,13 +295,24 @@ def test_diagnostics_dataframe_preserves_join_order_values_and_empty_dtypes(empt
         "servicer_advances_outstanding": 12.0,
         "excess_spread": 0.02,
     }
-    scalars = {"pool_factor", "wac", "weighted_avg_spread_bp", "warf", "excess_spread"}
+    # Averages are nullable: this period's floating population is empty.
+    averages = {"wac": 0.06, "weighted_avg_spread_bp": None, "warf": 250.0}
+    scalars = {"pool_factor", "excess_spread"}
     dates = [] if empty else ["2024-02-15", "2024-01-15", "2024-02-15", "2024-03-15"]
     balances = [] if empty else [101.0, 102.0, 103.0, 104.0]
     periods = []
     for date, balance in zip(dates, balances, strict=True):
         period = {key: value if key in scalars else money(value) for key, value in values.items()}
-        periods.append({"payment_date": date, "pool_balance": money(balance), "coverage_tests": [], **period})
+        periods.append({
+            "payment_date": date,
+            "pool_balance": money(balance),
+            "coverage_tests": [],
+            "waterfall": {**no_waterfall, "payment_date": date},
+            "non_waterfall_payments": [],
+            "credit_enhancement": [],
+            **averages,
+            **period,
+        })
     diagnostics = SimulationDiagnostics.from_json(
         json.dumps({
             "periods": periods,
@@ -306,11 +329,14 @@ def test_diagnostics_dataframe_preserves_join_order_values_and_empty_dtypes(empt
             "reserve_replenished": money(0.0),
             "early_amortization_date": None,
             "tranche_draws": [],
+            "first_breaches": [],
         })
     )
     expected = {"date": pd.Series(dates, dtype="str"), "pool_balance": pd.Series(balances, dtype="float64")}
     for key, value in values.items():
         expected[key] = pd.Series([value] * len(dates), dtype="float64")
+    for key, value in averages.items():
+        expected[key] = pd.Series([value] * len(dates), dtype="Float64")
     expected["reserve_interest"] = pd.Series([] if empty else [21.0, 22.0, 21.0, 0.0], dtype="float64")
     columns = [
         "date",

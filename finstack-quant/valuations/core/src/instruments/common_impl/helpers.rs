@@ -556,12 +556,12 @@ pub(crate) fn compute_metrics_dyn(
     let market_ref: Arc<MarketContext> = Arc::clone(&context.curves);
     instrument.seed_metric_context(&mut context, market_ref.as_ref(), as_of);
 
-    if !metrics.is_empty() {
-        if let PricingDispatch::Registered { model, registry } = context.clone_pricer_dispatch() {
-            let key = crate::pricer::PricerKey::new(instrument.key(), model);
-            if let Some(pricer) = registry.get_pricer(key) {
-                pricer.seed_metric_context(&mut context, metrics)?;
-            }
+    if !metrics.is_empty()
+        && let PricingDispatch::Registered { model, registry } = context.clone_pricer_dispatch()
+    {
+        let key = crate::pricer::PricerKey::new(instrument.key(), model);
+        if let Some(pricer) = registry.get_pricer(key) {
+            pricer.seed_metric_context(&mut context, metrics)?;
         }
     }
 
@@ -617,10 +617,7 @@ pub(crate) fn compute_metrics_dyn(
         .computed
         .iter()
         .filter_map(|(metric_id, value)| {
-            if (metric_id.is_custom()
-                || metric_id == &crate::metrics::MetricId::BucketedVegaResidual
-                || metric_id == &crate::metrics::MetricId::ThetaPeriodDays
-                || metric_id == &crate::metrics::MetricId::CarryDecompositionDegenerate)
+            if (metric_id.is_custom() || MetricId::SIDE_OUTPUT_METRICS.contains(metric_id))
                 && !measures.contains_key(metric_id)
             {
                 Some((metric_id, *value))
@@ -677,7 +674,7 @@ mod tests {
     use crate::metrics::MetricId;
     use crate::pricer::InstrumentType;
     use finstack_quant_cashflows::builder::CashFlowSchedule;
-    use finstack_quant_cashflows::{schedule_from_dated_flows, ScheduleBuildOpts};
+    use finstack_quant_cashflows::{ScheduleBuildOpts, schedule_from_dated_flows};
     use finstack_quant_core::config::FinstackConfig;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount};
@@ -733,8 +730,8 @@ mod tests {
         let err = resolve_mc_paths(None, too_many).expect_err("default above cap must error");
         assert!(err.to_string().contains("MAX_MC_PATHS"));
     }
-    use time::macros::date;
     use time::Duration;
+    use time::macros::date;
 
     #[derive(Clone)]
     struct StubInstrument {
@@ -916,8 +913,8 @@ mod tests {
     }
 
     #[test]
-    fn instrument_value_default_applies_scenario_price_shock_once(
-    ) -> finstack_quant_core::Result<()> {
+    fn instrument_value_default_applies_scenario_price_shock_once()
+    -> finstack_quant_core::Result<()> {
         // base_value returns 123.45; -10% shock should yield 111.105 from value(),
         // and value() == price_with_metrics().value to guarantee a single application.
         let mut instrument = StubInstrument::new("STUB-VALUE");
@@ -1028,9 +1025,10 @@ mod tests {
         )
         .err()
         .map(|err| err.to_string());
-        assert!(err
-            .as_deref()
-            .is_some_and(|msg| msg.contains("Failed to fetch dividend yield")));
+        assert!(
+            err.as_deref()
+                .is_some_and(|msg| msg.contains("Failed to fetch dividend yield"))
+        );
     }
 
     #[test]
@@ -1048,9 +1046,10 @@ mod tests {
         )
         .err()
         .map(|err| err.to_string());
-        assert!(err
-            .as_deref()
-            .is_some_and(|msg| msg.contains("should be a unitless scalar")));
+        assert!(
+            err.as_deref()
+                .is_some_and(|msg| msg.contains("should be a unitless scalar"))
+        );
     }
 
     #[test]
@@ -1543,28 +1542,32 @@ mod realized_inflation_index_tests {
             .with_publication_dates(index.get_publication_dates())
             .expect("release dates");
         let stale_market = market.clone().insert_inflation_index(stale);
-        assert!(resolve_reference_inflation(
-            &stale_market,
-            "US-CPI",
-            date!(2026 - 04 - 01),
-            release,
-            InflationLag::Months(3),
-            SeriesInterpolation::Step,
-        )
-        .is_err());
+        assert!(
+            resolve_reference_inflation(
+                &stale_market,
+                "US-CPI",
+                date!(2026 - 04 - 01),
+                release,
+                InflationLag::Months(3),
+                SeriesInterpolation::Step,
+            )
+            .is_err()
+        );
 
         let no_metadata = InflationIndex::new("US-CPI", vec![(december, 305.0)], Currency::USD)
             .expect("history with no publication policy");
         let no_metadata_market = market.insert_inflation_index(no_metadata);
-        assert!(resolve_reference_inflation(
-            &no_metadata_market,
-            "US-CPI",
-            date!(2026 - 04 - 01),
-            date!(2026 - 01 - 20),
-            InflationLag::Months(3),
-            SeriesInterpolation::Step,
-        )
-        .is_err());
+        assert!(
+            resolve_reference_inflation(
+                &no_metadata_market,
+                "US-CPI",
+                date!(2026 - 04 - 01),
+                date!(2026 - 01 - 20),
+                InflationLag::Months(3),
+                SeriesInterpolation::Step,
+            )
+            .is_err()
+        );
     }
 
     #[test]

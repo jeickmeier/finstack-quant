@@ -259,7 +259,7 @@ pub(super) struct PyStressAttribution {
 }
 
 impl PyStressAttribution {
-    fn from_inner(inner: StressAttribution) -> Self {
+    pub(super) fn from_inner(inner: StressAttribution) -> Self {
         Self { inner }
     }
 }

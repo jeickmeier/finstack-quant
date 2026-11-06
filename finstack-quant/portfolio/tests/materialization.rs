@@ -547,10 +547,12 @@ fn claimed_content_hash_is_verified() {
     let report = report_from_error(
         load(&bundle, &cache, &LoadLimits::default()).expect_err("hash mismatch"),
     );
-    assert!(report
-        .diagnostics
-        .iter()
-        .any(|diagnostic| diagnostic.code == "portfolio/content-hash-mismatch"));
+    assert!(
+        report
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "portfolio/content-hash-mismatch")
+    );
     assert_eq!(cache.len(), 0);
 }
 
@@ -563,10 +565,12 @@ fn producer_dependency_claim_is_cross_checked() {
     let report = report_from_error(
         load(&bundle, &cache, &LoadLimits::default()).expect_err("dependency mismatch"),
     );
-    assert!(report
-        .diagnostics
-        .iter()
-        .any(|diagnostic| diagnostic.code == "portfolio/dependencies-mismatch"));
+    assert!(
+        report
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "portfolio/dependencies-mismatch")
+    );
 }
 
 #[test]
@@ -887,8 +891,7 @@ fn typed_artifact_field_roundtrips_without_materializing_as_null() {
     let decoded: PortfolioMaterializationEnvelope =
         serde_json::from_slice(&bytes).expect("deserialize");
     assert_eq!(
-        serde_json::to_value(&decoded.instruments[0].envelope).expect("serialize envelope")
-            ["schema"],
+        serde_json::to_value(&decoded.instruments[0].envelope).expect("serialize envelope")["schema"],
         "finstack_quant.instrument/1"
     );
 }
@@ -915,10 +918,12 @@ fn book_depth_is_bounded_before_runtime_materialization() {
         Portfolio::validate_materialization(&bytes, &cache, &LoadLimits::default())
             .expect_err("excessive book depth"),
     );
-    assert!(report
-        .diagnostics
-        .iter()
-        .any(|issue| issue.code == "portfolio/book-depth-limit"));
+    assert!(
+        report
+            .diagnostics
+            .iter()
+            .any(|issue| issue.code == "portfolio/book-depth-limit")
+    );
     assert!(Portfolio::from_materialization(&bytes, &cache, &LoadLimits::default()).is_err());
 }
 

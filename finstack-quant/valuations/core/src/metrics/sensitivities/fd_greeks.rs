@@ -26,10 +26,10 @@ use crate::metrics::finite_difference::{
 };
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::{MetricCalculator, MetricContext};
+use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::Result;
 
 /// Minimum absolute bump size for spot-based finite differences.
 ///
@@ -54,7 +54,7 @@ use finstack_quant_core::Result;
 /// this floor.
 pub const MIN_ABSOLUTE_BUMP: f64 = 1e-8;
 
-use crate::metrics::finite_difference::{min_grid_vol, VOL_POINTS_PER_ABSOLUTE_VOL};
+use crate::metrics::finite_difference::{VOL_POINTS_PER_ABSOLUTE_VOL, min_grid_vol};
 
 /// Common random number seed scenario for MC greek calculations.
 ///
@@ -1135,11 +1135,13 @@ mod tests {
 
         let seeded = clone_with_crn_seed(&instrument).expect("instrument overrides");
 
-        assert!(instrument
-            .instrument_overrides
-            .model_config
-            .mc_seed_scenario
-            .is_none());
+        assert!(
+            instrument
+                .instrument_overrides
+                .model_config
+                .mc_seed_scenario
+                .is_none()
+        );
         assert_eq!(
             seeded
                 .instrument_overrides

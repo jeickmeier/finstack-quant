@@ -7,8 +7,8 @@
 //!
 //! # Wire contract
 //!
-//! Columns map `String` to `Utf8`, `f64` to `Float64`, `u32` to `UInt32`, and
-//! `i64` to `Int64`; the nullable envelope variant controls Arrow field
+//! Columns map `String` to `Utf8`, `f64` to `Float64`, `u32` to `UInt32`,
+//! `i64` to `Int64`, and `bool` to `Boolean`; the nullable envelope variant controls Arrow field
 //! nullability. Non-finite floats remain representable.
 //!
 //! Field metadata key [`ROLE_METADATA_KEY`] (`finstack:role`) stores
@@ -44,7 +44,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use arrow::array::{ArrayRef, Float64Array, Int64Array, StringArray, UInt32Array};
+use arrow::array::{ArrayRef, BooleanArray, Float64Array, Int64Array, StringArray, UInt32Array};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::error::ArrowError;
 use arrow::record_batch::{RecordBatch, RecordBatchOptions};
@@ -115,6 +115,11 @@ fn column_to_arrow(column: &TableColumn) -> Result<(Field, ArrayRef)> {
             DataType::Int64,
             true,
             Arc::new(Int64Array::from(values.clone())),
+        ),
+        TableColumnData::Boolean(values) => (
+            DataType::Boolean,
+            false,
+            Arc::new(BooleanArray::from(values.clone())),
         ),
     };
 
@@ -192,7 +197,7 @@ pub fn to_record_batch(table: &TableEnvelope) -> Result<RecordBatch> {
 
 #[cfg(test)]
 mod tests {
-    use super::{to_record_batch, METADATA_KEY, ROLE_METADATA_KEY};
+    use super::{METADATA_KEY, ROLE_METADATA_KEY, to_record_batch};
     use arrow::datatypes::DataType;
     use finstack_quant_core::table::{
         TableColumn, TableColumnData, TableColumnRole, TableEnvelope,
@@ -200,7 +205,7 @@ mod tests {
     use indexmap::IndexMap;
     use serde_json::json;
 
-    /// Envelope exercising all eight column variants, roles, and metadata.
+    /// Envelope exercising all nine column variants, roles, and metadata.
     fn full_envelope() -> TableEnvelope {
         let mut column_meta = IndexMap::new();
         column_meta.insert("unit".to_string(), json!("USD"));
@@ -237,6 +242,7 @@ mod tests {
                     "qty_opt",
                     TableColumnData::NullableInt64(vec![Some(-1), None]),
                 ),
+                TableColumn::new("flag", TableColumnData::Boolean(vec![true, false])),
             ],
             table_meta,
         )
@@ -247,10 +253,10 @@ mod tests {
     fn to_record_batch_maps_types_nullability_and_metadata() {
         let batch = to_record_batch(&full_envelope()).unwrap();
         assert_eq!(batch.num_rows(), 2);
-        assert_eq!(batch.num_columns(), 8);
+        assert_eq!(batch.num_columns(), 9);
 
         let schema = batch.schema();
-        let expected: [(&str, DataType, bool); 8] = [
+        let expected: [(&str, DataType, bool); 9] = [
             ("id", DataType::Utf8, false),
             ("label", DataType::Utf8, true),
             ("pv", DataType::Float64, false),
@@ -259,6 +265,7 @@ mod tests {
             ("count_opt", DataType::UInt32, true),
             ("qty", DataType::Int64, false),
             ("qty_opt", DataType::Int64, true),
+            ("flag", DataType::Boolean, false),
         ];
         for (i, (name, dtype, nullable)) in expected.iter().enumerate() {
             let field = schema.field(i);

@@ -1,0 +1,49 @@
+{
+  "cases": {
+    "blended": {
+      "inputs": {
+        "equity_weight": 0.6,
+        "cost_of_equity": 0.115,
+        "debt_weight": 0.4,
+        "cost_of_debt": 0.06,
+        "tax_rate": 0.25
+      },
+      "rate": 0.08700000000000001
+    },
+    "zero": {
+      "inputs": {
+        "equity_weight": 1,
+        "cost_of_equity": 0,
+        "debt_weight": 0,
+        "cost_of_debt": 0,
+        "tax_rate": 0
+      },
+      "rate": 0
+    }
+  },
+  "errors": {
+    "weights": {
+      "inputs": {
+        "equity_weight": 0.6,
+        "cost_of_equity": 0.115,
+        "debt_weight": 0.5,
+        "cost_of_debt": 0.06,
+        "tax_rate": 0.25
+      },
+      "message": "Evaluation error: WACC requires capital weights summing to 1.0 within 1e-6, got equity_weight=0.600000 + debt_weight=0.500000 = 1.100000"
+    },
+    "tax": {
+      "inputs": {
+        "equity_weight": 0.6,
+        "cost_of_equity": 0.115,
+        "debt_weight": 0.4,
+        "cost_of_debt": 0.06,
+        "tax_rate": 1.5
+      },
+      "message": "Evaluation error: WACC requires a tax_rate in [0, 1] (decimal form), got 1.500000"
+    },
+    "empty": {
+      "message": "inputs: inputs.equity_weight is NaN, which JSON cannot represent"
+    }
+  }
+}

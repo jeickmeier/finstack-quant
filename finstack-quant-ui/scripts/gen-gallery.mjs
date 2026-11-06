@@ -1,10 +1,9 @@
-import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { createHash } from "node:crypto";
+import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import prettier from "prettier";
 import { loadRegistry } from "shadcn/registry";
 import { checkGraph, visualTypes, workerRoles } from "./check-registry.mjs";
+import { emit, emitSource, sha256 } from "./fixture-output.mjs";
 const root = fileURLToPath(new URL("../", import.meta.url)),
   repo = path.resolve(root, "..");
 const output = path.join(repo, "docs-site/src/components/registry-gallery");
@@ -27,10 +26,45 @@ const nonvisual = registry.items.filter((item) => !visualTypes.has(item.type));
 const sources = {
   bond: "src/fixtures/results/bond.json",
   market: "tests/core/market-browser/cases.json",
+  curveQuery: "tests/core/curve-query/cases.json",
   cubes: "tests/core/cubes/cases.json",
   calibration: "tests/calibration/cases.json",
   scenarios: "tests/valuations/scenario-table/cases.json",
+  trancheAnalytics: "tests/valuations/scenario-table/tranche-analytics.json",
+  poolReport: "tests/valuations/scenario-table/pool-report.json",
+  waterfallReport: "tests/valuations/scenario-table/waterfall-report.json",
+  dealCharts: "tests/valuations/scenario-table/deal-charts.json",
+  equityTranche: "tests/valuations/scenario-table/equity-tranche.json",
   cashflows: "tests/valuations/cashflows/cases.json",
+  loanYield: "tests/valuations/loan-yield/cases.json",
+  bondCredit: "tests/valuations/bond-credit/cases.json",
+  convertibleCard: "tests/valuations/convertible/cases.json",
+  workoutLadder: "tests/valuations/workout-ladder/cases.json",
+  quoteConverter: "tests/valuations/quote-converter/cases.json",
+  marketScenario: "tests/scenarios/application/cases.json",
+  horizonReturn: "tests/scenarios/horizon/cases.json",
+  scenarioTemplates: "tests/scenarios/templates/cases.json",
+  pnlAttribution: "tests/attribution/cases.json",
+  performance: "tests/analytics/explicit.json",
+  benchmark: "tests/analytics/benchmark.json",
+  correlation: "tests/analytics/correlation/cases.json",
+  credit: "tests/models/credit/migration.json",
+  merton: "tests/models/credit/merton.json",
+  scorecard: "tests/models/credit/scorecard.json",
+  positionRisk: "tests/models/risk/cases.json",
+  options: "tests/models/options/cases.json",
+  liabilityManagement: "tests/models/liability-management/cases.json",
+  recovery: "tests/models/recovery/cases.json",
+  simm: "src/fixtures/margin/simm.json",
+  vm: "src/fixtures/margin/vm.json",
+  portfolioValuation: "tests/portfolio/gallery.json",
+  scenarioPnl: "tests/portfolio/scenario-pnl.json",
+  portfolioMargin: "tests/portfolio/margin/cases.json",
+  portfolioWorkbench: "tests/portfolio/workbench/cases.json",
+  portfolioExposures: "tests/portfolio/exposures/cases.json",
+  portfolioAttribution: "tests/portfolio/attribution/cases.json",
+  portfolioReturns: "tests/portfolio/returns/cases.json",
+  portfolioBrinson: "tests/portfolio/brinson/cases.json",
   details: "tests/valuations/details/cases.json",
   irsInstrument:
     "../finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",
@@ -39,26 +73,55 @@ const sources = {
   statementChecks: "src/fixtures/statements/analyst-checks.json",
   statementResult: "src/fixtures/statements/analyst-result.json",
   statementCheckReport: "src/fixtures/statements/analyst-check-report.json",
+  statementPlSummary: "src/fixtures/statements/analyst-pl-summary.json",
+  statementCreditAssessment:
+    "src/fixtures/statements/analyst-credit-assessment.json",
+  statementDcfAssumptions:
+    "src/fixtures/statements/analyst-dcf-assumptions.json",
+  statementDcf: "src/fixtures/statements/analyst-dcf.json",
+  statementDcfSensitivity:
+    "src/fixtures/statements/analyst-dcf-sensitivity.json",
+  statementLboConfig: "src/fixtures/statements/analyst-lbo-config.json",
+  statementLbo: "src/fixtures/statements/analyst-lbo.json",
+  statementSensitivityRun:
+    "src/fixtures/statements/analyst-sensitivity-run.json",
+  statementSensitivity: "src/fixtures/statements/analyst-sensitivity.json",
+  statementGoalSeekRun: "src/fixtures/statements/analyst-goal-seek-run.json",
+  statementGoalSeek: "src/fixtures/statements/analyst-goal-seek.json",
+  statementBridge: "src/fixtures/statements/analyst-bridge.json",
+  statementBacktest: "src/fixtures/statements/analyst-backtest.json",
+  statementMonteCarloConfig:
+    "src/fixtures/statements/analyst-monte-carlo-config.json",
+  statementMonteCarlo: "src/fixtures/statements/analyst-monte-carlo.json",
+  statementMonteCarloBreach:
+    "src/fixtures/statements/analyst-monte-carlo-breach.json",
+  statementScenarios: "src/fixtures/statements/analyst-scenarios.json",
+  statementScenarioDiff: "src/fixtures/statements/analyst-scenario-diff.json",
   statementRollForward2025Q2:
     "src/fixtures/statements/roll-forward-2025Q2.json",
   statementRollForward2025Q3:
     "src/fixtures/statements/roll-forward-2025Q3.json",
   statementRollForward2025Q4:
     "src/fixtures/statements/roll-forward-2025Q4.json",
+  waccCalculator: "tests/statements/wacc/cases.json",
+  normalizationEditor: "tests/statements/normalization/cases.json",
+  capitalStructureReport: "tests/statements/capital-structure/cases.json",
+  relativeValueTable: "tests/statements/relative-value/cases.json",
+  statementExport: "tests/statements/export/cases.json",
+  covenantSeries: "src/fixtures/covenants/analyst-covenant-series.json",
+  covenantEngine: "src/fixtures/covenants/analyst-covenants.json",
+  covenantForecastConfig: "src/fixtures/covenants/analyst-forecast-config.json",
+  covenantBreachForecast: "src/fixtures/covenants/analyst-breach-forecast.json",
 };
-// The example maps are hand-written: an unmapped visual item renders a crashing gallery page.
-const exampleMaps = (
-  await Promise.all(
-    ["primitives.tsx", "components.tsx"].map((name) =>
-      readFile(path.join(output, name), "utf8"),
-    ),
-  )
-).join("\n");
-const unmapped = visual
-  .map((item) => item.name)
-  .filter((name) => !exampleMaps.includes(`"${name}":`));
-if (unmapped.length)
-  throw new Error(`Visual items without a gallery example: ${unmapped}`);
+const unwritten = [];
+for (const { name } of visual)
+  await access(path.join(output, "examples", `${name}.tsx`)).catch(() =>
+    unwritten.push(name),
+  );
+if (unwritten.length)
+  throw new Error(
+    `Visual items without a gallery example (examples/<name>.tsx): ${unwritten}`,
+  );
 const data = {},
   provenance = [];
 for (const [name, relative] of Object.entries(sources)) {
@@ -66,7 +129,7 @@ for (const [name, relative] of Object.entries(sources)) {
   data[name] = JSON.parse(bytes);
   provenance.push({
     path: path.relative(repo, path.join(root, relative)),
-    sha256: createHash("sha256").update(bytes).digest("hex"),
+    sha256: sha256(bytes),
   });
 }
 const pricingCases = JSON.parse(
@@ -130,32 +193,38 @@ const imports = nonvisual.map((item) => {
     );
   return `${JSON.stringify(item.name)}:()=>Promise.all([${targets.map((target) => `import(${JSON.stringify("@/" + target.replace(/\.tsx?$/, ""))})`).join(",")}]).then(modules=>({name:${JSON.stringify(item.name)},modules:modules.length}))`;
 });
-const files = {
-  "inventory.json":
-    JSON.stringify(
-      {
-        visual,
-        nonvisual: nonvisual.map(({ name, type }) => ({ name, type })),
-        provenance,
-      },
-      null,
-      2,
-    ) + "\n",
-  "data.json": JSON.stringify(data, null, 2) + "\n",
-  "imports.ts": `// Generated consumer import harness. Worker entry executes only through FinstackProvider.\nexport const importHarnesses={${imports.join(",\n")}};\n`,
+const exampleId = (name) =>
+  name.replace(/(?:^|-)(\w)/g, (_, letter) => letter.toUpperCase());
+const components = `"use client";
+// Generated by finstack-quant-ui/scripts/gen-gallery.mjs: the example of every visual item, examples/<name>.tsx.
+import type { ExampleProps } from "./examples/props";
+${visual.map(({ name }) => `import { Example as ${exampleId(name)} } from "./examples/${name}";`).join("\n")}
+const examples = {
+${visual.map(({ name }) => `  ${JSON.stringify(name)}: ${exampleId(name)},`).join("\n")}
 };
-if (!process.argv.includes("--check")) await mkdir(output, { recursive: true });
-for (const [name, text] of Object.entries(files)) {
-  const file = path.join(output, name),
-    formatted = await prettier.format(text, {
-      ...(await prettier.resolveConfig(file)),
-      filepath: file,
-    });
-  if (process.argv.includes("--check")) {
-    if ((await readFile(file, "utf8")) !== formatted)
-      throw new Error(`Stale gallery artifact: ${name}`);
-  } else await writeFile(file, formatted);
+export function ComponentDemo({
+  name,
+  ...props
+}: ExampleProps & { name: string }) {
+  const Example = examples[name as keyof typeof examples];
+  if (!Example) throw new Error(\`Missing gallery example: \${name}\`);
+  return <Example {...props} />;
 }
+`;
+await emit(
+  path.join(output, "inventory.json"),
+  JSON.stringify({
+    visual,
+    nonvisual: nonvisual.map(({ name, type }) => ({ name, type })),
+    provenance,
+  }),
+);
+await emit(path.join(output, "data.json"), JSON.stringify(data));
+await emitSource(
+  path.join(output, "imports.ts"),
+  `// Generated consumer import harness. Worker entry executes only through FinstackProvider.\nexport const importHarnesses={${imports.join(",\n")}};\n`,
+);
+await emitSource(path.join(output, "components.tsx"), components);
 console.log(
   `Gallery: ${visual.length} visual and ${nonvisual.length} nonvisual items`,
 );

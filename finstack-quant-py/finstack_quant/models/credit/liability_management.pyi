@@ -4,7 +4,11 @@ Distressed-exchange hold-versus-tender economics and issuer LME analytics.
 Examples
 --------
 >>> from finstack_quant.models.credit import liability_management
->>> analysis = liability_management.analyze_exchange_offer(60.0, 75.0, 2.0, 0.0, "par_for_par")
+>>> analysis = liability_management.analyze_exchange_offer(
+...     liability_management.ExchangeOffer(
+...         old_pv=60.0, new_pv=75.0, consent_fee=2.0, equity_sweetener_value=0.0, exchange_type="par_for_par"
+...     )
+... )
 >>> (analysis.delta_npv, analysis.tender_recommended)
 (17.0, True)
 
@@ -17,9 +21,11 @@ from typing import Any
 import pandas
 
 __all__ = [
+    "ExchangeOffer",
     "ExchangeOfferAnalysis",
     "LeverageImpact",
     "LmeAnalysis",
+    "LmeTerms",
     "TENDER_RECOMMENDATION_HURDLE",
     "analyze_exchange_offer",
     "analyze_lme",
@@ -29,6 +35,422 @@ TENDER_RECOMMENDATION_HURDLE: float
 """Multiple of ``old_npv`` that ``tender_total`` must exceed for a tender
 recommendation (``1.02``, i.e. a 2% pickup hurdle)."""
 
+class ExchangeOffer:
+    """
+    Terms of a distressed exchange offer, from the creditor's side.
+
+    Every amount is in one caller-defined monetary unit.
+
+    Examples
+    --------
+    >>> from finstack_quant.models.credit import liability_management
+    >>> offer = liability_management.ExchangeOffer(
+    ...     old_pv=60.0, new_pv=75.0, consent_fee=2.0, equity_sweetener_value=0.0, exchange_type="par_for_par"
+    ... )
+    >>> offer.exchange_type
+    'par_for_par'
+    """
+
+    def __init__(
+        self,
+        *,
+        old_pv: float,
+        new_pv: float,
+        consent_fee: float,
+        equity_sweetener_value: float,
+        exchange_type: str,
+    ) -> None:
+        """
+        Build the offer terms by keyword.
+
+        Parameters
+        ----------
+        old_pv : float
+            Present value of the existing claim if it is not tendered, in the
+            caller's monetary unit; finite and non-negative.
+        new_pv : float
+            Present value of the new instrument received on tendering, in the
+            same unit as ``old_pv``.
+        consent_fee : float
+            Cash consent or early-tender fee paid to participating holders;
+            ``0.0`` when there is none.
+        equity_sweetener_value : float
+            Estimated value of equity or warrants attached to the new
+            instrument; ``0.0`` when there is none.
+        exchange_type : str
+            Offer structure, as the canonical snake_case label:
+            ``par_for_par``, ``discount``, ``uptier`` or ``downtier``.
+
+        Raises
+        ------
+        ValueError
+            If ``exchange_type`` is not a recognised structure.
+        """
+        ...
+
+    @property
+    def old_pv(self) -> float:
+        """
+        Present value of the existing claim if it is not tendered.
+
+        Returns
+        -------
+        float
+            Present value of the existing claim if it is not tendered.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def new_pv(self) -> float:
+        """
+        Present value of the new instrument received on tendering.
+
+        Returns
+        -------
+        float
+            Present value of the new instrument received on tendering.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def consent_fee(self) -> float:
+        """
+        Cash consent or early-tender fee.
+
+        Returns
+        -------
+        float
+            Cash consent or early-tender fee.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def equity_sweetener_value(self) -> float:
+        """
+        Estimated value of attached equity or warrants.
+
+        Returns
+        -------
+        float
+            Estimated value of attached equity or warrants.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def exchange_type(self) -> str:
+        """
+        Offer structure: ``par_for_par``, ``discount``, ``uptier`` or ``downtier``.
+
+        Returns
+        -------
+        str
+            Offer structure: ``par_for_par``, ``discount``, ``uptier`` or ``downtier``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @staticmethod
+    def from_json(json: str) -> ExchangeOffer:
+        """
+        Deserialize a ``ExchangeOffer`` from its canonical JSON form.
+
+        Parameters
+        ----------
+        json : str
+            JSON text produced by :meth:`to_json` (strict serde; unknown or
+            invalid fields are rejected).
+
+        Returns
+        -------
+        ExchangeOffer
+            Reconstructed value.
+
+        Raises
+        ------
+        ValueError
+            If the payload is not valid ``ExchangeOffer`` JSON.
+
+        Examples
+        --------
+        >>> from finstack_quant.models.credit import liability_management
+        >>> value = liability_management.ExchangeOffer(
+        ...     old_pv=60.0, new_pv=75.0, consent_fee=2.0, equity_sweetener_value=0.0, exchange_type="par_for_par"
+        ... )
+        >>> liability_management.ExchangeOffer.from_json(value.to_json()) == value
+        True
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize to compact canonical JSON.
+
+        Returns
+        -------
+        str
+            JSON text accepted by :meth:`from_json`.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """
+        Support ``pickle`` through the canonical JSON representation.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            ``(from_json, (json,))`` so unpickling rebuilds the value.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails.
+        """
+        ...
+
+    def __repr__(self) -> str:
+        """
+        Python-style representation rendered from the canonical fields.
+
+        Returns
+        -------
+        str
+            ``Name(field=value, ...)`` with Python literals.
+
+        Notes
+        -----
+        This method does not raise.
+        """
+        ...
+
+class LmeTerms:
+    """
+    Terms of a liability management exercise, from the issuer's side.
+
+    Amounts are in one caller-defined monetary unit; percentages are
+    fractions, never points.
+
+    Examples
+    --------
+    >>> from finstack_quant.models.credit import liability_management
+    >>> terms = liability_management.LmeTerms(
+    ...     lme_type="tender_offer", notional=100.0, repurchase_price_pct=0.8, opt_acceptance_pct=1.0
+    ... )
+    >>> (terms.lme_type, terms.ebitda)
+    ('tender_offer', None)
+    """
+
+    def __init__(
+        self,
+        *,
+        lme_type: str,
+        notional: float,
+        repurchase_price_pct: float,
+        opt_acceptance_pct: float,
+        ebitda: float | None = None,
+    ) -> None:
+        """
+        Build the exercise terms by keyword.
+
+        Parameters
+        ----------
+        lme_type : str
+            Structure of the exercise, as the canonical snake_case label:
+            ``open_market_repurchase``, ``tender_offer``, ``amend_and_extend``,
+            or ``dropdown``.
+        notional : float
+            Outstanding face amount of the target instrument, in the caller's
+            monetary unit. Must be finite and strictly positive.
+        repurchase_price_pct : float
+            Price as a fraction of par for repurchases and tenders (``(0, 1.5]``),
+            the extension fee for amend-and-extend (``[0, 0.10]``), or the
+            transferred-asset fraction for a dropdown (``[0, 1]``).
+        opt_acceptance_pct : float
+            Fraction of holders participating, in ``[0, 1]``.
+        ebitda : float or None, optional
+            EBITDA in the same unit as ``notional``. A positive value adds the
+            ``leverage_impact`` block; None or a non-positive value omits it.
+
+        Raises
+        ------
+        ValueError
+            If ``lme_type`` is not a recognised structure.
+        """
+        ...
+
+    @property
+    def lme_type(self) -> str:
+        """
+        Structure of the exercise as its snake_case label.
+
+        Returns
+        -------
+        str
+            Structure of the exercise as its snake_case label.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def notional(self) -> float:
+        """
+        Outstanding face amount of the target instrument.
+
+        Returns
+        -------
+        float
+            Outstanding face amount of the target instrument.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def repurchase_price_pct(self) -> float:
+        """
+        Price, extension fee, or transferred-asset fraction, by ``lme_type``.
+
+        Returns
+        -------
+        float
+            Price, extension fee, or transferred-asset fraction, by ``lme_type``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def opt_acceptance_pct(self) -> float:
+        """
+        Fraction of holders participating.
+
+        Returns
+        -------
+        float
+            Fraction of holders participating.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def ebitda(self) -> float | None:
+        """
+        EBITDA in the notional's unit, or ``None``.
+
+        Returns
+        -------
+        float | None
+            EBITDA in the notional's unit, or ``None``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @staticmethod
+    def from_json(json: str) -> LmeTerms:
+        """
+        Deserialize a ``LmeTerms`` from its canonical JSON form.
+
+        Parameters
+        ----------
+        json : str
+            JSON text produced by :meth:`to_json` (strict serde; unknown or
+            invalid fields are rejected).
+
+        Returns
+        -------
+        LmeTerms
+            Reconstructed value.
+
+        Raises
+        ------
+        ValueError
+            If the payload is not valid ``LmeTerms`` JSON.
+
+        Examples
+        --------
+        >>> from finstack_quant.models.credit import liability_management
+        >>> value = liability_management.LmeTerms(
+        ...     lme_type="tender_offer", notional=100.0, repurchase_price_pct=0.8, opt_acceptance_pct=1.0
+        ... )
+        >>> liability_management.LmeTerms.from_json(value.to_json()) == value
+        True
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize to compact canonical JSON.
+
+        Returns
+        -------
+        str
+            JSON text accepted by :meth:`from_json`.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """
+        Support ``pickle`` through the canonical JSON representation.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            ``(from_json, (json,))`` so unpickling rebuilds the value.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails.
+        """
+        ...
+
+    def __repr__(self) -> str:
+        """
+        Python-style representation rendered from the canonical fields.
+
+        Returns
+        -------
+        str
+            ``Name(field=value, ...)`` with Python literals.
+
+        Notes
+        -----
+        This method does not raise.
+        """
+        ...
+
 class ExchangeOfferAnalysis:
     """
     Hold-versus-tender economics of a distressed exchange offer.
@@ -36,7 +458,11 @@ class ExchangeOfferAnalysis:
     Examples
     --------
     >>> from finstack_quant.models.credit import liability_management
-    >>> analysis = liability_management.analyze_exchange_offer(60.0, 75.0, 2.0, 0.0, "par_for_par")
+    >>> analysis = liability_management.analyze_exchange_offer(
+    ...     liability_management.ExchangeOffer(
+    ...         old_pv=60.0, new_pv=75.0, consent_fee=2.0, equity_sweetener_value=0.0, exchange_type="par_for_par"
+    ...     )
+    ... )
     >>> (analysis.delta_npv, analysis.tender_recommended)
     (17.0, True)
 
@@ -234,7 +660,11 @@ class ExchangeOfferAnalysis:
         Examples
         --------
         >>> from finstack_quant.models.credit import liability_management
-        >>> value = liability_management.analyze_exchange_offer(60.0, 75.0, 2.0, 0.0, "par_for_par")
+        >>> value = liability_management.analyze_exchange_offer(
+        ...     liability_management.ExchangeOffer(
+        ...         old_pv=60.0, new_pv=75.0, consent_fee=2.0, equity_sweetener_value=0.0, exchange_type="par_for_par"
+        ...     )
+        ... )
         >>> liability_management.ExchangeOfferAnalysis.from_json(value.to_json()) == value
         True
         """
@@ -279,7 +709,15 @@ class LeverageImpact:
     Examples
     --------
     >>> from finstack_quant.models.credit import liability_management
-    >>> impact = liability_management.analyze_lme("open_market_repurchase", 100.0, 0.70, 0.50, 20.0).leverage_impact
+    >>> impact = liability_management.analyze_lme(
+    ...     liability_management.LmeTerms(
+    ...         lme_type="open_market_repurchase",
+    ...         notional=100.0,
+    ...         repurchase_price_pct=0.70,
+    ...         opt_acceptance_pct=0.50,
+    ...         ebitda=20.0,
+    ...     )
+    ... ).leverage_impact
     >>> (impact.pre_leverage, impact.post_leverage)
     (5.0, 2.5)
 
@@ -389,7 +827,15 @@ class LeverageImpact:
         Examples
         --------
         >>> from finstack_quant.models.credit import liability_management
-        >>> value = liability_management.analyze_lme("tender_offer", 100.0, 0.8, 1.0, ebitda=20.0).leverage_impact
+        >>> value = liability_management.analyze_lme(
+        ...     liability_management.LmeTerms(
+        ...         lme_type="tender_offer",
+        ...         notional=100.0,
+        ...         repurchase_price_pct=0.8,
+        ...         opt_acceptance_pct=1.0,
+        ...         ebitda=20.0,
+        ...     )
+        ... ).leverage_impact
         >>> liability_management.LeverageImpact.from_json(value.to_json()) == value
         True
         """
@@ -449,7 +895,11 @@ class LmeAnalysis:
     Examples
     --------
     >>> from finstack_quant.models.credit import liability_management
-    >>> analysis = liability_management.analyze_lme("open_market_repurchase", 100.0, 0.70, 0.50)
+    >>> analysis = liability_management.analyze_lme(
+    ...     liability_management.LmeTerms(
+    ...         lme_type="open_market_repurchase", notional=100.0, repurchase_price_pct=0.70, opt_acceptance_pct=0.50
+    ...     )
+    ... )
     >>> (analysis.notional_reduction, analysis.discount_capture)
     (50.0, 15.0)
 
@@ -624,7 +1074,11 @@ class LmeAnalysis:
         Examples
         --------
         >>> from finstack_quant.models.credit import liability_management
-        >>> value = liability_management.analyze_lme("tender_offer", 100.0, 0.8, 1.0)
+        >>> value = liability_management.analyze_lme(
+        ...     liability_management.LmeTerms(
+        ...         lme_type="tender_offer", notional=100.0, repurchase_price_pct=0.8, opt_acceptance_pct=1.0
+        ...     )
+        ... )
         >>> liability_management.LmeAnalysis.from_json(value.to_json()) == value
         True
         """
@@ -662,36 +1116,15 @@ class LmeAnalysis:
         """
         ...
 
-def analyze_exchange_offer(
-    old_pv: float,
-    new_pv: float,
-    consent_fee: float,
-    equity_sweetener_value: float,
-    exchange_type: str,
-) -> ExchangeOfferAnalysis:
+def analyze_exchange_offer(offer: ExchangeOffer) -> ExchangeOfferAnalysis:
     """
     Compare hold-versus-tender economics for a distressed exchange offer.
 
     Parameters
     ----------
-    old_pv : float
-        Present value of the existing claim if it is not tendered, in the
-        caller's monetary unit. Must be finite and non-negative.
-    new_pv : float
-        Present value of the new instrument received on tendering,
-        expressed in the same unit as ``old_pv``.
-    consent_fee : float
-        Cash consent or early-tender fee paid to participating holders, in
-        the same unit as ``old_pv``; pass ``0.0`` when there is none.
-    equity_sweetener_value : float
-        Estimated value of equity or warrants attached to the new
-        instrument, in the same unit as ``old_pv``; pass ``0.0`` when there
-        is none.
-    exchange_type : str
-        Offer structure, as the canonical snake_case label:
-        ``par_for_par``, ``discount``, ``uptier``, or ``downtier``. Any
-        other spelling raises. Every argument is required, as in Rust and
-        WASM.
+    offer : ExchangeOffer
+        The hold-out and new-instrument present values, consent fee and
+        equity sweetener (one monetary unit) and the offer structure.
 
     Returns
     -------
@@ -702,47 +1135,29 @@ def analyze_exchange_offer(
     Raises
     ------
     ValueError
-        If an amount is negative or non-finite, or ``exchange_type`` is not
-        a recognised structure.
+        If an amount is negative or non-finite.
 
     Examples
     --------
     >>> from finstack_quant.models.credit import liability_management
-    >>> liability_management.analyze_exchange_offer(60.0, 75.0, 2.0, 0.0, "par_for_par").tender_total
+    >>> offer = liability_management.ExchangeOffer(
+    ...     old_pv=60.0, new_pv=75.0, consent_fee=2.0, equity_sweetener_value=0.0, exchange_type="par_for_par"
+    ... )
+    >>> liability_management.analyze_exchange_offer(offer).tender_total
     77.0
 
     """
     ...
 
-def analyze_lme(
-    lme_type: str,
-    notional: float,
-    repurchase_price_pct: float,
-    opt_acceptance_pct: float,
-    ebitda: float | None = None,
-) -> LmeAnalysis:
+def analyze_lme(terms: LmeTerms) -> LmeAnalysis:
     """
     Compute discount capture and leverage impact for an LME transaction.
 
     Parameters
     ----------
-    lme_type : str
-        Structure of the exercise, as the canonical snake_case label:
-        ``open_market_repurchase``, ``tender_offer``, ``amend_and_extend``,
-        or ``dropdown``. Any other spelling raises.
-    notional : float
-        Outstanding face amount of the target instrument, in the caller's
-        monetary unit. Must be finite and strictly positive.
-    repurchase_price_pct : float
-        Price as a fraction of par for repurchases and tenders (``(0, 1.5]``),
-        the extension fee for amend-and-extend (``[0, 0.10]``), or the
-        transferred-asset fraction for a dropdown (``[0, 1]``).
-    opt_acceptance_pct : float
-        Fraction of holders participating, in ``[0, 1]``; required, as in
-        Rust and WASM.
-    ebitda : float or None, optional
-        EBITDA in the same unit as ``notional``. A positive value adds the
-        ``leverage_impact`` block; None or a non-positive value omits it.
+    terms : LmeTerms
+        The exercise structure, notional, price or fee fraction, the
+        participating fraction and an optional EBITDA.
 
     Returns
     -------
@@ -754,13 +1169,16 @@ def analyze_lme(
     ------
     ValueError
         If ``notional`` is not positive, ``opt_acceptance_pct`` is outside
-        ``[0, 1]``, ``repurchase_price_pct`` is outside the range admitted
-        by ``lme_type``, or ``lme_type`` is not recognised.
+        ``[0, 1]``, or ``repurchase_price_pct`` is outside the range admitted
+        by ``lme_type``.
 
     Examples
     --------
     >>> from finstack_quant.models.credit import liability_management
-    >>> liability_management.analyze_lme("open_market_repurchase", 100.0, 0.70, 0.50).discount_capture
+    >>> terms = liability_management.LmeTerms(
+    ...     lme_type="open_market_repurchase", notional=100.0, repurchase_price_pct=0.70, opt_acceptance_pct=0.50
+    ... )
+    >>> liability_management.analyze_lme(terms).discount_capture
     15.0
 
     """

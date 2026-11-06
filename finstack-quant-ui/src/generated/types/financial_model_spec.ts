@@ -745,6 +745,10 @@ export type D_97Ce4Fbfee051Bc20729 = "cashflow_date" | "period_end" | "period_av
 export type D_75Eaaaa2F753Dbeee283 =
   "fees" | "interest" | "amortization" | "mandatory_prepayment" | "voluntary_prepayment" | "sweep" | "equity";
 /**
+ * How one node's values combine over the source periods of a target period.
+ */
+export type DFc17544530079D46D05E = "sum" | "period_end" | "formula";
+/**
  * Node value type classification.
  *
  * Determines whether a node represents monetary values (with a specific currency)
@@ -3822,6 +3826,13 @@ export interface D_65B0652Ed08913529246 {
    */
   call_friction_cents?: number | null;
   /**
+   * Optional government discount curve identifier for the bond `g_spread` metric.
+   *
+   * The metric subtracts this curve's par yield from the bond's yield. It
+   * enters no price, and `g_spread` is an error when it is unset.
+   */
+  government_curve_id?: D_557De6D70142Abc041E8 | null;
+  /**
    * Mean-reversion speed of the hazard factor (κ_λ) on the rates-credit
    * lattice, annualised.
    *
@@ -4309,7 +4320,6 @@ export interface D_6Be6B905Ad3884Deeab6 {
            * Growth rate of the default barrier over time.
            */
           barrier_growth_rate: number;
-          [k: string]: unknown;
         };
       };
   /**
@@ -4336,7 +4346,6 @@ export interface D_6Be6B905Ad3884Deeab6 {
            * Volatility of log-jump size.
            */
           jump_vol: number;
-          [k: string]: unknown;
         };
       }
     | {
@@ -4354,7 +4363,6 @@ export interface D_6Be6B905Ad3884Deeab6 {
            * Mean recovery rate at default.
            */
           mean_recovery: number;
-          [k: string]: unknown;
         };
       };
   /**
@@ -4366,7 +4374,6 @@ export interface D_6Be6B905Ad3884Deeab6 {
    * Continuously compounded risk-free rate `r`, as a decimal fraction.
    */
   risk_free_rate: number;
-  [k: string]: unknown;
 }
 /**
  * Hard threshold toggle configuration.
@@ -6447,8 +6454,8 @@ export interface D_756Aabf913F51B821A96 {
   maturity: string;
   metric_pricing_overrides?: D_3883C45B3701884Ad50B2;
   /**
-   * Effective-interest-rate reporting switch for the
-   * `oid_eir_amortization` metric. `None` (the default) reports with fees
+   * Effective-interest-rate reporting switch for the `oid_eir_rate` and
+   * `oid_eir_amortization` metrics. `None` (the default) reports with fees
    * included, the same as `Some(OidEirSpec::default())`.
    */
   oid_eir?: D_3B1170Fe3280Aa725Fb4 | null;
@@ -15546,6 +15553,12 @@ export interface D_7B4Cd44901322286925A {
    * Node computation type
    */
   node_type: "value" | "calculated" | "mixed";
+  /**
+   * How this line rolls up to a coarser reporting frequency. A rollup uses
+   * its own per-line method first, then this; a line declaring nothing is
+   * summed. Tags never choose a method.
+   */
+  rollup?: DFc17544530079D46D05E | null;
   /**
    * Tags for grouping/filtering
    */

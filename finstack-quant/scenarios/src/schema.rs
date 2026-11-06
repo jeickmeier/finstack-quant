@@ -1,15 +1,15 @@
 //! JSON Schema generation helpers for scenario contracts.
-use crate::{ApplicationEnvelope, HorizonResult, HorizonSummary, TemplateMetadata};
+use crate::{ApplicationEnvelope, HorizonResult, HorizonSummary, ScenarioSpec, TemplateMetadata};
 
 /// Canonical title of the published scenario envelope schema.
 pub const SCENARIO_SCHEMA_TITLE: &str = "Finstack Quant Scenario Specification";
 /// Canonical description of the published scenario envelope schema.
-pub const SCENARIO_SCHEMA_DESCRIPTION: &str =
-    "Versioned scenario specification with typed market, instrument, statement, and time-roll operations.";
+pub const SCENARIO_SCHEMA_DESCRIPTION: &str = "Versioned scenario specification with typed market, instrument, statement, and time-roll operations.";
 
-/// A canonical single-operation scenario: a 50 bp parallel shock.
-fn scenario_examples() -> finstack_quant_core::Result<Vec<serde_json::Value>> {
-    let scenario = crate::ScenarioSpec {
+/// The canonical single-operation scenario every scenario example describes:
+/// a 50 bp parallel shock to the USD discount curve.
+fn example_scenario_spec() -> crate::ScenarioSpec {
+    crate::ScenarioSpec {
         id: "usd_rates_stress".into(),
         name: Some("USD +50bp parallel".into()),
         description: Some("Parallel shock to the USD discount curve.".into()),
@@ -22,11 +22,23 @@ fn scenario_examples() -> finstack_quant_core::Result<Vec<serde_json::Value>> {
         priority: 0,
         resolution_mode: Default::default(),
         hazard_bump_mode: Default::default(),
-    };
-    let value = serde_json::to_value(crate::ScenarioEnvelope::new(scenario)).map_err(|error| {
-        finstack_quant_core::Error::Internal(format!("serialize scenario example: {error}"))
-    })?;
+    }
+}
+
+/// The persistence envelope example: [`example_scenario_spec`] wrapped with
+/// its contract marker.
+fn scenario_examples() -> finstack_quant_core::Result<Vec<serde_json::Value>> {
+    let value = serde_json::to_value(crate::ScenarioEnvelope::new(example_scenario_spec()))
+        .map_err(|error| {
+            finstack_quant_core::Error::Internal(format!("serialize scenario example: {error}"))
+        })?;
     Ok(vec![value])
+}
+
+/// The bare scenario specification example, identical to the envelope's
+/// `scenario` payload.
+fn scenario_spec_examples() -> finstack_quant_core::Result<Vec<serde_json::Value>> {
+    finstack_quant_core::schema::example(&example_scenario_spec())
 }
 
 /// The metadata of the built-in 2008 global-financial-crisis template.
@@ -138,6 +150,14 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
     .with_kind(finstack_quant_core::schema::SchemaKind::Input)
     .with_summary("Ordered shock and roll operations over market, statement and valuation targets.")
     .with_examples(scenario_examples),
+    finstack_quant_core::schema_artifact!(
+        ScenarioSpec,
+        "scenarios",
+        "scenario_spec",
+        Input,
+        "Bare scenario specification: the ordered operations the scenario engine applies."
+    )
+    .with_examples(scenario_spec_examples),
     finstack_quant_core::schema_artifact!(
         TemplateMetadata,
         "scenarios",

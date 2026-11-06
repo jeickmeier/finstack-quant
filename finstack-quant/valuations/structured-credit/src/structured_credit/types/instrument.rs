@@ -1,21 +1,21 @@
 use super::{
     DealAccruals, StructuredCredit, TrancheAccrualPeriod, TrancheCashflows, TrancheSeniority,
 };
-use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::CashflowScheduleSource;
+use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::{
-    schedule_from_classified_flows, CashflowProvider, ScheduleBuildOpts,
+    CashflowProvider, ScheduleBuildOpts, schedule_from_classified_flows,
 };
+use finstack_quant_core::Error;
+use finstack_quant_core::FxHashMap;
 use finstack_quant_core::cashflow::CashFlow;
 use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::fixings::fixing_series_id;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Error;
-use finstack_quant_core::FxHashMap;
 use finstack_quant_valuations_core::impl_instrument_base;
-use finstack_quant_valuations_core::instruments::model_params::ModelParamsSnapshot;
 use finstack_quant_valuations_core::instruments::Instrument;
+use finstack_quant_valuations_core::instruments::model_params::ModelParamsSnapshot;
 use finstack_quant_valuations_core::metrics::{MetricContext, MetricSeed};
 
 impl CashflowScheduleSource for StructuredCredit {
@@ -190,12 +190,12 @@ impl Instrument for StructuredCredit {
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate_resolvable()?;
-        if let Some(threshold) = self.cleanup_call_decimal {
-            if !threshold.is_finite() || threshold <= 0.0 || threshold >= 1.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "cleanup_call_decimal must be finite and in (0, 1), got {threshold}"
-                )));
-            }
+        if let Some(threshold) = self.cleanup_call_decimal
+            && (!threshold.is_finite() || threshold <= 0.0 || threshold >= 1.0)
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "cleanup_call_decimal must be finite and in (0, 1), got {threshold}"
+            )));
         }
         self.validate_custom_waterfall()?;
         // A custom waterfall validates the deal-level triggers together with
@@ -229,12 +229,12 @@ impl Instrument for StructuredCredit {
                 )));
             }
         }
-        if let Some(price) = self.liquidation_price_pct {
-            if !price.is_finite() || price <= 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "liquidation_price_pct ({price}) must be a finite positive percent of par"
-                )));
-            }
+        if let Some(price) = self.liquidation_price_pct
+            && (!price.is_finite() || price <= 0.0)
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "liquidation_price_pct ({price}) must be a finite positive percent of par"
+            )));
         }
         self.validate_tranche_draws()?;
         if let Some(card) = &self.credit_model.card {
@@ -329,27 +329,26 @@ impl StructuredCredit {
             } else {
                 0
             };
-            if let Some(term) = asset.amortization_term_months {
-                if term == 0 || term < months_to_maturity {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "asset {} amortization_term_months ({term}) must be positive and at least the \
+            if let Some(term) = asset.amortization_term_months
+                && (term == 0 || term < months_to_maturity)
+            {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "asset {} amortization_term_months ({term}) must be positive and at least the \
                          {months_to_maturity} months from origination to maturity",
-                        asset.id
-                    )));
-                }
+                    asset.id
+                )));
             }
-            if let Some(io) = asset.io_months {
-                if io > months_to_maturity
+            if let Some(io) = asset.io_months
+                && (io > months_to_maturity
                     || asset
                         .amortization_term_months
-                        .is_some_and(|term| io >= term)
-                {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "asset {} io_months ({io}) must not exceed the {months_to_maturity} months to \
+                        .is_some_and(|term| io >= term))
+            {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "asset {} io_months ({io}) must not exceed the {months_to_maturity} months to \
                          maturity or reach the amortization term",
-                        asset.id
-                    )));
-                }
+                    asset.id
+                )));
             }
             if let Some(balloon) = asset.balloon {
                 balloon.validate()?;
@@ -360,14 +359,14 @@ impl StructuredCredit {
             if let Some(special) = asset.special_servicing {
                 special.validate()?;
             }
-            if let Some(noi) = asset.noi {
-                if noi.currency() != asset.balance.currency() || !noi.amount().is_finite() {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "asset {} noi must be a finite amount in {}",
-                        asset.id,
-                        asset.balance.currency()
-                    )));
-                }
+            if let Some(noi) = asset.noi
+                && (noi.currency() != asset.balance.currency() || !noi.amount().is_finite())
+            {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "asset {} noi must be a finite amount in {}",
+                    asset.id,
+                    asset.balance.currency()
+                )));
             }
         }
         Ok(())

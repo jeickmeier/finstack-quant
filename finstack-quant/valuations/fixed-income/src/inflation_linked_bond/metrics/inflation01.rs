@@ -27,10 +27,10 @@
 //! anchors require an explicit projection curve.
 
 use crate::inflation_linked_bond::InflationLinkedBond;
+use finstack_quant_core::Result;
 use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::units::ONE_BASIS_POINT;
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
 

@@ -27,6 +27,8 @@
 //! - **CS01**: Credit spread sensitivity (parallel)
 //! - **BucketedCS01**: Credit spread sensitivity by tenor
 //! - **Theta**: Time decay (1-day price change)
+//! - **Recovery01**: PV change per +1% recovery on a loan with a credit curve
+//! - **Jump to Default**: Recovery of par less current value on such a loan
 //!
 //! # Quick Example
 //!
@@ -63,6 +65,7 @@
 //! - [`AllInRateCalculator`] for borrower cost calculation
 
 mod cs01;
+mod default_risk;
 mod discount_margin;
 pub(crate) mod irr_helpers;
 mod oas;
@@ -93,9 +96,9 @@ use finstack_quant_valuations_core::metrics::MetricRegistry;
 ///
 /// # Registered Metrics
 ///
-/// - Standard: YTM, Discount Margin, DV01, BucketedDV01, CS01, BucketedCS01, Theta
-/// - Custom: YTW (`"ytw"`), YTC (`"ytc"`), YT2Y/3Y/4Y, All-In Rate (`"all_in_rate"`),
-///   OID EIR amortization (`"oid_eir_amortization"`)
+/// YTM, YTW, YTC, YT2Y/3Y/4Y, Discount Margin, All-In Rate, OID EIR amortization
+/// and effective rate, OAS, embedded option value, DV01, BucketedDV01, CS01,
+/// BucketedCS01, Recovery01 and Jump to Default.
 ///
 /// # Examples
 ///
@@ -120,21 +123,20 @@ pub(crate) fn register_term_loan_metrics(
             (BucketedDv01, risk_view::TermLoanBucketedDv01Calculator),
             (Cs01, risk_view::TermLoanCs01Calculator),
             (BucketedCs01, risk_view::TermLoanBucketedCs01Calculator),
+            (Recovery01, default_risk::TermLoanRecovery01Calculator),
+            (JumpToDefault, default_risk::TermLoanJumpToDefaultCalculator),
             (Ytm, YtmCalculator),
             (DiscountMargin, DiscountMarginCalculator),
             // Callable-tree metrics
             (Oas, OasCalculator),
             (EmbeddedOptionValue, EmbeddedOptionValueCalculator),
-        ],
-        custom: [
-            ("all_in_rate", AllInRateCalculator),
-            ("oid_eir_amortization", OidEirAmortizationCalculator),
-            // Yield to first call (custom id: ytc)
-            ("ytc", YtcCalculator),
-            // Yields to fixed horizons
-            ("yt2y", Yt2yCalculator),
-            ("yt3y", Yt3yCalculator),
-            ("yt4y", Yt4yCalculator),
+            (AllInRate, AllInRateCalculator),
+            (OidEirAmortization, OidEirAmortizationCalculator),
+            (OidEirRate, OidEirRateCalculator),
+            (Ytc, YtcCalculator),
+            (Yt2y, Yt2yCalculator),
+            (Yt3y, Yt3yCalculator),
+            (Yt4y, Yt4yCalculator),
         ]
     }
 
@@ -171,7 +173,7 @@ pub(crate) fn register_term_loan_metrics(
 ///
 /// The fee-inclusive "all-in" borrower cost — the IFRS-9 effective interest
 /// rate that amortizes upfront fees and OID over the loan's life — is a
-/// separate metric, [`OidEirAmortizationCalculator`]
+/// separate metric, [`OidEirRateCalculator`]
 /// (`"oid_eir_rate"`), which solves an XIRR over the full flow set (including
 /// the upfront fee when `OidEirSpec::include_fees`). Use that metric when the
 /// borrower's effective rate inclusive of origination economics is required.
@@ -244,7 +246,25 @@ impl MetricCalculator for OidEirAmortizationCalculator {
         let market = &context.curves;
 
         let schedule = crate::term_loan::cashflows::build_oid_eir_schedule(loan, market)?;
-        Ok(schedule.record(context))
+        schedule.record(context);
+        Ok(schedule.total_amortization())
+    }
+}
+
+/// Computes the effective interest rate (decimal XIRR of the full flow set).
+///
+/// Shares one solve with [`OidEirAmortizationCalculator`]: whichever of the two
+/// runs first stores both results, and the registry then skips the other.
+pub(crate) struct OidEirRateCalculator;
+
+impl MetricCalculator for OidEirRateCalculator {
+    fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+        let loan: &TermLoan = context.instrument_as()?;
+        let market = &context.curves;
+
+        let schedule = crate::term_loan::cashflows::build_oid_eir_schedule(loan, market)?;
+        schedule.record(context);
+        Ok(schedule.effective_rate)
     }
 }
 

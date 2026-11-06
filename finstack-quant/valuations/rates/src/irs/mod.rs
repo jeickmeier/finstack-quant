@@ -99,7 +99,7 @@ pub(crate) mod metrics;
 pub(crate) mod pricer;
 mod types;
 
-pub(crate) use types::{resolve_fixed_leg, resolve_float_leg};
 pub use types::{
     ConventionSwapParams, InterestRateSwap, InterestRateSwapBuilder, IrsLegConventions,
 };
+pub(crate) use types::{resolve_fixed_leg, resolve_float_leg};

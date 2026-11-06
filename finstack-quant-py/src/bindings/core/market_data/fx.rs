@@ -3,15 +3,15 @@
 use std::sync::Arc;
 
 use finstack_quant_core::money::fx::{
-    fx_pair_convention as rust_fx_pair_convention, invert_fx_rate as rust_invert_fx_rate,
     CurrencyPair, FxConversionPolicy, FxMatrix, FxPairConvention, FxQuery, FxQuoteConvention,
-    FxRateResult,
+    FxRateResult, fx_pair_convention as rust_fx_pair_convention,
+    invert_fx_rate as rust_invert_fx_rate,
 };
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
 use pyo3::wrap_pyfunction;
 
-use crate::bindings::core::currency::{extract_currency, PyCurrency};
+use crate::bindings::core::currency::{PyCurrency, extract_currency};
 use crate::bindings::date_utils::py_to_date;
 use crate::bindings::macros::{
     impl_repr_html_via_dataframe, label_enum, typed_or_label, wire_methods,

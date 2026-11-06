@@ -5,11 +5,11 @@
 
 use crate::{AttributionMethod, CreditFactorDetailOptions, ExecutionPolicy, PnlAttribution};
 use finstack_quant_core::{
+    Result,
     config::{FinstackConfig, ResultsMeta},
     currency::Currency,
     dates::Date,
     market_data::context::MarketContextState,
-    Result,
 };
 use finstack_quant_factor::credit::hierarchy::CreditFactorModel;
 use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
@@ -219,11 +219,11 @@ impl AttributionInputs {
         let mut config = FinstackConfig::default();
 
         if let Some(ref cfg) = self.config {
-            if let Some(scale) = cfg.rounding_scale {
-                if let Some(ccy) = instrument_currency {
-                    config.rounding.output_scale.set_scale(ccy, scale)?;
-                    config.rounding.ingest_scale.set_scale(ccy, scale)?;
-                }
+            if let Some(scale) = cfg.rounding_scale
+                && let Some(ccy) = instrument_currency
+            {
+                config.rounding.output_scale.set_scale(ccy, scale)?;
+                config.rounding.ingest_scale.set_scale(ccy, scale)?;
             }
             if let Some(rate_bump_bp) = cfg.rate_bump_bp {
                 config.extensions.insert(

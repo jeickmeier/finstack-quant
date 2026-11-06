@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Structured-credit CPR x CDR x severity grid swept by the tranche scenario table.",
+  "examples": [
+    {
+      "cdrs": [
+        0.02,
+        0.06
+      ],
+      "cprs": [
+        0.15
+      ],
+      "recovery_lag": null,
+      "severities": [
+        0.4
+      ]
+    }
+  ],
+  "properties": {
+    "cdrs": {
+      "description": "Annual CDR values (decimal) to sweep.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "cprs": {
+      "description": "Annual CPR values (decimal) to sweep.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "recovery_lag": {
+      "default": null,
+      "description": "Recovery lag (months) applied in every scenario. When `None`, the deal's\nown recovery lag is used; set it to override (e.g. `Some(0)` for\nimmediate recoveries).",
+      "format": "uint32",
+      "minimum": 0,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "severities": {
+      "description": "Loss severities (decimal); recovery = `1 - severity`.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "cprs",
+    "cdrs",
+    "severities"
+  ],
+  "title": "ScenarioGrid",
+  "type": "object",
+  "$id": "https://finstack_quant.dev/schemas/common/1/scenario_grid.schema.json",
+  "$defs": {}
+}

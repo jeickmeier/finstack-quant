@@ -1000,8 +1000,10 @@ fn bermudan_lsmc_grid_and_seed_acceptance() {
                 half_width < mc_budget,
                 "LSMC 99% half-width {half_width} exceeds {mc_budget}"
             );
-            assert!((value - reference).abs() < mc_budget,
-                "steps={steps}, seed={seed}, LSMC={value}, tree={reference}, 99% half-width={half_width}");
+            assert!(
+                (value - reference).abs() < mc_budget,
+                "steps={steps}, seed={seed}, LSMC={value}, tree={reference}, 99% half-width={half_width}"
+            );
             mc_values.push(value);
         }
     }

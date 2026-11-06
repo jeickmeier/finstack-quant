@@ -207,7 +207,7 @@ The fees are emitted as `CFKind::LcFee` and `CFKind::FrontingFee`.
 the present value only while that date lies after the valuation date.
 `scheduled_fees: Vec<ScheduledFee { date, amount }>` are dated fixed fees
 (amendment, waiver, extension, consent) emitted as `CFKind::Fee`.
-`custom("oid_eir_amortization")` reports the origination effective interest
+`OidEirAmortization` reports the origination effective interest
 rate (`oid_eir_rate`, the XIRR of the full flow set from the commitment date
 including the upfront fee and, unless `oid_eir.include_fees` is false, every
 running fee) with the dated `oid_eir_amortization` and
@@ -413,9 +413,10 @@ Registered for `InstrumentType::RevolvingCredit` in `metrics/mod.rs`:
 | `DiscountMargin` | Floating facilities: constant spread over the discount curve repricing the settlement schedule to the quoted clean price on the drawn balance plus accrued (LSTA), else to the model value; decimal |
 | `custom("price_from_dm")` | Clean price per 100 of the drawn balance at settlement implied by `market_quotes.quoted_discount_margin` (decimal) |
 | `Ytm` | IRR of the holder-view flows after settlement against the quoted or model price, on the facility day count |
-| `custom("all_in_rate")` | Running cash cost: interest plus every fee after the valuation date over the time-weighted drawn balance |
+| `AllInRate` | Running cash cost: interest plus every fee after the valuation date over the time-weighted drawn balance |
 | `custom("accrued_interest")` | Cash interest accrued to the settlement date, in the facility currency |
-| `custom("oid_eir_amortization")` | Total EIR amortization; stores `oid_eir_rate` and the dated amortization and carrying-value series |
+| `OidEirRate` | Origination effective interest rate, decimal; one solve shared with `oid_eir_amortization` |
+| `OidEirAmortization` | Total EIR amortization; stores `oid_eir_rate` and the dated amortization and carrying-value series |
 
 `Theta` is registered universally by `pricer::STANDARD.metrics()`.
 

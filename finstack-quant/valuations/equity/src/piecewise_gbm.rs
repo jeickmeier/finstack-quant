@@ -7,6 +7,7 @@
 //! override / surface resolution into the model-level checkpoints, and runs
 //! the engine over a caller-built time grid and payoff.
 
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -14,7 +15,6 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::types::InstrumentId;
-use finstack_quant_core::Result;
 use finstack_quant_models::monte_carlo::engine::McEngine;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricerConfig;
 use finstack_quant_models::monte_carlo::process::piecewise_gbm::{

@@ -6,12 +6,12 @@
 //! use the discount curve's own base date and day count at actual payment dates.
 
 use crate::bond::Bond;
+use finstack_quant_core::Result;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_core::Result;
 use finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_reference_period;
 
 /// Payment dates and actual coupon boundaries for ACT/365L bond timing.
@@ -65,7 +65,7 @@ pub(crate) fn bond_coupon_dates(bond: &Bond) -> Result<Vec<(Date, Date, Date)>> 
         }
         return Ok(periods);
     }
-    use finstack_quant_cashflows::builder::{build_periods, BuildPeriodsParams};
+    use finstack_quant_cashflows::builder::{BuildPeriodsParams, build_periods};
     Ok(build_periods(BuildPeriodsParams::from_schedule(
         bond.cashflow_spec.schedule(),
         bond.issue_date,
@@ -178,10 +178,10 @@ pub(crate) fn bond_model_schedule(bond: &Bond, as_of: Date) -> Result<BondModelS
         if cf.date <= as_of || !(cf.kind.is_interest_like() || cf.kind == CFKind::Pik) {
             continue;
         }
-        if let Some(rule) = &ex_coupon {
-            if rule.is_ex_coupon(cf.date, as_of)? {
-                continue;
-            }
+        if let Some(rule) = &ex_coupon
+            && rule.is_ex_coupon(cf.date, as_of)?
+        {
+            continue;
         }
         // Split coupons emit a cash and a PIK flow on the same date for one
         // accrual period; keep one entry per payment date.
@@ -423,10 +423,10 @@ mod tests {
         assert!(bond_coupon_periods(&bond.clone().with_custom_cashflows(custom)).is_err());
         let mut overlap = custom_bond.custom_cashflows.expect("custom schedule");
         overlap.update_flows(|flow| {
-            if let Some(accrual) = &mut flow.accrual {
-                if accrual.start == bond.issue_date {
-                    accrual.coupon_period = Some((bond.issue_date, bond.maturity));
-                }
+            if let Some(accrual) = &mut flow.accrual
+                && accrual.start == bond.issue_date
+            {
+                accrual.coupon_period = Some((bond.issue_date, bond.maturity));
             }
         });
         assert!(bond_coupon_periods(&bond.with_custom_cashflows(overlap)).is_err());

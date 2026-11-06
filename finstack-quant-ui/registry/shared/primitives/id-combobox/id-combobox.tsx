@@ -14,7 +14,11 @@ import { useVirtualizer, type Virtualizer } from "@tanstack/react-virtual";
 import { FieldFrame, type FieldInfo } from "../field-frame/field-frame";
 import { useSurfaceAttributes } from "../surface/surface";
 type ListVirtualizer = Virtualizer<HTMLDivElement, Element>;
-/** Free-text IDs with virtualized supplied suggestions composed from stock shadcn Combobox. */
+/**
+ * Free-text IDs with virtualized supplied suggestions composed from stock
+ * shadcn Combobox. Typed text is the value: closing the suggestions by Tab,
+ * blur or Escape keeps it, and only typing or picking a suggestion changes it.
+ */
 export function IdCombobox({
   value,
   onValueChange,
@@ -41,12 +45,10 @@ export function IdCombobox({
           inputValue={value}
           value={options.includes(value) ? value : null}
           onInputValueChange={(next, event) => {
-            if (
-              event.reason === "input-change" ||
-              event.reason === "input-clear" ||
-              event.reason === "clear-press"
-            )
-              onValueChange(next);
+            // Only typing is an edit. Base UI resets the input to the selected
+            // label (reason "input-clear") after every close, and free text has
+            // no selection, so forwarding that reset would erase the typed ID.
+            if (event.reason === "input-change") onValueChange(next);
           }}
           onValueChange={(next) => {
             if (next !== null) onValueChange(next);
@@ -116,6 +118,7 @@ function VirtualIds({
               value={items[row.index]}
               index={row.index}
               aria-setsize={items.length}
+              // finstack-arith: 1-based aria-posinset of the row
               aria-posinset={row.index + 1}
             >
               {items[row.index]}

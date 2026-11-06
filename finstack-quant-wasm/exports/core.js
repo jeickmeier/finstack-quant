@@ -3,16 +3,20 @@ import * as wasm from '../pkg/finstack_quant_wasm.js';
 import { schema } from './core/schema.js';
 
 // Rust `DayCount::year_fraction` / `signed_year_fraction` take a context; the
-// published methods make it optional. An omitted context is the Rust default
+// published methods make it optional, which wasm-bindgen cannot express for a
+// borrowed handle. An omitted context is the Rust default
 // (`new DayCountContext()`), created once after `init()` and only borrowed.
 let defaultDayCountContext;
+// wasm-bindgen cannot borrow an optional context: resolves an omitted one to the Rust default.
 const dayCountContext = (ctx) =>
   ctx === undefined || ctx === null ? (defaultDayCountContext ??= new wasm.DayCountContext()) : ctx;
 const rawYearFraction = wasm.DayCount.prototype.yearFraction;
 const rawSignedYearFraction = wasm.DayCount.prototype.signedYearFraction;
+// wasm-bindgen cannot borrow an optional context: `dayCountContext` resolves it.
 wasm.DayCount.prototype.yearFraction = function yearFraction(start, end, ctx = undefined) {
   return rawYearFraction.call(this, start, end, dayCountContext(ctx));
 };
+// wasm-bindgen cannot borrow an optional context: `dayCountContext` resolves it.
 wasm.DayCount.prototype.signedYearFraction = function signedYearFraction(
   start,
   end,
@@ -26,6 +30,7 @@ wasm.DayCount.prototype.signedYearFraction = function signedYearFraction(
 // `init()` and only borrowed.
 let defaultFxConversionPolicy;
 const rawFxRate = wasm.FxMatrix.prototype.rate;
+// wasm-bindgen cannot borrow an optional policy: an omitted one is the shared Rust default.
 wasm.FxMatrix.prototype.rate = function rate(base, quote, date, policy = undefined) {
   const resolved =
     policy === undefined || policy === null
@@ -53,6 +58,7 @@ const marketContextInserts = [
   delete wasm.MarketContext.prototype[name];
   return [curveClass, insertTyped];
 });
+// wasm-bindgen cannot express a borrowed union of handles: dispatches on the handle's class.
 wasm.MarketContext.prototype.insert = function insert(curve) {
   for (const [curveClass, insertTyped] of marketContextInserts) {
     if (curve instanceof curveClass) {

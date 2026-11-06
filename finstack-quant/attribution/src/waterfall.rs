@@ -32,10 +32,10 @@
 //! - Residual is minimal by construction (should be within numeric precision)
 //! - Recommended for risk reporting where sum must equal total
 
-use crate::credit_cascade::{build_credit_factor_attribution, plan_credit_cascade, CreditCascade};
+use crate::AttributionRequest;
+use crate::credit_cascade::{CreditCascade, build_credit_factor_attribution, plan_credit_cascade};
 use crate::factors::*;
 use crate::helpers::*;
-use crate::AttributionRequest;
 use crate::{AttributionFactor, AttributionMethod, ExecutionPolicy, PnlAttribution, WaterfallStep};
 use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
 use finstack_quant_core::currency::Currency;
@@ -334,16 +334,16 @@ pub(crate) fn attribute_pnl_waterfall(
     }
 
     // Populate credit_factor_detail when the cascade ran.
-    if let (Some(c), Some(model)) = (&cascade, credit_factor_model) {
-        if !credit_step_pnls.is_empty() {
-            let detail = build_credit_factor_attribution(
-                model,
-                c,
-                credit_factor_detail_options,
-                &credit_step_pnls,
-            )?;
-            attribution.credit_factor_detail = Some(detail);
-        }
+    if let (Some(c), Some(model)) = (&cascade, credit_factor_model)
+        && !credit_step_pnls.is_empty()
+    {
+        let detail = build_credit_factor_attribution(
+            model,
+            c,
+            credit_factor_detail_options,
+            &credit_step_pnls,
+        )?;
+        attribution.credit_factor_detail = Some(detail);
     }
 
     finalize_attribution(

@@ -1,0 +1,303 @@
+{
+  "description": "Native built-in scenario templates: the template metadata list, the rate_shock_2022 template and its rates and equity components, the rates component remapped from USD-SOFR to USD-OIS composed with the equity component, and each applied to the results-fixture bond market at its valuation date (the native error, or the report with its warnings).",
+  "sources": [
+    {
+      "path": "finstack-quant-ui/src/fixtures/results/bond.json",
+      "sha256": "8a60765d749cd9b6aa9889c70475eeb9787646aee8845e6ca1a710052d793619"
+    }
+  ],
+  "asOf": "2025-01-01",
+  "curveIds": ["USD-OIS", "HZ"],
+  "templateId": "rate_shock_2022",
+  "componentIds": {
+    "rates": "rate_shock_2022_rates",
+    "equity": "rate_shock_2022_equity"
+  },
+  "metadata": [
+    {
+      "id": "gfc_2008",
+      "name": "Global Financial Crisis 2008",
+      "description": "Lehman Brothers collapse and ensuing global credit crisis. Severe flight-to-quality in rates, massive credit spread widening, equity crash, and volatility spike. Market-data identifiers in this template (e.g. USD-SOFR, USD-IG, SPX_VOL) are modern placeholders, not historical instruments; to match your market data, build the template (or one of its components) and edit the market-data identifiers in the resulting spec's operations before applying it.",
+      "event_date": "2008-09-15",
+      "asset_classes": ["rates", "credit", "equity", "volatility", "fx"],
+      "tags": ["systemic", "credit", "liquidity", "historical"],
+      "severity": "severe",
+      "components": [
+        "gfc_2008_rates",
+        "gfc_2008_credit",
+        "gfc_2008_equity",
+        "gfc_2008_vol",
+        "gfc_2008_fx"
+      ]
+    },
+    {
+      "id": "covid_2020",
+      "name": "COVID 2020 Market Shock",
+      "description": "Pandemic-driven market dislocation in March 2020. Emergency rate cuts, sharp credit widening, an equity crash, volatility spike, and broad USD strength. Market-data identifiers in this template (e.g. USD-SOFR, USD-IG, SPX_VOL) are modern placeholders, not historical instruments; to match your market data, build the template (or one of its components) and edit the market-data identifiers in the resulting spec's operations before applying it.",
+      "event_date": "2020-03-16",
+      "asset_classes": ["rates", "credit", "equity", "volatility", "fx"],
+      "tags": ["systemic", "pandemic", "liquidity", "historical"],
+      "severity": "severe",
+      "components": [
+        "covid_2020_rates",
+        "covid_2020_credit",
+        "covid_2020_equity",
+        "covid_2020_vol",
+        "covid_2020_fx"
+      ]
+    },
+    {
+      "id": "rate_shock_2022",
+      "name": "2022 Fed Hiking Cycle",
+      "description": "Inflation-driven 2022 hiking cycle. Sharp rate repricing, wider credit spreads, equity drawdowns, higher volatility, and a stronger USD. Market-data identifiers in this template (e.g. USD-SOFR, USD-IG, SPX_VOL) are modern placeholders, not historical instruments; to match your market data, build the template (or one of its components) and edit the market-data identifiers in the resulting spec's operations before applying it.",
+      "event_date": "2022-06-15",
+      "asset_classes": ["rates", "credit", "equity", "volatility", "fx"],
+      "tags": ["historical", "rates", "inflation", "systemic"],
+      "severity": "moderate",
+      "components": [
+        "rate_shock_2022_rates",
+        "rate_shock_2022_credit",
+        "rate_shock_2022_equity",
+        "rate_shock_2022_vol",
+        "rate_shock_2022_fx"
+      ]
+    },
+    {
+      "id": "svb_2023",
+      "name": "SVB / Regional Banking Crisis 2023",
+      "description": "March 2023 regional banking stress after Silicon Valley Bank failed. Front-end rates rallied, regional bank spreads widened, equities sold off, volatility rose, and the USD strengthened modestly. Market-data identifiers in this template (e.g. USD-SOFR, USD-IG, SPX_VOL) are modern placeholders, not historical instruments; to match your market data, build the template (or one of its components) and edit the market-data identifiers in the resulting spec's operations before applying it. The credit component is an instrument-level spread shock and requires a portfolio of instruments in the execution context to take effect.",
+      "event_date": "2023-03-10",
+      "asset_classes": ["rates", "credit", "equity", "volatility", "fx"],
+      "tags": ["historical", "banking", "liquidity", "regional"],
+      "severity": "moderate",
+      "components": [
+        "svb_2023_rates",
+        "svb_2023_credit",
+        "svb_2023_equity",
+        "svb_2023_vol",
+        "svb_2023_fx"
+      ]
+    },
+    {
+      "id": "ltcm_1998",
+      "name": "LTCM / Russian Default 1998",
+      "description": "August 1998 LTCM crisis and Russian default. Flight-to-quality in rates, EM spread blowouts, an equity selloff, higher volatility, and sharp USD strength versus EM FX. Market-data identifiers in this template (e.g. USD-SOFR, USD-IG, SPX_VOL) are modern placeholders, not historical instruments; to match your market data, build the template (or one of its components) and edit the market-data identifiers in the resulting spec's operations before applying it.",
+      "event_date": "1998-08-17",
+      "asset_classes": ["rates", "credit", "equity", "volatility", "fx"],
+      "tags": ["historical", "credit", "liquidity", "emerging_markets"],
+      "severity": "severe",
+      "components": [
+        "ltcm_1998_rates",
+        "ltcm_1998_credit",
+        "ltcm_1998_equity",
+        "ltcm_1998_vol",
+        "ltcm_1998_fx"
+      ]
+    }
+  ],
+  "template": {
+    "id": "rate_shock_2022",
+    "name": "2022 Fed Hiking Cycle",
+    "description": "Inflation shock - rates surge, credit widens, equities fall, vol rises",
+    "operations": [
+      {
+        "kind": "curve_parallel_bp",
+        "curve_kind": "discount",
+        "curve_id": "USD-SOFR",
+        "bp": 300
+      },
+      {
+        "kind": "curve_parallel_bp",
+        "curve_kind": "par_cds",
+        "curve_id": "USD-IG",
+        "bp": 100
+      },
+      {
+        "kind": "curve_parallel_bp",
+        "curve_kind": "par_cds",
+        "curve_id": "USD-HY",
+        "bp": 200
+      },
+      {
+        "kind": "equity_price_pct",
+        "ids": ["SPX"],
+        "pct": -25
+      },
+      {
+        "kind": "equity_price_pct",
+        "ids": ["NDX"],
+        "pct": -33
+      },
+      {
+        "kind": "vol_surface_parallel_pct",
+        "vol_surface_id": "SPX_VOL",
+        "pct": 50
+      },
+      {
+        "kind": "market_fx_pct",
+        "base": "EUR",
+        "quote": "USD",
+        "pct": -15
+      }
+    ],
+    "priority": 0,
+    "resolution_mode": "most_specific_wins"
+  },
+  "rates": {
+    "id": "rate_shock_2022_rates",
+    "name": "2022 Rate Shock - Rates",
+    "description": null,
+    "operations": [
+      {
+        "kind": "curve_parallel_bp",
+        "curve_kind": "discount",
+        "curve_id": "USD-SOFR",
+        "bp": 300
+      }
+    ],
+    "priority": 0,
+    "resolution_mode": "most_specific_wins"
+  },
+  "equity": {
+    "id": "rate_shock_2022_equity",
+    "name": "2022 Rate Shock - Equity",
+    "description": null,
+    "operations": [
+      {
+        "kind": "equity_price_pct",
+        "ids": ["SPX"],
+        "pct": -25
+      },
+      {
+        "kind": "equity_price_pct",
+        "ids": ["NDX"],
+        "pct": -33
+      }
+    ],
+    "priority": 2,
+    "resolution_mode": "most_specific_wins"
+  },
+  "remapped": {
+    "id": "rate_shock_2022_rates",
+    "name": "2022 Rate Shock - Rates",
+    "description": null,
+    "operations": [
+      {
+        "kind": "curve_parallel_bp",
+        "curve_kind": "discount",
+        "curve_id": "USD-OIS",
+        "bp": 300
+      }
+    ],
+    "priority": 0,
+    "resolution_mode": "most_specific_wins"
+  },
+  "composed": {
+    "id": "rate_shock_2022_rates+rate_shock_2022_equity",
+    "name": "2022 Rate Shock - Rates + 2022 Rate Shock - Equity",
+    "description": null,
+    "operations": [
+      {
+        "kind": "curve_parallel_bp",
+        "curve_kind": "discount",
+        "curve_id": "USD-OIS",
+        "bp": 300
+      },
+      {
+        "kind": "equity_price_pct",
+        "ids": ["SPX"],
+        "pct": -25
+      },
+      {
+        "kind": "equity_price_pct",
+        "ids": ["NDX"],
+        "pct": -33
+      }
+    ],
+    "priority": 0,
+    "resolution_mode": "most_specific_wins"
+  },
+  "applications": [
+    {
+      "name": "rates-as-built",
+      "scenarioJson": "{\"id\":\"rate_shock_2022_rates\",\"name\":\"2022 Rate Shock - Rates\",\"description\":null,\"operations\":[{\"kind\":\"curve_parallel_bp\",\"curve_kind\":\"discount\",\"curve_id\":\"USD-SOFR\",\"bp\":300}],\"priority\":0,\"resolution_mode\":\"most_specific_wins\"}",
+      "error": {
+        "name": "FinstackError",
+        "kind": "not_found",
+        "message": "Market data not found: USD-SOFR"
+      }
+    },
+    {
+      "name": "whole-template",
+      "scenarioJson": "{\"id\":\"rate_shock_2022\",\"name\":\"2022 Fed Hiking Cycle\",\"description\":\"Inflation shock - rates surge, credit widens, equities fall, vol rises\",\"operations\":[{\"kind\":\"curve_parallel_bp\",\"curve_kind\":\"discount\",\"curve_id\":\"USD-SOFR\",\"bp\":300},{\"kind\":\"curve_parallel_bp\",\"curve_kind\":\"par_cds\",\"curve_id\":\"USD-IG\",\"bp\":100},{\"kind\":\"curve_parallel_bp\",\"curve_kind\":\"par_cds\",\"curve_id\":\"USD-HY\",\"bp\":200},{\"kind\":\"equity_price_pct\",\"ids\":[\"SPX\"],\"pct\":-25},{\"kind\":\"equity_price_pct\",\"ids\":[\"NDX\"],\"pct\":-33},{\"kind\":\"vol_surface_parallel_pct\",\"vol_surface_id\":\"SPX_VOL\",\"pct\":50},{\"kind\":\"market_fx_pct\",\"base\":\"EUR\",\"quote\":\"USD\",\"pct\":-15}],\"priority\":0,\"resolution_mode\":\"most_specific_wins\"}",
+      "error": {
+        "name": "FinstackError",
+        "kind": "not_found",
+        "message": "Market data not found: USD-SOFR"
+      }
+    },
+    {
+      "name": "rates-remapped-with-equity",
+      "scenarioJson": "{\"id\":\"rate_shock_2022_rates+rate_shock_2022_equity\",\"name\":\"2022 Rate Shock - Rates + 2022 Rate Shock - Equity\",\"description\":null,\"operations\":[{\"kind\":\"curve_parallel_bp\",\"curve_kind\":\"discount\",\"curve_id\":\"USD-OIS\",\"bp\":300},{\"kind\":\"equity_price_pct\",\"ids\":[\"SPX\"],\"pct\":-25},{\"kind\":\"equity_price_pct\",\"ids\":[\"NDX\"],\"pct\":-33}],\"priority\":0,\"resolution_mode\":\"most_specific_wins\"}",
+      "report": {
+        "operations_applied": 1,
+        "user_operations": 3,
+        "expanded_operations": 3,
+        "changes": {
+          "market_targets": [
+            {
+              "kind": "curve",
+              "curve_kind": "discount",
+              "curve_id": "USD-OIS"
+            }
+          ],
+          "changed_instrument_indices": [],
+          "as_of_changed": false,
+          "portfolio_shape_changed": false,
+          "all_dirty": false
+        },
+        "applied_shocks": [
+          {
+            "applies_to": {
+              "scope": "market",
+              "target": {
+                "kind": "curve",
+                "curve_kind": "discount",
+                "curve_id": "USD-OIS"
+              }
+            },
+            "shock": {
+              "kind": "uniform",
+              "value": 300,
+              "unit": "bp"
+            }
+          }
+        ],
+        "warnings": [
+          {
+            "kind": "equity_not_found",
+            "id": "SPX"
+          },
+          {
+            "kind": "equity_not_found",
+            "id": "NDX"
+          }
+        ],
+        "meta": {
+          "numeric_mode": "f64",
+          "rounding": {
+            "mode": "bankers",
+            "ingest_scale_by_currency": {},
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "generic_epsilon": 1e-10
+            },
+            "version": 1
+          },
+          "fx_policy_applied": null,
+          "version": "0.11.0"
+        }
+      }
+    }
+  ]
+}

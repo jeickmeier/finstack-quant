@@ -148,12 +148,14 @@ fn test_ecf_sweep_basic() {
         .expect("evaluation should succeed");
 
     // Verify that EBITDA values are present
-    assert!(results
-        .get(
-            "ebitda",
-            &PeriodId::quarter(2025, 1).expect("valid period fixture")
-        )
-        .is_some());
+    assert!(
+        results
+            .get(
+                "ebitda",
+                &PeriodId::quarter(2025, 1).expect("valid period fixture")
+            )
+            .is_some()
+    );
     assert_eq!(
         results.get(
             "ebitda",
@@ -179,7 +181,7 @@ mod period_flow_waterfall_integration {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::money::Money;
     use finstack_quant_statements::capital_structure::{
-        calculate_period_flows, CapitalStructureState, EcfSweepSpec, PikToggleSpec, WaterfallSpec,
+        CapitalStructureState, EcfSweepSpec, PikToggleSpec, WaterfallSpec, calculate_period_flows,
     };
     use finstack_quant_statements::evaluator::EvaluationContext;
     use finstack_quant_statements::types::NodeId;
@@ -225,8 +227,12 @@ mod period_flow_waterfall_integration {
         for (idx, (name, _)) in values.iter().enumerate() {
             node_to_column.insert(NodeId::new(*name), idx);
         }
-        let mut ctx =
-            EvaluationContext::new(period, Arc::new(node_to_column), Arc::new(IndexMap::new()));
+        let mut ctx = EvaluationContext::new(
+            period,
+            &[],
+            Arc::new(node_to_column),
+            Arc::new(IndexMap::new()),
+        );
         for (name, value) in values {
             ctx.set_value(name, *value).expect("context accepts value");
         }

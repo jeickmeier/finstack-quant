@@ -108,6 +108,7 @@ import type {
 import type {
   DrawdownEpisode,
   LookbackReturns,
+  PerformancePanel,
   PeriodicReturn,
 } from './types/generated/analytics/index.js';
 import type { CovenantReport } from './types/generated/covenants/index.js';
@@ -174,9 +175,13 @@ import type {
   LmeAnalysis,
   LvarBangiaScalar,
   MoneyEstimate,
+  OptionCalculation,
+  OptionCalculationResult,
   PositionEsContribution,
   PositionFactorContribution,
   PositionRiskDecomposition,
+  PositionRiskReport,
+  PositionRiskRequest,
   PositionVarContribution,
   RiskDecomposition,
   RiskMeasure,
@@ -191,14 +196,23 @@ import type {
   CompositeRebalanceResult,
   CompositeTrade,
   EnhancedMonteCarloResult,
+  CurrencyLadder,
   ListedProductCoverage,
+  MetricFieldUnit,
   MetricMetadata,
   OasResult,
+  PoolReportFieldUnits,
+  ScenarioTableFieldUnits,
+  SimulationFieldUnits,
+  EquityMetricsFieldUnits,
+  StandardDealFamily,
+  TrancheSolveFieldUnits,
   PrimitiveAggregate,
   PrimitiveExposure,
   ResultsMeta,
   ScenarioCell,
   ScenarioTable,
+  TrancheCashflows,
   TrancheMetrics,
   ToleranceConfig,
   ValidationReport,
@@ -208,6 +222,7 @@ import type {
   AttributionSpec,
   AttributionResultEnvelope,
   PnlAttribution,
+  PnlBucketShare,
 } from './types/generated/attribution/index.js';
 import type {
   CheckCategory,
@@ -342,7 +357,7 @@ export type {
   ToleranceConfig,
 };
 export type { Period, RatingLevel } from './types/generated/core/index.js';
-export type { DrawdownEpisode, LookbackReturns, PeriodicReturn };
+export type { DrawdownEpisode, LookbackReturns, PerformancePanel, PeriodicReturn };
 export type { CovenantReport };
 export type {
   CrossSectionalOp,
@@ -406,9 +421,13 @@ export type {
   LmeAnalysis,
   LvarBangiaScalar,
   MoneyEstimate,
+  OptionCalculation,
+  OptionCalculationResult,
   PositionEsContribution,
   PositionFactorContribution,
   PositionRiskDecomposition,
+  PositionRiskReport,
+  PositionRiskRequest,
   PositionVarContribution,
   RiskDecomposition,
   RiskMeasure,
@@ -423,19 +442,34 @@ export type {
   CompositeRebalanceResult,
   CompositeTrade,
   EnhancedMonteCarloResult,
+  CurrencyLadder,
   ListedProductCoverage,
+  MetricFieldUnit,
   MetricMetadata,
   OasResult,
+  PoolReportFieldUnits,
+  ScenarioTableFieldUnits,
+  SimulationFieldUnits,
+  EquityMetricsFieldUnits,
+  StandardDealFamily,
+  TrancheSolveFieldUnits,
   PrimitiveAggregate,
   PrimitiveExposure,
   ResultsMeta,
   ScenarioCell,
   ScenarioTable,
+  TrancheCashflows,
   TrancheMetrics,
   ValidationReport,
 };
 export type { Diagnostic } from './types/generated/valuations/index.js';
-export type { AttributionInputs, AttributionSpec, AttributionResultEnvelope, PnlAttribution };
+export type {
+  AttributionInputs,
+  AttributionSpec,
+  AttributionResultEnvelope,
+  PnlAttribution,
+  PnlBucketShare,
+};
 export type {
   CheckCategory,
   CheckFinding,
@@ -8612,14 +8646,12 @@ export type RollingGreeks = WithFields<
 /**
  * Stateful performance analytics engine over a panel of ticker series.
  *
- * `Performance` is the single entry point exposed to JS. Construct from
- * a price matrix (`new Performance(...)`) or a return matrix
- * (`Performance.fromReturns(...)`); every metric is then reachable as
- * an instance method.
+ * `Performance` is the single entry point exposed to JS. Construct from a
+ * `PerformancePanel` of prices or simple returns (`new Performance(panel)`);
+ * every metric is then reachable as an instance method.
  *
- * The `prices` and `returns` supplied to the panel constructors are ticker-major
- * and column-oriented; matrix inputs to other methods follow their parameter
- * documentation.
+ * The panel's `series` are ticker-major (`series[tickerIdx][dateIdx]`); matrix
+ * inputs to other methods follow their parameter documentation.
  *
  * Multi-ticker scalar outputs come back as a `Float64Array` in
  * `tickerNames()` order (`maxDrawdownDuration` returns a plain `number[]` of
@@ -8628,40 +8660,26 @@ export type RollingGreeks = WithFields<
  */
 declare class Performance {
   /**
-   * Construct from a ticker-major, column-oriented price matrix. The outer
-   * element selects a ticker, and each inner series is aligned to `dates`.
-   * @param dates - ISO-8601 observation dates in ascending order, with one entry per value in each inner price series.
-   * @param prices - Ticker-major, column-oriented matrix where `prices[tickerIdx][dateIdx]` is the price for `tickerIdx` at `dates[dateIdx]`.
-   * @param tickerNames - Ticker labels aligned with the outer elements of `prices`.
-   * @param benchmarkTicker - Optional ticker label to use as the benchmark return series.
-   * @param frequency - Optional observation frequency token; defaults to daily.
-   * @throws Error - Rejects malformed dates or matrices, invalid prices, unsupported frequencies, a non-string benchmark ticker (kind `invalid_type`), and an unknown benchmark ticker (kind `not_found`).
+   * Construct from a dated price or return panel (the Rust `PerformancePanel`).
+   *
+   * @example
+   * ```typescript
+   * import init, { analytics } from "finstack-quant-wasm";
+   * await init();
+   * const perf = new analytics.Performance({
+   *   dates: ["2024-01-01", "2024-01-02", "2024-01-03"],
+   *   series: [[100, 101, 103]],
+   *   kind: "prices",
+   *   ticker_names: ["FUND"],
+   * });
+   * console.log(perf.getTickerNames()); // ["FUND"]
+   * perf.free();
+   * ```
+   *
+   * @param panel - `PerformancePanel` object or JSON text: strictly ascending ISO-8601 `dates`, ticker-major `series` (`series[i][t]` is ticker `i` at `dates[t]`; a leading or trailing gap is `null`), `kind` (`"prices"` for strictly positive prices or `"returns"` for simple decimal returns), unique `ticker_names`, an optional `benchmark_ticker` (the first ticker when omitted) and an optional `frequency` token (daily when omitted).
+   * @throws Error - Rejects a malformed panel or unknown field (kind `validation`), a non-finite number (kind `invalid_type`), invalid series or dates (kind `validation`) and an unknown benchmark ticker (kind `not_found`).
    */
-  constructor(
-    dates: string[],
-    prices: NumericMatrix,
-    tickerNames: string[],
-    benchmarkTicker?: string | null,
-    frequency?: string
-  );
-  /**
-   * Construct from a ticker-major, column-oriented return matrix. The outer
-   * element selects a ticker, and each inner series is aligned to `dates`.
-   * @param dates - ISO-8601 observation dates in ascending order, with one entry per value in each inner return series.
-   * @param returns - Ticker-major, column-oriented simple decimal return matrix where `returns[tickerIdx][dateIdx]` is the return for `tickerIdx` at `dates[dateIdx]`.
-   * @param tickerNames - Ticker labels aligned with the outer elements of `returns`.
-   * @param benchmarkTicker - Optional ticker label to use as the benchmark return series.
-   * @param frequency - Optional observation frequency token; defaults to daily.
-   * @returns A `Performance` handle over the supplied return panel.
-   * @throws Error - Rejects malformed dates or matrices, unsupported frequencies, a non-string benchmark ticker (kind `invalid_type`), and an unknown benchmark ticker (kind `not_found`).
-   */
-  static fromReturns(
-    dates: string[],
-    returns: NumericMatrix,
-    tickerNames: string[],
-    benchmarkTicker?: string | null,
-    frequency?: string
-  ): Performance;
+  constructor(panel: PerformancePanel | string);
   /**
    * Rebuild a panel from JSON produced by `toJson`.
    *
@@ -9030,11 +9048,12 @@ declare class Performance {
    * ```ts
    * import init, { analytics } from "finstack-quant-wasm";
    * await init();
-   * const perf = analytics.Performance.fromReturns(
-   *   ["2024-01-01", "2024-01-02"],
-   *   [[0.01, 0.02]],
-   *   ["FUND"],
-   * );
+   * const perf = new analytics.Performance({
+   *   dates: ["2024-01-01", "2024-01-02"],
+   *   series: [[0.01, 0.02]],
+   *   kind: "returns",
+   *   ticker_names: ["FUND"],
+   * });
    * const [[point]] = perf.periodicReturns();
    * console.log(point.date, point.value); // "2024-01-02", 0.0302
    * ```
@@ -9055,7 +9074,7 @@ declare class Performance {
    * two overlapping points; otherwise pairwise intersecting spans. A raw
    * estimate that is not a valid correlation matrix is Higham-repaired to
    * the nearest valid correlation matrix.
-   * @returns `{ matrix, repaired }`: the square correlation matrix as nested Float64Array rows in `getTickerNames()` order, and `true` when Higham repair was applied.
+   * @returns `{ matrix, repaired }`: the square correlation matrix as nested Float64Array rows in `getTickerNames()` order, with a diagonal of exactly 1 and every coefficient inside [-1, 1], and `true` when Higham repair was applied.
    * @throws Error - Rejects a degenerate pair or a matrix that cannot be repaired to a valid correlation matrix.
    */
   correlationMatrix(): { matrix: Float64Array[]; repaired: boolean };
@@ -9171,12 +9190,12 @@ declare class Performance {
    * calendar quarter and year. FYTD is the first observation on or after the
    * fiscal calendar start of `fiscalConfig` through `refDate`. Holidays are not
    * skipped. The first included simple return still spans the prior close.
-   * @param refDate - ISO-8601 date on which MTD, QTD, YTD, and FYTD windows end.
+   * @param refDate - ISO-8601 date on which MTD, QTD, YTD, and FYTD windows end. Omitted or `null` is the last active date; the result's `ref_date` states the date used.
    * @param fiscalConfig - Optional `FiscalConfig` handle for FYTD. Omitted or `null` is the calendar year (`FiscalConfig::default`).
-   * @returns Per-ticker `{ mtd, qtd, ytd, fytd }` numeric arrays of lookback returns as decimal fractions; `fytd` is never null.
-   * @throws Error - Rejects an invalid ISO `ref_date` or a result that cannot be serialized to JavaScript.
+   * @returns The window end `ref_date` and per-ticker `{ mtd, qtd, ytd, fytd }` numeric arrays of lookback returns as decimal fractions; `fytd` is never null.
+   * @throws Error - Rejects an invalid ISO `ref_date`, an omitted one while no dates are active, or a result that cannot be serialized to JavaScript.
    */
-  lookbackReturns(refDate: string, fiscalConfig?: FiscalConfig | null): LookbackReturns;
+  lookbackReturns(refDate?: string | null, fiscalConfig?: FiscalConfig | null): LookbackReturns;
   /**
    * Aggregated period statistics for one asset at the given frequency. Without
    * a fiscal calendar, Gregorian periods are bucketed with ISO weeks.
@@ -9215,8 +9234,8 @@ declare class Performance {
 export interface AnalyticsNamespace {
   /**
    * `Performance` is the single entry point for analytics on a panel of
-   * ticker series. Construct from prices (`new Performance(...)`) or from
-   * returns (`Performance.fromReturns(...)`); every metric — return/risk
+   * ticker series. Construct from a `PerformancePanel` of prices or returns
+   * (`new Performance(panel)`); every metric — return/risk
    * scalars, drawdown statistics, rolling windows, periodic returns
    * (MTD/QTD/YTD/FYTD), benchmark alpha/beta, basic factor models — is a
    * method on the resulting instance.
@@ -9733,62 +9752,32 @@ export interface FactorModelCreditNamespace {
 /**
  * Product-independent factor and position risk decomposition kernels.
  *
- * The VaR, ES, and risk-budget functions return the canonical Rust result types
- * (`PositionRiskDecomposition`, `RiskBudgetResult`), the same objects the
+ * The position risk report and risk-budget functions return the canonical Rust
+ * result types (`PositionRiskReport`, `RiskBudgetResult`), the same objects the
  * Python functions return.
  * @example
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const result = models.factor.risk.parametricVarDecomposition(
- *   ["A", "B"],
- *   [0.6, 0.4],
- *   [[0.04, 0.01], [0.01, 0.09]],
- * );
- * console.log(result.portfolio_var, result.var_contributions[0].relative_var);
+ * const report = models.factor.risk.positionRiskReport({
+ *   position_ids: ["A", "B"],
+ *   source: { kind: "parametric", weights: [0.6, 0.4], covariance: [[0.04, 0.01], [0.01, 0.09]] },
+ * });
+ * console.log(report.decomposition.portfolio_var, report.stress); // ..., null
  * ```
  */
 export interface FactorRiskNamespace {
   /**
-   * Decompose portfolio VaR and ES into position contributions via
-   * parametric Euler allocation.
+   * Decompose position VaR/ES from a parametric or historical source, with an
+   * optional risk budget and, for scenario P&L, the tail stress attribution.
    *
-   * Returns the canonical `PositionRiskDecomposition` (the object Python's
-   * `parametric_var_decomposition` returns): portfolio VaR/ES (losses
-   * negative), `method`, and per-position `var_contributions` and
-   * `es_contributions` rows.
-   * @returns The canonical `PositionRiskDecomposition` with VaR and ES contributions.
-   * @param positionIds - Position identifiers, one per weight.
-   * @param weights - Position weights or exposures in portfolio currency.
-   * @param covariance - Square position-return covariance matrix as nested rows (`n x n`, row-major).
-   * @param confidence - Optional tail confidence as a decimal probability in `(0.5, 1)`; omitted or `null` defaults to 0.95.
-   * @param computeIncremental - Optional; when `true`, also computes incremental VaR (one full repricing per position). Defaults to `false`.
-   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if identifier, weight, or covariance dimensions disagree; the covariance matrix is not finite, symmetric, and positive semidefinite; or `confidence` is not finite and in `(0.5, 1)`.
+   * Returns the canonical `PositionRiskReport` (the object Python's
+   * `position_risk_report` returns).
+   * @returns `decomposition` (portfolio and per-position VaR/ES, losses negative), `budget` (`null` without a budget) and `stress` (`null` for a parametric source).
+   * @param request - `PositionRiskRequest` object or JSON text: `position_ids`, an optional `confidence` (decimal in `(0.5, 1)`, default 0.95), a `source` tagged by `kind` (`{kind: "parametric", weights, covariance, compute_incremental}` with exposures in portfolio currency, an `n x n` covariance in position order and incremental VaR off by default, or `{kind: "historical", pnls}` with one row of scenario P&L per position, losses negative) and an optional `budget` (`{targets, utilization_threshold}`, target VaR shares in position order summing to ~1).
+   * @throws Error - Throws a `validation` error for a malformed request, an unknown field or kind, dimensions that disagree with the position ids, an invalid covariance, too few scenarios for the tail, a confidence outside `(0.5, 1)` or a malformed budget; `invalid_type` for a non-finite number.
    */
-  parametricVarDecomposition(
-    positionIds: string[],
-    weights: NumericArray,
-    covariance: NumericArray[],
-    confidence?: number | null,
-    computeIncremental?: boolean | null
-  ): PositionRiskDecomposition;
-  /**
-   * Decompose portfolio VaR and Expected Shortfall from per-position scenario
-   * profit-and-loss series using historical simulation.
-   *
-   * `positionPnls` is position-major (one row per position), the Rust
-   * layout both hosts share.
-   * @returns The canonical `PositionRiskDecomposition`, including the historical `es_contributions` rows.
-   * @param positionIds - Position identifiers, one per P&L row.
-   * @param positionPnls - Position-major P&L matrix: one row per position, one column per scenario (losses negative).
-   * @param confidence - Optional tail confidence as a decimal probability in `(0.5, 1)`; omitted or `null` defaults to 0.95.
-   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if the matrix does not have one row per position or its rows have different scenario counts, `confidence` is not finite and in `(0.5, 1)`, too few scenarios resolve the requested tail, or a P&L value is non-finite.
-   */
-  historicalVarDecomposition(
-    positionIds: string[],
-    positionPnls: NumericArray[],
-    confidence?: number | null
-  ): PositionRiskDecomposition;
+  positionRiskReport(request: PositionRiskRequest | string): PositionRiskReport;
   /**
    * Evaluate per-position component VaRs against target risk-budget shares.
    * @returns The canonical `RiskBudgetResult` with per-position utilization and excess.
@@ -9831,12 +9820,25 @@ export interface FactorRiskNamespace {
   defaultUtilizationThreshold(): number;
   /**
    * One position's component VaR from a position risk decomposition.
-   * @param decomp - `PositionRiskDecomposition` object or JSON, as returned by `parametricVarDecomposition` or `historicalVarDecomposition`.
+   * @param decomp - `PositionRiskDecomposition` object or JSON, such as a `positionRiskReport` result's `decomposition`.
    * @param positionId - Position identifier exactly as it appears in the decomposition.
    * @returns The position's Euler-allocated component VaR (losses negative).
    * @throws Error - Throws a `validation` error if `decomp` is malformed, and a `not_found` error if the position is not in the decomposition.
    */
   positionComponentVar(decomp: PositionRiskDecomposition | string, positionId: string): number;
+  /**
+   * Evaluate a risk budget against a position risk decomposition.
+   * @param decomp - `PositionRiskDecomposition` object or JSON, such as a `positionRiskReport` result's `decomposition`.
+   * @param targetVarPct - Target fraction of portfolio VaR in `[0, 1]` per position, aligned with `decomp.var_contributions`; non-empty targets must sum to one within 0.05.
+   * @param utilizationThreshold - Optional actual-to-target ratio that flags a budget breach; omit for the Rust default of 1.2.
+   * @returns `RiskBudgetResult`: per-position `positions` rows, `total_overbudget` and `has_breach`.
+   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if `decomp` is malformed, `targetVarPct` does not have one entry per position, targets are non-finite, outside [0, 1] or do not sum to one, the threshold is non-positive, or nonzero component VaR is paired with zero portfolio VaR.
+   */
+  evaluateRiskBudgetFromDecomposition(
+    decomp: PositionRiskDecomposition | string,
+    targetVarPct: number[] | Float64Array,
+    utilizationThreshold?: number | null
+  ): RiskBudgetResult;
   /**
    * Decompose portfolio risk into factor and position contributions.
    *
@@ -11930,16 +11932,16 @@ export interface VmCalculator extends WasmOwned {
    * @param exposure - Signed mark-to-market in `currency`: positive means the counterparty owes the desk.
    * @param postedCollateral - Signed collateral balance in `currency`: positive held, negative posted, including pending agreed calls.
    * @param currency - ISO-4217 code; must equal the CSA base currency.
-   * @param asOf - ISO-8601 calculation date; the settlement date is derived from it on the CSA calendar.
-   * @returns The `VmResult` as a plain object: `date`, `settlement_date`, and Money amounts `gross_exposure`, `threshold`, `independent_amount`, `net_exposure`, `collateral_balance`, `unrounded_call`, `mta`, `rounding_increment`, `post_amount` and `collect_amount`.
+   * @param asOf - ISO-8601 valuation date; a date that is not a business day of the CSA calendar is rolled to the next one (Following), and the settlement date is derived from that call date.
+   * @returns The `VmResult` as a plain object: `date` (the call date, a CSA business day), `settlement_date`, and Money amounts `gross_exposure`, `threshold`, `independent_amount`, `net_exposure`, `collateral_balance`, `unrounded_call`, `mta`, `rounding_increment`, `post_amount` and `collect_amount`.
    * @throws Error - Throws if the currency is unknown or differs from the CSA base currency, an amount is non-finite, the date is not ISO 8601, or the CSA calendar is not registered.
    */
   calculate(exposure: number, postedCollateral: number, currency: string, asOf: string): VmResult;
   /**
    * Run an exposure time series into a margin-call schedule.
-   * @param exposures - Array of `[date, exposure]` pairs: ISO-8601 date and signed exposure in the CSA base currency (positive means the counterparty owes the desk), processed in the order given.
+   * @param exposures - Array of `[date, exposure]` pairs: ISO-8601 date and signed exposure in the CSA base currency (positive means the counterparty owes the desk), processed in the order given; a date that is not a business day of the CSA calendar is rolled to the next one (Following).
    * @param initialCollateral - Collateral balance before the first date, in major units of the CSA base currency.
-   * @returns One `MarginCall` plain object per call (`call_date`, `settlement_date`, `call_type`, `amount`, `mtm_trigger`, `threshold`, `mta_applied`); dates without a call produce no entry.
+   * @returns One `MarginCall` plain object per call (`call_date` on a CSA business day, `settlement_date`, `call_type`, `amount`, `mtm_trigger`, `threshold`, `mta_applied`); dates without a call produce no entry.
    * @throws Error - Throws if `exposures` is not an array of `[string, number]` pairs, an amount is non-finite, a date is not ISO 8601, or the CSA calendar is not registered.
    */
   generateMarginCalls(
@@ -12933,10 +12935,10 @@ export interface MarginNamespace {
   /**
    * Regulatory CSA specification for any supported base currency.
    * @param currency - ISO-4217 base currency of the agreement; every CSA amount is in it.
-   * @param id - Identifier stamped on the specification.
+   * @param id - Identifier stamped on the specification; must be non-empty (an empty or whitespace-only id is rejected).
    * @param collateralCurve - Curve id used to discount and accrue interest on collateral, for example `"USD-OIS"`.
    * @returns The `CsaSpec` as a plain object.
-   * @throws Error - Throws for an unknown currency, or if the embedded margin registry has no regulatory terms for it or cannot be loaded.
+   * @throws Error - Throws a `validation` error for an empty or whitespace-only id or an empty collateral curve; throws for an unknown currency, or if the embedded margin registry has no regulatory terms for it or cannot be loaded.
    */
   csaSpecRegulatory(currency: string, id: string, collateralCurve: string): CsaSpec;
   /**
@@ -14574,7 +14576,8 @@ export interface CovenantEngine extends WasmOwned {
  * ```typescript
  * import init, { covenants } from "finstack-quant-wasm";
  * await init();
- * const engine = covenants.CovenantEngine.fromSpecs(covenants.covLite(7.0, 4.5));
+ * const specs = covenants.covenantTemplate({ kind: "cov_lite", max_leverage: 7.0, max_senior_leverage: 4.5 });
+ * const engine = covenants.CovenantEngine.fromSpecs(specs);
  * const reports = engine.evaluate({ total_leverage: 5.0, senior_leverage: 3.0 }, "2026-03-31");
  * console.log(reports.max_total_leverage.passed);
  * engine.free();
@@ -14621,7 +14624,13 @@ export interface CovenantEngineConstructor {
  * ```typescript
  * import init, { covenants } from "finstack-quant-wasm";
  * await init();
- * const specs = JSON.parse(covenants.lboStandardJson(6, 2, 1.5, 50_000_000));
+ * const specs = covenants.covenantTemplate({
+ *   kind: "lbo_standard",
+ *   initial_leverage: 6,
+ *   interest_coverage: 2,
+ *   fixed_charge_coverage: 1.5,
+ *   max_capex: 50_000_000,
+ * });
  * const reports = covenants.evaluateEngine(
  *   JSON.stringify({ specs }),
  *   JSON.stringify({ debt_to_ebitda: 4.5, interest_coverage: 3, fixed_charge_coverage: 2, capex: 1e7 }),
@@ -14666,125 +14675,19 @@ export interface CovenantsNamespace {
     asOf: string
   ): Record<string, CovenantReport>;
   /**
-   * Standard leveraged-buyout covenant package as JSON.
-   * @param initialLeverage - Maximum debt-to-EBITDA threshold in turns (`5.0` = 5.0x), applied at every quarterly test date.
-   * @param interestCoverage - Minimum EBIT-to-interest coverage ratio in turns.
-   * @param fixedChargeCoverage - Minimum fixed-charge-coverage threshold in turns, tested against the caller-supplied `fixed_charge_coverage` metric.
-   * @param maxCapex - Maximum annual capital expenditure amount in the caller's reporting currency.
-   * @returns Compact JSON array of `CovenantSpec` objects in serde field order (not key-sorted canonical form); wrap it as `{ "specs": [...] }` for `evaluateEngine` / `validateCovenantEngineJson`, or pass one element through `validateCovenantSpecJson` for canonical form.
-   * @throws Error - Throws a JavaScript exception if any threshold is `NaN`, infinite or negative, or if the generated covenant package cannot be serialized to JSON.
-   */
-  lboStandardJson(
-    initialLeverage: number,
-    interestCoverage: number,
-    fixedChargeCoverage: number,
-    maxCapex: number
-  ): string;
-  /**
-   * Covenant-lite package as JSON.
-   * @param maxLeverage - Maximum total debt-to-EBITDA leverage ratio.
-   * @param maxSeniorLeverage - Maximum senior-debt-to-EBITDA leverage ratio.
-   * @returns Compact JSON array of `CovenantSpec` objects in serde field order (not key-sorted canonical form); wrap it as `{ "specs": [...] }` for `evaluateEngine` / `validateCovenantEngineJson`, or pass one element through `validateCovenantSpecJson` for canonical form.
-   * @throws Error - Throws a JavaScript exception if any threshold is `NaN`, infinite or negative, or if the generated covenant package cannot be serialized to JSON.
-   */
-  covLiteJson(maxLeverage: number, maxSeniorLeverage: number): string;
-  /**
-   * Real-estate covenant package as JSON.
-   * @param minDscr - Minimum debt-service coverage ratio.
-   * @param minDebtYield - Minimum net-operating-income debt yield expressed as a decimal.
-   * @param maxLtv - Maximum loan-to-value ratio expressed as a decimal.
-   * @returns Compact JSON array of `CovenantSpec` objects in serde field order (not key-sorted canonical form); wrap it as `{ "specs": [...] }` for `evaluateEngine` / `validateCovenantEngineJson`, or pass one element through `validateCovenantSpecJson` for canonical form.
-   * @throws Error - Throws a JavaScript exception if any threshold is `NaN`, infinite or negative, or if the generated covenant package cannot be serialized to JSON.
-   */
-  realEstateJson(minDscr: number, minDebtYield: number, maxLtv: number): string;
-  /**
-   * Project-finance covenant package as JSON.
-   * @param minDscr - Minimum debt-service coverage ratio.
-   * @param distributionLockupDscr - DSCR threshold below which borrower distributions are locked up.
-   * @param minLiquidity - Minimum required liquidity reserve in the model's monetary units.
-   * @param maxNetLeverage - Maximum net-debt-to-EBITDA leverage ratio.
-   * @returns Compact JSON array of `CovenantSpec` objects in serde field order (not key-sorted canonical form); wrap it as `{ "specs": [...] }` for `evaluateEngine` / `validateCovenantEngineJson`, or pass one element through `validateCovenantSpecJson` for canonical form.
-   * @throws Error - Throws a JavaScript exception if any threshold is `NaN`, infinite or negative, or if the generated covenant package cannot be serialized to JSON.
-   */
-  projectFinanceJson(
-    minDscr: number,
-    distributionLockupDscr: number,
-    minLiquidity: number,
-    maxNetLeverage: number
-  ): string;
-
-  /**
    * `CovenantEngine` handle: covenant package: specifications, waivers and the breach history.
    */
   CovenantEngine: CovenantEngineConstructor;
 
   /**
-   * Standard leveraged-buyout covenant package.
+   * Build the covenant specs of one standard package.
    *
-   * Typed twin of `lboStandardJson`: quarterly maximum Debt / EBITDA, minimum
-   * interest coverage and minimum fixed-charge coverage tests plus an annual
-   * maximum-capex test.
-   *
-   * @param initialLeverage - Maximum debt-to-EBITDA threshold in turns (`5.0` means 5.0x).
-   * @param interestCoverage - Minimum interest-coverage threshold in turns.
-   * @param fixedChargeCoverage - Minimum fixed-charge-coverage threshold in turns.
-   * @param maxCapex - Maximum annual capital expenditure in the reporting currency.
-   * @returns `CovenantSpec` wire objects, ready for `CovenantEngine.fromSpecs`.
-   * @throws If a threshold is not a number (kind `invalid_type`), or is NaN, infinite or negative (kind `validation`).
+   * @param template - `CovenantTemplate` object or JSON text: `kind` (`"lbo_standard"`, `"cov_lite"`, `"real_estate"` or `"project_finance"`) and that package's thresholds by Rust field name (ratios in turns, `min_debt_yield` and `max_ltv` as decimals, `max_capex` and `min_liquidity` in the reporting currency).
+   * @returns `CovenantSpec` wire objects in the package's documented order, ready for `CovenantEngine.fromSpecs`.
+   * @throws If the template is malformed, has an unknown kind or field, or a threshold is NaN, infinite or negative (kind `validation`).
    */
-  lboStandard(
-    initialLeverage: number,
-    interestCoverage: number,
-    fixedChargeCoverage: number,
-    maxCapex: number
-  ): generated.covenants.CovenantSpec[];
-
-  /**
-   * Covenant-lite package: incurrence-style total and senior leverage tests.
-   *
-   * Typed twin of `covLiteJson`.
-   *
-   * @param maxLeverage - Maximum total debt-to-EBITDA leverage in turns.
-   * @param maxSeniorLeverage - Maximum senior-debt-to-EBITDA leverage in turns.
-   * @returns `CovenantSpec` wire objects, ready for `CovenantEngine.fromSpecs`.
-   * @throws If a threshold is not a number (kind `invalid_type`), or is NaN, infinite or negative (kind `validation`).
-   */
-  covLite(maxLeverage: number, maxSeniorLeverage: number): generated.covenants.CovenantSpec[];
-
-  /**
-   * Real-estate covenant package: DSCR, debt yield and loan-to-value tests.
-   *
-   * Typed twin of `realEstateJson`.
-   *
-   * @param minDscr - Minimum debt-service coverage ratio in turns.
-   * @param minDebtYield - Minimum net-operating-income debt yield as a decimal (`0.08` = 8%).
-   * @param maxLtv - Maximum loan-to-value ratio as a decimal (`0.65` = 65%).
-   * @returns `CovenantSpec` wire objects, ready for `CovenantEngine.fromSpecs`.
-   * @throws If a threshold is not a number (kind `invalid_type`), or is NaN, infinite or negative (kind `validation`).
-   */
-  realEstate(
-    minDscr: number,
-    minDebtYield: number,
-    maxLtv: number
-  ): generated.covenants.CovenantSpec[];
-
-  /**
-   * Project-finance covenant package: DSCR, distribution lock-up, liquidity and net leverage tests.
-   *
-   * Typed twin of `projectFinanceJson`.
-   *
-   * @param minDscr - Minimum debt-service coverage ratio in turns.
-   * @param distributionLockupDscr - DSCR below which distributions are locked up, in turns.
-   * @param minLiquidity - Minimum liquidity reserve in the reporting currency.
-   * @param maxNetLeverage - Maximum net-debt-to-EBITDA leverage in turns.
-   * @returns `CovenantSpec` wire objects, ready for `CovenantEngine.fromSpecs`.
-   * @throws If a threshold is not a number (kind `invalid_type`), or is NaN, infinite or negative (kind `validation`).
-   */
-  projectFinance(
-    minDscr: number,
-    distributionLockupDscr: number,
-    minLiquidity: number,
-    maxNetLeverage: number
+  covenantTemplate(
+    template: generated.covenants.CovenantTemplate | string
   ): generated.covenants.CovenantSpec[];
 
   /**
@@ -21980,9 +21883,9 @@ export interface StructuredCredit extends WasmOwned {
    * Equity-tranche return metrics (mirrors Rust `calculate_equity_metrics`).
    * @param marketJson - Canonical market-context JSON (string or plain object) supplying the discount and forward curves.
    * @param asOf - ISO-8601 valuation date.
-   * @param purchasePricePct - Optional equity purchase price in percent of its balance (`60` = 60%); omit to invest at the model net asset value.
-   * @returns `EquityMetrics` plain object with IRR, MOIC, NAV in percent of balance and cash-on-cash yields.
-   * @throws Error - Throws with kind `not_found` if a curve is missing, kind `validation` if an input is malformed or the deal has no equity tranche, and kind `computation` if the simulation fails.
+   * @param purchasePricePct - Optional equity purchase price in percent of its current balance (`60` = 60%); omit to invest at par. Must be finite and non-negative.
+   * @returns `EquityMetrics` plain object: `invested`; `irr`, an annual XIRR (ACT/365F) decimal or `null` when no rate solves; `moic`, a multiple of invested; `nav_pct`, the distributions discounted on the deal's discount curve as a percent of current balance; and `cash_on_cash`, each distribution as an unannualized decimal share of invested. `equityMetricsFieldUnits` states the units.
+   * @throws Error - Throws with kind `not_found` if a curve is missing or the simulation records no equity tranche, kind `validation` if an input is malformed or the deal has no equity tranche, and kind `computation` if the simulation fails.
    */
   equityMetrics(
     marketJson: JsonInput,
@@ -22083,12 +21986,12 @@ export interface StructuredCreditConstructor {
    * example.free();
    * ```
    * @param dealType - Registry family: `abs`, `clo`, `cmbs` or `rmbs`; other deal types are rejected.
-   * @param params - Canonical `StandardDealParams` object or JSON string; `calendar_id` may be null at construction but simulation requires a payment calendar.
+   * @param params - Canonical `StandardDealParams` object or JSON string; `calendar_id` may be null at construction but simulation requires a payment calendar, and `pool.deal_type` must be the family (`abs` also takes `auto` and `card` pools).
    * @returns The deal with its selected registry assumptions and validated structure.
-   * @throws Error - Throws with kind `validation` for an unsupported profile, malformed inputs or invalid deal, and `invalid_type` for a wrong JavaScript type.
+   * @throws Error - Throws with kind `validation` for an unsupported profile, a pool that contradicts the family, malformed inputs or invalid deal, and `invalid_type` for a wrong JavaScript type.
    */
   newStandard(
-    dealType: 'abs' | 'clo' | 'cmbs' | 'rmbs',
+    dealType: generated.valuations.StandardDealFamily['deal_type'],
     params: generated.valuations.StandardDealParams | string
   ): StructuredCredit;
 }
@@ -23168,11 +23071,102 @@ export interface ValuationInstrumentsNamespace {
    * ]);
    * console.log(ytm.unit, bucket.components, bucket.bucketed);
    * ```
-   * @param keys - Canonical scalar or qualified wire keys in output order. Custom keys retain unknown units; malformed or obsolete encodings are rejected.
-   * @returns Ordered metadata records preserving original keys, decoded components, native unit families, display groups, and bucket eligibility.
+   * @param keys - Canonical scalar or qualified wire keys in output order. A custom key has a unit only when Rust declares one; one the standard registry holds gets the group `"Instrument Specific"`, any other gets no group; malformed or obsolete encodings are rejected.
+   * @returns Ordered metadata records preserving original keys, decoded components, the coordinates that order them, native unit families, display groups, and bucket eligibility.
    * @throws Error - Throws a validation error for malformed canonical metric keys or a serialization error when conversion fails.
    */
   metricMetadata(keys: string[]): MetricMetadata[];
+  /**
+   * Wire names of the mutually exclusive price-driving market quotes.
+   * @returns Field names as they appear on the wire, in precedence order.
+   * @throws Error - Throws a `computation` error only if the names cannot cross the boundary.
+   */
+  priceDriverFields(): string[];
+  /**
+   * Units of the `ScenarioCell` fields, the one place a host reads them from.
+   *
+   * Rates are decimals, the price is percent of the tranche's current balance and the writedown is in currency units. Values are never rescaled.
+   * @param currency - ISO-4217 code of the result's `ScenarioTable.currency`, in any ASCII case; it names the unit of `writedown`.
+   * @returns `ScenarioTableFieldUnits`: `axes`, one `MetricFieldUnit` per swept input (`cpr`, `cdr`, `severity`), and `measures`, one per reported measure (`price`, `wal`, `writedown`), each in struct order.
+   * @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+   */
+  scenarioTableFieldUnits(currency: string): ScenarioTableFieldUnits;
+  /**
+   * Units of a structured-credit simulation's charted series, the one place a host reads them from.
+   *
+   * Coverage ratios, triggers and cushions are in times covered, credit enhancement is a decimal share of the collateral and excess spread an annual decimal of the opening pool balance. Values are never rescaled.
+   * @param currency - ISO-4217 code of the simulation's deal currency, in any ASCII case; it names the unit of `diverted_cash`.
+   * @returns `SimulationFieldUnits`: `coverage_tests`, one `MetricFieldUnit` per numeric coverage-test field (`ratio`, `trigger_level`, `cushion`) in struct order, and one each for `diverted_cash`, `credit_enhancement` and `excess_spread`.
+   * @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+   */
+  simulationFieldUnits(currency: string): SimulationFieldUnits;
+  /**
+   * Units of the `EquityMetrics` fields, the one place a host reads them from.
+   *
+   * The IRR is an annual decimal, the MOIC a multiple of the invested amount, the NAV a percent of the equity's current balance and cash-on-cash a decimal share of the invested amount. Values are never rescaled.
+   * @param currency - ISO-4217 code of the result's `currency`, in any ASCII case; it names the unit of `invested`.
+   * @returns `EquityMetricsFieldUnits`: one `MetricFieldUnit` each for `invested`, `irr`, `moic`, `nav_pct` and `cash_on_cash`, and `purchase_price` for the `purchasePricePct` argument of `equityMetrics`: percent of current balance, omitted means par.
+   * @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+   */
+  equityMetricsFieldUnits(currency: string): EquityMetricsFieldUnits;
+  /**
+   * Deal families `StructuredCredit.newStandard` accepts, the one place a host reads them from.
+   *
+   * @returns `StandardDealFamily[]` in `abs`, `clo`, `cmbs`, `rmbs` order: `deal_type`, the `newStandard` argument; `profile_id`, the registry profile supplying the family's frequency and credit assumptions; and `example`, complete `StandardDealParams` that `newStandard` accepts for the family, with its id, tranche ids and `pool.deal_type` naming the family.
+   * @throws Error - Throws a `validation` error if an example cannot be constructed, which its fixed inputs do not trigger.
+   */
+  standardDealFamilies(): StandardDealFamily[];
+  /**
+   * Units of the `PoolReport` fields, the one place a host reads them from.
+   * @param currency - ISO-4217 code of the pool's base currency, in any ASCII case; it names the unit of `total_balance`, `undrawn_commitment` and each row's `balance`.
+   * @returns `PoolReportFieldUnits`: `total_balance` and `warf`, each one `MetricFieldUnit`; `stats`, one per `PoolStats` field in struct order; and `concentration`, one per numeric `PoolConcentrationEntry` field in struct order.
+   * @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+   */
+  poolReportFieldUnits(currency: string): PoolReportFieldUnits;
+  /**
+   * Units of the `BondQuoteSet` fields, in struct order, the one place a host reads them from.
+   * @param currency - ISO-4217 code of the bond whose set is being labelled, in any ASCII case; it names the unit of `clean_price_currency` and `dirty_price_currency`.
+   * @returns One `MetricFieldUnit` per `BondQuoteSet` field in struct order: the wire field name, its unit text and the Rust field the unit is documented on.
+   * @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+   */
+  bondQuoteSetFieldUnits(currency: string): MetricFieldUnit[];
+  /**
+   * Units of the scalar `TrancheMetrics` fields, in struct order.
+   * @param currency - ISO-4217 code of the result's `TrancheMetrics.currency`, in any ASCII case; it names the unit of `pv`, `accrued` and `cs01`.
+   * @returns One `MetricFieldUnit` per scalar field: the wire field name, its unit text and the Rust field that documents it. `tranche_id`, `currency` and the `metrics` map are not listed.
+   * @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+   */
+  trancheMetricFieldUnits(currency: string): MetricFieldUnit[];
+  /**
+   * Units of the tranche break-even CDR, discount margin and OAS results.
+   * @returns `TrancheSolveFieldUnits`: `breakeven_cdr` and `discount_margin`, each one `MetricFieldUnit`, and `oas`, one `MetricFieldUnit` per `OasResult` field in struct order.
+   */
+  trancheSolveFieldUnits(): TrancheSolveFieldUnits;
+  /**
+   * Calendar-year ladders of a cashflow envelope, one per row currency.
+   * @param envelope - `InstrumentCashflowEnvelope` returned by `instrumentCashflows`, as an object or JSON.
+   * @returns One `CurrencyLadder` per row currency, in first-appearance order of `flows`; rows ascend by year.
+   * @throws Error - Throws a `validation` error if `envelope` is malformed or an amount or native PV is non-finite.
+   */
+  calendarYearLadderByCurrency(
+    envelope: generated.valuations.InstrumentCashflowEnvelope | string
+  ): CurrencyLadder[];
+  /**
+   * List the standard metrics registered for one instrument type, grouped by
+   * display category.
+   * @example
+   * ```typescript
+   * import init, { valuations } from "finstack-quant-wasm";
+   * await init();
+   * const grouped = valuations.instruments.metricsForInstrument('structured_credit');
+   * const offersWal = Object.values(grouped).some((ids) => ids.includes('wal'));
+   * console.log(offersWal); // true
+   * ```
+   * @param instrumentType - Canonical instrument-type tag, matched exactly in snake case (for example `"bond"`, `"fx_option"` or `"structured_credit"`); the same tag an instrument envelope carries in its `type` field.
+   * @returns Applicable metric identifiers keyed by human-readable group name, each array sorted ascending.
+   * @throws Error - Throws a validation error when `instrumentType` is not a known instrument type, or a `TypeError` when it is not a string.
+   */
+  metricsForInstrument(instrumentType: string): Record<string, string[]>;
   /**
    * Z-spread-equivalent discount margin for a floating-rate tranche, returned in
    * decimal units (`0.015` = 150 bp).
@@ -23496,32 +23490,35 @@ export interface ValuationInstrumentsNamespace {
   /**
    * Weighted-average coupon of the performing fixed-rate collateral (mirrors Rust `AssetPool::wac`).
    * @param pool - `AssetPool` plain object or JSON string.
-   * @returns Balance-weighted coupon as an annual decimal (`0.07` = 7%); `0` when no performing fixed-rate collateral exists.
+   * @returns Balance-weighted coupon as an annual decimal (`0.07` = 7%); `undefined` when no performing fixed-rate collateral exists.
    * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema.
    */
-  assetPoolWac(pool: generated.valuations.AssetPool | string): number;
+  assetPoolWac(pool: generated.valuations.AssetPool | string): number | undefined;
   /**
    * Weighted-average spread of the performing collateral that carries an explicit spread (mirrors Rust `AssetPool::weighted_avg_spread_bp`).
    * @param pool - `AssetPool` plain object or JSON string.
-   * @returns Balance-weighted spread in basis points; `0` when no performing asset carries a spread.
+   * @returns Balance-weighted spread in basis points; `undefined` when no performing asset carries a spread.
    * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema.
    */
-  assetPoolWeightedAvgSpreadBp(pool: generated.valuations.AssetPool | string): number;
+  assetPoolWeightedAvgSpreadBp(pool: generated.valuations.AssetPool | string): number | undefined;
   /**
    * Balance-weighted average remaining maturity (mirrors Rust `AssetPool::weighted_avg_maturity`).
    * @param pool - `AssetPool` plain object or JSON string.
    * @param asOf - ISO-8601 date the remaining maturities are measured from.
-   * @returns Weighted average maturity in years (ACT/365F from `asOf`); `0` for an empty pool.
+   * @returns Weighted average maturity in years (ACT/365F from `asOf`); `undefined` when the pool balance is zero.
    * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, `asOf` is malformed, or the pool balances are inconsistent.
    */
-  assetPoolWeightedAvgMaturity(pool: generated.valuations.AssetPool | string, asOf: string): number;
+  assetPoolWeightedAvgMaturity(
+    pool: generated.valuations.AssetPool | string,
+    asOf: string
+  ): number | undefined;
   /**
    * Moody's diversity score of the pool (mirrors Rust `AssetPool::diversity_score`).
    * @param pool - `AssetPool` plain object or JSON string.
-   * @returns Diversity score from the obligor and industry concentrations; `0` when the pool balance cannot be computed.
-   * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema.
+   * @returns Diversity score over the assets that name an obligor; `undefined` when the pool balance is zero or no asset names an obligor.
+   * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema or the pool balances are inconsistent.
    */
-  assetPoolDiversityScore(pool: generated.valuations.AssetPool | string): number;
+  assetPoolDiversityScore(pool: generated.valuations.AssetPool | string): number | undefined;
   /**
    * Loan-level assets of one obligor (mirrors Rust `AssetPool::assets_by_obligor`).
    * @param pool - `AssetPool` plain object or JSON string.
@@ -23544,6 +23541,99 @@ export interface ValuationInstrumentsNamespace {
     pool: generated.valuations.AssetPool | string,
     industry: string
   ): generated.valuations.PoolAsset[];
+  /**
+   * One row per payment date of a tranche's flows (mirrors Rust `TrancheCashflows::to_table`).
+   *
+   * Python reaches the same table through `TrancheCashflows.to_dataframe`.
+   * @param cashflows - `TrancheCashflows` plain object or JSON string, as `StructuredCredit.trancheCashflows` returns it.
+   * @returns `TableEnvelope` with a `date` column in ascending order and float `cashflow`, `interest`, `principal`, `pik`, `deferred` and `writedown` columns in the flows' one currency, which the table does not state (read `total_interest.currency`). Flows on one date are summed per kind; a kind with no flow on a date is zero; the columns remain when there are no rows.
+   * @throws Error - Throws with kind `validation` if `cashflows` does not match the `TrancheCashflows` schema or mixes currencies.
+   */
+  trancheCashflowsTable(cashflows: generated.valuations.TrancheCashflows | string): TableEnvelope;
+  /**
+   * Yield and I-spread to every call, put and maturity exit of a bond at one market price, with the worst marked (mirrors Rust `bond_workout_ladder`).
+   * @param bond - Borrowed `Bond` handle; it is not consumed. A bond with exercise rights must carry `quoted_clean_price_pct`; one with none falls back to its model price.
+   * @param marketJson - Canonical market-context JSON holding the bond's discount curve, the source of the swap par rates, and any floating index and make-whole reference curves.
+   * @param asOf - ISO-8601 valuation date; the quote date and coupon entitlement follow the bond's settlement convention.
+   * @returns `BondWorkoutLadder` plain object: `clean_price_pct` and `dirty_price`, the one price every exit is solved at, and `rows` in date order, each with `date`, `kind` (`call`, `put` or `maturity`), `redemption_price_pct` in percent of the principal redeemed, `redemption_amount`, `make_whole`, `yield_rate` and `i_spread` as decimals (the par rate runs to `date` when the bond has an exit other than maturity, and to contractual maturity when it has none) or `null` when the path has no finite yield (an exit on the quote date, or same-day cash at or above the price; a worst row can be `null`, where the `ytw` metric is negative infinity), and `is_worst`.
+   * @throws Error - Throws with kind `not_found` if a bond with exercise rights has no quoted clean price or a curve is missing, kind `validation` if the market JSON or `asOf` is malformed, and kind `computation` if a yield cannot be solved.
+   */
+  bondWorkoutLadder(
+    bond: Bond,
+    marketJson: string,
+    asOf: string
+  ): generated.valuations.BondWorkoutLadder;
+  /**
+   * One row per exit of a bond workout ladder (mirrors Rust `BondWorkoutLadder::to_table`).
+   * @param ladder - `BondWorkoutLadder` plain object or JSON string, as `bondWorkoutLadder` returns it.
+   * @returns `TableEnvelope` in date order with columns `date` (ISO string), `kind` (`call`, `put` or `maturity`), `redemption_price_pct` (percent of the principal redeemed), `redemption_amount` (float), `currency` (ISO code of the amount), `make_whole` (boolean), `yield_rate` and `i_spread` (nullable decimals) and `is_worst` (boolean). The columns remain when there are no rows.
+   * @throws Error - Throws with kind `validation` if `ladder` does not match the `BondWorkoutLadder` schema.
+   */
+  bondWorkoutLadderTable(ladder: generated.valuations.BondWorkoutLadder | string): TableEnvelope;
+  /**
+   * Price, delta, parity, conversion premium, regime and bond floor of a convertible at a ladder of share prices (mirrors Rust `convertible_spot_ladder`).
+   * @param bond - Borrowed `ConvertibleBond` handle; it is not consumed. Its `metric_pricing_overrides.bump_config` sets the spot bump behind delta (default 1% of each row's share price).
+   * @param marketJson - Canonical market-context JSON holding the bond's discount curve, share price, volatility and any dividend yield, hazard curve and floating index.
+   * @param asOf - ISO-8601 valuation date and origin of the tree's ACT/365F clock.
+   * @param spots - Share prices in the bond's currency, each finite and positive, sorted ascending with duplicates dropped; omit for 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2 and 3 times the market's share price.
+   * @returns `ConvertibleSpotLadder` plain object: `instrument_id`, `as_of`, `currency`, `market_spot` and `rows` in ascending share price, each with `spot`, `is_market_spot`, `price`, `conversion_value` and `bond_floor` in `currency`, `parity` over notional, and `delta` per unit of share price, `hedge_ratio` as a decimal share of the conversion ratio, `regime` (`busted` below 0.40, `balanced` to 0.80, `equity_sensitive` above) and `conversion_premium` as a decimal, each `null` where undefined: a mandatory-variable bond has no hedge ratio or regime.
+   * @throws Error - Throws with kind `validation` if `spots` is empty or holds a value that is not finite and positive, or the bond or market JSON is invalid, and kind `not_found` if market data the bond needs is missing.
+   */
+  convertibleSpotLadder(
+    bond: ConvertibleBond,
+    marketJson: string,
+    asOf: string,
+    spots?: readonly number[] | null
+  ): generated.valuations.ConvertibleSpotLadder;
+  /**
+   * One row per share price of a convertible spot ladder (mirrors Rust `ConvertibleSpotLadder::to_table`).
+   * @param ladder - `ConvertibleSpotLadder` plain object or JSON string, as `convertibleSpotLadder` returns it.
+   * @returns `TableEnvelope` in ascending share price with columns `spot` (float), `is_market_spot` (boolean), `price` (float), `delta` and `hedge_ratio` (nullable float), `regime` (nullable string: `busted`, `balanced` or `equity_sensitive`), `conversion_value` and `parity` (float), `conversion_premium` (nullable float) and `bond_floor` (float); money columns are in the ladder's `currency`, which the table does not state. The columns remain when there are no rows.
+   * @throws Error - Throws with kind `validation` if `ladder` does not match the `ConvertibleSpotLadder` schema.
+   */
+  convertibleSpotLadderTable(
+    ladder: generated.valuations.ConvertibleSpotLadder | string
+  ): TableEnvelope;
+  /**
+   * Every price, yield and spread quote of a bond, solved from any one of them (mirrors Rust `compute_quotes`).
+   * @param bond - Borrowed `Bond` handle; it is not consumed. A bond with exercise rights needs HW1F parameters on the bond or in the market, because its `oas` is part of the set.
+   * @param marketJson - Canonical market-context JSON holding the bond's discount curve, the source of the swap par rates, and any floating index curve.
+   * @param asOf - ISO-8601 valuation date; the quote date and accrued interest follow the bond's settlement convention.
+   * @param quoteInput - One `BondQuoteInput`, a plain object or JSON string with exactly one key: `clean_price_pct` (percent of par), `dirty_price_currency` (currency, the whole notional), `ytm`, `ytw`, `z_spread`, `discount_margin`, `oas`, `asw_market`, `i_spread` or `japanese_simple_yield` (decimals, `0.01` = 100bp).
+   * @returns `BondQuoteSet` plain object: `clean_price_currency`, `clean_price_pct`, `dirty_price_currency`, and `ytm`, `ytw`, `z_spread`, `discount_margin`, `oas`, `asw_par`, `asw_market`, `i_spread`, `japanese_simple_yield` and `moosmuller_ytm` as decimals, each `null` when it does not apply to the bond or has no finite value.
+   * @throws Error - Throws with kind `validation` if `quoteInput` has an unknown or second key or a non-finite value, a dirty price is not positive, the market JSON or `asOf` is malformed, the quote kind does not apply to the bond (`discount_margin` with no floating coupons, `asw_market` or `japanese_simple_yield` on a floating coupon, `z_spread` or `asw_market` with exercise rights, whose workout path depends on the price), or a metric of the set cannot be solved, which fails the whole set (`z_spread` with a call or put on the quote date below the price, `oas` with exercise rights and no HW1F parameters); and with kind `not_found` if a curve the bond needs to normalize the quote is missing.
+   */
+  computeQuotes(
+    bond: Bond,
+    marketJson: string,
+    asOf: string,
+    quoteInput: generated.valuations.BondQuoteInput | string
+  ): generated.valuations.BondQuoteSet;
+  /**
+   * The quote set of a bond as a one-row table (mirrors Rust `BondQuoteSet::to_table`).
+   * @param quotes - `BondQuoteSet` plain object or JSON string, as `computeQuotes` returns it.
+   * @returns `TableEnvelope` with one row and one column per field in declaration order: float `clean_price_currency`, `clean_price_pct` and `dirty_price_currency`, then nullable float `ytm`, `ytw`, `z_spread`, `discount_margin`, `oas`, `asw_par`, `asw_market`, `i_spread`, `japanese_simple_yield` and `moosmuller_ytm`, null where the quote does not apply.
+   * @throws Error - Throws with kind `validation` if `quotes` does not match the `BondQuoteSet` schema.
+   */
+  bondQuoteSetTable(quotes: generated.valuations.BondQuoteSet | string): TableEnvelope;
+  /**
+   * Statistics, WARF and concentration of a collateral pool (mirrors Rust `pool_report`).
+   * @param pool - `AssetPool` plain object or JSON string, in any of its three representations.
+   * @param asOf - ISO-8601 date the remaining maturities are measured from. It also stands in for the closing date when a pool is normalized: it ages representative lines and counts the delayed draws already funded on instrument collateral.
+   * @returns `PoolReport` plain object: `total_balance` (the denominator of every share), `stats` (`PoolStats` of the same rows), `warf` (Moody's rating factor weighted by balance over the performing rows, unrated assets at the `NR` factor) and `by_obligor`, `by_industry`, `by_rating`, each a list of `PoolConcentrationEntry` with `balance_pct` in percent points. An empty pool reports zero balances and empty tables. `poolReportFieldUnits` states every unit.
+   * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, `asOf` is malformed, the pool cannot be normalized, an asset is not in the pool's base currency, or a rating has no Moody's factor.
+   */
+  poolReport(
+    pool: generated.valuations.AssetPool | string,
+    asOf: string
+  ): generated.valuations.PoolReport;
+  /**
+   * The three concentration tables of a pool report stacked as one long table (mirrors Rust `PoolReport::to_table`).
+   * @param report - `PoolReport` plain object or JSON string, as `poolReport` returns it.
+   * @returns `TableEnvelope` with the obligor rows, then industry, then rating, each in report order, and columns `dimension` (`obligor`, `industry` or `rating`), `key` (nullable string, null for the assets with no value on the dimension), `balance` (float), `currency` (ISO code of the balance), `balance_pct` (percent points) and `asset_count` (integer). The columns remain when every table is empty.
+   * @throws Error - Throws with kind `validation` if `report` does not match the `PoolReport` schema.
+   */
+  poolReportTable(report: generated.valuations.PoolReport | string): TableEnvelope;
   /**
    * Collateral-pool statistics at a date (mirrors Rust `calculate_pool_stats`).
    * @param pool - `AssetPool` plain object or JSON string.
@@ -27002,6 +27092,19 @@ export interface ModelCreditNamespace {
    */
   migration: CreditMigrationNamespace;
   /**
+   * One Merton report: the model, its term structure, grades and CDS terms.
+   *
+   * An equity source takes the KMV default point (short-term debt plus half of
+   * long-term debt) as its barrier, and grades come from the default PD master
+   * scale, so every host gets the same numbers.
+   * @param request - `MertonReportRequest` object or JSON text: `source` (`{ kind: "model", model }` with canonical `MertonModel` JSON, or `{ kind: "equity", equity_value, equity_vol, short_term_debt, long_term_debt, risk_free_rate, payout_rate, maturity }` in the firm's monetary unit, decimals and years), `horizons` (years, finite and positive, in display order), `maturity` (CDS and implied-equity years) and `recovery` (decimal fraction of par).
+   * @returns `MertonReport` plain object; per-horizon arrays align with `horizons`, and a measure Rust rejects for this model is `null` with its message under its field name in `errors`.
+   * @throws Error - Throws with kind `validation` if the request is malformed or has an unknown field, a horizon is non-finite or not positive, or the equity calibration rejects its inputs.
+   */
+  mertonReport(
+    request: generated.models.MertonReportRequest | string
+  ): generated.models.MertonReport;
+  /**
    * Moody's WARF rating factor for one credit rating.
    * @param rating - Rating label such as `"Baa3"`, `"BBB-"` or `"B2"`; agency notches are normalized by the Rust parser.
    * @returns The Moody's weighted-average rating factor for that rating (for example 610 for Baa3).
@@ -27078,6 +27181,12 @@ export interface CreditLgdNamespace {
    */
   EadCalculator: EadCalculatorConstructor;
   /**
+   * Seniority recovery calibration IDs held by the embedded credit registry.
+   * @returns Exact calibration IDs, each accepted unchanged by `seniorityRecoveryStats`: the registry's default calibration first, then the others in registry order.
+   * @throws Error - Throws a `validation` error if the embedded registry is malformed.
+   */
+  seniorityCalibrationIds(): string[];
+  /**
    * Historical Beta recovery distribution for a debt seniority class.
    * @param seniority - Seniority class label such as `"senior_secured"`, `"senior_unsecured"` or `"subordinated"`.
    * @param calibrationId - Exact registry methodology ID, such as `"moodys_recovery_1982_2023"` or `"sp_recovery_historical"`; aliases are rejected.
@@ -27094,25 +27203,6 @@ export interface CreditLgdNamespace {
    */
   WorkoutLgd: WorkoutLgdConstructor;
   /**
-   * One-call workout LGD from collateral tuples and cost assumptions.
-   * @param ead - Exposure at default in monetary units; positive.
-   * @param collateral - Array of `[collateralType, bookValue, haircut]` tuples, such as `[["real_estate", 800000, 0.3]]`.
-   * @param directCostPct - Direct workout costs as a fraction of EAD.
-   * @param indirectCostPct - Indirect workout costs as a fraction of EAD.
-   * @param timeToResolutionYears - Expected workout duration in years.
-   * @param discountRate - Annual discount rate over the workout period, as a decimal.
-   * @returns The `WorkoutLgdResult` object (`net_recovery`, `lgd`, `recovery_rate`).
-   * @throws Error - Throws a `validation` error if any input is out of range or a collateral type is not recognized.
-   */
-  workoutLgd(
-    ead: number,
-    collateral: readonly (readonly [string, number, number])[] | string,
-    directCostPct: number,
-    indirectCostPct: number,
-    timeToResolutionYears: number,
-    discountRate: number
-  ): generated.models.WorkoutLgdResult;
-  /**
    * Fluent builder returned by `WorkoutLgd.builder()`.
    */
   WorkoutLgdBuilder: WorkoutLgdBuilderClass;
@@ -27127,7 +27217,7 @@ export interface CreditLgdNamespace {
  * import init, { models } from "finstack-quant-wasm";
  * await init();
  * const hurdle = models.credit.liabilityManagement.tenderRecommendationHurdle();
- * console.log(hurdle); // 0.02
+ * console.log(hurdle); // 1.02
  * ```
  */
 export interface CreditLiabilityManagementNamespace {
@@ -27135,42 +27225,22 @@ export interface CreditLiabilityManagementNamespace {
    * Compare hold-versus-tender economics for a distressed exchange offer.
    * Tendering is recommended only when total consideration exceeds the
    * hold-out present value by more than 2%.
+   * @param offer - `ExchangeOffer` object or JSON text: `old_pv`, `new_pv`, `consent_fee` and `equity_sweetener_value` (non-negative, one monetary unit) and `exchange_type` (`par_for_par`, `discount`, `uptier` or `downtier`).
    * @returns Tender total, NPV pickup, breakeven recovery, and recommendation.
-   * @param oldPv - Present value of the existing claim if it is not tendered, in the caller's monetary unit.
-   * @param newPv - Present value of the new instrument received on tendering, in the same unit as oldPv.
-   * @param consentFee - Cash consent or early-tender fee paid to participating holders, in the same unit as oldPv.
-   * @param equitySweetenerValue - Estimated value of equity or warrants attached to the new instrument, in the same unit as oldPv.
-   * @param exchangeType - Canonical offer structure: par_for_par, discount, uptier, or downtier.
-   * @throws Error - Throws a JavaScript exception if `exchangeType` is unrecognized, any monetary input is negative or non-finite, or the result cannot be converted to a JavaScript object.
+   * @throws Error - Throws a JavaScript exception if the offer is malformed, has an unknown field or structure, or any monetary input is negative or non-finite.
    */
-  analyzeExchangeOffer(
-    oldPv: number,
-    newPv: number,
-    consentFee: number,
-    equitySweetenerValue: number,
-    exchangeType: string
-  ): ExchangeOfferAnalysis;
+  analyzeExchangeOffer(offer: generated.models.ExchangeOffer | string): ExchangeOfferAnalysis;
   /**
    * Compute discount capture and leverage impact for an LME transaction.
+   * @param terms - `LmeTerms` object or JSON text: `lme_type` (`open_market_repurchase`, `tender_offer`, `amend_and_extend` or `dropdown`), `notional` (positive), `repurchase_price_pct` (price as a fraction of par for repurchases and tenders, the extension fee for amend-and-extend, or the transferred-asset fraction for a dropdown), `opt_acceptance_pct` (in [0, 1]) and optional `ebitda` (a positive value adds the leverage_impact block).
    * @returns Cash cost, par retired, discount captured, holder impact, and optional leverage analysis.
-   * @param lmeType - Canonical structure: open_market_repurchase, tender_offer, amend_and_extend, or dropdown.
-   * @param notional - Outstanding face amount of the target instrument, in the caller's monetary unit; must be positive.
-   * @param repurchasePricePct - Price as a fraction of par for repurchases and tenders, the extension fee for amend-and-extend, or the transferred-asset fraction for a dropdown.
-   * @param optAcceptancePct - Fraction of holders participating, in [0, 1].
-   * @param ebitda - EBITDA in the same unit as notional; a positive value adds the leverage_impact block, null or non-positive omits it.
-   * @throws Error - Throws a JavaScript exception if `lmeType` is unrecognized, `notional` is non-positive or non-finite, `optAcceptancePct` is outside `[0, 1]`, or `repurchasePricePct` is outside the range accepted for the selected LME type: `(0, 1.5]` for repurchases and tenders, `[0, 0.1]` for amend-and-extend, and `[0, 1]` for dropdowns. It also throws if the result cannot be converted to a JavaScript object.
+   * @throws Error - Throws a JavaScript exception if the terms are malformed or have an unknown field or structure, `notional` is non-positive or non-finite, `opt_acceptance_pct` is outside `[0, 1]`, or `repurchase_price_pct` is outside the range accepted for the selected LME type: `(0, 1.5]` for repurchases and tenders, `[0, 0.1]` for amend-and-extend, and `[0, 1]` for dropdowns.
    */
-  analyzeLme(
-    lmeType: string,
-    notional: number,
-    repurchasePricePct: number,
-    optAcceptancePct: number,
-    ebitda?: number | null
-  ): LmeAnalysis;
+  analyzeLme(terms: generated.models.LmeTerms | string): LmeAnalysis;
   /**
    * Minimum NPV ratio at which a tender is recommended. Twin of the Rust and
    * Python constant `TENDER_RECOMMENDATION_HURDLE`: a holder is advised to
-   * tender when the tender NPV is at least `old_npv` times this hurdle.
+   * tender when the tender NPV exceeds `old_npv` times this hurdle.
    * @returns The dimensionless hurdle multiple.
    */
   tenderRecommendationHurdle(): number;
@@ -27352,117 +27422,88 @@ export interface CreditRecoveryWaterfallNamespace {
 
 /**
  * Accounting-based credit scores: Altman Z / Z' / Z'' / EM, Ohlson O-Score and Zmijewski.
- * Mirrors Rust `credit::scoring`.
+ * Mirrors Rust `credit::scoring`: each scoring function takes its canonical input struct.
  *
  * @example
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * console.log(models.credit.scoring.zmijewskiScore(0.05, 0.6, 1.5).implied_pd);
+ * const input = {
+ *   net_income_to_total_assets: 0.05,
+ *   total_liabilities_to_total_assets: 0.6,
+ *   current_assets_to_current_liabilities: 1.5,
+ * };
+ * console.log(models.credit.scoring.zmijewskiScore(input).implied_pd);
+ * console.log(models.credit.scoring.creditScoreReport({ model: "zmijewski_score", input }).grade?.grade);
  * ```
  */
 export interface CreditScoringNamespace {
   /**
    * Altman emerging-market score: the Z''-Score plus a constant of 3.25.
-   * @param workingCapitalToTotalAssets - Working capital divided by total assets (ratio X1).
-   * @param retainedEarningsToTotalAssets - Retained earnings divided by total assets (ratio X2).
-   * @param ebitToTotalAssets - Earnings before interest and taxes divided by total assets (ratio X3).
-   * @param bookEquityToTotalLiabilities - Book value of equity divided by total liabilities (ratio X4).
-   * @returns The `ScoringResult` object (`score`, `zone`, `implied_pd`, `model`).
-   * @throws Error - Throws a `validation` error if any ratio is non-finite.
+   * @param input - `AltmanZDoublePrimeInput` object or JSON text: `working_capital_to_total_assets` (X1), `retained_earnings_to_total_assets` (X2), `ebit_to_total_assets` (X3) and `book_equity_to_total_liabilities` (X4), all decimal ratios.
+   * @returns The `ScoringResult` object (`score`, `zone`, `implied_pd`, `model`); `implied_pd` is `null`.
+   * @throws Error - Throws a `validation` error if the input is malformed, has an unknown field, or a ratio is non-finite.
    */
   altmanEmScore(
-    workingCapitalToTotalAssets: number,
-    retainedEarningsToTotalAssets: number,
-    ebitToTotalAssets: number,
-    bookEquityToTotalLiabilities: number
+    input: generated.models.AltmanZDoublePrimeInput | string
   ): generated.models.ScoringResult;
   /**
    * Altman Z''-Score for non-manufacturers (no sales ratio).
-   * @param workingCapitalToTotalAssets - Working capital divided by total assets (ratio X1).
-   * @param retainedEarningsToTotalAssets - Retained earnings divided by total assets (ratio X2).
-   * @param ebitToTotalAssets - Earnings before interest and taxes divided by total assets (ratio X3).
-   * @param bookEquityToTotalLiabilities - Book value of equity divided by total liabilities (ratio X4).
-   * @returns The `ScoringResult` object (`score`, `zone`, `implied_pd`, `model`).
-   * @throws Error - Throws a `validation` error if any ratio is non-finite.
+   * @param input - `AltmanZDoublePrimeInput` object or JSON text: `working_capital_to_total_assets` (X1), `retained_earnings_to_total_assets` (X2), `ebit_to_total_assets` (X3) and `book_equity_to_total_liabilities` (X4), all decimal ratios.
+   * @returns The `ScoringResult` object (`score`, `zone`, `implied_pd`, `model`); `implied_pd` is `null`.
+   * @throws Error - Throws a `validation` error if the input is malformed, has an unknown field, or a ratio is non-finite.
    */
   altmanZDoublePrime(
-    workingCapitalToTotalAssets: number,
-    retainedEarningsToTotalAssets: number,
-    ebitToTotalAssets: number,
-    bookEquityToTotalLiabilities: number
+    input: generated.models.AltmanZDoublePrimeInput | string
   ): generated.models.ScoringResult;
   /**
    * Altman Z'-Score for private firms (book equity replaces market equity).
-   * @param workingCapitalToTotalAssets - Working capital divided by total assets (ratio X1).
-   * @param retainedEarningsToTotalAssets - Retained earnings divided by total assets (ratio X2).
-   * @param ebitToTotalAssets - Earnings before interest and taxes divided by total assets (ratio X3).
-   * @param bookEquityToTotalLiabilities - Book value of equity divided by total liabilities (ratio X4).
-   * @param salesToTotalAssets - Sales divided by total assets (ratio X5).
-   * @returns The `ScoringResult` object (`score`, `zone`, `implied_pd`, `model`).
-   * @throws Error - Throws a `validation` error if any ratio is non-finite.
+   * @param input - `AltmanZPrimeInput` object or JSON text: `working_capital_to_total_assets` (X1), `retained_earnings_to_total_assets` (X2), `ebit_to_total_assets` (X3), `book_equity_to_total_liabilities` (X4, book equity over book liabilities) and `sales_to_total_assets` (X5), all decimal ratios.
+   * @returns The `ScoringResult` object (`score`, `zone`, `implied_pd`, `model`); `implied_pd` is `null`.
+   * @throws Error - Throws a `validation` error if the input is malformed, has an unknown field, or a ratio is non-finite.
    */
   altmanZPrime(
-    workingCapitalToTotalAssets: number,
-    retainedEarningsToTotalAssets: number,
-    ebitToTotalAssets: number,
-    bookEquityToTotalLiabilities: number,
-    salesToTotalAssets: number
+    input: generated.models.AltmanZPrimeInput | string
   ): generated.models.ScoringResult;
   /**
    * Original Altman (1968) Z-Score for publicly traded manufacturers.
-   * @param workingCapitalToTotalAssets - Working capital divided by total assets (ratio X1).
-   * @param retainedEarningsToTotalAssets - Retained earnings divided by total assets (ratio X2).
-   * @param ebitToTotalAssets - Earnings before interest and taxes divided by total assets (ratio X3).
-   * @param marketEquityToTotalLiabilities - Market value of equity divided by total liabilities (ratio X4).
-   * @param salesToTotalAssets - Sales divided by total assets (ratio X5).
-   * @returns The `ScoringResult` object (`score`, `zone`, `implied_pd`, `model`).
-   * @throws Error - Throws a `validation` error if any ratio is non-finite.
+   * @param input - `AltmanZScoreInput` object or JSON text: `working_capital_to_total_assets` (X1), `retained_earnings_to_total_assets` (X2), `ebit_to_total_assets` (X3), `market_equity_to_total_liabilities` (X4, market equity over book liabilities) and `sales_to_total_assets` (X5), all decimal ratios.
+   * @returns The `ScoringResult` object (`score`, `zone`, `implied_pd`, `model`); `implied_pd` is `null`.
+   * @throws Error - Throws a `validation` error if the input is malformed, has an unknown field, or a ratio is non-finite.
    */
   altmanZScore(
-    workingCapitalToTotalAssets: number,
-    retainedEarningsToTotalAssets: number,
-    ebitToTotalAssets: number,
-    marketEquityToTotalLiabilities: number,
-    salesToTotalAssets: number
+    input: generated.models.AltmanZScoreInput | string
   ): generated.models.ScoringResult;
   /**
+   * Score one model and grade its implied PD on the default PD master scale.
+   *
+   * The implied PD of a model that has one (Ohlson, Zmijewski) is graded on the
+   * default PD master scale, so every host gets the same grade; the Altman
+   * family has no implied PD and no grade.
+   * @param request - `CreditScoreRequest` object or JSON text: `model` (`"altman_z_score"`, `"altman_z_prime"`, `"altman_z_double_prime"`, `"altman_em_score"`, `"ohlson_o_score"` or `"zmijewski_score"`) and `input` (that model's input ratios by Rust field name; `"altman_em_score"` takes the Z''-Score ratios).
+   * @returns `CreditScoreReport` plain object: `result` (the `ScoringResult`) and `grade` (the default master-scale `MasterScaleResult` of the implied PD, or `null` for the Altman family).
+   * @throws Error - Throws a `validation` error if the request is malformed or has an unknown model or field, a ratio is non-finite, or an Ohlson indicator is not exactly 0 or 1.
+   */
+  creditScoreReport(
+    request: generated.models.CreditScoreRequest | string
+  ): generated.models.CreditScoreReport;
+  /**
    * Ohlson (1980) O-Score logit bankruptcy model.
-   * @param logTotalAssetsAdjusted - Natural log of total assets deflated by the GNP price-level index.
-   * @param totalLiabilitiesToTotalAssets - Total liabilities divided by total assets.
-   * @param workingCapitalToTotalAssets - Working capital divided by total assets.
-   * @param currentLiabilitiesToCurrentAssets - Current liabilities divided by current assets.
-   * @param liabilitiesExceedAssets - Indicator, exactly 1 when total liabilities exceed total assets and 0 otherwise.
-   * @param netIncomeToTotalAssets - Net income divided by total assets.
-   * @param fundsFromOperationsToTotalLiabilities - Funds from operations divided by total liabilities.
-   * @param negativeNetIncomeTwoYears - Indicator, exactly 1 when net income was negative in each of the last two years and 0 otherwise.
-   * @param netIncomeChange - Scaled change in net income, `(NI_t - NI_{t-1}) / (|NI_t| + |NI_{t-1}|)`.
-   * @returns The `ScoringResult` object (`score`, `zone`, `implied_pd`, `model`).
-   * @throws Error - Throws a `validation` error if any input is non-finite or an indicator is not exactly 0 or 1.
+   * @param input - `OhlsonOScoreInput` object or JSON text: `log_total_assets_adjusted` (log of total assets over the GNP price-level index), `total_liabilities_to_total_assets`, `working_capital_to_total_assets`, `current_liabilities_to_current_assets`, `liabilities_exceed_assets` (indicator, exactly 0 or 1), `net_income_to_total_assets`, `funds_from_operations_to_total_liabilities`, `negative_net_income_two_years` (indicator, exactly 0 or 1) and `net_income_change` (`(NI_t - NI_{t-1}) / (|NI_t| + |NI_{t-1}|)`).
+   * @returns The `ScoringResult` object (`score`, `zone`, `implied_pd`, `model`); `implied_pd` is the logistic probability.
+   * @throws Error - Throws a `validation` error if the input is malformed, has an unknown field, a ratio is non-finite, or an indicator is not exactly 0 or 1.
    */
   ohlsonOScore(
-    logTotalAssetsAdjusted: number,
-    totalLiabilitiesToTotalAssets: number,
-    workingCapitalToTotalAssets: number,
-    currentLiabilitiesToCurrentAssets: number,
-    liabilitiesExceedAssets: number,
-    netIncomeToTotalAssets: number,
-    fundsFromOperationsToTotalLiabilities: number,
-    negativeNetIncomeTwoYears: number,
-    netIncomeChange: number
+    input: generated.models.OhlsonOScoreInput | string
   ): generated.models.ScoringResult;
   /**
    * Zmijewski (1984) probit financial-distress model.
-   * @param netIncomeToTotalAssets - Net income divided by total assets.
-   * @param totalLiabilitiesToTotalAssets - Total liabilities divided by total assets.
-   * @param currentAssetsToCurrentLiabilities - Current assets divided by current liabilities.
-   * @returns The `ScoringResult` object (`score`, `zone`, `implied_pd`, `model`).
-   * @throws Error - Throws a `validation` error if any ratio is non-finite.
+   * @param input - `ZmijewskiInput` object or JSON text: `net_income_to_total_assets` (ROA), `total_liabilities_to_total_assets` (debt ratio) and `current_assets_to_current_liabilities` (current ratio), all decimal ratios.
+   * @returns The `ScoringResult` object (`score`, `zone`, `implied_pd`, `model`); `implied_pd` is the probit probability.
+   * @throws Error - Throws a `validation` error if the input is malformed, has an unknown field, or a ratio is non-finite.
    */
   zmijewskiScore(
-    netIncomeToTotalAssets: number,
-    totalLiabilitiesToTotalAssets: number,
-    currentAssetsToCurrentLiabilities: number
+    input: generated.models.ZmijewskiInput | string
   ): generated.models.ScoringResult;
 }
 
@@ -28327,7 +28368,7 @@ export interface RatesNamespace {
  * const cube = new core.VolCube(
  *   "USD-SWAPTION", [1], [5], [{ alpha: 0.03, beta: 0.5, rho: -0.2, nu: 0.4 }], [0.03]
  * );
- * console.log(models.volatility.getCubeVol(cube, 1, 5, 0.03));
+ * console.log(models.volatility.getCubeVol(cube, 1, 5, 0.03, "lognormal"));
  * cube.free();
  * ```
  */
@@ -28345,25 +28386,39 @@ export interface VolatilityNamespace {
    */
   SabrCalibrator: SabrCalibratorConstructor;
   /**
-   * Evaluate checked Black/lognormal volatility from a data-only SABR cube.
-   * @returns Annualized Black volatility as a decimal.
+   * Evaluate a data-only SABR cube in the requested quote convention.
+   * @returns Annualized volatility: decimal Black for `"lognormal"`, absolute rate units for `"normal"`.
    * @param cube - Structurally validated data-only volatility cube.
    * @param expiry - Positive option expiry in years within the cube grid.
    * @param tenor - Positive underlying tenor in years within the cube grid.
    * @param strike - Finite strike in the same rate units as the stored forwards.
-   * @throws Error - Throws a JavaScript exception for out-of-grid coordinates or invalid SABR model inputs.
+   * @param convention - Output quote convention: `"lognormal"` (decimal Black, shifted by the cube's own SABR shifts where it stores them) or `"normal"` (absolute Bachelier vol in the forward's rate units). The serde form `{"shifted_lognormal": {"shift": s}}` is rejected because the cube already carries its own shifts.
+   * @throws Error - Throws a JavaScript exception for out-of-grid coordinates, invalid SABR model inputs, or a shifted-lognormal or undecodable `convention`.
    */
-  getCubeVol(cube: VolCube, expiry: number, tenor: number, strike: number): number;
+  getCubeVol(
+    cube: VolCube,
+    expiry: number,
+    tenor: number,
+    strike: number,
+    convention: VolatilityConvention
+  ): number;
   /**
-   * Evaluate Black/lognormal cube volatility with flat coordinate clamping.
-   * @returns Annualized Black volatility, or `NaN` when undefined.
-   * @throws Never; invalid inputs are represented by `NaN`.
+   * Evaluate a data-only SABR cube in the requested convention with flat coordinate clamping.
+   * @returns Annualized volatility in `convention`, or `NaN` when undefined (including a shifted-lognormal `convention`).
    * @param cube - Structurally validated data-only volatility cube.
    * @param expiry - Finite option expiry in years; clamped to the stored grid.
    * @param tenor - Finite underlying tenor in years; clamped to the stored grid.
    * @param strike - Finite strike in the same rate units as the stored forwards.
+   * @param convention - Output quote convention: `"lognormal"` (decimal Black, shifted by the cube's own SABR shifts where it stores them) or `"normal"` (absolute Bachelier vol in the forward's rate units). The serde form `{"shifted_lognormal": {"shift": s}}` is rejected because the cube already carries its own shifts. A shifted-lognormal convention yields `NaN`.
+   * @throws Error - Throws a JavaScript exception for a non-numeric coordinate or an undecodable `convention`.
    */
-  getCubeVolClamped(cube: VolCube, expiry: number, tenor: number, strike: number): number;
+  getCubeVolClamped(
+    cube: VolCube,
+    expiry: number,
+    tenor: number,
+    strike: number,
+    convention: VolatilityConvention
+  ): number;
   /**
    * Interpolate a fixed-expiry cube slice; coordinates outside the grid are rejected.
    * @param slice - `core.VolCubeExpirySlice` handle, such as a `materializeCubeExpirySlice` result.
@@ -28382,26 +28437,6 @@ export interface VolatilityNamespace {
    * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `tenor` or `strike` is not a number.
    */
   getCubeExpirySliceVolClamped(slice: VolCubeExpirySlice, tenor: number, strike: number): number;
-  /**
-   * Evaluate checked normal/Bachelier volatility from a data-only SABR cube.
-   * @returns Annualized normal volatility in absolute rate units.
-   * @param cube - Structurally validated data-only volatility cube.
-   * @param expiry - Positive option expiry in years within the cube grid.
-   * @param tenor - Positive underlying tenor in years within the cube grid.
-   * @param strike - Finite strike in the same rate units as the stored forwards.
-   * @throws Error - Throws a JavaScript exception for out-of-grid coordinates, an invalid shifted-SABR domain, or a failed normal-volatility expansion.
-   */
-  getCubeNormalVol(cube: VolCube, expiry: number, tenor: number, strike: number): number;
-  /**
-   * Evaluate normal/Bachelier cube volatility with coordinate clamping.
-   * @returns Annualized normal volatility, or `NaN` when undefined.
-   * @throws Never; invalid inputs are represented by `NaN`.
-   * @param cube - Structurally validated data-only volatility cube.
-   * @param expiry - Finite option expiry in years; clamped to the stored grid.
-   * @param tenor - Finite underlying tenor in years; clamped to the stored grid.
-   * @param strike - Finite strike in the same rate units as the stored forwards.
-   */
-  getCubeNormalVolClamped(cube: VolCube, expiry: number, tenor: number, strike: number): number;
   /**
    * Return ATM, 25-delta put, and 25-delta call vols at a stored FX expiry.
    * @returns Three annualized decimal volatilities in ATM, put, call order.
@@ -28649,6 +28684,17 @@ export interface VolatilityNamespace {
     forwardPrices: NumericArray
   ): generated.models.ArbitrageViolation[];
   /**
+   * Run the configured butterfly, calendar-spread and local-vol density checks on a volatility surface.
+   * @param surface - `core.VolSurface` handle of unshifted Black lognormal volatilities on a strike axis (expiries in years, strikes in price units); it is read, not modified.
+   * @param config - `ArbitrageCheckConfig` as an object or JSON text. Every field is optional and an omitted one takes its Rust default: `check_butterfly`, `check_calendar_spread` and `check_local_vol_density` (default `true`); `forward_prices` (one finite positive forward to broadcast or one per expiry, required while any check is enabled); `tolerance` (non-negative, total-variance units, default `DEFAULT_ARBITRAGE_TOLERANCE` = 1e-10); `min_severity` (`"negligible"` default, `"minor"`, `"major"`, `"critical"`). Unknown fields are rejected.
+   * @returns The `ArbitrageReport` object (`vol_surface_id`, `violations` sorted most severe first, `passed`, `counts_by_type`, `counts_by_severity`).
+   * @throws Error - Throws a `validation` error if `config` has an unknown or mistyped field, the forwards are missing while a check is enabled, non-finite, non-positive or of the wrong length, the tolerance is negative or non-finite, or the surface is normal-quoted, shifted-Black or on a tenor axis.
+   */
+  checkSurface(
+    surface: VolSurface,
+    config: generated.models.ArbitrageCheckConfig | string
+  ): generated.models.ArbitrageReport;
+  /**
    * Run every static-arbitrage check on a strike by expiry volatility grid.
    * @param strikes - Strictly increasing strike grid shared by every row.
    * @param expiries - Strictly increasing expiries in years, one per row of `vols`.
@@ -28684,49 +28730,35 @@ export interface VolatilityNamespace {
    */
   getSurfaceVolClamped(surface: VolSurface, expiry: number, strike: number): number;
   /**
-   * Materialize the Black volatility slice of a SABR cube at one option expiry.
+   * Materialize the volatility slice of a SABR cube at one option expiry.
    * @param cube - `core.VolCube` handle.
    * @param expiry - Option expiry in years, within the cube grid.
    * @param strikes - Strictly increasing strikes of the output surface.
-   * @returns The tenor by strike `core.VolCubeExpirySlice` handle.
-   * @throws Error - Throws a `validation` error if the expiry is outside the cube, the strikes are invalid, or a SABR evaluation fails.
+   * @param convention - `"lognormal"` for Black volatilities or `"normal"` for absolute Bachelier volatilities; shifted-lognormal is rejected.
+   * @returns The tenor by strike `core.VolCubeExpirySlice` handle in `convention`.
+   * @throws Error - Throws a `validation` error if the expiry is outside the cube, the strikes are invalid, a SABR evaluation fails, or `convention` is shifted-lognormal.
    */
   materializeCubeExpirySlice(
     cube: VolCube,
     expiry: number,
-    strikes: NumericArray
+    strikes: NumericArray,
+    convention: VolatilityConvention
   ): VolCubeExpirySlice;
   /**
-   * Materialize the normal (Bachelier) volatility slice of a SABR cube at one option expiry.
+   * Materialize the volatility slice of a SABR cube at one underlying tenor.
    * @param cube - `core.VolCube` handle.
-   * @param expiry - Option expiry in years, within the cube grid.
+   * @param tenor - Underlying tenor in years, within the cube grid.
    * @param strikes - Strictly increasing strikes of the output surface.
-   * @returns The tenor by strike `core.VolCubeExpirySlice` handle of normal volatilities.
-   * @throws Error - Throws a `validation` error if the expiry is outside the cube, the strikes are invalid, or a SABR evaluation fails.
+   * @param convention - `"lognormal"` for Black volatilities or `"normal"` for absolute Bachelier volatilities; shifted-lognormal is rejected.
+   * @returns The expiry by strike `core.VolSurface` handle in `convention`.
+   * @throws Error - Throws a `validation` error if the tenor is outside the cube, the strikes are invalid, a SABR evaluation fails, or `convention` is shifted-lognormal.
    */
-  materializeCubeExpirySliceNormal(
+  materializeCubeTenorSlice(
     cube: VolCube,
-    expiry: number,
-    strikes: NumericArray
-  ): VolCubeExpirySlice;
-  /**
-   * Materialize the Black volatility slice of a SABR cube at one underlying tenor.
-   * @param cube - `core.VolCube` handle.
-   * @param tenor - Underlying tenor in years, within the cube grid.
-   * @param strikes - Strictly increasing strikes of the output surface.
-   * @returns The expiry by strike `core.VolSurface` handle.
-   * @throws Error - Throws a `validation` error if the tenor is outside the cube, the strikes are invalid, or a SABR evaluation fails.
-   */
-  materializeCubeTenorSlice(cube: VolCube, tenor: number, strikes: NumericArray): VolSurface;
-  /**
-   * Materialize the normal (Bachelier) volatility slice of a SABR cube at one underlying tenor.
-   * @param cube - `core.VolCube` handle.
-   * @param tenor - Underlying tenor in years, within the cube grid.
-   * @param strikes - Strictly increasing strikes of the output surface.
-   * @returns The expiry by strike `core.VolSurface` handle of normal volatilities.
-   * @throws Error - Throws a `validation` error if the tenor is outside the cube, the strikes are invalid, or a SABR evaluation fails.
-   */
-  materializeCubeTenorSliceNormal(cube: VolCube, tenor: number, strikes: NumericArray): VolSurface;
+    tenor: number,
+    strikes: NumericArray,
+    convention: VolatilityConvention
+  ): VolSurface;
   /**
    * Materialize an FX delta-quoted surface as an expiry by strike volatility surface.
    * @param surface - `core.FxDeltaVolSurface` handle.
@@ -29234,6 +29266,27 @@ export interface ModelsNamespace {
    */
   volatility: VolatilityNamespace;
   /**
+   * Price a closed-form option or invert its price, with Greeks at the resulting volatility.
+   *
+   * One call replaces choosing and sequencing `bsPrice`, `black76Price`, `bachelierPrice`, their implied-volatility inverses and their Greeks.
+   *
+   * @example
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const result = models.optionCalculation({
+   *   model: { kind: "black76", forward: 100, strike: 100, df: 0.98, expiry: 1, is_call: true },
+   *   solve: { kind: "price", vol: 0.2 },
+   * });
+   * console.log(result.price, result.greeks.kind); // ..., "forward"
+   * ```
+   *
+   * @returns The price, the volatility both are at (the supplied vol, or the solved implied vol) and the model's Greeks tagged by `kind` (`"black_scholes"` or `"forward"`).
+   * @param request - `OptionCalculation` object or JSON text: `model` tagged by `kind` (`"black_scholes"` with `spot`, `strike`, continuously compounded decimal `rate` and `div_yield`, `expiry` in years, `is_call` and an optional `theta_days_per_year` defaulting to 365; `"black76"` with `forward`, `strike`, discount factor `df`, `expiry`, `is_call`; `"bachelier"` with `forward`, `strike`, `expiry`, `is_call`) and `solve` (`{kind: "price", vol}` with a decimal Black vol or an absolute normal vol for Bachelier, or `{kind: "implied_vol", price}` discounted for Black-Scholes and Black-76, undiscounted for Bachelier).
+   * @throws Error - Throws a `validation` error for a malformed request, an unknown field or kind, an input outside the model's domain, or a price whose implied volatility cannot be solved; `invalid_type` for a non-finite number.
+   */
+  optionCalculation(request: OptionCalculation | string): OptionCalculationResult;
+  /**
    * Per-unit Black-Scholes / Garman-Kohlhagen price of a European option.
    *
    * Black-Scholes (1973): see docs/REFERENCES.md#black-scholes-1973.
@@ -29397,8 +29450,8 @@ export interface ModelsNamespace {
     forward: number,
     strike: number,
     df: number,
-    expiry: number,
     vol: number,
+    expiry: number,
     isCall: boolean
   ): number;
   /**
@@ -29417,8 +29470,8 @@ export interface ModelsNamespace {
   black76Greeks(
     forward: number,
     strike: number,
-    expiry: number,
     vol: number,
+    expiry: number,
     isCall: boolean
   ): ForwardGreeks;
   /**
@@ -30816,6 +30869,13 @@ export interface AttributionNamespace {
    */
   pnlAttributionPctOfTotal(pnl: PnlAttribution | string, amount: number): number | undefined;
   /**
+   * Every money bucket with its share of total P&L, in the struct's field order.
+   * @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).
+   * @returns One `PnlBucketShare` per bucket: the attribute's wire `field`, its `amount` in the `total_pnl` currency and `pct_of_total` in signed percentage points, `null` when `total_pnl` is effectively zero.
+   * @throws Error - Throws with kind `validation` if `pnl` is not a `PnlAttribution`.
+   */
+  pnlAttributionPctOfTotalByBucket(pnl: PnlAttribution | string): PnlBucketShare[];
+  /**
    * Whether the attribution residual is within tolerance (twin of Python `PnlAttribution.residual_within_tolerance`).
    * @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).
    * @param pctTolerance - Optional percentage tolerance (`0.1` = 0.1%); omitted uses the run's `meta.tolerance_pct`.
@@ -30919,8 +30979,8 @@ export interface Evaluator extends WasmOwned {
    * `Evaluator::evaluate_monte_carlo`).
    * @param model - `FinancialModelSpec` whose stochastic forecast nodes are simulated (object or JSON).
    * @param config - `MonteCarloConfig`: `n_paths`, `seed`, optional `percentiles` (fractions in `[0, 1]`) and `include_path_data` (object or JSON).
-   * @returns `MonteCarloResults` plain object with percentile summaries per metric and, when requested, the per-path table.
-   * @throws Error with kind `validation` if an input is malformed, `n_paths` is zero, the model has a capital structure, or a path fails to evaluate; kind `not_found` if a formula references a missing node.
+   * @returns `MonteCarloResults` plain object with percentile summaries per metric, the distinct forecast-period `warnings` (each reported once however many paths raised it; actual periods are not simulated and are omitted) and, when requested, the per-path table.
+   * @throws Error with kind `validation` if an input is malformed, `n_paths` is zero, or a path fails to evaluate; kind `not_found` if a formula references a missing node or a capital-structure instrument needs market data; kind `computation` for a capital-structure failure on a path.
    */
   evaluateMonteCarlo(
     model: JsonInput,
@@ -31144,6 +31204,13 @@ export interface ModelBuilder extends WasmOwned {
    */
   availabilityDates(nodeId: string, availabilityDates: Record<string, string> | string): void;
   /**
+   * Declare how an existing line rolls up to a coarser reporting frequency.
+   * @param nodeId - Existing node to declare the method on.
+   * @param rollup - `"sum"` for flows, `"period_end"` for balances and trailing metrics, `"formula"` for ratios. A rollup rejects `"formula"` on a node without a formula, and a `RollupSpec` entry for the node overrides this declaration.
+   * @throws Error with kind `validation` if `rollup` is not a recognized method, the node does not exist or the builder was consumed.
+   */
+  rollup(nodeId: string, rollup: generated.statements.RollupMethod): void;
+  /**
    * Add a calculated node defined by a DSL formula.
    *
    * Twin of Python `ModelBuilder.compute` (Rust `ModelBuilder::compute`).
@@ -31178,7 +31245,7 @@ export interface ModelBuilder extends WasmOwned {
    *
    * Twin of Python `ModelBuilder.forecast` (Rust `ModelBuilder::forecast`).
    * @param nodeId - Node whose forecast periods the spec fills.
-   * @param forecastSpec - `ForecastSpec` (`method` plus `params`, e.g. `{ method: "growth_pct", params: { rate: 0.05 } }`; object or JSON).
+   * @param forecastSpec - `ForecastSpec` (`method` plus `params`, e.g. `{ method: "growth_pct", params: { rate: 0.05 } }`; object or JSON). `params` must hold exactly the method's parameters: an unknown key, a missing or `null` parameter, or a value of the wrong JSON type fails `build()` with kind `validation`.
    * @throws Error with kind `validation` if `forecastSpec` is malformed or the builder was consumed.
    */
   forecast(nodeId: string, forecastSpec: generated.statements.ForecastSpec | string): void;
@@ -31453,7 +31520,7 @@ export interface MixedNodeBuilder extends WasmOwned {
    *
    * Twin of Python `MixedNodeBuilder.forecast` (Rust
    * `MixedNodeBuilder::forecast`).
-   * @param forecastSpec - `ForecastSpec` (`method` plus `params`, e.g. `{ method: "growth_pct", params: { rate: 0.05 } }`; object or JSON).
+   * @param forecastSpec - `ForecastSpec` (`method` plus `params`, e.g. `{ method: "growth_pct", params: { rate: 0.05 } }`; object or JSON). `params` must hold exactly the method's parameters: an unknown key, a missing or `null` parameter, or a value of the wrong JSON type fails `build()` with kind `validation`.
    * @throws Error with kind `validation` if `forecastSpec` is malformed or the builder was consumed.
    */
   forecast(forecastSpec: generated.statements.ForecastSpec | string): void;
@@ -31475,6 +31542,12 @@ export interface MixedNodeBuilder extends WasmOwned {
    * @throws Error with kind `validation` if the builder was consumed.
    */
   name(name: string): void;
+  /**
+   * Declare how this line rolls up to a coarser reporting frequency.
+   * @param rollup - `"sum"` for flows, `"period_end"` for balances and trailing metrics, `"formula"` for ratios. A rollup rejects `"formula"` on a node without a formula, and a `RollupSpec` entry for the node overrides this declaration.
+   * @throws Error with kind `validation` if `rollup` is not a recognized method or the builder was consumed.
+   */
+  rollup(rollup: generated.statements.RollupMethod): void;
   /**
    * Finish the node and return the model builder.
    *
@@ -31785,7 +31858,7 @@ export interface StatementsNamespace {
    * @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
    * @param model - The `FinancialModelSpec` the result was evaluated from (object or JSON); it supplies the period dates and the formulas of `formula` nodes.
    * @param spec - `RollupSpec`: target `frequency` (`"quarterly"`, `"semi_annual"` or `"annual"`) and per-node `methods` (`"sum"` default, `"period_end"`, `"formula"`) (object or JSON).
-   * @returns `StatementResult` plain object keyed by the target periods (`"2025"`, `"2025H1"`, `"2025Q1"`), without `node_sources`, capital-structure cashflows or a check report.
+   * @returns `StatementResult` plain object keyed by the target periods (`"2025"`, `"2025H1"`, `"2025Q1"`), with those periods in `periods` (each actual only when every source period is), without `node_sources`, capital-structure cashflows or a check report.
    * @throws Error - Throws with kind `validation` if an input is malformed, the target frequency is not a whole multiple of the model's, a target period is incomplete, a method names an unknown node, a `formula` node has no formula or reads `cs.*` values, or a re-evaluated formula fails.
    */
   statementResultRollup(
@@ -31793,6 +31866,17 @@ export interface StatementsNamespace {
     model: JsonInput,
     spec: generated.statements.RollupSpec | string
   ): StatementResult;
+  /**
+   * List the rollup methods a model's lines declare. A line that declares nothing is not listed and sums, whatever its tags say.
+   * @param model - The `FinancialModelSpec` whose node declarations are listed (object or JSON); nothing is evaluated.
+   * @param frequency - Target frequency stored on the spec: `"quarterly"`, `"semi_annual"` or `"annual"`. `statementResultRollup` checks it against the model's periods.
+   * @returns `RollupSpec` plain object with the `frequency` and every declared node with its method in model order; `methods` is omitted when no node declares one.
+   * @throws Error - Throws with kind `validation` if the model is malformed or `frequency` is not a recognized label.
+   */
+  rollupSpecDeclaredMethods(
+    model: JsonInput,
+    frequency: 'quarterly' | 'semi_annual' | 'annual'
+  ): generated.statements.RollupSpec;
   /**
    * Period-to-value map of one node.
    *
@@ -31922,7 +32006,7 @@ export interface StatementsNamespace {
    * Twin of Python `normalize` (Rust `adjustments::normalize`).
    * @param results - Evaluated `StatementResult` holding the target node and any reference nodes (object or JSON).
    * @param config - `NormalizationConfig`: target node plus the adjustments to apply (object or JSON).
-   * @returns One `NormalizationResult` per period of the target node: base value, each applied adjustment (raw and capped) and the final value.
+   * @returns One `NormalizationResult` per period of the target node: base value, each applied adjustment (raw and capped amounts and `adjusted_value`, the target through that step) and the final value.
    * @throws Error - Throws with kind `validation` if an input is malformed, the target node or a referenced node is absent from the results, the configuration is invalid, or the target and a reference node have incompatible units.
    */
   normalize(
@@ -32276,7 +32360,9 @@ export interface CreditScorecardExtensionConstructor {
  * ```typescript
  * import init, { statements_analytics } from "finstack-quant-wasm";
  * await init();
- * console.log(statements_analytics.wacc(0.6, 0.1, 0.4, 0.05, 0.25));
+ * console.log(
+ *   statements_analytics.wacc({ equity_weight: 0.6, cost_of_equity: 0.1, debt_weight: 0.4, cost_of_debt: 0.05, tax_rate: 0.25 })
+ * );
  * ```
  */
 export interface StatementsAnalyticsNamespace {
@@ -32289,7 +32375,7 @@ export interface StatementsAnalyticsNamespace {
    * result as JSON, so pass `JSON.stringify(result)` when chaining the two.
    * @returns Sensitivity results for each perturbation scenario.
    * @param modelJson - Financial-model specification JSON.
-   * @param configJson - Configuration JSON for this call.
+   * @param configJson - `SensitivityConfig` object or JSON text: `mode` (`diagonal`, `full_grid` or `tornado`), `parameters` (each `node_id`, `period_id`, `base_value` and exactly one of absolute `perturbations` or `pct_range` percentage moves of `base_value`, `10` meaning +10%) and `target_metrics`.
    * @throws Error - Rejects malformed model or configuration JSON, invalid sensitivity modes or parameter perturbations, duplicate parameters, non-finite values, requests over 128 parameters, 10,000 scenarios or 10 million model node-period evaluation cells, missing model nodes or periods, model-evaluation failures, or failure to serialize the sensitivity result to JavaScript.
    */
   runSensitivity(modelJson: JsonInput, configJson: JsonInput): SensitivityResult;
@@ -32357,21 +32443,6 @@ export interface StatementsAnalyticsNamespace {
     metrics: string[]
   ): TableEnvelope;
   /**
-   * Sensitivity parameter whose perturbations are percentage moves of a base value (twin of Python `ParameterSpec.with_percentages`).
-   * @param nodeId - Node identifier to vary.
-   * @param periodId - Period to vary, e.g. `"2025Q1"`.
-   * @param baseValue - Base value of the node in its own units.
-   * @param pctRange - Percentage moves, e.g. `[-10, 0, 10]` for ±10%.
-   * @returns Plain `ParameterSpec` object (`node_id`, `period_id`, `base_value`, absolute `perturbations`) for a `SensitivityConfig`.
-   * @throws Error - Throws with kind `validation` if `periodId` is not a valid period, and kind `invalid_type` if a number argument is not a number.
-   */
-  parameterSpecWithPercentages(
-    nodeId: string,
-    periodId: string,
-    baseValue: number,
-    pctRange: number[] | Float64Array
-  ): generated.statements_analytics.ParameterSpec;
-  /**
    * Compute forecast accuracy metrics (MAE, MAPE, sMAPE, RMSE).
    *
    * Takes two float arrays (actual, forecast) and returns the serde form of
@@ -32389,15 +32460,15 @@ export interface StatementsAnalyticsNamespace {
    * Generate tornado chart entries for a sensitivity result.
    * @param resultJson - Result JSON produced by a prior call.
    * @param metricNode - Statement metric node identifier selected for the requested analysis.
-   * @param period - Model period label for the requested statement value or calculation.
-   * @returns Structured tornado entries sorted by descending absolute swing, with parameter IDs preserving the perturbed `node@period` key.
-   * @throws Error - Rejects malformed `result_json`, an invalid optional `period` identifier, or a full-grid run, a scenario that does not identify exactly one perturbed parameter, an absent unperturbed baseline, a missing target metric or period, non-finite metric values or impacts, or failure to convert the entries to JavaScript.
+   * @param period - Required model period, such as `"2025Q4"`, at which the metric is read in the baseline and every scenario; a shock replaces one forecast cell, so the metric moves only in the shocked period and in later periods whose formulas read it.
+   * @returns Structured tornado entries sorted by descending absolute swing, with parameter IDs preserving the perturbed `node@period` key; `null` for a full-grid run, whose scenarios combine parameters and cannot be ranked.
+   * @throws Error - Rejects malformed `result_json`, an invalid `period` identifier, or a one-at-a-time run whose scenario does not identify exactly one perturbed parameter, an absent unperturbed baseline, a missing target metric or period, non-finite metric values or impacts, or failure to convert the entries to JavaScript.
    */
   generateTornadoEntries(
     resultJson: JsonInput,
     metricNode: string,
-    period?: string | null
-  ): TornadoEntry[];
+    period: string
+  ): TornadoEntry[] | null;
   /**
    * Find the driver value that makes a target node reach a target value.
    *
@@ -32469,23 +32540,12 @@ export interface StatementsAnalyticsNamespace {
   /**
    * Weighted-average cost of capital (WACC).
    *
-   * Blends the required return on equity with the after-tax cost of debt:
    * `WACC = w_E * r_E + w_D * r_D * (1 - T)`.
-   * @returns Returns the blended discount rate as a decimal fraction.
-   * @param equityWeight - Equity share of total capital as a decimal fraction (0.6 = 60% equity-funded).
-   * @param costOfEquity - Required return on equity in decimal form, typically from CAPM (0.115 = 11.5%).
-   * @param debtWeight - Debt share of total capital as a decimal fraction; must sum with the equity weight to 1.0.
-   * @param costOfDebt - Pre-tax marginal borrowing yield in decimal form, before the interest tax shield (0.06 = 6%).
-   * @param taxRate - Marginal corporate tax rate as a decimal fraction in [0, 1] (0.25 = 25%).
-   * @throws Error - Rejects any non-finite input, negative capital weights, weights that do not sum to one within tolerance, or a `tax_rate` outside `[0, 1]`.
+   * @param inputs - `WaccInputs` object or JSON text: `equity_weight` and `debt_weight` (decimal fractions of total capital summing to 1.0), `cost_of_equity` and pre-tax `cost_of_debt` (decimals, `0.06` = 6%) and `tax_rate` (decimal in [0, 1]).
+   * @returns The blended discount rate as a decimal fraction.
+   * @throws Error - Rejects malformed inputs, any non-finite value, negative capital weights, weights that do not sum to one within tolerance, or a `tax_rate` outside `[0, 1]`.
    */
-  wacc(
-    equityWeight: number,
-    costOfEquity: number,
-    debtWeight: number,
-    costOfDebt: number,
-    taxRate: number
-  ): number;
+  wacc(inputs: generated.statements_analytics.WaccInputs | string): number;
   /**
    * Explain a formula for a specific node and period (JSON in, structured
    * object out).
@@ -32547,10 +32607,75 @@ export interface StatementsAnalyticsNamespace {
    * Returns a structured JavaScript object.
    * @returns Credit-assessment result object from the statement results.
    * @param resultsJson - Evaluated statement-result JSON.
-   * @param period - Statement period identifier, such as `2025Q4` or `2025A`.
-   * @throws Error - Rejects malformed `results_json`, an `period` value that is not a valid statement period identifier, or failure to serialize the assessment to JavaScript.
+   * @param period - Statement period identifier, such as `2025Q4`, that is a period of the results in the model's own frequency: `2025` is the annual period, not the last quarter of a quarterly model.
+   * @throws Error - Rejects malformed `results_json`, a `period` value that is not a valid statement period identifier, a `period` that is not one of the results' `periods` (kind `validation`), or failure to serialize the assessment to JavaScript.
    */
   creditAssessment(resultsJson: JsonInput, period: string): CreditAssessment;
+  /**
+   * Summarize the debt stack by seniority at one period (mirrors Rust `capital_structure_summary`).
+   * @param results - Evaluated `StatementResult` (object or JSON) holding `cs_cashflows` and both configured nodes. A scalar EBITDA or cash node is read as an amount in the debt currency.
+   * @param model - `FinancialModelSpec` (object or JSON) whose capital structure gives the instruments, their declaration order and the payment classes, and whose periods bound the LTM window.
+   * @param config - `CapitalStructureSummaryConfig` (object or JSON): `period` (the reporting period, such as `"2025Q4"`), `ebitda_node` (required; the node holding EBITDA for each single period, never inferred from a conventional name) and `cash_node` (optional; the node holding the period-end cash balance, omitted means null cash, net debt and net leverage).
+   * @returns `CapitalStructureSummary` plain object: `as_of`, `currency`, `total_debt`, `cash`, `net_debt` and `ltm_ebitda` as money, `ltm_periods_required`, `ltm_periods_found`, `total_leverage`, `net_leverage` and `total_coverage` in turns, `tranches` by rank then declaration order (`id`, `kind`, `rank`, `payment_class`, `balance` with a revolver at its drawn balance, `share_of_debt` as a decimal, `maturity`, `cumulative_debt`, `leverage` and `interest_coverage` through the class, `ltm_interest`) and `maturity_wall` by calendar year of final maturity, ascending (`year`, `amount`, `share_of_debt`), using the balance at the period and ignoring any scheduled amortization after it.
+   * @throws If an argument is malformed, the model has no capital structure or no debt instruments once hedges are excluded, `cs_cashflows` is absent, the period is not in the model, a configured node is not in the results or the cash node has no value at the period, an instrument has no cashflows at the period or is in no class while payment classes are declared, a consumed value or ratio is non-finite, tranches are in more than one currency (no FX is applied), or the EBITDA or cash node is monetary in another currency (kind `validation`).
+   */
+  capitalStructureSummary(
+    results: StatementResult | string,
+    model: JsonInput,
+    config: generated.statements_analytics.CapitalStructureSummaryConfig | string
+  ): generated.statements_analytics.CapitalStructureSummary;
+  /**
+   * One row per tranche of a capital structure summary (mirrors Rust `CapitalStructureSummary::to_table`).
+   * @param summary - `CapitalStructureSummary` plain object or JSON string, as `capitalStructureSummary` returns it.
+   * @returns `TableEnvelope` in tranche order (rank, then model declaration order) with columns `id`, `kind` (`bond`, `convertible_bond`, `term_loan` or `revolving_credit`), `rank` (integer), `payment_class` (nullable string), `balance`, `share_of_debt` (nullable decimal), `maturity` (ISO date string), `cumulative_debt`, `leverage` and `interest_coverage` (nullable, in turns) and `ltm_interest` (nullable); amounts are floats in the summary's `currency`, which the table does not state. The columns remain when there are no tranches.
+   * @throws Error - Throws with kind `validation` if `summary` does not match the `CapitalStructureSummary` schema.
+   */
+  capitalStructureSummaryTable(
+    summary: generated.statements_analytics.CapitalStructureSummary | string
+  ): TableEnvelope;
+  /**
+   * Evaluate covenant compliance at the end of every statement result period.
+   *
+   * Each period of `results.periods` is tested on its last calendar day with
+   * the covenants applicable on that date: a covenant window covering the date replaces the engine's
+   * top-level specifications, and waivers and threshold schedules apply. A
+   * node is read only when an applicable covenant needs it, so a node that is
+   * missing or non-finite in a period where no applicable covenant reads it
+   * (for example a trailing ratio before four quarters of history, outside the
+   * window that tests it) does not throw. The engine's breach history is not
+   * updated.
+   *
+   * @param results - Evaluated `StatementResult` (object or JSON). Node ids are the covenant metric ids (`metric_id`, or each covenant type's conventional name); ratios in turns (`3.5` means 3.5x), amounts in the model currency.
+   * @param covenants - `CovenantEngine` handle whose specifications, windows, waivers and threshold schedules are evaluated.
+   * @returns `DatedCovenantReports` rows (`{ as_of, reports }`), one per result period in timeline order, with the reports of the covenants applicable on that date keyed by covenant instance key in engine order. (Python returns the same reports as a long DataFrame.)
+   * @throws If `results` is malformed, the engine is invalid or a metric an applicable covenant reads is non-finite (kind `validation`), or such a metric has no value in the period (kind `not_found`).
+   */
+  evaluateCovenants(
+    results: StatementResult | string,
+    covenants: CovenantEngine
+  ): generated.covenants.DatedCovenantReports[];
+  /**
+   * Forecast covenant breaches over every statement result period.
+   *
+   * Every period of `results.periods` is a test date (its last calendar day).
+   * Effective windows, waivers and threshold schedules are
+   * honored and non-numeric covenants are skipped. Deterministic breaches are
+   * always listed; in stochastic mode dates whose breach probability reaches
+   * `config.breach_probability_threshold` are listed too. Without
+   * `config.reference_date` the horizon starts the day before the first result
+   * period begins.
+   *
+   * @param results - Evaluated `StatementResult` (object or JSON) holding every metric the active numeric covenants read on each test date (ratios in turns).
+   * @param covenants - `CovenantEngine` handle whose effective specifications are forecast.
+   * @param config - Optional `CovenantForecastConfig` object or JSON text (JSON text keeps a uint64 `random_seed` exact); omitted means deterministic maintenance-scope forecasting.
+   * @returns `FutureBreach` wire objects sorted by breach date, then covenant id.
+   * @throws If `results` or `config` is malformed, the engine or configuration is invalid or a metric an active covenant reads is non-finite (kind `validation`), or such a metric has no value in a period (kind `not_found`).
+   */
+  forecastBreaches(
+    results: StatementResult | string,
+    covenants: CovenantEngine,
+    config?: generated.covenants.CovenantForecastConfig | string | null
+  ): generated.covenants.FutureBreach[];
   /**
    * Run checks from a suite spec against a model.
    *
@@ -32677,6 +32802,34 @@ export interface StatementsAnalyticsNamespace {
    * @throws Error - Rejects when `peer_set` or `dimensions` cannot be decoded into its declared schema, when a weight is negative/non-finite, no positive-weight dimension has usable data, the composite is non-finite, or the result cannot be serialized to JavaScript. Unusable dimensions are excluded; regression dimensions do not fall back to univariate scoring.
    */
   scoreRelativeValue(peerSet: unknown, dimensions: unknown[]): RelativeValueResult;
+  /**
+   * Compare one subject with its filtered peers (mirrors Rust `relative_value_report`).
+   *
+   * Returns the comps table, peer statistics, regression scatter and composite
+   * rich/cheap score in one result, so a caller has nothing to compute. A used
+   * dimension and the composite are exactly what `scoreRelativeValue` returns on
+   * the same peers and dimensions; where that function throws because no dimension
+   * is usable, this one still returns the table.
+   * @param subject - `CompanyMetrics` of the company being evaluated (object or JSON). Monetary metrics carry no currency and every company's must already be in one currency. It need not be in `universe`.
+   * @param universe - Candidate peers as `CompanyMetrics` (array or JSON), in the order the report returns them. A member with the subject's id is never a peer and does not count as excluded.
+   * @param config - `RelativeValueReportConfig` (object or JSON): `filter` (optional; a `PeerFilter` in which every field is optional, an omitted field meaning no constraint and an unknown one rejected; an omitted filter makes every other company a peer), `period_basis` (required; `"ltm"`, `"ntm"` or `{custom: "<label>"}`; it labels the report and the metrics are used as given), `dimensions` (required; `ScoringDimension` objects with finite non-negative weights, zero disabling one; may be empty when `multiples` is not) and `multiples` (required; multiple identifiers such as `"ev_ebitda"`, the columns in order; may be empty when `dimensions` is not).
+   * @returns `RelativeValueReport` plain object: `subject_id`, `period_basis`, `peer_count`, `excluded_count` (universe members the filter dropped, not counting the subject), `companies` (subject first, then peers in universe order: `id`, `is_subject`, `values` with one number or null per configured multiple), `multiples` in config order (`multiple`, `subject_value`, `peer_stats`, `percentile`, `z_score`), `dimensions` in config order including excluded ones (`label`, `weight`, `direction`, `y`, `x`, `subject_y`, `subject_x`, `peer_stats`, `percentile`, `z_score`, `regression`, `signal` positive meaning cheap, `excluded_reason`, and `points` for the scatter with `company_id`, `is_subject` (true on the subject's point, first when the subject has both metrics), `x`, `y`, `fitted_y`), `composite` (the `scoreRelativeValue` result, or null) and `composite_excluded_reason` (`no_dimensions`, `no_usable_dimension`, `non_finite_score`, or null).
+   * @throws If an argument is malformed or carries an unknown field (a misspelt `CompanyMetrics` or `PeerFilter` key included), `dimensions` and `multiples` are both empty, or a weight is negative or non-finite (kind `validation`). No usable dimension is not an error: the table is returned with a null `composite`.
+   */
+  relativeValueReport(
+    subject: generated.statements_analytics.CompanyMetrics | string,
+    universe: generated.statements_analytics.CompanyMetrics[] | string,
+    config: generated.statements_analytics.RelativeValueReportConfig | string
+  ): generated.statements_analytics.RelativeValueReport;
+  /**
+   * Comps table of a relative value report, one row per company (mirrors Rust `RelativeValueReport::to_table`).
+   * @param report - `RelativeValueReport` plain object or JSON string, as `relativeValueReport` returns it.
+   * @returns `TableEnvelope` with `id` (string) and `is_subject` (boolean) columns, then one nullable float column per configured multiple named by its wire form (`ev_ebitda`, `pe`, ...), in config order; rows are the subject first, then the peers in universe order, and a value Rust cannot compute is null.
+   * @throws Error - Throws with kind `validation` if `report` does not match the `RelativeValueReport` schema, a multiple appears twice, or a company row does not hold one value per multiple.
+   */
+  relativeValueReportTable(
+    report: generated.statements_analytics.RelativeValueReport | string
+  ): TableEnvelope;
   /**
    * Reusable dependency tracer for a financial model.
    */
@@ -32928,9 +33081,9 @@ export interface StatementsAnalyticsNamespace {
    * @param netDebtOverride - Flat net debt in model currency used instead of the model-derived equity bridge.
    * @param options - Optional Rust `DcfOptions`; every field is optional and a missing one takes its Rust default (`mid_year_convention`, `equity_bridge`, `shares_outstanding`, `valuation_discounts`, `exit_multiple_metric_node`, ...). Unknown keys are rejected (object or JSON).
    * @param market - Optional `MarketContext` state used for statement evaluation, not for WACC discounting (object or JSON).
-   * @param asOf - Optional ISO 8601 valuation date; required when `market` is supplied.
+   * @param asOf - Optional ISO 8601 valuation date; required when `market` is supplied. With `market` it is also the statement visibility cutoff: an actual is hidden until its availability date, by default the period's exclusive end (the first day of the next period), so a quarter-end `"2025-03-31"` hides 2025Q1's actuals; pass `"2025-04-01"` or set the nodes' `availability_dates`. Only forecast periods ending after it are discounted.
    * @returns `CorporateValuationResult`: enterprise value, terminal-value PV, net debt and equity value as `Money` wire objects, plus per-share value when shares are supplied, and the DCF working: `wacc`, per-period `periods` rows (flow, discount factor, present value), `pv_explicit`, the undiscounted `terminal_value` with its `terminal_discount_years`, and the `equity_bridge` (gross debt and cash separately).
-   * @throws Error - Throws with kind `validation` if an input is malformed, the model currency is missing, the WACC and terminal-value assumptions are inconsistent, or the valuation fails, and kind `not_found` if the UFCF or exit-multiple metric node is missing.
+   * @throws Error - Throws with kind `validation` if an input is malformed, the model currency is missing, `asOf` hides an actual that a value node needs, no forecast cash flow ends after `asOf`, the WACC and terminal-value assumptions are inconsistent, or the valuation fails, and kind `not_found` if the UFCF or exit-multiple metric node is missing.
    */
   evaluateDcf(
     model: JsonInput,
@@ -33059,7 +33212,7 @@ export interface StatementsAnalyticsNamespace {
    * @param universe - Array of candidate `CompanyMetrics` (array or JSON).
    * @param filter - `PeerFilter` applied to the universe (object or JSON).
    * @param periodBasis - `"ltm"`, `"ntm"`, or `{custom: "<label>"}` for another basis such as `"FY2025E"`.
-   * @returns `PeerSet` plain object: `subject`, the accepted `peers` and `period_basis`.
+   * @returns `[peerSet, excludedCount]`: the `PeerSet` plain object (`subject`, the accepted `peers` and `period_basis`) and the number of universe members the filter dropped, a member with the subject's id not counted.
    * @throws Error - Throws with kind `validation` if an input is malformed or `periodBasis` is not a period basis.
    */
   peerSetFromUniverse(
@@ -33067,7 +33220,7 @@ export interface StatementsAnalyticsNamespace {
     universe: generated.statements_analytics.CompanyMetrics[] | string,
     filter: generated.statements_analytics.PeerFilter | string,
     periodBasis: generated.statements_analytics.PeriodBasis
-  ): generated.statements_analytics.PeerSet;
+  ): [generated.statements_analytics.PeerSet, number];
   /**
    * Statement result of one scenario.
    *
@@ -33707,6 +33860,21 @@ export interface PortfolioNamespace {
    */
   carinoLink(periodsJson: JsonInput): CarinoLinkedAttribution;
   /**
+   * Attribute each period with Brinson-Fachler and Carino-link the results.
+   *
+   * Binds Rust `brinson_linked`: the multi-period Brinson-Fachler report in one
+   * call, identical to `carinoLink(periods.map(brinsonFachler))`. Returns a
+   * structured `CarinoLinkedAttribution` object with every period's sector
+   * allocation, selection and interaction (`periods`), the linked effects by
+   * sector (`linked_sectors`) and by effect (`linked_allocation`,
+   * `linked_selection`, `linked_interaction`), and the compounded portfolio and
+   * benchmark returns; the linked effects sum to the compounded active return.
+   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
+   * @param periods - Chronological array of periods (or its JSON text), each an array of `SectorPeriod` objects (`sector`, `portfolio_weight`, `benchmark_weight`, `portfolio_return`, `benchmark_return`). Weights are decimal fractions summing to one on each side; returns are decimal period returns (`0.015` is +1.5 %). Every period lists the same sectors in the same order; a sector absent on one side keeps a zero weight.
+   * @throws Error - Throws a JavaScript exception if `periods` is malformed or a row has an unknown field, there are no periods, a period fails Brinson-Fachler (no sectors, a non-finite input, or weights not summing to one; the message names the zero-based period), the sector ordering changes between periods, or a period return is at most `-1` (kind `validation`).
+   */
+  brinsonLinked(periods: generated.portfolio.SectorPeriod[][] | string): CarinoLinkedAttribution;
+  /**
    * Compute a single-period Campisi fixed-income attribution from JSON.
    *
    * Decomposes both sides into carry / treasury / spread / selection and
@@ -33913,8 +34081,8 @@ export interface PortfolioNamespace {
    * Geometrically link TWRR sub-period returns from returns JSON.
    * @returns Linked time-weighted return object, including the annualized rate over `horizonYears`.
    * @param returnsJson - Numeric return-series JSON.
-   * @param horizonYears - Return-linking horizon measured in years for annualization.
-   * @throws Error - Throws a JavaScript exception if `returnsJson` is malformed, the return series is invalid (non-finite sub-period return or return at most -1, non-positive compounded growth factor), or the linked result cannot be converted to a JavaScript value.
+   * @param horizonYears - Full elapsed horizon in 365-day calendar years; must be finite (`NaN` or `Infinity` throws). Below one year, including zero and negative values, the linked return is not annualised (`annualised` mirrors `cumulative` and `is_annualised` is false).
+   * @throws Error - Throws a JavaScript exception if `returnsJson` is malformed, `horizonYears` is `NaN` or infinite, the return series is invalid (non-finite sub-period return or return at most -1, non-positive compounded growth factor), or the linked result cannot be converted to a JavaScript value.
    */
   twrrLinked(returnsJson: JsonInput, horizonYears: number): LinkedReturn;
   /**
@@ -34243,6 +34411,15 @@ export interface PortfolioNamespace {
    */
   portfolioAttributionExplainText(attribution: PortfolioAttribution | string): string;
   /**
+   * Every base-currency money bucket of a portfolio attribution with its share of total P&L.
+   * @param attribution - `PortfolioAttribution` object or JSON from `attributePortfolioPnl`.
+   * @returns One `PnlBucketShare` per bucket: the attribute's wire `field`, its `amount` in the base currency and `pct_of_total` in signed percentage points, `null` when `total_pnl` is effectively zero.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `attribution` is not a JSON string or plain object, and a `FinstackError` (kind `validation`) if it does not match the `PortfolioAttribution` schema.
+   */
+  portfolioAttributionPctOfTotalByBucket(
+    attribution: PortfolioAttribution | string
+  ): PnlBucketShare[];
+  /**
    * Check that a portfolio attribution's factor buckets sum to its total P&L.
    *
    * Twin of Python `PortfolioAttribution.reconciliation_check` (Rust
@@ -34500,7 +34677,12 @@ export interface ScenariosNamespace {
   /**
    * Compose multiple structured scenario specs into a single scenario.
    *
-   * Specs are merged in priority order (lower number runs first).
+   * Specs are merged in priority order (lower number runs first; equal
+   * priorities keep input order). The composed spec takes its `id` and `name`
+   * from the inputs joined with `+` / `" + "`, its `description` from the
+   * present input descriptions joined with `" + "` (`null` when no input has
+   * one), and the lowest input `priority` (`0` for an empty array), all in
+   * execution order.
    * @returns Structured composed scenario specification.
    * @param specs - ScenarioSpec objects to validate and compose in priority order.
    * @throws Error - Rejects malformed structured specs, any input spec that fails `ScenarioSpec` validation (blank ID, non-finite numbers, invalid identifiers, tenors or operations; the message names the scenario), input specs with mixed `hazard_bump_mode` values, composition that contains more than one time-roll operation, or failure to convert the composed specification.
@@ -34600,7 +34782,7 @@ export interface ScenariosNamespace {
    * @param marketJson - JSON-serialized `MarketContext`.
    * @param asOf - Valuation date (ISO 8601).
    * @param scenarioJson - JSON-serialized `ScenarioSpec`.
-   * @param method - `AttributionMethod` wire value: a unit variant name such as `"parallel"` or `"metrics_based"`, an object such as `{ waterfall: ["carry", "rates_curves"] }` or `{ taylor: {} }`, or the same value as JSON text. Omit for the Rust default (`AttributionMethod::default()`, currently "parallel"). "metrics_based" calculates the canonical registry's applicable subset of default attribution metrics at the opening snapshot; metrics unsupported by the instrument type are omitted, while failures calculating selected metrics throw.
+   * @param method - `AttributionMethod` wire value: a unit variant name such as `"parallel"` or `"metrics_based"`, an object such as `{ waterfall: ["carry", "rates_curves"] }` or `{ taylor: {} }`, or the same value as JSON text. Omit for the Rust default (`AttributionMethod::default()`, currently "parallel"). "metrics_based" calculates the canonical registry's applicable subset of default attribution metrics at the opening snapshot; metrics unsupported by the instrument type are omitted, and when a hazard curve of the instrument has no calibration recipe and that menu fails, the quote-space credit metrics are dropped with a note and credit-curve P&L flows to residual; any other failure calculating selected metrics throws.
    * @param configJson - Optional FinstackConfig JSON for horizon analysis; omit to use defaults.
    * @param calendarId - Optional built-in holiday calendar (e.g. "nyse", "target") used to business-day adjust `time_roll_forward` targets under `business_days` mode. Omit for a weekends-only calendar; unknown identifiers throw.
    * @returns The serde `HorizonResult` (`attribution`, `initial_value` and `terminal_value` as exact-decimal Money objects, `horizon_days`, null without a time roll, and `scenario_report`) plus `summary`: the Rust-computed `total_return`, `annualized_return`, `currency` and `factor_contributions` that Python exposes as `HorizonResult` accessors. Rust computes every derived value. Undefined derived values are null here and NaN in Python: total return and factor contributions require positive initial value and matching P&L currency; annualization also requires a positive horizon and total return at or above -100%.
@@ -34719,6 +34901,14 @@ export interface ScenariosNamespace {
    * @throws Error - Throws a `TypeError` when `result` is not an object or JSON string, and a `validation` error when it is not a `HorizonResult`.
    */
   horizonResultExplainText(result: HorizonReport | HorizonResult | string): string;
+  /**
+   * The valuation date that holds after a scenario.
+   * @param report - `ApplicationReport` returned by `applyScenario`, as an object or JSON.
+   * @param asOf - ISO-8601 valuation date the scenario was applied at, returned unchanged without a roll.
+   * @returns ISO-8601 date: the roll's new date, else `asOf`.
+   * @throws Error - Throws a `TypeError` when an argument has the wrong type, and a `validation` error when `report` is not an `ApplicationReport` or `asOf` is not an ISO date.
+   */
+  applicationReportEffectiveAsOf(report: ApplicationReport | string, asOf: string): string;
   /**
    * One attribution factor's P&L as a fraction of the initial value.
    *

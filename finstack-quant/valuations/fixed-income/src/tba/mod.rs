@@ -45,5 +45,5 @@ pub(crate) mod metrics;
 pub(crate) mod pricer;
 mod types;
 
-pub(crate) use types::{settlement_class, sifma_settlement};
 pub use types::{AgencyTba, TbaTerm};
+pub(crate) use types::{settlement_class, sifma_settlement};

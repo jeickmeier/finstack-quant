@@ -10,9 +10,10 @@
 //! commodity P&L landed 100% in the residual.
 
 use finstack_quant_attribution::{
-    attribute_pnl, default_waterfall_order, AttributionMethod, AttributionRequest, ExecutionPolicy,
-    MarketRestoreFlags, MarketSnapshot,
+    AttributionMethod, AttributionRequest, ExecutionPolicy, MarketRestoreFlags, MarketSnapshot,
+    attribute_pnl, default_waterfall_order,
 };
+use finstack_quant_core::Result;
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
@@ -26,7 +27,6 @@ use finstack_quant_core::market_data::term_structures::{
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::Result;
 use finstack_quant_models::volatility::get_cube_vol_clamped;
 use finstack_quant_valuations::instruments::{Instrument, MarketDependencies};
 use finstack_quant_valuations::metrics::MetricId;
@@ -124,7 +124,14 @@ impl Instrument for RestoreTestInstrument {
             Kind::PriceCurve => 100_000.0 * market.get_price_curve("WTI")?.spot_price(),
             Kind::VolCube => {
                 let cube = market.get_vol_cube("SWPT-CUBE")?;
-                1_000_000.0 * get_cube_vol_clamped(&cube, 1.0, 1.0, 0.05)
+                1_000_000.0
+                    * get_cube_vol_clamped(
+                        &cube,
+                        1.0,
+                        1.0,
+                        0.05,
+                        finstack_quant_models::volatility::VolatilityConvention::Lognormal,
+                    )
             }
             Kind::RatesInflation => {
                 let rate = market.get_forward("USD-FWD")?.rate(1.0);

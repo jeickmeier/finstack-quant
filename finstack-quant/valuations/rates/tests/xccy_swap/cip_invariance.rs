@@ -12,8 +12,8 @@ use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
-use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
 use finstack_quant_core::money::Money;
+use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::instruments::FloatLegSpec;
 use finstack_quant_valuations_core::instruments::Instrument;
@@ -422,10 +422,10 @@ fn mtm_reset_cashflow_schedule_npv_matches_base_value() {
 
         let tol = 1e-10 * N_USD;
         assert!(
-        (pv_pricer - pv_from_schedule).abs() < tol,
-        "Schedule-PV mismatch: pricer={pv_pricer:.4}, schedule={pv_from_schedule:.4}, diff={:.4e}, tol={tol:.4e}",
-        pv_pricer - pv_from_schedule
-    );
+            (pv_pricer - pv_from_schedule).abs() < tol,
+            "Schedule-PV mismatch: pricer={pv_pricer:.4}, schedule={pv_from_schedule:.4}, diff={:.4e}, tol={tol:.4e}",
+            pv_pricer - pv_from_schedule
+        );
     }
 }
 

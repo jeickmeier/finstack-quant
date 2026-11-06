@@ -20,7 +20,8 @@ There is **no `prelude` module** — import the names you need directly.
 |------|---------|
 | `StructuredCredit` | The instrument. `new_standard(deal_type, params)` apply deal-type defaults; `builder()` for full control; `example()` for a canonical deal. |
 | `DealType`, `AssetType`, `TrancheSeniority` | `DealType::{Clo, Cbo, Abs, Rmbs, Cmbs, Auto, Card}` and pool/tranche taxonomy. Only `Abs`, `Clo`, `Cmbs` and `Rmbs` have `new_*` constructors and registry profiles. |
-| `AssetPool`, `PoolAsset`, `RepLine`, `PoolStats`, `calculate_pool_stats` | Collateral pool and its aggregates. Floating rows (`forward_curve_id` + `spread_bp`) may carry `index_floor_bp`, a floor on the index in basis points applied before the spread. |
+| `standard_deal_families`, `StandardDealFamily` | Each family `StructuredCredit::new_standard` accepts, with its registry profile id and an example of its inputs. `new_standard` rejects a `pool.deal_type` that contradicts the family. |
+| `AssetPool`, `PoolAsset`, `RepLine`, `PoolStats`, `calculate_pool_stats`, `PoolReport`, `PoolConcentrationEntry`, `pool_report` | Collateral pool and its aggregates. `pool_report` is the one call for a pool screen: `PoolStats`, WARF and concentration tables by obligor, industry and rating. Floating rows (`forward_curve_id` + `spread_bp`) may carry `index_floor_bp`, a floor on the index in basis points applied before the spread. |
 | `Tranche`, `TrancheBuilder`, `TrancheStructure` | Capital structure; tranche coupons are the cashflows `RateSpec`. |
 | `Waterfall`, `WaterfallBuilder`, `WaterfallTier`, `Recipient`, `RecipientType`, `PaymentType`, `PaymentCalculation`, `AllocationMode` | Waterfall construction. |
 | `WaterfallRules`, `AfcSpec`, `StepDownSpec`, `StepDownTrigger`, `ShiftingInterestSpec`, `ShiftMode` | Declarative rules layered onto the base waterfall per period (`pricing/resolve.rs`). |
@@ -705,7 +706,63 @@ recoveries, reinvested par and fees paid, the reserve, spread and funding
 account balances, the delinquent balance, the realized excess spread, and
 every coverage test as the executor evaluated it (`CoverageTestDiagnostic {
 test_id, ratio, trigger_level, cushion, passing }`; a single source, not a
-recomputation).
+recomputation). `ratio` and `cushion` are `None` when the test has no claim
+outstanding: the notes it covers are retired or owe no interest, and it passes.
+`wac`, `weighted_avg_spread_bp` and `warf` are `None` where their population is
+empty.
+
+`PeriodDiagnostics::waterfall` (`WaterfallDistribution`) says who was paid: the tier
+allocations, each recipient's `PaymentRecord` (requested, paid, shortfall,
+`diverted`, `is_principal`), the coverage ratios as the executor computed them,
+the diversions and what was carried forward. Per-recipient totals are
+`WaterfallDistribution::distributions` and `principal_distributions`, summed from
+the payment records. Cash that reaches a tranche outside the waterfall is on
+`PeriodDiagnostics::non_waterfall_payments` (`NonWaterfallPayment`, tagged with a
+`NonWaterfallSource`): reserve interest routed to a tranche on the period that
+earned it, and the redemption and terminal releases on the deal's last period.
+Per tranche and date the two sum to the tranche's `cashflows`, and to its
+`interest_flows` plus `principal_flows`. Residual cash a custom waterfall pays a
+debt class is a turbo: principal, capped at the balance the class has left, with
+the excess passing to the next recipient or tier, and it does not repay deferred
+interest first. A custom waterfall may pay a debt class only its own interest,
+capped interest, net-WAC carryover and principal, and residual cash; validation
+rejects a fixed, percentage, incentive-fee or reserve calculation paid to one, or
+an amount calculated for another tranche. A recovery settling after the last
+period carries its own later `payment_date`; a deal with no payment period left
+that still settles cash has one record holding that settlement. Monte Carlo and OAS paths build the same
+record and discard it with the path.
+
+`PeriodDiagnostics::credit_enhancement` holds each tranche's end-of-period share
+of collateral beneath it, a decimal `(C − N) ÷ C`, with `C` the collateral plus
+the funding account and `N` the balances of the tranche and every tranche paid
+ahead of it. The `MinCreditEnhancement` step-down trigger reads the senior value
+from the same function on the next payment date, before that date's principal.
+`SimulationDiagnostics::first_breaches` lists each coverage test once, sorted by
+id, with its first failing payment date or `None`: the tests the waterfall
+carries and every tranche `oc_trigger` / `ic_trigger` (`OC_<tranche>_trigger`),
+including the ones that divert nothing and so never appear on `coverage_tests`.
+A test the waterfall carries is listed only if a period evaluated it, so a
+settlement with no waterfall run lists none of those.
+
+`PeriodDiagnostics::excess_spread` is the realized number the early-amortization
+test reads: pool interest less the debt coupons due, the service-provider and
+manager fees paid through the waterfall and the period's net charge-off, as an
+annual decimal of the opening pool balance. `AbsExcessSpread` is a different,
+static card-trust metric in percent. `simulation_field_units(currency)` states
+the units of these charted series for a host.
+
+`calculate_equity_metrics(deal, market, as_of, purchase_price_pct)` reports the
+deal's first equity-seniority class. `invested` is its current balance times the
+price, par when omitted. `irr` is the annual XIRR (ACT/365F, decimal) of `-invested`
+on `as_of` against every later distribution, interest and principal alike. `moic`
+is total distributions over `invested`. `nav_pct` is those distributions discounted
+from `as_of` on `deal.discount_curve_id`, as a percent of current balance, and does
+not move with the price. `cash_on_cash` is each distribution as an unannualized
+decimal share of `invested`. A class that receives nothing has `irr: None` and a true
+zero MOIC and NAV. With nothing invested `irr`, `moic` and each `cash_on_cash` share
+are `None`, as each divides by `invested`. A deal with no equity
+class is a validation error. `equity_metrics_field_units(currency)` (in `pricer`)
+states these units for a host.
 
 `SimulationDiagnostics::to_table()` owns the nineteen-column period export used
 by Python `to_dataframe()`. It retains period order and duplicate dates, joins

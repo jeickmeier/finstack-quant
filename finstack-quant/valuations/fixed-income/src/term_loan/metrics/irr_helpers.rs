@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use crate::term_loan::TermLoan;
 use finstack_quant_cashflows::builder::CashFlowSchedule;
-use finstack_quant_core::cashflow::{xirr, CFKind};
+use finstack_quant_core::cashflow::{CFKind, xirr};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::metrics::MetricContext;
@@ -293,10 +293,11 @@ pub(super) fn exercisable_call_candidates(
             .min();
         if let Some(exercise) = first_coupon_after_settlement {
             let active = cs.calls.iter().rfind(|c| c.date <= exercise);
-            if let Some(call) = active {
-                if exercise < loan.maturity && !candidates.iter().any(|(d, _)| *d == exercise) {
-                    candidates.push((exercise, call));
-                }
+            if let Some(call) = active
+                && exercise < loan.maturity
+                && !candidates.iter().any(|(d, _)| *d == exercise)
+            {
+                candidates.push((exercise, call));
             }
         }
     }

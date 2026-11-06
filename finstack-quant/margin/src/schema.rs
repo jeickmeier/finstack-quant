@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "json-schema")]
 use serde_json::Value;
 
-use crate::calculators::im::schedule::ScheduleAssetClass;
 use crate::calculators::im::CcpMethodology;
+use crate::calculators::im::schedule::ScheduleAssetClass;
 use crate::calculators::{ImResult, VmResult};
 use crate::regulatory::frtb::{FrtbRiskClass, FrtbSbaResult, FrtbSensitivities};
 use crate::regulatory::sa_ccr::{EadResult, SaCcrNettingSetConfig, SaCcrTrade};
@@ -13,10 +13,10 @@ use crate::types::{ConcentrationBreach, ImCollateralResult, RepoMarginSpec};
 use crate::types::{CsaSpec, MarginCall, OtcMarginSpec};
 #[cfg(feature = "json-schema")]
 use crate::{
-    constants::MarginConstants, metrics::ExcessCollateral, metrics::Haircut01,
+    SimmVersion, constants::MarginConstants, metrics::ExcessCollateral, metrics::Haircut01,
     metrics::MarginFundingCost, metrics::MarginUtilization, types::SimmSensitivitiesJson,
     xva::mva::ImDecayProfile, xva::mva::MvaResult, xva::types::ExposureProfile,
-    xva::types::FundingConfig, xva::types::XvaResult, SimmVersion,
+    xva::types::FundingConfig, xva::types::XvaResult,
 };
 
 /// Stable base URI for margin-owned schemas.
@@ -132,15 +132,14 @@ impl MarginEnvelope {
     }
 }
 
-/// A canonical CSA specification.
+/// The canonical CSA specification every margin CSA example describes.
 ///
-/// The `csa_spec` branch is the one a caller authors most often; the VM
-/// parameters, eligible-collateral schedule and call timing come from their
-/// documented defaults rather than invented numbers.
+/// The VM parameters, eligible-collateral schedule and call timing come from
+/// their documented defaults rather than invented numbers.
 #[cfg(feature = "json-schema")]
-fn margin_examples() -> finstack_quant_core::Result<Vec<Value>> {
+fn example_csa_spec() -> finstack_quant_core::Result<CsaSpec> {
     let registry = crate::registry::embedded_registry()?;
-    let csa = crate::types::CsaSpec {
+    Ok(CsaSpec {
         id: "CSA-ACME-2024".to_string(),
         base_currency: finstack_quant_core::currency::Currency::USD,
         calendar_id: "nyse".to_string(),
@@ -151,12 +150,45 @@ fn margin_examples() -> finstack_quant_core::Result<Vec<Value>> {
         eligible_collateral: Default::default(),
         call_timing: registry.defaults.timing.standard.clone(),
         collateral_curve_id: "USD-OIS".into(),
-    };
-    let envelope = MarginEnvelope::csa_spec(csa);
+    })
+}
+
+/// The margin envelope example: the `csa_spec` branch, the one a caller
+/// authors most often.
+#[cfg(feature = "json-schema")]
+fn margin_examples() -> finstack_quant_core::Result<Vec<Value>> {
+    let envelope = MarginEnvelope::csa_spec(example_csa_spec()?);
     let value = serde_json::to_value(&envelope).map_err(|error| {
         finstack_quant_core::Error::Internal(format!("serialize margin example: {error}"))
     })?;
     Ok(vec![value])
+}
+
+/// The standalone CSA specification example, identical to the envelope's
+/// `csa_spec` payload.
+#[cfg(feature = "json-schema")]
+fn csa_spec_examples() -> finstack_quant_core::Result<Vec<Value>> {
+    finstack_quant_core::schema::example(&example_csa_spec()?)
+}
+
+/// Replace the shared core definitions a margin schema embeds (currency,
+/// money, decimal, date and identifier wire types) with references to their
+/// published `common/1` artifacts, as the instrument and cashflow schemas do.
+///
+/// # Arguments
+///
+/// * `schema` - Generated margin schema to repoint in place.
+///
+/// # Errors
+///
+/// Returns [`finstack_quant_core::Error::Validation`] if a replaced definition
+/// is not assertion-equivalent to the published artifact.
+#[cfg(feature = "json-schema")]
+fn package_margin_schema(schema: &mut Value) -> finstack_quant_core::Result<()> {
+    finstack_quant_core::schema::externalize_schema_definitions(
+        schema,
+        finstack_quant_core::schema::COMMON_SCHEMA_DEFINITIONS,
+    )
 }
 
 #[cfg(feature = "json-schema")]
@@ -166,11 +198,11 @@ mod examples {
     //! Calculator outputs are produced by running the calculator on the
     //! neighbouring input example, so the pair stays consistent.
 
+    use finstack_quant_core::Result;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::schema::{example, example_from_json};
-    use finstack_quant_core::Result;
-    use serde_json::{json, Value};
+    use serde_json::{Value, json};
 
     fn usd(amount: i64) -> Money {
         Money::from((amount, Currency::USD))
@@ -444,7 +476,8 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
     .with_summary(
         "One of three closed root shapes: an OTC margin spec, a CSA spec, or a margin call.",
     )
-    .with_examples(margin_examples),
+    .with_examples(margin_examples)
+    .with_packager(package_margin_schema),
     finstack_quant_core::schema_artifact!(
         CcpMethodology,
         "margin",
@@ -452,7 +485,8 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         Component,
         "CCP methodology type."
     )
-    .with_examples(examples::ccp_methodology),
+    .with_examples(examples::ccp_methodology)
+    .with_packager(package_margin_schema),
     finstack_quant_core::schema_artifact!(
         ConcentrationBreach,
         "margin",
@@ -460,7 +494,8 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         Output,
         "A breach of a collateral concentration limit."
     )
-    .with_examples(examples::concentration_breach),
+    .with_examples(examples::concentration_breach)
+    .with_packager(package_margin_schema),
     finstack_quant_core::schema_artifact!(
         EadResult,
         "margin",
@@ -468,7 +503,17 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         Output,
         "SA-CCR Exposure at Default result."
     )
-    .with_examples(examples::ead_result),
+    .with_examples(examples::ead_result)
+    .with_packager(package_margin_schema),
+    finstack_quant_core::schema_artifact!(
+        CsaSpec,
+        "margin",
+        "csa_spec",
+        Input,
+        "Credit Support Annex specification (ISDA standard)."
+    )
+    .with_examples(csa_spec_examples)
+    .with_packager(package_margin_schema),
     finstack_quant_core::schema_artifact!(
         ExcessCollateral,
         "margin",
@@ -476,7 +521,8 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         Output,
         "Excess collateral result."
     )
-    .with_examples(examples::excess_collateral),
+    .with_examples(examples::excess_collateral)
+    .with_packager(package_margin_schema),
     finstack_quant_core::schema_artifact!(
         ExposureProfile,
         "margin",
@@ -484,7 +530,8 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         Input,
         "Exposure profile computed at each time grid point."
     )
-    .with_examples(examples::exposure_profile),
+    .with_examples(examples::exposure_profile)
+    .with_packager(package_margin_schema),
     finstack_quant_core::schema_artifact!(
         FrtbRiskClass,
         "margin",
@@ -492,7 +539,8 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         Component,
         "FRTB risk classes per BCBS d457."
     )
-    .with_examples(examples::frtb_risk_class),
+    .with_examples(examples::frtb_risk_class)
+    .with_packager(package_margin_schema),
     finstack_quant_core::schema_artifact!(
         FrtbSbaResult,
         "margin",
@@ -500,7 +548,8 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         Output,
         "Complete FRTB SBA capital charge result."
     )
-    .with_examples(examples::frtb_sba_result),
+    .with_examples(examples::frtb_sba_result)
+    .with_packager(package_margin_schema),
     finstack_quant_core::schema_artifact!(
         FrtbSensitivities,
         "margin",
@@ -508,7 +557,8 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         Input,
         "FRTB sensitivity inputs organized by risk class."
     )
-    .with_examples(examples::frtb_sensitivities),
+    .with_examples(examples::frtb_sensitivities)
+    .with_packager(package_margin_schema),
     finstack_quant_core::schema_artifact!(
         FundingConfig,
         "margin",
@@ -516,7 +566,8 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         Input,
         "Funding cost/benefit configuration for FVA and MVA calculation."
     )
-    .with_examples(examples::funding_config),
+    .with_examples(examples::funding_config)
+    .with_packager(package_margin_schema),
     finstack_quant_core::schema_artifact!(
         Haircut01,
         "margin",
@@ -524,7 +575,8 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         Output,
         "Haircut sensitivity (Haircut01) result."
     )
-    .with_examples(examples::haircut01),
+    .with_examples(examples::haircut01)
+    .with_packager(package_margin_schema),
     finstack_quant_core::schema_artifact!(
         ImCollateralResult,
         "margin",
@@ -532,7 +584,8 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         Output,
         "One-way IM collateral account after applying the CSA's allocated threshold."
     )
-    .with_examples(examples::im_collateral_result),
+    .with_examples(examples::im_collateral_result)
+    .with_packager(package_margin_schema),
     finstack_quant_core::schema_artifact!(
         ImDecayProfile,
         "margin",
@@ -540,7 +593,8 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         Input,
         "Deterministic decay applied to today's SIMM IM to approximate `E[IM(t)]`."
     )
-    .with_examples(examples::im_decay_profile),
+    .with_examples(examples::im_decay_profile)
+    .with_packager(package_margin_schema),
     finstack_quant_core::schema_artifact!(
         ImResult,
         "margin",
@@ -548,7 +602,8 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         Output,
         "Initial margin calculation result."
     )
-    .with_examples(examples::im_result),
+    .with_examples(examples::im_result)
+    .with_packager(package_margin_schema),
     finstack_quant_core::schema_artifact!(
         MarginConstants,
         "margin",
@@ -556,7 +611,8 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         Output,
         "Margin constants a host needs to interpret inputs and results."
     )
-    .with_examples(examples::margin_constants),
+    .with_examples(examples::margin_constants)
+    .with_packager(package_margin_schema),
     finstack_quant_core::schema_artifact!(
         MarginFundingCost,
         "margin",
@@ -564,7 +620,8 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         Output,
         "Margin funding cost result."
     )
-    .with_examples(examples::margin_funding_cost),
+    .with_examples(examples::margin_funding_cost)
+    .with_packager(package_margin_schema),
     finstack_quant_core::schema_artifact!(
         MarginUtilization,
         "margin",
@@ -572,7 +629,8 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         Output,
         "Margin utilization result."
     )
-    .with_examples(examples::margin_utilization),
+    .with_examples(examples::margin_utilization)
+    .with_packager(package_margin_schema),
     finstack_quant_core::schema_artifact!(
         MvaResult,
         "margin",
@@ -580,7 +638,8 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         Output,
         "Result of an MVA computation."
     )
-    .with_examples(examples::mva_result),
+    .with_examples(examples::mva_result)
+    .with_packager(package_margin_schema),
     finstack_quant_core::schema_artifact!(
         RepoMarginSpec,
         "margin",
@@ -588,7 +647,8 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         Input,
         "GMRA 2011 compliant repo margin specification."
     )
-    .with_examples(examples::repo_margin_spec),
+    .with_examples(examples::repo_margin_spec)
+    .with_packager(package_margin_schema),
     finstack_quant_core::schema_artifact!(
         SaCcrNettingSetConfig,
         "margin",
@@ -596,7 +656,8 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         Input,
         "Netting set configuration for SA-CCR."
     )
-    .with_examples(examples::sa_ccr_netting_set_config),
+    .with_examples(examples::sa_ccr_netting_set_config)
+    .with_packager(package_margin_schema),
     finstack_quant_core::schema_artifact!(
         SaCcrTrade,
         "margin",
@@ -604,7 +665,8 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         Input,
         "A single derivative trade for SA-CCR EAD computation."
     )
-    .with_examples(examples::sa_ccr_trade),
+    .with_examples(examples::sa_ccr_trade)
+    .with_packager(package_margin_schema),
     finstack_quant_core::schema_artifact!(
         ScheduleAssetClass,
         "margin",
@@ -612,7 +674,8 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         Component,
         "Asset class for schedule-based IM calculation."
     )
-    .with_examples(examples::schedule_asset_class),
+    .with_examples(examples::schedule_asset_class)
+    .with_packager(package_margin_schema),
     finstack_quant_core::schema_artifact!(
         SimmSensitivitiesJson,
         "margin",
@@ -620,7 +683,8 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         Input,
         "JSON-friendly representation of `SimmSensitivities`."
     )
-    .with_examples(examples::simm_sensitivities_json),
+    .with_examples(examples::simm_sensitivities_json)
+    .with_packager(package_margin_schema),
     finstack_quant_core::schema_artifact!(
         SimmVersion,
         "margin",
@@ -628,7 +692,8 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         Component,
         "SIMM version identifier."
     )
-    .with_examples(examples::simm_version),
+    .with_examples(examples::simm_version)
+    .with_packager(package_margin_schema),
     finstack_quant_core::schema_artifact!(
         VmResult,
         "margin",
@@ -636,7 +701,8 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         Output,
         "Variation margin calculation result."
     )
-    .with_examples(examples::vm_result),
+    .with_examples(examples::vm_result)
+    .with_packager(package_margin_schema),
     finstack_quant_core::schema_artifact!(
         XvaResult,
         "margin",
@@ -644,7 +710,8 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         Output,
         "Result of XVA calculations."
     )
-    .with_examples(examples::xva_result),
+    .with_examples(examples::xva_result)
+    .with_packager(package_margin_schema),
 ];
 
 /// Generate the published margin schema exactly as it is checked in.

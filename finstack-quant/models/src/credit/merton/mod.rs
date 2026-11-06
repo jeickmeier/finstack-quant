@@ -54,9 +54,14 @@ mod default_probability;
 mod dynamics;
 mod hazard_curve;
 mod model;
+mod report;
 mod simulation;
 mod spreads;
 
 pub use dynamics::{AssetDynamics, MertonBarrierType};
 pub use model::MertonModel;
+pub use report::{
+    MertonImpliedEquity, MertonReport, MertonReportMeasure, MertonReportRequest,
+    MertonReportSource, merton_report,
+};
 pub use simulation::SimulatedPaths;

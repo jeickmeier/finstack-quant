@@ -5,9 +5,9 @@ use crate::utils::input::{js_currency, js_f64_seq, js_string, js_string_seq};
 use crate::utils::wire::js_wire;
 use crate::utils::{parse_iso_dates, to_js_err, to_js_value};
 use finstack_quant_cashflows::aggregation::{
-    aggregate_by_period as rust_aggregate_by_period,
+    PeriodAggregation, aggregate_by_period as rust_aggregate_by_period,
     aggregate_cashflows_checked as rust_aggregate_cashflows_checked,
-    calendar_year_ladder as rust_calendar_year_ladder, PeriodAggregation,
+    calendar_year_ladder as rust_calendar_year_ladder,
 };
 use finstack_quant_core::dates::Period;
 use wasm_bindgen::prelude::*;

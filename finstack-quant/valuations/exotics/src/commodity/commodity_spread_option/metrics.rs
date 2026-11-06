@@ -33,7 +33,7 @@ impl MetricCalculator for SpreadDeltaCalculator {
             _ => {
                 return Err(finstack_quant_core::Error::Validation(
                     "invalid spread leg".into(),
-                ))
+                ));
             }
         };
         let forward = inst.leg_forward(&context.curves, curve_id)?;

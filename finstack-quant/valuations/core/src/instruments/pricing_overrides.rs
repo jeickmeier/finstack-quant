@@ -235,27 +235,57 @@ impl MarketQuoteOverrides {
         }
     }
 
+    /// The price-driving fields and their values, by wire name, in precedence order.
+    ///
+    /// The one definition of the set: [`Self::price_driver_count`] and
+    /// [`Self::price_driver_fields`] both read it.
+    fn price_drivers(&self) -> [(&'static str, Option<f64>); 10] {
+        [
+            ("quoted_clean_price_pct", self.quoted_clean_price_pct),
+            (
+                "quoted_dirty_price_currency",
+                self.quoted_dirty_price_currency,
+            ),
+            ("quoted_ytm", self.quoted_ytm),
+            ("quoted_ytw", self.quoted_ytw),
+            ("quoted_z_spread", self.quoted_z_spread),
+            ("quoted_oas", self.quoted_oas),
+            ("quoted_discount_margin", self.quoted_discount_margin),
+            ("quoted_i_spread", self.quoted_i_spread),
+            ("quoted_asw_market", self.quoted_asw_market),
+            (
+                "quoted_japanese_simple_yield",
+                self.quoted_japanese_simple_yield,
+            ),
+        ]
+    }
+
+    /// Wire names of the mutually exclusive price-driving fields.
+    ///
+    /// [`Self::validate`] rejects more than one of these being set, so a host
+    /// editor can clear the others when one is entered.
+    ///
+    /// # Returns
+    ///
+    /// The field names as they appear on the wire, in precedence order.
+    pub fn price_driver_fields() -> Vec<&'static str> {
+        Self::default()
+            .price_drivers()
+            .iter()
+            .map(|(name, _)| *name)
+            .collect()
+    }
+
     /// Return the number of price-driving fields that are currently set.
     ///
     /// The price-driving fields are mutually exclusive inside `Bond::base_value`
     /// (only the first one in the precedence chain would take effect), so
     /// [`Self::validate`] enforces that at most one is set.
     fn price_driver_count(&self) -> usize {
-        [
-            self.quoted_clean_price_pct.is_some(),
-            self.quoted_dirty_price_currency.is_some(),
-            self.quoted_ytm.is_some(),
-            self.quoted_ytw.is_some(),
-            self.quoted_z_spread.is_some(),
-            self.quoted_oas.is_some(),
-            self.quoted_discount_margin.is_some(),
-            self.quoted_i_spread.is_some(),
-            self.quoted_asw_market.is_some(),
-            self.quoted_japanese_simple_yield.is_some(),
-        ]
-        .iter()
-        .filter(|b| **b)
-        .count()
+        self.price_drivers()
+            .iter()
+            .filter(|(_, value)| value.is_some())
+            .count()
     }
 
     /// Whether any price-driving quote other than `quoted_z_spread` is set.
@@ -595,6 +625,12 @@ pub struct ModelConfig {
     /// this forward curve instead of using a discount-curve par-rate proxy.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub asw_forward_curve_id: Option<CurveId>,
+    /// Optional government discount curve identifier for the bond `g_spread` metric.
+    ///
+    /// The metric subtracts this curve's par yield from the bond's yield. It
+    /// enters no price, and `g_spread` is an error when it is unset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub government_curve_id: Option<CurveId>,
     /// Quote compounding convention for OAS inputs and outputs.
     ///
     /// The OAS is added to each short rate on this basis: a semiannual
@@ -672,26 +708,26 @@ impl ModelConfig {
 
     /// Validate model config (tree steps > 0, non-negative vol/friction).
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
-        if let Some(steps) = self.tree_steps {
-            if steps == 0 {
-                return Err(finstack_quant_core::Error::Validation(
-                    "tree_steps must be greater than zero".to_string(),
-                ));
-            }
+        if let Some(steps) = self.tree_steps
+            && steps == 0
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "tree_steps must be greater than zero".to_string(),
+            ));
         }
-        if let Some(paths) = self.mc_paths {
-            if paths == 0 {
-                return Err(finstack_quant_core::Error::Validation(
-                    "mc_paths must be greater than zero".to_string(),
-                ));
-            }
+        if let Some(paths) = self.mc_paths
+            && paths == 0
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "mc_paths must be greater than zero".to_string(),
+            ));
         }
-        if let Some(target) = self.mc_target_ci_half_width {
-            if !target.is_finite() || target <= 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "mc_target_ci_half_width must be finite and positive, got {target}"
-                )));
-            }
+        if let Some(target) = self.mc_target_ci_half_width
+            && (!target.is_finite() || target <= 0.0)
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "mc_target_ci_half_width must be finite and positive, got {target}"
+            )));
         }
         // Friction, volatilities, and mean reversions must be finite and
         // non-negative. Correlation is signed, so it is range-checked
@@ -706,20 +742,20 @@ impl ModelConfig {
             (self.hazard_sigma, true),
             (self.hazard_mean_reversion, true),
         ])?;
-        if let Some(base_vol) = self.lmm_base_vol {
-            if !base_vol.is_finite() || base_vol <= 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "lmm_base_vol must be positive and finite, got {base_vol}"
-                )));
-            }
+        if let Some(base_vol) = self.lmm_base_vol
+            && (!base_vol.is_finite() || base_vol <= 0.0)
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "lmm_base_vol must be positive and finite, got {base_vol}"
+            )));
         }
         validate_oas_quote_compounding(self.oas_quote_compounding)?;
-        if let Some(rho) = self.rate_credit_correlation {
-            if !rho.is_finite() || !(-1.0..=1.0).contains(&rho) {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "rate_credit_correlation must be finite and in [-1, 1], got {rho}"
-                )));
-            }
+        if let Some(rho) = self.rate_credit_correlation
+            && (!rho.is_finite() || !(-1.0..=1.0).contains(&rho))
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "rate_credit_correlation must be finite and in [-1, 1], got {rho}"
+            )));
         }
         Ok(())
     }
@@ -903,6 +939,17 @@ impl InstrumentPricingOverrides {
         self
     }
 
+    /// Set the government discount curve the bond `g_spread` metric reads.
+    ///
+    /// # Arguments
+    ///
+    /// * `curve_id` - Identifier of a discount curve in the market. The metric
+    ///   takes its par yield at the bond's horizon; no price reads it.
+    pub fn with_government_curve_id(mut self, curve_id: impl Into<CurveId>) -> Self {
+        self.model_config.government_curve_id = Some(curve_id.into());
+        self
+    }
+
     /// Set issuer/borrower call friction in cents per 100 of par.
     pub fn with_call_friction_cents(mut self, cents: f64) -> Self {
         self.model_config.call_friction_cents = Some(cents);
@@ -968,7 +1015,7 @@ pub fn resolve_rates_credit_config(
 ) -> finstack_quant_core::Result<
     finstack_quant_models::trees::two_factor_rates_credit::RatesCreditConfig,
 > {
-    use finstack_quant_models::trees::two_factor_rates_credit::{RatesCreditConfig, KAPPA_MAX};
+    use finstack_quant_models::trees::two_factor_rates_credit::{KAPPA_MAX, RatesCreditConfig};
 
     let model = &overrides.model_config;
     let quotes = &overrides.market_quotes;
@@ -1343,6 +1390,40 @@ impl ScenarioPricingOverrides {
 }
 
 #[cfg(test)]
+mod price_driver_tests {
+    use super::MarketQuoteOverrides;
+
+    /// Set every named field through the wire, so a name that is not a real
+    /// field fails to deserialize.
+    fn with_fields(fields: &[&str]) -> MarketQuoteOverrides {
+        let quotes: serde_json::Map<String, serde_json::Value> = fields
+            .iter()
+            .map(|field| ((*field).to_string(), serde_json::json!(1.0)))
+            .collect();
+        serde_json::from_value(serde_json::Value::Object(quotes)).expect("wire field names")
+    }
+
+    #[test]
+    fn published_fields_are_the_wire_names_the_count_reads() {
+        let fields = MarketQuoteOverrides::price_driver_fields();
+        assert_eq!(fields.len(), 10);
+        assert_eq!(with_fields(&fields).price_driver_count(), fields.len());
+        for field in &fields {
+            assert_eq!(with_fields(&[field]).price_driver_count(), 1, "{field}");
+        }
+    }
+
+    #[test]
+    fn non_driving_quotes_are_not_in_the_set() {
+        let fields = MarketQuoteOverrides::price_driver_fields();
+        for field in ["implied_volatility", "quoted_premium", "cds_quote_bp"] {
+            assert!(!fields.contains(&field));
+            assert_eq!(with_fields(&[field]).price_driver_count(), 0, "{field}");
+        }
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -1405,27 +1486,33 @@ mod tests {
             )
             .expect("valid schedule fixture"),
         );
-        assert!(resolve_rates_credit_config(&scheduled, 32)
-            .expect_err("unsupported schedule must fail")
-            .to_string()
-            .contains("hw1f_sigma_schedule"));
+        assert!(
+            resolve_rates_credit_config(&scheduled, 32)
+                .expect_err("unsupported schedule must fail")
+                .to_string()
+                .contains("hw1f_sigma_schedule")
+        );
     }
 
     #[test]
     fn resolver_rejects_legacy_channels_without_canonical_counterpart() {
         let mut legacy_vol = InstrumentPricingOverrides::default();
         legacy_vol.market_quotes.implied_volatility = Some(0.01);
-        assert!(resolve_rates_credit_config(&legacy_vol, 32)
-            .expect_err("legacy vol must fail")
-            .to_string()
-            .contains("implied_volatility"));
+        assert!(
+            resolve_rates_credit_config(&legacy_vol, 32)
+                .expect_err("legacy vol must fail")
+                .to_string()
+                .contains("implied_volatility")
+        );
 
         let mut bdt = InstrumentPricingOverrides::default();
         bdt.model_config.bdt_sigma = Some(0.20);
-        assert!(resolve_rates_credit_config(&bdt, 32)
-            .expect_err("a BDT volatility is not a rates-credit input")
-            .to_string()
-            .contains("instrument_pricing_overrides.model_config.bdt_sigma"));
+        assert!(
+            resolve_rates_credit_config(&bdt, 32)
+                .expect_err("a BDT volatility is not a rates-credit input")
+                .to_string()
+                .contains("instrument_pricing_overrides.model_config.bdt_sigma")
+        );
 
         for field in ["bk_sigma", "bk_mean_reversion"] {
             let mut bk = InstrumentPricingOverrides::default();
@@ -1433,12 +1520,14 @@ mod tests {
                 "bk_sigma" => bk.model_config.bk_sigma = Some(0.20),
                 _ => bk.model_config.bk_mean_reversion = Some(0.03),
             }
-            assert!(resolve_rates_credit_config(&bk, 32)
-                .expect_err("a Black-Karasinski input is not a rates-credit input")
-                .to_string()
-                .contains(&format!(
-                    "instrument_pricing_overrides.model_config.{field}"
-                )));
+            assert!(
+                resolve_rates_credit_config(&bk, 32)
+                    .expect_err("a Black-Karasinski input is not a rates-credit input")
+                    .to_string()
+                    .contains(&format!(
+                        "instrument_pricing_overrides.model_config.{field}"
+                    ))
+            );
         }
     }
 
@@ -1514,9 +1603,11 @@ mod tests {
         let missing = MarketQuoteOverrides::default()
             .required_quoted_premium()
             .expect_err("missing premium");
-        assert!(missing
-            .to_string()
-            .contains("instrument_pricing_overrides.market_quotes.quoted_premium"));
+        assert!(
+            missing
+                .to_string()
+                .contains("instrument_pricing_overrides.market_quotes.quoted_premium")
+        );
     }
 
     #[test]
@@ -1602,10 +1693,12 @@ mod tests {
         assert!(instrument.validate().is_ok());
         assert!(metrics.validate().is_ok());
         assert!(scenario.validate().is_ok());
-        assert!(MetricPricingOverrides::default()
-            .with_vol_bump_decimal(-0.01)
-            .validate()
-            .is_err());
+        assert!(
+            MetricPricingOverrides::default()
+                .with_vol_bump_decimal(-0.01)
+                .validate()
+                .is_err()
+        );
     }
 
     #[test]
@@ -1751,10 +1844,12 @@ mod tests {
             serde_json::from_str::<MetricPricingOverrides>(r#"{"theta_period": "1W"}"#).is_err()
         );
         // A zero-length horizon is not a tenor.
-        assert!(serde_json::from_str::<MetricPricingOverrides>(
-            r#"{"theta_period": {"count": 0, "unit": "days"}}"#
-        )
-        .is_err());
+        assert!(
+            serde_json::from_str::<MetricPricingOverrides>(
+                r#"{"theta_period": {"count": 0, "unit": "days"}}"#
+            )
+            .is_err()
+        );
     }
 
     #[test]

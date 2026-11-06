@@ -4,16 +4,16 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_margin::schema::MarginEnvelope;
 use finstack_quant_margin::schema::{
-    generated_margin_schema, MARGIN_SCHEMA_BASE, MARGIN_SCHEMA_DESCRIPTION, MARGIN_SCHEMA_FILENAME,
-    MARGIN_SCHEMA_TITLE,
+    MARGIN_SCHEMA_BASE, MARGIN_SCHEMA_DESCRIPTION, MARGIN_SCHEMA_FILENAME, MARGIN_SCHEMA_TITLE,
+    generated_margin_schema,
 };
 use finstack_quant_margin::types::{
     CollateralAssetClass, CollateralEligibility, CsaSpec, EligibleCollateralSchedule, ImParameters,
     MarginCall, MarginCallTiming, MaturityConstraints, OtcMarginSpec,
 };
-use serde::de::DeserializeOwned;
 use serde::Serialize;
-use serde_json::{json, Value};
+use serde::de::DeserializeOwned;
+use serde_json::{Value, json};
 use std::fmt::Debug;
 use time::macros::date;
 
@@ -24,9 +24,46 @@ fn margin_schema() -> Value {
         .expect("schema JSON should be valid")
 }
 
+/// The published `common/1` artifacts margin schemas reference by `$id`.
+///
+/// They are published by the valuations crate; reading the checked-in files
+/// keeps this test on the same documents a host resolver serves. Only the
+/// self-contained scalar artifacts margin embeds are loaded: others (such as
+/// `instrument_json`) reference further families.
+fn common_schema_resources() -> Vec<(String, jsonschema::Resource)> {
+    [
+        "currency.schema.json",
+        "date.schema.json",
+        "decimal.schema.json",
+        "id.schema.json",
+        "money.schema.json",
+    ]
+    .into_iter()
+    .map(|filename| {
+        let schema = common_schema(filename);
+        let id = schema["$id"]
+            .as_str()
+            .unwrap_or_else(|| panic!("{filename} is missing $id"))
+            .to_string();
+        let resource = jsonschema::Resource::from_contents(schema)
+            .unwrap_or_else(|error| panic!("resource {filename}: {error}"));
+        (id, resource)
+    })
+    .collect()
+}
+
+fn common_schema(filename: &str) -> Value {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../valuations/schemas/common/1")
+        .join(filename);
+    serde_json::from_str(&std::fs::read_to_string(&path).expect("read common schema"))
+        .expect("common schema JSON should be valid")
+}
+
 fn validate_fixture(schema: &Value, fixture: &Value) -> Result<(), Vec<String>> {
     let validator = jsonschema::options()
         .should_validate_formats(true)
+        .with_resources(common_schema_resources().into_iter())
         .build(schema)
         .expect("checked-in schema should compile");
     let errors = validator
@@ -172,10 +209,17 @@ fn margin_schema_preserves_canonical_metadata_and_nested_types() {
         schema["$defs"]["OtcMarginSpec"]["properties"]["csa"]["$ref"],
         "#/$defs/CsaSpec"
     );
-    assert!(
-        schema["$defs"]["Money"]["properties"]["amount"].is_object(),
-        "Money amounts should retain their generated representation"
+    assert_eq!(
+        schema["$defs"]["VmParameters"]["properties"]["threshold"]["$ref"],
+        "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+        "Money amounts reference the published common artifact"
     );
+    for shared in ["Currency", "DecimalWire", "Id", "Money"] {
+        assert!(
+            schema["$defs"].get(shared).is_none(),
+            "{shared} must be referenced from common/1, not duplicated locally"
+        );
+    }
     assert_eq!(
         schema["$defs"]["MarginCall"]["properties"]["call_type"]["$ref"],
         "#/$defs/MarginCallType"
@@ -207,7 +251,7 @@ fn margin_schema_applies_canonical_decimal_and_date_normalization() {
     let schema = margin_schema();
 
     assert_eq!(
-        schema.pointer("/$defs/DecimalWire/pattern"),
+        common_schema("money.schema.json").pointer("/$defs/DecimalWire/pattern"),
         Some(&json!(CANONICAL_DECIMAL_PATTERN))
     );
     assert_eq!(
@@ -431,11 +475,11 @@ fn margin_schema_and_serde_reject_out_of_range_collateral_ratios() {
     excessive_fx_addon["csa_spec"]["eligible_collateral"]["eligible"][0]["fx_haircut_addon"] =
         json!(1.01);
     let mut negative_concentration = csa_fixture();
-    negative_concentration["csa_spec"]["eligible_collateral"]["eligible"][0]
-        ["concentration_limit"] = json!(-0.01);
+    negative_concentration["csa_spec"]["eligible_collateral"]["eligible"][0]["concentration_limit"] =
+        json!(-0.01);
     let mut excessive_concentration = csa_fixture();
-    excessive_concentration["csa_spec"]["eligible_collateral"]["eligible"][0]
-        ["concentration_limit"] = json!(1.01);
+    excessive_concentration["csa_spec"]["eligible_collateral"]["eligible"][0]["concentration_limit"] =
+        json!(1.01);
     let mut negative_default_haircut = csa_fixture();
     negative_default_haircut["csa_spec"]["eligible_collateral"]["default_haircut"] = json!(-0.01);
     let mut excessive_default_haircut = csa_fixture();
@@ -484,11 +528,11 @@ fn margin_schema_and_serde_reject_out_of_range_collateral_ratios() {
 fn margin_schema_and_serde_reject_negative_maturity_years_and_late_notification_hour() {
     let schema = margin_schema();
     let mut negative_minimum_maturity = csa_fixture();
-    negative_minimum_maturity["csa_spec"]["eligible_collateral"]["eligible"][0]
-        ["maturity_constraints"] = json!({"min_remaining_years": -0.01});
+    negative_minimum_maturity["csa_spec"]["eligible_collateral"]["eligible"][0]["maturity_constraints"] =
+        json!({"min_remaining_years": -0.01});
     let mut negative_maximum_maturity = csa_fixture();
-    negative_maximum_maturity["csa_spec"]["eligible_collateral"]["eligible"][0]
-        ["maturity_constraints"] = json!({"max_remaining_years": -0.01});
+    negative_maximum_maturity["csa_spec"]["eligible_collateral"]["eligible"][0]["maturity_constraints"] =
+        json!({"max_remaining_years": -0.01});
     let mut invalid_notification_hour = csa_fixture();
     invalid_notification_hour["csa_spec"]["call_timing"]["notification_deadline_hours"] = json!(24);
 
@@ -579,4 +623,30 @@ fn margin_utilization_schema_matches_its_amount_only_wire() {
     .expect("valid utilization");
     let wire = assert_wire_matches_registered_schema("MarginUtilization", &utilization);
     assert!(wire.get("ratio").is_none(), "ratio is derived on decode");
+}
+
+#[test]
+fn csa_spec_artifact_is_the_envelope_csa_branch_standing_alone() {
+    let schema = registered_schema("CsaSpec");
+    assert_eq!(
+        schema["$id"],
+        "https://finstack_quant.dev/schemas/margin/1/csa_spec.schema.json"
+    );
+    let example = schema["examples"][0].clone();
+    assert_eq!(
+        example,
+        margin_schema()["examples"][0]["csa_spec"],
+        "the standalone example is the envelope example's CSA payload"
+    );
+    assert_wire_matches_registered_schema(
+        "CsaSpec",
+        &serde_json::from_value::<CsaSpec>(example).expect("example deserializes"),
+    );
+    assert_wire_matches_registered_schema(
+        "CsaSpec",
+        &CsaSpec::usd_regulatory().expect("embedded margin registry should load"),
+    );
+    let mut unknown_field = schema["examples"][0].clone();
+    unknown_field["unexpected"] = json!(true);
+    assert!(validate_fixture(&schema, &unknown_field).is_err());
 }

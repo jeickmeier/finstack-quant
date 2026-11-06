@@ -5,7 +5,7 @@ use finstack_quant_core::{Error, Result};
 /// Controls the stochastic process assumed for the firm's asset value.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum AssetDynamics {
     /// Standard geometric Brownian motion (lognormal diffusion).
     GeometricBrownian,
@@ -101,7 +101,7 @@ impl AssetDynamics {
 /// Barrier monitoring type for default determination.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum MertonBarrierType {
     /// Default only assessed at maturity (classic Merton).
     Terminal,
@@ -139,24 +139,30 @@ mod tests {
                 dynamics,
             )
         };
-        assert!(build(AssetDynamics::JumpDiffusion {
-            jump_intensity: -0.5,
-            jump_mean: 0.0,
-            jump_vol: 0.1,
-        })
-        .is_err());
-        assert!(build(AssetDynamics::JumpDiffusion {
-            jump_intensity: 0.5,
-            jump_mean: 0.0,
-            jump_vol: -0.1,
-        })
-        .is_err());
-        assert!(build(AssetDynamics::JumpDiffusion {
-            jump_intensity: f64::NAN,
-            jump_mean: 0.0,
-            jump_vol: 0.1,
-        })
-        .is_err());
+        assert!(
+            build(AssetDynamics::JumpDiffusion {
+                jump_intensity: -0.5,
+                jump_mean: 0.0,
+                jump_vol: 0.1,
+            })
+            .is_err()
+        );
+        assert!(
+            build(AssetDynamics::JumpDiffusion {
+                jump_intensity: 0.5,
+                jump_mean: 0.0,
+                jump_vol: -0.1,
+            })
+            .is_err()
+        );
+        assert!(
+            build(AssetDynamics::JumpDiffusion {
+                jump_intensity: f64::NAN,
+                jump_mean: 0.0,
+                jump_vol: 0.1,
+            })
+            .is_err()
+        );
     }
 
     #[test]
@@ -176,30 +182,36 @@ mod tests {
             )
         };
         assert!(build(MertonBarrierType::Terminal).is_err());
-        assert!(build(MertonBarrierType::FirstPassage {
-            barrier_growth_rate: 0.02
-        })
-        .is_err());
-        assert!(build(MertonBarrierType::FirstPassage {
-            barrier_growth_rate: 0.0
-        })
-        .is_ok());
-        // A negative log-barrier volatility is rejected rather than clamped.
-        assert!(MertonModel::new_with_dynamics(
-            100.0,
-            0.20,
-            80.0,
-            0.05,
-            0.0,
-            MertonBarrierType::FirstPassage {
+        assert!(
+            build(MertonBarrierType::FirstPassage {
+                barrier_growth_rate: 0.02
+            })
+            .is_err()
+        );
+        assert!(
+            build(MertonBarrierType::FirstPassage {
                 barrier_growth_rate: 0.0
-            },
-            AssetDynamics::CreditGrades {
-                barrier_uncertainty: -0.30,
-                mean_recovery: 0.40,
-            },
-        )
-        .is_err());
+            })
+            .is_ok()
+        );
+        // A negative log-barrier volatility is rejected rather than clamped.
+        assert!(
+            MertonModel::new_with_dynamics(
+                100.0,
+                0.20,
+                80.0,
+                0.05,
+                0.0,
+                MertonBarrierType::FirstPassage {
+                    barrier_growth_rate: 0.0
+                },
+                AssetDynamics::CreditGrades {
+                    barrier_uncertainty: -0.30,
+                    mean_recovery: 0.40,
+                },
+            )
+            .is_err()
+        );
     }
 
     #[test]

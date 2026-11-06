@@ -130,16 +130,14 @@ impl ListedFutureTerms {
             asset,
             quantity_per_contract,
         } = &self.settlement
-        {
-            if asset.trim().is_empty()
+            && (asset.trim().is_empty()
                 || !quantity_per_contract.is_finite()
-                || *quantity_per_contract <= 0.0
-            {
-                return Err(finstack_quant_core::Error::Validation(
+                || *quantity_per_contract <= 0.0)
+        {
+            return Err(finstack_quant_core::Error::Validation(
                     "physically settled future requires a non-empty asset and positive finite quantity_per_contract"
                         .to_string(),
                 ));
-            }
         }
         Ok(())
     }

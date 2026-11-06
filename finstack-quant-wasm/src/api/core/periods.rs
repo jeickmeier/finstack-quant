@@ -7,8 +7,8 @@
 use crate::utils::input::{js_epoch_days, js_int, js_opt_string, js_string, js_uint};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::dates::{
-    build_fiscal_periods as rust_build_fiscal_periods, build_periods as rust_build_periods,
-    days_since_epoch, FiscalConfig, PeriodId, PeriodKind,
+    FiscalConfig, PeriodId, PeriodKind, build_fiscal_periods as rust_build_fiscal_periods,
+    build_periods as rust_build_periods, days_since_epoch,
 };
 use wasm_bindgen::prelude::*;
 

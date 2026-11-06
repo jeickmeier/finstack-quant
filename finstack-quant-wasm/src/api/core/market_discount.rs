@@ -10,12 +10,12 @@ use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::market_data::term_structures::{
     DiscountCurve as RustDiscountCurve, ValidationMode,
 };
-use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::math::Compounding;
+use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use serde::Deserialize;
 use wasm_bindgen::prelude::*;
 
-use crate::api::core::curve_args::{flat_pairs, js_time_point, TimePoint};
+use crate::api::core::curve_args::{TimePoint, flat_pairs, js_time_point};
 use crate::api::core::market_forward::JsForwardCurve;
 
 /// Discount factor curve for present-value calculations.

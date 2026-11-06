@@ -6,7 +6,7 @@
 //! [`SchemaArtifact::generate`](finstack_quant_core::schema::SchemaArtifact::generate).
 
 use crate::{
-    allocation::WeightAllocationResult, allocation::WeightAllocationSpec,
+    PortfolioResult, allocation::WeightAllocationResult, allocation::WeightAllocationSpec,
     attribution::ReconciliationReport, brinson::CarinoLinkedAttribution, brinson::SectorPeriod,
     cashflows::CashflowAggregationOptions, cashflows::PortfolioCashflows,
     dependencies::MarketFactorKey, excess_return::CellConfig, excess_return::DurationCellTable,
@@ -22,12 +22,12 @@ use crate::{
     performance::DatedCashflow, performance::LinkedReturn, performance::TwrrPeriod,
     primitive::PortfolioPrimitiveExposureReport, replay::ReplayConfig, replay::ReplayResult,
     scenarios::ScenarioPnlBatchItem, scenarios::ScenarioRevalueView, sensitivity::FactorPnlProfile,
-    sensitivity::SensitivityMatrixJson, PortfolioResult,
-};
-use finstack_quant_core::schema::{
-    externalize_schema_definitions, ExternalSchemaDefinition, SchemaArtifact, SchemaKind,
+    sensitivity::SensitivityMatrixJson,
 };
 use finstack_quant_core::Result;
+use finstack_quant_core::schema::{
+    ExternalSchemaDefinition, SchemaArtifact, SchemaKind, externalize_schema_definitions,
+};
 use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
 use finstack_quant_valuations::results::ValuationResult;
 use serde_json::Value;

@@ -248,24 +248,31 @@ add-backs. Each `Adjustment` carries an `AdjustmentValue` (fixed per-period
 amounts or a percentage of another node) and an optional `AdjustmentCap`. The
 returned `Vec<NormalizationResult>` keeps both the adjusted total (`final_value`)
 and the per-adjustment audit trail (`adjustments: Vec<AppliedAdjustment>`), so
-the reported-to-adjusted bridge stays explainable.
+the reported-to-adjusted bridge stays explainable: each `AppliedAdjustment`
+carries its raw and capped amounts and `adjusted_value`, the target through
+that step, so a bridge chart reads every step's position without summing.
 `adjustments::merge_into_results(&mut result, &normalized, "adj_ebitda")`
 folds the adjusted series back into a `StatementResult` as a new node.
 
 ## Results and export
 
 `StatementResult` holds `nodes: node_id → period_id → f64`, plus
-`monetary_nodes` for `Money`-typed nodes, `node_value_types`, optional
+`periods` (the periods `nodes` is keyed by), `monetary_nodes` for
+`Money`-typed nodes, `node_value_types`, optional
 `cs_cashflows`, an optional `check_report`, and `meta: EvalStats` (timings,
 graph size, numeric mode, parallel flag, warnings). Accessors: `get`,
 `get_money`, `get_scalar`, `get_node`, `get_or`, `all_periods`.
 
 `rollup(&model, &RollupSpec)` rolls results up to a coarser frequency
 (monthly or quarterly into quarterly, semi-annual or annual, or semi-annual into
-annual). Nodes sum by
-default (flows); list balances and trailing metrics as `period_end` and ratios
-as `formula`, which re-evaluates the formula on the rolled-up values. Every
-target period must be complete.
+annual). Each line declares its method on the node (`NodeSpec::rollup`):
+`period_end` for balances and trailing metrics, `formula` for ratios, which
+re-evaluates the formula on the rolled-up values, and `sum` for flows. A line
+resolves as its entry in `RollupSpec::methods`, then its declaration, then
+`sum`; tags never choose a method. Every target period must be complete, and
+the result's `periods` are the targets, each actual only when every source is.
+`RollupSpec::declared_methods(&model, frequency)` lists the declared methods so a
+host can seed its method choices.
 
 Tabular export returns `finstack_quant_core::table::TableEnvelope`:
 

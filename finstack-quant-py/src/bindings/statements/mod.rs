@@ -95,10 +95,9 @@ pub(crate) fn extract_value_series(
     extract_period_pairs(values)?
         .into_iter()
         .map(|(period, value)| {
-            let amount = if let Ok(money) = value.extract::<PyRef<'_, PyMoney>>() {
-                AmountOrScalar::Amount(money.inner)
-            } else {
-                AmountOrScalar::scalar(value.extract::<f64>()?)
+            let amount = match value.extract::<PyRef<'_, PyMoney>>() {
+                Ok(money) => AmountOrScalar::Amount(money.inner),
+                _ => AmountOrScalar::scalar(value.extract::<f64>()?),
             };
             Ok((parse_period_id(&period)?, amount))
         })

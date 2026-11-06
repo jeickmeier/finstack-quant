@@ -1,13 +1,13 @@
 //! Instrument and structured-credit correlation shock application.
 
 use crate::adapters::instruments::{
-    apply_instrument_shock, InstrumentFilter, InstrumentShockOutcome, ShockKind,
+    InstrumentFilter, InstrumentShockOutcome, ShockKind, apply_instrument_shock,
 };
 use crate::error::Result;
 use crate::spec::OperationSpec;
 use crate::warning::Warning;
-use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit;
 use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit;
 
 /// Apply an instrument-scoped operation to the inventory.
 ///

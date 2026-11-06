@@ -19,6 +19,8 @@
 //! - **Convexity**: Curvature of price/yield relationship
 //! - **DV01**: Dollar value of 1bp rate change
 //! - **CS01**: Credit spread sensitivity
+//! - **Recovery01**: PV change per +1% recovery on a hazard-priced bond
+//! - **Jump to Default**: Recovery of par less current value, on a hazard-priced bond
 //! - **Spread Duration**: Quote-reproducing Z-spread sensitivity normalized by
 //!   the Z-spread base PV into years
 //!
@@ -26,6 +28,7 @@
 //! - **Z-Spread**: Zero-volatility spread over discount curve
 //! - **OAS**: Option-adjusted spread (for call, put, or return-floor rights)
 //! - **I-Spread**: Interpolated spread (YTM - par swap rate)
+//! - **G-Spread**: Same yield over the par yield of a named government curve
 //! - **Discount Margin**: Spread measure for floating-rate notes
 //! - **Asset Swap Spreads**: Par and market asset swap spreads
 //!
@@ -46,6 +49,8 @@ pub(crate) mod carry;
 pub(crate) mod convexity;
 /// CS01 calculators with z-spread fallback for bonds without credit curves
 pub(crate) mod cs01;
+/// Recovery01 and jump-to-default on hazard-priced bonds
+mod default_risk;
 /// Macaulay duration calculator
 pub(crate) mod duration_macaulay;
 /// Modified duration calculator
@@ -75,7 +80,7 @@ pub(crate) use duration_modified::ModifiedDurationCalculator;
 pub(crate) use dv01::{BondBucketedDv01Calculator, BondDv01Calculator};
 pub(crate) use price_yield_spread::{
     AssetSwapMarketCalculator, AssetSwapParCalculator, BondVegaCalculator, CleanPriceCalculator,
-    DirtyPriceCalculator, EmbeddedOptionValueCalculator, ISpreadCalculator,
+    DirtyPriceCalculator, EmbeddedOptionValueCalculator, GSpreadCalculator, ISpreadCalculator,
     JapaneseSimpleYieldCalculator, OasCalculator, YtmCalculator, YtwCalculator,
 };
 pub use price_yield_spread::{DiscountMarginCalculator, ZSpreadCalculator};
@@ -238,7 +243,7 @@ pub(crate) fn register_bond_metrics(
 ) -> std::result::Result<(), finstack_quant_valuations_core::metrics::MetricRegistryError> {
     use crate::bond::pricing::quote_conversions::YieldCompounding;
     use finstack_quant_valuations_core::metrics::sensitivities::cross_factor::{
-        make_credit_bumper, make_rates_bumper, CrossFactorCalculator,
+        CrossFactorCalculator, make_credit_bumper, make_rates_bumper,
     };
     use finstack_quant_valuations_core::pricer::InstrumentType;
 
@@ -264,6 +269,7 @@ pub(crate) fn register_bond_metrics(
             (Vega, BondVegaCalculator),
             (ZSpread, ZSpreadCalculator),
             (ISpread, ISpreadCalculator),
+            (GSpread, GSpreadCalculator),
             (DiscountMargin, DiscountMarginCalculator),
             (ASWPar, AssetSwapParCalculator),
             (ASWMarket, AssetSwapMarketCalculator),
@@ -279,6 +285,9 @@ pub(crate) fn register_bond_metrics(
             // Always quote-reproducing Z-spread risk, even when CS01 uses a
             // hazard/par-CDS curve.
             (SpreadDuration, BondSpreadDurationCalculator),
+
+            (Recovery01, default_risk::BondRecovery01Calculator),
+            (JumpToDefault, default_risk::BondJumpToDefaultCalculator),
 
             (Moic, return_metrics::moic::MoicCalculator),
             (MoicToWorst, return_metrics::moic::MoicToWorstCalculator),

@@ -11,7 +11,9 @@
 
 use finstack_quant_core::schema::SchemaArtifact;
 
-use crate::closed_form::{BsGreeks, ForwardGreeks, HestonPricingParams};
+use crate::closed_form::{
+    BsGreeks, ForwardGreeks, HestonPricingParams, OptionCalculation, OptionCalculationResult,
+};
 use crate::monte_carlo::simulate::{
     FbmSpec, PathSimulationSpec, PathSummary, ProcessSpec, SchemeSpec,
 };
@@ -19,20 +21,23 @@ use crate::types::{ExerciseStyle, OptionType};
 use crate::{
     correlation::CreditExposure, correlation::LatentFactorSpec, correlation::PortfolioLossConfig,
     correlation::PortfolioLossResult, correlation::RecoverySpec,
-    correlation::TrancheLossStatistics, credit::lgd::DownturnLgd, credit::lgd::EadCalculator,
+    correlation::TrancheLossStatistics, credit::CreditState, credit::DynamicRecoverySpec,
+    credit::EndogenousHazardSpec, credit::MertonModel, credit::MertonReport,
+    credit::MertonReportRequest, credit::RatingFactorTable, credit::SimulatedPaths,
+    credit::ToggleExerciseModel, credit::lgd::DownturnLgd, credit::lgd::EadCalculator,
     credit::lgd::SeniorityCalibration, credit::lgd::WorkoutLgd, credit::lgd::WorkoutLgdResult,
+    credit::liability_management::ExchangeOffer,
     credit::liability_management::ExchangeOfferAnalysis, credit::liability_management::LmeAnalysis,
-    credit::migration::MigrationSimulator, credit::migration::RatingPath,
-    credit::migration::TransitionMatrix, credit::pd::MasterScale, credit::pd::MasterScaleResult,
-    credit::pd::PdCycleParams, credit::pool::CorrelationStructure, credit::pool::PoolGranularity,
-    credit::pool::StochasticDefaultSpec, credit::pool::StochasticPrepaySpec,
-    credit::recovery_waterfall::RecoveryClaim, credit::recovery_waterfall::RecoveryWaterfallResult,
-    credit::scoring::AltmanZDoublePrimeInput, credit::scoring::AltmanZPrimeInput,
-    credit::scoring::AltmanZScoreInput, credit::scoring::OhlsonOScoreInput,
-    credit::scoring::ScoringResult, credit::scoring::ZmijewskiInput, credit::CreditState,
-    credit::DynamicRecoverySpec, credit::EndogenousHazardSpec, credit::MertonModel,
-    credit::RatingFactorTable, credit::SimulatedPaths, credit::ToggleExerciseModel,
-    fourier::characteristic_function::BlackScholesCf,
+    credit::liability_management::LmeTerms, credit::migration::MigrationSimulator,
+    credit::migration::RatingPath, credit::migration::TransitionMatrix, credit::pd::MasterScale,
+    credit::pd::MasterScaleResult, credit::pd::PdCycleParams, credit::pool::CorrelationStructure,
+    credit::pool::PoolGranularity, credit::pool::StochasticDefaultSpec,
+    credit::pool::StochasticPrepaySpec, credit::recovery_waterfall::RecoveryClaim,
+    credit::recovery_waterfall::RecoveryWaterfallResult, credit::scoring::AltmanZDoublePrimeInput,
+    credit::scoring::AltmanZPrimeInput, credit::scoring::AltmanZScoreInput,
+    credit::scoring::CreditScoreReport, credit::scoring::CreditScoreRequest,
+    credit::scoring::OhlsonOScoreInput, credit::scoring::ScoringResult,
+    credit::scoring::ZmijewskiInput, fourier::characteristic_function::BlackScholesCf,
     fourier::characteristic_function::MertonJumpCf,
     fourier::characteristic_function::VarianceGammaCf, fourier::cos::CosConfig,
     liquidity::AlmgrenChrissModel, liquidity::ExecutionTrajectory, liquidity::ImpactEstimate,
@@ -50,11 +55,11 @@ use crate::{
     monte_carlo::results::MonteCarloResult, rates::dtsm::DieboldLi, rates::dtsm::YieldForecast,
     rates::dtsm::YieldPanel, rates::dtsm::YieldPca, rates::dtsm::YieldPcaView,
     rates::hull_white::HullWhiteCalibrationParams, rates::hull_white::HullWhiteParams,
-    volatility::arbitrage::ArbitrageCheckConfig, volatility::arbitrage::ArbitrageReport,
-    volatility::heston::HestonParams, volatility::local_vol::LocalVolSurface,
-    volatility::rough_heston::RoughHestonFourierParams,
+    volatility::VolatilityConvention, volatility::arbitrage::ArbitrageCheckConfig,
+    volatility::arbitrage::ArbitrageReport, volatility::heston::HestonParams,
+    volatility::local_vol::LocalVolSurface, volatility::rough_heston::RoughHestonFourierParams,
     volatility::sabr::ArbitrageValidationResult, volatility::sabr::SabrCalibrationOutcome,
-    volatility::sabr::SabrParameters, volatility::svi::SviParams, volatility::VolatilityConvention,
+    volatility::sabr::SabrParameters, volatility::svi::SviParams,
 };
 
 /// The crate's complete schema registry.
@@ -179,6 +184,20 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "One name in a finite credit portfolio."
     ),
     finstack_quant_core::schema_artifact!(
+        CreditScoreReport,
+        "models",
+        "credit_score_report",
+        Output,
+        "A scoring model's result and the default master-scale grade of its implied PD."
+    ),
+    finstack_quant_core::schema_artifact!(
+        CreditScoreRequest,
+        "models",
+        "credit_score_request",
+        Input,
+        "One scoring model and its input ratios."
+    ),
+    finstack_quant_core::schema_artifact!(
         CreditState,
         "models",
         "credit_state",
@@ -226,6 +245,13 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "estimate",
         Output,
         "Numeric Monte Carlo estimate for discounted path values."
+    ),
+    finstack_quant_core::schema_artifact!(
+        ExchangeOffer,
+        "models",
+        "exchange_offer",
+        Input,
+        "Terms of a distressed exchange offer, from the creditor's side."
     ),
     finstack_quant_core::schema_artifact!(
         ExchangeOfferAnalysis,
@@ -340,6 +366,13 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "Issuer-side economics of a liability management exercise."
     ),
     finstack_quant_core::schema_artifact!(
+        LmeTerms,
+        "models",
+        "lme_terms",
+        Input,
+        "Terms of a liability management exercise, from the issuer's side."
+    ),
+    finstack_quant_core::schema_artifact!(
         LmmParams,
         "models",
         "lmm_params",
@@ -403,6 +436,20 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "Merton structural credit model."
     ),
     finstack_quant_core::schema_artifact!(
+        MertonReport,
+        "models",
+        "merton_report",
+        Output,
+        "One-call Merton report: model, term structure, grades and CDS terms."
+    ),
+    finstack_quant_core::schema_artifact!(
+        MertonReportRequest,
+        "models",
+        "merton_report_request",
+        Input,
+        "Inputs of a Merton report: model source, horizons, CDS maturity and recovery."
+    ),
+    finstack_quant_core::schema_artifact!(
         MigrationSimulator,
         "models",
         "migration_simulator",
@@ -429,6 +476,20 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "ohlson_o_score_input",
         Input,
         "Input for the Ohlson O-Score logistic model (1980)."
+    ),
+    finstack_quant_core::schema_artifact!(
+        OptionCalculation,
+        "models",
+        "option_calculation",
+        Input,
+        "One closed-form option calculation: a model with its terms and a price or implied-volatility solve."
+    ),
+    finstack_quant_core::schema_artifact!(
+        OptionCalculationResult,
+        "models",
+        "option_calculation_result",
+        Output,
+        "Price, volatility and Greeks of one closed-form option calculation."
     ),
     finstack_quant_core::schema_artifact!(
         OptionType,

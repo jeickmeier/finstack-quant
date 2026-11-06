@@ -96,12 +96,12 @@ impl WaterfallRules {
                     )));
                 }
             }
-            if let Some(bp) = afc.net_wac_fee_bp {
-                if !bp.is_finite() || bp < 0.0 {
-                    return Err(invalid(format!(
-                        "waterfall_rules: afc.net_wac_fee_bp must be finite and non-negative, got {bp}"
-                    )));
-                }
+            if let Some(bp) = afc.net_wac_fee_bp
+                && (!bp.is_finite() || bp < 0.0)
+            {
+                return Err(invalid(format!(
+                    "waterfall_rules: afc.net_wac_fee_bp must be finite and non-negative, got {bp}"
+                )));
             }
         }
 
@@ -166,14 +166,14 @@ impl WaterfallRules {
             let mut prev: Option<u32> = None;
             for step in &si.schedule {
                 unit(step.senior_decimal, "shifting_interest senior_decimal")?;
-                if let Some(p) = prev {
-                    if step.months_from_closing <= p {
-                        return Err(invalid(format!(
-                            "waterfall_rules: shifting_interest.schedule must be strictly ascending in \
+                if let Some(p) = prev
+                    && step.months_from_closing <= p
+                {
+                    return Err(invalid(format!(
+                        "waterfall_rules: shifting_interest.schedule must be strictly ascending in \
                              months_from_closing (found {} after {p})",
-                            step.months_from_closing
-                        )));
-                    }
+                        step.months_from_closing
+                    )));
                 }
                 prev = Some(step.months_from_closing);
             }
@@ -190,23 +190,23 @@ impl WaterfallRules {
             if let Some(max_loss) = ea.max_cumulative_loss {
                 unit(max_loss, "early_amortization.max_cumulative_loss")?;
             }
-            if let Some(floor) = ea.min_excess_spread_3m {
-                if !floor.is_finite() {
-                    return Err(invalid(format!(
-                        "waterfall_rules: early_amortization.min_excess_spread_3m must be finite, got {floor}"
-                    )));
-                }
+            if let Some(floor) = ea.min_excess_spread_3m
+                && !floor.is_finite()
+            {
+                return Err(invalid(format!(
+                    "waterfall_rules: early_amortization.min_excess_spread_3m must be finite, got {floor}"
+                )));
             }
         }
 
-        if let Some(ca) = &self.controlled_accumulation {
-            if ca.start > ca.bullet_date {
-                return Err(invalid(format!(
-                    "waterfall_rules: controlled_accumulation.start ({}) must be on or before \
+        if let Some(ca) = &self.controlled_accumulation
+            && ca.start > ca.bullet_date
+        {
+            return Err(invalid(format!(
+                "waterfall_rules: controlled_accumulation.start ({}) must be on or before \
                      bullet_date ({})",
-                    ca.start, ca.bullet_date
-                )));
-            }
+                ca.start, ca.bullet_date
+            )));
         }
 
         Ok(())
@@ -444,9 +444,10 @@ pub struct ExcessSpreadSpec {
 /// - cumulative loss is a fraction of the *original* pool balance;
 /// - the OC ratio is `current pool balance ÷ rated (non-equity) note balance`;
 /// - credit enhancement is the senior cushion `(pool − senior note) ÷ pool`,
-///   where the senior note is the *single* most-senior tranche by payment
-///   priority — for pari-passu senior classes (e.g. A-1/A-2) only the
-///   lowest-priority one is taken as the reference.
+///   where the senior note is the tranche with the lowest `payment_priority`.
+///   `TrancheStructure` gives every tranche a distinct priority, so for
+///   same-seniority senior classes (e.g. A-1/A-2) this is the first one in
+///   input order: A-1 is subtracted and A-2, ranked behind it, is not.
 ///
 /// `MaxDelinquency` reads the delinquent share of the pool, which is zero
 /// unless the deal carries a `credit_model.delinquency` model.

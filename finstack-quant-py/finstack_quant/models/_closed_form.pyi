@@ -356,6 +356,193 @@ class ForwardGreeks:
         """
         ...
 
+class OptionCalculationResult:
+    """
+    Price, volatility and Greeks of one :func:`option_calculation`.
+
+    ``price`` and ``implied_vol`` are both present whichever way the request
+    solved: a price solve returns the supplied volatility, an implied-vol
+    solve the supplied price. ``greeks`` are at ``implied_vol``. Immutable,
+    compares by value, picklable.
+
+    Examples
+    --------
+    >>> from finstack_quant.models import option_calculation
+    >>> model = {"kind": "black76", "forward": 100.0, "strike": 100.0, "df": 0.98, "expiry": 1.0, "is_call": True}
+    >>> result = option_calculation({"model": model, "solve": {"kind": "price", "vol": 0.2}})
+    >>> result.implied_vol
+    0.2
+    >>> type(result.greeks).__name__
+    'ForwardGreeks'
+    """
+
+    @property
+    def price(self) -> float:
+        """
+        Option price per unit in the model's convention.
+
+        Returns
+        -------
+        float
+            Discounted price for Black-Scholes and Black-76, undiscounted for
+            Bachelier: computed for a price solve, the supplied price
+            otherwise.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def implied_vol(self) -> float:
+        """
+        Volatility the price and Greeks are at.
+
+        Returns
+        -------
+        float
+            The supplied vol for a price solve, the solved implied volatility
+            otherwise: a decimal Black vol for Black-Scholes and Black-76, an
+            absolute normal vol in the forward's units for Bachelier.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def greeks(self) -> BsGreeks | ForwardGreeks:
+        """
+        Greeks at :attr:`implied_vol`.
+
+        Returns
+        -------
+        BsGreeks | ForwardGreeks
+            :class:`BsGreeks` for Black-Scholes, :class:`ForwardGreeks` for
+            Black-76 and Bachelier.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize to compact JSON with the canonical field names.
+
+        Returns
+        -------
+        str
+            JSON object with ``price``, ``implied_vol`` and ``greeks`` (tagged
+            by ``kind``: ``"black_scholes"`` or ``"forward"``). Does not raise.
+        """
+        ...
+
+    @staticmethod
+    def from_json(json: str) -> OptionCalculationResult:
+        """
+        Deserialize from the JSON produced by :meth:`to_json`.
+
+        Parameters
+        ----------
+        json : str
+            JSON object with ``price``, ``implied_vol`` and tagged ``greeks``.
+
+        Returns
+        -------
+        OptionCalculationResult
+            Reconstructed result.
+
+        Raises
+        ------
+        ValueError
+            If a field is missing or unknown.
+
+        Examples
+        --------
+        >>> from finstack_quant.models import OptionCalculationResult, option_calculation
+        >>> model = {"kind": "bachelier", "forward": 0.03, "strike": 0.03, "expiry": 1.0, "is_call": True}
+        >>> result = option_calculation({"model": model, "solve": {"kind": "price", "vol": 0.0075}})
+        >>> OptionCalculationResult.from_json(result.to_json()) == result
+        True
+        """
+        ...
+
+    def __eq__(self, other: object) -> bool: ...
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct this value for ``pickle`` through its canonical JSON form.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            The bound ``from_json`` reconstruction callable and its JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails or the JSON payload cannot reconstruct the
+            stored value, including non-finite floats unsupported by its schema.
+        """
+        ...
+
+def option_calculation(request: str | dict[str, Any]) -> OptionCalculationResult:
+    """
+    Price a closed-form option or invert its price, with Greeks at the resulting volatility.
+
+    One call replaces choosing and sequencing the scalar kernels
+    (:func:`bs_price`, :func:`black76_price`, :func:`bachelier_price`, their
+    implied-volatility inverses and Greeks), which stay available.
+
+    Parameters
+    ----------
+    request : str | dict[str, Any]
+        ``OptionCalculation`` as a dict or JSON text with ``model`` and
+        ``solve``. ``model`` is tagged by ``kind``: ``"black_scholes"``
+        (``spot``, ``strike``, ``rate``, ``div_yield`` as continuously
+        compounded decimals, ``expiry`` in years, ``is_call``, optional
+        ``theta_days_per_year`` defaulting to 365), ``"black76"``
+        (``forward``, ``strike``, discount factor ``df``, ``expiry``,
+        ``is_call``) or ``"bachelier"`` (``forward``, ``strike``, ``expiry``,
+        ``is_call``). ``solve`` is ``{"kind": "price", "vol": v}`` (decimal
+        Black vol, or absolute normal vol for Bachelier) or
+        ``{"kind": "implied_vol", "price": p}`` (discounted for Black-Scholes
+        and Black-76, undiscounted for Bachelier).
+
+    Returns
+    -------
+    OptionCalculationResult
+        Price, volatility and the model's Greeks at that volatility.
+
+    Raises
+    ------
+    ValueError
+        If the request is malformed or has an unknown field or kind, an input
+        is outside the model's domain, or an implied-volatility price cannot
+        be inverted (at or below intrinsic value, or the solver does not
+        converge).
+
+    Examples
+    --------
+    >>> from finstack_quant.models import bs_price, option_calculation
+    >>> model = {
+    ...     "kind": "black_scholes",
+    ...     "spot": 100.0,
+    ...     "strike": 100.0,
+    ...     "rate": 0.05,
+    ...     "div_yield": 0.0,
+    ...     "expiry": 1.0,
+    ...     "is_call": True,
+    ... }
+    >>> price = bs_price(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, True)
+    >>> solved = option_calculation({"model": model, "solve": {"kind": "implied_vol", "price": price}})
+    >>> round(solved.implied_vol, 8)
+    0.2
+    """
+    ...
+
 def bs_price(
     spot: float,
     strike: float,

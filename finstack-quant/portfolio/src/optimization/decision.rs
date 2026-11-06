@@ -1,8 +1,8 @@
 //! Problem, decision-space, constraint, and solver types for portfolio optimization.
 //!
 use super::problem::PortfolioOptimizationProblem;
-use super::types::{MetricExpr, MissingMetricPolicy, Objective, WeightingScheme};
 use super::types::{GROSS_BASE_TOL, MIN_WEIGHT_TOL, PV_PER_UNIT_TOL};
+use super::types::{MetricExpr, MissingMetricPolicy, Objective, WeightingScheme};
 use crate::error::{Error, Result};
 use crate::position::PositionUnit;
 use crate::types::{AttributeValue, EntityId, PositionId};
@@ -112,11 +112,7 @@ fn is_missing_required_metrics(
 }
 
 fn pv_per_scale_unit(pv_base: f64, scale: f64) -> f64 {
-    if scale != 0.0 {
-        pv_base / scale
-    } else {
-        0.0
-    }
+    if scale != 0.0 { pv_base / scale } else { 0.0 }
 }
 
 /// Absolute deal notional converted to the portfolio reporting currency.

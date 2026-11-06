@@ -3,7 +3,7 @@
 use crate::bindings::date_utils::date_to_py;
 use crate::bindings::macros::wire_methods;
 use crate::bindings::pandas_utils::{
-    serde_rows_to_dataframe_with_schema, serde_to_py, ColumnSchema,
+    ColumnSchema, serde_rows_to_dataframe_with_schema, serde_to_py,
 };
 use crate::bindings::pydoc::pydoc;
 use crate::errors::{core_to_py, serde_json_to_py, statements_to_py};
@@ -239,9 +239,9 @@ impl PyForecastSpec {
     /// Build a forecast spec from a method plus its method-specific parameters.
     ///
     /// The parameter map is validated on construction: keys the method does
-    /// not understand and values of the wrong type (a string ``rate``, a
-    /// non-list ``curve``) raise ``ValueError`` here rather than at
-    /// evaluation.
+    /// not understand, missing or ``None`` parameters and values of the wrong
+    /// type (a string ``rate``, a non-list ``curve``) raise ``ValueError`` here
+    /// rather than at evaluation.
     ///
     /// Parameters
     /// ----------
@@ -262,7 +262,8 @@ impl PyForecastSpec {
     /// ------
     /// ValueError
     ///     If ``params`` is not a JSON object / dict, names a parameter the
-    ///     method does not accept, or carries a value of the wrong type.
+    ///     method does not accept, omits a required one, sets one to ``None``,
+    ///     or carries a value of the wrong type.
     #[new]
     #[pyo3(signature = (method, params=None), text_signature = "(method, params=None)")]
     fn new(
@@ -763,16 +764,20 @@ impl PyNodeSpec {
     ///     Optional DSL predicate; periods where it is false evaluate to 0.
     /// tags : list[str] | None
     ///     Free-form labels for grouping and filtering.
+    /// rollup : str | None
+    ///     How the line rolls up to a coarser frequency: ``"sum"`` (flows),
+    ///     ``"period_end"`` (balances, trailing metrics) or ``"formula"``
+    ///     (ratios). ``None`` sums. A ``RollupSpec`` entry overrides it.
     ///
     /// Raises
     /// ------
     /// ValueError
-    ///     If a period id does not parse or a value is neither numeric nor
-    ///     ``Money``.
+    ///     If a period id does not parse, a value is neither numeric nor
+    ///     ``Money``, or ``rollup`` is not a recognized method.
     #[new]
     #[pyo3(
-        signature = (node_id, node_type, name=None, values=None, forecast=None, formula_text=None, where_text=None, tags=None),
-        text_signature = "(node_id, node_type, name=None, values=None, forecast=None, formula_text=None, where_text=None, tags=None)"
+        signature = (node_id, node_type, name=None, values=None, forecast=None, formula_text=None, where_text=None, tags=None, rollup=None),
+        text_signature = "(node_id, node_type, name=None, values=None, forecast=None, formula_text=None, where_text=None, tags=None, rollup=None)"
     )]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -784,6 +789,7 @@ impl PyNodeSpec {
         formula_text: Option<String>,
         where_text: Option<String>,
         tags: Option<Vec<String>>,
+        rollup: Option<&str>,
     ) -> PyResult<Self> {
         let mut inner = NodeSpec::new(node_id, node_type.inner);
         inner.name = name;
@@ -795,6 +801,10 @@ impl PyNodeSpec {
         inner.formula_text = formula_text;
         inner.where_text = where_text;
         inner.tags = tags.unwrap_or_default();
+        inner.rollup = rollup
+            .map(finstack_quant_core::wire::serde_parse)
+            .transpose()
+            .map_err(core_to_py)?;
         Ok(Self { inner })
     }
 
@@ -879,6 +889,17 @@ impl PyNodeSpec {
     #[getter]
     fn tags(&self) -> Vec<String> {
         self.inner.tags.clone()
+    }
+
+    #[doc = pydoc!("finstack_quant.statements._types", "NodeSpec.rollup")]
+    #[getter]
+    fn rollup(&self) -> PyResult<Option<String>> {
+        self.inner
+            .rollup
+            .as_ref()
+            .map(finstack_quant_core::wire::serde_label)
+            .transpose()
+            .map_err(core_to_py)
     }
 
     /// Declared or inferred value type: ``"monetary"``, ``"scalar"``, or

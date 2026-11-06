@@ -12,12 +12,12 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::units::ONE_BASIS_POINT;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::price_from_z_spread;
 use finstack_quant_valuations::instruments::fixed_income::bond::{
     Bond, BondSettlementConvention, CallPut, CallPutSchedule, CashflowSpec,
 };
 use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
-use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 
@@ -178,8 +178,8 @@ fn credit_curve_bond_spread_duration_stays_on_z_spread_basis() {
 
 #[test]
 fn callable_bond_spread_duration_uses_quote_reproducing_workout_path() {
-    use finstack_quant_cashflows::accrual::accrued_interest_amount;
     use finstack_quant_cashflows::CashflowProvider;
+    use finstack_quant_cashflows::accrual::accrued_interest_amount;
 
     let as_of = date!(2025 - 01 - 06);
     let quote_date = date!(2025 - 01 - 09);

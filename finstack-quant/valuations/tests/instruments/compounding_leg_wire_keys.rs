@@ -14,8 +14,8 @@ use finstack_quant_valuations::instruments::pricing_overrides::ModelConfig;
 use finstack_quant_valuations::instruments::rates::ir_future::InterestRateFuture;
 use finstack_quant_valuations::instruments::rates::irs::InterestRateSwap;
 use finstack_quant_valuations::instruments::rates::xccy_swap::XccySwap;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 /// Serialize `value`, rename `from` to `to` in the object at `pointer`, and

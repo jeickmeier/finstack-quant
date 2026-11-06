@@ -35,8 +35,10 @@ from finstack_quant.portfolio import (
     aggregate_metrics,
     allocate_weights,
     attribute_portfolio_pnl,
+    brinson_linked,
     build_credit_vol_report,
     scenario_pnl_batch,
+    twrr_linked,
     value_portfolio,
 )
 
@@ -160,6 +162,23 @@ def _inputs() -> dict[str, Any]:
                 "tag_taxonomy": {},
             },
         },
+        "brinson_periods": [
+            [
+                {
+                    "sector": sector,
+                    "portfolio_weight": wp,
+                    "benchmark_weight": wb,
+                    "portfolio_return": rp,
+                    "benchmark_return": rb,
+                }
+                for sector, wp, wb, rp, rb in rows
+            ]
+            for rows in (
+                (("Tech", 0.7, 0.5, 0.10, 0.06), ("Energy", 0.3, 0.4, 0.04, 0.05), ("Cash", 0.0, 0.1, 0.0, 0.01)),
+                (("Tech", 0.6, 0.5, 0.02, 0.03), ("Energy", 0.4, 0.4, -0.01, 0.00), ("Cash", 0.0, 0.1, 0.0, 0.01)),
+                (("Tech", 0.4, 0.5, -0.03, -0.02), ("Energy", 0.5, 0.4, 0.05, 0.01), ("Cash", 0.1, 0.1, 0.01, 0.01)),
+            )
+        ],
         "credit_decomposition": {
             "total_risk": 1.0,
             "measure": "variance",
@@ -185,6 +204,8 @@ def _inputs() -> dict[str, Any]:
             ],
             "position_residual_contributions": [],
         },
+        "twrr_returns": [0.05, 0.03, -0.02],
+        "twrr_horizons": [2.0, 0.5],
     }
 
 
@@ -218,6 +239,7 @@ def _compute(inputs: dict[str, Any]) -> dict[str, Any]:
         ],
         "attribute_portfolio_pnl": json.loads(attribution.to_json()),
         "attribution_explain": attribution.explain(),
+        "attribution_pct_of_total_by_bucket": attribution.pct_of_total_by_bucket(),
         "attribution_reconciliation_check": json.loads(
             attribution.reconciliation_check(inputs["reconciliation_tolerance"]).to_json()
         ),
@@ -229,6 +251,11 @@ def _compute(inputs: dict[str, Any]) -> dict[str, Any]:
         "metrics_total_dv01": metrics.get_total("dv01"),
         "metrics_position_dv01": None if position_metrics is None else position_metrics["metrics"]["dv01"],
         "builder_spec": json.loads(_built_portfolio(inputs).to_json()),
+        "brinson_linked": json.loads(brinson_linked(inputs["brinson_periods"]).to_json()),
+        "twrr_linked": [
+            json.loads(twrr_linked(json.dumps(inputs["twrr_returns"]), horizon).to_json())
+            for horizon in inputs["twrr_horizons"]
+        ],
     }
 
 

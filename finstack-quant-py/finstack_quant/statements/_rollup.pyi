@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from finstack_quant.statements._types import FinancialModelSpec
+
 class RollupSpec:
     """
     Target frequency and per-node methods for :meth:`StatementResult.rollup`.
@@ -15,10 +17,11 @@ class RollupSpec:
         using canonical spellings only. It must be
         coarser than the model's periods and hold a whole number of them.
     methods : dict[str, str] or None
-        Rollup method per node id: ``"sum"`` (flows, the default for nodes not
-        listed), ``"period_end"`` (balances and trailing metrics such as LTM
-        EBITDA take the last source period) or ``"formula"`` (ratios
-        re-evaluate their formula on the rolled-up values).
+        Rollup method per node id, overriding the node's declared
+        :attr:`NodeSpec.rollup`: ``"sum"`` (flows), ``"period_end"`` (balances
+        and trailing metrics such as LTM EBITDA take the last source period) or
+        ``"formula"`` (ratios re-evaluate their formula on the rolled-up
+        values). A node not listed uses its declaration, and sums without one.
 
     Examples
     --------
@@ -38,13 +41,65 @@ class RollupSpec:
             Target frequency label (``"quarterly"``, ``"semi_annual"``,
             ``"annual"``; surrounding whitespace and ASCII case are ignored).
         methods : dict[str, str] or None, default None
-            Node id to ``"sum"``, ``"period_end"`` or ``"formula"``; nodes not
-            listed are summed.
+            Node id to ``"sum"``, ``"period_end"`` or ``"formula"``, overriding
+            the node's declared method; a node not listed uses its declaration
+            and sums without one.
 
         Raises
         ------
         ValueError
             If ``frequency`` or a method is not a recognized label.
+        """
+        ...
+
+    @staticmethod
+    def declared_methods(model: FinancialModelSpec | str, frequency: str) -> RollupSpec:
+        """
+        List the rollup methods a model's lines declare.
+
+        Only each node's ``rollup`` is read: a line that declares nothing is not
+        listed and sums, whatever its tags say. Use it to seed the method
+        choices a host shows; :meth:`StatementResult.rollup` already applies
+        the declarations when given a spec with no methods.
+
+        Parameters
+        ----------
+        model : FinancialModelSpec | str
+            Model whose node declarations are listed, typed or its canonical
+            JSON. Nothing is evaluated.
+        frequency : str
+            Target frequency stored on the spec (``"quarterly"``,
+            ``"semi_annual"``, ``"annual"``; surrounding whitespace and ASCII
+            case are ignored). It is checked against the model's periods by
+            :meth:`StatementResult.rollup`, not here.
+
+        Returns
+        -------
+        RollupSpec
+            The ``frequency`` and every declared node with its method, in model
+            order.
+
+        Raises
+        ------
+        ValueError
+            If ``model`` is malformed JSON or ``frequency`` is not a recognized
+            label.
+
+        Examples
+        --------
+        >>> import json
+        >>> from finstack_quant.statements import ModelBuilder, RollupSpec
+        >>> b = ModelBuilder("m")
+        >>> _ = b.periods("2025Q1..Q4", None)
+        >>> _ = b.value("revenue", [("2025Q1", 100.0)])
+        >>> _ = b.value("cash", [("2025Q1", 10.0)])
+        >>> _ = b.compute("margin", "revenue / revenue")
+        >>> model = json.loads(b.build().to_json())
+        >>> model["nodes"]["cash"]["rollup"] = "period_end"
+        >>> model["nodes"]["margin"]["rollup"] = "formula"
+        >>> RollupSpec.declared_methods(json.dumps(model), "annual").methods
+        {'cash': 'period_end', 'margin': 'formula'}
+
         """
         ...
 
@@ -115,7 +170,7 @@ class RollupSpec:
     @property
     def methods(self) -> dict[str, str]:
         """
-        Rollup method label per listed node id; unlisted nodes are summed.
+        Rollup method label per listed node id; unlisted nodes use their declaration or sum.
 
         Returns
         -------

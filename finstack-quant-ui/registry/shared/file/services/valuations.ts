@@ -1,10 +1,42 @@
 import type { valuations } from "finstack-quant-wasm";
 import { exportValuation } from "@/lib/finstack/host";
 import { resolveModel, type ValuationsApi } from "../finstack-contract";
-import type { ServiceContext } from "./context";
+import { attempt, type ServiceContext } from "./context";
 /** valuations facade members this slice reads. */
 export type ValuationsNative = {
-  valuations: Pick<typeof valuations, "instruments" | "valuationResultToJson">;
+  valuations: Pick<typeof valuations, "valuationResultToJson"> & {
+    instruments: Pick<
+      typeof valuations.instruments,
+      | "validateInstrumentJson"
+      | "priceInstrumentWithMarket"
+      | "instrumentCashflowsWithMarket"
+      | "trancheCashflowsTable"
+      | "trancheScenarioTable"
+      | "trancheMetrics"
+      | "trancheOas"
+      | "trancheDiscountMargin"
+      | "trancheBreakevenCdr"
+      | "StructuredCredit"
+      | "listModelsGrouped"
+      | "metricsForInstrument"
+      | "metricMetadata"
+      | "priceDriverFields"
+      | "trancheMetricFieldUnits"
+      | "trancheSolveFieldUnits"
+      | "scenarioTableFieldUnits"
+      | "simulationFieldUnits"
+      | "equityMetricsFieldUnits"
+      | "Bond"
+      | "bondWorkoutLadder"
+      | "ConvertibleBond"
+      | "convertibleSpotLadder"
+      | "computeQuotes"
+      | "poolReport"
+      | "poolReportFieldUnits"
+      | "bondQuoteSetFieldUnits"
+      | "standardDealFamilies"
+    >;
+  };
 };
 /** ValuationsApi over the valuations facade namespace and the shared market cache. */
 export function createValuationsService(
@@ -12,6 +44,16 @@ export function createValuationsService(
   context: ServiceContext,
 ): ValuationsApi {
   const instruments = native.valuations.instruments;
+  type Deal = ReturnType<typeof instruments.StructuredCredit.fromJson>;
+  /** Load the deal once per call and free its handle whatever the native call does. */
+  function withDeal<T>(instrumentJson: string, call: (deal: Deal) => T): T {
+    const deal = instruments.StructuredCredit.fromJson(instrumentJson);
+    try {
+      return call(deal);
+    } finally {
+      deal.free();
+    }
+  }
   return {
     price(request) {
       return context.result(() => {
@@ -31,6 +73,30 @@ export function createValuationsService(
         );
       });
     },
+    metricValues(request) {
+      return context.result(() => {
+        const instrument = instruments.validateInstrumentJson(
+          request.instrumentJson,
+          request.metricPricingOverrides,
+        );
+        const market = context.market(request.marketJson).handle;
+        return request.metrics.map((metric) => ({
+          metric,
+          value: attempt(
+            () =>
+              instruments.priceInstrumentWithMarket(
+                instrument,
+                market,
+                request.asOf,
+                resolveModel(request.model),
+                [metric],
+                undefined,
+                request.marketHistory,
+              ).measures[metric],
+          ),
+        }));
+      });
+    },
     validate(instrumentJson) {
       return context.result(() =>
         instruments.validateInstrumentJson(instrumentJson),
@@ -41,39 +107,207 @@ export function createValuationsService(
         const instrument = instruments.validateInstrumentJson(
           request.instrumentJson,
         );
-        return JSON.stringify(
-          instruments.instrumentCashflowsWithMarket(
-            instrument,
-            context.market(request.marketJson).handle,
-            request.asOf,
-            resolveModel(request.model),
-          ),
+        return instruments.instrumentCashflowsWithMarket(
+          instrument,
+          context.market(request.marketJson).handle,
+          request.asOf,
+          resolveModel(request.model),
         );
       });
     },
-    scenarioTable(request) {
+    standardDealFamilies: () =>
+      context.result(() => instruments.standardDealFamilies()),
+    newStandardDeal(request) {
       return context.result(() => {
-        const deal = instruments.StructuredCredit.fromJson(
-          request.instrumentJson,
+        const deal = instruments.StructuredCredit.newStandard(
+          request.dealType,
+          request.paramsJson,
         );
         try {
-          return instruments.trancheScenarioTable(
-            deal,
-            request.trancheId,
-            request.marketJson,
-            request.asOf,
-            request.gridJson,
-          );
+          return deal.toJson();
         } finally {
           deal.free();
         }
       });
     },
+    dealTranches(instrumentJson) {
+      return context.result(() =>
+        withDeal(instrumentJson, (deal) => deal.tranches),
+      );
+    },
+    trancheSchedule(request) {
+      return context.result(() =>
+        withDeal(request.instrumentJson, (deal) => {
+          const cashflows = deal.trancheCashflows(
+            request.trancheId,
+            request.marketJson,
+            request.asOf,
+          );
+          return {
+            cashflows,
+            table: instruments.trancheCashflowsTable(cashflows),
+          };
+        }),
+      );
+    },
+    scenarioTable(request) {
+      return context.result(() =>
+        withDeal(request.instrumentJson, (deal) =>
+          instruments.trancheScenarioTable(
+            deal,
+            request.trancheId,
+            request.marketJson,
+            request.asOf,
+            request.gridJson,
+          ),
+        ),
+      );
+    },
+    bondWorkoutLadder(request) {
+      return context.result(() => {
+        const bond = instruments.Bond.fromJson(request.instrumentJson);
+        try {
+          return instruments.bondWorkoutLadder(
+            bond,
+            request.marketJson,
+            request.asOf,
+          );
+        } finally {
+          bond.free();
+        }
+      });
+    },
+    convertibleSpotLadder(request) {
+      return context.result(() => {
+        const bond = instruments.ConvertibleBond.fromJson(
+          request.instrumentJson,
+        );
+        try {
+          return instruments.convertibleSpotLadder(
+            bond,
+            request.marketJson,
+            request.asOf,
+            request.spots as number[] | null | undefined,
+          );
+        } finally {
+          bond.free();
+        }
+      });
+    },
+    computeQuotes(request) {
+      return context.result(() => {
+        const bond = instruments.Bond.fromJson(request.instrumentJson);
+        try {
+          return instruments.computeQuotes(
+            bond,
+            request.marketJson,
+            request.asOf,
+            request.quoteInput,
+          );
+        } finally {
+          bond.free();
+        }
+      });
+    },
+    poolReport(request) {
+      return context.result(() =>
+        withDeal(request.instrumentJson, (deal) =>
+          instruments.poolReport(deal.pool, request.asOf),
+        ),
+      );
+    },
+    runSimulation(request) {
+      return context.result(() =>
+        withDeal(request.instrumentJson, (deal) =>
+          deal.runSimulation(request.marketJson, request.asOf),
+        ),
+      );
+    },
+    equityMetrics(request) {
+      return context.result(() =>
+        withDeal(request.instrumentJson, (deal) =>
+          deal.equityMetrics(
+            request.marketJson,
+            request.asOf,
+            request.purchasePricePct,
+          ),
+        ),
+      );
+    },
+    trancheMetrics(request) {
+      return context.result(() =>
+        withDeal(request.instrumentJson, (deal) =>
+          instruments.trancheMetrics(
+            deal,
+            request.trancheId,
+            request.marketJson,
+            request.asOf,
+            request.marketPricePct,
+            request.metrics == null ? request.metrics : [...request.metrics],
+          ),
+        ),
+      );
+    },
+    trancheOas(request) {
+      return context.result(() =>
+        withDeal(request.instrumentJson, (deal) =>
+          instruments.trancheOas(
+            deal,
+            request.trancheId,
+            request.marketJson,
+            request.asOf,
+            request.marketPricePct,
+            request.configJson,
+          ),
+        ),
+      );
+    },
+    trancheDiscountMargin(request) {
+      return context.result(() =>
+        withDeal(request.instrumentJson, (deal) =>
+          instruments.trancheDiscountMargin(
+            deal,
+            request.trancheId,
+            request.marketJson,
+            request.asOf,
+            request.marketPricePct,
+          ),
+        ),
+      );
+    },
+    trancheBreakevenCdr(request) {
+      return context.result(() =>
+        withDeal(request.instrumentJson, (deal) =>
+          instruments.trancheBreakevenCdr(
+            deal,
+            request.trancheId,
+            request.marketJson,
+            request.asOf,
+          ),
+        ),
+      );
+    },
     models: () => context.result(() => instruments.listModelsGrouped()),
-    metrics: () =>
-      context.result(() => instruments.listStandardMetricsGrouped()),
+    metrics: (instrumentType) =>
+      context.result(() => instruments.metricsForInstrument(instrumentType)),
     metricMetadata: (keys) =>
       context.result(() => instruments.metricMetadata([...keys])),
+    priceDriverFields: () =>
+      context.result(() => instruments.priceDriverFields()),
+    trancheMetricFieldUnits: (currency) =>
+      context.result(() => instruments.trancheMetricFieldUnits(currency)),
+    scenarioTableFieldUnits: (currency) =>
+      context.result(() => instruments.scenarioTableFieldUnits(currency)),
+    simulationFieldUnits: (currency) =>
+      context.result(() => instruments.simulationFieldUnits(currency)),
+    equityMetricsFieldUnits: (currency) =>
+      context.result(() => instruments.equityMetricsFieldUnits(currency)),
+    bondQuoteSetFieldUnits: (currency) =>
+      context.result(() => instruments.bondQuoteSetFieldUnits(currency)),
+    poolReportFieldUnits: (currency) =>
+      context.result(() => instruments.poolReportFieldUnits(currency)),
+    trancheSolveFieldUnits: () =>
+      context.result(() => instruments.trancheSolveFieldUnits()),
     exportResult: (value) =>
       context.result(() =>
         exportValuation(value, native.valuations.valuationResultToJson),

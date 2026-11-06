@@ -246,13 +246,13 @@ impl Instrument for PrivateMarketsFund {
             }
         }
 
-        if let Some(nav) = self.unrealized_nav {
-            if nav.currency() != self.currency {
-                return Err(finstack_quant_core::Error::CurrencyMismatch {
-                    expected: self.currency,
-                    actual: nav.currency(),
-                });
-            }
+        if let Some(nav) = self.unrealized_nav
+            && nav.currency() != self.currency
+        {
+            return Err(finstack_quant_core::Error::CurrencyMismatch {
+                expected: self.currency,
+                actual: nav.currency(),
+            });
         }
 
         Ok(())

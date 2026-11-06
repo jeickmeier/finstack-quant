@@ -12,21 +12,20 @@ use crate::bindings::core::money::PyMoney;
 use crate::bindings::extract::{extract_market_opt, extract_model_ref};
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::{
-    serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,
-    serde_to_py, ColumnSchema,
+    ColumnSchema, serde_object_to_single_row_dataframe_with_schema,
+    serde_rows_to_dataframe_with_schema, serde_to_py,
 };
 use crate::bindings::statements::checks::PyCheckReport;
 use crate::bindings::statements::evaluator::PyStatementResult;
 use crate::bindings::statements_analytics::checks::{
-    extract_check_suite_spec, extract_credit_mapping, extract_three_statement_mapping,
-    PyCreditMapping, PyThreeStatementMapping,
+    PyCreditMapping, PyThreeStatementMapping, extract_check_suite_spec, extract_credit_mapping,
+    extract_three_statement_mapping,
 };
-use crate::bindings::statements_analytics::extract_serde_any;
 use crate::bindings::statements_analytics::typed::PyTornadoEntry;
 use crate::errors::{serde_json_to_py, statements_to_py};
 use finstack_quant_statements_analytics::analysis::{
-    CorporateAnalysis, CorporateValuationResult, DcfOptions, DcfSensitivityResult,
-    LboCheckMappings, LboConfig, LboResult, DEFAULT_UFCF_NODE,
+    CorporateAnalysis, CorporateValuationResult, DEFAULT_UFCF_NODE, DcfOptions,
+    DcfSensitivityResult, LboCheckMappings, LboConfig, LboResult, WaccInputs,
 };
 use finstack_quant_valuations::instruments::equity::dcf_equity::{
     EquityBridge, TerminalValueSpec, ValuationDiscounts,
@@ -360,13 +359,13 @@ fn extract_terminal_value(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<Te
     if let Ok(typed) = obj.extract::<PyRef<'_, PyTerminalValueSpec>>() {
         return Ok(typed.inner.clone());
     }
-    extract_serde_any(py, obj, "terminal_value")
+    crate::bindings::module_utils::spec_from_py(py, obj, "terminal_value")
 }
 
 /// Rust `DcfOptions` from its serde form (a dict or JSON string, missing
 /// fields taking their Rust defaults); `None` is `DcfOptions::default()`.
 fn extract_dcf_options(py: Python<'_>, obj: Option<&Bound<'_, PyAny>>) -> PyResult<DcfOptions> {
-    obj.map(|obj| extract_serde_any(py, obj, "options"))
+    obj.map(|obj| crate::bindings::module_utils::spec_from_py(py, obj, "options"))
         .transpose()
         .map(Option::unwrap_or_default)
 }
@@ -1006,7 +1005,12 @@ wire_methods!(PyCorporateAnalysis, CorporateAnalysis, "CorporateAnalysis");
 ///     lookups); DCF discounting stays WACC-only. Requires ``as_of``.
 /// as_of : datetime.date | str | None
 ///     DCF valuation date and, with ``market``, the statement visibility and
-///     market-data date. Defaults to the first forecast boundary.
+///     market-data date. Defaults to the first forecast boundary. As a
+///     visibility cutoff it hides each actual whose availability date (by
+///     default the period's exclusive end, the first day of the next period) is
+///     after it: a quarter-end ``"2025-03-31"`` hides 2025Q1's actuals, so pass
+///     ``"2025-04-01"`` or set the nodes' ``availability_dates``. Only forecast
+///     periods ending after ``as_of`` are discounted.
 ///
 /// Returns
 /// -------
@@ -1020,8 +1024,9 @@ wire_methods!(PyCorporateAnalysis, CorporateAnalysis, "CorporateAnalysis");
 /// ------
 /// ValueError
 ///     If ``market`` is set without ``as_of``, a payload or ``options`` is
-///     malformed, or the model, cash-flow node, exit-multiple node or DCF
-///     inputs are invalid.
+///     malformed, ``as_of`` hides an actual that a value node needs, no
+///     forecast cash flow ends after ``as_of``, or the model, cash-flow node,
+///     exit-multiple node or DCF inputs are invalid.
 /// KeyError
 ///     If ``ufcf_node`` or ``exit_multiple_metric_node`` is missing from the model.
 ///
@@ -1249,7 +1254,7 @@ fn evaluate_lbo<'py>(
     config: &Bound<'py, PyAny>,
 ) -> PyResult<PyLboResult> {
     let model = extract_model_ref(model)?.into_owned();
-    let config: LboConfig = extract_serde_any(py, config, "config")?;
+    let config: LboConfig = crate::bindings::module_utils::spec_from_py(py, config, "config")?;
 
     let inner = py
         .detach(move || {
@@ -1259,9 +1264,7 @@ fn evaluate_lbo<'py>(
     Ok(PyLboResult { inner })
 }
 
-/// Weighted-average cost of capital (WACC).
-///
-/// ``WACC = w_E * r_E + w_D * r_D * (1 - T)``.
+/// Capital-structure inputs of a WACC calculation, all decimals.
 ///
 /// Parameters
 /// ----------
@@ -1277,6 +1280,91 @@ fn evaluate_lbo<'py>(
 /// tax_rate : float
 ///     Marginal corporate tax rate as a decimal in ``[0, 1]``.
 ///
+/// Examples
+/// --------
+/// >>> from finstack_quant.statements_analytics import WaccInputs
+/// >>> WaccInputs(equity_weight=0.6, cost_of_equity=0.10, debt_weight=0.4, cost_of_debt=0.05, tax_rate=0.25).tax_rate
+/// 0.25
+#[pyclass(
+    name = "WaccInputs",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    eq,
+    from_py_object
+)]
+#[derive(Clone, PartialEq)]
+pub struct PyWaccInputs {
+    pub(crate) inner: WaccInputs,
+}
+
+#[pymethods]
+impl PyWaccInputs {
+    #[new]
+    #[pyo3(signature = (*, equity_weight, cost_of_equity, debt_weight, cost_of_debt, tax_rate))]
+    fn new(
+        equity_weight: f64,
+        cost_of_equity: f64,
+        debt_weight: f64,
+        cost_of_debt: f64,
+        tax_rate: f64,
+    ) -> Self {
+        Self {
+            inner: WaccInputs {
+                equity_weight,
+                cost_of_equity,
+                debt_weight,
+                cost_of_debt,
+                tax_rate,
+            },
+        }
+    }
+
+    /// Equity share of total capital as a decimal fraction.
+    #[getter]
+    fn equity_weight(&self) -> f64 {
+        self.inner.equity_weight
+    }
+
+    /// Required return on equity as a decimal.
+    #[getter]
+    fn cost_of_equity(&self) -> f64 {
+        self.inner.cost_of_equity
+    }
+
+    /// Debt share of total capital as a decimal fraction.
+    #[getter]
+    fn debt_weight(&self) -> f64 {
+        self.inner.debt_weight
+    }
+
+    /// Pre-tax cost of debt as a decimal.
+    #[getter]
+    fn cost_of_debt(&self) -> f64 {
+        self.inner.cost_of_debt
+    }
+
+    /// Marginal corporate tax rate as a decimal.
+    #[getter]
+    fn tax_rate(&self) -> f64 {
+        self.inner.tax_rate
+    }
+
+    fn __repr__(&self) -> String {
+        crate::bindings::repr_support::repr_from_serde("WaccInputs", &self.inner)
+    }
+}
+
+wire_methods!(PyWaccInputs, WaccInputs, "WaccInputs");
+
+/// Weighted-average cost of capital (WACC).
+///
+/// ``WACC = w_E * r_E + w_D * r_D * (1 - T)``.
+///
+/// Parameters
+/// ----------
+/// inputs : WaccInputs
+///     Capital weights, cost of equity, pre-tax cost of debt and tax rate.
+///
 /// Returns
 /// -------
 /// float
@@ -1285,31 +1373,19 @@ fn evaluate_lbo<'py>(
 /// Raises
 /// ------
 /// ValueError
-///     If a weight is negative, the weights do not sum to ``1.0``, or the tax
-///     rate is outside ``[0, 1]``.
+///     If an input is not finite, a weight is negative, the weights do not
+///     sum to ``1.0``, or the tax rate is outside ``[0, 1]``.
 ///
 /// Examples
 /// --------
-/// >>> from finstack_quant.statements_analytics import wacc
-/// >>> round(wacc(0.6, 0.10, 0.4, 0.05, 0.25), 4)
+/// >>> from finstack_quant.statements_analytics import WaccInputs, wacc
+/// >>> inputs = WaccInputs(equity_weight=0.6, cost_of_equity=0.10, debt_weight=0.4, cost_of_debt=0.05, tax_rate=0.25)
+/// >>> round(wacc(inputs), 4)
 /// 0.075
 #[pyfunction]
-#[pyo3(signature = (equity_weight, cost_of_equity, debt_weight, cost_of_debt, tax_rate))]
-fn wacc(
-    equity_weight: f64,
-    cost_of_equity: f64,
-    debt_weight: f64,
-    cost_of_debt: f64,
-    tax_rate: f64,
-) -> PyResult<f64> {
-    finstack_quant_statements_analytics::analysis::wacc(
-        equity_weight,
-        cost_of_equity,
-        debt_weight,
-        cost_of_debt,
-        tax_rate,
-    )
-    .map_err(statements_to_py)
+#[pyo3(signature = (inputs))]
+fn wacc(inputs: PyWaccInputs) -> PyResult<f64> {
+    finstack_quant_statements_analytics::analysis::wacc(&inputs.inner).map_err(statements_to_py)
 }
 
 /// Run the full corporate analysis pipeline.
@@ -1436,6 +1512,7 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyLboCheckMappings>()?;
     m.add_class::<PyLboResult>()?;
     m.add_class::<PyCorporateAnalysis>()?;
+    m.add_class::<PyWaccInputs>()?;
     m.add_function(pyo3::wrap_pyfunction!(evaluate_dcf, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(dcf_sensitivity, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(evaluate_lbo, m)?)?;

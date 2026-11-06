@@ -1,6 +1,6 @@
 //! Pricing and metric helpers for interest-rate instruments.
 //!
-use crate::irs::{resolve_fixed_leg, resolve_float_leg, InterestRateSwap};
+use crate::irs::{InterestRateSwap, resolve_fixed_leg, resolve_float_leg};
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
@@ -14,16 +14,16 @@ use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
 use finstack_quant_core::validation;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_models::types::OptionType;
-use finstack_quant_models::volatility::sabr::SabrParameters;
 use finstack_quant_models::volatility::VolatilityConvention;
+use finstack_quant_models::volatility::sabr::SabrParameters;
 use finstack_quant_valuations_core::impl_instrument_base;
 use finstack_quant_valuations_core::instruments::common_impl::vol_resolution::{
-    resolve_volatility, validate_sigma, ResolvedVolatility, VolatilityRequest,
+    ResolvedVolatility, VolatilityRequest, resolve_volatility, validate_sigma,
 };
 use finstack_quant_valuations_core::instruments::pricing_overrides::VolSurfaceExtrapolation;
 use finstack_quant_valuations_core::instruments::{FixedLegSpec, FloatLegSpec, PayReceive};
-use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
+use rust_decimal::prelude::ToPrimitive;
 
 use super::definitions::CashSettlementMethod;
 use finstack_quant_valuations_core::instruments::{SettlementType, VolatilityModel};
@@ -887,29 +887,28 @@ impl Swaption {
             .market_quotes
             .implied_volatility
             .is_none()
+            && let Some(params) = &self.sabr_params
         {
-            if let Some(params) = &self.sabr_params {
-                let sigma = match self.vol_model {
-                    VolatilityModel::Normal => {
-                        params.implied_vol_normal(forward, strike, time_to_expiry)?
+            let sigma = match self.vol_model {
+                VolatilityModel::Normal => {
+                    params.implied_vol_normal(forward, strike, time_to_expiry)?
+                }
+                VolatilityModel::Black => {
+                    let sigma = params.implied_vol(forward, strike, time_to_expiry)?;
+                    if params.quote_convention() == VolatilityConvention::Normal {
+                        return Err(Error::Validation(
+                            "normal SABR cannot supply a Black volatility quote".to_owned(),
+                        ));
                     }
-                    VolatilityModel::Black => {
-                        let sigma = params.implied_vol(forward, strike, time_to_expiry)?;
-                        if params.quote_convention() == VolatilityConvention::Normal {
-                            return Err(Error::Validation(
-                                "normal SABR cannot supply a Black volatility quote".to_owned(),
-                            ));
-                        }
-                        sigma
-                    }
-                };
-                let quote = ResolvedVolatility {
-                    sigma: validate_sigma(sigma)?,
-                    convention,
-                };
-                quote.model_rates(forward, strike)?;
-                return Ok(quote);
-            }
+                    sigma
+                }
+            };
+            let quote = ResolvedVolatility {
+                sigma: validate_sigma(sigma)?,
+                convention,
+            };
+            quote.model_rates(forward, strike)?;
+            return Ok(quote);
         }
         let quote = resolve_volatility(
             &self.instrument_pricing_overrides.market_quotes,

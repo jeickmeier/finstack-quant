@@ -12,7 +12,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 
-use finstack_quant_cashflows::builder::{merge_cashflow_schedules, CashFlowSchedule, Notional};
+use finstack_quant_cashflows::builder::{CashFlowSchedule, Notional, merge_cashflow_schedules};
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_valuations_core::impl_instrument_base;
 
@@ -119,12 +119,12 @@ impl FxSwap {
             )));
         }
         for (name, rate) in [("near_rate", self.near_rate), ("far_rate", self.far_rate)] {
-            if let Some(rate) = rate {
-                if !rate.is_finite() || rate <= 0.0 {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "FxSwap {name} must be positive and finite, got {rate}"
-                    )));
-                }
+            if let Some(rate) = rate
+                && (!rate.is_finite() || rate <= 0.0)
+            {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "FxSwap {name} must be positive and finite, got {rate}"
+                )));
             }
         }
         Ok(())

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Literal, TypedDict
 import pandas as pd
+from finstack_quant.core.market_data import VolSurface
 
 _ArbitrageTypeName = Literal[
     "butterfly",
@@ -33,7 +34,7 @@ class ArbitrageReport:
     """
     Aggregated model-free arbitrage report for a volatility grid.
 
-    Returned by :func:`check_surface_grid`. Picklable and JSON round-trippable;
+    Returned by :func:`check_surface` and :func:`check_surface_grid`. Picklable and JSON round-trippable;
     ``to_dataframe()`` gives one row per violation.
 
     Examples
@@ -347,6 +348,63 @@ def check_local_vol_density_grid(
     >>> vols, forwards = [[0.2, 0.2, 0.2], [0.2, 0.2, 0.2]], [100.0, 100.0]
     >>> check_local_vol_density_grid(strikes, expiries, vols, forwards)
     []
+
+    """
+    ...
+
+def check_surface(surface: VolSurface, config: dict[str, Any] | str) -> ArbitrageReport:
+    """
+    Run the configured butterfly, calendar-spread and local-vol density checks on a surface.
+
+    The model-free detector reads the surface's expiry by strike grid without
+    modifying it. Violations below ``config["min_severity"]`` are dropped and the
+    rest are sorted from most to least severe. It reports violations; it does not
+    repair the surface or prove the absence of arbitrage between grid points.
+
+    Parameters
+    ----------
+    surface : VolSurface
+        Expiry by strike surface of unshifted Black lognormal volatilities
+        (``secondary_axis="strike"``, ``quote_type="black_lognormal"``), expiries
+        in years and strikes in the underlying's price units.
+    config : dict or str
+        Serde form of the Rust ``ArbitrageCheckConfig``, as a dict or JSON text.
+        Every field is optional and an omitted one takes its default:
+        ``check_butterfly``, ``check_calendar_spread`` and
+        ``check_local_vol_density`` (bool, default ``True``) select the checks;
+        ``forward_prices`` (list of float, default ``None``) holds one finite
+        positive forward to broadcast or one per surface expiry, and is required
+        while any check is enabled; ``tolerance`` (float, default ``1e-10``, the
+        Rust ``DEFAULT_ARBITRAGE_TOLERANCE``) is the non-negative violation
+        tolerance in total-variance units; ``min_severity`` (``"negligible"``
+        (default), ``"minor"``, ``"major"`` or ``"critical"``) is the lowest
+        severity reported. ``{"forward_prices": [100.0]}`` is the smallest valid
+        configuration.
+
+    Returns
+    -------
+    ArbitrageReport
+        Typed report carrying the surface id in ``vol_surface_id``, with
+        ``passed``, ``total_violations``, ``by_severity``, ``by_type``,
+        ``violations`` and ``to_dataframe()``.
+
+    Raises
+    ------
+    ValueError
+        If ``config`` has an unknown field or a wrongly typed value, the forward
+        prices are missing while a check is enabled, non-finite, non-positive or
+        of a length other than one or the expiry count, the tolerance is negative
+        or non-finite, or the surface is normal-quoted, shifted-Black or on a
+        tenor axis.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import VolSurface
+    >>> from finstack_quant.models.volatility import check_surface
+    >>> surface = VolSurface("SPX-VOL", [1.0, 2.0], [90.0, 100.0, 110.0], [[0.2, 0.2, 0.2], [0.2, 0.2, 0.2]])
+    >>> report = check_surface(surface, {"forward_prices": [100.0]})
+    >>> (report.passed, report.vol_surface_id)
+    (True, 'SPX-VOL')
 
     """
     ...

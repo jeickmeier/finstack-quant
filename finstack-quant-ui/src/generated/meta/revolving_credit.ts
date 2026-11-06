@@ -1108,7 +1108,7 @@ export default [
     "path": "#/$defs/d_2d9b65cc4d957fd6344e/properties/oid_eir",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/RevolvingCredit/properties/oid_eir",
     "default": null,
-    "description": "Effective-interest-rate reporting switch for the\n`oid_eir_amortization` metric. `None` (the default) reports with fees\nincluded, the same as `Some(OidEirSpec::default())`."
+    "description": "Effective-interest-rate reporting switch for the `oid_eir_rate` and\n`oid_eir_amortization` metrics. `None` (the default) reports with fees\nincluded, the same as `Some(OidEirSpec::default())`."
   },
   {
     "path": "#/$defs/d_2d9b65cc4d957fd6344e/properties/oid_eir/anyOf/0",
@@ -1602,6 +1602,21 @@ export default [
     "default": null,
     "description": "Exercise friction cost for issuer/borrower calls, expressed as **cents per 100 of par**.\n\nThis models the real-world costs of refinancing / reissue (fees, OID, documentation),\nby requiring the issuer/borrower to see sufficient economic benefit before exercising.\n\n## Convention\n- `0.0` (or `None`) means frictionless optimal exercise (pure model)\n- `50.0` means **$0.50 per $100** of outstanding principal (0.50 points)\n- `200.0` means **$2.00 per $100** of outstanding principal (2.00 points)\n\nThe friction affects the **exercise decision threshold**, but redemption still occurs\nat the contractual call price.",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/government_curve_id",
+    "description": "Optional government discount curve identifier for the bond `g_spread` metric.\n\nThe metric subtracts this curve's par yield from the bond's yield. It\nenters no price, and `g_spread` is an error when it is unset."
+  },
+  {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/government_curve_id/anyOf/0",
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Id"
+  },
+  {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/government_curve_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/government_curve_id/anyOf/1"
   },
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/hazard_mean_reversion",
@@ -5050,7 +5065,7 @@ export default [
   {
     "path": "#/$defs/d_ee4323acfdb49e4fe15b",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonModel",
-    "description": "Merton structural credit model.\n\nModels a firm's equity as a call option on its assets, where default\noccurs when asset value falls below the debt barrier.\n\n# Fields\n\n- `asset_value` (V_0): Current market value of the firm's assets.\n- `asset_vol` (sigma_V): Annualized volatility of asset returns.\n- `debt_barrier` (B): Face value of debt / default point.\n- `risk_free_rate` (r): Continuous risk-free rate.\n- `payout_rate` (q): Continuous dividend / payout yield on assets.\n- `barrier_type`: Terminal or first-passage barrier monitoring.\n- `dynamics`: Asset return dynamics specification.\n\n# Wire format\n\nDeserialization is routed through [`MertonModel::new_with_dynamics`] via\n`RawMertonModel`, so a model loaded from JSON satisfies exactly the same\ninvariants as one built in Rust. The serialized field set is unchanged."
+    "description": "Merton structural credit model.\n\nModels a firm's equity as a call option on its assets, where default\noccurs when asset value falls below the debt barrier.\n\n# Fields\n\n- `asset_value` (V_0): Current market value of the firm's assets.\n- `asset_vol` (sigma_V): Annualized volatility of asset returns.\n- `debt_barrier` (B): Face value of debt / default point.\n- `risk_free_rate` (r): Continuous risk-free rate.\n- `payout_rate` (q): Continuous dividend / payout yield on assets.\n- `barrier_type`: Terminal or first-passage barrier monitoring.\n- `dynamics`: Asset return dynamics specification.\n\n# Wire format\n\nDeserialization is routed through [`MertonModel::new_with_dynamics`] via\n`RawMertonModel`, so a model loaded from JSON satisfies exactly the same\ninvariants as one built in Rust. Unknown fields are rejected."
   },
   {
     "path": "#/$defs/d_ee4323acfdb49e4fe15b/properties/asset_value",

@@ -2,7 +2,7 @@ use std::cell::Cell;
 use std::fs;
 use std::path::Path;
 
-use finstack_quant_core::canonical::{content_hash, to_canonical_bytes, CANONICAL_VERSION};
+use finstack_quant_core::canonical::{CANONICAL_VERSION, content_hash, to_canonical_bytes};
 use finstack_quant_core::contract::LoadLimits;
 use finstack_quant_core::market_data::context::{MarketContext, MarketContextState};
 use finstack_quant_core::{Error, InputError};
@@ -104,9 +104,11 @@ fn canonicalization_embeds_nested_raw_json_as_its_public_value() {
         canonical,
         br#"{"embedded":{"a":{"x":0,"y":1},"z":2},"stateful":1.0}"#
     );
-    assert!(!canonical
-        .windows(b"$serde_json".len())
-        .any(|window| window == b"$serde_json"));
+    assert!(
+        !canonical
+            .windows(b"$serde_json".len())
+            .any(|window| window == b"$serde_json")
+    );
     assert_eq!(stateful.serializations.get(), 1);
 }
 

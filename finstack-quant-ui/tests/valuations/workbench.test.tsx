@@ -16,6 +16,8 @@ import { serializeHost } from "../../src/codec.mjs";
 import detailFixtures from "./details/cases.json";
 import cashflowFixtures from "./cashflows/cases.json";
 import scenarioCases from "./scenario-table/cases.json";
+import standardDeals from "./scenario-table/standard-deals.json";
+import scenarioGridSchema from "../../src/generated/schemas/scenario_grid.json";
 import pricingMarket from "./instruments/pricing-market.json";
 import type { ValuationResult } from "finstack-quant-wasm";
 import bondFixture from "../../src/fixtures/results/bond.json";
@@ -25,14 +27,22 @@ import {
   type PriceRequest,
   FinstackError,
   errorValue,
+  unwrap,
 } from "@/workers/finstack-contract";
 import { formatMoney, formatRawMoney } from "../../src/format/format";
 import { budget } from "../shared/budget";
+import { createContext } from "@/workers/services/context";
+import { createScenariosService } from "@/workers/services/scenarios";
+import { createAttributionService } from "@/workers/services/attribution";
+import { createModelsService } from "@/workers/services/models";
+import calibrationCases from "../calibration/cases.json";
+import marketScenarios from "../scenarios/application/cases.json";
+import { createClient } from "../shared/worker/client";
 const bondDisplay = formatRawMoney(fixture.result.value);
-const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
-vi.mock("@/hooks/shared/use-finstack/client", () => ({
-  createClient: mock.createClient,
-}));
+vi.mock(
+  "@/hooks/shared/use-finstack/client",
+  () => import("../shared/worker/client"),
+);
 // jsdom has no Canvas/ResizeObserver. The installed Chromium test owns figure rendering.
 vi.mock(
   "@/components/finstack/shared/chart/finstack-chart/finstack-chart",
@@ -49,6 +59,39 @@ const native = createRequire(import.meta.url)(
   "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
 );
 let call: ReturnType<typeof vi.fn>, close: ReturnType<typeof vi.fn>;
+// The production ScenariosApi over the Node facade; its envelopes unwrap as the client does.
+const scenarioService = createScenariosService(
+  { scenarios: native, attribution: native },
+  createContext({
+    initialize: async () => undefined,
+    core: { MarketContext: native.MarketContext },
+    portfolio: { Portfolio: native.Portfolio },
+  }),
+);
+// The production AttributionApi over the Node facade.
+const attributionService = createAttributionService(
+  { attribution: native },
+  createContext({
+    initialize: async () => undefined,
+    core: { MarketContext: native.MarketContext },
+    portfolio: { Portfolio: native.Portfolio },
+  }),
+);
+// The production checkSurface over the Node facade's VolSurface and checkSurface.
+const modelsService = createModelsService(
+  {
+    core: { VolSurface: native.VolSurface },
+    models: {
+      volatility: { checkSurface: native.checkSurface },
+      credit: { migration: {} },
+    },
+  } as unknown as Parameters<typeof createModelsService>[0],
+  createContext({
+    initialize: async () => undefined,
+    core: { MarketContext: native.MarketContext },
+    portfolio: { Portfolio: native.Portfolio },
+  }),
+);
 beforeEach(() => {
   vi.stubGlobal("Worker", class {});
   call = vi.fn(async (method: string, request: any) => {
@@ -58,7 +101,7 @@ beforeEach(() => {
       case "models":
         return native.listModelsGrouped();
       case "metrics":
-        return native.listStandardMetricsGrouped();
+        return native.metricsForInstrument(request);
       case "metricMetadata":
         return native.metricMetadata(request);
       case "validate":
@@ -77,6 +120,79 @@ beforeEach(() => {
         return native.dryRun(request);
       case "calibrate":
         return native.calibrate(request);
+      case "standardDealFamilies":
+        return native.standardDealFamilies();
+      case "newStandardDeal": {
+        const deal = native.StructuredCredit.newStandard(
+          request.dealType,
+          request.paramsJson,
+        );
+        try {
+          return deal.toJson();
+        } finally {
+          deal.free();
+        }
+      }
+      case "dealTranches": {
+        const deal = native.StructuredCredit.fromJson(request);
+        try {
+          return deal.tranches;
+        } finally {
+          deal.free();
+        }
+      }
+      case "trancheSchedule": {
+        const deal = native.StructuredCredit.fromJson(request.instrumentJson);
+        try {
+          const cashflows = deal.trancheCashflows(
+            request.trancheId,
+            request.marketJson,
+            request.asOf,
+          );
+          return {
+            cashflows,
+            table: native.trancheCashflowsTable(cashflows),
+          };
+        } finally {
+          deal.free();
+        }
+      }
+      case "poolReport": {
+        const deal = native.StructuredCredit.fromJson(request.instrumentJson);
+        try {
+          return native.poolReport(deal.pool, request.asOf);
+        } finally {
+          deal.free();
+        }
+      }
+      case "poolReportFieldUnits":
+        return native.poolReportFieldUnits(request);
+      case "runSimulation": {
+        const deal = native.StructuredCredit.fromJson(request.instrumentJson);
+        try {
+          return deal.runSimulation(request.marketJson, request.asOf);
+        } finally {
+          deal.free();
+        }
+      }
+      case "equityMetrics": {
+        const deal = native.StructuredCredit.fromJson(request.instrumentJson);
+        try {
+          return deal.equityMetrics(
+            request.marketJson,
+            request.asOf,
+            request.purchasePricePct,
+          );
+        } finally {
+          deal.free();
+        }
+      }
+      case "equityMetricsFieldUnits":
+        return native.equityMetricsFieldUnits(request);
+      case "scenarioTableFieldUnits":
+        return native.scenarioTableFieldUnits(request);
+      case "simulationFieldUnits":
+        return native.simulationFieldUnits(request);
       case "scenarioTable": {
         const deal = native.StructuredCredit.fromJson(request.instrumentJson);
         try {
@@ -91,16 +207,34 @@ beforeEach(() => {
           deal.free();
         }
       }
+      case "applyMarketScenario":
+        return unwrap(await scenarioService.applyMarketScenario(request));
+      case "horizonReturn":
+        return unwrap(await scenarioService.horizonReturn(request));
+      case "validateScenarioSpec":
+        return unwrap(await scenarioService.validateScenarioSpec(request));
+      case "listBuiltinTemplateMetadata":
+        return unwrap(await scenarioService.listBuiltinTemplateMetadata());
+      case "attributePnlMany":
+        return unwrap(await attributionService.attributePnlMany(request));
+      case "checkSurface":
+        return unwrap(await modelsService.checkSurface(request));
+      case "defaultWaterfallOrder":
+        return native.defaultWaterfallOrder();
+      case "calendars":
+        return native.availableCalendars();
+      case "priceDriverFields":
+        return native.priceDriverFields();
+      case "cashflowLadder":
+        return native.calendarYearLadderByCurrency(request);
       case "formatMoney":
         return formatMoney(request.value, request.rounding, native);
       case "cashflows":
-        return JSON.stringify(
-          native.instrumentCashflows(
-            request.instrumentJson,
-            request.marketJson,
-            request.asOf,
-            request.model,
-          ),
+        return native.instrumentCashflows(
+          request.instrumentJson,
+          request.marketJson,
+          request.asOf,
+          request.model,
         );
       case "price":
         try {
@@ -119,7 +253,7 @@ beforeEach(() => {
     }
   });
   close = vi.fn();
-  mock.createClient.mockReset().mockReturnValue({ call, close });
+  createClient.mockReset().mockReturnValue({ call, close });
 });
 afterEach(() => {
   cleanup();
@@ -228,7 +362,7 @@ it(
       (screen.getByRole("textbox", { name: "Amount" }) as HTMLInputElement)
         .value,
     ).toBe("1000000.123456789");
-    expect(mock.createClient).toHaveBeenCalledTimes(1);
+    expect(createClient).toHaveBeenCalledTimes(1);
     view.unmount();
     expect(close).toHaveBeenCalledTimes(1);
   },
@@ -394,6 +528,63 @@ it(
   budget(15000),
 );
 
+it(
+  "adds the native static-arbitrage badge to a stored surface only when the host supplies forwards",
+  async () => {
+    const surface = calibrationCases.find((c) =>
+      c.source.includes("08_equity"),
+    )!.result.result.final_market.surfaces[0]!;
+    const market = JSON.parse(fixture.request.marketJson);
+    market.surfaces = [surface];
+    const surfaceOptions = vi.fn((stored: { id: string }) =>
+      stored.id === "AAPL-EQUITY-VOL"
+        ? { colorDomain: [0, 1] as const, forwards: [175] }
+        : undefined,
+    );
+    render(
+      <FinstackQueryProvider>
+        <PricingWorkbench
+          defaultRequest={{
+            ...fixture.request,
+            marketJson: JSON.stringify(market),
+          }}
+          surfaceOptions={surfaceOptions}
+        />
+      </FinstackQueryProvider>,
+    );
+    await userEvent.click(screen.getByRole("tab", { name: "2 Market" }));
+    await userEvent.click(screen.getByRole("tab", { name: "View market" }));
+    fireEvent.change(
+      await screen.findByLabelText(
+        "Search market data",
+        {},
+        { timeout: budget(5000) },
+      ),
+      { target: { value: "AAPL-EQUITY-VOL" } },
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Inspect AAPL-EQUITY-VOL/ }),
+    );
+    const details = await screen.findByRole("button", {
+      name: "Arbitrage details",
+    });
+    await waitFor(
+      () => expect(details.parentElement!.textContent).toContain("Passed"),
+      { timeout: budget(5000) },
+    );
+    expect(
+      call.mock.calls
+        .filter(([method]) => method === "checkSurface")
+        .map(([, request]) => request),
+    ).toEqual([{ surface, config: { forward_prices: [175] } }]);
+    // The stored chart stays beside the badge.
+    expect(
+      screen.getAllByRole("img", { name: /AAPL-EQUITY-VOL/ }).length,
+    ).toBeGreaterThan(0);
+  },
+  budget(15000),
+);
+
 it.each(detailFixtures.cases)(
   "composes actual $type pricing with its returned $detailType route",
   async (entry) => {
@@ -439,7 +630,7 @@ it.each(detailFixtures.cases)(
   20000,
 );
 it.each(cashflowFixtures.cases.filter((entry) => entry.type !== "bond"))(
-  "keeps $type pricing intact with exact cashflow output or its actual native export error",
+  "keeps $type pricing intact with the native cashflow envelope or its actual native export error",
   async (entry) => {
     mount(entry.request);
     const results = within(screen.getByRole("region", { name: "Results" }));
@@ -469,11 +660,13 @@ it.each(cashflowFixtures.cases.filter((entry) => entry.type !== "bond"))(
       });
       await within(viewer).findByRole("table", { name: "Cashflow schedule" });
       fireEvent.click(
-        within(viewer).getByText("Original JSON", { exact: true }),
+        within(viewer).getByText("Envelope JSON", { exact: true }),
       );
       await waitFor(() => {
         showOriginal(viewer);
-        expect(viewer.querySelector("pre")!.textContent).toBe(entry.cashflows);
+        expect(viewer.querySelector("pre")!.textContent).toBe(
+          serializeHost(entry.cashflows),
+        );
       });
     }
     expect(JSON.parse(result.querySelector("pre")!.textContent!).value).toEqual(
@@ -551,7 +744,7 @@ it(
   budget(15000),
 );
 
-it("offers configured scenario prices only while structured credit is selected", async () => {
+it("offers scenarios only while structured credit is selected", async () => {
   render(
     <FinstackQueryProvider>
       <PricingWorkbench
@@ -570,7 +763,47 @@ it("offers configured scenario prices only while structured credit is selected",
   expect(screen.queryByRole("tab", { name: "Scenarios" })).toBeNull();
 });
 it(
-  "loads configured scenario prices only on demand from the completed structured-credit context",
+  "passes a seeded tranche Rust does not know through, so Rust's error shows",
+  async () => {
+    render(
+      <FinstackQueryProvider>
+        <PricingWorkbench
+          defaultRequest={{
+            instrumentJson: JSON.stringify(scenarioCases.cases[0]!.instrument),
+            marketJson: JSON.stringify(pricingMarket),
+            asOf: scenarioCases.asOf,
+            model: "discounting",
+            metrics: [],
+          }}
+          scenario={{
+            trancheId: "NO-SUCH-TRANCHE",
+            gridJson: JSON.stringify(scenarioCases.grid),
+          }}
+        />
+      </FinstackQueryProvider>,
+    );
+    await waitFor(() => expect(prices()).toHaveLength(1), {
+      timeout: budget(10000),
+    });
+    await userEvent.click(screen.getByRole("tab", { name: "Scenarios" }));
+    await waitFor(
+      () =>
+        expect(
+          screen
+            .getAllByRole("alert")
+            .some((alert) => /NO-SUCH-TRANCHE/.test(alert.textContent!)),
+        ).toBe(true),
+      { timeout: budget(10000) },
+    );
+    expect(
+      call.mock.calls.find(([method]) => method === "trancheMetrics")![1]
+        .trancheId,
+    ).toBe("NO-SUCH-TRANCHE");
+  },
+  budget(15000),
+);
+it(
+  "loads scenarios only on demand from the completed structured-credit context",
   async () => {
     const request = {
       instrumentJson: JSON.stringify(scenarioCases.cases[0]!.instrument),
@@ -597,7 +830,7 @@ it(
     );
     await userEvent.click(screen.getByRole("tab", { name: "Scenarios" }));
     const toggle = await screen.findByText(
-      "Scenario prices",
+      "Scenarios",
       { selector: "summary" },
       { timeout: budget(5000) },
     );
@@ -622,13 +855,237 @@ it(
     await waitFor(
       () =>
         expect(
-          document.querySelector('[aria-label="CLONOTES-A scenario prices"]'),
+          document.querySelector('[aria-label="CLONOTES-A scenario measures"]'),
         ).toBeTruthy(),
       { timeout: budget(5000) },
     );
     expect(prices()).toHaveLength(1);
+    // The ScenarioGrid editor is seeded from the host grid; an edit runs only on submit.
+    // Queries stay inside the disclosure: the whole workbench DOM is large.
+    const panel = within(toggle.closest("details")!);
+    const cpr = panel.getByLabelText(/^cprs 2$/i) as HTMLInputElement;
+    expect(Number(cpr.value)).toBe(scenarioCases.grid.cprs[1]);
+    fireEvent.change(cpr, { target: { value: "0.1" } });
+    const run = panel.getByRole("button", {
+      name: "Run scenarios",
+    }) as HTMLButtonElement;
+    await waitFor(() => expect(run.disabled).toBe(false), {
+      timeout: budget(5000),
+    });
+    const tables = () =>
+      call.mock.calls.filter(([method]) => method === "scenarioTable");
+    expect(tables()).toHaveLength(1);
+    fireEvent.click(run);
+    await waitFor(() => expect(tables()).toHaveLength(2), {
+      timeout: budget(5000),
+    });
+    const edited = tables()[1]![1];
+    expect({ ...edited, gridJson: undefined }).toEqual({
+      ...invocation,
+      gridJson: undefined,
+    });
+    expect(JSON.parse(edited.gridJson)).toEqual({
+      ...scenarioCases.grid,
+      cprs: [scenarioCases.grid.cprs[0], 0.1, scenarioCases.grid.cprs[2]],
+    });
+    await waitFor(
+      () =>
+        expect(
+          document.querySelector('[aria-label="CLONOTES-A scenario measures"]'),
+        ).toBeTruthy(),
+      { timeout: budget(5000) },
+    );
   },
-  budget(30000),
+  budget(60000),
+);
+
+it(
+  "enters a deal from a registry family and analyses its tranche with no host seeds",
+  async () => {
+    const family = standardDeals.cases.find((c) => c.family === "rmbs")!;
+    render(
+      <FinstackQueryProvider>
+        <PricingWorkbench
+          defaultRequest={{
+            instrumentJson: JSON.stringify(scenarioCases.cases[0]!.instrument),
+            marketJson: JSON.stringify(pricingMarket),
+            asOf: scenarioCases.asOf,
+            model: "discounting",
+            metrics: [],
+          }}
+        />
+      </FinstackQueryProvider>,
+    );
+    await waitFor(() => expect(prices()).toHaveLength(1), {
+      timeout: budget(10000),
+    });
+    // The form starts from Rust's example, and building sends that family and those params.
+    const summary = screen.getByText("Start from a standard deal", {
+      selector: "summary",
+    });
+    const details = summary.closest("details")!;
+    details.open = true;
+    fireEvent(details, new Event("toggle"));
+    const entry = within(details);
+    fireEvent.click(
+      await entry.findByRole(
+        "radio",
+        { name: "RMBS" },
+        { timeout: budget(10000) },
+      ),
+    );
+    expect(entry.getByText(family.profileId)).toBeTruthy();
+    const build = entry.getByRole("button", {
+      name: "Build deal",
+    }) as HTMLButtonElement;
+    await waitFor(() => expect(build.disabled).toBe(false), {
+      timeout: budget(5000),
+    });
+    fireEvent.click(build);
+    await waitFor(
+      () =>
+        expect(
+          call.mock.calls.some(([method]) => method === "newStandardDeal"),
+        ).toBe(true),
+      { timeout: budget(5000) },
+    );
+    const built = call.mock.calls.find(
+      ([method]) => method === "newStandardDeal",
+    )![1];
+    expect(built.dealType).toBe("rmbs");
+    expect(JSON.parse(built.paramsJson)).toEqual(family.params);
+    // The built deal reprices through the workbench's normal path.
+    await waitFor(
+      () => expect(prices().at(-1)!.instrumentJson).toBe(family.instrumentJson),
+      { timeout: budget(10000) },
+    );
+    // No host seed: the tab lists the deal's native tranches and selects the first returned.
+    await userEvent.click(screen.getByRole("tab", { name: "Scenarios" }));
+    const tranche = family.tranches.tranches[0]!.id;
+    await waitFor(
+      () =>
+        expect(
+          document.querySelector(`[aria-label="${tranche} tranche analytics"]`),
+        ).toBeTruthy(),
+      { timeout: budget(10000) },
+    );
+    const metricCalls = call.mock.calls.filter(
+      ([method]) => method === "trancheMetrics",
+    );
+    expect(metricCalls.at(-1)![1]).toMatchObject({
+      instrumentJson: family.instrumentJson,
+      trancheId: tranche,
+    });
+    // The built deal reaches the pool report, which runs only when opened.
+    expect(call.mock.calls.some(([method]) => method === "poolReport")).toBe(
+      false,
+    );
+    fireEvent.click(screen.getByText("Pool report", { selector: "summary" }));
+    await waitFor(
+      () =>
+        expect(
+          document.querySelector('[aria-label="Pool report"] table'),
+        ).toBeTruthy(),
+      { timeout: budget(10000) },
+    );
+    expect(
+      call.mock.calls.find(([method]) => method === "poolReport")![1],
+    ).toEqual({
+      instrumentJson: family.instrumentJson,
+      asOf: scenarioCases.asOf,
+    });
+    // ... and the waterfall report, on the completed request's market and date.
+    expect(call.mock.calls.some(([method]) => method === "runSimulation")).toBe(
+      false,
+    );
+    fireEvent.click(
+      screen.getByText("Waterfall report", { selector: "summary" }),
+    );
+    await waitFor(
+      () =>
+        expect(
+          document.querySelector('[aria-label="Waterfall report"] table'),
+        ).toBeTruthy(),
+      { timeout: budget(10000) },
+    );
+    const simulated = call.mock.calls.find(
+      ([method]) => method === "runSimulation",
+    )![1];
+    const lastPrice = prices().at(-1)!;
+    expect(simulated).toEqual({
+      instrumentJson: family.instrumentJson,
+      marketJson: lastPrice.marketJson,
+      asOf: lastPrice.asOf,
+    });
+    // ... and the coverage tests, from that same simulation in Rust's units.
+    fireEvent.click(
+      screen.getByText("Coverage tests", { selector: "summary" }),
+    );
+    await waitFor(
+      () =>
+        // The family's registry deal configures no coverage test.
+        expect(
+          screen.queryByText("No coverage test was evaluated."),
+        ).toBeTruthy(),
+      { timeout: budget(10000) },
+    );
+    expect(
+      call.mock.calls.filter(([method]) => method === "runSimulation"),
+    ).toHaveLength(1);
+    // ... and the enhancement chart, from that same simulation.
+    fireEvent.click(
+      screen.getByText("Credit enhancement and excess spread", {
+        selector: "summary",
+      }),
+    );
+    await waitFor(
+      () =>
+        expect(
+          document.querySelector(
+            '[aria-label="Credit enhancement and excess spread"]',
+          ),
+        ).toBeTruthy(),
+      { timeout: budget(10000) },
+    );
+    expect(
+      call.mock.calls.filter(([method]) => method === "runSimulation"),
+    ).toHaveLength(1);
+    // ... and the equity tranche: the call is always made and Rust answers for the deal.
+    fireEvent.click(
+      screen.getByText("Equity tranche", { selector: "summary" }),
+    );
+    await waitFor(
+      () =>
+        expect(
+          screen
+            .getByRole("region", { name: "Equity tranche" })
+            .querySelector('[role="alert"]')?.textContent,
+        ).toMatch(/deal has no equity tranche/),
+      { timeout: budget(10000) },
+    );
+    const equity = call.mock.calls.find(
+      ([method]) => method === "equityMetrics",
+    )![1];
+    // A blank price is not a price: JS leaves the default to Rust.
+    expect(equity.purchasePricePct).toBeNull();
+    expect(equity.instrumentJson).toBe(family.instrumentJson);
+    // The grid and the price extent come from Rust's example and the returned prices.
+    fireEvent.click(screen.getByText("Scenarios", { selector: "summary" }));
+    await waitFor(
+      () =>
+        expect(
+          document.querySelector(`[aria-label="${tranche} scenario measures"]`),
+        ).toBeTruthy(),
+      { timeout: budget(10000) },
+    );
+    expect(
+      JSON.parse(
+        call.mock.calls.find(([method]) => method === "scenarioTable")![1]
+          .gridJson,
+      ),
+    ).toEqual(scenarioGridSchema.examples[0]);
+  },
+  budget(60000),
 );
 
 it(
@@ -762,3 +1219,215 @@ it("keeps shortcuts within the focused workbench and leaves field typing intact"
   first.unmount();
   second.unmount();
 });
+it(
+  "prices the applied market scenario beside the base valuation and never subtracts them",
+  async () => {
+    const roll = marketScenarios.cases.find(
+      (entry) => entry.name === "roll-1m-25bp",
+    )!;
+    render(
+      <FinstackQueryProvider>
+        <PricingWorkbench
+          defaultRequest={fixture.request}
+          marketScenario={roll.scenarioJson}
+        />
+      </FinstackQueryProvider>,
+    );
+    const results = screen.getByRole("region", { name: "Results" });
+    await within(results).findByTitle(
+      fixture.result.value.amount,
+      {},
+      { timeout: budget(3000) },
+    );
+    expect(within(results).queryByText("Comparison valuation")).toBeNull();
+    await userEvent.click(
+      within(screen.getByRole("tablist", { name: "Pricing inputs" })).getByRole(
+        "tab",
+        { name: "Market scenario" },
+      ),
+    );
+    const apply = screen.getByRole("button", { name: "Apply scenario" });
+    await waitFor(
+      () => expect((apply as HTMLButtonElement).disabled).toBe(false),
+      {
+        timeout: budget(3000),
+      },
+    );
+    expect(
+      call.mock.calls.filter(([method]) => method === "applyMarketScenario"),
+    ).toEqual([]);
+    await userEvent.click(apply);
+    await waitFor(() => expect(prices()).toHaveLength(2), {
+      timeout: budget(5000),
+    });
+    const [base, shocked] = prices();
+    expect(
+      call.mock.calls.filter(([method]) => method === "applyMarketScenario"),
+    ).toEqual([
+      [
+        "applyMarketScenario",
+        {
+          scenarioJson: roll.scenarioJson,
+          marketJson: base!.marketJson,
+          asOf: base!.asOf,
+          instrumentJson: base!.instrumentJson,
+        },
+      ],
+    ]);
+    // Same model, metrics and instrument; the rolled date and the shocked market.
+    expect(shocked).toEqual({
+      ...base,
+      asOf: "2025-02-03",
+      marketJson: shocked!.marketJson,
+    });
+    expect(shocked!.marketJson).not.toBe(base!.marketJson);
+    await within(results).findByTitle(
+      roll.shocked.value.amount,
+      {},
+      { timeout: budget(3000) },
+    );
+    expect(within(results).getByText("Comparison valuation")).toBeTruthy();
+    expect(
+      within(results).getByTitle(fixture.result.value.amount),
+    ).toBeTruthy();
+    expect(within(results).getByText("2025-02-03")).toBeTruthy();
+    await userEvent.click(
+      within(screen.getByRole("tablist", { name: "Result views" })).getByRole(
+        "tab",
+        { name: "Market scenario" },
+      ),
+    );
+    const timeRoll = await within(results).findByRole("region", {
+      name: "Time roll",
+    });
+    expect(within(timeRoll).getAllByTitle("4613.745264131")).toHaveLength(2);
+    // Rust's horizon return of the same base request under the applied
+    // scenario; method and calendar stay unset.
+    expect(
+      call.mock.calls.filter(([method]) => method === "horizonReturn"),
+    ).toEqual([
+      [
+        "horizonReturn",
+        {
+          instrumentJson: base!.instrumentJson,
+          marketJson: base!.marketJson,
+          asOf: base!.asOf,
+          scenarioJson: roll.scenarioJson,
+          method: null,
+          calendarId: null,
+        },
+      ],
+    ]);
+    const horizon = within(results).getByRole("region", {
+      name: "Horizon return",
+    });
+    const expected = native.computeHorizonReturn(
+      base!.instrumentJson,
+      base!.marketJson,
+      base!.asOf,
+      roll.scenarioJson,
+    );
+    await within(horizon).findByText(
+      String(expected.summary.annualized_return),
+      {},
+      { timeout: budget(5000) },
+    );
+    expect(within(horizon).getByText(/Horizon: 33 days/)).toBeTruthy();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Clear scenario" }),
+    );
+    await waitFor(() =>
+      expect(within(results).queryByText("Comparison valuation")).toBeNull(),
+    );
+    expect(prices()).toHaveLength(2);
+  },
+  budget(20000),
+);
+
+it(
+  "explains the P&L from a pinned T0 market to an edited, repriced market with Rust's attribution only",
+  async () => {
+    mount();
+    const results = screen.getByRole("region", { name: "Results" });
+    await within(results).findByTitle(
+      fixture.result.value.amount,
+      {},
+      { timeout: budget(3000) },
+    );
+    await userEvent.click(
+      within(screen.getByRole("tablist", { name: "Result views" })).getByRole(
+        "tab",
+        { name: "P&L explain" },
+      ),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Pin as T0" }));
+    expect(within(results).getByText(/T0 pinned at/).textContent).toBe(
+      `T0 pinned at ${fixture.request.asOf}`,
+    );
+    // Rust requires a method; none is preselected and nothing is requested.
+    expect(
+      within(results).getByText("Choose an attribution method."),
+    ).toBeTruthy();
+    await userEvent.click(screen.getByRole("tab", { name: "2 Market" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Edit market" }));
+    fireEvent.change(screen.getAllByLabelText("Stored value 1")[0], {
+      target: { value: "0.985" },
+    });
+    await waitFor(() => expect(prices()).toHaveLength(2), {
+      timeout: budget(4000),
+    });
+    const [t0, t1] = prices();
+    await userEvent.click(
+      within(results).getByRole("radio", { name: "parallel" }),
+    );
+    await waitFor(
+      () =>
+        expect(
+          call.mock.calls.filter(([method]) => method === "attributePnlMany"),
+        ).toHaveLength(1),
+      { timeout: budget(4000) },
+    );
+    // The pinned market and date, and the last priced instrument, market and date.
+    expect(
+      call.mock.calls.filter(([method]) => method === "attributePnlMany"),
+    ).toEqual([
+      [
+        "attributePnlMany",
+        {
+          instrumentJsons: [t1!.instrumentJson],
+          marketT0Json: t0!.marketJson,
+          marketT1Json: t1!.marketJson,
+          inputs: {
+            as_of_t0: t0!.asOf,
+            as_of_t1: t1!.asOf,
+            method: "parallel",
+          },
+        },
+      ],
+    ]);
+    const [expected] = native.attributePnlMany(
+      `{"as_of_t0":"${t0!.asOf}","as_of_t1":"${t1!.asOf}","market_t0":${t0!.marketJson},"market_t1":${t1!.marketJson},"method":"parallel"}`,
+      [t1!.instrumentJson],
+    );
+    const report = within(results).getByRole("region", {
+      name: "P&L attribution",
+    });
+    expect(
+      await within(report).findAllByTitle(
+        expected.total_pnl.amount,
+        {},
+        { timeout: budget(4000) },
+      ),
+    ).not.toHaveLength(0);
+    expect(
+      within(report).getAllByTitle(expected.rates_curves_pnl.amount),
+    ).not.toHaveLength(0);
+    // The scenario source stays unavailable until a scenario is applied.
+    expect(
+      within(results)
+        .getByRole("radio", { name: "Applied market scenario" })
+        .getAttribute("aria-disabled"),
+    ).toBe("true");
+  },
+  budget(20000),
+);

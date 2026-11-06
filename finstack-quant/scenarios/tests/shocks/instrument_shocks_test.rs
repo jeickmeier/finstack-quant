@@ -6,9 +6,9 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_scenarios::{ExecutionContext, OperationSpec, ScenarioEngine, ScenarioSpec};
 use finstack_quant_statements::types::FinancialModelSpec;
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
-use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::pricer::InstrumentType;
 use indexmap::IndexMap;
 use time::Month;
@@ -455,9 +455,11 @@ fn test_instrument_attr_price_shock_no_matches() {
     let report = engine.apply(&scenario, &mut ctx).unwrap();
     assert_eq!(report.operations_applied, 0);
     assert_eq!(report.warnings.len(), 1);
-    assert!(report.warnings[0]
-        .to_string()
-        .contains("No instruments matched attribute filter"));
+    assert!(
+        report.warnings[0]
+            .to_string()
+            .contains("No instruments matched attribute filter")
+    );
 }
 
 #[test]

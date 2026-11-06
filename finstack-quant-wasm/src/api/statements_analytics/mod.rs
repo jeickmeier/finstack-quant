@@ -6,7 +6,9 @@
 //! classes: `DependencyTracer`, `CorkscrewExtension` and
 //! `CreditScorecardExtension`.
 
+mod capital_structure;
 mod comps;
+mod covenants;
 mod ecl;
 mod handles;
 mod members;
@@ -14,14 +16,17 @@ mod templates;
 
 pub use handles::{JsCorkscrewExtension, JsCreditScorecardExtension, JsDependencyTracer};
 
+pub use capital_structure::capital_structure_summary;
+pub use covenants::{evaluate_covenants, forecast_breaches};
+
 pub use comps::{
-    compute_multiple, peer_stats, percentile_rank, regression_fair_value, score_relative_value,
-    z_score,
+    compute_multiple, peer_stats, percentile_rank, regression_fair_value, relative_value_report,
+    score_relative_value, z_score,
 };
 
 use crate::utils::input::{
-    js_bool, js_f64, js_f64_seq, js_opt_f64, js_opt_string, js_string, js_string_seq, json_text,
-    opt_json_text,
+    from_js_json, js_bool, js_f64, js_f64_seq, js_opt_f64, js_opt_string, js_string, js_string_seq,
+    json_text, opt_json_text,
 };
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_statements::types::FinancialModelSpec;
@@ -39,6 +44,13 @@ pub(super) fn parse_model(model: &JsValue) -> Result<FinancialModelSpec, JsValue
 /// as a structured JavaScript object. `generateTornadoEntries` still takes the
 /// result as JSON, so pass `JSON.stringify(result)` when chaining the two.
 ///
+/// Each perturbation replaces its node's value in its one forecast period
+/// (Value > Forecast > Formula). It does not re-anchor the node's own
+/// forecast: later periods of a growth, seasonal or stochastic forecast keep
+/// their unshocked base. Formula nodes that read the shocked cell move, in its
+/// period and in later periods reached through `lag`, `ttm` or `cumsum`. Add
+/// one parameter per period to shock a whole forecast path.
+///
 /// # Errors
 ///
 /// Rejects malformed model or configuration JSON, invalid sensitivity modes or
@@ -47,7 +59,7 @@ pub(super) fn parse_model(model: &JsValue) -> Result<FinancialModelSpec, JsValue
 /// evaluation cells, missing model nodes or periods, model-evaluation failures,
 /// or failure to serialize the sensitivity result to JavaScript.
 /// @param model_json - Financial-model specification JSON.
-/// @param config_json - Configuration JSON for this call.
+/// @param config_json - `SensitivityConfig` object or JSON text: `mode` (`diagonal`, `full_grid` or `tornado`), `parameters` (each `node_id`, `period_id`, `base_value` and exactly one of absolute `perturbations` or `pct_range` percentage moves of `base_value`, `10` meaning +10%) and `target_metrics`.
 #[wasm_bindgen(js_name = runSensitivity)]
 pub fn run_sensitivity(model_json: JsValue, config_json: JsValue) -> Result<JsValue, JsValue> {
     let model_json: &str = &json_text(&model_json, "modelJson")?;
@@ -209,41 +221,6 @@ pub fn scenario_comparison_table(
     to_js_value(&results.to_comparison_table(&metrics).map_err(to_js_err)?)
 }
 
-/// Sensitivity parameter whose perturbations are percentage moves of a base value.
-///
-/// Free-function twin of Python `ParameterSpec.with_percentages` (Rust
-/// `ParameterSpec::with_percentages`): each perturbation is
-/// `baseValue * (1 + pct / 100)`.
-/// @param node_id - Node identifier to vary.
-/// @param period_id - Period to vary, e.g. `"2025Q1"`.
-/// @param base_value - Base value of the node in its own units.
-/// @param pct_range - Percentage moves, e.g. `[-10, 0, 10]` for ±10%.
-/// @returns Plain `ParameterSpec` object (`node_id`, `period_id`, `base_value`, absolute `perturbations`) for a `SensitivityConfig`.
-///
-/// # Errors
-///
-/// Throws with kind `validation` if `periodId` is not a valid period, and kind
-/// `invalid_type` if a number argument is not a number.
-#[wasm_bindgen(js_name = parameterSpecWithPercentages)]
-pub fn parameter_spec_with_percentages(
-    node_id: JsValue,
-    period_id: JsValue,
-    base_value: JsValue,
-    pct_range: JsValue,
-) -> Result<JsValue, JsValue> {
-    let period_id: finstack_quant_core::dates::PeriodId = js_string(&period_id, "periodId")?
-        .parse()
-        .map_err(to_js_err)?;
-    to_js_value(
-        &finstack_quant_statements_analytics::analysis::ParameterSpec::with_percentages(
-            js_string(&node_id, "nodeId")?,
-            period_id,
-            js_f64(&base_value, "baseValue")?,
-            js_f64_seq(&pct_range, "pctRange")?,
-        ),
-    )
-}
-
 /// Compute forecast accuracy metrics (MAE, MAPE, sMAPE, RMSE).
 ///
 /// Takes two float arrays (actual, forecast) and returns the serde form of
@@ -275,32 +252,31 @@ pub fn backtest_forecast(actual: JsValue, forecast: JsValue) -> Result<JsValue, 
 ///
 /// # Errors
 ///
-/// Rejects malformed `result_json`, an invalid optional `period` identifier, or
-/// a full-grid run, a scenario that does not identify exactly one perturbed
+/// Rejects malformed `result_json`, an invalid `period` identifier, or a
+/// one-at-a-time run whose scenario does not identify exactly one perturbed
 /// parameter, an absent unperturbed baseline, a missing target metric or period,
 /// non-finite metric values or impacts, or failure to convert the entries to
 /// JavaScript.
-/// @returns Structured tornado entries sorted by descending absolute swing, with parameter IDs preserving the perturbed `node@period` key.
+/// @returns Structured tornado entries sorted by descending absolute swing, with parameter IDs preserving the perturbed `node@period` key; `null` for a full-grid run, whose scenarios combine parameters and cannot be ranked.
 /// @param result_json - Result JSON produced by a prior call.
 /// @param metric_node - Statement metric node identifier selected for the requested analysis.
-/// @param period - Model period label for the requested statement value or calculation.
+/// @param period - Required model period, such as `"2025Q4"`, at which the metric is read in the baseline and every scenario; a shock replaces one forecast cell, so the metric moves only in the shocked period and in later periods whose formulas read it.
 #[wasm_bindgen(js_name = generateTornadoEntries)]
 pub fn generate_tornado_entries(
     result_json: JsValue,
     metric_node: JsValue,
-    period: Option<JsValue>,
+    period: JsValue,
 ) -> Result<JsValue, JsValue> {
     let result_json: &str = &json_text(&result_json, "resultJson")?;
     let metric_node: &str = &js_string(&metric_node, "metricNode")?;
-    let period = js_opt_string(period.as_ref(), "period")?;
+    let period: finstack_quant_core::dates::PeriodId =
+        js_string(&period, "period")?.parse().map_err(to_js_err)?;
     let result: finstack_quant_statements_analytics::analysis::SensitivityResult =
         serde_json::from_str(result_json).map_err(to_js_err)?;
-    let period_id: Option<finstack_quant_core::dates::PeriodId> =
-        period.map(|p| p.parse().map_err(to_js_err)).transpose()?;
     let entries = finstack_quant_statements_analytics::analysis::generate_tornado_entries(
         &result,
         metric_node,
-        period_id,
+        period,
     )
     .map_err(to_js_err)?;
     to_js_value(&entries)
@@ -337,7 +313,7 @@ pub fn dcf_sensitivity(
 ) -> Result<JsValue, JsValue> {
     let wacc = js_f64(&wacc, "wacc")?;
     let net_debt_override = js_opt_f64(net_debt_override.as_ref(), "netDebtOverride")?;
-    use finstack_quant_statements_analytics::analysis::{DcfOptions, DEFAULT_UFCF_NODE};
+    use finstack_quant_statements_analytics::analysis::{DEFAULT_UFCF_NODE, DcfOptions};
 
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let terminal_value_json: &str = &json_text(&terminal_value_json, "terminalValueJson")?;
@@ -405,39 +381,20 @@ pub fn evaluate_lbo(model_json: JsValue, config_json: JsValue) -> Result<JsValue
 
 /// Weighted-average cost of capital (WACC).
 ///
-/// Blends the required return on equity with the after-tax cost of debt:
 /// `WACC = w_E * r_E + w_D * r_D * (1 - T)`.
 ///
 /// # Errors
 ///
-/// Rejects any non-finite input, negative capital weights, weights that do not
-/// sum to one within tolerance, or a `tax_rate` outside `[0, 1]`.
-/// @param equity_weight - Equity share of total capital as a decimal fraction (0.6 = 60% equity-funded).
-/// @param cost_of_equity - Required return on equity in decimal form, typically from CAPM (0.115 = 11.5%).
-/// @param debt_weight - Debt share of total capital as a decimal fraction; must sum with the equity weight to 1.0.
-/// @param cost_of_debt - Pre-tax marginal borrowing yield in decimal form, before the interest tax shield (0.06 = 6%).
-/// @param tax_rate - Marginal corporate tax rate as a decimal fraction in [0, 1] (0.25 = 25%).
+/// Rejects malformed inputs, any non-finite value, negative capital weights,
+/// weights that do not sum to one within tolerance, or a `tax_rate` outside
+/// `[0, 1]`.
+/// @param inputs - `WaccInputs` object or JSON text: `equity_weight` and `debt_weight` (decimal fractions of total capital summing to 1.0), `cost_of_equity` and pre-tax `cost_of_debt` (decimals, `0.06` = 6%) and `tax_rate` (decimal in [0, 1]).
+/// @returns The blended discount rate as a decimal fraction.
 #[wasm_bindgen(js_name = wacc)]
-pub fn wacc(
-    equity_weight: JsValue,
-    cost_of_equity: JsValue,
-    debt_weight: JsValue,
-    cost_of_debt: JsValue,
-    tax_rate: JsValue,
-) -> Result<f64, JsValue> {
-    let equity_weight = js_f64(&equity_weight, "equityWeight")?;
-    let cost_of_equity = js_f64(&cost_of_equity, "costOfEquity")?;
-    let debt_weight = js_f64(&debt_weight, "debtWeight")?;
-    let cost_of_debt = js_f64(&cost_of_debt, "costOfDebt")?;
-    let tax_rate = js_f64(&tax_rate, "taxRate")?;
-    finstack_quant_statements_analytics::analysis::wacc(
-        equity_weight,
-        cost_of_equity,
-        debt_weight,
-        cost_of_debt,
-        tax_rate,
-    )
-    .map_err(to_js_err)
+pub fn wacc(inputs: JsValue) -> Result<f64, JsValue> {
+    let inputs: finstack_quant_statements_analytics::analysis::WaccInputs =
+        from_js_json(&inputs, "inputs")?;
+    finstack_quant_statements_analytics::analysis::wacc(&inputs).map_err(to_js_err)
 }
 
 /// Find the driver value that makes a target node reach a target value.
@@ -645,7 +602,8 @@ pub fn credit_assessment_report_text(
 
 /// Compute a structured credit assessment (leverage, coverage, FCF).
 ///
-/// Returns a structured JavaScript object.
+/// Returns a structured JavaScript object whose `series` covers every period
+/// of the results' `periods` up to `period`, in timeline order.
 /// Ratios are `null` when their inputs have mixed scalar/money representations,
 /// different currencies, or non-finite arithmetic.
 /// Trailing-year ratios require all annual, semiannual, quarterly or monthly
@@ -655,11 +613,12 @@ pub fn credit_assessment_report_text(
 ///
 /// # Errors
 ///
-/// Rejects malformed `results_json`, an `period` value that is not a valid
-/// statement period identifier, or failure to serialize the assessment to
+/// Rejects malformed `results_json`, a `period` value that is not a valid
+/// statement period identifier, a `period` that is not one of the results'
+/// `periods` (kind `validation`), or failure to serialize the assessment to
 /// JavaScript.
 /// @param results_json - Evaluated statement-result JSON.
-/// @param period - Statement period identifier, such as `2025Q4` or `2025A`.
+/// @param period - Statement period identifier, such as `2025Q4`, that is a period of the results in the model's own frequency: `2025` is the annual period, not the last quarter of a quarterly model.
 #[wasm_bindgen(js_name = creditAssessment)]
 pub fn credit_assessment(results_json: JsValue, period: JsValue) -> Result<JsValue, JsValue> {
     let results_json: &str = &json_text(&results_json, "resultsJson")?;
@@ -668,7 +627,8 @@ pub fn credit_assessment(results_json: JsValue, period: JsValue) -> Result<JsVal
         serde_json::from_str(results_json).map_err(to_js_err)?;
     let period: finstack_quant_core::dates::PeriodId = period.parse().map_err(to_js_err)?;
     let assessment =
-        finstack_quant_statements_analytics::analysis::CreditAssessment::compute(&results, period);
+        finstack_quant_statements_analytics::analysis::CreditAssessment::compute(&results, period)
+            .map_err(to_js_err)?;
     to_js_value(&assessment)
 }
 

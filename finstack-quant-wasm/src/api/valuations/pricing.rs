@@ -378,19 +378,178 @@ pub fn list_standard_metrics_grouped() -> Result<JsValue, JsValue> {
     to_js_value(&map)
 }
 
+/// List every metric the standard registry holds for one instrument type,
+/// grouped by display category.
+///
+/// The per-instrument counterpart to `listStandardMetricsGrouped`: each group
+/// keeps only the metrics the standard registry applies to `instrumentType`,
+/// and groups left empty are omitted. Applicable metrics outside every display
+/// group, such as `all_in_rate` or `parity`, are listed under
+/// `"Instrument Specific"`. A listed metric is registered for the type; whether
+/// it computes under a given pricing model or market still depends on that
+/// model and market.
+///
+/// # Arguments
+///
+/// * `instrument_type` - Canonical instrument-type tag, matched exactly in snake case (for example `"bond"`, `"fx_option"` or `"structured_credit"`); the same tag an instrument envelope carries in its `type` field.
+/// @returns Applicable metric identifiers keyed by human-readable group name, each array sorted ascending.
+/// @throws Error - Throws a validation error when `instrumentType` is not a known instrument type, or a `TypeError` when it is not a string.
+#[wasm_bindgen(js_name = metricsForInstrument)]
+pub fn metrics_for_instrument(instrument_type: JsValue) -> Result<JsValue, JsValue> {
+    let instrument_type = js_string(&instrument_type, "instrumentType")?;
+    let map = finstack_quant_valuations::pricer::metrics_for_instrument(&instrument_type)
+        .map_err(to_js_err)?;
+    to_js_value(&map)
+}
+
 /// Describe canonical metric identifiers using Rust-owned units and coordinates.
 ///
 /// # Arguments
 ///
-/// * `keys` - Canonical scalar or qualified wire keys in output order. Custom
-///   keys retain unknown units; malformed or obsolete encodings are rejected.
-/// @returns Ordered metadata records preserving original keys, decoded components, native unit families, display groups, and bucket eligibility.
+/// * `keys` - Canonical scalar or qualified wire keys in output order. A custom
+///   key has a unit only when Rust declares one; one the standard registry holds gets the group
+///   `"Instrument Specific"`, any other gets no group; malformed or obsolete
+///   encodings are rejected.
+/// @returns Ordered metadata records preserving original keys, decoded components, the coordinates that order them, native unit families, display groups, and bucket eligibility.
 /// @throws Error - Throws a validation error for malformed canonical metric keys or a serialization error when conversion fails.
 #[wasm_bindgen(js_name = metricMetadata)]
 pub fn metric_metadata(keys: JsValue) -> Result<JsValue, JsValue> {
     let keys = js_string_seq(&keys, "keys")?;
     let metadata = finstack_quant_valuations::pricer::metric_metadata(&keys).map_err(to_js_err)?;
     to_js_value(&metadata)
+}
+
+/// Wire names of the mutually exclusive price-driving market quotes.
+///
+/// Validation rejects more than one of these on a
+/// `instrument_pricing_overrides.market_quotes` object, so a host editor can
+/// clear the others when one is entered. Other quotes, such as
+/// `implied_volatility`, are not in the set.
+/// @returns Field names as they appear on the wire, in precedence order.
+/// @throws Error - Throws a `computation` error only if the names cannot cross the boundary.
+#[wasm_bindgen(js_name = priceDriverFields)]
+pub fn price_driver_fields() -> Result<JsValue, JsValue> {
+    to_js_value(&finstack_quant_valuations::instruments::pricing_overrides::MarketQuoteOverrides::price_driver_fields())
+}
+
+/// Calendar-year ladders of a cashflow envelope, one per row currency.
+///
+/// Free-function twin of Python `InstrumentCashflowEnvelope.calendar_year_ladder_by_currency`
+/// (Rust `InstrumentCashflowEnvelope::calendar_year_ladder_by_currency`). Currencies never mix;
+/// each ladder reads `native_pv`, the row-currency PV before FX conversion and any scenario price shock.
+/// @param envelope - `InstrumentCashflowEnvelope` returned by `instrumentCashflows`, as an object or JSON.
+/// @returns One `CurrencyLadder` per row currency, in first-appearance order of `flows`; rows ascend by year.
+/// @throws Error - Throws a `validation` error if `envelope` is malformed or an amount or native PV is non-finite.
+#[wasm_bindgen(js_name = calendarYearLadderByCurrency)]
+pub fn calendar_year_ladder_by_currency(envelope: JsValue) -> Result<JsValue, JsValue> {
+    let envelope: finstack_quant_valuations::instruments::cashflow_export::InstrumentCashflowEnvelope =
+        crate::utils::input::from_js_json(&envelope, "envelope")?;
+    to_js_value(
+        &envelope
+            .calendar_year_ladder_by_currency()
+            .map_err(to_js_err)?,
+    )
+}
+
+/// Units of the tranche break-even CDR, discount margin and OAS results.
+///
+/// Those solvers document their units in prose and do not state them on the wire.
+/// Values are never rescaled.
+/// @returns `TrancheSolveFieldUnits`: `breakeven_cdr` and `discount_margin`, each one `MetricFieldUnit`, and `oas`, one `MetricFieldUnit` per `OasResult` field in struct order.
+#[wasm_bindgen(js_name = trancheSolveFieldUnits)]
+pub fn tranche_solve_field_units() -> Result<JsValue, JsValue> {
+    to_js_value(&finstack_quant_valuations::pricer::tranche_solve_field_units())
+}
+
+/// Units of the scalar `TrancheMetrics` fields, in struct order.
+///
+/// `TrancheMetrics` documents these units in prose and does not state them on
+/// the wire. Values are never rescaled.
+/// @param currency - ISO-4217 code of the result's `TrancheMetrics.currency`, in any ASCII case; it names the unit of `pv`, `accrued` and `cs01`.
+/// @returns One `MetricFieldUnit` per scalar field: the wire field name, its unit text and the Rust field that documents it. `tranche_id`, `currency` and the `metrics` map are not listed.
+/// @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+#[wasm_bindgen(js_name = trancheMetricFieldUnits)]
+pub fn tranche_metric_field_units(currency: JsValue) -> Result<JsValue, JsValue> {
+    let currency = crate::utils::input::js_currency(&currency, "currency")?;
+    to_js_value(&finstack_quant_valuations::pricer::tranche_metric_field_units(currency))
+}
+
+/// Units of the `ScenarioCell` fields, the one place a host reads them from.
+///
+/// Rates are decimals, the price is a clean percent of the tranche's current balance and
+/// the writedown is in currency units. Values are never rescaled.
+/// @param currency - ISO-4217 code of the result's `ScenarioTable.currency`, in any ASCII case; it names the unit of `writedown`.
+/// @returns `ScenarioTableFieldUnits`: `axes`, one `MetricFieldUnit` per swept input (`cpr`, `cdr`, `severity`), and `measures`, one per reported measure (`price`, `wal`, `writedown`), each in struct order.
+/// @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+#[wasm_bindgen(js_name = scenarioTableFieldUnits)]
+pub fn scenario_table_field_units(currency: JsValue) -> Result<JsValue, JsValue> {
+    let currency = crate::utils::input::js_currency(&currency, "currency")?;
+    to_js_value(&finstack_quant_valuations::pricer::scenario_table_field_units(currency))
+}
+
+/// Units of a structured-credit simulation's charted series, the one place a host reads them from.
+///
+/// Coverage ratios, triggers and cushions are in times covered, credit enhancement
+/// is a decimal share of the collateral and excess spread an annual decimal of the opening pool
+/// balance. Values are never rescaled.
+/// @param currency - ISO-4217 code of the simulation's deal currency, in any ASCII case; it names the unit of `diverted_cash`.
+/// @returns `SimulationFieldUnits`: `coverage_tests`, one `MetricFieldUnit` per numeric coverage-test field (`ratio`, `trigger_level`, `cushion`) in struct order, and one each for `diverted_cash`, `credit_enhancement` and `excess_spread`.
+/// @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+#[wasm_bindgen(js_name = simulationFieldUnits)]
+pub fn simulation_field_units(currency: JsValue) -> Result<JsValue, JsValue> {
+    let currency = crate::utils::input::js_currency(&currency, "currency")?;
+    to_js_value(&finstack_quant_valuations::pricer::simulation_field_units(
+        currency,
+    ))
+}
+
+/// Deal families `StructuredCredit.newStandard` accepts, the one place a host reads them from.
+///
+/// @returns `StandardDealFamily[]` in `abs`, `clo`, `cmbs`, `rmbs` order: `deal_type`, the `newStandard` argument; `profile_id`, the registry profile supplying the family's frequency and credit assumptions; and `example`, complete `StandardDealParams` that `newStandard` accepts for the family, with its id, tranche ids and `pool.deal_type` naming the family.
+/// @throws Error - Throws a `validation` error if an example cannot be constructed, which its fixed inputs do not trigger.
+#[wasm_bindgen(js_name = standardDealFamilies)]
+pub fn standard_deal_families() -> Result<JsValue, JsValue> {
+    to_js_value(&finstack_quant_valuations::instruments::fixed_income::structured_credit::standard_deal_families().map_err(crate::utils::to_js_err)?)
+}
+
+/// Units of the `EquityMetrics` fields, the one place a host reads them from.
+///
+/// The IRR is an annual decimal, the MOIC a multiple of the invested amount, the NAV a percent of the
+/// equity's current balance and cash-on-cash a decimal share of the invested amount. Values are never rescaled.
+/// @param currency - ISO-4217 code of the result's `currency`, in any ASCII case; it names the unit of `invested`.
+/// @returns `EquityMetricsFieldUnits`: one `MetricFieldUnit` each for `invested`, `irr`, `moic`, `nav_pct` and `cash_on_cash`, and `purchase_price` for the `purchasePricePct` argument of `equityMetrics`: percent of current balance, omitted means par.
+/// @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+#[wasm_bindgen(js_name = equityMetricsFieldUnits)]
+pub fn equity_metrics_field_units(currency: JsValue) -> Result<JsValue, JsValue> {
+    let currency = crate::utils::input::js_currency(&currency, "currency")?;
+    to_js_value(&finstack_quant_valuations::pricer::equity_metrics_field_units(currency))
+}
+
+/// Units of the `BondQuoteSet` fields, in struct order, the one place a host reads them from.
+///
+/// The set mixes currency prices, a percent-of-par price and decimal yields and spreads. Each field with a metric states that metric's unit, and `clean_price_pct`, which has none, states its quote convention. Values are never rescaled.
+/// @param currency - ISO-4217 code of the bond whose set is being labelled, in any ASCII case; it names the unit of `clean_price_currency` and `dirty_price_currency`.
+/// @returns One `MetricFieldUnit` per `BondQuoteSet` field in struct order: the wire field name, its unit text and the Rust field the unit is documented on.
+/// @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+#[wasm_bindgen(js_name = bondQuoteSetFieldUnits)]
+pub fn bond_quote_set_field_units(currency: JsValue) -> Result<JsValue, JsValue> {
+    let currency = crate::utils::input::js_currency(&currency, "currency")?;
+    to_js_value(&finstack_quant_valuations::pricer::bond_quote_set_field_units(currency))
+}
+
+/// Units of the `PoolReport` fields, the one place a host reads them from.
+///
+/// `PoolStats` mixes a decimal coupon, a basis-point spread and a percent-point
+/// defaulted share. Values are never rescaled.
+/// @param currency - ISO-4217 code of the pool's base currency, in any ASCII case; it names the unit of `total_balance`, `undrawn_commitment` and each row's `balance`.
+/// @returns `PoolReportFieldUnits`: `total_balance` and `warf`, each one `MetricFieldUnit`; `stats`, one per `PoolStats` field in struct order; and `concentration`, one per numeric `PoolConcentrationEntry` field in struct order.
+/// @throws Error - Throws a `validation` error if `currency` is not a recognized ISO-4217 code.
+#[wasm_bindgen(js_name = poolReportFieldUnits)]
+pub fn pool_report_field_units(currency: JsValue) -> Result<JsValue, JsValue> {
+    let currency = crate::utils::input::js_currency(&currency, "currency")?;
+    to_js_value(&finstack_quant_valuations::pricer::pool_report_field_units(
+        currency,
+    ))
 }
 
 /// List every pricing model key registered in the standard pricer registry.
@@ -865,13 +1024,13 @@ pub(super) mod tests {
         use finstack_quant_core::dates::{Date, DayCount};
         use finstack_quant_core::money::Money;
         use finstack_quant_core::types::{CurveId, InstrumentId};
+        use finstack_quant_valuations::instruments::BermudanCallProvision;
         use finstack_quant_valuations::instruments::exotics::callable_range_accrual::CallableRangeAccrual;
         use finstack_quant_valuations::instruments::exotics::range_accrual::{
             BoundsType, RangeAccrualTerms,
         };
         use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
         use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
-        use finstack_quant_valuations::instruments::BermudanCallProvision;
         use time::Month;
 
         let mut instrument_pricing_overrides = InstrumentPricingOverrides::default();
@@ -1102,11 +1261,13 @@ pub(super) mod tests {
 
     #[test]
     fn validate_revolving_credit_rejects_invalid_floating_rate_spec() {
-        assert!(finstack_quant_valuations::pricer::validate_instrument_json(
-            &revolving_credit_json(true, false),
-            None
-        )
-        .is_err());
+        assert!(
+            finstack_quant_valuations::pricer::validate_instrument_json(
+                &revolving_credit_json(true, false),
+                None
+            )
+            .is_err()
+        );
     }
 
     #[test]

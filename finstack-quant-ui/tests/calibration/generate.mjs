@@ -1,25 +1,18 @@
-import { createRequire } from "node:module";
-import { readFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
-import { emit } from "../../scripts/fixture-output.mjs";
-const native = createRequire(import.meta.url)(
-  "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-);
-const inventory = JSON.parse(
-  await readFile(
-    new URL("../../src/generated/fixtures.json", import.meta.url),
-    "utf8",
-  ),
+import { emit, sha256 } from "../../scripts/fixture-output.mjs";
+import {
+  native,
+  readRepoJson,
+  readRepoText,
+} from "../../scripts/fixture-inputs.mjs";
+const inventory = await readRepoJson(
+  "finstack-quant-ui/src/generated/fixtures.json",
 );
 const cases = [];
 for (const fixture of inventory.filter((f) => f.kind === "calibration-input")) {
-  const json = await readFile(
-    new URL(`../../../${fixture.source}`, import.meta.url),
-    "utf8",
-  );
+  const json = await readRepoText(fixture.source);
   cases.push({
     source: fixture.source,
-    sha256: createHash("sha256").update(json).digest("hex"),
+    sha256: sha256(json),
     input: native.validateCalibration(json),
     result: native.calibrate(json),
   });

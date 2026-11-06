@@ -8,8 +8,8 @@
 //! - Error handling for invalid inputs
 
 use super::common::*;
-use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
+use rust_decimal::prelude::ToPrimitive;
 
 #[test]
 fn test_real_yield_at_par() {

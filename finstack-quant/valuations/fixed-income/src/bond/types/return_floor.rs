@@ -469,12 +469,12 @@ impl ReturnFloorSpec {
                 "return floor issue price must be finite and > 0, got {value}"
             )));
         }
-        if let ProtectionWindow::Between { start, end } = self.window {
-            if start >= end {
-                return Err(finstack_quant_core::Error::Validation(
-                    "return floor window: start must be before end".to_string(),
-                ));
-            }
+        if let ProtectionWindow::Between { start, end } = self.window
+            && start >= end
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "return floor window: start must be before end".to_string(),
+            ));
         }
         Ok(())
     }
@@ -512,18 +512,22 @@ mod tests {
     #[test]
     fn validate_rejects_invalid_explicit_issue_prices() {
         for pct in [f64::NAN, 0.0, -1.0] {
-            assert!(ReturnFloorSpec::moic(1.0)
-                .issue_price(IssuePrice::PctOfPar(pct))
-                .validate()
-                .is_err());
+            assert!(
+                ReturnFloorSpec::moic(1.0)
+                    .issue_price(IssuePrice::PctOfPar(pct))
+                    .validate()
+                    .is_err()
+            );
         }
         for amount in [0.0, -100.0] {
-            assert!(ReturnFloorSpec::moic(1.0)
-                .issue_price(IssuePrice::Amount(
-                    Money::new(amount, Currency::USD).expect("valid money fixture")
-                ))
-                .validate()
-                .is_err());
+            assert!(
+                ReturnFloorSpec::moic(1.0)
+                    .issue_price(IssuePrice::Amount(
+                        Money::new(amount, Currency::USD).expect("valid money fixture")
+                    ))
+                    .validate()
+                    .is_err()
+            );
         }
     }
 
@@ -532,12 +536,16 @@ mod tests {
         let notional = Money::from((100_i64, Currency::USD));
         assert!(IssuePrice::PctOfPar(0.0).resolve(notional).is_err());
         assert!(IssuePrice::PctOfPar(f64::NAN).resolve(notional).is_err());
-        assert!(IssuePrice::Amount(Money::from((-1_i64, Currency::USD)))
-            .resolve(notional)
-            .is_err());
-        assert!(IssuePrice::Amount(Money::from((100_i64, Currency::EUR)))
-            .resolve(notional)
-            .is_err());
+        assert!(
+            IssuePrice::Amount(Money::from((-1_i64, Currency::USD)))
+                .resolve(notional)
+                .is_err()
+        );
+        assert!(
+            IssuePrice::Amount(Money::from((100_i64, Currency::EUR)))
+                .resolve(notional)
+                .is_err()
+        );
     }
 
     #[test]

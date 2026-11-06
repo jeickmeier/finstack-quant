@@ -194,6 +194,69 @@ fn extrema_correlation_scan_matches_exhaustive_node_pairs() {
     assert!((extrema_hi - exhaustive_hi).abs() < 1e-14);
 }
 
+/// The node-terms tables are an optimization: every sampled state, in or out of
+/// the tabulated band, must carry the same bits as the direct expressions.
+#[test]
+fn sampled_states_match_direct_node_terms_bit_for_bit() {
+    let steps = 120;
+    let horizon = 2.0;
+    let times: Vec<f64> = (0..=steps)
+        .map(|step| step as f64 * horizon / steps as f64)
+        .collect();
+    let targets = RatesCreditCalibrationTargets {
+        discount_factors: times.iter().map(|&time| (-0.03 * time).exp()).collect(),
+        survival_probabilities: times.iter().map(|&time| (-0.002 * time).exp()).collect(),
+        times,
+        recovery_rate: 0.4,
+    };
+    for (rate_vol, hazard_vol, correlation, rate_mean_reversion, hazard_mean_reversion) in [
+        (0.01, 0.0, 0.0, 0.03, 0.0),
+        (0.0, 0.02, 0.0, 0.0, 0.05),
+        (0.01, 0.02, 0.3, 0.03, 0.02),
+    ] {
+        let mut tree = RatesCreditTree::new(RatesCreditConfig {
+            steps,
+            rate_vol,
+            hazard_vol,
+            correlation,
+            rate_mean_reversion,
+            hazard_mean_reversion,
+        });
+        tree.calibrate(&targets).expect("calibrate");
+        let dt = tree.calibrated_dt().expect("dt");
+        for step in 0..=steps {
+            for node in 0..=step {
+                let rate_row = tree.calibrated_rates[step];
+                if let Some(held) = held_node_terms(&tree.rate_terms, rate_row, step, node) {
+                    assert_eq!(
+                        held,
+                        tree.rate_node_terms(step, rate_row.value_unchecked(node), dt)
+                    );
+                }
+                let hazard_row = tree.calibrated_hazards[step];
+                if let Some(held) = held_node_terms(&tree.hazard_terms, hazard_row, step, node) {
+                    assert_eq!(
+                        held,
+                        tree.hazard_node_terms(step, hazard_row.value_unchecked(node), dt)
+                    );
+                }
+            }
+        }
+        let mut path = Vec::new();
+        for path_index in 0..200 {
+            tree.sample_path_into(11, path_index, path_index % 2 == 1, &mut path)
+                .expect("path");
+            for state in &path {
+                assert_eq!(
+                    *state,
+                    tree.state_at(state.step, state.rate_node, state.hazard_node)
+                        .expect("state")
+                );
+            }
+        }
+    }
+}
+
 #[test]
 fn sampled_paths_are_seeded_weighted_and_antithetic() {
     let steps = 12;
@@ -375,6 +438,31 @@ fn joint_probabilities_preserve_marginals_at_skewed_nodes() {
                  p_r={p_r}, p_h={p_h}"
             );
         }
+    }
+}
+
+/// A marginal clamped to exactly 1 leaves `p_r + p_h − 1` a rounding of the
+/// other marginal, which can land one ulp above `min(p_r, p_h)`. The inverted
+/// interval must not panic, and the factor that cannot move keeps both
+/// marginals exact.
+#[test]
+fn joint_probabilities_survive_a_rounded_frechet_interval() {
+    // The other marginal at the node where a callable bond's vega panicked.
+    let p = 0.4998626174292936_f64;
+    assert!(
+        1.0 + p - 1.0 > p,
+        "fixture must invert the Fréchet interval: lower bound {}, upper bound {p}",
+        1.0 + p - 1.0
+    );
+
+    for &rho in &[-0.1, 0.0, 0.1] {
+        let tree = RatesCreditTree::new(RatesCreditConfig {
+            correlation: rho,
+            ..RatesCreditConfig::default()
+        });
+
+        assert_eq!(tree.joint_probabilities(1.0, p), (p, 1.0 - p, 0.0, 0.0));
+        assert_eq!(tree.joint_probabilities(p, 1.0), (p, 0.0, 1.0 - p, 0.0));
     }
 }
 
@@ -1092,17 +1180,19 @@ fn node_coupon_descriptor_validation_rejects_bad_geometry() {
         payment_step: steps + 1,
         ..base.clone()
     };
-    assert!(tree
-        .price_with_node_coupons(0.0, &valuator, std::slice::from_ref(&beyond))
-        .is_err());
+    assert!(
+        tree.price_with_node_coupons(0.0, &valuator, std::slice::from_ref(&beyond))
+            .is_err()
+    );
 
     let bad_accrual = NodeCoupon {
         accrual: 0.0,
         ..base
     };
-    assert!(tree
-        .price_with_node_coupons(0.0, &valuator, std::slice::from_ref(&bad_accrual))
-        .is_err());
+    assert!(
+        tree.price_with_node_coupons(0.0, &valuator, std::slice::from_ref(&bad_accrual))
+            .is_err()
+    );
 }
 
 #[test]

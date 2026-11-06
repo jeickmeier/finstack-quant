@@ -2,17 +2,17 @@
 
 use crate::error::{Error, Result};
 use crate::evaluator::context::EvaluationContext;
-use crate::evaluator::dag::{evaluate_order, DependencyGraph};
+use crate::evaluator::dag::{DependencyGraph, evaluate_order};
 use crate::evaluator::forecast_eval;
 use crate::evaluator::formula::evaluate_formula;
 use crate::evaluator::formula_helpers::is_truthy;
 use crate::evaluator::monte_carlo::{
     MonteCarloAccumulator, MonteCarloConfig, MonteCarloResults, PathResult,
 };
-use crate::evaluator::precedence::{resolve_node_value, NodeValueSource};
+use crate::evaluator::precedence::{HiddenObservation, NodeValueSource, resolve_node_value};
 use crate::evaluator::results::{CellSource, EvalStats, EvalWarning, StatementResult};
 use crate::evaluator::{
-    capital_structure_runtime, capital_structure_runtime::dependent_closure, PeriodHistory,
+    PeriodHistory, capital_structure_runtime, capital_structure_runtime::dependent_closure,
 };
 use crate::types::{FinancialModelSpec, NodeId, NodeValueType};
 use finstack_quant_core::dates::PeriodId;
@@ -30,7 +30,7 @@ type PeriodEvaluation = (
 );
 
 /// Per-path cache of Monte Carlo z-scores, keyed by node then period.
-type McZCache = IndexMap<NodeId, IndexMap<PeriodId, f64>>;
+pub(super) type McZCache = IndexMap<NodeId, IndexMap<PeriodId, f64>>;
 
 /// Cached structural analysis from [`Evaluator::prepare`], allowing repeated
 /// evaluations of the same model structure without recompilation.
@@ -297,7 +297,7 @@ impl Evaluator {
         let prepared = self.prepare(model)?;
         self.visibility_cutoff = visibility_cutoff;
         let (mut results, all_warnings) =
-            self.evaluate_periods(model, &prepared, capital_structure)?;
+            self.evaluate_periods(model, &prepared, capital_structure, None)?;
 
         self.finalize_results(
             &mut results,
@@ -323,8 +323,11 @@ impl Evaluator {
     ///
     /// `capital_structure` is the market and cashflow date the model's
     /// instruments are generated from; `None` skips the capital structure.
-    /// Shared by [`evaluate_inner`](Self::evaluate_inner) and
-    /// [`evaluate_prepared_inner`](Self::evaluate_prepared_inner).
+    /// `mc_seed` is a Monte Carlo path's seed offset (`None` for a single
+    /// deterministic run); each path runs this same loop, capital-structure
+    /// waterfall included. Shared by [`evaluate_inner`](Self::evaluate_inner),
+    /// [`evaluate_prepared_inner`](Self::evaluate_prepared_inner) and
+    /// [`evaluate_monte_carlo`](Self::evaluate_monte_carlo).
     fn evaluate_periods(
         &mut self,
         model: &FinancialModelSpec,
@@ -333,7 +336,9 @@ impl Evaluator {
             &finstack_quant_core::market_data::context::MarketContext,
             finstack_quant_core::dates::Date,
         )>,
+        mc_seed: Option<u64>,
     ) -> Result<(StatementResult, Vec<EvalWarning>)> {
+        let mut mc_z_cache = McZCache::new();
         let market_ctx = capital_structure.map(|(market, _)| market);
         let as_of = capital_structure.map(|(_, as_of)| as_of);
 
@@ -426,6 +431,7 @@ impl Evaluator {
                         insts,
                         state,
                         &cs_affected_nodes,
+                        mc_seed.map(|seed| (seed, &mut mc_z_cache)),
                     )?;
 
                     cs_cashflows_accum.set_period(period_cs);
@@ -440,7 +446,7 @@ impl Evaluator {
                         &prepared.eval_order,
                         &historical,
                         &historical_cs,
-                        None,
+                        mc_seed.map(|seed| (seed, &mut mc_z_cache)),
                     )?
                 };
 
@@ -692,6 +698,7 @@ impl Evaluator {
             model,
             prepared,
             contractual_capital_structure(model, &empty_market),
+            None,
         )?;
 
         self.finalize_results(
@@ -717,19 +724,22 @@ impl Evaluator {
     /// deterministic, seeds for stochastic forecast methods and aggregates
     /// the resulting distribution into percentile bands.
     ///
-    /// Monte Carlo evaluation currently focuses on statement forecasts and
-    /// does not support capital structure (`capital_structure`) integration.
+    /// Each path runs the deterministic period loop of [`Evaluator::evaluate`]
+    /// on its sampled forecasts, so a model with a capital structure has its
+    /// instruments and waterfall evaluated per path (from an empty market as
+    /// of the first period's start, as in [`Evaluator::evaluate`]), and every
+    /// `cs.*` reference sees that path's own debt service and balances.
     /// The same configuration seed produces reproducible path draws across
     /// runs. The returned distribution aggregates node-by-period results into
     /// percentile bands rather than returning every raw path.
     ///
     /// # Errors
     ///
-    /// Returns an evaluation error when `config.n_paths` is zero, the model
-    /// contains capital structure, model compilation or dependency analysis
-    /// fails, or any simulated path cannot resolve a required formula, input,
-    /// or forecast. Use the valuations crate for instrument-level Monte Carlo
-    /// analysis when capital structure is required.
+    /// Returns an evaluation error when `config.n_paths` is zero, model
+    /// compilation or dependency analysis fails, a capital-structure
+    /// instrument needs market data to generate its cashflows, or any
+    /// simulated path cannot resolve a required formula, input, forecast or
+    /// waterfall step.
     pub fn evaluate_monte_carlo(
         &mut self,
         model: &FinancialModelSpec,
@@ -768,20 +778,10 @@ impl Evaluator {
             ));
         }
 
-        if model.capital_structure.is_some() {
-            return Err(Error::eval(
-                "Monte Carlo evaluation for statements does not yet support capital_structure. \
-                 Run Monte Carlo on the underlying instruments using finstack-quant-valuations \
-                 for capital structure analysis.",
-            ));
-        }
-
         let prepared = self.prepare(model)?;
+        let empty_market = finstack_quant_core::market_data::context::MarketContext::new();
+        let capital_structure = contractual_capital_structure(model, &empty_market);
 
-        let empty_history = std::sync::Arc::new(PeriodHistory::with_periods(
-            std::sync::Arc::clone(&prepared.node_to_column),
-            &model.periods,
-        ));
         // Run paths — parallel via rayon on native targets, serial on wasm32
         // (rayon's thread pool is unavailable in single-threaded wasm).
         // Both paths are deterministic for a given seed, and both report the
@@ -794,41 +794,13 @@ impl Evaluator {
                 .seed
                 .wrapping_mul(6_364_136_223_846_793_005)
                 .wrapping_add(path_idx as u64);
-            let mut mc_z_cache = McZCache::new();
-            let mut historical = std::sync::Arc::clone(&empty_history);
-            // Monte Carlo paths carry no capital-structure history.
-            let historical_cs: std::sync::Arc<
-                IndexMap<PeriodId, crate::capital_structure::CapitalStructureCashflows>,
-            > = std::sync::Arc::new(IndexMap::new());
-            let mut all_warnings = Vec::new();
-
-            for period in &model.periods {
-                let (_period_results, period_row, warnings, _sources) = path_eval.evaluate_period(
-                    model,
-                    &period.id,
-                    period.is_actual,
-                    &prepared.eval_order,
-                    &historical,
-                    &historical_cs,
-                    Some((seed_offset, &mut mc_z_cache)),
-                )?;
-                all_warnings.extend(warnings);
-                std::sync::Arc::make_mut(&mut historical).push_row(period.id, period_row);
-            }
-
-            let mut node_map: IndexMap<String, IndexMap<PeriodId, f64>> = IndexMap::new();
-            for (node_id, &column) in historical.node_to_column() {
-                let mut values = IndexMap::new();
-                for (period_id, row) in historical.iter() {
-                    if let Some(value) = row.get(column).copied().flatten() {
-                        values.insert(period_id, value);
-                    }
-                }
-                if !values.is_empty() {
-                    node_map.insert(node_id.as_str().to_string(), values);
-                }
-            }
-            Ok((node_map, all_warnings))
+            let (results, warnings) = path_eval.evaluate_periods(
+                model,
+                &prepared,
+                capital_structure,
+                Some(seed_offset),
+            )?;
+            Ok((results.nodes, warnings))
         };
 
         let accumulator_seed = MonteCarloAccumulator::new(model, config)?;
@@ -894,6 +866,7 @@ impl Evaluator {
         meta: EvalStats,
     ) -> Result<()> {
         results.meta = meta;
+        results.periods = model.periods.clone();
         results.populate_value_types(&prepared.node_value_types);
         if let Some(suite) = &self.check_suite {
             results.check_report = Some(suite.run(model, results)?);
@@ -925,10 +898,10 @@ impl Evaluator {
             .find(|period| period.id == *period_id)
             .ok_or_else(|| Error::eval(format!("Period '{period_id}' not found in model")))?;
         for node_id in eval_order {
-            if let Some(filter) = node_filter {
-                if !filter.contains(node_id.as_str()) {
-                    continue;
-                }
+            if let Some(filter) = node_filter
+                && !filter.contains(node_id.as_str())
+            {
+                continue;
             }
 
             let node_spec = model
@@ -947,14 +920,15 @@ impl Evaluator {
                     }
                 }
             }
-            let explicit_value_is_visible =
-                !period.is_actual || node_spec.explicit_value_is_visible(period, visibility_cutoff);
-            let source = resolve_node_value(
-                node_spec,
-                period_id,
-                is_actual && explicit_value_is_visible,
-                explicit_value_is_visible,
-            )?;
+            let hidden = visibility_cutoff
+                .filter(|_| period.is_actual)
+                .map(|as_of| HiddenObservation {
+                    available_on: node_spec.explicit_value_available_on(period),
+                    as_of,
+                })
+                .filter(|hidden| hidden.available_on > hidden.as_of);
+            let source =
+                resolve_node_value(node_spec, period_id, is_actual && hidden.is_none(), hidden)?;
             let cell_source = match source {
                 NodeValueSource::Value(_) => CellSource::Value,
                 NodeValueSource::Forecast => CellSource::Forecast,

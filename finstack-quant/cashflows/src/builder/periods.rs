@@ -4,8 +4,8 @@
 //! builder's date generation and calendar policy.
 
 use finstack_quant_core::dates::{
-    adjust, BusinessDayConvention, Date, DateExt, DayCount, DayCountContext, HolidayCalendar,
-    StubKind, Tenor,
+    BusinessDayConvention, Date, DateExt, DayCount, DayCountContext, HolidayCalendar, StubKind,
+    Tenor, adjust,
 };
 
 use super::date_generation::{

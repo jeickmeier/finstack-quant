@@ -13,8 +13,8 @@ use finstack_quant_cashflows::builder::{
     ScheduleParams, StepUpCouponSpec,
 };
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount};
-use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
+use rust_decimal::prelude::ToPrimitive;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -34,9 +34,11 @@ fn every_registered_cashflow_schema_is_a_resolvable_resource() {
         resources.len(),
         finstack_quant_cashflows::schema::ARTIFACTS.len()
     );
-    assert!(resources
-        .iter()
-        .all(|(uri, _)| uri.starts_with("https://finstack_quant.dev/schemas/cashflow/1/")));
+    assert!(
+        resources
+            .iter()
+            .all(|(uri, _)| uri.starts_with("https://finstack_quant.dev/schemas/cashflow/1/"))
+    );
 }
 
 // Payload wrapper types for each spec
@@ -481,8 +483,8 @@ fn test_floating_coupon_spec() {
             .adjust_accrual_dates
     );
     assert_eq!(
-        serde_json::to_value(adjusted).expect("adjusted schedule serializes")
-            ["floating_coupon_spec"]["adjust_accrual_dates"],
+        serde_json::to_value(adjusted).expect("adjusted schedule serializes")["floating_coupon_spec"]
+            ["adjust_accrual_dates"],
         json!(true)
     );
 }
@@ -784,10 +786,12 @@ fn canonical_coupon_and_payment_programs_build_nontrivial_schedule() {
             .expect("canonical programs build");
     let schedule: finstack_quant_cashflows::builder::CashFlowSchedule =
         serde_json::from_str(&schedule_json).expect("schedule deserializes");
-    assert!(schedule
-        .get_flows()
-        .iter()
-        .any(|flow| flow.kind == finstack_quant_core::cashflow::CFKind::Pik));
+    assert!(
+        schedule
+            .get_flows()
+            .iter()
+            .any(|flow| flow.kind == finstack_quant_core::cashflow::CFKind::Pik)
+    );
 }
 
 #[test]

@@ -64,11 +64,7 @@ where
 /// Convert boolean to f64 (1.0 for true, 0.0 for false).
 #[inline]
 fn bool_to_f64(b: bool) -> f64 {
-    if b {
-        1.0
-    } else {
-        0.0
-    }
+    if b { 1.0 } else { 0.0 }
 }
 
 /// Validate that a function has exactly the expected number of arguments.
@@ -589,6 +585,7 @@ mod tests {
 
         let mut context = EvaluationContext::new(
             current_period,
+            &[],
             std::sync::Arc::new(node_to_column),
             std::sync::Arc::new(historical),
         );
@@ -1127,6 +1124,7 @@ mod tests {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let mut context = EvaluationContext::new(
             period,
+            &[],
             std::sync::Arc::new(IndexMap::new()),
             std::sync::Arc::new(IndexMap::new()),
         );
@@ -1195,6 +1193,7 @@ mod tests {
         let period = PeriodId::month(2025, 3).expect("valid period fixture");
         let mut context = EvaluationContext::new(
             period,
+            &[],
             std::sync::Arc::new(IndexMap::new()),
             std::sync::Arc::new(IndexMap::new()),
         );
@@ -1251,6 +1250,7 @@ mod tests {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let mut context = EvaluationContext::new(
             period,
+            &[],
             std::sync::Arc::new(IndexMap::new()),
             std::sync::Arc::new(IndexMap::new()),
         );
@@ -1306,6 +1306,7 @@ mod tests {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let mut context = EvaluationContext::new(
             period,
+            &[],
             std::sync::Arc::new(IndexMap::new()),
             std::sync::Arc::new(IndexMap::new()),
         );
@@ -1332,6 +1333,7 @@ mod tests {
         let p2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
         let mut context = EvaluationContext::new(
             p2,
+            &[],
             std::sync::Arc::new(IndexMap::new()),
             std::sync::Arc::new(IndexMap::new()),
         );
@@ -1354,6 +1356,7 @@ mod tests {
         let p2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
         let mut context = EvaluationContext::new(
             p2,
+            &[],
             std::sync::Arc::new(IndexMap::new()),
             std::sync::Arc::new(IndexMap::new()),
         );

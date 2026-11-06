@@ -169,8 +169,8 @@
 use super::vanilla::{require_finite, require_finite_non_negative, require_finite_positive};
 use super::{black_call, black_put};
 use crate::types::OptionType;
-use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::Result;
+use finstack_quant_core::math::summation::NeumaierAccumulator;
 
 /// Validate a discount factor supplied to a DF-first Asian pricer.
 ///
@@ -1417,28 +1417,32 @@ mod tests {
         );
 
         // Schedule validation.
-        assert!(geometric_asian_price_times(
-            spot,
-            strike,
-            time,
-            df,
-            div_yield,
-            vol,
-            &[],
-            OptionType::Call
-        )
-        .is_err());
-        assert!(arithmetic_asian_tw_price_times(
-            spot,
-            strike,
-            time,
-            df,
-            div_yield,
-            vol,
-            &[0.5, 0.25],
-            OptionType::Call,
-        )
-        .is_err());
+        assert!(
+            geometric_asian_price_times(
+                spot,
+                strike,
+                time,
+                df,
+                div_yield,
+                vol,
+                &[],
+                OptionType::Call
+            )
+            .is_err()
+        );
+        assert!(
+            arithmetic_asian_tw_price_times(
+                spot,
+                strike,
+                time,
+                df,
+                div_yield,
+                vol,
+                &[0.5, 0.25],
+                OptionType::Call,
+            )
+            .is_err()
+        );
     }
 
     #[test]

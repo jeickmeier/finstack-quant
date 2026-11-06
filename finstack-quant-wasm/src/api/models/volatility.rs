@@ -839,7 +839,7 @@ pub fn svi_implied_vol(params: JsValue, k: JsValue, t: JsValue) -> Result<f64, J
     params.implied_vol(k, t).map_err(to_js_err)
 }
 
-/// Evaluate Black/lognormal volatility from a core SABR cube.
+/// Evaluate a core SABR cube in the requested quote convention.
 ///
 /// # Arguments
 ///
@@ -847,25 +847,33 @@ pub fn svi_implied_vol(params: JsValue, k: JsValue, t: JsValue) -> Result<f64, J
 /// * `expiry` - Positive option expiry in years within the cube grid.
 /// * `tenor` - Positive underlying tenor in years within the cube grid.
 /// * `strike` - Finite strike in the same rate units as the stored forwards.
+/// * `convention` - Output quote convention: `"lognormal"` (decimal Black,
+///   shifted by the cube's own SABR shifts where it stores them) or `"normal"`
+///   (absolute Bachelier vol in the forward's rate units). The serde form
+///   `{"shifted_lognormal": {"shift": s}}` is rejected because the cube already
+///   carries its own shifts.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception for out-of-grid coordinates or invalid SABR
-/// model inputs.
+/// Throws a JavaScript exception for out-of-grid coordinates, invalid SABR
+/// model inputs, or a shifted-lognormal or undecodable `convention`.
 #[wasm_bindgen(js_name = getCubeVol)]
 pub fn get_cube_vol(
     cube: &JsVolCube,
     expiry: JsValue,
     tenor: JsValue,
     strike: JsValue,
+    convention: JsValue,
 ) -> Result<f64, JsValue> {
     let expiry = js_f64(&expiry, "expiry")?;
     let tenor = js_f64(&tenor, "tenor")?;
     let strike = js_f64(&strike, "strike")?;
-    vol::get_cube_vol(&cube.inner, expiry, tenor, strike).map_err(to_js_err)
+    let convention: vol::VolatilityConvention = js_wire(&convention, "convention")?;
+    vol::get_cube_vol(&cube.inner, expiry, tenor, strike, convention).map_err(to_js_err)
 }
 
-/// Evaluate Black/lognormal cube volatility with flat coordinate clamping.
+/// Evaluate a core SABR cube in the requested convention with flat coordinate
+/// clamping; returns `NaN` where the volatility is undefined.
 ///
 /// # Arguments
 ///
@@ -873,73 +881,35 @@ pub fn get_cube_vol(
 /// * `expiry` - Finite option expiry in years; clamped to the stored grid.
 /// * `tenor` - Finite underlying tenor in years; clamped to the stored grid.
 /// * `strike` - Finite strike in the same rate units as the stored forwards.
+/// * `convention` - Output quote convention: `"lognormal"` (decimal Black,
+///   shifted by the cube's own SABR shifts where it stores them) or `"normal"`
+///   (absolute Bachelier vol in the forward's rate units). The serde form
+///   `{"shifted_lognormal": {"shift": s}}` is rejected because the cube already
+///   carries its own shifts.
+///   A shifted-lognormal convention yields `NaN`.
+///
+/// # Errors
+///
+/// Throws a JavaScript exception for a non-numeric coordinate or an
+/// undecodable `convention`.
 #[wasm_bindgen(js_name = getCubeVolClamped)]
 pub fn get_cube_vol_clamped(
     cube: &JsVolCube,
     expiry: JsValue,
     tenor: JsValue,
     strike: JsValue,
+    convention: JsValue,
 ) -> Result<f64, JsValue> {
     let expiry = js_f64(&expiry, "expiry")?;
     let tenor = js_f64(&tenor, "tenor")?;
     let strike = js_f64(&strike, "strike")?;
+    let convention: vol::VolatilityConvention = js_wire(&convention, "convention")?;
     Ok(vol::get_cube_vol_clamped(
         &cube.inner,
         expiry,
         tenor,
         strike,
-    ))
-}
-
-/// Evaluate normal/Bachelier volatility from a core SABR cube.
-///
-/// # Arguments
-///
-/// * `cube` - Structurally validated data-only volatility cube.
-/// * `expiry` - Positive option expiry in years within the cube grid.
-/// * `tenor` - Positive underlying tenor in years within the cube grid.
-/// * `strike` - Finite strike in the same rate units as the stored forwards.
-///
-/// # Errors
-///
-/// Throws a JavaScript exception for out-of-grid coordinates, an invalid
-/// shifted-SABR domain, or a failed normal-volatility expansion.
-#[wasm_bindgen(js_name = getCubeNormalVol)]
-pub fn get_cube_normal_vol(
-    cube: &JsVolCube,
-    expiry: JsValue,
-    tenor: JsValue,
-    strike: JsValue,
-) -> Result<f64, JsValue> {
-    let expiry = js_f64(&expiry, "expiry")?;
-    let tenor = js_f64(&tenor, "tenor")?;
-    let strike = js_f64(&strike, "strike")?;
-    vol::get_cube_normal_vol(&cube.inner, expiry, tenor, strike).map_err(to_js_err)
-}
-
-/// Evaluate normal/Bachelier cube volatility with coordinate clamping.
-///
-/// # Arguments
-///
-/// * `cube` - Structurally validated data-only volatility cube.
-/// * `expiry` - Finite option expiry in years; clamped to the stored grid.
-/// * `tenor` - Finite underlying tenor in years; clamped to the stored grid.
-/// * `strike` - Finite strike in the same rate units as the stored forwards.
-#[wasm_bindgen(js_name = getCubeNormalVolClamped)]
-pub fn get_cube_normal_vol_clamped(
-    cube: &JsVolCube,
-    expiry: JsValue,
-    tenor: JsValue,
-    strike: JsValue,
-) -> Result<f64, JsValue> {
-    let expiry = js_f64(&expiry, "expiry")?;
-    let tenor = js_f64(&tenor, "tenor")?;
-    let strike = js_f64(&strike, "strike")?;
-    Ok(vol::get_cube_normal_vol_clamped(
-        &cube.inner,
-        expiry,
-        tenor,
-        strike,
+        convention,
     ))
 }
 
@@ -1312,6 +1282,25 @@ pub fn check_surface_grid(
     to_js_value(&report)
 }
 
+/// Run the configured butterfly, calendar-spread and local-vol density checks on a volatility surface.
+/// @param surface - `core.VolSurface` handle of unshifted Black lognormal volatilities on a strike axis (expiries in years, strikes in price units); it is read, not modified.
+/// @param config - `ArbitrageCheckConfig` as an object or JSON text. Every field is optional and an omitted one takes its Rust default: `check_butterfly`, `check_calendar_spread` and `check_local_vol_density` (default `true`); `forward_prices` (one finite positive forward to broadcast or one per expiry, required while any check is enabled); `tolerance` (non-negative, total-variance units, default `DEFAULT_ARBITRAGE_TOLERANCE` = 1e-10); `min_severity` (`"negligible"` default, `"minor"`, `"major"`, `"critical"`). Unknown fields are rejected.
+/// @returns The `ArbitrageReport` object (`vol_surface_id`, `violations` sorted most severe first, `passed`, `counts_by_type`, `counts_by_severity`).
+///
+/// # Errors
+///
+/// Throws a `validation` error if `config` has an unknown or mistyped field,
+/// the forwards are missing while a check is enabled, non-finite,
+/// non-positive or of the wrong length, the tolerance is negative or
+/// non-finite, or the surface is normal-quoted, shifted-Black or on a tenor
+/// axis.
+#[wasm_bindgen(js_name = checkSurface)]
+pub fn check_surface(surface: &JsVolSurface, config: JsValue) -> Result<JsValue, JsValue> {
+    let config = from_js_json::<model_arbitrage::ArbitrageCheckConfig>(&config, "config")?;
+    let report = model_arbitrage::check_surface(&surface.inner, &config).map_err(to_js_err)?;
+    to_js_value(&report)
+}
+
 /// Interpolate a volatility surface; coordinates outside the grid are rejected.
 /// @param surface - `core.VolSurface` handle, such as a `materializeCubeTenorSlice` or `materializeFxDeltaSurface` result.
 /// @param expiry - Option expiry in years, within the surface grid.
@@ -1358,103 +1347,59 @@ pub fn get_surface_vol_clamped(
     ))
 }
 
-/// Materialize the Black volatility slice of a SABR cube at one underlying tenor.
+/// Materialize the volatility slice of a SABR cube at one underlying tenor.
 /// @param cube - `core.VolCube` handle.
 /// @param tenor - Underlying tenor in years, within the cube grid.
 /// @param strikes - Strictly increasing strikes of the output surface.
-/// @returns The expiry by strike `core.VolSurface` handle.
+/// @param convention - `"lognormal"` for Black volatilities or `"normal"` for
+/// absolute Bachelier volatilities; shifted-lognormal is rejected.
+/// @returns The expiry by strike `core.VolSurface` handle in `convention`.
 ///
 /// # Errors
 ///
 /// Throws a `validation` error if the tenor is outside the cube, the strikes
-/// are invalid, or a SABR evaluation fails.
+/// are invalid, a SABR evaluation fails, or `convention` is shifted-lognormal.
 #[wasm_bindgen(js_name = materializeCubeTenorSlice)]
 pub fn materialize_cube_tenor_slice(
     cube: &JsVolCube,
     tenor: JsValue,
     strikes: JsValue,
+    convention: JsValue,
 ) -> Result<JsVolSurface, JsValue> {
     let surface = vol::materialize_cube_tenor_slice(
         &cube.inner,
         js_f64(&tenor, "tenor")?,
         &js_f64_seq(&strikes, "strikes")?,
+        js_wire(&convention, "convention")?,
     )
     .map_err(to_js_err)?;
     Ok(JsVolSurface::from_inner(Arc::new(surface)))
 }
 
-/// Materialize the normal (Bachelier) volatility slice of a SABR cube at one underlying tenor.
-/// @param cube - `core.VolCube` handle.
-/// @param tenor - Underlying tenor in years, within the cube grid.
-/// @param strikes - Strictly increasing strikes of the output surface.
-/// @returns The expiry by strike `core.VolSurface` handle of normal volatilities.
-///
-/// # Errors
-///
-/// Throws a `validation` error if the tenor is outside the cube, the strikes
-/// are invalid, or a SABR evaluation fails.
-#[wasm_bindgen(js_name = materializeCubeTenorSliceNormal)]
-pub fn materialize_cube_tenor_slice_normal(
-    cube: &JsVolCube,
-    tenor: JsValue,
-    strikes: JsValue,
-) -> Result<JsVolSurface, JsValue> {
-    let surface = vol::materialize_cube_tenor_slice_normal(
-        &cube.inner,
-        js_f64(&tenor, "tenor")?,
-        &js_f64_seq(&strikes, "strikes")?,
-    )
-    .map_err(to_js_err)?;
-    Ok(JsVolSurface::from_inner(Arc::new(surface)))
-}
-
-/// Materialize the Black volatility slice of a SABR cube at one option expiry.
+/// Materialize the volatility slice of a SABR cube at one option expiry.
 /// @param cube - `core.VolCube` handle.
 /// @param expiry - Option expiry in years, within the cube grid.
 /// @param strikes - Strictly increasing strikes of the output surface.
-/// @returns The tenor by strike `core.VolCubeExpirySlice` handle.
+/// @param convention - `"lognormal"` for Black volatilities or `"normal"` for
+/// absolute Bachelier volatilities; shifted-lognormal is rejected.
+/// @returns The tenor by strike `core.VolCubeExpirySlice` handle in `convention`.
 ///
 /// # Errors
 ///
 /// Throws a `validation` error if the expiry is outside the cube, the strikes
-/// are invalid, or a SABR evaluation fails.
+/// are invalid, a SABR evaluation fails, or `convention` is shifted-lognormal.
 #[wasm_bindgen(js_name = materializeCubeExpirySlice)]
 pub fn materialize_cube_expiry_slice(
     cube: &JsVolCube,
     expiry: JsValue,
     strikes: JsValue,
+    convention: JsValue,
 ) -> Result<JsVolCubeExpirySlice, JsValue> {
     let surface = vol::materialize_cube_expiry_slice(
         &cube.inner,
         js_f64(&expiry, "expiry")?,
         &js_f64_seq(&strikes, "strikes")?,
-    )
-    .map_err(to_js_err)?;
-    Ok(JsVolCubeExpirySlice {
-        inner: Arc::new(surface),
-    })
-}
-
-/// Materialize the normal (Bachelier) volatility slice of a SABR cube at one option expiry.
-/// @param cube - `core.VolCube` handle.
-/// @param expiry - Option expiry in years, within the cube grid.
-/// @param strikes - Strictly increasing strikes of the output surface.
-/// @returns The tenor by strike `core.VolCubeExpirySlice` handle of normal volatilities.
-///
-/// # Errors
-///
-/// Throws a `validation` error if the expiry is outside the cube, the strikes
-/// are invalid, or a SABR evaluation fails.
-#[wasm_bindgen(js_name = materializeCubeExpirySliceNormal)]
-pub fn materialize_cube_expiry_slice_normal(
-    cube: &JsVolCube,
-    expiry: JsValue,
-    strikes: JsValue,
-) -> Result<JsVolCubeExpirySlice, JsValue> {
-    let surface = vol::materialize_cube_expiry_slice_normal(
-        &cube.inner,
-        js_f64(&expiry, "expiry")?,
-        &js_f64_seq(&strikes, "strikes")?,
+        js_wire(&convention, "convention")?,
     )
     .map_err(to_js_err)?;
     Ok(JsVolCubeExpirySlice {

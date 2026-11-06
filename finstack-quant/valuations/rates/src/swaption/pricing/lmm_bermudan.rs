@@ -28,9 +28,9 @@
 //! - Glasserman, P. (2003). *Monte Carlo Methods in Financial Engineering*,
 //!   Ch. 8, Springer. `docs/REFERENCES.md#glasserman-2004-monte-carlo`
 
+use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::time_grid::TimeGrid;
-use finstack_quant_core::Result;
 use finstack_quant_models::monte_carlo::discretization::lmm_predictor_corrector::LmmPredictorCorrector;
 use finstack_quant_models::monte_carlo::engine::MAX_NUM_PATHS;
 use finstack_quant_models::monte_carlo::pricer::lsq::solve_least_squares;

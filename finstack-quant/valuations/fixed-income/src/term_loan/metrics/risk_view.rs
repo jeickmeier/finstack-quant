@@ -14,7 +14,7 @@ use finstack_quant_valuations_core::metrics::sensitivities::dv01::{
     Dv01CalculatorConfig, UnifiedDv01Calculator,
 };
 use finstack_quant_valuations_core::metrics::{
-    quoted_z_spread, MetricCalculator, MetricContext, ZSpreadBucketedCs01, ZSpreadParallelCs01,
+    MetricCalculator, MetricContext, ZSpreadBucketedCs01, ZSpreadParallelCs01, quoted_z_spread,
 };
 use finstack_quant_valuations_core::pricer::ModelKey;
 use std::sync::Arc;
@@ -103,7 +103,7 @@ pub(super) fn with_term_loan_risk_view<R>(
     }
 }
 
-fn uses_credit_tree(context: &MetricContext, loan: &TermLoan) -> bool {
+pub(super) fn uses_credit_tree(context: &MetricContext, loan: &TermLoan) -> bool {
     loan.credit_curve_id.is_some()
         && matches!(
             context

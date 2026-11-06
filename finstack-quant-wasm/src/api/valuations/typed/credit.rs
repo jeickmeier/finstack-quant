@@ -4,7 +4,7 @@
 use crate::api::core::dates::{JsDayCount, JsTenor};
 use crate::api::core::money::JsMoney;
 use crate::api::valuations::pricing::parse_market;
-use crate::utils::input::{from_js_json, js_f64, js_string};
+use crate::utils::input::{from_js_json, js_f64, js_opt_f64_seq, js_string};
 use crate::utils::wire::{js_date, js_wire};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_valuations::instruments::Instrument;
@@ -619,6 +619,49 @@ getters!(JsConvertibleBond, "ConvertibleBond", |i| {
 });
 
 common_getters!(JsConvertibleBond, "ConvertibleBond");
+
+/// Price, delta, parity, conversion premium, regime and bond floor of a convertible at a ladder of share prices (mirrors Rust `convertible_spot_ladder`).
+///
+/// Each row reprices on the market with only the share price moved, on the convertible tree, the bond's only model; volatility, rates and credit stay as supplied.
+/// @param bond - Borrowed `ConvertibleBond` handle; it is not consumed. Its `metric_pricing_overrides.bump_config` sets the spot bump behind delta (default 1% of each row's share price).
+/// @param market_json - Canonical market-context JSON holding the bond's discount curve, share price, volatility and any dividend yield, hazard curve and floating index.
+/// @param as_of - ISO-8601 valuation date and origin of the tree's ACT/365F clock.
+/// @param spots - Share prices in the bond's currency, each finite and positive, sorted ascending with duplicates dropped; omit for 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2 and 3 times the market's share price.
+/// @returns `ConvertibleSpotLadder` plain object: `instrument_id`, `as_of`, `currency`, `market_spot` and `rows` in ascending share price, each with `spot`, `is_market_spot`, `price`, `conversion_value` and `bond_floor` in `currency`, `parity` over notional, and `delta` per unit of share price, `hedge_ratio` as a decimal share of the conversion ratio, `regime` (`busted` below 0.40, `balanced` to 0.80, `equity_sensitive` above) and `conversion_premium` as a decimal, each `null` where undefined: a mandatory-variable bond has no hedge ratio or regime.
+/// @throws Error - Throws with kind `validation` if `spots` is empty or holds a value that is not finite and positive, or the bond or market JSON is invalid, and kind `not_found` if market data the bond needs is missing.
+#[wasm_bindgen(js_name = convertibleSpotLadder)]
+pub fn convertible_spot_ladder(
+    bond: &JsConvertibleBond,
+    market_json: JsValue,
+    as_of: JsValue,
+    spots: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    let market = parse_market(&market_json)?;
+    let as_of = js_date(&as_of, "asOf")?;
+    let spots = js_opt_f64_seq(spots.as_ref(), "spots")?;
+    to_js_value(
+        &finstack_quant_valuations::instruments::fixed_income::convertible::convertible_spot_ladder(
+            &bond.inner,
+            &market,
+            as_of,
+            spots.as_deref(),
+        )
+        .map_err(to_js_err)?,
+    )
+}
+
+/// One row per share price of a convertible spot ladder (mirrors Rust `ConvertibleSpotLadder::to_table`).
+///
+/// Python reaches the same table through `ConvertibleSpotLadder.to_dataframe`.
+/// @param ladder - `ConvertibleSpotLadder` plain object or JSON string, as `convertibleSpotLadder` returns it.
+/// @returns `TableEnvelope` in ascending share price with columns `spot` (float), `is_market_spot` (boolean), `price` (float), `delta` and `hedge_ratio` (nullable float), `regime` (nullable string: `busted`, `balanced` or `equity_sensitive`), `conversion_value` and `parity` (float), `conversion_premium` (nullable float) and `bond_floor` (float); money columns are in the ladder's `currency`, which the table does not state. The columns remain when there are no rows.
+/// @throws Error - Throws with kind `validation` if `ladder` does not match the `ConvertibleSpotLadder` schema.
+#[wasm_bindgen(js_name = convertibleSpotLadderTable)]
+pub fn convertible_spot_ladder_table(ladder: JsValue) -> Result<JsValue, JsValue> {
+    let ladder: finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleSpotLadder =
+        from_js_json(&ladder, "ladder")?;
+    to_js_value(&ladder.to_table())
+}
 
 factories!(JsConvertibleBond, "ConvertibleBond", finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond, {
         /// Canonical 5-year USD 1,000,000 2% semi-annual convertible (mirrors Rust `ConvertibleBond::example`): ratio 25 shares per bond, voluntary conversion, underlying `"TECH"`, curves `USD-IG` / `USD-CREDIT-BBB`, issue 2024-01-15, maturity 2029-01-15.

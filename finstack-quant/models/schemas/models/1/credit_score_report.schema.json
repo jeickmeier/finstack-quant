@@ -1,0 +1,114 @@
+{
+  "$defs": {
+    "MasterScaleResult": {
+      "description": "Result of mapping a PD to a master scale grade.",
+      "properties": {
+        "central_pd": {
+          "description": "The central PD for the assigned grade.",
+          "format": "double",
+          "type": "number"
+        },
+        "grade": {
+          "description": "The assigned rating grade label.",
+          "type": "string"
+        },
+        "grade_index": {
+          "description": "Index of the grade in the scale (0 = best).",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "input_pd": {
+          "description": "The input PD that was mapped.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "grade",
+        "central_pd",
+        "input_pd",
+        "grade_index"
+      ],
+      "type": "object"
+    },
+    "ScoringResult": {
+      "description": "Result from any academic scoring model.\n\nProvides a uniform interface across Altman Z-Score, Ohlson O-Score,\nand Zmijewski probit models. The `score` field contains the raw\ndiscriminant or regression output, `zone` classifies credit risk,\nand `implied_pd` contains a probability only when the model has a native\nprobability transform or an explicit calibration was requested.",
+      "properties": {
+        "implied_pd": {
+          "description": "Optional implied probability of default.\n\nAltman score results leave this as `None` unless an explicit,\nversioned heuristic calibration is requested. Ohlson and Zmijewski\nretain their native logistic and probit probabilities.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "model": {
+          "description": "Name of the model that produced this result.",
+          "type": "string"
+        },
+        "score": {
+          "description": "The raw score value (Z, Z', Z'', O, or Zmijewski Y).",
+          "format": "double",
+          "type": "number"
+        },
+        "zone": {
+          "$ref": "#/$defs/ScoringZone",
+          "description": "Risk zone classification (Safe/Grey/Distress)."
+        }
+      },
+      "required": [
+        "score",
+        "zone",
+        "model"
+      ],
+      "type": "object"
+    },
+    "ScoringZone": {
+      "description": "Zone classification across all scoring models.\n\nRepresents the risk category derived from a model's score:\n- `Safe`: low bankruptcy probability.\n- `Grey`: ambiguous / requires further analysis.\n- `Distress`: high bankruptcy probability.",
+      "oneOf": [
+        {
+          "const": "safe",
+          "description": "Safe zone (low bankruptcy probability).",
+          "type": "string"
+        },
+        {
+          "const": "grey",
+          "description": "Grey zone (ambiguous).",
+          "type": "string"
+        },
+        {
+          "const": "distress",
+          "description": "Distress zone (high bankruptcy probability).",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/credit_score_report.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "A scoring model's result and the default master-scale grade of its implied PD.",
+  "properties": {
+    "grade": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/MasterScaleResult"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Default-calibration master-scale grade of `result.implied_pd`; `None`\nwhen the model has no native implied PD (the Altman family)."
+    },
+    "result": {
+      "$ref": "#/$defs/ScoringResult",
+      "description": "The scoring model's result."
+    }
+  },
+  "required": [
+    "result"
+  ],
+  "title": "CreditScoreReport",
+  "type": "object"
+}

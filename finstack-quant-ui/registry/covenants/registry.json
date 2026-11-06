@@ -2,11 +2,135 @@
   "$schema": "https://ui.shadcn.com/schema/registry.json",
   "items": [
     {
+      "name": "covenant-engine-editor",
+      "type": "registry:component",
+      "title": "Covenant engine editor",
+      "description": "Edits a covenant engine with the generated form, optionally starting from a Rust covenant package template, and lists each covenant's metric id against the model's nodes.",
+      "docs": "Composes schema-form over the generated covenant_engine contract (started from defaultJson; Rust publishes no example, so it otherwise starts empty). When loadTemplate is supplied, a second schema form over the generated covenant_template contract picks a Rust package (cov_lite, lbo_standard, real_estate or project_finance) and its thresholds, which start empty; Load template passes the structurally checked CovenantTemplate to covenants.covenantTemplate and replaces the engine with the returned specs, and a rejected template shows the native error in that form. Every metric_id and denominator_metric_id (top-level and windowed specs) is an id-combobox: free text with metricIds as suggestions. A Covenant metrics table lists each spec's metric id and whether metricIds contains it, before any evaluation; an unset metric id is listed as read by Rust's conventional metric for the covenant type and is not checked. Validation, templates and every term are native: connect validate to useCovenantEngineValidator, loadTemplate to useCovenantTemplate and onSubmit to the useEvaluateCovenants request. Accepts defaultJson, validate, onSubmit, loadTemplate, metricIds, disabled and density props.",
+      "files": [
+        {
+          "path": "components/covenant-engine-editor/covenant-engine-editor.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/covenants/components/covenant-engine-editor/covenant-engine-editor.tsx"
+        },
+        {
+          "path": "components/covenant-engine-editor/covenant-engine.ts",
+          "type": "registry:component",
+          "target": "components/finstack/covenants/components/covenant-engine-editor/covenant-engine.ts"
+        },
+        {
+          "path": "components/covenant-engine-editor/covenant-template.ts",
+          "type": "registry:component",
+          "target": "components/finstack/covenants/components/covenant-engine-editor/covenant-template.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/schema-form",
+        "@finstack/finstack-form",
+        "@finstack/id-combobox",
+        "@finstack/finstack-table",
+        "@finstack/contract-covenant-engine",
+        "@finstack/contract-covenant-template",
+        "@finstack/finstack-codec"
+      ],
+      "dependencies": [
+        "@tanstack/react-table@9.2.4",
+        "finstack-quant-wasm@0.11.0",
+        "react@19.2.8"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/covenants/1/covenant_engine.schema.json",
+          "https://finstack_quant.dev/schemas/covenants/1/covenant_template.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "covenant-breach-forecast",
+      "type": "registry:component",
+      "title": "Covenant breach forecast",
+      "description": "Forecasts covenant breaches under a CovenantForecastConfig edited with the generated form and presents the returned FutureBreach rows.",
+      "docs": "Composes schema-form over the generated covenant_forecast_config contract (started from defaultConfigJson; Rust publishes no example and an empty config takes Rust's deterministic maintenance-scope defaults; Rust validates the config when it forecasts, so the form checks structure only and a uint64 random_seed stays exact) and a finstack-table of native FutureBreach rows (statements_analytics.forecastBreaches) in the order supplied, which Rust sorts by breach date, then covenant id: date, covenant, Rust's test description, projected value, threshold, headroom and breach probability with every supplied digit (a host may inject formatValue), an unset value as a dash. Deterministic forecasts list breached dates with probability 1; a stochastic config also lists dates whose probability reaches its breach_probability_threshold. Connect onSubmit to the useForecastBreaches request. Accepts defaultConfigJson, onSubmit, breaches, loading, error, formatValue and density props. No worker is required.",
+      "files": [
+        {
+          "path": "components/covenant-breach-forecast/covenant-breach-forecast.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/covenants/components/covenant-breach-forecast/covenant-breach-forecast.tsx"
+        },
+        {
+          "path": "components/covenant-breach-forecast/covenant-forecast-config.ts",
+          "type": "registry:component",
+          "target": "components/finstack/covenants/components/covenant-breach-forecast/covenant-forecast-config.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/schema-form",
+        "@finstack/finstack-table",
+        "@finstack/contract-covenant-forecast-config",
+        "@finstack/contract-future-breach",
+        "@finstack/finstack-codec",
+        "@finstack/native-display"
+      ],
+      "dependencies": ["@tanstack/react-table@9.2.4", "react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/covenants/1/covenant_forecast_config.schema.json",
+          "https://finstack_quant.dev/schemas/covenants/1/future_breach.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "covenant-compliance",
+      "type": "registry:component",
+      "title": "Covenant compliance",
+      "description": "Displays a native covenant series as a covenant by test-date grid of returned verdicts; selecting a date shows its covenant reports.",
+      "docs": "Present native DatedCovenantReports rows (statements_analytics.evaluateCovenants over statement results, or CovenantEngine#evaluateSeries over dated rows) as a grid: one column per test date in the order supplied, one row per covenant instance key in first-appearance order, each cell the returned verdict as Passed or Failed, or a dash when Rust returned no report for that covenant on that date. A date header button selects the date (the latest initially) and its reports render below through covenant-report. Nothing is computed, sorted or inferred. No worker is required.",
+      "files": [
+        {
+          "path": "components/covenant-compliance/covenant-compliance.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/covenants/components/covenant-compliance/covenant-compliance.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-table",
+        "button",
+        "@finstack/covenant-report",
+        "@finstack/contract-dated-covenant-reports"
+      ],
+      "dependencies": ["@tanstack/react-table@9.2.4", "react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/covenants/1/covenant_report.schema.json",
+          "https://finstack_quant.dev/schemas/covenants/1/dated_covenant_reports.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "covenant-report",
       "type": "registry:component",
       "title": "Covenant report",
-      "description": "Lossless disclosure of a valuation result's optional covenant payload.",
-      "docs": "Optional original valuation covenant payload rendered losslessly; no verdict or financial headroom is inferred.",
+      "description": "Displays native covenant reports: test, actual, threshold, headroom, verdict and details per covenant, with the complete JSON.",
+      "docs": "Present native CovenantReport values keyed by covenant instance key (CovenantEngine#evaluate, one DatedCovenantReports row, or a valuation result's covenants) as a typed table in the order supplied: Rust's test description, actual value, threshold and headroom with every supplied digit (a host may inject formatValue), the passed verdict as Passed or Failed, and details; a field Rust leaves unset shows as a dash. The complete reports stay available as JSON in a Covenants disclosure. No verdict, headroom or threshold is computed. No worker is required.",
       "files": [
         {
           "path": "components/covenant-report/covenant-report.tsx",
@@ -15,16 +139,125 @@
         }
       ],
       "registryDependencies": [
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/finstack-table",
         "@finstack/json-viewer",
-        "@finstack/finstack-codec"
+        "@finstack/finstack-codec",
+        "@finstack/contract-covenant-report"
       ],
-      "dependencies": ["react@19.2.8"],
+      "dependencies": ["@tanstack/react-table@9.2.4", "react@19.2.8"],
       "categories": ["Individual Components"],
       "meta": {
         "version": "0.2.0",
         "wasmVersion": "0.11.0",
         "schemaIds": [
+          "https://finstack_quant.dev/schemas/covenants/1/covenant_report.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-covenant-engine-validator",
+      "type": "registry:hook",
+      "title": "useCovenantEngineValidator",
+      "description": "Validates covenant engine JSON natively and returns its canonical text through the WASM worker.",
+      "docs": "covenants.validateCovenantEngineJson: canonical CovenantEngine text (schema, covenant package and engine invariants, unknown fields), or the native error. Pass it as schema-form's or covenant-engine-editor's validate. Requires the shared Finstack provider.",
+      "files": [
+        {
+          "path": "hooks/use-covenant-engine-validator/use-covenant-engine-validator.ts",
+          "type": "registry:hook",
+          "target": "hooks/covenants/use-covenant-engine-validator/use-covenant-engine-validator.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-covenant-template",
+      "type": "registry:hook",
+      "title": "useCovenantTemplate",
+      "description": "Loads a Rust covenant package template through the WASM worker.",
+      "docs": "Returns a loader of a Rust CovenantTemplate wire value ({kind: \"cov_lite\" | \"lbo_standard\" | \"real_estate\" | \"project_finance\"} with that variant's snake_case thresholds), passed unchanged to covenants.covenantTemplate; it resolves to the returned CovenantSpec objects or rejects with the native error (a NaN, infinite or negative threshold). Pass it as covenant-engine-editor's loadTemplate. Requires the shared Finstack provider.",
+      "files": [
+        {
+          "path": "hooks/use-covenant-template/use-covenant-template.ts",
+          "type": "registry:hook",
+          "target": "hooks/covenants/use-covenant-template/use-covenant-template.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-evaluate-covenants",
+      "type": "registry:hook",
+      "title": "useEvaluateCovenants",
+      "description": "Tests a covenant engine against evaluated statements through the WASM worker.",
+      "docs": "covenants.CovenantEngine.fromJson(engineJson), then statements_analytics.evaluateCovenants(resultsJson, engine): DatedCovenantReports rows, one per result period tested on its last day with the covenants applicable on that date. The handle is freed. A metric an applicable covenant reads that the results lack returns the native not_found error, a non-finite one the validation error, unchanged. Keyed on the complete request and worker session; null disables. Requires the shared Finstack/Query provider.",
+      "files": [
+        {
+          "path": "hooks/use-evaluate-covenants/use-evaluate-covenants.ts",
+          "type": "registry:hook",
+          "target": "hooks/covenants/use-evaluate-covenants/use-evaluate-covenants.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-forecast-breaches",
+      "type": "registry:hook",
+      "title": "useForecastBreaches",
+      "description": "Forecasts covenant breaches of evaluated statements through the WASM worker.",
+      "docs": "covenants.CovenantEngine.fromJson(engineJson), then statements_analytics.forecastBreaches(resultsJson, engine, configJson?): FutureBreach rows sorted by breach date, then covenant id. Every result period is a test date and, without reference_date, the horizon starts the day before the first period. An omitted configJson is Rust's deterministic maintenance-scope default; the config crosses as JSON text so a uint64 random_seed stays exact. The handle is freed. A missing required metric returns the native not_found error, a non-finite one or an invalid config the validation error, unchanged. Keyed on the complete request and worker session; null disables. Requires the shared Finstack/Query provider.",
+      "files": [
+        {
+          "path": "hooks/use-forecast-breaches/use-forecast-breaches.ts",
+          "type": "registry:hook",
+          "target": "hooks/covenants/use-forecast-breaches/use-forecast-breaches.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.11.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+          "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json"
         ]
       }
     }

@@ -26,8 +26,7 @@ export function explainStatementOptions(
 export function useExplainStatement(
   request: StatementExplanationRequest | null,
 ) {
-  return useWorkerQuery((worker) => ({
-    ...explainStatementOptions(worker.client, worker.session, request),
-    enabled: worker.status === "ready" && request !== null,
-  }));
+  return useWorkerQuery((worker) =>
+    explainStatementOptions(worker.client, worker.session, request),
+  );
 }

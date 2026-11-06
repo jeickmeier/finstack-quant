@@ -118,7 +118,7 @@ impl std::str::FromStr for CurrencyPair {
             None => {
                 return Err(crate::Error::Validation(format!(
                     "invalid FX pair {s:?}: expected \"EURUSD\" or \"EUR/USD\""
-                )))
+                )));
             }
         };
         Ok(Self {

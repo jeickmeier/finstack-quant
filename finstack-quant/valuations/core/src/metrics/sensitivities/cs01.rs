@@ -57,8 +57,8 @@
 //!   (short bond, buy protection) gains when spreads widen, so CS01 is
 //!   positive.
 
-use crate::market::conventions::ids::CdsDocClause;
 use crate::market::conventions::CdsValuationConvention;
+use crate::market::conventions::ids::CdsDocClause;
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::{MetricContext, MetricId};
 use crate::recalibration::{DealCdsQuoteOverride, QuoteBump};
@@ -524,7 +524,7 @@ impl MetricCalculator for GenericBucketedCs01 {
 /// Build the reval closure used by CS01 calculators.
 pub fn cs01_reval(
     context: &MetricContext,
-) -> impl FnMut(&MarketContext) -> finstack_quant_core::Result<f64> {
+) -> impl FnMut(&MarketContext) -> finstack_quant_core::Result<f64> + use<> {
     let inst_arc = Arc::clone(&context.instrument);
     let dispatch = context.clone_pricer_dispatch();
     let as_of = context.as_of;

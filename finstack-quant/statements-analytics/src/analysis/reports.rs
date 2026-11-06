@@ -15,7 +15,7 @@
 //! println!("{report}");
 //! ```
 
-use finstack_quant_core::dates::{PeriodId, PeriodKind};
+use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::table::{TableColumn, TableColumnData, TableColumnRole, TableEnvelope};
 use finstack_quant_statements::evaluator::StatementResult;
 use indexmap::IndexMap;
@@ -277,59 +277,41 @@ impl fmt::Display for PLSummaryReport<'_> {
 
 /// Trailing-twelve-month sum of `node_id` ending at (and including) `at`.
 ///
-/// Requires a complete contiguous year of finite values in consistent units.
-/// Annual, semiannual, quarterly and monthly windows use 1, 2, 4 and 12
-/// periods, including fiscal identifiers. Gregorian daily windows use the
-/// calendar year ending immediately after `at`, including leap days; a
-/// February 29 boundary maps to February 28 in the prior year.
-/// Weekly windows and fiscal daily windows return `None`: these results do
-/// not contain the calendar dates needed to resolve a full calendar year.
-/// Incomplete windows are unavailable rather than annualized from partial data.
+/// Sums the window of [`ltm_window`](finstack_quant_core::dates::ltm_window)
+/// over the results' periods: 1, 2, 4, 12 or 52 periods for annual,
+/// semi-annual, quarterly, monthly and weekly models (Gregorian or fiscal), and
+/// every model day in the twelve calendar months ending at `at` for a daily
+/// calendar-day or business-day model. Requires a complete window of finite
+/// values in consistent units; incomplete windows are unavailable rather than
+/// annualized from partial data.
 ///
 /// # Arguments
 ///
-/// * `results` - Evaluated statement nodes to read. The named node must exist
-///   and contribute a value at each period in the trailing window.
+/// * `results` - Evaluated statement nodes and their periods. The named node
+///   must exist and contribute a value at each period in the trailing window.
 /// * `node_id` - Statement node whose period values are summed (typically a
 ///   flow such as EBITDA or interest expense), in the model's reporting units.
-/// * `at` - Inclusive reporting-period end. Gregorian daily windows cover a
-///   calendar year; fixed-frequency windows cover the documented period count.
+/// * `at` - Inclusive reporting-period end.
 pub(crate) fn trailing_sum_at(
     results: &StatementResult,
     node_id: &str,
     at: &PeriodId,
 ) -> Option<f64> {
-    let count = match at.kind() {
-        PeriodKind::Weekly => return None,
-        PeriodKind::Daily if at.is_fiscal() => return None,
-        PeriodKind::Daily => {
-            let (_, end) = at.bounds().ok()?;
-            let year = end.year().checked_sub(1)?;
-            let start =
-                finstack_quant_core::dates::Date::from_calendar_date(year, end.month(), end.day())
-                    .or_else(|_| {
-                        finstack_quant_core::dates::Date::from_calendar_date(year, end.month(), 28)
-                    })
-                    .ok()?;
-            usize::try_from((end - start).whole_days()).ok()?
-        }
-        _ => usize::from(at.kind().periods_per_year()),
-    };
-    let mut period = *at;
-    let mut total = 0.0;
+    let window = finstack_quant_core::dates::ltm_window(*at, &results.periods).ok()?;
+    if !window.is_complete() {
+        return None;
+    }
     let unit = super::units::node_unit_at(results, node_id, at).ok()?;
-    for index in 0..count {
-        if super::units::node_unit_at(results, node_id, &period).ok()? != unit {
+    let mut total = 0.0;
+    for period in &window.slots {
+        if super::units::node_unit_at(results, node_id, period).ok()? != unit {
             return None;
         }
-        let value = results.get(node_id, &period)?;
+        let value = results.get(node_id, period)?;
         if !value.is_finite() {
             return None;
         }
         total += value;
-        if index + 1 < count {
-            period = period.shift(-1).ok()?;
-        }
     }
     total.is_finite().then_some(total)
 }
@@ -380,11 +362,22 @@ pub struct CreditAssessmentPoint {
 ///
 /// ```rust
 /// # use finstack_quant_statements::evaluator::StatementResult;
-/// # use finstack_quant_core::dates::PeriodId;
+/// # use finstack_quant_core::dates::{Period, PeriodId};
 /// # use finstack_quant_statements_analytics::analysis::CreditAssessment;
-/// # let results = StatementResult::new();
-/// let assessment = CreditAssessment::compute(&results, PeriodId::quarter(2025, 4).expect("valid period fixture"));
+/// let q4 = PeriodId::quarter(2025, 4)?;
+/// let mut results = StatementResult::new();
+/// results.periods.push(Period {
+///     id: q4,
+///     start: time::macros::date!(2025 - 10 - 01),
+///     end: time::macros::date!(2026 - 01 - 01),
+///     is_actual: false,
+/// });
+/// results.nodes.entry("total_debt".into()).or_default().insert(q4, 300.0);
+/// let assessment = CreditAssessment::compute(&results, q4)?;
 /// assert_eq!(assessment.period, "2025Q4");
+/// // A period the results do not contain is an error, not a null assessment.
+/// assert!(CreditAssessment::compute(&results, PeriodId::annual(2025)).is_err());
+/// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -404,9 +397,8 @@ pub struct CreditAssessment {
 impl CreditAssessment {
     /// Compute a structured credit assessment from statement results.
     ///
-    /// The series spans every period (≤ `period`) present on any of the driver
-    /// nodes (`ebitda`, `total_debt`, `interest_expense`, `free_cash_flow`),
-    /// in ascending order. Ratios are unavailable for incompatible node types
+    /// The series spans every period of [`StatementResult::periods`] up to and
+    /// including `period`, in timeline order. Ratios are unavailable for incompatible node types
     /// or currencies, incomplete trailing years, or non-positive denominators.
     /// Gregorian daily windows use a calendar year including leap days.
     /// Fiscal fixed-frequency windows are supported; weekly and fiscal daily
@@ -417,31 +409,42 @@ impl CreditAssessment {
     /// * `results` - Evaluated statement values with monetary/scalar metadata
     ///   preserved so ratios only compare like units and currencies.
     /// * `period` - Inclusive reporting period ending each trailing-year window.
-    pub fn compute(results: &StatementResult, period: PeriodId) -> Self {
-        let mut periods: std::collections::BTreeSet<PeriodId> = std::collections::BTreeSet::new();
-        for node in ["ebitda", "total_debt", "interest_expense", "free_cash_flow"] {
-            if let Some(series) = results.get_node(node) {
-                for (observed, _) in series.iter() {
-                    if *observed <= period {
-                        periods.insert(*observed);
-                    }
-                }
-            }
+    ///   It must be one of [`StatementResult::periods`], in the model's own
+    ///   frequency: `2025` is the annual period, not
+    ///   the last quarter of a quarterly model.
+    ///
+    /// # Errors
+    ///
+    /// Returns an invalid-input error when `period` is not one of
+    /// [`StatementResult::periods`], so an unknown or wrong-frequency period never yields an
+    /// all-null assessment or a series truncated at a foreign period.
+    pub fn compute(
+        results: &StatementResult,
+        period: PeriodId,
+    ) -> finstack_quant_statements::Result<Self> {
+        if !results.periods.iter().any(|p| p.id == period) {
+            return Err(finstack_quant_statements::Error::invalid_input(format!(
+                "Credit assessment period '{period}' is not a period of the statement results"
+            )));
         }
+        let periods = results
+            .periods
+            .iter()
+            .map(|p| p.id)
+            .filter(|observed| *observed <= period);
 
         let series: Vec<CreditAssessmentPoint> = periods
-            .iter()
             .map(|period| CreditAssessmentPoint {
                 period: period.to_string(),
-                leverage_ratio: leverage_at(results, period),
-                interest_coverage: interest_coverage_at(results, period),
+                leverage_ratio: leverage_at(results, &period),
+                interest_coverage: interest_coverage_at(results, &period),
                 free_cash_flow: results
-                    .get("free_cash_flow", period)
+                    .get("free_cash_flow", &period)
                     .filter(|value| value.is_finite()),
             })
             .collect();
 
-        Self {
+        Ok(Self {
             period: period.to_string(),
             leverage_ratio: leverage_at(results, &period),
             interest_coverage: interest_coverage_at(results, &period),
@@ -449,7 +452,7 @@ impl CreditAssessment {
                 .get("free_cash_flow", &period)
                 .filter(|value| value.is_finite()),
             series,
-        }
+        })
     }
 }
 
@@ -523,6 +526,28 @@ impl fmt::Display for CreditAssessmentReport<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use finstack_quant_core::dates::PeriodKind;
+
+    /// Record every period a node has a value in as a result period; only the
+    /// ids matter to fixed-frequency windows.
+    fn record_periods(results: &mut StatementResult) {
+        let mut ids: Vec<PeriodId> = results
+            .nodes
+            .values()
+            .flat_map(|values| values.keys().copied())
+            .collect();
+        ids.sort();
+        ids.dedup();
+        results.periods = ids
+            .into_iter()
+            .map(|id| finstack_quant_core::dates::Period {
+                id,
+                start: time::macros::date!(2000 - 01 - 01),
+                end: time::macros::date!(2000 - 01 - 02),
+                is_actual: false,
+            })
+            .collect();
+    }
 
     #[test]
     fn test_empty_table() {
@@ -628,8 +653,9 @@ mod tests {
                 300.0,
             );
 
+        record_periods(&mut results);
         let period = PeriodId::quarter(2025, 4).expect("valid period fixture");
-        let assessment = CreditAssessment::compute(&results, period);
+        let assessment = CreditAssessment::compute(&results, period).expect("known period");
 
         assert_eq!(assessment.period, period.to_string());
         assert_eq!(assessment.leverage_ratio, Some(3.0));
@@ -659,10 +685,12 @@ mod tests {
                 300.0,
             );
 
+        record_periods(&mut results);
         let assessment = CreditAssessment::compute(
             &results,
             PeriodId::quarter(2025, 4).expect("valid period fixture"),
-        );
+        )
+        .expect("known period");
 
         let q4 = assessment
             .series
@@ -774,7 +802,8 @@ mod tests {
             .entry("total_debt".into())
             .or_default()
             .insert(at, 4.0);
-        let assessment = CreditAssessment::compute(&results, at);
+        record_periods(&mut results);
+        let assessment = CreditAssessment::compute(&results, at).expect("known period");
         assert_eq!(assessment.leverage_ratio, Some(1.0));
         assert_eq!(assessment.interest_coverage, Some(2.0));
         results
@@ -782,7 +811,12 @@ mod tests {
             .get_mut("ebitda")
             .expect("ebitda")
             .swap_remove(&"FY2024Q4".parse::<PeriodId>().expect("quarter"));
-        assert_eq!(CreditAssessment::compute(&results, at).leverage_ratio, None);
+        assert_eq!(
+            CreditAssessment::compute(&results, at)
+                .expect("known period")
+                .leverage_ratio,
+            None
+        );
     }
 
     #[test]
@@ -791,6 +825,13 @@ mod tests {
             let mut results = StatementResult::new();
             for ordinal in 1..=days {
                 let period = PeriodId::day(year, ordinal).expect("day");
+                let (start, end) = period.bounds().expect("bounds");
+                results.periods.push(finstack_quant_core::dates::Period {
+                    id: period,
+                    start,
+                    end,
+                    is_actual: true,
+                });
                 results
                     .nodes
                     .entry("ebitda".into())
@@ -804,7 +845,9 @@ mod tests {
                 .or_default()
                 .insert(at, f64::from(days));
             assert_eq!(
-                CreditAssessment::compute(&results, at).leverage_ratio,
+                CreditAssessment::compute(&results, at)
+                    .expect("known period")
+                    .leverage_ratio,
                 Some(1.0)
             );
             // A gap near the beginning must not be replaced with a shorter
@@ -814,8 +857,51 @@ mod tests {
                 .get_mut("ebitda")
                 .expect("ebitda")
                 .swap_remove(&PeriodId::day(year, 1).expect("day"));
-            assert_eq!(CreditAssessment::compute(&results, at).leverage_ratio, None);
+            assert_eq!(
+                CreditAssessment::compute(&results, at)
+                    .expect("known period")
+                    .leverage_ratio,
+                None
+            );
         }
+    }
+
+    #[test]
+    fn business_day_credit_window_sums_the_trailing_year_of_trading_days() {
+        use finstack_quant_core::dates::{Date, Period};
+        use time::Month;
+        // Two years of weekdays only; LTM at 2025-12-31 is the 261 weekdays of
+        // 2025, not the last 252 rows (which would start in late January).
+        let mut results = StatementResult::new();
+        let mut date = Date::from_calendar_date(2024, Month::January, 1).expect("start");
+        let last = Date::from_calendar_date(2025, Month::December, 31).expect("end");
+        while date <= last {
+            if date.weekday().number_days_from_monday() < 5 {
+                let id = PeriodId::from_date(date, PeriodKind::Daily, None).expect("day");
+                results.periods.push(Period {
+                    id,
+                    start: date,
+                    end: date.next_day().expect("next day"),
+                    is_actual: true,
+                });
+                results
+                    .nodes
+                    .entry("ebitda".into())
+                    .or_default()
+                    .insert(id, 1.0);
+            }
+            date = date.next_day().expect("next day");
+        }
+        let at = PeriodId::from_date(last, PeriodKind::Daily, None).expect("day");
+        assert_eq!(trailing_sum_at(&results, "ebitda", &at), Some(261.0));
+        // A year-end inside the first year of history has no full window.
+        let early = PeriodId::from_date(
+            Date::from_calendar_date(2024, Month::December, 30).expect("day"),
+            PeriodKind::Daily,
+            None,
+        )
+        .expect("day");
+        assert_eq!(trailing_sum_at(&results, "ebitda", &early), None);
     }
 
     #[test]
@@ -837,6 +923,12 @@ mod tests {
             while date < end {
                 let period =
                     PeriodId::from_date(date, PeriodKind::Daily, None).expect("daily period");
+                results.periods.push(finstack_quant_core::dates::Period {
+                    id: period,
+                    start: date,
+                    end: date.next_day().expect("next day"),
+                    is_actual: true,
+                });
                 results
                     .nodes
                     .entry("ebitda".into())
@@ -855,7 +947,7 @@ mod tests {
     }
 
     #[test]
-    fn ambiguous_weekly_and_fiscal_daily_credit_windows_are_unavailable() {
+    fn credit_windows_without_a_full_year_of_periods_are_unavailable() {
         for label in ["2025W52", "FY2025W52", "FY2025D365"] {
             let at: PeriodId = label.parse().expect("period");
             let mut results = StatementResult::new();

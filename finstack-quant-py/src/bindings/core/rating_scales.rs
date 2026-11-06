@@ -9,8 +9,8 @@ use super::config::PyFinstackConfig;
 use crate::bindings::macros::{label_enum, wire_methods};
 use crate::errors::{core_to_py, serde_json_to_py};
 use finstack_quant_core::rating_scales::{
-    embedded_registry, registry_from_config, RatingLevel, RatingScaleRegistry, ScorecardScale,
-    UnknownScalePolicy, RATING_SCALES_EXTENSION_KEY,
+    RATING_SCALES_EXTENSION_KEY, RatingLevel, RatingScaleRegistry, ScorecardScale,
+    UnknownScalePolicy, embedded_registry, registry_from_config,
 };
 use pyo3::exceptions::PyIndexError;
 use pyo3::prelude::*;

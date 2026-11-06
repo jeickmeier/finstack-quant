@@ -249,16 +249,17 @@ impl SabrParameters {
                     self.beta, forward, strike
                 )));
             }
-        } else if let Some(shift) = self.shift {
-            if self.beta >= BETA_SNAP_TOL && (forward + shift <= 0.0 || strike + shift <= 0.0) {
-                return Err(Error::Validation(format!(
-                    "Shifted SABR: effective rates must be positive. \
+        } else if let Some(shift) = self.shift
+            && self.beta >= BETA_SNAP_TOL
+            && (forward + shift <= 0.0 || strike + shift <= 0.0)
+        {
+            return Err(Error::Validation(format!(
+                "Shifted SABR: effective rates must be positive. \
                      Got forward+shift={:.6}, strike+shift={:.6} (shift={:.6})",
-                    forward + shift,
-                    strike + shift,
-                    shift
-                )));
-            }
+                forward + shift,
+                strike + shift,
+                shift
+            )));
         }
 
         Ok(())

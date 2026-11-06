@@ -1,0 +1,439 @@
+{
+  "$defs": {
+    "CollateralAssetClass": {
+      "description": "Collateral asset classes per BCBS-IOSCO standards.\n\nAsset classes determine baseline haircuts and eligibility criteria.\nThe BCBS-IOSCO framework specifies minimum haircuts by asset class.\n\n# Reference\n\nBCBS-IOSCO \"Margin requirements for non-centrally cleared derivatives\" (2020)\nAnnex A: Standardized haircut schedule `docs/REFERENCES.md#bcbs-iosco-uncleared-margin`",
+      "oneOf": [
+        {
+          "const": "cash",
+          "description": "Cash in eligible currency",
+          "type": "string"
+        },
+        {
+          "const": "government_bonds",
+          "description": "Sovereign government bonds accepted as collateral.",
+          "type": "string"
+        },
+        {
+          "const": "agency_bonds",
+          "description": "Debt issued or guaranteed by eligible agencies.",
+          "type": "string"
+        },
+        {
+          "const": "covered_bonds",
+          "description": "Covered bonds meeting the applicable eligibility criteria.",
+          "type": "string"
+        },
+        {
+          "const": "corporate_bonds",
+          "description": "Investment-grade corporate bonds accepted under the CSA.",
+          "type": "string"
+        },
+        {
+          "const": "equity",
+          "description": "Eligible listed equity collateral.",
+          "type": "string"
+        },
+        {
+          "const": "gold",
+          "description": "Eligible gold collateral.",
+          "type": "string"
+        },
+        {
+          "const": "mutual_funds",
+          "description": "Eligible mutual funds or exchange-traded funds.",
+          "type": "string"
+        }
+      ]
+    },
+    "CollateralEligibility": {
+      "additionalProperties": false,
+      "description": "Single collateral eligibility entry.\n\nDefines eligibility criteria and haircut for a specific type of collateral.",
+      "properties": {
+        "asset_class": {
+          "$ref": "#/$defs/CollateralAssetClass",
+          "description": "Asset class"
+        },
+        "concentration_limit": {
+          "description": "Concentration limit as fraction of total collateral (optional)\n\nE.g., 0.30 means max 30% of collateral can be this type.",
+          "format": "double",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "fx_haircut_addon": {
+          "default": 0.0,
+          "description": "Additional FX haircut for currency mismatch (decimal)\n\nApplied when collateral currency differs from settlement currency.",
+          "format": "double",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "haircut": {
+          "description": "Haircut as decimal (e.g., 0.02 = 2%)",
+          "format": "double",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "maturity_constraints": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MaturityConstraints"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Remaining maturity constraints"
+        },
+        "min_rating": {
+          "description": "Minimum credit rating requirement (e.g., \"A-\", \"BBB\")\n\nIf None, no rating constraint applies.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "asset_class",
+        "haircut"
+      ],
+      "type": "object"
+    },
+    "EligibleCollateralSchedule": {
+      "additionalProperties": false,
+      "description": "Eligible collateral schedule with haircuts.\n\nDefines the complete set of collateral types accepted under a CSA\nor margin agreement, along with associated haircuts and constraints.\n\n# Example\n\n```\nuse finstack_quant_margin::types::{CollateralEligibility, EligibleCollateralSchedule};\n\n// Start from a standard schedule (BCBS-IOSCO compliant)\nlet schedule = EligibleCollateralSchedule::bcbs_standard()?;\n# let _ = schedule;\n# Ok::<(), finstack_quant_core::Error>(())\n```",
+      "properties": {
+        "default_haircut": {
+          "description": "Default haircut for unlisted collateral (if accepted)\n\nIf None, only explicitly listed collateral types are accepted.",
+          "format": "double",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "eligible": {
+          "description": "List of eligible collateral types with haircuts",
+          "items": {
+            "$ref": "#/$defs/CollateralEligibility"
+          },
+          "type": "array"
+        },
+        "rehypothecation_allowed": {
+          "default": false,
+          "description": "Whether rehypothecation of posted collateral is permitted\n\nFor IM under BCBS-IOSCO rules, rehypothecation is prohibited.\nFor VM, rehypothecation may be permitted by bilateral agreement.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "eligible"
+      ],
+      "type": "object"
+    },
+    "ImMethodology": {
+      "description": "Initial margin calculation methodology.\n\nDifferent methodologies are used depending on regulatory requirements,\nproduct type, and whether trades are cleared or bilateral.\n\n# BCBS-IOSCO Standards\n\nFor bilateral (uncleared) OTC derivatives, either SIMM or the regulatory\nschedule approach may be used. SIMM is the industry standard for large\ndealers due to its risk-sensitivity.",
+      "oneOf": [
+        {
+          "const": "haircut",
+          "description": "Haircut-based IM calculation (standard for repos and securities financing)\n\nIM = Collateral_Value × Haircut\n\nHaircuts are determined by asset class, rating, maturity, and FX mismatch.",
+          "type": "string"
+        },
+        {
+          "const": "simm",
+          "description": "ISDA Standard Initial Margin Model (SIMM)\n\nSensitivities-based model calculating IM from delta, vega, and curvature\nrisk across interest rate, credit, equity, commodity, and FX risk classes.\n\nReference: ISDA SIMM Methodology v2.6 (2023)",
+          "type": "string"
+        },
+        {
+          "const": "schedule",
+          "description": "BCBS-IOSCO regulatory schedule approach\n\nGrid-based IM calculation using notional × rate based on asset class and maturity.\nSimpler but typically more conservative than SIMM.\n\nExample rates:\n- Interest Rate: 0-2yr: 1%, 2-5yr: 2%, 5+yr: 4%\n- Credit: 2-5yr: 5%, 5+yr: 10%\n- Equity: 15%\n- FX: 6%",
+          "type": "string"
+        },
+        {
+          "const": "internal_model",
+          "description": "Internal model approved by regulator\n\nBank's proprietary VaR or ES-based model approved by supervisor.\nMust meet regulatory backtesting and validation requirements.",
+          "type": "string"
+        },
+        {
+          "const": "clearing_house",
+          "description": "Clearing house methodology\n\nCCP-specific IM calculation (typically VaR or SPAN-based).\nExamples: LCH SwapClear, CME, ICE Clear Credit",
+          "type": "string"
+        }
+      ]
+    },
+    "ImParameters": {
+      "additionalProperties": false,
+      "description": "Initial margin parameters.\n\nInitial margin is collateral posted to cover potential future exposure (PFE)\nduring the close-out period following a default. IM is required for\nnon-centrally cleared derivatives under BCBS-IOSCO rules.\n\n# Margin Period of Risk (MPOR)\n\nThe MPOR determines the horizon over which PFE is calculated:\n- Standard: 10 business days for bilateral derivatives\n- Reduced: 5 days for certain liquid products\n\n# Example\n\n```\nuse finstack_quant_margin::types::{ImMethodology, ImParameters};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\n\nlet im_params = ImParameters {\n    methodology: ImMethodology::Simm,\n    mpor_days: 10,\n    threshold: Money::from((50_000_000_i64, Currency::USD)),\n    mta: Money::from((0_i64, Currency::USD)), // Combined with VM MTA\n    segregated: true,\n};\n```",
+      "properties": {
+        "methodology": {
+          "$ref": "#/$defs/ImMethodology",
+          "description": "IM calculation methodology.\n\nOptions include SIMM, regulatory schedule, or CCP methodology."
+        },
+        "mpor_days": {
+          "description": "Margin Period of Risk in business days.\n\nStandard is 10 days under BCBS-IOSCO. CCPs may use shorter periods.",
+          "format": "uint32",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "mta": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Minimum Transfer Amount for IM.\n\nCombined IM+VM MTA must not exceed €500,000 under BCBS-IOSCO."
+        },
+        "segregated": {
+          "description": "Whether IM must be held in a segregated account.\n\nUnder BCBS-IOSCO, IM must be segregated with a third-party custodian\nto protect it in case of the collecting party's insolvency.",
+          "type": "boolean"
+        },
+        "threshold": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Group-level IM threshold allocated to this CSA by the caller.\n\nBCBS-IOSCO permits €50M aggregate threshold at group level.\nMany large dealers operate with zero threshold by agreement."
+        }
+      },
+      "required": [
+        "methodology",
+        "mpor_days",
+        "threshold",
+        "mta",
+        "segregated"
+      ],
+      "type": "object"
+    },
+    "MarginCallTiming": {
+      "additionalProperties": false,
+      "description": "Margin call timing parameters.\n\nSpecifies the operational timing for margin calls including\nnotification and dispute resolution windows.",
+      "properties": {
+        "delivery_grace_days": {
+          "description": "Grace period for collateral delivery (business days)",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "dispute_resolution_days": {
+          "description": "Dispute resolution window (business days)",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "notification_deadline_hours": {
+          "description": "Notification deadline (hours after valuation, e.g., 13:00 local time)",
+          "format": "uint8",
+          "maximum": 23,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "response_deadline_hours": {
+          "description": "Response deadline (hours after notification)",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "notification_deadline_hours",
+        "response_deadline_hours",
+        "dispute_resolution_days",
+        "delivery_grace_days"
+      ],
+      "type": "object"
+    },
+    "MarginTenor": {
+      "description": "Margin call frequency.\n\nDetermines how often margin calls are made and collateral is exchanged.\nIndustry standard for OTC derivatives is daily under BCBS-IOSCO rules.",
+      "oneOf": [
+        {
+          "const": "daily",
+          "description": "Daily margin calls (standard for OTC derivatives post-2016)",
+          "type": "string"
+        },
+        {
+          "const": "weekly",
+          "description": "Weekly margin calls (pre-regulatory period)",
+          "type": "string"
+        },
+        {
+          "const": "monthly",
+          "description": "Monthly margin calls (pre-regulatory period)",
+          "type": "string"
+        },
+        {
+          "const": "on_demand",
+          "description": "On-demand margin calls (used for repos and some bilateral agreements)",
+          "type": "string"
+        }
+      ]
+    },
+    "MaturityConstraints": {
+      "additionalProperties": false,
+      "description": "Maturity constraints for eligible collateral.\n\nSome CSAs restrict collateral based on remaining maturity to limit\nduration risk in the collateral portfolio.",
+      "properties": {
+        "max_remaining_years": {
+          "default": null,
+          "description": "Maximum remaining years to maturity (if any)",
+          "format": "double",
+          "minimum": 0.0,
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "min_remaining_years": {
+          "default": null,
+          "description": "Minimum remaining years to maturity (if any)",
+          "format": "double",
+          "minimum": 0.0,
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "VmParameters": {
+      "additionalProperties": false,
+      "description": "Variation margin parameters.\n\nThese parameters govern the daily (or periodic) exchange of variation margin\nunder a CSA agreement. VM is exchanged to eliminate mark-to-market exposure.\n\n# ISDA CSA Standard Terms\n\nThe 2016 VM CSA introduced standardized terms for variation margin:\n- Zero threshold for in-scope entities\n- Daily exchange with T+1 settlement\n- Cash or highly liquid securities as collateral\n\n# Example\n\n```\nuse finstack_quant_margin::types::{MarginTenor, VmParameters};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\n\nlet vm_params = VmParameters {\n    threshold: Money::from((10_000_000_i64, Currency::USD)),\n    mta: Money::from((500_000_i64, Currency::USD)),\n    rounding: Money::from((10_000_i64, Currency::USD)),\n    independent_amount: Money::from((0_i64, Currency::USD)),\n    frequency: MarginTenor::Daily,\n    settlement_lag: 1,\n};\n```",
+      "properties": {
+        "frequency": {
+          "$ref": "#/$defs/MarginTenor",
+          "description": "Margin call frequency.\n\nUnder BCBS-IOSCO, daily margin exchange is required."
+        },
+        "independent_amount": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Independent Amount (IA) / Additional Margin.\n\nFixed collateral amount required regardless of exposure.\nOften used for credit enhancement or as a buffer."
+        },
+        "mta": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Minimum Transfer Amount (MTA).\n\nMargin calls below MTA are not made. BCBS-IOSCO permits combined\nIM+VM MTA up to €500,000 equivalent."
+        },
+        "rounding": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Rounding increment for margin amounts.\n\nMargin calls are typically rounded to the nearest multiple of this amount."
+        },
+        "settlement_lag": {
+          "description": "Settlement lag in business days (T+n).\n\nStandard is T+1 for VM under 2016 VM CSA.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "threshold": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Threshold amount below which no margin is exchanged.\n\nUnder BCBS-IOSCO rules for covered entities, VM threshold must be zero.\nLegacy bilateral CSAs may have non-zero thresholds."
+        }
+      },
+      "required": [
+        "threshold",
+        "mta",
+        "rounding",
+        "independent_amount",
+        "frequency",
+        "settlement_lag"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/margin/1/csa_spec.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Credit Support Annex specification (ISDA standard).",
+  "examples": [
+    {
+      "base_currency": "USD",
+      "calendar_id": "nyse",
+      "call_timing": {
+        "delivery_grace_days": 1,
+        "dispute_resolution_days": 2,
+        "notification_deadline_hours": 13,
+        "response_deadline_hours": 2
+      },
+      "collateral_curve_id": "USD-OIS",
+      "eligible_collateral": {
+        "eligible": [
+          {
+            "asset_class": "cash",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.0
+          }
+        ],
+        "rehypothecation_allowed": false
+      },
+      "id": "CSA-ACME-2024",
+      "vm_params": {
+        "frequency": "daily",
+        "independent_amount": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "mta": {
+          "amount": "500000",
+          "currency": "USD"
+        },
+        "rounding": {
+          "amount": "10000",
+          "currency": "USD"
+        },
+        "settlement_lag": 1,
+        "threshold": {
+          "amount": "0",
+          "currency": "USD"
+        }
+      }
+    }
+  ],
+  "properties": {
+    "base_currency": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+      "description": "Base currency for margin calculations.\n\nAll exposures and collateral values are converted to this currency\nfor netting and comparison with thresholds."
+    },
+    "calendar_id": {
+      "description": "Contractual business-day calendar for calls and settlements.",
+      "type": "string"
+    },
+    "call_timing": {
+      "$ref": "#/$defs/MarginCallTiming",
+      "description": "Margin call timing parameters."
+    },
+    "collateral_curve_id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Discount curve ID for collateral valuation.\n\nCash collateral is typically discounted at OIS/RFR rates.\nThis curve should match the CSA's collateral interest rate."
+    },
+    "eligible_collateral": {
+      "$ref": "#/$defs/EligibleCollateralSchedule",
+      "description": "Eligible collateral schedule.\n\nDefines what collateral types are acceptable and associated haircuts."
+    },
+    "id": {
+      "description": "CSA identifier (e.g., \"USD-CSA-STANDARD\", \"COUNTERPARTY-XYZ-CSA\")",
+      "type": "string"
+    },
+    "im_params": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ImParameters"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Initial margin parameters (optional).\n\nIf None, no IM is exchanged (either not in scope for regulations\nor trade is cleared)."
+    },
+    "vm_params": {
+      "$ref": "#/$defs/VmParameters",
+      "description": "Variation margin parameters.\n\nGoverns daily mark-to-market collateral exchange."
+    }
+  },
+  "required": [
+    "id",
+    "base_currency",
+    "calendar_id",
+    "vm_params",
+    "eligible_collateral",
+    "call_timing",
+    "collateral_curve_id"
+  ],
+  "title": "CsaSpec",
+  "type": "object"
+}

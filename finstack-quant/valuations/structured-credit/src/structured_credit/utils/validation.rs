@@ -7,7 +7,7 @@
 //! - Empty/impossible tier configurations
 
 use crate::structured_credit::types::{
-    AllocationMode, PaymentCalculation, PaymentType, WaterfallTier,
+    AllocationMode, PaymentCalculation, PaymentType, RecipientType, WaterfallTier,
 };
 use finstack_quant_core::FxHashSet;
 
@@ -55,11 +55,78 @@ pub enum ValidationError {
         /// Total weight.
         total_weight: f64,
     },
+    /// A debt class is paid by a calculation that is not a note entitlement.
+    #[error(
+        "Recipient '{recipient_id}' in tier '{tier_id}' pays tranche '{tranche_id}' with a \
+         {calculation} calculation, which a note has no claim to. Pay its coupon with \
+         tranche_interest, its balance with tranche_principal or residual_cash, and fee or \
+         reserve formulas to a service provider, manager fee or reserve account. Model a class \
+         that takes excess cash with equity seniority."
+    )]
+    NonNoteCalculation {
+        /// Tier id.
+        tier_id: String,
+        /// Recipient id.
+        recipient_id: String,
+        /// Tranche the recipient pays.
+        tranche_id: String,
+        /// Wire name of the rejected calculation (`fixed_amount`).
+        calculation: String,
+    },
+    /// A recipient pays one tranche the interest or principal of another.
+    #[error(
+        "Recipient '{recipient_id}' in tier '{tier_id}' pays tranche '{tranche_id}' an amount \
+         calculated for tranche '{calculated_for}'"
+    )]
+    TrancheMismatch {
+        /// Tier id.
+        tier_id: String,
+        /// Recipient id.
+        recipient_id: String,
+        /// Tranche the recipient pays.
+        tranche_id: String,
+        /// Tranche the calculation names.
+        calculated_for: String,
+    },
+}
+
+/// What a tranche recipient may be paid: `Ok` with the tranche a note calculation
+/// is sized on (`None` for residual cash), or `Err` naming a calculation no note
+/// has a claim to.
+///
+/// A note is owed interest at its rate and the return of its balance. A fixed or
+/// percentage amount is a fee formula with no basis as either, and paid to a note
+/// it would be cash booked as neither interest nor principal.
+fn non_note_calculation(calculation: &PaymentCalculation) -> Result<Option<&str>, String> {
+    match calculation {
+        PaymentCalculation::TrancheInterest { tranche_id, .. }
+        | PaymentCalculation::CappedTrancheInterest { tranche_id, .. }
+        | PaymentCalculation::TranchePrincipal { tranche_id, .. }
+        | PaymentCalculation::NetWacCarryover { tranche_id, .. } => Ok(Some(tranche_id)),
+        PaymentCalculation::ResidualCash => Ok(None),
+        PaymentCalculation::FixedAmount { .. }
+        | PaymentCalculation::PercentageOfCollateral { .. }
+        | PaymentCalculation::PercentageOfSpecialServiced { .. }
+        | PaymentCalculation::IncentiveFee { .. }
+        | PaymentCalculation::ReserveReplenishment { .. } => Err(wire_name(calculation)),
+    }
+}
+
+/// The serde tag of `calculation`'s variant, as it is written in JSON.
+fn wire_name(calculation: &PaymentCalculation) -> String {
+    match serde_json::to_value(calculation) {
+        Ok(serde_json::Value::String(name)) => name,
+        Ok(serde_json::Value::Object(variant)) if variant.len() == 1 => {
+            variant.into_iter().map(|(name, _)| name).collect()
+        }
+        _ => format!("{calculation:?}"),
+    }
 }
 
 /// Structural validation of waterfall tiers: duplicate tier or recipient
 /// ids, empty tiers, non-finite or negative weights and payment parameters,
-/// and pro-rata tiers without positive total weight.
+/// pro-rata tiers without positive total weight, and tranche recipients paid
+/// anything but their own interest, carryover, principal or residual cash.
 ///
 /// # Arguments
 ///
@@ -120,14 +187,14 @@ pub fn validate_tiers(tiers: &[WaterfallTier]) -> Vec<ValidationError> {
             // panics on the non-finite result (core/src/money/types.rs), so a
             // malformed weight took down the pricing call rather than being
             // reported. Testing for non-finite explicitly closes that.
-            if let Some(weight) = recipient.weight {
-                if !weight.is_finite() || weight < 0.0 {
-                    errors.push(ValidationError::InvalidWeight {
-                        tier_id: tier.id.clone(),
-                        recipient_id: recipient.id.clone(),
-                        weight,
-                    });
-                }
+            if let Some(weight) = recipient.weight
+                && (!weight.is_finite() || weight < 0.0)
+            {
+                errors.push(ValidationError::InvalidWeight {
+                    tier_id: tier.id.clone(),
+                    recipient_id: recipient.id.clone(),
+                    weight,
+                });
             }
             // A non-finite payment PARAMETER reaches `Money::new` in
             // `calculate_payment_amount` and panics there. Validation is the
@@ -155,6 +222,25 @@ pub fn validate_tiers(tiers: &[WaterfallTier]) -> Vec<ValidationError> {
                     weight: f64::NAN,
                 });
             }
+            if let RecipientType::Tranche(tranche_id) = &recipient.recipient_type {
+                match non_note_calculation(&recipient.calculation) {
+                    Err(calculation) => errors.push(ValidationError::NonNoteCalculation {
+                        tier_id: tier.id.clone(),
+                        recipient_id: recipient.id.clone(),
+                        tranche_id: tranche_id.clone(),
+                        calculation,
+                    }),
+                    Ok(Some(calculated_for)) if calculated_for != tranche_id => {
+                        errors.push(ValidationError::TrancheMismatch {
+                            tier_id: tier.id.clone(),
+                            recipient_id: recipient.id.clone(),
+                            tranche_id: tranche_id.clone(),
+                            calculated_for: calculated_for.to_string(),
+                        });
+                    }
+                    Ok(_) => {}
+                }
+            }
         }
 
         // For pro-rata tiers, validate total weight
@@ -180,7 +266,7 @@ pub fn validate_tiers(tiers: &[WaterfallTier]) -> Vec<ValidationError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::structured_credit::types::{PaymentCalculation, Recipient, RecipientType};
+    use crate::structured_credit::types::{PaymentCalculation, Recipient};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::money::Money;
 
@@ -219,5 +305,124 @@ mod tests {
         let errors = validate_tiers(&tiers);
         assert_eq!(errors.len(), 1);
         assert!(matches!(errors[0], ValidationError::EmptyTier { .. }));
+    }
+
+    fn paying_class_b(calculation: PaymentCalculation) -> Vec<ValidationError> {
+        validate_tiers(&[
+            WaterfallTier::new("tier", 1, PaymentType::Residual).add_recipient(Recipient::new(
+                "class_b",
+                RecipientType::Tranche("CLASS_B".to_string()),
+                calculation,
+            )),
+        ])
+    }
+
+    /// A note is owed interest and principal, so every fee or reserve formula
+    /// is rejected for it, and the error says what to use instead.
+    #[test]
+    fn a_debt_class_cannot_be_paid_a_fee_or_reserve_calculation() {
+        let usd = Money::from((50_000_i64, Currency::USD));
+        for (calculation, name) in [
+            (
+                PaymentCalculation::FixedAmount {
+                    amount: usd,
+                    rounding: None,
+                },
+                "fixed_amount",
+            ),
+            (
+                PaymentCalculation::PercentageOfCollateral {
+                    rate: 0.01,
+                    annualized: true,
+                    day_count: None,
+                    rounding: None,
+                },
+                "percentage_of_collateral",
+            ),
+            (
+                PaymentCalculation::PercentageOfSpecialServiced {
+                    rate: 0.01,
+                    annualized: true,
+                    day_count: None,
+                    rounding: None,
+                },
+                "percentage_of_special_serviced",
+            ),
+            (
+                PaymentCalculation::IncentiveFee {
+                    hurdle_irr: 0.1,
+                    share: 0.2,
+                },
+                "incentive_fee",
+            ),
+            (
+                PaymentCalculation::ReserveReplenishment {
+                    target_balance: usd,
+                },
+                "reserve_replenishment",
+            ),
+        ] {
+            let errors = paying_class_b(calculation);
+            assert_eq!(errors.len(), 1, "{name}");
+            assert!(matches!(
+                &errors[0],
+                ValidationError::NonNoteCalculation { calculation, .. } if calculation == name
+            ));
+            let message = errors[0].to_string();
+            assert!(message.contains("CLASS_B"), "{message}");
+            assert!(message.contains("tranche_principal"), "{message}");
+            assert!(message.contains("equity seniority"), "{message}");
+        }
+    }
+
+    #[test]
+    fn a_debt_class_can_be_paid_its_own_claims_and_residual_cash() {
+        for calculation in [
+            PaymentCalculation::TrancheInterest {
+                tranche_id: "CLASS_B".to_string(),
+                rounding: None,
+            },
+            PaymentCalculation::CappedTrancheInterest {
+                tranche_id: "CLASS_B".to_string(),
+                cap_rate: 0.05,
+                rounding: None,
+            },
+            PaymentCalculation::TranchePrincipal {
+                tranche_id: "CLASS_B".to_string(),
+                target_balance: None,
+                rounding: None,
+            },
+            PaymentCalculation::ResidualCash,
+        ] {
+            assert_eq!(paying_class_b(calculation), Vec::new());
+        }
+    }
+
+    /// Cash to one class sized on another retires or defers the wrong balance.
+    #[test]
+    fn a_tranche_cannot_be_paid_another_tranches_amount() {
+        for calculation in [
+            PaymentCalculation::TrancheInterest {
+                tranche_id: "CLASS_A".to_string(),
+                rounding: None,
+            },
+            PaymentCalculation::TranchePrincipal {
+                tranche_id: "CLASS_A".to_string(),
+                target_balance: None,
+                rounding: None,
+            },
+        ] {
+            let errors = paying_class_b(calculation);
+            assert!(matches!(
+                &errors[..],
+                [ValidationError::TrancheMismatch { calculated_for, .. }] if calculated_for == "CLASS_A"
+            ));
+        }
+    }
+
+    /// Fee and reserve calculations keep their own recipients.
+    #[test]
+    fn a_fee_recipient_can_use_a_fee_calculation() {
+        assert!(validate_tiers(&[create_valid_tier("tier", 1)]).is_empty());
     }
 }

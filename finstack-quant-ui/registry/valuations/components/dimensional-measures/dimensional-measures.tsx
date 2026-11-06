@@ -2,7 +2,10 @@
 
 import { useId, useState } from "react";
 import type { MetricMetadata, ValuationResult } from "finstack-quant-wasm";
-import { compareTenorLabels } from "@/lib/finstack/format/format";
+import {
+  compareCoordinates,
+  type AxisCoordinate,
+} from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
 import { MeasureValue } from "../../primitives/measure-value/measure-value";
 
@@ -24,6 +27,8 @@ type MeasureEntry = {
   metric: string;
   group: string | null;
   coordinates: readonly string[];
+  /** Rust's ordering of each coordinate, aligned with `coordinates`. */
+  axes: readonly AxisCoordinate[];
   unit: MetricMetadata["unit"];
   comparisonUnit: MetricMetadata["unit"] | undefined;
   bucketed: boolean;
@@ -32,6 +37,16 @@ type MeasureEntry = {
 };
 
 const metadataSource = "finstack_quant_valuations::pricer::metric_metadata";
+
+/** The distinct labels on one coordinate axis, in Rust's order. */
+function axisLabels(entries: readonly MeasureEntry[], axis: number): string[] {
+  const byLabel = new Map(
+    entries.map((entry) => [entry.axes[axis]!.label, entry.axes[axis]!]),
+  );
+  return [...byLabel.values()]
+    .sort(compareCoordinates)
+    .map(({ label }) => label);
+}
 
 function dimensionalEntries(props: DimensionalMeasuresProps): MeasureEntry[] {
   const primary = new Map(props.metadata?.map((entry) => [entry.key, entry]));
@@ -52,6 +67,10 @@ function dimensionalEntries(props: DimensionalMeasuresProps): MeasureEntry[] {
         metric: descriptor.metric,
         group: descriptor.group ?? null,
         coordinates: descriptor.components,
+        axes: descriptor.coordinates.map((coordinate, index) => ({
+          ...coordinate,
+          label: descriptor.components[index]!,
+        })),
         unit: primary.get(key)?.unit ?? descriptor.unit,
         comparisonUnit: comparison.get(key)?.unit,
         bucketed: descriptor.bucketed,
@@ -120,6 +139,7 @@ function Value({
 function axisLabel(index: number, bucketed: boolean): string {
   if (bucketed && index === 0) return "Identifier";
   if (bucketed && index === 1) return "Bucket";
+  // finstack-arith: 1-based ordinal for a label
   return `Coordinate ${index + 1}`;
 }
 
@@ -165,12 +185,14 @@ function CoordinateTable({
         </caption>
         <thead className="bg-muted/50 text-muted-foreground">
           <tr>
+            {/* finstack-arith: position among the returned coordinate axes */}
             {Array.from({ length: dimensions - axisOffset }, (_, offset) => (
               <th
                 key={offset}
                 scope="col"
                 className="border-b border-border px-3 py-2 font-medium"
               >
+                {/* finstack-arith: position among the returned coordinate axes */}
                 {axisLabel(axisOffset + offset, bucketed)}
               </th>
             ))}
@@ -244,6 +266,7 @@ function CoordinateView({
   bucketed: boolean;
 }) {
   const axes = entries[0]?.coordinates.length ?? 0;
+  // finstack-arith: position among the returned coordinate axes
   if (axes - axisOffset !== 2) {
     return (
       <CoordinateTable
@@ -255,12 +278,9 @@ function CoordinateView({
     );
   }
 
-  const rows = [
-    ...new Set(entries.map((entry) => entry.coordinates[axisOffset])),
-  ].sort(compareTenorLabels);
-  const columns = [
-    ...new Set(entries.map((entry) => entry.coordinates[axisOffset + 1])),
-  ].sort(compareTenorLabels);
+  const rows = axisLabels(entries, axisOffset);
+  // finstack-arith: position among the returned coordinate axes
+  const columns = axisLabels(entries, axisOffset + 1);
   const cells = new Map<string, MeasureEntry>();
   let regular = rows.every(Boolean) && columns.every(Boolean);
   for (const entry of entries) {
@@ -281,9 +301,11 @@ function CoordinateView({
   }
 
   if (rows.length === 1 || columns.length === 1) {
+    // finstack-arith: position among the returned coordinate axes
     const fixedAxis = rows.length === 1 ? axisOffset : axisOffset + 1;
     const fixed = rows.length === 1 ? rows[0] : columns[0];
     const labels = rows.length === 1 ? columns : rows;
+    // finstack-arith: position among the returned coordinate axes
     const variableAxis = rows.length === 1 ? axisOffset + 1 : axisOffset;
     return (
       <div className="overflow-hidden rounded-md border border-border bg-card">
@@ -345,6 +367,7 @@ function CoordinateView({
               className="sticky left-0 z-10 min-w-28 border-b border-r border-border bg-muted px-3 py-2 text-left font-medium text-muted-foreground"
             >
               {axisLabel(axisOffset, bucketed)} /{" "}
+              {/* finstack-arith: position among the returned coordinate axes */}
               {axisLabel(axisOffset + 1, bucketed)}
             </th>
             {columns.map((column) => (
@@ -395,11 +418,7 @@ function MetricSection({
   const first = entries[0];
   if (!first) return null;
   const threeDimensional = first.coordinates.length === 3;
-  const slices = threeDimensional
-    ? [...new Set(entries.map((entry) => entry.coordinates[0]))].sort(
-        compareTenorLabels,
-      )
-    : [];
+  const slices = threeDimensional ? axisLabels(entries, 0) : [];
   const activeSlice = slice && slices.includes(slice) ? slice : slices[0];
   const visible = threeDimensional
     ? entries.filter((entry) => entry.coordinates[0] === activeSlice)

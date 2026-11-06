@@ -49,7 +49,14 @@ FIXTURES = {
         "kelly_criterion": 0.0,
     },
     "RollingGreeks": {"dates": ["2025-01-02"], "alphas": [0.0], "betas": [1.0]},
-    "LookbackReturns": {"ticker_names": ["FUND"], "mtd": [0.1], "qtd": [0.1], "ytd": [0.1], "fytd": [0.1]},
+    "LookbackReturns": {
+        "ref_date": "2025-01-02",
+        "ticker_names": ["FUND"],
+        "mtd": [0.1],
+        "qtd": [0.1],
+        "ytd": [0.1],
+        "fytd": [0.1],
+    },
 }
 REQUIRED = {
     "BetaResult": ["n_obs", "confidence_level"],

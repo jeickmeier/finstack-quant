@@ -1,5 +1,6 @@
 "use client";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import type { ColumnDef } from "@tanstack/react-table";
 import {
   Table,
   TableHeader,
@@ -10,9 +11,16 @@ import {
   TableFooter,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { formatRawMoney } from "@/lib/finstack/format/format";
+import { formatRaw, formatRawMoney } from "@/lib/finstack/format/format";
+import { serializeHost } from "@/lib/finstack/codec.mjs";
 import { JsonViewer } from "@/components/finstack/shared/primitives/json-viewer/json-viewer";
-import { readCashflows } from "./cashflow-data";
+import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
+import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
+import {
+  readCashflows,
+  type CashflowLadder,
+  type CashflowSchedule,
+} from "./cashflow-data";
 
 const diagnostics = [
   ["rate", "Rate", "Projected or contractual rate, as supplied"],
@@ -28,42 +36,114 @@ const extraDiagnostics = [
   ["conditional_default_prob", "Interval default probability"],
   ["inflation_index_ratio", "Inflation ratio"],
   ["prepayment_smm", "Prepayment SMM"],
-  ["beginning_balance", "Beginning balance"],
-  ["ending_balance", "Ending balance"],
 ] as const;
-/** Native cashflow schedule with exact numeric tokens and an unchanged JSON export. */
+/** The envelope's balance fields, labelled for what Rust documents them to be. */
+const balances = [
+  [
+    "beginning_balance",
+    "Principal before",
+    "Outstanding principal before this row, in the row currency; for agency MBS, the pool balance at the start of the period",
+  ],
+  [
+    "ending_balance",
+    "Principal after",
+    "Outstanding principal after this row, in the row currency; for agency MBS, the pool balance at the end of the period",
+  ],
+] as const;
+const views = [
+  { value: "schedule", label: "Schedule" },
+  { value: "ladder", label: "Annual ladder" },
+] as const;
+type LadderRow = CashflowLadder["rows"][number];
+/** Supplied native ladder rows in a row currency; values are formatted, never summed. */
+function ladderColumns(
+  currency: CashflowLadder["currency"],
+): ColumnDef<{}, LadderRow, any>[] {
+  const money = (
+    id: "non_principal" | "principal" | "pv",
+    header: string,
+    title?: string,
+  ): ColumnDef<{}, LadderRow, any> => ({
+    id,
+    header: () => <span title={title}>{header}</span>,
+    accessorFn: (row) => row[id],
+    meta: { className: "text-right finstack-numeric font-sans" },
+    cell: (context) => (
+      <span className="whitespace-nowrap" title={String(context.getValue())}>
+        {formatRawMoney({ amount: String(context.getValue()), currency })}
+      </span>
+    ),
+  });
+  return [
+    {
+      id: "year",
+      header: "Year",
+      accessorFn: (row) => row.year,
+      meta: { className: "font-mono", rowHeader: true },
+    },
+    money("non_principal", "Non-principal"),
+    money("principal", "Principal"),
+    money(
+      "pv",
+      "Native PV",
+      "Row-currency present value before FX conversion and any scenario price shock",
+    ),
+  ];
+}
+/** Native cashflow envelope as a table, with an optional native annual ladder and a host serialization of the supplied object. */
 export function CashflowViewer({
-  text,
+  cashflows,
+  ladder,
+  ladderError,
   loading = false,
   error: suppliedError,
   density = "compact",
 }: {
-  /** Unmodified native cashflow JSON; no worker or query provider is required. */
-  text?: string | null;
+  /** Native cashflow envelope object as returned by the facade; no worker or query provider is required. */
+  cashflows?: CashflowSchedule | null;
+  /** Native calendar-year ladder per row currency of the same envelope (useCashflowLadder); supplying it, even as null while pending, adds the Annual ladder view. */
+  ladder?: readonly CashflowLadder[] | null;
+  /** Native ladder error supplied by the owner of the ladder request. */
+  ladderError?: string | null;
   loading?: boolean;
   /** Native query error supplied by the owner of the request. */
   error?: string | null;
   density?: "compact" | "comfortable";
 }) {
   const presentation = useMemo(() => {
-    if (!text) return {};
+    if (!cashflows) return {};
     try {
-      return { schedule: readCashflows(text) };
+      return { schedule: readCashflows(cashflows) };
     } catch (error) {
       return {
         error: `Cashflow table unavailable: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
-  }, [text]);
+  }, [cashflows]);
+  // Host serialization of the supplied object for copy and download; not native text.
+  const text = useMemo(() => {
+    if (!cashflows) return null;
+    try {
+      return serializeHost(cashflows);
+    } catch {
+      return null;
+    }
+  }, [cashflows]);
+  const [view, setView] = useState<"schedule" | "ladder">("schedule");
+  const hasLadder = ladder !== undefined || Boolean(ladderError);
+  const showLadder = hasLadder && view === "ladder";
   const schedule = presentation.schedule;
   const error = suppliedError
     ? `Cashflows unavailable: ${suppliedError}`
     : presentation.error;
   const columns = diagnostics.filter(([key]) =>
-    schedule?.flows.some((row) => row[key] !== undefined),
+    schedule?.flows.some((row) => row[key] != null),
+  );
+  const balanceColumns = balances.filter(([key]) =>
+    schedule?.flows.some((row) => row[key] != null),
   );
   const hasExtra = schedule?.flows.some((row) =>
-    extraDiagnostics.some(([key]) => row[key] !== undefined),
+    extraDiagnostics.some(([key]) => row[key] != null),
   );
   const numeric = "text-right finstack-numeric font-sans";
   const cell = density === "compact" ? "py-1.5" : "py-3";
@@ -97,7 +177,54 @@ export function CashflowViewer({
               {schedule.model}
             </span>
           </div>
-          {schedule.flows.length ? (
+          {hasLadder && (
+            <div className="mb-3 print:hidden">
+              <EnumField
+                label="Cashflow view"
+                orientation="horizontal"
+                layout="radio"
+                value={view}
+                onValueChange={(next) =>
+                  setView(next === "ladder" ? "ladder" : "schedule")
+                }
+                options={views}
+              />
+            </div>
+          )}
+          {showLadder ? (
+            <div aria-label="Annual ladder" role="group" className="space-y-4">
+              {ladderError ? (
+                <p role="alert" className="text-sm text-error">
+                  Annual ladder unavailable: {ladderError}
+                </p>
+              ) : !ladder ? (
+                <p role="status" className="text-sm text-muted-foreground">
+                  Loading annual ladder…
+                </p>
+              ) : ladder.length ? (
+                ladder.map((entry) => (
+                  <FinstackTable
+                    key={entry.currency}
+                    data={[...entry.rows]}
+                    columns={ladderColumns(entry.currency)}
+                    getRowId={(row) => String(row.year)}
+                    caption={`Annual ladder · ${entry.currency}`}
+                    density={density}
+                    emptyState="No ladder rows returned."
+                  />
+                ))
+              ) : (
+                <p className="py-4 text-sm text-muted-foreground">
+                  No ladder rows returned.
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Rust calendar-year ladder per row currency. Amounts and native
+                PV are in that currency, before FX conversion and any scenario
+                price shock; no FX conversion or totals across currencies.
+              </p>
+            </div>
+          ) : schedule.flows.length ? (
             <div className="max-w-full [&_[data-slot=table-container]]:print:overflow-visible">
               <Table
                 aria-label="Cashflow schedule"
@@ -113,6 +240,16 @@ export function CashflowViewer({
                     <TableHead scope="col" className="text-right">
                       Amount
                     </TableHead>
+                    {balanceColumns.map(([key, label, title]) => (
+                      <TableHead
+                        key={key}
+                        scope="col"
+                        className="text-right"
+                        title={title}
+                      >
+                        {label}
+                      </TableHead>
+                    ))}
                     {columns.map(([key, label, title]) => (
                       <TableHead
                         key={key}
@@ -150,22 +287,45 @@ export function CashflowViewer({
                       </TableCell>
                       <TableCell
                         className={`${cell} ${numeric} align-top`}
-                        title={row.amount}
+                        title={String(row.amount)}
                       >
                         <span className="whitespace-nowrap">
                           {formatRawMoney({
-                            amount: row.amount,
+                            amount: String(row.amount),
                             currency: row.currency,
                           })}
                         </span>
                       </TableCell>
+                      {balanceColumns.map(([key]) => {
+                        const balance = row[key];
+                        return (
+                          <TableCell
+                            key={key}
+                            className={`${cell} ${numeric} align-top`}
+                            title={
+                              balance == null ? undefined : String(balance)
+                            }
+                          >
+                            <span className="whitespace-nowrap">
+                              {balance == null
+                                ? formatRaw(balance)
+                                : formatRawMoney({
+                                    amount: String(balance),
+                                    currency: row.currency,
+                                  })}
+                            </span>
+                          </TableCell>
+                        );
+                      })}
                       {columns.map(([key]) => (
                         <TableCell
                           key={key}
                           className={`${cell} ${numeric} align-top print:hidden`}
-                          title={row[key]}
+                          title={
+                            row[key] == null ? undefined : String(row[key])
+                          }
                         >
-                          {row[key] ?? "—"}
+                          {formatRaw(row[key])}
                         </TableCell>
                       ))}
                       <TableCell
@@ -174,7 +334,7 @@ export function CashflowViewer({
                         <dl className="space-y-1">
                           {[...columns, ...extraDiagnostics].flatMap(
                             ([key, label]) =>
-                              row[key] === undefined
+                              row[key] == null
                                 ? []
                                 : [
                                     <div
@@ -185,7 +345,7 @@ export function CashflowViewer({
                                         {label}
                                       </dt>
                                       <dd className="finstack-numeric whitespace-nowrap font-sans">
-                                        {row[key]}
+                                        {formatRaw(row[key])}
                                       </dd>
                                     </div>,
                                   ],
@@ -194,11 +354,11 @@ export function CashflowViewer({
                       </TableCell>
                       <TableCell
                         className={`${cell} ${numeric} align-top`}
-                        title={row.pv}
+                        title={String(row.pv)}
                       >
                         <span className="whitespace-nowrap">
                           {formatRawMoney({
-                            amount: row.pv,
+                            amount: String(row.pv),
                             currency: schedule.currency,
                           })}
                         </span>
@@ -207,7 +367,7 @@ export function CashflowViewer({
                         <TableCell className={`${cell} align-top print:hidden`}>
                           <dl>
                             {extraDiagnostics.flatMap(([key, label]) =>
-                              row[key] === undefined
+                              row[key] == null
                                 ? []
                                 : [
                                     <div
@@ -215,7 +375,9 @@ export function CashflowViewer({
                                       className="flex justify-between gap-3"
                                     >
                                       <dt>{label}</dt>
-                                      <dd className={numeric}>{row[key]}</dd>
+                                      <dd className={numeric}>
+                                        {formatRaw(row[key])}
+                                      </dd>
                                     </div>,
                                   ],
                             )}
@@ -228,21 +390,24 @@ export function CashflowViewer({
                 <TableFooter>
                   <TableRow>
                     <TableCell
-                      colSpan={3 + columns.length}
+                      colSpan={3 + balanceColumns.length + columns.length}
                       className="text-right print:hidden"
                     >
                       Total PV · {schedule.currency}
                     </TableCell>
                     <TableCell
-                      colSpan={3}
+                      colSpan={3 + balanceColumns.length}
                       className="hidden text-right print:table-cell"
                     >
                       Total PV · {schedule.currency}
                     </TableCell>
-                    <TableCell className={numeric} title={schedule.total_pv}>
+                    <TableCell
+                      className={numeric}
+                      title={String(schedule.total_pv)}
+                    >
                       <span className="whitespace-nowrap">
                         {formatRawMoney({
-                          amount: schedule.total_pv,
+                          amount: String(schedule.total_pv),
                           currency: schedule.currency,
                         })}
                       </span>
@@ -265,13 +430,17 @@ export function CashflowViewer({
             </Badge>
             <span>
               {!schedule.flows.length &&
-                `Total PV · ${formatRawMoney({ amount: schedule.total_pv, currency: schedule.currency })}`}
+                `Total PV · ${formatRawMoney({ amount: String(schedule.total_pv), currency: schedule.currency })}`}
             </span>
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            Amounts use each row’s currency. PV and total PV use reporting
-            currency {schedule.currency}.
-          </p>
+          {!showLadder && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Amounts use each row’s currency. PV and total PV use reporting
+              currency {schedule.currency}.
+              {balanceColumns.length > 0 &&
+                " Principal before and after are the outstanding principal Rust supplies per row, in the row currency: an issue funding row starts from zero, and rows of one agency MBS period share its pool balances."}
+            </p>
+          )}
         </>
       )}
       {!loading && !error && !schedule && (
@@ -279,7 +448,7 @@ export function CashflowViewer({
       )}
       <details className="mt-4 text-xs print:hidden">
         <summary className="cursor-pointer text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring">
-          Original JSON
+          Envelope JSON
         </summary>
         <div className="mt-2">
           <JsonViewer

@@ -6,8 +6,8 @@ use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_valuations_core::instruments::pricing::overnight::{
-    project_overnight_coupon, resolve_overnight_fixing_calendar, OvernightCouponProjectionInput,
-    OvernightObservationExposure, OvernightProjectionCurve,
+    OvernightCouponProjectionInput, OvernightObservationExposure, OvernightProjectionCurve,
+    project_overnight_coupon, resolve_overnight_fixing_calendar,
 };
 
 /// Resolved economics for one optioned cap/floor coupon.

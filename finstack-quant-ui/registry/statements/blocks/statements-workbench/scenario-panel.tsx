@@ -12,11 +12,16 @@ import {
   useEvaluateStatementScenarios,
   type StatementScenarioRequest,
 } from "@/hooks/statements/use-evaluate-statement-scenarios/use-evaluate-statement-scenarios";
+import {
+  useDiffStatementScenarios,
+  type StatementScenarioDiffRequest,
+} from "@/hooks/statements/use-diff-statement-scenarios/use-diff-statement-scenarios";
+import { useTraceStatementScenarios } from "@/hooks/statements/use-trace-statement-scenario/use-trace-statement-scenario";
 import type { LinkedSelection } from "@/hooks/shared/use-linked-selection/use-linked-selection";
 import type { FinancialModelSpecWire } from "@/lib/finstack/generated/types/financial_model_spec";
 import schema from "@/lib/finstack/generated/schemas/scenario_set.json";
 import type { ScenarioSetWire } from "@/lib/finstack/generated/types/scenario_set";
-import { createWireCodec } from "@/lib/finstack/codec.mjs";
+import { createWireCodec, serializeHost } from "@/lib/finstack/codec.mjs";
 import { formatRawMoney } from "@/lib/finstack/format/format";
 import {
   adaptStatementResult,
@@ -24,6 +29,7 @@ import {
   statementRows,
   type StatementCell,
 } from "../../components/statement-grid/projection";
+import { VarianceTable } from "../../components/variance-table/variance-table";
 import { ForecastEditor, type ForecastSpecWire } from "./forecast-editor";
 
 const scenarioSetCodec = createWireCodec(schema);
@@ -151,6 +157,33 @@ function scenarioSetJson(
   }
 }
 
+/**
+ * Accounting text of a native scenarioDiff value (an f64 for every node), on
+ * the same path as the line's cells: a monetary line's value takes its model
+ * currency and the display mode's scaling; nothing is recomputed.
+ */
+function diffValueText(
+  model: FinancialModelSpecWire,
+  metric: string,
+  periodId: string,
+  value: number,
+  displayMode: "exact" | "millions",
+): string {
+  const type = model.nodes[metric]?.value_type;
+  return reportStatementCell(
+    {
+      periodId,
+      present: true,
+      value:
+        type?.type === "monetary"
+          ? { amount: String(value), currency: type.currency }
+          : value,
+      text: String(value),
+    },
+    displayMode,
+  );
+}
+
 function moneyCell(
   periodId: string,
   value: Parameters<typeof formatRawMoney>[0] | undefined,
@@ -212,6 +245,54 @@ export function ScenarioPanel({
   const [revision, setRevision] = useState(0);
   const names = useMemo(() => (results ? Object.keys(results) : []), [results]);
   const shownName = shown && names.includes(shown) ? shown : names[0];
+  // One native lineage per scenario, root first; the parent is the entry before the scenario.
+  const traces = useTraceStatementScenarios(
+    request && results
+      ? names.map((scenario) => ({
+          scenarioSetJson: request.scenarioSetJson,
+          scenario,
+        }))
+      : [],
+  );
+  const lineages = traces.map((trace) => trace.data);
+  const traced = traces.every((trace) => trace.data !== undefined);
+  /** User baseline per comparison scenario; "" chooses none. */
+  const [chosen, setChosen] = useState<Record<string, string>>({});
+  const baselineOf = (name: string, index: number): string => {
+    const choice = chosen[name] ?? lineages[index]?.at(-2) ?? "";
+    return names.includes(choice) && choice !== name ? choice : "";
+  };
+  const pairs = traced
+    ? names
+        .map((comparison, index) => ({
+          baseline: baselineOf(comparison, index),
+          comparison,
+        }))
+        .filter((pair) => pair.baseline)
+    : [];
+  const resultsJson = useMemo(
+    () => (results ? serializeHost(results) : null),
+    [results],
+  );
+  const diffRequest: StatementScenarioDiffRequest | null =
+    request && resultsJson && activePeriod && pairs.length
+      ? {
+          scenarioSetJson: request.scenarioSetJson,
+          resultsJson,
+          pairs,
+          metrics: nodeIds,
+          periods: [activePeriod],
+        }
+      : null;
+  const diffs = useDiffStatementScenarios(diffRequest);
+  // One native ScenarioDiff per pair, in pair order.
+  const diffData = diffRequest ? diffs.data : undefined;
+  const diffFailure =
+    traces.find((trace) => trace.error)?.error?.message ?? diffs.error?.message;
+  const diffText = (metric: string, value: number) =>
+    diffValueText(model, metric, activePeriod ?? "", value, displayMode);
+  const shownDiff =
+    diffData?.[pairs.findIndex((pair) => pair.comparison === shownName)];
   const valueNodes = nodeIds.filter(
     (id) => model.nodes[id] && model.nodes[id].node_type !== "calculated",
   );
@@ -294,10 +375,12 @@ export function ScenarioPanel({
         return (
           <section
             key={index}
+            // finstack-arith: 1-based ordinal for a label
             aria-label={`Scenario ${draft.name || index + 1}`}
             className="space-y-4 rounded-lg border border-border bg-card p-4"
           >
             <span id={scenarioId} className="sr-only">
+              {/* finstack-arith: 1-based ordinal for a label */}
               Scenario {draft.name || index + 1}
             </span>
             <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
@@ -442,6 +525,7 @@ export function ScenarioPanel({
                     layout="select"
                     value=""
                     onValueChange={(id) => {
+                      // finstack-arith: remount revision counter, not a value
                       setRevision((value) => value + 1);
                       update(index, {
                         forecasts: {
@@ -524,9 +608,63 @@ export function ScenarioPanel({
                   reportStatementCell(line.cells[i], displayMode),
                 meta: { className: "text-right font-mono text-xs" },
               })),
+              // Native abs_var per pair; capital-structure rows have no scenarioDiff row.
+              ...(diffData
+                ? pairs.map((pair, k) => ({
+                    id: `delta-${k}`,
+                    header: `Δ ${pair.comparison} vs ${pair.baseline}`,
+                    accessorFn: (line: ComparisonLine) => {
+                      const row = diffData[k]?.variance.rows.find(
+                        (row) =>
+                          row.metric === line.id && row.period === activePeriod,
+                      );
+                      return row ? diffText(row.metric, row.abs_var) : "—";
+                    },
+                    meta: { className: "text-right font-mono text-xs" },
+                  }))
+                : []),
             ]}
             density={density}
           />
+          {diffFailure && (
+            <p
+              role="alert"
+              className="rounded-md border border-error p-3 text-sm text-error"
+            >
+              {diffFailure}
+            </p>
+          )}
+          <div
+            role="group"
+            aria-label="Scenario baselines"
+            className="grid gap-3 sm:grid-cols-2"
+          >
+            {names.map((name, index) => (
+              <div key={name} className="space-y-1">
+                <p
+                  aria-label={`Lineage of ${name}`}
+                  className="text-xs text-muted-foreground"
+                >
+                  {lineages[index]?.join(" › ") ?? name}
+                </p>
+                <EnumField
+                  label={`Baseline for ${name}`}
+                  layout="radio"
+                  value={traced ? baselineOf(name, index) : ""}
+                  disabled={!traced}
+                  onValueChange={(baseline) =>
+                    setChosen({ ...chosen, [name]: baseline })
+                  }
+                  options={[
+                    { value: "", label: "No baseline" },
+                    ...names
+                      .filter((other) => other !== name)
+                      .map((other) => ({ value: other, label: other })),
+                  ]}
+                />
+              </div>
+            ))}
+          </div>
         </section>
       )}
       {results && shownName && (
@@ -549,6 +687,15 @@ export function ScenarioPanel({
               </Button>
             ))}
           </div>
+          {shownDiff && activePeriod && (
+            <VarianceTable
+              report={shownDiff.variance}
+              caption={`${shownDiff.comparison} against ${shownDiff.baseline}, ${activePeriod}`}
+              metricLabel={(metric) => model.nodes[metric]?.name ?? metric}
+              formatValue={diffText}
+              density={density}
+            />
+          )}
           <StatementGrid
             title={`${shownName} statements`}
             model={model}
