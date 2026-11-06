@@ -219,6 +219,11 @@ path = "src/bin/gen_schemas.rs"
 required-features = ["json-schema"]
 test = false
 
+[[bin]]
+name = "gen_registry_snapshot"
+path = "src/bin/gen_registry_snapshot.rs"
+test = false
+
 [lints]
 workspace = true
 

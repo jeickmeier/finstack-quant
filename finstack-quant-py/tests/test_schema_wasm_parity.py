@@ -8,13 +8,14 @@ pinned to one Rust result. Python returns JSON text where WASM returns plain
 objects; the cases compare the parsed documents.
 
 The golden is derived from the published schemas; ``mise run gen-write``
-regenerates it (through the ``UPDATE_SCHEMA_PARITY_GOLDEN=1`` branch below).
+regenerates it through the WASM facade test. The instrument payload is the
+golden's JSON text (the WASM serialization of the bond schema example), so both
+hosts validate the same bytes.
 """
 
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from typing import Any
 
@@ -75,7 +76,7 @@ def _index(text: str) -> dict[str, Any]:
     }
 
 
-def _cases() -> dict[str, Any]:
+def _cases(instrument_json: str) -> dict[str, Any]:
     registries = {}
     for path, (module, selector) in REGISTRIES.items():
         registries[path] = {
@@ -85,8 +86,6 @@ def _cases() -> dict[str, Any]:
             "llm": _summary(module.get(selector, "llm")),
             "report": json.loads(module.validate(selector, INVALID_PAYLOAD)),
         }
-    bond = json.loads(valuations.schema.instrument_schema("bond"))["examples"][0]
-    instrument_json = json.dumps(bond)
     resources = cashflows.schema.resources()
     return {
         "invalid_payload": INVALID_PAYLOAD,
@@ -102,10 +101,11 @@ def _cases() -> dict[str, Any]:
 
 
 def test_python_matches_the_cross_host_golden() -> None:
-    cases = _cases()
-    if os.environ.get("UPDATE_SCHEMA_PARITY_GOLDEN") == "1":
-        GOLDEN.write_text(json.dumps(cases, indent=2) + "\n")
-    assert cases == json.loads(GOLDEN.read_text())
+    golden = json.loads(GOLDEN.read_text())
+    instrument_json = golden["instrument"]["json"]
+    bond = json.loads(valuations.schema.instrument_schema("bond"))["examples"][0]
+    assert json.loads(instrument_json) == bond
+    assert _cases(instrument_json) == golden
 
 
 def test_every_registry_exercises_a_real_failure() -> None:

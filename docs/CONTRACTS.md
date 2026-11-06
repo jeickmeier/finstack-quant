@@ -158,9 +158,12 @@ file digest.
 schemas, the core reference tables, the WASM contract types, the facade
 declaration and surface, the UI's generated files and fixtures, and the pinned
 registry snapshot. Every schema generator supports `--write`, `--check`,
-`--list`, and `--output-root`; the tasks build the generators first (locally
-the `rust-test` build) and run the binaries from `target/debug` through
-`scripts/check_schema_generation.py`.
+`--list`, and `--output-root`; `gen-write` builds only the generator binaries
+and runs them from `target/debug` through
+`scripts/check_schema_generation.py` (gen-check reuses the local `rust-test`
+build). The registry snapshot comes from the `gen_registry_snapshot` binary
+(`--write` / `--check`), and the cross-host schema parity golden from the WASM
+facade test.
 
 `mise run gen-check` is non-mutating. For the schemas it verifies registry inventory,
 checked-in bytes, unique `$id` values, resolvable references, and v1-only
