@@ -559,7 +559,6 @@ impl ConvertibleBond {
     /// - **Soft call:** 130% trigger, 20 of 30 trading days
     /// - **Call schedule:** Issuer can call at 101% after year 2
     /// - **Put schedule:** Holder can put at 100% after year 1
-    #[allow(clippy::expect_used)] // Example uses hardcoded valid values
     pub fn example_mandatory() -> finstack_quant_core::Result<Self> {
         use crate::bond::CallPut;
         use finstack_quant_cashflows::builder::CouponType;

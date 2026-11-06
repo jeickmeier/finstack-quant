@@ -60,7 +60,7 @@
     },
     {
       "id": "CALIBRATION-FRAMEWORK-012",
-      "title": "Weighted Levenberg\u2013Marquardt and bound projection",
+      "title": "Weighted Levenberg–Marquardt and bound projection",
       "path": "12-weighted-global-solve.md"
     },
     {
@@ -90,7 +90,7 @@
     },
     {
       "id": "CALIBRATION-FRAMEWORK-018",
-      "title": "Dated Hull\u2013White quote preparation and persisted output",
+      "title": "Dated Hull–White quote preparation and persisted output",
       "path": "18-hull-white-market-adapter.md"
     },
     {
@@ -139,7 +139,7 @@
       "sha256": "6168cf340193b4fab97b17f63ed99aa1d36c5d0ad97027f0d5b994d5a4311bdd"
     },
     {
-      "path": "finstack-quant/calibration/src/api/dependency_review_tests.rs",
+      "path": "finstack-quant/calibration/src/api/tests/engine_dependency_review.rs",
       "classification": "test",
       "records": [
         "CALIBRATION-FRAMEWORK-003"
@@ -311,7 +311,7 @@
       "sha256": "374b1bfb4ffcbcd785089b6a11c9b9374b964551d84dafe376c4397efb7444d7"
     },
     {
-      "path": "finstack-quant/calibration/src/build/tests_credit.rs",
+      "path": "finstack-quant/calibration/src/build/tests/credit.rs",
       "classification": "test",
       "records": [
         "CALIBRATION-FRAMEWORK-007",
@@ -321,7 +321,7 @@
       "sha256": "cac15727df88daf5ee4c31d66a29011694ecb07615b7df682b619cd8368cf4fb"
     },
     {
-      "path": "finstack-quant/calibration/src/build/tests_quote_construction.rs",
+      "path": "finstack-quant/calibration/src/build/tests/quote_construction.rs",
       "classification": "test",
       "records": [
         "CALIBRATION-FRAMEWORK-004",
@@ -334,7 +334,7 @@
       "sha256": "72d16665cc44989daeb804a2e0633ea81bbb783383144c041aa8915ae55d4eae"
     },
     {
-      "path": "finstack-quant/calibration/src/build/tests_rates.rs",
+      "path": "finstack-quant/calibration/src/build/tests/rates.rs",
       "classification": "test",
       "records": [
         "CALIBRATION-FRAMEWORK-004",
@@ -457,7 +457,7 @@
       "sha256": "5760edf2c6b434a0791a3fc33d4ba2b0262141efb9e50c269b8737fd1deb9288"
     },
     {
-      "path": "finstack-quant/calibration/src/recalibration/rates_review_tests.rs",
+      "path": "finstack-quant/calibration/src/recalibration/tests/rates_review.rs",
       "classification": "test",
       "records": [
         "CALIBRATION-FRAMEWORK-019",

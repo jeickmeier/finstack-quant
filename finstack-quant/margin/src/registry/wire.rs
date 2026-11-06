@@ -1,9 +1,7 @@
 //! Loading, merging, and wire-format support for margin registry data.
 //!
 //! Every type below is a deserialization target for an embedded registry JSON
-//! file. Their fields are read by serde and never by a Rust call-site, so the
-//! module as a whole opts out of `dead_code` rather than annotating each type.
-#![allow(dead_code)]
+//! file.
 
 use serde::Deserialize;
 use serde_json::Value;

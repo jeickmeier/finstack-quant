@@ -14,7 +14,7 @@
 //! principal proceeds are not reinvested but repay the notes.
 
 use super::*;
-use crate::structured_credit::pricing::coverage_tests::TestContext;
+use crate::structured_credit::pricing::coverage::TestContext;
 use crate::structured_credit::pricing::waterfall::{
     SeniorFeeInputs, coverage_inputs, evaluate_coverage_tests, senior_fee_accrual,
     special_serviced_balance,

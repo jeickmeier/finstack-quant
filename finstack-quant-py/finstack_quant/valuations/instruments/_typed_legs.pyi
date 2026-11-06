@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import datetime
+from decimal import Decimal
 from typing import Any, Literal
-import pandas as pd
 from finstack_quant.cashflows.builder import RollRule
 from finstack_quant.core.dates import DayCount, StubKind, Tenor
-from finstack_quant.core.types import Bps, Rate
 
 class FixedLegSpec:
     """
@@ -24,12 +23,12 @@ class FixedLegSpec:
     >>> from finstack_quant.core.dates import DayCount, Tenor
     >>> from finstack_quant.valuations.instruments import FixedLegSpec
     >>> leg = FixedLegSpec(
-    ...     "USD-OIS",
-    ...     0.04,
-    ...     Tenor.semi_annual(),
-    ...     DayCount.THIRTY_360,
-    ...     "2024-01-15",
-    ...     "2029-01-15",
+    ...     discount_curve_id="USD-OIS",
+    ...     rate="0.04",
+    ...     frequency=Tenor.semi_annual(),
+    ...     day_count=DayCount.THIRTY_360,
+    ...     start="2024-01-15",
+    ...     end="2029-01-15",
     ... )
     >>> leg.rate
     0.04
@@ -37,13 +36,13 @@ class FixedLegSpec:
 
     def __init__(
         self,
-        discount_curve_id: str,
-        rate: float | Rate,
-        frequency: Tenor,
-        day_count: DayCount,
-        start: datetime.date | datetime.datetime | pd.Timestamp | str,
-        end: datetime.date | datetime.datetime | pd.Timestamp | str,
         *,
+        discount_curve_id: str,
+        rate: Decimal | str,
+        frequency: Tenor,
+        day_count: DayCount | str,
+        start: datetime.date | str,
+        end: datetime.date | str,
         business_day_convention: str = "modified_following",
         calendar_id: str | None = None,
         stub: StubKind | Literal["none", "short_front", "long_front", "short_back", "long_back"] = "short_front",
@@ -53,19 +52,24 @@ class FixedLegSpec:
         """
         Create a fixed leg.
 
+        Every field is keyword-only: Rust reads the keywords as the
+        ``FixedLegSpec`` wire struct, supplies the defaults shown and rejects an
+        unknown keyword.
+
         Parameters
         ----------
         discount_curve_id : str
             Discount curve identifier for pricing this leg.
-        rate : float | Rate
-            Fixed rate as a decimal (``0.04`` = 4%) or a ``Rate``.
+        rate : decimal.Decimal | str
+            Fixed rate as an exact decimal fraction (``"0.04"`` = 4%); a
+            ``float`` or ``Rate`` is rejected.
         frequency : Tenor
             Payment frequency.
-        day_count : DayCount
+        day_count : DayCount | str
             Day count convention for accrual.
-        start : datetime.date | datetime.datetime | pd.Timestamp | str
-            Start date of the fixed leg (ISO 8601 strings accepted).
-        end : datetime.date | datetime.datetime | pd.Timestamp | str
+        start : datetime.date | str
+            Start date of the fixed leg (a date or an ISO 8601 string).
+        end : datetime.date | str
             End date of the fixed leg.
         business_day_convention : str, default "modified_following"
             Business day convention for payment dates.
@@ -81,23 +85,24 @@ class FixedLegSpec:
         Raises
         ------
         ValueError
-            If an enum value is invalid, ``rate`` is not finite, or the
-            accrual period is malformed (``start >= end``).
+            If a required field is missing, a keyword is unknown, an enum
+            value or date string is invalid, ``rate`` is not an exact-decimal
+            string, or the accrual period is malformed (``start >= end``).
         TypeError
-            If ``rate`` is neither a number nor a ``Rate`` or a date cannot
-            be interpreted.
+            If a positional argument is passed, or a value is not
+            JSON-encodable (neither a wire value nor a typed wrapper).
 
         Examples
         --------
         >>> from finstack_quant.core.dates import DayCount, Tenor
         >>> from finstack_quant.valuations.instruments import FixedLegSpec
         >>> leg = FixedLegSpec(
-        ...     "USD-OIS",
-        ...     0.04,
-        ...     Tenor.semi_annual(),
-        ...     DayCount.THIRTY_360,
-        ...     "2024-01-15",
-        ...     "2029-01-15",
+        ...     discount_curve_id="USD-OIS",
+        ...     rate="0.04",
+        ...     frequency=Tenor.semi_annual(),
+        ...     day_count=DayCount.THIRTY_360,
+        ...     start="2024-01-15",
+        ...     end="2029-01-15",
         ... )
         >>> leg.end_of_month
         False
@@ -130,12 +135,12 @@ class FixedLegSpec:
         >>> from finstack_quant.core.dates import DayCount, Tenor
         >>> from finstack_quant.valuations.instruments import FixedLegSpec
         >>> leg = FixedLegSpec(
-        ...     "USD-OIS",
-        ...     0.04,
-        ...     Tenor.semi_annual(),
-        ...     DayCount.THIRTY_360,
-        ...     "2024-01-15",
-        ...     "2029-01-15",
+        ...     discount_curve_id="USD-OIS",
+        ...     rate="0.04",
+        ...     frequency=Tenor.semi_annual(),
+        ...     day_count=DayCount.THIRTY_360,
+        ...     start="2024-01-15",
+        ...     end="2029-01-15",
         ... )
         >>> FixedLegSpec.from_json(leg.to_json()).rate
         0.04
@@ -384,13 +389,13 @@ class FloatLegSpec:
     >>> from finstack_quant.core.dates import DayCount, Tenor
     >>> from finstack_quant.valuations.instruments import FloatLegSpec
     >>> leg = FloatLegSpec(
-    ...     "USD-OIS",
-    ...     "USD-SOFR-3M",
-    ...     0.0,
-    ...     Tenor.quarterly(),
-    ...     DayCount.ACT_360,
-    ...     "2024-01-15",
-    ...     "2029-01-15",
+    ...     discount_curve_id="USD-OIS",
+    ...     forward_curve_id="USD-SOFR-3M",
+    ...     spread_bp="0",
+    ...     frequency=Tenor.quarterly(),
+    ...     day_count=DayCount.ACT_360,
+    ...     start="2024-01-15",
+    ...     end="2029-01-15",
     ... )
     >>> (leg.reset_lag_days, leg.compounding)
     (0, 'simple')
@@ -398,25 +403,29 @@ class FloatLegSpec:
 
     def __init__(
         self,
+        *,
         discount_curve_id: str,
         forward_curve_id: str,
-        spread_bp: float | Bps,
+        spread_bp: Decimal | str,
         frequency: Tenor,
-        day_count: DayCount,
-        start: datetime.date | datetime.datetime | pd.Timestamp | str,
-        end: datetime.date | datetime.datetime | pd.Timestamp | str,
-        *,
+        day_count: DayCount | str,
+        start: datetime.date | str,
+        end: datetime.date | str,
         business_day_convention: str = "modified_following",
         calendar_id: str | None = None,
         stub: StubKind | Literal["none", "short_front", "long_front", "short_back", "long_back"] = "short_front",
         reset_lag_days: int = 0,
         fixing_calendar_id: str | None = None,
-        compounding: Literal["simple"] | dict[str, dict[str, int]] | None = None,
+        compounding: Literal["simple"] | dict[str, dict[str, int]] = "simple",
         payment_lag_days: int = 0,
         end_of_month: bool = False,
     ) -> None:
         """
         Create a floating leg.
+
+        Every field is keyword-only: Rust reads the keywords as the
+        ``FloatLegSpec`` wire struct, supplies the defaults shown and rejects an
+        unknown keyword.
 
         Parameters
         ----------
@@ -424,16 +433,16 @@ class FloatLegSpec:
             Discount curve identifier for pricing this leg.
         forward_curve_id : str
             Forward curve identifier for rate projections.
-        spread_bp : float | Bps
-            Spread over the index in basis points (``25.0`` = 25bp) or a
-            ``Bps``.
+        spread_bp : decimal.Decimal | str
+            Spread over the index in basis points, as an exact decimal
+            (``"25"`` = 25bp); a ``float`` or ``Bps`` is rejected.
         frequency : Tenor
             Payment frequency.
-        day_count : DayCount
+        day_count : DayCount | str
             Day count convention for accrual.
-        start : datetime.date | datetime.datetime | pd.Timestamp | str
-            Start date of the floating leg (ISO 8601 strings accepted).
-        end : datetime.date | datetime.datetime | pd.Timestamp | str
+        start : datetime.date | str
+            Start date of the floating leg (a date or an ISO 8601 string).
+        end : datetime.date | str
             End date of the floating leg.
         business_day_convention : str, default "modified_following"
             Business day convention for payment dates.
@@ -451,8 +460,8 @@ class FloatLegSpec:
             market context.
         fixing_calendar_id : str, optional
             Calendar used for rate fixing (reset lag).
-        compounding : str | dict, optional
-            Coupon compounding; ``None`` means ``"simple"`` (term indices).
+        compounding : str | dict, default "simple"
+            Coupon compounding; ``"simple"`` for term indices.
             Overnight RFR legs pass a struct variant such as
             ``{"compounded_in_arrears": {"lookback_days": 0}}``,
             ``{"compounded_with_observation_shift": {"shift_days": 0}}`` or
@@ -465,25 +474,26 @@ class FloatLegSpec:
         Raises
         ------
         ValueError
-            If an enum value is invalid, ``compounding`` does not name a
-            variant, ``spread_bp`` is not finite, or the accrual period is
-            malformed (``start >= end``).
+            If a required field is missing, a keyword is unknown, an enum
+            value or date string is invalid, ``compounding`` does not name a
+            variant, ``spread_bp`` is not an exact-decimal string, or the
+            accrual period is malformed (``start >= end``).
         TypeError
-            If ``spread_bp`` is neither a number nor a ``Bps`` or a date
-            cannot be interpreted.
+            If a positional argument is passed, or a value is not
+            JSON-encodable (neither a wire value nor a typed wrapper).
 
         Examples
         --------
         >>> from finstack_quant.core.dates import DayCount, Tenor
         >>> from finstack_quant.valuations.instruments import FloatLegSpec
         >>> ois = FloatLegSpec(
-        ...     "USD-OIS",
-        ...     "USD-SOFR",
-        ...     0.0,
-        ...     Tenor.annual(),
-        ...     DayCount.ACT_360,
-        ...     "2024-01-15",
-        ...     "2029-01-15",
+        ...     discount_curve_id="USD-OIS",
+        ...     forward_curve_id="USD-SOFR",
+        ...     spread_bp="0",
+        ...     frequency=Tenor.annual(),
+        ...     day_count=DayCount.ACT_360,
+        ...     start="2024-01-15",
+        ...     end="2029-01-15",
         ...     compounding={"compounded_in_arrears": {"lookback_days": 0}},
         ... )
         >>> ois.compounding
@@ -517,13 +527,13 @@ class FloatLegSpec:
         >>> from finstack_quant.core.dates import DayCount, Tenor
         >>> from finstack_quant.valuations.instruments import FloatLegSpec
         >>> leg = FloatLegSpec(
-        ...     "USD-OIS",
-        ...     "USD-SOFR-3M",
-        ...     0.0,
-        ...     Tenor.quarterly(),
-        ...     DayCount.ACT_360,
-        ...     "2024-01-15",
-        ...     "2029-01-15",
+        ...     discount_curve_id="USD-OIS",
+        ...     forward_curve_id="USD-SOFR-3M",
+        ...     spread_bp="0",
+        ...     frequency=Tenor.quarterly(),
+        ...     day_count=DayCount.ACT_360,
+        ...     start="2024-01-15",
+        ...     end="2029-01-15",
         ... )
         >>> FloatLegSpec.from_json(leg.to_json()).forward_curve_id
         'USD-SOFR-3M'
@@ -830,12 +840,12 @@ class PremiumLegSpec:
     >>> from finstack_quant.core.dates import DayCount, Tenor
     >>> from finstack_quant.valuations.instruments import PremiumLegSpec
     >>> leg = PremiumLegSpec(
-    ...     "2024-03-20",
-    ...     "2029-06-20",
-    ...     Tenor.quarterly(),
-    ...     DayCount.ACT_360,
-    ...     100.0,
-    ...     "USD-OIS",
+    ...     start="2024-03-20",
+    ...     end="2029-06-20",
+    ...     frequency=Tenor.quarterly(),
+    ...     day_count=DayCount.ACT_360,
+    ...     coupon_bp="100",
+    ...     discount_curve_id="USD-OIS",
     ...     roll_rule=RollRule.CDS_IMM,
     ... )
     >>> leg.coupon_bp
@@ -844,14 +854,14 @@ class PremiumLegSpec:
 
     def __init__(
         self,
-        start: datetime.date | datetime.datetime | pd.Timestamp | str,
-        end: datetime.date | datetime.datetime | pd.Timestamp | str,
-        frequency: Tenor,
-        day_count: DayCount,
-        coupon_bp: float | Bps,
-        discount_curve_id: str,
         *,
-        roll_rule: RollRule,
+        start: datetime.date | str,
+        end: datetime.date | str,
+        frequency: Tenor,
+        day_count: DayCount | str,
+        coupon_bp: Decimal | str,
+        discount_curve_id: str,
+        roll_rule: RollRule | str,
         stub: StubKind | Literal["none", "short_front", "long_front", "short_back", "long_back"] = "short_front",
         business_day_convention: str = "modified_following",
         calendar_id: str | None = None,
@@ -859,21 +869,27 @@ class PremiumLegSpec:
         """
         Create a premium leg.
 
+        Every field is keyword-only: Rust reads the keywords as the
+        ``PremiumLegSpec`` wire struct, supplies the defaults shown and rejects an
+        unknown keyword.
+
         Parameters
         ----------
-        start : datetime.date | datetime.datetime | pd.Timestamp | str
-            Start date of protection / premium accrual (ISO strings accepted).
-        end : datetime.date | datetime.datetime | pd.Timestamp | str
+        start : datetime.date | str
+            Start date of protection / premium accrual (a date or an ISO
+            8601 string).
+        end : datetime.date | str
             End date of protection / premium accrual.
         frequency : Tenor
             Payment frequency.
-        day_count : DayCount
+        day_count : DayCount | str
             Day count convention for accrual.
-        coupon_bp : float | Bps
-            Contractual running coupon in basis points (``100.0`` = 100bp = 1%).
+        coupon_bp : decimal.Decimal | str
+            Contractual running coupon in basis points, as an exact decimal
+            (``"100"`` = 100bp = 1%); a ``float`` or ``Bps`` is rejected.
         discount_curve_id : str
             Discount curve identifier for pricing this leg.
-        roll_rule : RollRule
+        roll_rule : RollRule | str
             ``RollRule.CDS_IMM`` for the prescribed quarterly CDS 20th dates
             (requires quarterly frequency and a short-front stub at pricing).
             ``RollRule.NONE`` generates a bespoke schedule from ``frequency``
@@ -888,10 +904,12 @@ class PremiumLegSpec:
         Raises
         ------
         ValueError
-            If an enum value is invalid or ``coupon_bp`` is not finite.
+            If a required field is missing, a keyword is unknown, an enum
+            value or date string is invalid, or ``coupon_bp`` is not an
+            exact-decimal string.
         TypeError
-            If ``coupon_bp`` is neither a number nor a ``Bps`` or a date
-            cannot be interpreted.
+            If a positional argument is passed, or a value is not
+            JSON-encodable (neither a wire value nor a typed wrapper).
 
         Examples
         --------
@@ -899,12 +917,12 @@ class PremiumLegSpec:
         >>> from finstack_quant.core.dates import DayCount, Tenor
         >>> from finstack_quant.valuations.instruments import PremiumLegSpec
         >>> leg = PremiumLegSpec(
-        ...     "2024-03-20",
-        ...     "2029-06-20",
-        ...     Tenor.quarterly(),
-        ...     DayCount.ACT_360,
-        ...     100.0,
-        ...     "USD-OIS",
+        ...     start="2024-03-20",
+        ...     end="2029-06-20",
+        ...     frequency=Tenor.quarterly(),
+        ...     day_count=DayCount.ACT_360,
+        ...     coupon_bp="100",
+        ...     discount_curve_id="USD-OIS",
         ...     roll_rule=RollRule.CDS_IMM,
         ... )
         >>> leg.discount_curve_id
@@ -939,12 +957,12 @@ class PremiumLegSpec:
         >>> from finstack_quant.core.dates import DayCount, Tenor
         >>> from finstack_quant.valuations.instruments import PremiumLegSpec
         >>> leg = PremiumLegSpec(
-        ...     "2024-03-20",
-        ...     "2029-06-20",
-        ...     Tenor.quarterly(),
-        ...     DayCount.ACT_360,
-        ...     100.0,
-        ...     "USD-OIS",
+        ...     start="2024-03-20",
+        ...     end="2029-06-20",
+        ...     frequency=Tenor.quarterly(),
+        ...     day_count=DayCount.ACT_360,
+        ...     coupon_bp="100",
+        ...     discount_curve_id="USD-OIS",
         ...     roll_rule=RollRule.CDS_IMM,
         ... )
         >>> PremiumLegSpec.from_json(leg.to_json()).coupon_bp

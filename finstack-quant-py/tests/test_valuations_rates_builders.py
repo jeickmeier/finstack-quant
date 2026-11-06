@@ -11,6 +11,7 @@ ISO-string date acceptance, and builder ``__repr__``.
 from __future__ import annotations
 
 import datetime
+from decimal import Decimal
 import inspect
 import json
 import pickle
@@ -66,7 +67,7 @@ def _market() -> MarketContext:
 def _fixed_leg(**overrides: object) -> FixedLegSpec:
     kwargs: dict[str, object] = {
         "discount_curve_id": "USD-OIS",
-        "rate": 0.04,
+        "rate": "0.04",
         "frequency": Tenor.semi_annual(),
         "day_count": DayCount.THIRTY_360,
         "start": AS_OF,
@@ -80,7 +81,7 @@ def _float_leg(**overrides: object) -> FloatLegSpec:
     kwargs: dict[str, object] = {
         "discount_curve_id": "USD-OIS",
         "forward_curve_id": "USD-SOFR-3M",
-        "spread_bp": 0.0,
+        "spread_bp": "0",
         "frequency": Tenor.quarterly(),
         "day_count": DayCount.ACT_360,
         "start": AS_OF,
@@ -98,7 +99,7 @@ def test_swap_from_legs_prices_on_start_date_without_fixings() -> None:
         InterestRateSwap
         .builder()
         .id("IRS-SPOT")
-        .notional(10_000_000.0, currency="USD")
+        .notional(Money(10_000_000.0, "USD"))
         .side("pay")
         .fixed_leg(_fixed_leg())
         .float_leg(_float_leg())
@@ -116,18 +117,17 @@ def test_swap_from_legs_prices_on_start_date_without_fixings() -> None:
 
 
 def test_swap_from_conventions_prices_on_start_date_without_fixings() -> None:
-    swap = InterestRateSwap.from_conventions(
-        "IRS-5Y-CONV",
-        10_000_000.0,
-        "pay",
-        0.035,
-        AS_OF,
-        END,
-        "USD-SOFR",
-        "USD-OIS",
-        "USD-SOFR",
-        currency="USD",
-    )
+    swap = InterestRateSwap.from_conventions({
+        "id": "IRS-5Y-CONV",
+        "notional": Money(10_000_000.0, "USD"),
+        "side": "pay",
+        "fixed_rate": 0.035,
+        "start_date": AS_OF,
+        "maturity": END,
+        "index_id": "USD-SOFR",
+        "discount_curve_id": "USD-OIS",
+        "forward_curve_id": "USD-SOFR",
+    })
     assert swap.side == "pay"
     assert swap.float_leg.reset_lag_days == 0
     assert swap.float_leg.compounding != "simple"
@@ -159,7 +159,7 @@ def test_compounding_keyword_accepts_string_and_dict() -> None:
 
 
 def test_removed_par_method_keyword_is_rejected() -> None:
-    with pytest.raises(TypeError):
+    with pytest.raises(ValueError, match="unknown field `par_method`"):
         _fixed_leg(par_method="discount_ratio")
 
 
@@ -207,7 +207,7 @@ def test_builder_build_does_not_run_pricing_validation() -> None:
         InterestRateSwap
         .builder()
         .id("IRS-NO-PRICING-CHECK")
-        .notional(1_000_000.0, currency="USD")
+        .notional(Money(1_000_000.0, "USD"))
         .side("pay")
         .fixed_leg(_fixed_leg())
         .float_leg(_float_leg())
@@ -222,13 +222,20 @@ def test_builder_names_missing_field() -> None:
             InterestRateSwap
             .builder()
             .id("IRS-MISSING")
-            .notional(1_000_000.0, currency="USD")
+            .notional(Money(1_000_000.0, "USD"))
             .side("pay")
             .fixed_leg(_fixed_leg())
             .build()
         )
     with pytest.raises(ValueError, match="missing required field 'id'"):
-        InterestRateSwap.builder().notional(1_000_000.0, currency="USD").build()
+        InterestRateSwap.builder().notional(Money(1_000_000.0, "USD")).build()
+
+
+def test_money_inputs_take_only_money() -> None:
+    with pytest.raises(TypeError, match=r"notional: expected finstack_quant\.core\.money\.Money, got float"):
+        InterestRateSwap.builder().notional(1_000_000.0)
+    with pytest.raises(TypeError, match=r"notional: expected finstack_quant\.core\.money\.Money"):
+        Bond.zero_coupon("ZC", 1_000_000.0, "2024-01-01", "2029-01-01", "USD-OIS")
 
 
 def test_builder_repr_renders_fields_set_so_far() -> None:
@@ -255,7 +262,13 @@ def test_leg_specs_pickle_round_trip() -> None:
     fixed = _fixed_leg(calendar_id="usny", stub="none")
     floating = _float_leg(reset_lag_days=2, fixing_calendar_id="usny")
     premium = PremiumLegSpec(
-        "2024-03-20", "2029-06-20", Tenor.quarterly(), DayCount.ACT_360, 100.0, "USD-OIS", roll_rule=RollRule.CDS_IMM
+        start="2024-03-20",
+        end="2029-06-20",
+        frequency=Tenor.quarterly(),
+        day_count=DayCount.ACT_360,
+        coupon_bp="100",
+        discount_curve_id="USD-OIS",
+        roll_rule=RollRule.CDS_IMM,
     )
     protection = ProtectionLegSpec("ACME-HZD", 0.4, 3)
     for leg in (fixed, floating, premium, protection):
@@ -268,17 +281,26 @@ def test_leg_specs_pickle_round_trip() -> None:
     assert pickle.loads(pickle.dumps(protection)).settlement_delay == 3  # noqa: S301
 
 
-def test_leg_specs_accept_rate_and_bps_objects() -> None:
-    fixed = _fixed_leg(rate=Rate(0.04))
+def test_leg_spec_decimal_fields_take_exact_decimal_strings() -> None:
+    fixed = _fixed_leg(rate=Decimal("0.04"))
     assert fixed.rate == pytest.approx(0.04)
-    floating = _float_leg(spread_bp=Bps(25))
+    floating = _float_leg(spread_bp="25")
     assert floating.spread_bp == pytest.approx(25.0)
     premium = PremiumLegSpec(
-        AS_OF, END, Tenor.quarterly(), DayCount.ACT_360, Bps(100), "USD-OIS", roll_rule=RollRule.CDS_IMM
+        start=AS_OF,
+        end=END,
+        frequency=Tenor.quarterly(),
+        day_count=DayCount.ACT_360,
+        coupon_bp="100",
+        discount_curve_id="USD-OIS",
+        roll_rule=RollRule.CDS_IMM,
     )
     assert premium.coupon_bp == pytest.approx(100.0)
-    with pytest.raises(TypeError):
-        _fixed_leg(rate="4%")
+    # One spelling per value: a float, a ``Rate`` or a percent label is not the
+    # exact-decimal wire form.
+    for rate in (0.04, Rate(0.04), "4%"):
+        with pytest.raises(ValueError, match="invalid FixedLegSpec"):
+            _fixed_leg(rate=rate)
 
 
 def test_leg_specs_accept_iso_string_dates_and_stub_names() -> None:
@@ -305,7 +327,7 @@ def test_leg_spec_repr_is_python_style() -> None:
 
 
 def test_bond_fixed_accepts_floats_strings_and_with_convention_takes_a_stub() -> None:
-    bond = Bond.fixed("BOND-STR", 1_000_000.0, 0.05, "2024-01-15", "2034-01-15", "none", "USD-OIS", currency="USD")
+    bond = Bond.fixed("BOND-STR", Money(1_000_000.0, "USD"), 0.05, "2024-01-15", "2034-01-15", "none", "USD-OIS")
     assert bond.issue_date == datetime.date(2024, 1, 15)
     assert bond.maturity == datetime.date(2034, 1, 15)
     assert bond.notional.amount == pytest.approx(1_000_000.0)
@@ -321,53 +343,53 @@ def test_bond_fixed_accepts_floats_strings_and_with_convention_takes_a_stub() ->
     )
     assert typed.to_dict()["cashflow_spec"] == bond.to_dict()["cashflow_spec"]
     bund = Bond.with_convention(
-        "BUND", 1_000_000.0, 0.025, "2024-01-15", "2034-01-15", "german_bund", "EUR-OIS", currency="EUR"
+        "BUND", Money(1_000_000.0, "EUR"), 0.025, "2024-01-15", "2034-01-15", "german_bund", "EUR-OIS"
     ).with_stub("long_back")
     assert bund.settlement_days == 2
     assert bund.to_dict()["cashflow_spec"]["fixed"]["stub"] == "long_back"
-    with pytest.raises(ValueError, match=r"needs a currency"):
-        Bond.fixed("X", 1.0, 0.05, "2024-01-15", "2034-01-15", "none", "USD-OIS")
+    with pytest.raises(TypeError, match=r"notional"):
+        Bond.fixed("X", 1.0, 0.05, "2024-01-15", "2034-01-15", "none", "USD-OIS")  # type: ignore[arg-type]
     with pytest.raises(ValueError, match=r"unknown variant `martian`"):
-        Bond.with_convention("X", 1.0, 0.05, "2024-01-15", "2034-01-15", "martian", "USD-OIS", currency="USD")
+        Bond.with_convention("X", Money(1.0, "USD"), 0.05, "2024-01-15", "2034-01-15", "martian", "USD-OIS")
     with pytest.raises(TypeError):
-        Bond.fixed("X", 1.0, 0.05, "2024-01-15", "2034-01-15", "none", "USD-OIS", currency="USD", convention="uk_gilt")
+        Bond.fixed("X", Money(1.0, "USD"), 0.05, "2024-01-15", "2034-01-15", "none", "USD-OIS", convention="uk_gilt")
 
 
 def test_bond_constructors_and_examples() -> None:
     assert (
-        Bond.zero_coupon("ZC", 1_000_000.0, "2024-01-01", "2029-01-01", "USD-OIS", currency="USD").has_floating_coupons
+        Bond.zero_coupon("ZC", Money(1_000_000.0, "USD"), "2024-01-01", "2029-01-01", "USD-OIS").has_floating_coupons
         is False
     )
     gilt = Bond.with_convention(
-        "GILT", 1_000_000.0, 0.04, "2024-01-01", "2034-01-01", "uk_gilt", "GBP-OIS", currency="GBP"
+        "GILT", Money(1_000_000.0, "GBP"), 0.04, "2024-01-01", "2034-01-01", "uk_gilt", "GBP-OIS"
     )
     assert gilt.settlement_days == 1
-    frn = Bond.floating(
-        "FRN",
-        1000.0,
-        "USD-SOFR-3M",
-        125.0,
-        "2024-01-01",
-        "2029-01-01",
-        Tenor.quarterly(),
-        DayCount.ACT_360,
-        "USD-OIS",
-        currency="USD",
-    )
+    frn = Bond.floating({
+        "id": "FRN",
+        "notional": Money(1000.0, "USD"),
+        "forward_curve_id": "USD-SOFR-3M",
+        "spread_bp": 125,
+        "issue_date": "2024-01-01",
+        "maturity": "2029-01-01",
+        "frequency": Tenor.quarterly(),
+        "day_count": DayCount.ACT_360,
+        "discount_curve_id": "USD-OIS",
+    })
     assert frn.has_floating_coupons
     assert frn.cashflow_spec["floating"]["rate_spec"]["forward_curve_id"] == "USD-SOFR-3M"
     frn_eur = Bond.floating_with_convention(
-        "FRN-EUR",
-        1000.0,
-        "EUR-EURIBOR-3M",
-        Bps(80),
-        "2024-01-01",
-        "2029-01-01",
-        Tenor.quarterly(),
-        DayCount.ACT_360,
+        {
+            "id": "FRN-EUR",
+            "notional": Money(1000.0, "EUR"),
+            "forward_curve_id": "EUR-EURIBOR-3M",
+            "spread_bp": Bps(80),
+            "issue_date": "2024-01-01",
+            "maturity": "2029-01-01",
+            "frequency": Tenor.quarterly(),
+            "day_count": DayCount.ACT_360,
+            "discount_curve_id": "EUR-OIS",
+        },
         "eur_corporate",
-        "EUR-OIS",
-        currency="EUR",
     )
     assert frn_eur.settlement_days == 2
     assert Bond.example().discount_curve_id == "USD-TREASURY"
@@ -386,7 +408,7 @@ def test_bond_builder_credit_models_preserve_explicit_model_contract() -> None:
             Bond
             .builder()
             .id(bond_id)
-            .notional(1_000_000.0, currency="USD")
+            .notional(Money(1_000_000.0, "USD"))
             .issue_date("2024-01-15")
             .maturity("2034-01-15")
             .cashflow_spec(base["cashflow_spec"])
@@ -478,7 +500,7 @@ def test_bond_builder_credit_models_preserve_explicit_model_contract() -> None:
 
 
 def test_bond_getters_and_pricing_helpers() -> None:
-    bond = Bond.fixed("BOND-GETTERS", 1_000_000.0, 0.05, "2024-01-15", "2034-01-15", "none", "USD-OIS", currency="USD")
+    bond = Bond.fixed("BOND-GETTERS", Money(1_000_000.0, "USD"), 0.05, "2024-01-15", "2034-01-15", "none", "USD-OIS")
     assert isinstance(bond.notional, Money)
     assert isinstance(bond.issue_date, datetime.date)
     assert bond.credit_curve_id is None
@@ -490,7 +512,7 @@ def test_bond_getters_and_pricing_helpers() -> None:
         _market(),
         AS_OF,
         metrics=["ytm", "dv01"],
-        metric_pricing_overrides={"theta_period": {"count": 1, "unit": "days"}},
+        extras={"metric_pricing_overrides": {"theta_period": {"count": 1, "unit": "days"}}},
     )
     assert result.get_metric("ytm") is not None
     assert bond.metric(_market(), AS_OF, "ytm") == pytest.approx(result.get_metric("ytm"))
@@ -509,7 +531,7 @@ def test_bond_builder_requires_contractual_issue_date() -> None:
         Bond
         .builder()
         .id("MISSING-ISSUE")
-        .notional(1_000_000.0, currency="USD")
+        .notional(Money(1_000_000.0, "USD"))
         .maturity("2034-01-15")
         .cashflow_spec(base["cashflow_spec"])
         .discount_curve_id("USD-OIS")
@@ -527,7 +549,7 @@ def test_term_loan_builder_and_getters() -> None:
         .builder()
         .id("TL-1")
         .currency("USD")
-        .notional_limit(10_000_000.0, currency="USD")
+        .notional_limit(Money(10_000_000.0, "USD"))
         .issue_date("2024-01-01")
         .maturity("2029-01-01")
         .rate(0.06)
@@ -587,7 +609,7 @@ def test_swaption_examples_getters_and_accessors() -> None:
         .builder()
         .id("SWPT-ATTR")
         .option_type("put")
-        .notional(1_000_000.0, currency="USD")
+        .notional(Money(1_000_000.0, "USD"))
         .expiry("2025-01-13")
         .settlement("physical")
         .cash_settlement_method("par_yield")
@@ -616,10 +638,10 @@ def test_cap_floor_example_getters_and_new_setters() -> None:
         .builder()
         .id("CAP-KW")
         .rate_option_type("floor")
-        .notional(5_000_000.0, currency="USD")
+        .notional(Money(5_000_000.0, "USD"))
         .strike(Rate(0.02))
         .spread_bp(0.0)
-        .premium("2025-01-20", 10_000.0, currency="USD")
+        .premium("2025-01-20", Money(10_000.0, "USD"))
         .start_date("2025-01-15")
         .maturity("2028-01-15")
         .frequency(Tenor.quarterly())
@@ -660,7 +682,7 @@ def test_metric_keys_are_human_readable_not_escaped() -> None:
         InterestRateSwap
         .builder()
         .id("IRS-KEYS")
-        .notional(10_000_000.0, currency="USD")
+        .notional(Money(10_000_000.0, "USD"))
         .side("pay")
         .fixed_leg(_fixed_leg())
         .float_leg(_float_leg())
@@ -753,7 +775,7 @@ def test_bond_builder_quoted_price_drives_ytm_like_the_wire_field() -> None:
             Bond
             .builder()
             .id(spec["id"])
-            .notional(float(spec["notional"]["amount"]), currency=spec["notional"]["currency"])
+            .notional(Money(float(spec["notional"]["amount"]), spec["notional"]["currency"]))
             .issue_date(spec["issue_date"])
             .maturity(spec["maturity"])
             .cashflow_spec(spec["cashflow_spec"])

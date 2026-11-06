@@ -220,19 +220,19 @@ fn compounded_sofr_implied_vol_round_trip_uses_contractual_coupon_and_payment() 
                 .expect("SOFR forward curve"),
         )
         .insert_surface(build_flat_vol_surface(surface_vol, as_of, "USD_CAP_VOL"));
-    let mut caplet = CapFloor::new(
-        "SOFR-IV-ROUNDTRIP",
-        RateOptionType::Caplet,
-        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-        0.04,
-        start,
-        end,
-        None,
-        DayCount::Act360,
-        "USD_OIS",
-        "USD-SOFR-OIS",
-        "USD_CAP_VOL",
-    )
+    let mut caplet = CapFloor::new(finstack_quant_valuations_rates::cap_floor::CapFloorParams {
+        id: "SOFR-IV-ROUNDTRIP".into(),
+        rate_option_type: RateOptionType::Caplet,
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        strike: 0.04,
+        start_date: start,
+        maturity: end,
+        frequency: None,
+        day_count: DayCount::Act360,
+        discount_curve_id: "USD_OIS".into(),
+        forward_curve_id: "USD-SOFR-OIS".into(),
+        vol_surface_id: "USD_CAP_VOL".into(),
+    })
     .expect("caplet");
     caplet.overnight_coupon = Some(OvernightCouponConvention {
         compounding: FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 1 },
@@ -279,19 +279,19 @@ fn normal_implied_vol_round_trips_non_positive_forward() {
             )
             .expect("valid quote convention"),
         );
-    let mut caplet = CapFloor::new(
-        "NORMAL-IV-NEGATIVE",
-        RateOptionType::Caplet,
-        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-        0.0,
-        date!(2024 - 07 - 02),
-        date!(2024 - 10 - 02),
-        None,
-        DayCount::Act360,
-        "USD_OIS",
-        "NEGATIVE_TERM",
-        "USD_CAP_VOL",
-    )
+    let mut caplet = CapFloor::new(finstack_quant_valuations_rates::cap_floor::CapFloorParams {
+        id: "NORMAL-IV-NEGATIVE".into(),
+        rate_option_type: RateOptionType::Caplet,
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        strike: 0.0,
+        start_date: date!(2024 - 07 - 02),
+        maturity: date!(2024 - 10 - 02),
+        frequency: None,
+        day_count: DayCount::Act360,
+        discount_curve_id: "USD_OIS".into(),
+        forward_curve_id: "NEGATIVE_TERM".into(),
+        vol_surface_id: "USD_CAP_VOL".into(),
+    })
     .expect("caplet");
     caplet.vol_type = CapFloorVolType::Normal;
     let pv = caplet.value(&market, as_of).expect("normal price");
@@ -323,19 +323,19 @@ fn shifted_lognormal_implied_vol_round_trips_shifted_domain() {
         .insert(build_flat_discount_curve(0.03, as_of, "USD_OIS"))
         .insert(build_flat_forward_curve(-0.005, as_of, "NEGATIVE_TERM"))
         .insert_surface(build_flat_vol_surface(surface_vol, as_of, "USD_CAP_VOL"));
-    let mut caplet = CapFloor::new(
-        "SHIFTED-IV",
-        RateOptionType::Caplet,
-        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-        0.0,
-        date!(2024 - 07 - 02),
-        date!(2024 - 10 - 02),
-        None,
-        DayCount::Act360,
-        "USD_OIS",
-        "NEGATIVE_TERM",
-        "USD_CAP_VOL",
-    )
+    let mut caplet = CapFloor::new(finstack_quant_valuations_rates::cap_floor::CapFloorParams {
+        id: "SHIFTED-IV".into(),
+        rate_option_type: RateOptionType::Caplet,
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        strike: 0.0,
+        start_date: date!(2024 - 07 - 02),
+        maturity: date!(2024 - 10 - 02),
+        frequency: None,
+        day_count: DayCount::Act360,
+        discount_curve_id: "USD_OIS".into(),
+        forward_curve_id: "NEGATIVE_TERM".into(),
+        vol_surface_id: "USD_CAP_VOL".into(),
+    })
     .expect("caplet");
     caplet.vol_type = CapFloorVolType::ShiftedLognormal;
     caplet.vol_shift = 0.02;
@@ -367,19 +367,19 @@ fn same_day_caplet_does_not_synthesize_option_time() {
         .insert(build_flat_discount_curve(0.03, as_of, "USD_OIS"))
         .insert(build_flat_forward_curve(0.12, as_of, "USD_LIBOR_3M"))
         .insert_surface(build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL"));
-    let mut caplet = CapFloor::new(
-        "SAME-DAY-IV",
-        RateOptionType::Caplet,
-        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-        0.05,
-        as_of,
-        date!(2024 - 06 - 01),
-        None,
-        DayCount::Act360,
-        "USD_OIS",
-        "USD_LIBOR_3M",
-        "USD_CAP_VOL",
-    )
+    let mut caplet = CapFloor::new(finstack_quant_valuations_rates::cap_floor::CapFloorParams {
+        id: "SAME-DAY-IV".into(),
+        rate_option_type: RateOptionType::Caplet,
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        strike: 0.05,
+        start_date: as_of,
+        maturity: date!(2024 - 06 - 01),
+        frequency: None,
+        day_count: DayCount::Act360,
+        discount_curve_id: "USD_OIS".into(),
+        forward_curve_id: "USD_LIBOR_3M".into(),
+        vol_surface_id: "USD_CAP_VOL".into(),
+    })
     .expect("caplet");
     let intrinsic = caplet.value(&market, as_of).expect("intrinsic price");
     caplet
@@ -413,19 +413,19 @@ fn auto_implied_vol_round_trips_negative_rate_normal_quote() {
             )
             .expect("valid quote convention"),
         );
-    let mut caplet = CapFloor::new(
-        "AUTO-IV-NEGATIVE",
-        RateOptionType::Caplet,
-        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-        0.0,
-        date!(2024 - 07 - 02),
-        date!(2024 - 10 - 02),
-        None,
-        DayCount::Act360,
-        "USD_OIS",
-        "NEGATIVE_TERM",
-        "USD_CAP_VOL",
-    )
+    let mut caplet = CapFloor::new(finstack_quant_valuations_rates::cap_floor::CapFloorParams {
+        id: "AUTO-IV-NEGATIVE".into(),
+        rate_option_type: RateOptionType::Caplet,
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        strike: 0.0,
+        start_date: date!(2024 - 07 - 02),
+        maturity: date!(2024 - 10 - 02),
+        frequency: None,
+        day_count: DayCount::Act360,
+        discount_curve_id: "USD_OIS".into(),
+        forward_curve_id: "NEGATIVE_TERM".into(),
+        vol_surface_id: "USD_CAP_VOL".into(),
+    })
     .expect("caplet");
     caplet.vol_type = CapFloorVolType::Auto;
     let pv = caplet.value(&market, as_of).expect("auto normal price");

@@ -27,7 +27,7 @@ Wrong expiry for an arrears contract fails; the builder does not silently infer 
 - Implementation: [build/prepared.rs](../../../../finstack-quant/calibration/src/build/prepared.rs) — future pillar selection.
 - Implementation: [api/authoring.rs](../../../../finstack-quant/calibration/src/api/authoring.rs) — default zero convexity.
 - Test evidence: [src/build/rates.rs](../../../../finstack-quant/calibration/src/build/rates.rs) — contract reference-period regressions located; inspected or located, not executed.
-- Test evidence: [src/build/tests_rates.rs](../../../../finstack-quant/calibration/src/build/tests_rates.rs) — SOFR and EURIBOR future construction fields; inspected or located, not executed.
+- Test evidence: [src/build/tests/rates.rs](../../../../finstack-quant/calibration/src/build/tests/rates.rs) — SOFR and EURIBOR future construction fields; inspected or located, not executed.
 - Reference gap: no method-specific independent source or external benchmark is established by this record; source and regression evidence describe implementation behavior.
 
 ## Follow-up tracking

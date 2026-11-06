@@ -42,13 +42,19 @@ pub mod panel;
 /// Rejects values that cannot be decoded into the declared arrays or JSON
 /// parameters, unequal row counts, an unsupported `op`, malformed operation
 /// parameters, non-finite arithmetic, or a result that cannot be serialized to JavaScript.
-#[wasm_bindgen(js_name = transformTimeseries)]
+/// @param values - Numeric observations aligned with the key columns; null and non-finite inputs are missing.
+/// @param entity - String entity identifiers grouping observations into independent time series.
+/// @param order - Lexicographic order keys within each entity; temporal keys require a common timezone and fixed precision.
+/// @param op - Snake_case TimeSeriesOp selector accepted by timeSeriesOpValues; parsed by the canonical Rust enum.
+/// @param params - Optional operation parameters; omitted or null uses Rust defaults and unknown keys fail validation. `rolling_sharpe` accepts optional `risk_free` (default `0.0`) in the same units as the input return series, with no annualization.
+/// @returns Transformed values aligned one-for-one with the input `values` rows.
+#[wasm_bindgen(js_name = transformTimeseries, unchecked_return_type = "FeatureValue[]")]
 pub fn transform_timeseries(
-    values: JsValue,
-    entity: JsValue,
-    order: JsValue,
-    op: JsValue,
-    params: Option<JsValue>,
+    #[wasm_bindgen(unchecked_param_type = "FeatureValue[]")] values: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string[]")] entity: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string[]")] order: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "TimeSeriesOp")] op: JsValue,
+    #[wasm_bindgen(unchecked_optional_param_type = "FeatureParams | null")] params: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let op: TimeSeriesOp = js_string(&op, "op")?.parse().map_err(to_js_err)?;
     let values = js_nullable_f64_seq(&values, "values")?;
@@ -85,12 +91,17 @@ pub fn transform_timeseries(
 /// parameters, unequal `values` and `time_key` lengths, an unsupported `op`,
 /// malformed operation parameters, non-finite arithmetic, or a result that cannot be serialized to
 /// JavaScript.
-#[wasm_bindgen(js_name = transformCrossSectional)]
+/// @param values - Numeric observations aligned with time_key; null and non-finite inputs are missing.
+/// @param timeKey - String partition keys; equal keys select the same cross-section.
+/// @param op - Snake_case CrossSectionalOp selector accepted by crossSectionalOpValues; parsed by the canonical Rust enum.
+/// @param params - Optional operation parameters; omitted or null uses Rust defaults and unknown keys fail validation.
+/// @returns Transformed values aligned one-for-one with the input `values` rows.
+#[wasm_bindgen(js_name = transformCrossSectional, unchecked_return_type = "FeatureValue[]")]
 pub fn transform_cross_sectional(
-    values: JsValue,
-    time_key: JsValue,
-    op: JsValue,
-    params: Option<JsValue>,
+    #[wasm_bindgen(unchecked_param_type = "FeatureValue[]")] values: JsValue,
+    #[wasm_bindgen(js_name = "timeKey", unchecked_param_type = "string[]")] time_key: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "CrossSectionalOp")] op: JsValue,
+    #[wasm_bindgen(unchecked_optional_param_type = "FeatureParams | null")] params: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let op: CrossSectionalOp = js_string(&op, "op")?.parse().map_err(to_js_err)?;
     let values = js_nullable_f64_seq(&values, "values")?;
@@ -118,13 +129,19 @@ pub fn transform_cross_sectional(
 /// parameters, unequal `values`, `time_key`, and `groups` lengths, an
 /// unsupported `op`, malformed operation parameters, or a result that cannot
 /// be serialized to JavaScript.
-#[wasm_bindgen(js_name = transformCrossSectionalGrouped)]
+/// @param values - Numeric observations aligned with both key columns; null and non-finite inputs are missing.
+/// @param timeKey - String timestamp partition keys; equal keys select the same cross-section.
+/// @param groups - String subgroup labels aligned with values; transforms run independently for each time_key and group pair.
+/// @param op - Snake_case CrossSectionalOp selector accepted by crossSectionalOpValues; parsed by the canonical Rust enum.
+/// @param params - Optional operation parameters; omitted or null uses Rust defaults and unknown keys fail validation.
+/// @returns Transformed values aligned one-for-one with the input `values` rows.
+#[wasm_bindgen(js_name = transformCrossSectionalGrouped, unchecked_return_type = "FeatureValue[]")]
 pub fn transform_cross_sectional_grouped(
-    values: JsValue,
-    time_key: JsValue,
-    groups: JsValue,
-    op: JsValue,
-    params: Option<JsValue>,
+    #[wasm_bindgen(unchecked_param_type = "FeatureValue[]")] values: JsValue,
+    #[wasm_bindgen(js_name = "timeKey", unchecked_param_type = "string[]")] time_key: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string[]")] groups: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "CrossSectionalOp")] op: JsValue,
+    #[wasm_bindgen(unchecked_optional_param_type = "FeatureParams | null")] params: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let op: CrossSectionalOp = js_string(&op, "op")?.parse().map_err(to_js_err)?;
     let values = js_nullable_f64_seq(&values, "values")?;
@@ -154,15 +171,16 @@ pub fn transform_cross_sectional_grouped(
 /// `values`, a non-boolean `fit_intercept`, a singular or underdetermined
 /// cross-section, non-finite arithmetic, or a result that cannot be serialized to JavaScript.
 /// @param values - Numeric observations in the shape and order required by the selected transformation.
-/// @param time_key - Cross-sectional time key shared by values evaluated in the same slice.
+/// @param timeKey - Cross-sectional time key shared by values evaluated in the same slice.
 /// @param exposures - Factor-exposure matrix aligned with the supplied observations.
 /// @param params - Operation-specific parameter object defining transformation settings.
-#[wasm_bindgen(js_name = neutralize)]
+/// @returns Transformed values aligned one-for-one with the input `values` rows.
+#[wasm_bindgen(js_name = neutralize, unchecked_return_type = "FeatureValue[]")]
 pub fn neutralize(
-    values: JsValue,
-    time_key: JsValue,
-    exposures: JsValue,
-    params: Option<JsValue>,
+    #[wasm_bindgen(unchecked_param_type = "FeatureValue[]")] values: JsValue,
+    #[wasm_bindgen(js_name = "timeKey", unchecked_param_type = "string[]")] time_key: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "FeatureValue[][]")] exposures: JsValue,
+    #[wasm_bindgen(unchecked_optional_param_type = "FeatureParams | null")] params: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let values = js_nullable_f64_seq(&values, "values")?;
     let time_key = js_string_seq(&time_key, "timeKey")?;
@@ -195,14 +213,21 @@ pub fn neutralize(
 /// parameters, unequal row counts, an unsupported `op`, non-positive or
 /// non-integer `window` or `min_periods` parameters, or a result that cannot be
 /// serialized to JavaScript.
-#[wasm_bindgen(js_name = transformTimeseriesPairwise)]
+/// @param values - Primary numeric observations aligned with other and both key columns; null and non-finite inputs are missing.
+/// @param other - Second numeric observation column; rolling windows retain only complete finite pairs.
+/// @param entity - String entity identifiers grouping observations into independent time series.
+/// @param order - Lexicographic order keys within each entity; temporal keys require a common timezone and fixed precision.
+/// @param op - Snake_case PairwiseOp selector accepted by pairwiseOpValues; parsed by the canonical Rust enum.
+/// @param params - Optional rolling parameters; window counts entity rows, min_periods counts complete pairs and cannot exceed window.
+/// @returns Transformed values aligned one-for-one with the input `values` rows.
+#[wasm_bindgen(js_name = transformTimeseriesPairwise, unchecked_return_type = "FeatureValue[]")]
 pub fn transform_timeseries_pairwise(
-    values: JsValue,
-    other: JsValue,
-    entity: JsValue,
-    order: JsValue,
-    op: JsValue,
-    params: Option<JsValue>,
+    #[wasm_bindgen(unchecked_param_type = "FeatureValue[]")] values: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "FeatureValue[]")] other: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string[]")] entity: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string[]")] order: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "PairwiseOp")] op: JsValue,
+    #[wasm_bindgen(unchecked_optional_param_type = "FeatureParams | null")] params: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let op: PairwiseOp = js_string(&op, "op")?.parse().map_err(to_js_err)?;
     let values = js_nullable_f64_seq(&values, "values")?;
@@ -242,13 +267,14 @@ pub fn transform_timeseries_pairwise(
 /// @param entity - Entity identifier used to group ordered time-series observations.
 /// @param order - Observation-order key used to sort each entity time series.
 /// @param params - Operation-specific parameter object defining transformation settings.
-#[wasm_bindgen(js_name = rollingRegressionResidual)]
+/// @returns Transformed values aligned one-for-one with the input `values` rows.
+#[wasm_bindgen(js_name = rollingRegressionResidual, unchecked_return_type = "FeatureValue[]")]
 pub fn rolling_regression_residual(
-    values: JsValue,
-    exposures: JsValue,
-    entity: JsValue,
-    order: JsValue,
-    params: Option<JsValue>,
+    #[wasm_bindgen(unchecked_param_type = "FeatureValue[]")] values: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "FeatureValue[][]")] exposures: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string[]")] entity: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string[]")] order: JsValue,
+    #[wasm_bindgen(unchecked_optional_param_type = "FeatureParams | null")] params: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let values = js_nullable_f64_seq(&values, "values")?;
     let exposures = js_nullable_f64_matrix(&exposures, "exposures")?;
@@ -278,13 +304,14 @@ pub fn rolling_regression_residual(
 /// `values`, `time_key`, and `volatility` lengths, negative volatility, or a result that cannot be
 /// serialized to JavaScript.
 /// @param values - Numeric signal observations aligned with `timeKey` and `volatility`.
-/// @param time_key - Cross-sectional time key shared by values evaluated in the same slice.
+/// @param timeKey - Cross-sectional time key shared by values evaluated in the same slice.
 /// @param volatility - Row-aligned nonnegative risk estimates in a common horizon and units, used as `signal / volatility`; negative estimates fail, while zero, missing, or non-finite values yield missing weights.
-#[wasm_bindgen(js_name = riskScaledWeights)]
+/// @returns Transformed values aligned one-for-one with the input `values` rows.
+#[wasm_bindgen(js_name = riskScaledWeights, unchecked_return_type = "FeatureValue[]")]
 pub fn risk_scaled_weights(
-    values: JsValue,
-    time_key: JsValue,
-    volatility: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "FeatureValue[]")] values: JsValue,
+    #[wasm_bindgen(js_name = "timeKey", unchecked_param_type = "string[]")] time_key: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "FeatureValue[]")] volatility: JsValue,
 ) -> Result<JsValue, JsValue> {
     let values = js_nullable_f64_seq(&values, "values")?;
     let time_key = js_string_seq(&time_key, "timeKey")?;
@@ -302,9 +329,13 @@ pub fn risk_scaled_weights(
 /// `values` and `time_key` lengths, non-finite arithmetic, or a result that cannot be serialized to
 /// JavaScript.
 /// @param values - Numeric observations in the shape and order required by the selected transformation.
-/// @param time_key - Cross-sectional time key shared by values evaluated in the same slice.
-#[wasm_bindgen(js_name = rankToWeights)]
-pub fn rank_to_weights(values: JsValue, time_key: JsValue) -> Result<JsValue, JsValue> {
+/// @param timeKey - Cross-sectional time key shared by values evaluated in the same slice.
+/// @returns Transformed values aligned one-for-one with the input `values` rows.
+#[wasm_bindgen(js_name = rankToWeights, unchecked_return_type = "FeatureValue[]")]
+pub fn rank_to_weights(
+    #[wasm_bindgen(unchecked_param_type = "FeatureValue[]")] values: JsValue,
+    #[wasm_bindgen(js_name = "timeKey", unchecked_param_type = "string[]")] time_key: JsValue,
+) -> Result<JsValue, JsValue> {
     let values = js_nullable_f64_seq(&values, "values")?;
     let time_key = js_string_seq(&time_key, "timeKey")?;
     let result = finstack_quant_features::rank_to_weights(&values, &time_key).map_err(to_js_err)?;
@@ -331,11 +362,15 @@ pub fn rank_to_weights(values: JsValue, time_key: JsValue) -> Result<JsValue, Js
 /// counts, exposure columns whose lengths differ from `values`, a singular or
 /// underdetermined cross-section, non-finite arithmetic, or a result that cannot
 /// be serialized to JavaScript.
-#[wasm_bindgen(js_name = neutralizeAndZscore)]
+/// @param values - Numeric signal observations, with null or non-finite inputs treated as missing, aligned with the partition and exposure columns.
+/// @param timeKey - String partition keys grouping observations into independent cross-sections; exact equal strings select the same partition.
+/// @param exposures - Column-major numeric factor exposures, each column aligned with `values`; rows missing any exposure are excluded from the fit.
+/// @returns Transformed values aligned one-for-one with the input `values` rows.
+#[wasm_bindgen(js_name = neutralizeAndZscore, unchecked_return_type = "FeatureValue[]")]
 pub fn neutralize_and_zscore(
-    values: JsValue,
-    time_key: JsValue,
-    exposures: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "FeatureValue[]")] values: JsValue,
+    #[wasm_bindgen(js_name = "timeKey", unchecked_param_type = "string[]")] time_key: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "FeatureValue[][]")] exposures: JsValue,
 ) -> Result<JsValue, JsValue> {
     let values = js_nullable_f64_seq(&values, "values")?;
     let time_key = js_string_seq(&time_key, "timeKey")?;
@@ -356,9 +391,12 @@ pub fn neutralize_and_zscore(
 /// or duplicate operation names, unknown `input` columns, missing partition
 /// columns, unequal row counts, malformed operation parameters, operations
 /// that cannot be evaluated, non-finite arithmetic, or a result that cannot be serialized to JSON.
-/// @param spec_json - Canonical panel-transformation JSON. Each operation may set optional `input` (`undefined` default: previous column, or raw `values` for the first op).
+/// @param specJson - Canonical panel-transformation JSON. Each operation may set optional `input` (`undefined` default: previous column, or raw `values` for the first op).
+/// @returns JSON panel after applying the transform pipeline.
 #[wasm_bindgen(js_name = transformPanelJson)]
-pub fn transform_panel_json(spec_json: JsValue) -> Result<String, JsValue> {
+pub fn transform_panel_json(
+    #[wasm_bindgen(js_name = "specJson", unchecked_param_type = "JsonInput")] spec_json: JsValue,
+) -> Result<String, JsValue> {
     let spec_json: &str = &json_text(&spec_json, "specJson")?;
     finstack_quant_features::transform_panel_json(spec_json).map_err(to_js_err)
 }

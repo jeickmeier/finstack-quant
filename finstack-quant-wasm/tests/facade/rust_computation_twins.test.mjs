@@ -198,33 +198,21 @@ test('Bond presets, zeroCoupon and return floors construct validated bonds', () 
   const floored = zc.minMoic(1.3);
   assert.notEqual(floored.toJson(), zc.toJson());
   assert.notEqual(zc.minXirr(new core.Rate(0.12)).toJson(), zc.toJson());
-  const frn = Bond.floatingWithConvention(
-    'FRN',
-    new core.Money(1_000_000, usd()),
-    'USD-SOFR-3M',
-    new core.Bps(150),
-    '2024-01-15',
-    '2029-01-15',
-    core.Tenor.quarterly(),
-    core.DayCount.act360(),
-    'us_corporate',
-    'USD-OIS'
-  );
+  const frnParams = {
+    id: 'FRN',
+    notional: { amount: '1000000', currency: 'USD' },
+    forward_curve_id: 'USD-SOFR-3M',
+    spread_bp: 150,
+    issue_date: '2024-01-15',
+    maturity: '2029-01-15',
+    frequency: { count: 3, unit: 'months' },
+    day_count: 'act_360',
+    discount_curve_id: 'USD-OIS',
+  };
+  const frn = Bond.floatingWithConvention(frnParams, 'us_corporate');
   assert.equal(frn.id, 'FRN');
   assert.throws(
-    () =>
-      Bond.floatingWithConvention(
-        'FRN',
-        new core.Money(1_000_000, usd()),
-        'USD-SOFR-3M',
-        new core.Bps(150),
-        '2024-01-15',
-        '2029-01-15',
-        core.Tenor.quarterly(),
-        core.DayCount.act360(),
-        'not_a_convention',
-        'USD-OIS'
-      ),
+    () => Bond.floatingWithConvention(frnParams, 'not_a_convention'),
     (e) => e.kind === 'validation'
   );
   assert.equal(JSON.parse(TermLoan.exampleCallable().toJson()).instrument.type, 'term_loan');
@@ -347,42 +335,26 @@ test('FxForward presets and the CIP market forward match Python', () => {
   const forward = FxForward.example();
   close(forward.marketForwardRate(FX_MARKET, '2025-01-15'), 1.109139126165159, 1e-12, 'fwd');
   close(forward.metric(FX_MARKET, '2025-01-15', 'dv01'), 0.44193883896969055, 1e-9, 'dv01');
-  const traded = FxForward.fromTradeDate(
-    'EURUSD-3M',
-    'EUR',
-    'USD',
-    '2025-01-15',
-    core.Tenor.parse('3M'),
-    new core.Money(1_000_000, new core.Currency('EUR')),
-    'USD-OIS',
-    'EUR-OIS'
-  );
+  const forwardParams = {
+    id: 'EURUSD-3M',
+    base_currency: 'EUR',
+    quote_currency: 'USD',
+    trade_date: '2025-01-15',
+    tenor: { count: 3, unit: 'months' },
+    notional: { amount: '1000000', currency: 'EUR' },
+    domestic_discount_curve_id: 'USD-OIS',
+    foreign_discount_curve_id: 'EUR-OIS',
+    end_of_month: false,
+  };
+  const traded = FxForward.fromTradeDate(forwardParams);
   assert.equal(JSON.parse(traded.toJson()).instrument.spec.maturity, '2025-04-17');
-  const explicit = FxForward.fromTradeDate(
-    'EURUSD-3M',
-    'EUR',
-    'USD',
-    '2025-01-15',
-    core.Tenor.parse('3M'),
-    new core.Money(1_000_000, new core.Currency('EUR')),
-    'USD-OIS',
-    'EUR-OIS',
-    { settlement_days: 2, business_day_convention: 'modified_following' }
-  );
+  const explicit = FxForward.fromTradeDate({
+    ...forwardParams,
+    settlement_days: 2,
+    business_day_convention: 'modified_following',
+  });
   assert.equal(explicit.toJson(), traded.toJson());
-  assert.throws(() =>
-    FxForward.fromTradeDate(
-      'X',
-      'EUR',
-      'USD',
-      '2025-01-15',
-      core.Tenor.parse('3M'),
-      new core.Money(1_000_000, new core.Currency('EUR')),
-      'USD-OIS',
-      'EUR-OIS',
-      { settlement_lag: 2 }
-    )
-  );
+  assert.throws(() => FxForward.fromTradeDate({ ...forwardParams, settlement_lag: 2 }));
   const withPoints = traded.withForwardPoints(1.1, 0.0025);
   assert.equal(JSON.parse(withPoints.toJson()).instrument.spec.contract_rate, 1.1025);
   const withPips = traded.withForwardPips(1.1, 25);
@@ -396,38 +368,28 @@ test('FxForward presets and the CIP market forward match Python', () => {
 test('FxOption.european and impliedVol recover the surface vol', () => {
   const { FxOption } = valuations.instruments;
   assert.equal(JSON.parse(FxOption.example().toJson()).instrument.type, 'fx_option');
-  const option = FxOption.european(
-    'EURUSD-CALL',
-    'EUR',
-    'USD',
-    1.12,
-    '2025-06-15',
-    new core.Money(1_000_000, new core.Currency('EUR')),
-    'EURUSD-VOL',
-    'call',
-    'spot',
-    'USD',
-    'desk'
-  );
+  const optionParams = {
+    id: 'EURUSD-CALL',
+    base_currency: 'EUR',
+    quote_currency: 'USD',
+    strike: 1.12,
+    expiry: '2025-06-15',
+    notional: { amount: '1000000', currency: 'EUR' },
+    vol_surface_id: 'EURUSD-VOL',
+    option_type: 'call',
+    delta_convention: { kind: 'spot', premium_currency: 'USD', venue: 'desk' },
+  };
+  const option = FxOption.european(optionParams);
   const price = Number(option.price(FX_MARKET, '2025-01-15').value.amount);
   close(price, 23106.07324729069, 1e-6, 'price');
   close(option.impliedVol(FX_MARKET, '2025-01-15', price), 0.1, 1e-9, 'iv');
   close(option.metric(FX_MARKET, '2025-01-15', 'delta'), 448773.4593981477, 1e-6, 'delta');
   assert.throws(
     () =>
-      FxOption.european(
-        'X',
-        'EUR',
-        'USD',
-        1.12,
-        '2025-06-15',
-        new core.Money(1_000_000, new core.Currency('EUR')),
-        'EURUSD-VOL',
-        'call',
-        'sideways',
-        'USD',
-        'desk'
-      ),
+      FxOption.european({
+        ...optionParams,
+        delta_convention: { kind: 'sideways', premium_currency: 'USD', venue: 'desk' },
+      }),
     (e) => e.kind === 'validation'
   );
 });

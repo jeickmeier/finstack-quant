@@ -3,15 +3,12 @@
 use crate::bindings::macros::wire_methods;
 use crate::bindings::pydoc::pydoc;
 use finstack_quant_cashflows::builder::{PrincipalExchange, RollRule, ScheduleParams};
-use finstack_quant_core::dates::BusinessDayConvention;
 use pyo3::prelude::*;
 
-use crate::bindings::core::dates::calendar::{
-    PyBusinessDayConvention, extract_business_day_convention,
-};
+use crate::bindings::core::dates::calendar::PyBusinessDayConvention;
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::dates::schedule::PyStubKind;
-use crate::bindings::core::dates::tenor::{PyTenor, extract_tenor};
+use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::repr_support::{enum_repr_from_serde as enum_repr, repr_from_serde};
 use crate::errors::core_to_py;
 
@@ -153,36 +150,12 @@ impl PyScheduleParams {
     #[doc = pydoc!("finstack_quant.cashflows.builder._specs.schedule", "ScheduleParams.__init__")]
     #[new]
     #[pyo3(
-        signature = (frequency, day_count, calendar_id, business_day_convention=None, stub=None, end_of_month=false, payment_lag_days=0, adjust_accrual_dates=false, roll_rule=None),
-        text_signature = "(frequency, day_count, calendar_id, business_day_convention=None, stub=None, end_of_month=False, payment_lag_days=0, adjust_accrual_dates=False, roll_rule=None)"
+        signature = (**fields),
+        text_signature = "(*, frequency, day_count, calendar_id, business_day_convention='modified_following', stub='short_front', end_of_month=False, payment_lag_days=0, adjust_accrual_dates=False, roll_rule='none')"
     )]
-    #[allow(clippy::too_many_arguments)]
-    fn new(
-        frequency: &Bound<'_, PyAny>,
-        day_count: PyRef<'_, PyDayCount>,
-        calendar_id: &str,
-        business_day_convention: Option<&Bound<'_, PyAny>>,
-        stub: Option<PyRef<'_, PyStubKind>>,
-        end_of_month: bool,
-        payment_lag_days: i32,
-        adjust_accrual_dates: bool,
-        roll_rule: Option<PyRef<'_, PyRollRule>>,
-    ) -> PyResult<Self> {
-        let business_day_convention = match business_day_convention {
-            Some(obj) => extract_business_day_convention(obj)?,
-            None => BusinessDayConvention::default(),
-        };
-        let inner = ScheduleParams {
-            frequency: extract_tenor(frequency)?,
-            day_count: day_count.inner,
-            business_day_convention,
-            calendar_id: calendar_id.into(),
-            stub: stub.map_or(ScheduleParams::DEFAULT_STUB, |s| s.inner),
-            end_of_month,
-            payment_lag_days,
-            adjust_accrual_dates,
-            roll_rule: roll_rule.map(|r| r.inner).unwrap_or_default(),
-        };
+    fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
+        let inner: ScheduleParams =
+            crate::bindings::module_utils::fields_from_py(py, fields, "ScheduleParams")?;
         inner.validate().map_err(core_to_py)?;
         Ok(Self::from_inner(inner))
     }

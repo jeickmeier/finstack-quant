@@ -9,6 +9,7 @@ use super::pricing::{ModelInputs, stochastic_vol_inputs};
 use super::types::EquityOption;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_models::monte_carlo::engine::McPricingInputs;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::pricer::PricingError;
 use finstack_quant_valuations_core::pricer::expect_inst;
@@ -185,15 +186,15 @@ impl finstack_quant_valuations_core::pricer::Pricer for EquityOptionRoughHestonM
             self.num_steps,
         );
         let result = engine
-            .price(
-                &rng,
-                &process,
-                &disc,
-                &initial_state,
-                &payoff,
-                ccy,
+            .price(McPricingInputs {
+                rng: &rng,
+                process: &process,
+                disc: &disc,
+                initial_state: &initial_state,
+                payoff: &payoff,
+                currency: ccy,
                 discount_factor,
-            )
+            })
             .map_err(|e| {
                 finstack_quant_valuations_core::pricer::PricingError::from_core(e, err_ctx.clone())
             })?;

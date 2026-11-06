@@ -78,17 +78,17 @@ def test_sa_ccr_trade_keyword_constructor_matches_json() -> None:
 
     with pytest.raises(ValueError, match="agree in sign"):
         SaCcrTrade(
-            "X",
-            "credit",
-            1.0,
-            "2025-01-15",
-            "2026-01-15",
-            "ACME",
-            "HS",
-            1.0,
-            -1.0,
-            0.0,
-            False,
+            trade_id="X",
+            asset_class="credit",
+            notional=1.0,
+            start_date="2025-01-15",
+            end_date="2026-01-15",
+            underlier="ACME",
+            hedging_set="HS",
+            direction=1.0,
+            supervisory_delta=-1.0,
+            mtm=0.0,
+            is_option=False,
             supervisory_category="credit_bbb",
         )
 
@@ -355,16 +355,16 @@ def test_frtb_basis_repo_and_option_categories_round_trip() -> None:
     assert FrtbSensitivities.from_dataframe(sens.to_dataframe(), "USD").to_json() == sens.to_json()
     assert frtb_sba_charge(sens).total > 0
     option = SaCcrTrade(
-        "OPT",
-        "equity",
-        1e6,
-        "2025-01-15",
-        "2030-01-15",
-        "ACME",
-        "EQ",
-        1.0,
-        0.6,
-        0.0,
+        trade_id="OPT",
+        asset_class="equity",
+        notional=1e6,
+        start_date="2025-01-15",
+        end_date="2030-01-15",
+        underlier="ACME",
+        hedging_set="EQ",
+        direction=1.0,
+        supervisory_delta=0.6,
+        mtm=0.0,
         is_option=True,
         option_type="call_long",
         supervisory_category="equity_single_name",
@@ -424,8 +424,19 @@ def test_regulatory_inputs_have_no_binding_defaults() -> None:
     sens = FrtbSensitivities("USD")
     with pytest.raises(TypeError):
         sens.add_rrao_position("X", 1_000_000.0)  # type: ignore[call-arg]
-    with pytest.raises(TypeError):
-        SaCcrTrade("X", "interest_rate", 1.0, "2025-01-15", "2026-01-15", "USD", "HS", 1.0, 1.0, 0.0)  # type: ignore[call-arg]
+    with pytest.raises(ValueError, match="missing field `is_option`"):
+        SaCcrTrade(
+            trade_id="X",
+            asset_class="interest_rate",
+            notional=1.0,
+            start_date="2025-01-15",
+            end_date="2026-01-15",
+            underlier="USD",
+            hedging_set="HS",
+            direction=1.0,
+            supervisory_delta=1.0,
+            mtm=0.0,
+        )  # type: ignore[call-arg]
 
     tape = SaCcrTrade.from_json(json.dumps(linear_trade_payload())).to_dataframe()
     with pytest.raises(ValueError, match="is_option"):

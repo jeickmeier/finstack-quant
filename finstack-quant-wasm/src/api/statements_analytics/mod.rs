@@ -25,7 +25,7 @@ pub use comps::{
 };
 
 use crate::utils::input::{
-    from_js_json, js_bool, js_f64, js_f64_seq, js_opt_f64, js_opt_string, js_string, js_string_seq,
+    from_js_json, js_f64, js_f64_seq, js_opt_f64, js_opt_string, js_string, js_string_seq,
     json_text, opt_json_text,
 };
 use crate::utils::{to_js_err, to_js_value};
@@ -58,10 +58,15 @@ pub(super) fn parse_model(model: &JsValue) -> Result<FinancialModelSpec, JsValue
 /// over 128 parameters, 10,000 scenarios or 10 million model node-period
 /// evaluation cells, missing model nodes or periods, model-evaluation failures,
 /// or failure to serialize the sensitivity result to JavaScript.
-/// @param model_json - Financial-model specification JSON.
-/// @param config_json - `SensitivityConfig` object or JSON text: `mode` (`diagonal`, `full_grid` or `tornado`), `parameters` (each `node_id`, `period_id`, `base_value` and exactly one of absolute `perturbations` or `pct_range` percentage moves of `base_value`, `10` meaning +10%) and `target_metrics`.
-#[wasm_bindgen(js_name = runSensitivity)]
-pub fn run_sensitivity(model_json: JsValue, config_json: JsValue) -> Result<JsValue, JsValue> {
+/// @param modelJson - Financial-model specification JSON.
+/// @param configJson - `SensitivityConfig` object or JSON text: `mode` (`diagonal`, `full_grid` or `tornado`), `parameters` (each `node_id`, `period_id`, `base_value` and exactly one of absolute `perturbations` or `pct_range` percentage moves of `base_value`, `10` meaning +10%) and `target_metrics`.
+/// @returns Sensitivity results for each perturbation scenario.
+#[wasm_bindgen(js_name = runSensitivity, unchecked_return_type = "SensitivityResult")]
+pub fn run_sensitivity(
+    #[wasm_bindgen(js_name = "modelJson", unchecked_param_type = "JsonInput")] model_json: JsValue,
+    #[wasm_bindgen(js_name = "configJson", unchecked_param_type = "JsonInput")]
+    config_json: JsValue,
+) -> Result<JsValue, JsValue> {
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let config_json: &str = &json_text(&config_json, "configJson")?;
     let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
@@ -85,13 +90,15 @@ pub fn run_sensitivity(model_json: JsValue, config_json: JsValue) -> Result<JsVa
 /// selections, mismatched metric types or currencies, a requested value
 /// missing from either result, or failure to serialize the variance report
 /// to JavaScript.
-/// @param base_json - Base statement-result JSON.
-/// @param comparison_json - Comparison statement-result JSON.
-/// @param config_json - Configuration JSON for this call.
-#[wasm_bindgen(js_name = runVariance)]
+/// @param baseJson - Base statement-result JSON.
+/// @param comparisonJson - Comparison statement-result JSON.
+/// @param configJson - Configuration JSON for this call.
+/// @returns Variance report comparing the two evaluated statement results.
+#[wasm_bindgen(js_name = runVariance, unchecked_return_type = "VarianceReport")]
 pub fn run_variance(
-    base_json: JsValue,
-    comparison_json: JsValue,
+    #[wasm_bindgen(js_name = "baseJson", unchecked_param_type = "JsonInput")] base_json: JsValue,
+    #[wasm_bindgen(js_name = "comparisonJson", unchecked_param_type = "JsonInput")] comparison_json: JsValue,
+    #[wasm_bindgen(js_name = "configJson", unchecked_param_type = "JsonInput")]
     config_json: JsValue,
 ) -> Result<JsValue, JsValue> {
     let base_json: &str = &json_text(&base_json, "baseJson")?;
@@ -128,11 +135,13 @@ pub fn run_variance(
 /// overrides, a capital-structure instrument needing market data (kind
 /// `not_found`), failure to evaluate any scenario, or failure to serialize
 /// the result map to JavaScript.
-/// @param model_json - Financial-model specification JSON.
-/// @param scenario_set_json - Scenario-set JSON keyed by scenario name.
-#[wasm_bindgen(js_name = evaluateScenarioSet)]
+/// @param modelJson - Financial-model specification JSON.
+/// @param scenarioSetJson - Scenario-set JSON keyed by scenario name.
+/// @returns Statement results keyed by scenario name.
+#[wasm_bindgen(js_name = evaluateScenarioSet, unchecked_return_type = "ScenarioResults")]
 pub fn evaluate_scenario_set(
-    model_json: JsValue,
+    #[wasm_bindgen(js_name = "modelJson", unchecked_param_type = "JsonInput")] model_json: JsValue,
+    #[wasm_bindgen(js_name = "scenarioSetJson", unchecked_param_type = "JsonInput")]
     scenario_set_json: JsValue,
 ) -> Result<JsValue, JsValue> {
     let model_json: &str = &json_text(&model_json, "modelJson")?;
@@ -165,17 +174,18 @@ pub fn evaluate_scenario_set(
 /// of missing or incompatible nodes, invalid forecast overrides, an
 /// instrument needing market data `market` lacks (kind `not_found`), or a
 /// failure to evaluate any scenario.
-/// @param model_json - Financial-model specification JSON.
-/// @param scenario_set_json - Scenario-set JSON keyed by scenario name.
+/// @param modelJson - Financial-model specification JSON.
+/// @param scenarioSetJson - Scenario-set JSON keyed by scenario name.
 /// @param market - `MarketContext` state supplying curves, fixings and FX (object or JSON), shared by every scenario.
-/// @param as_of - ISO 8601 date (`"2025-01-15"`): the pricing date for capital-structure instruments and the cutoff for explicit-value visibility.
+/// @param asOf - ISO 8601 date (`"2025-01-15"`): the pricing date for capital-structure instruments and the cutoff for explicit-value visibility.
 /// @returns Map of scenario name to `StatementResult` plain object.
-#[wasm_bindgen(js_name = evaluateScenarioSetWithMarket)]
+#[wasm_bindgen(js_name = evaluateScenarioSetWithMarket, unchecked_return_type = "ScenarioResults")]
 pub fn evaluate_scenario_set_with_market(
-    model_json: JsValue,
+    #[wasm_bindgen(js_name = "modelJson", unchecked_param_type = "JsonInput")] model_json: JsValue,
+    #[wasm_bindgen(js_name = "scenarioSetJson", unchecked_param_type = "JsonInput")]
     scenario_set_json: JsValue,
-    market: JsValue,
-    as_of: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] market: JsValue,
+    #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
 ) -> Result<JsValue, JsValue> {
     let model =
         FinancialModelSpec::from_json(&json_text(&model_json, "modelJson")?).map_err(to_js_err)?;
@@ -200,7 +210,7 @@ pub fn evaluate_scenario_set_with_market(
 /// `"base"` when present, otherwise the first scenario; the fractional change
 /// is `(scenario - baseline) / baseline`, `0.0` when the baseline is
 /// effectively zero.
-/// @param scenario_results_json - The scenario map returned by `evaluateScenarioSet` (object or JSON).
+/// @param scenarioResultsJson - The scenario map returned by `evaluateScenarioSet` (object or JSON).
 /// @param metrics - Node identifiers to include, in row order within each period.
 /// @returns `TableEnvelope` with `period` and `metric` columns, one value column per scenario and the `_frac` change columns.
 ///
@@ -208,10 +218,14 @@ pub fn evaluate_scenario_set_with_market(
 ///
 /// Throws with kind `validation` if the results input is malformed, the
 /// result set or metric list is empty, or table construction fails.
-#[wasm_bindgen(js_name = scenarioComparisonTable)]
+#[wasm_bindgen(js_name = scenarioComparisonTable, unchecked_return_type = "TableEnvelope")]
 pub fn scenario_comparison_table(
+    #[wasm_bindgen(
+        js_name = "scenarioResultsJson",
+        unchecked_param_type = "ScenarioResults | string"
+    )]
     scenario_results_json: JsValue,
-    metrics: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string[]")] metrics: JsValue,
 ) -> Result<JsValue, JsValue> {
     let results: finstack_quant_statements_analytics::analysis::ScenarioResults =
         serde_json::from_str(&json_text(&scenario_results_json, "scenarioResultsJson")?)
@@ -235,8 +249,12 @@ pub fn scenario_comparison_table(
 /// overflow, or metrics that cannot be serialized to JavaScript.
 /// @param actual - Finite actual realized values in consistent units aligned one-for-one with the forecast series; negative values are accepted.
 /// @param forecast - Finite forecast values in the same units aligned one-for-one with the actual realized series.
-#[wasm_bindgen(js_name = backtestForecast)]
-pub fn backtest_forecast(actual: JsValue, forecast: JsValue) -> Result<JsValue, JsValue> {
+/// @returns Backtest forecast accuracy metrics for the selected series.
+#[wasm_bindgen(js_name = backtestForecast, unchecked_return_type = "ForecastMetrics")]
+pub fn backtest_forecast(
+    #[wasm_bindgen(unchecked_param_type = "number[]")] actual: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number[]")] forecast: JsValue,
+) -> Result<JsValue, JsValue> {
     let actual_vec = js_f64_seq(&actual, "actual")?;
     let forecast_vec = js_f64_seq(&forecast, "forecast")?;
 
@@ -258,14 +276,15 @@ pub fn backtest_forecast(actual: JsValue, forecast: JsValue) -> Result<JsValue, 
 /// non-finite metric values or impacts, or failure to convert the entries to
 /// JavaScript.
 /// @returns Structured tornado entries sorted by descending absolute swing, with parameter IDs preserving the perturbed `node@period` key; `null` for a full-grid run, whose scenarios combine parameters and cannot be ranked.
-/// @param result_json - Result JSON produced by a prior call.
-/// @param metric_node - Statement metric node identifier selected for the requested analysis.
+/// @param resultJson - Result JSON produced by a prior call.
+/// @param metricNode - Statement metric node identifier selected for the requested analysis.
 /// @param period - Required model period, such as `"2025Q4"`, at which the metric is read in the baseline and every scenario; a shock replaces one forecast cell, so the metric moves only in the shocked period and in later periods whose formulas read it.
-#[wasm_bindgen(js_name = generateTornadoEntries)]
+#[wasm_bindgen(js_name = generateTornadoEntries, unchecked_return_type = "TornadoEntry[] | null")]
 pub fn generate_tornado_entries(
+    #[wasm_bindgen(js_name = "resultJson", unchecked_param_type = "JsonInput")]
     result_json: JsValue,
-    metric_node: JsValue,
-    period: JsValue,
+    #[wasm_bindgen(js_name = "metricNode", unchecked_param_type = "string")] metric_node: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] period: JsValue,
 ) -> Result<JsValue, JsValue> {
     let result_json: &str = &json_text(&result_json, "resultJson")?;
     let metric_node: &str = &js_string(&metric_node, "metricNode")?;
@@ -296,19 +315,30 @@ pub fn generate_tornado_entries(
 /// series or model currency, inconsistent WACC or terminal-value assumptions,
 /// a missing or incomplete exit-multiple metric node, missing bridge inputs,
 /// valuation failures, or failure to serialize the sensitivity result.
-/// @param model_json - Financial-model specification JSON.
+/// @param modelJson - Financial-model specification JSON.
 /// @param wacc - Baseline weighted average cost of capital in decimal form (0.10 = 10%).
-/// @param terminal_value_json - Terminal-value spec JSON selecting whether growth or the exit multiple is shocked.
-/// @param ufcf_node - Node identifier holding monetary unlevered free cash flow in model currency for the forecast periods; omitted uses the canonical "ufcf" node. Gordon Growth / H-Model terminal cash flow requires a complete contiguous calendar year at the forecast end.
-/// @param net_debt_override - Optional net debt in model currency; otherwise requires debt and cash in that currency from a period ending on or before valuation.
-/// @param options_json - Optional Rust `DcfOptions` JSON; every field is optional and a missing one takes its default: `mid_year_convention` (false), `wacc_sensitivity_bump` (0.01 = +/-100 bp), `wacc_denominator_epsilon` (0.005), `max_stable_growth_rate` (0.05), `exit_multiple_bump` (`{"absolute": 1.0}` turns or `{"relative": 0.10}`), `exit_multiple_metric_node` (flow node whose complete trailing year supplies the exit-multiple metric), `equity_bridge`, `shares_outstanding`, `valuation_discounts`. Unknown keys are rejected.
-#[wasm_bindgen(js_name = dcfSensitivity)]
+/// @param terminalValueJson - Terminal-value spec JSON selecting whether growth or the exit multiple is shocked.
+/// @param ufcfNode - Node identifier holding monetary unlevered free cash flow in model currency for the forecast periods; omitted uses the canonical "ufcf" node. Gordon Growth / H-Model terminal cash flow requires a complete contiguous calendar year at the forecast end.
+/// @param netDebtOverride - Optional net debt in model currency; otherwise requires debt and cash in that currency from a period ending on or before valuation.
+/// @param optionsJson - Optional Rust `DcfOptions` JSON; every field is optional and a missing one takes its default: `mid_year_convention` (false), `wacc_sensitivity_bump` (0.01 = +/-100 bp), `wacc_denominator_epsilon` (0.005), `max_stable_growth_rate` (0.05), `exit_multiple_bump` (`{"absolute": 1.0}` turns or `{"relative": 0.10}`), `exit_multiple_metric_node` (flow node whose complete trailing year supplies the exit-multiple metric), `equity_bridge`, `shares_outstanding`, `valuation_discounts`. Unknown keys are rejected.
+/// @returns Ranked DCF-assumption impacts on enterprise value.
+#[wasm_bindgen(js_name = dcfSensitivity, unchecked_return_type = "DcfSensitivityResult")]
 pub fn dcf_sensitivity(
-    model_json: JsValue,
-    wacc: JsValue,
+    #[wasm_bindgen(js_name = "modelJson", unchecked_param_type = "JsonInput")] model_json: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] wacc: JsValue,
+    #[wasm_bindgen(js_name = "terminalValueJson", unchecked_param_type = "JsonInput")]
     terminal_value_json: JsValue,
+    #[wasm_bindgen(js_name = "ufcfNode", unchecked_optional_param_type = "string | null")]
     ufcf_node: Option<JsValue>,
+    #[wasm_bindgen(
+        js_name = "netDebtOverride",
+        unchecked_optional_param_type = "number | null"
+    )]
     net_debt_override: Option<JsValue>,
+    #[wasm_bindgen(
+        js_name = "optionsJson",
+        unchecked_optional_param_type = "JsonInput | null"
+    )]
     options_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let wacc = js_f64(&wacc, "wacc")?;
@@ -361,10 +391,15 @@ pub fn dcf_sensitivity(
 /// values, negative tranche amounts, a non-positive sponsor equity check,
 /// check-suite failures, or failure to serialize the result to JavaScript.
 /// The result is a structured JavaScript object.
-/// @param model_json - Financial-model specification JSON.
-/// @param config_json - Rust `LboConfig` JSON: `entry_multiple` (8.5 = 8.5x), `entry_metric_node`, `transaction_fees` (model currency), `sources` (`[{"name", "amount"}]` funded at close, model currency), `exit_multiple`, `exit_metric_node`, `exit_net_debt_node`, `exit_period` (e.g. "2029"), and optional `check_mappings` (`{"three_statement", "credit"}`). Every field except `check_mappings` is required.
-#[wasm_bindgen(js_name = evaluateLbo)]
-pub fn evaluate_lbo(model_json: JsValue, config_json: JsValue) -> Result<JsValue, JsValue> {
+/// @param modelJson - Financial-model specification JSON.
+/// @param configJson - Rust `LboConfig` JSON: `entry_multiple` (8.5 = 8.5x), `entry_metric_node`, `transaction_fees` (model currency), `sources` (`[{"name", "amount"}]` funded at close, model currency), `exit_multiple`, `exit_metric_node`, `exit_net_debt_node`, `exit_period` (e.g. "2029"), and optional `check_mappings` (`{"three_statement", "credit"}`). Every field except `check_mappings` is required.
+/// @returns Leveraged-buyout evaluation result against the statement model.
+#[wasm_bindgen(js_name = evaluateLbo, unchecked_return_type = "LboResult")]
+pub fn evaluate_lbo(
+    #[wasm_bindgen(js_name = "modelJson", unchecked_param_type = "JsonInput")] model_json: JsValue,
+    #[wasm_bindgen(js_name = "configJson", unchecked_param_type = "JsonInput")]
+    config_json: JsValue,
+) -> Result<JsValue, JsValue> {
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let config_json: &str = &json_text(&config_json, "configJson")?;
     let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
@@ -391,7 +426,10 @@ pub fn evaluate_lbo(model_json: JsValue, config_json: JsValue) -> Result<JsValue
 /// @param inputs - `WaccInputs` object or JSON text: `equity_weight` and `debt_weight` (decimal fractions of total capital summing to 1.0), `cost_of_equity` and pre-tax `cost_of_debt` (decimals, `0.06` = 6%) and `tax_rate` (decimal in [0, 1]).
 /// @returns The blended discount rate as a decimal fraction.
 #[wasm_bindgen(js_name = wacc)]
-pub fn wacc(inputs: JsValue) -> Result<f64, JsValue> {
+pub fn wacc(
+    #[wasm_bindgen(unchecked_param_type = "generated.statements_analytics.WaccInputs | string")]
+    inputs: JsValue,
+) -> Result<f64, JsValue> {
     let inputs: finstack_quant_statements_analytics::analysis::WaccInputs =
         from_js_json(&inputs, "inputs")?;
     finstack_quant_statements_analytics::analysis::wacc(&inputs).map_err(to_js_err)
@@ -399,64 +437,34 @@ pub fn wacc(inputs: JsValue) -> Result<f64, JsValue> {
 
 /// Find the driver value that makes a target node reach a target value.
 ///
-/// Returns the serde form of the Rust `GoalSeekResult`: `solved_value`, the
-/// solve diagnostics (`residual` and `tolerance` in the target node's units,
-/// `evaluations`, `converged`) and `model`, the input model with the solved
-/// driver written in when `update_model` is `true` and `null` otherwise. The
-/// input model is never
+/// Twin of Python `goal_seek` (Rust `goal_seek`). Returns the serde form of
+/// the Rust `GoalSeekResult`: `solved_value`, the solve diagnostics
+/// (`residual` and `tolerance` in the target node's units, `evaluations`,
+/// `converged`) and `model`, the input model with the solved driver written in
+/// when `update_model` is `true` and `null` otherwise. The input model is never
 /// modified; pass `model` straight back as the `modelJson` of another call.
 ///
 /// # Errors
 ///
-/// Rejects malformed `model_json`, invalid target or driver period identifiers,
-/// `bounds` that is not a two-number array, missing target or driver nodes or
-/// periods, non-finite or unordered bounds, model-evaluation or
+/// Rejects a malformed `modelJson` or `spec` (a missing or unknown key
+/// included), invalid target or driver period identifiers, missing target or
+/// driver nodes or periods, non-finite or unordered bounds, model-evaluation or
 /// solver-convergence failures, or failure to serialize the result.
-/// @param model_json - Financial-model specification JSON.
-/// @param target_node - Statement node identifier whose value is driven toward the target.
-/// @param target_period - Model period label in which the goal-seek target is evaluated.
-/// @param target_value - Numeric target value the goal-seek routine attempts to reach.
-/// @param driver_node - Statement node identifier adjusted by the goal-seek routine.
-/// @param driver_period - Model period label of the adjustable goal-seek driver.
-/// @param update_model - Whether the result carries the model with the solved driver value applied.
-/// @param bounds - Optional `[lower, upper]` search bracket for the driver, in the driver node's units.
-#[wasm_bindgen(js_name = goalSeek)]
-#[allow(clippy::too_many_arguments)]
+/// @param modelJson - Financial-model specification (object or JSON).
+/// @param spec - Rust `GoalSeekSpec` (object or JSON); an unknown key is rejected: `target_node` (node driven toward the target), `target_period` (period label of the target, e.g. `"2025Q4"`), `target_value` (finite target in the target node's units), `driver_node` (node the solve adjusts), `driver_period` (period label of the driver), `update_model` (whether the result carries the model with the solved driver applied) and the optional `bounds` (`[lower, upper]` search bracket in the driver node's units; omitted searches outward from the driver's current value). Every key except `bounds` is required.
+/// @returns Solved driver value and the updated model (or `null`).
+#[wasm_bindgen(js_name = goalSeek, unchecked_return_type = "GoalSeekResult")]
 pub fn goal_seek(
-    model_json: JsValue,
-    target_node: JsValue,
-    target_period: JsValue,
-    target_value: JsValue,
-    driver_node: JsValue,
-    driver_period: JsValue,
-    update_model: JsValue,
-    bounds: Option<JsValue>,
+    #[wasm_bindgen(js_name = "modelJson", unchecked_param_type = "JsonInput")] model_json: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.statements_analytics.GoalSeekSpec | string")]
+    spec: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let target_value = js_f64(&target_value, "targetValue")?;
     let model_json: &str = &json_text(&model_json, "modelJson")?;
-    let target_node: &str = &js_string(&target_node, "targetNode")?;
-    let target_period: &str = &js_string(&target_period, "targetPeriod")?;
-    let driver_node: &str = &js_string(&driver_node, "driverNode")?;
-    let driver_period: &str = &js_string(&driver_period, "driverPeriod")?;
-    let update_model = js_bool(&update_model, "updateModel")?;
-    let bounds: Option<(f64, f64)> = opt_json_text(bounds.as_ref(), "bounds")?
-        .map(|json| serde_json::from_str(&json).map_err(to_js_err))
-        .transpose()?;
     let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
-    let tp: finstack_quant_core::dates::PeriodId = target_period.parse().map_err(to_js_err)?;
-    let dp: finstack_quant_core::dates::PeriodId = driver_period.parse().map_err(to_js_err)?;
-
-    let result = finstack_quant_statements_analytics::analysis::goal_seek(
-        &model,
-        target_node,
-        tp,
-        target_value,
-        driver_node,
-        dp,
-        update_model,
-        bounds,
-    )
-    .map_err(to_js_err)?;
+    let spec: finstack_quant_statements_analytics::analysis::GoalSeekSpec =
+        from_js_json(&spec, "spec")?;
+    let result = finstack_quant_statements_analytics::analysis::goal_seek(&model, &spec)
+        .map_err(to_js_err)?;
     to_js_value(&result)
 }
 
@@ -477,16 +485,18 @@ pub fn goal_seek(
 /// Rejects malformed model or result JSON, an invalid `period` identifier, a
 /// missing model node or node-period result, an invalid formula used to build
 /// the breakdown, or failure to serialize the explanation to JavaScript.
-/// @param model_json - Financial-model specification JSON.
-/// @param results_json - Evaluated statement-result JSON.
-/// @param node_id - Stable node identifier used to select the required domain object.
+/// @param modelJson - Financial-model specification JSON.
+/// @param resultsJson - Evaluated statement-result JSON.
+/// @param nodeId - Stable node identifier used to select the required domain object.
 /// @param period - Model period label for the requested statement value or calculation.
-#[wasm_bindgen(js_name = explainFormula)]
+/// @returns Structured formula breakdown for the selected node and period.
+#[wasm_bindgen(js_name = explainFormula, unchecked_return_type = "Explanation")]
 pub fn explain_formula(
-    model_json: JsValue,
+    #[wasm_bindgen(js_name = "modelJson", unchecked_param_type = "JsonInput")] model_json: JsValue,
+    #[wasm_bindgen(js_name = "resultsJson", unchecked_param_type = "JsonInput")]
     results_json: JsValue,
-    node_id: JsValue,
-    period: JsValue,
+    #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] period: JsValue,
 ) -> Result<JsValue, JsValue> {
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let results_json: &str = &json_text(&results_json, "resultsJson")?;
@@ -515,16 +525,18 @@ pub fn explain_formula(
 /// Rejects malformed model or result JSON, an invalid `period` identifier, a
 /// missing model node or node-period result, or an invalid formula used to
 /// build the explanation breakdown.
-/// @param model_json - Financial-model specification JSON.
-/// @param results_json - Evaluated statement-result JSON.
-/// @param node_id - Stable node identifier used to select the required domain object.
+/// @param modelJson - Financial-model specification JSON.
+/// @param resultsJson - Evaluated statement-result JSON.
+/// @param nodeId - Stable node identifier used to select the required domain object.
 /// @param period - Model period label for the requested statement value or calculation.
+/// @returns Formatted formula explanation for the selected node and period.
 #[wasm_bindgen(js_name = explainFormulaText)]
 pub fn explain_formula_text(
-    model_json: JsValue,
+    #[wasm_bindgen(js_name = "modelJson", unchecked_param_type = "JsonInput")] model_json: JsValue,
+    #[wasm_bindgen(js_name = "resultsJson", unchecked_param_type = "JsonInput")]
     results_json: JsValue,
-    node_id: JsValue,
-    period: JsValue,
+    #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] period: JsValue,
 ) -> Result<String, JsValue> {
     let model_json: &str = &json_text(&model_json, "modelJson")?;
     let results_json: &str = &json_text(&results_json, "resultsJson")?;
@@ -548,14 +560,16 @@ pub fn explain_formula_text(
 /// Rejects malformed `results_json`, `line_items` or `periods` values that are
 /// not JavaScript string arrays, or any period string that is not a valid
 /// statement period identifier.
-/// @param results_json - Evaluated statement-result JSON.
-/// @param line_items - Ordered statement line-item definitions included in the summary report.
+/// @param resultsJson - Evaluated statement-result JSON.
+/// @param lineItems - Ordered statement line-item definitions included in the summary report.
 /// @param periods - Ordered period labels or observations aligned with the supplied data.
+/// @returns Returns a human-readable text report, not JSON.
 #[wasm_bindgen(js_name = plSummaryReportText)]
 pub fn pl_summary_report_text(
+    #[wasm_bindgen(js_name = "resultsJson", unchecked_param_type = "JsonInput")]
     results_json: JsValue,
-    line_items: JsValue,
-    periods: JsValue,
+    #[wasm_bindgen(js_name = "lineItems", unchecked_param_type = "string[]")] line_items: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string[]")] periods: JsValue,
 ) -> Result<String, JsValue> {
     let results_json: &str = &json_text(&results_json, "resultsJson")?;
     let results: finstack_quant_statements::evaluator::StatementResult =
@@ -582,12 +596,14 @@ pub fn pl_summary_report_text(
 ///
 /// Rejects malformed `results_json` or an `period` value that is not a valid
 /// statement period identifier.
-/// @param results_json - Evaluated statement-result JSON.
+/// @param resultsJson - Evaluated statement-result JSON.
 /// @param period - Statement period identifier, such as `2025Q4` or `2025A`.
+/// @returns Returns a human-readable text report, not JSON.
 #[wasm_bindgen(js_name = creditAssessmentReportText)]
 pub fn credit_assessment_report_text(
+    #[wasm_bindgen(js_name = "resultsJson", unchecked_param_type = "JsonInput")]
     results_json: JsValue,
-    period: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] period: JsValue,
 ) -> Result<String, JsValue> {
     let results_json: &str = &json_text(&results_json, "resultsJson")?;
     let period: &str = &js_string(&period, "period")?;
@@ -617,10 +633,15 @@ pub fn credit_assessment_report_text(
 /// statement period identifier, a `period` that is not one of the results'
 /// `periods` (kind `validation`), or failure to serialize the assessment to
 /// JavaScript.
-/// @param results_json - Evaluated statement-result JSON.
+/// @param resultsJson - Evaluated statement-result JSON.
 /// @param period - Statement period identifier, such as `2025Q4`, that is a period of the results in the model's own frequency: `2025` is the annual period, not the last quarter of a quarterly model.
-#[wasm_bindgen(js_name = creditAssessment)]
-pub fn credit_assessment(results_json: JsValue, period: JsValue) -> Result<JsValue, JsValue> {
+/// @returns Credit-assessment result object from the statement results.
+#[wasm_bindgen(js_name = creditAssessment, unchecked_return_type = "CreditAssessment")]
+pub fn credit_assessment(
+    #[wasm_bindgen(js_name = "resultsJson", unchecked_param_type = "JsonInput")]
+    results_json: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] period: JsValue,
+) -> Result<JsValue, JsValue> {
     let results_json: &str = &json_text(&results_json, "resultsJson")?;
     let period: &str = &js_string(&period, "period")?;
     let results: finstack_quant_statements::evaluator::StatementResult =
@@ -644,13 +665,17 @@ pub fn credit_assessment(results_json: JsValue, period: JsValue) -> Result<JsVal
 /// missing nodes, incompatible data, or invalid check configuration during
 /// execution; or failure to convert the report to JavaScript.
 /// @returns Structured check report with individual results and aggregate summary.
-/// @param model_json - Financial-model specification JSON.
-/// @param suite_spec_json - Check-suite specification JSON.
-/// @param results_json - Evaluated statement-result JSON.
-#[wasm_bindgen(js_name = runChecks)]
+/// @param modelJson - Financial-model specification JSON.
+/// @param suiteSpecJson - Check-suite specification JSON.
+/// @param resultsJson - Evaluated statement-result JSON.
+#[wasm_bindgen(js_name = runChecks, unchecked_return_type = "CheckReport")]
 pub fn run_checks(
-    model_json: JsValue,
-    suite_spec_json: JsValue,
+    #[wasm_bindgen(js_name = "modelJson", unchecked_param_type = "JsonInput")] model_json: JsValue,
+    #[wasm_bindgen(js_name = "suiteSpecJson", unchecked_param_type = "JsonInput")] suite_spec_json: JsValue,
+    #[wasm_bindgen(
+        js_name = "resultsJson",
+        unchecked_optional_param_type = "JsonInput | null"
+    )]
     results_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let model_json: &str = &json_text(&model_json, "modelJson")?;
@@ -680,13 +705,18 @@ pub fn run_checks(
 /// that is missing from the model does not throw: its check is skipped or
 /// reported as a finding.
 /// @returns Structured three-statement check report with results and aggregate summary.
-/// @param model_json - Financial-model specification JSON.
-/// @param mapping_json - `ThreeStatementMapping` (object or JSON) naming the model nodes that feed each check.
-/// @param results_json - Evaluated statement-result JSON.
-#[wasm_bindgen(js_name = runThreeStatementChecks)]
+/// @param modelJson - Financial-model specification JSON.
+/// @param mappingJson - `ThreeStatementMapping` (object or JSON) naming the model nodes that feed each check.
+/// @param resultsJson - Evaluated statement-result JSON.
+#[wasm_bindgen(js_name = runThreeStatementChecks, unchecked_return_type = "CheckReport")]
 pub fn run_three_statement_checks(
-    model_json: JsValue,
+    #[wasm_bindgen(js_name = "modelJson", unchecked_param_type = "JsonInput")] model_json: JsValue,
+    #[wasm_bindgen(js_name = "mappingJson", unchecked_param_type = "JsonInput")]
     mapping_json: JsValue,
+    #[wasm_bindgen(
+        js_name = "resultsJson",
+        unchecked_optional_param_type = "JsonInput | null"
+    )]
     results_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let model_json: &str = &json_text(&model_json, "modelJson")?;
@@ -713,13 +743,18 @@ pub fn run_three_statement_checks(
 /// that is missing from the model does not throw: its check is skipped or
 /// reported as a finding.
 /// @returns Structured credit-underwriting check report with results and aggregate summary.
-/// @param model_json - Financial-model specification JSON.
-/// @param mapping_json - `CreditMapping` (object or JSON) naming the debt, EBITDA and interest nodes plus the optional warning bands (`leverage_warn` is a `(min, max)` band in turns).
-/// @param results_json - Evaluated statement-result JSON.
-#[wasm_bindgen(js_name = runCreditUnderwritingChecks)]
+/// @param modelJson - Financial-model specification JSON.
+/// @param mappingJson - `CreditMapping` (object or JSON) naming the debt, EBITDA and interest nodes plus the optional warning bands (`leverage_warn` is a `(min, max)` band in turns).
+/// @param resultsJson - Evaluated statement-result JSON.
+#[wasm_bindgen(js_name = runCreditUnderwritingChecks, unchecked_return_type = "CheckReport")]
 pub fn run_credit_underwriting_checks(
-    model_json: JsValue,
+    #[wasm_bindgen(js_name = "modelJson", unchecked_param_type = "JsonInput")] model_json: JsValue,
+    #[wasm_bindgen(js_name = "mappingJson", unchecked_param_type = "JsonInput")]
     mapping_json: JsValue,
+    #[wasm_bindgen(
+        js_name = "resultsJson",
+        unchecked_optional_param_type = "JsonInput | null"
+    )]
     results_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let model_json: &str = &json_text(&model_json, "modelJson")?;
@@ -750,9 +785,13 @@ fn parse_optional_results(
 ///
 /// Rejects `report_json` when it is malformed or incompatible with the check
 /// report schema.
-/// @param report_json - Check-report JSON.
+/// @param reportJson - Check-report JSON.
+/// @returns Plain-text check report.
 #[wasm_bindgen(js_name = renderCheckReportText)]
-pub fn render_check_report_text(report_json: JsValue) -> Result<String, JsValue> {
+pub fn render_check_report_text(
+    #[wasm_bindgen(js_name = "reportJson", unchecked_param_type = "JsonInput")]
+    report_json: JsValue,
+) -> Result<String, JsValue> {
     let report_json: &str = &json_text(&report_json, "reportJson")?;
     let report: finstack_quant_statements::checks::CheckReport =
         serde_json::from_str(report_json).map_err(to_js_err)?;
@@ -765,9 +804,13 @@ pub fn render_check_report_text(report_json: JsValue) -> Result<String, JsValue>
 ///
 /// Rejects `report_json` when it is malformed or incompatible with the check
 /// report schema.
-/// @param report_json - Check-report JSON.
+/// @param reportJson - Check-report JSON.
+/// @returns HTML check report.
 #[wasm_bindgen(js_name = renderCheckReportHtml)]
-pub fn render_check_report_html(report_json: JsValue) -> Result<String, JsValue> {
+pub fn render_check_report_html(
+    #[wasm_bindgen(js_name = "reportJson", unchecked_param_type = "JsonInput")]
+    report_json: JsValue,
+) -> Result<String, JsValue> {
     let report_json: &str = &json_text(&report_json, "reportJson")?;
     let report: finstack_quant_statements::checks::CheckReport =
         serde_json::from_str(report_json).map_err(to_js_err)?;

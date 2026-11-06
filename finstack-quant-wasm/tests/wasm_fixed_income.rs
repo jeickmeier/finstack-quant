@@ -3,7 +3,6 @@
 
 #![cfg(target_arch = "wasm32")]
 
-use finstack_quant_wasm::api::core::dates::{JsDayCount, JsTenor};
 use finstack_quant_wasm::api::core::money::JsMoney;
 use finstack_quant_wasm::api::core::types::{JsBps, JsRate};
 use finstack_quant_wasm::api::valuations::pricing::price_instrument;
@@ -188,18 +187,18 @@ fn bond_from_json_round_trip_preserves_fields() {
 
 #[wasm_bindgen_test]
 fn bond_floating_constructor_builds_frn() {
-    let frn = JsBond::floating(
-        JsValue::from("FRN-1"),
-        &usd_money(1_000_000.0),
-        JsValue::from("USD-SOFR-3M"),
-        &JsBps::new(JsValue::from(200.0)).unwrap(),
-        JsValue::from("2024-01-01"),
-        JsValue::from("2030-01-01"),
-        &JsTenor::quarterly(),
-        &JsDayCount::act360(),
-        JsValue::from("USD-OIS"),
-    )
-    .expect("floating bond");
+    let params = serde_json::json!({
+        "id": "FRN-1",
+        "notional": {"amount": "1000000", "currency": "USD"},
+        "forward_curve_id": "USD-SOFR-3M",
+        "spread_bp": 200,
+        "issue_date": "2024-01-01",
+        "maturity": "2030-01-01",
+        "frequency": {"count": 3, "unit": "months"},
+        "day_count": "act_360",
+        "discount_curve_id": "USD-OIS",
+    });
+    let frn = JsBond::floating(JsValue::from(params.to_string())).expect("floating bond");
     assert_eq!(frn.id(), "FRN-1");
     let value: serde_json::Value = serde_json::from_str(&frn.to_json().unwrap()).unwrap();
     assert_eq!(value["instrument"]["type"], "bond");
@@ -223,8 +222,6 @@ fn bond_typed_to_json_prices_identically_to_handwritten_json() {
         Some(JsValue::from("default".to_string())),
         None,
         None,
-        None,
-        None,
     )
     .expect("price typed");
     let via_json = price_instrument(
@@ -237,8 +234,6 @@ fn bond_typed_to_json_prices_identically_to_handwritten_json() {
         JsValue::from(&market),
         JsValue::from("2024-06-30"),
         Some(JsValue::from("default".to_string())),
-        None,
-        None,
         None,
         None,
     )
@@ -254,8 +249,6 @@ fn rates_credit_values_bond_call_and_put_rights() {
             JsValue::from(market_json),
             JsValue::from("2024-06-30"),
             Some(JsValue::from(model.to_string())),
-            None,
-            None,
             None,
             None,
         )
@@ -298,8 +291,6 @@ fn rates_credit_values_bond_call_and_put_rights() {
         Some(JsValue::from("hazard_rate".to_string())),
         None,
         None,
-        None,
-        None,
     )
     .expect_err("hazard_rate must reject embedded exercise rights");
     let message = js_sys::Reflect::get(&error, &wasm_bindgen::JsValue::from_str("message"))
@@ -332,8 +323,6 @@ fn stochastic_rates_credit_result_exports_full_width_seed_as_bigint() {
         JsValue::from(&credit_market_context_json()),
         JsValue::from("2024-06-30"),
         Some(JsValue::from("rates_credit".to_string())),
-        None,
-        None,
         None,
         None,
     )
@@ -393,8 +382,6 @@ fn term_loan_example_round_trips_and_prices() {
         JsValue::from(&market),
         JsValue::from("2024-06-30"),
         Some(JsValue::from("default".to_string())),
-        None,
-        None,
         None,
         None,
     )

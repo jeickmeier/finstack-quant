@@ -19,7 +19,7 @@ fn price_instrument_from_json(
     model: &str,
     metrics: &[String],
     metric_pricing_overrides_json: Option<&str>,
-    market_history_json: Option<&str>,
+    market_history: Option<&finstack_quant_valuations::metrics::risk::MarketHistory>,
 ) -> finstack_quant_core::Result<finstack_quant_valuations::results::ValuationResult> {
     let instrument =
         parse_boxed_instrument_from_json(instrument_json, metric_pricing_overrides_json)?;
@@ -29,7 +29,7 @@ fn price_instrument_from_json(
         as_of,
         model,
         metrics,
-        market_history_json,
+        market_history,
         PricingOptions::default()
             .with_recalibration_provider(Arc::new(CachedRecalibrationProvider::default())),
     )

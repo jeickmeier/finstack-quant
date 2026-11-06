@@ -8,9 +8,6 @@ use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
 use crate::errors::core_to_py;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
-use finstack_quant_valuations::instruments::equity::equity_option::{
-    EquityOptionMarketData, EquityOptionParams,
-};
 
 use super::convert::enum_from_str;
 use super::convert::{
@@ -62,15 +59,7 @@ impl PyEquityOption {
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOption.european")]
     #[staticmethod]
-    #[pyo3(signature = (id, ticker, strike, expiry, quantity, currency, option_type, *, discount_curve_id="USD-OIS",
-                        spot_id="EQUITY-SPOT", vol_surface_id="EQUITY-VOL",
-                        div_yield_id="EQUITY-DIVYIELD"))]
-    #[pyo3(
-        text_signature = "(id, ticker, strike, expiry, quantity, currency, option_type, *, discount_curve_id='USD-OIS', \
-spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIELD')"
-    )]
-    // PyO3 binding: the argument list mirrors the Python keyword-argument API.
-    #[allow(clippy::too_many_arguments)]
+    #[pyo3(text_signature = "(id, ticker, strike, expiry, quantity, currency, option_type)")]
     fn european(
         id: &str,
         ticker: &str,
@@ -79,32 +68,18 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
         quantity: f64,
         currency: &Bound<'_, PyAny>,
         option_type: &str,
-        discount_curve_id: &str,
-        spot_id: &str,
-        vol_surface_id: &str,
-        div_yield_id: Option<&str>,
     ) -> PyResult<Self> {
-        let mut market_data =
-            EquityOptionMarketData::new(discount_curve_id, spot_id, vol_surface_id);
-        if let Some(div) = div_yield_id {
-            market_data = market_data.with_div_yield_id(div);
-        }
-        let option_params = EquityOptionParams::new(
+        finstack_quant_valuations::instruments::equity::equity_option::EquityOption::european(
+            id,
+            ticker,
             strike,
             py_to_date(expiry)?,
-            enum_from_str(option_type, "option_type")?,
             quantity,
             crate::bindings::core::currency::extract_currency(currency)?,
-        );
-        let inner =
-            finstack_quant_valuations::instruments::equity::equity_option::EquityOption::european_with_market_data(
-                id,
-                ticker,
-                option_params,
-                market_data,
-            )
-            .map_err(core_to_py)?;
-        Ok(Self { inner })
+            enum_from_str(option_type, "option_type")?,
+        )
+        .map(|inner| Self { inner })
+        .map_err(core_to_py)
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_equity", "EquityOption.implied_vol")]

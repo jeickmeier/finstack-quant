@@ -27,7 +27,7 @@ This construction enforces sampled discount/projection relationships but interpo
 
 - Implementation: [recalibration/rates.rs](../../../../finstack-quant/calibration/src/recalibration/rates.rs) — link checks, one-curve replay, integer-date inversion and simple-forward construction.
 - Test evidence: [src/recalibration/rates.rs](../../../../finstack-quant/calibration/src/recalibration/rates.rs) — single-calibration counter, reciprocal recipe failures, source fixings and cross-clock projection checks; inspected or located, not executed.
-- Test evidence: [src/recalibration/rates_review_tests.rs](../../../../finstack-quant/calibration/src/recalibration/rates_review_tests.rs) — linked and single-OIS composition/direct-repricing fixtures; inspected or located, not executed.
+- Test evidence: [src/recalibration/tests/rates_review.rs](../../../../finstack-quant/calibration/src/recalibration/tests/rates_review.rs) — linked and single-OIS composition/direct-repricing fixtures; inspected or located, not executed.
 - Reference gap: no method-specific independent source or external benchmark is established by this record; source and regression evidence describe implementation behavior.
 
 ## Follow-up tracking

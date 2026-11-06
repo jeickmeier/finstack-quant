@@ -29,8 +29,8 @@ fn refs(names: &[String]) -> Vec<&str> {
 /// the node `name`, the sum over lags of `newVolume[t - lag] * decayCurve[lag]`.
 /// @param model - `FinancialModelSpec` to extend (object or JSON).
 /// @param name - Identifier of the outstanding-balance node to create.
-/// @param new_volume_node - Existing node holding each period's new volume.
-/// @param decay_curve - Fraction of a cohort still outstanding `lag` periods after origination, as decimals starting at lag 0 (e.g. `[1.0, 0.8, 0.5]`).
+/// @param newVolumeNode - Existing node holding each period's new volume.
+/// @param decayCurve - Fraction of a cohort still outstanding `lag` periods after origination, as decimals starting at lag 0 (e.g. `[1.0, 0.8, 0.5]`).
 /// Existing generated node identifiers are replaced.
 /// @returns The extended `FinancialModelSpec` plain object.
 ///
@@ -38,11 +38,16 @@ fn refs(names: &[String]) -> Vec<&str> {
 ///
 /// Throws with kind `validation` if the model is malformed, a node identifier
 /// is invalid, or the generated formula does not compile.
-#[wasm_bindgen(js_name = addVintageBuildup)]
+#[wasm_bindgen(js_name = addVintageBuildup, unchecked_return_type = "generated.statements.FinancialModelSpec")]
 pub fn add_vintage_buildup(
-    model: JsValue,
-    name: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
+    #[wasm_bindgen(js_name = "newVolumeNode", unchecked_param_type = "string")]
     new_volume_node: JsValue,
+    #[wasm_bindgen(
+        js_name = "decayCurve",
+        unchecked_param_type = "number[] | Float64Array"
+    )]
     decay_curve: JsValue,
 ) -> Result<JsValue, JsValue> {
     let builder = vintage::add_vintage_buildup(
@@ -71,12 +76,12 @@ pub fn add_vintage_buildup(
 ///
 /// Throws with kind `validation` if the model is malformed, a node identifier
 /// is invalid, or a generated formula does not compile.
-#[wasm_bindgen(js_name = addRollForward)]
+#[wasm_bindgen(js_name = addRollForward, unchecked_return_type = "generated.statements.FinancialModelSpec")]
 pub fn add_roll_forward(
-    model: JsValue,
-    name: JsValue,
-    increases: JsValue,
-    decreases: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string[]")] increases: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string[]")] decreases: JsValue,
 ) -> Result<JsValue, JsValue> {
     let increases = js_string_seq(&increases, "increases")?;
     let decreases = js_string_seq(&decreases, "decreases")?;
@@ -105,13 +110,13 @@ pub fn add_roll_forward(
 ///
 /// Throws with kind `validation` if the model is malformed, a node identifier
 /// is invalid, or a generated formula does not compile.
-#[wasm_bindgen(js_name = addRollForwardWithOpening)]
+#[wasm_bindgen(js_name = addRollForwardWithOpening, unchecked_return_type = "generated.statements.FinancialModelSpec")]
 pub fn add_roll_forward_with_opening(
-    model: JsValue,
-    name: JsValue,
-    increases: JsValue,
-    decreases: JsValue,
-    opening: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string[]")] increases: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string[]")] decreases: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] opening: JsValue,
 ) -> Result<JsValue, JsValue> {
     let increases = js_string_seq(&increases, "increases")?;
     let decreases = js_string_seq(&decreases, "decreases")?;
@@ -129,11 +134,11 @@ pub fn add_roll_forward_with_opening(
 ///
 /// Twin of Python `add_noi_buildup` (Rust `add_noi_buildup`).
 /// @param model - `FinancialModelSpec` to extend (object or JSON).
-/// @param total_revenue_node - Identifier of the total-revenue node to create.
-/// @param revenue_nodes - Existing revenue line nodes summed into the total.
-/// @param total_expenses_node - Identifier of the total-expenses node to create.
-/// @param expense_nodes - Existing operating-expense line nodes summed into the total.
-/// @param noi_node - Identifier of the NOI node to create (`total revenue - total expenses`).
+/// @param totalRevenueNode - Identifier of the total-revenue node to create.
+/// @param revenueNodes - Existing revenue line nodes summed into the total.
+/// @param totalExpensesNode - Identifier of the total-expenses node to create.
+/// @param expenseNodes - Existing operating-expense line nodes summed into the total.
+/// @param noiNode - Identifier of the NOI node to create (`total revenue - total expenses`).
 /// Existing generated node identifiers are replaced.
 /// @returns The extended `FinancialModelSpec` plain object.
 ///
@@ -142,14 +147,18 @@ pub fn add_roll_forward_with_opening(
 /// Throws with kind `validation` if the model is malformed, a node list is
 /// empty, a node identifier is invalid, or a generated formula
 /// does not compile.
-#[wasm_bindgen(js_name = addNoiBuildup)]
+#[wasm_bindgen(js_name = addNoiBuildup, unchecked_return_type = "generated.statements.FinancialModelSpec")]
 pub fn add_noi_buildup(
-    model: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
+    #[wasm_bindgen(js_name = "totalRevenueNode", unchecked_param_type = "string")]
     total_revenue_node: JsValue,
+    #[wasm_bindgen(js_name = "revenueNodes", unchecked_param_type = "string[]")]
     revenue_nodes: JsValue,
+    #[wasm_bindgen(js_name = "totalExpensesNode", unchecked_param_type = "string")]
     total_expenses_node: JsValue,
+    #[wasm_bindgen(js_name = "expenseNodes", unchecked_param_type = "string[]")]
     expense_nodes: JsValue,
-    noi_node: JsValue,
+    #[wasm_bindgen(js_name = "noiNode", unchecked_param_type = "string")] noi_node: JsValue,
 ) -> Result<JsValue, JsValue> {
     let revenue_nodes = js_string_seq(&revenue_nodes, "revenueNodes")?;
     let expense_nodes = js_string_seq(&expense_nodes, "expenseNodes")?;
@@ -169,9 +178,9 @@ pub fn add_noi_buildup(
 ///
 /// Twin of Python `add_ncf_buildup` (Rust `add_ncf_buildup`).
 /// @param model - `FinancialModelSpec` to extend (object or JSON).
-/// @param noi_node - Existing NOI node.
-/// @param capex_nodes - Existing capital-expenditure nodes subtracted from NOI; an empty list makes NCF equal NOI.
-/// @param ncf_node - Identifier of the NCF node to create.
+/// @param noiNode - Existing NOI node.
+/// @param capexNodes - Existing capital-expenditure nodes subtracted from NOI; an empty list makes NCF equal NOI.
+/// @param ncfNode - Identifier of the NCF node to create.
 /// Existing generated node identifiers are replaced.
 /// @returns The extended `FinancialModelSpec` plain object.
 ///
@@ -179,12 +188,12 @@ pub fn add_noi_buildup(
 ///
 /// Throws with kind `validation` if the model is malformed, a node identifier
 /// is invalid, or the generated formula does not compile.
-#[wasm_bindgen(js_name = addNcfBuildup)]
+#[wasm_bindgen(js_name = addNcfBuildup, unchecked_return_type = "generated.statements.FinancialModelSpec")]
 pub fn add_ncf_buildup(
-    model: JsValue,
-    noi_node: JsValue,
-    capex_nodes: JsValue,
-    ncf_node: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
+    #[wasm_bindgen(js_name = "noiNode", unchecked_param_type = "string")] noi_node: JsValue,
+    #[wasm_bindgen(js_name = "capexNodes", unchecked_param_type = "string[]")] capex_nodes: JsValue,
+    #[wasm_bindgen(js_name = "ncfNode", unchecked_param_type = "string")] ncf_node: JsValue,
 ) -> Result<JsValue, JsValue> {
     let capex_nodes = js_string_seq(&capex_nodes, "capexNodes")?;
     let builder = real_estate::add_ncf_buildup(
@@ -211,10 +220,14 @@ pub fn add_ncf_buildup(
 /// Throws with kind `validation` if an input is malformed, `leases` is empty,
 /// a lease fails validation, or a generated node identifier or formula is
 /// invalid.
-#[wasm_bindgen(js_name = addRentRoll)]
+#[wasm_bindgen(js_name = addRentRoll, unchecked_return_type = "generated.statements.FinancialModelSpec")]
 pub fn add_rent_roll(
-    model: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.statements_analytics.LeaseSpec[] | string")]
     leases: JsValue,
+    #[wasm_bindgen(
+        unchecked_optional_param_type = "generated.statements_analytics.RentRollOutputNodes | string | null"
+    )]
     nodes: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let leases: Vec<real_estate::LeaseSpec> = from_js_json(&leases, "leases")?;
@@ -231,10 +244,10 @@ pub fn add_rent_roll(
 /// `add_property_operating_statement`).
 /// @param model - `FinancialModelSpec` to extend (object or JSON).
 /// @param leases - Array of `LeaseSpec` objects, at least one (array or JSON).
-/// @param other_income_nodes - Existing other-income nodes added to effective rent; omitted means none.
-/// @param opex_nodes - Existing operating-expense nodes; omitted means none.
-/// @param capex_nodes - Existing capital-expenditure nodes; omitted means none.
-/// @param management_fee - Optional `ManagementFeeSpec` (`rate` as a decimal of its `base`); omitted adds no fee (object or JSON).
+/// @param otherIncomeNodes - Existing other-income nodes added to effective rent; omitted means none.
+/// @param opexNodes - Existing operating-expense nodes; omitted means none.
+/// @param capexNodes - Existing capital-expenditure nodes; omitted means none.
+/// @param managementFee - Optional `ManagementFeeSpec` (`rate` as a decimal of its `base`); omitted adds no fee (object or JSON).
 /// @param nodes - Optional `PropertyTemplateNodes` naming the generated nodes; omitted uses the Rust default names (object or JSON).
 /// Existing generated node identifiers are replaced.
 /// @returns The extended `FinancialModelSpec` plain object.
@@ -244,15 +257,34 @@ pub fn add_rent_roll(
 /// Throws with kind `validation` if an input is malformed, `leases` is empty,
 /// a lease fails validation, or a generated node identifier or formula is
 /// invalid.
-#[wasm_bindgen(js_name = addPropertyOperatingStatement)]
-#[allow(clippy::too_many_arguments)]
+#[wasm_bindgen(js_name = addPropertyOperatingStatement, unchecked_return_type = "generated.statements.FinancialModelSpec")]
 pub fn add_property_operating_statement(
-    model: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.statements_analytics.LeaseSpec[] | string")]
     leases: JsValue,
+    #[wasm_bindgen(
+        js_name = "otherIncomeNodes",
+        unchecked_optional_param_type = "string[] | null"
+    )]
     other_income_nodes: Option<JsValue>,
+    #[wasm_bindgen(
+        js_name = "opexNodes",
+        unchecked_optional_param_type = "string[] | null"
+    )]
     opex_nodes: Option<JsValue>,
+    #[wasm_bindgen(
+        js_name = "capexNodes",
+        unchecked_optional_param_type = "string[] | null"
+    )]
     capex_nodes: Option<JsValue>,
+    #[wasm_bindgen(
+        js_name = "managementFee",
+        unchecked_optional_param_type = "generated.statements_analytics.ManagementFeeSpec | string | null"
+    )]
     management_fee: Option<JsValue>,
+    #[wasm_bindgen(
+        unchecked_optional_param_type = "generated.statements_analytics.PropertyTemplateNodes | string | null"
+    )]
     nodes: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let leases: Vec<real_estate::LeaseSpec> = from_js_json(&leases, "leases")?;
@@ -289,7 +321,9 @@ pub fn add_property_operating_statement(
 /// invalid: an empty node identifier, a non-finite base rent, growth rate or
 /// rent step, an occupancy outside `[0, 1]`, or an invalid renewal.
 #[wasm_bindgen(js_name = validateLeaseSpecJson)]
-pub fn validate_lease_spec_json(json: JsValue) -> Result<String, JsValue> {
+pub fn validate_lease_spec_json(
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+) -> Result<String, JsValue> {
     crate::utils::input::validated_json(&json, real_estate::LeaseSpec::validate)
 }
 
@@ -306,6 +340,8 @@ pub fn validate_lease_spec_json(json: JsValue) -> Result<String, JsValue> {
 /// invalid: a zero term, a probability outside `[0, 1]`, or a non-positive
 /// rent factor.
 #[wasm_bindgen(js_name = validateRenewalSpecJson)]
-pub fn validate_renewal_spec_json(json: JsValue) -> Result<String, JsValue> {
+pub fn validate_renewal_spec_json(
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+) -> Result<String, JsValue> {
     crate::utils::input::validated_json(&json, real_estate::RenewalSpec::validate)
 }

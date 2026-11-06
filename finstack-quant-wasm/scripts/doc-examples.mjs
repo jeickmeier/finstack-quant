@@ -1,6 +1,8 @@
 // Collect every code sample a consumer can copy: each fenced `ts`/`js` block in
-// an `index.d.ts` doc comment (the `@example` blocks) and in the Markdown files
-// that document the package.
+// a published declaration doc comment (the `@example` blocks: wasm-bindgen's
+// `pkg/finstack_quant_wasm.d.ts`, from the Rustdoc in `src/api/**`, and the
+// generated facade `index.d.ts`, from the JSDoc in `exports/**`) and in the
+// Markdown files that document the package.
 //
 // `check-typescript-examples.mjs` type-checks the samples and
 // `tests/docs/doc_examples.test.mjs` executes them. A sample must therefore
@@ -16,8 +18,10 @@ const PACKAGE = new URL('../', import.meta.url);
 
 /** The files whose samples are gated, relative to the package root. */
 export const SOURCES = [
+  'pkg/finstack_quant_wasm.d.ts',
   'index.d.ts',
   'README.md',
+  '../README.md',
   '../.agents/rules/wasm/javascript-usage-standards.md',
 ];
 
@@ -85,16 +89,21 @@ export function fencedBlocks(text, inComments) {
  *   the program text (with `PRELUDE` in front when the block has no import).
  */
 export function collectExamples() {
+  // The facade copies each re-exported function's JSDoc from the package
+  // declarations, so the same sample appears in both files; it is gated once.
+  const seen = new Set();
   return SOURCES.flatMap((source) => {
     const url = new URL(source, PACKAGE);
     const label = source.replace(/^(\.\.\/)+/, '');
-    return fencedBlocks(readFileSync(url, 'utf8'), source.endsWith('.d.ts')).map((block) => ({
-      source: label,
-      line: block.line,
-      language: block.language,
-      name: `${label.replace(/[^A-Za-z0-9]+/g, '_')}_L${block.line}`,
-      code: /^[ \t]*import\s/m.test(block.code) ? block.code : PRELUDE + block.code,
-    }));
+    return fencedBlocks(readFileSync(url, 'utf8'), source.endsWith('.d.ts'))
+      .filter((block) => !seen.has(block.code) && seen.add(block.code))
+      .map((block) => ({
+        source: label,
+        line: block.line,
+        language: block.language,
+        name: `${label.replace(/[^A-Za-z0-9]+/g, '_')}_L${block.line}`,
+        code: /^[ \t]*import\s/m.test(block.code) ? block.code : PRELUDE + block.code,
+      }));
   });
 }
 

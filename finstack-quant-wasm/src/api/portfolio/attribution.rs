@@ -14,10 +14,10 @@ use wasm_bindgen::prelude::*;
 /// per factor (`carry`, `rates_curves_pnl`, `credit_curves_pnl`, `fx_pnl`,
 /// `vol_pnl`, ..., `residual`) and the per-position `by_position` detail.
 /// @param portfolio - Built portfolio whose positions are attributed.
-/// @param market_t0 - `core.MarketContext` handle for the opening snapshot.
-/// @param market_t1 - `core.MarketContext` handle for the closing snapshot.
-/// @param as_of_t0 - ISO-8601 date of the opening snapshot.
-/// @param as_of_t1 - ISO-8601 date of the closing snapshot.
+/// @param marketT0 - `core.MarketContext` handle for the opening snapshot.
+/// @param marketT1 - `core.MarketContext` handle for the closing snapshot.
+/// @param asOfT0 - ISO-8601 date of the opening snapshot.
+/// @param asOfT1 - ISO-8601 date of the closing snapshot.
 /// @param method - `AttributionMethod` wire value: a unit variant name such as `"parallel"` or `"metrics_based"`, an object such as `{ waterfall: ["carry", "rates_curves"] }`, or the same value as JSON text.
 /// @param config - Optional `FinstackConfig` object or JSON; omit for the Rust default configuration.
 /// @returns The `PortfolioAttribution`.
@@ -28,15 +28,15 @@ use wasm_bindgen::prelude::*;
 /// `FinstackError` if a date is not an ISO date or `method` / `config` is
 /// malformed (kind `validation`), a required FX rate or market datum is
 /// missing (kind `not_found`), or a position valuation or attribution fails.
-#[wasm_bindgen(js_name = attributePortfolioPnl)]
+#[wasm_bindgen(js_name = attributePortfolioPnl, unchecked_return_type = "PortfolioAttribution")]
 pub fn attribute_portfolio_pnl(
     portfolio: &JsPortfolio,
-    market_t0: &JsMarketContext,
-    market_t1: &JsMarketContext,
-    as_of_t0: JsValue,
-    as_of_t1: JsValue,
-    method: JsValue,
-    config: Option<JsValue>,
+    #[wasm_bindgen(js_name = "marketT0")] market_t0: &JsMarketContext,
+    #[wasm_bindgen(js_name = "marketT1")] market_t1: &JsMarketContext,
+    #[wasm_bindgen(js_name = "asOfT0", unchecked_param_type = "string")] as_of_t0: JsValue,
+    #[wasm_bindgen(js_name = "asOfT1", unchecked_param_type = "string")] as_of_t1: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] method: JsValue,
+    #[wasm_bindgen(unchecked_optional_param_type = "JsonInput")] config: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let as_of_t0 = crate::utils::parse_iso_date(&js_string(&as_of_t0, "asOfT0")?)?;
     let as_of_t1 = crate::utils::parse_iso_date(&js_string(&as_of_t1, "asOfT1")?)?;

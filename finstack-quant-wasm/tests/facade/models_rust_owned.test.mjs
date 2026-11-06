@@ -58,16 +58,16 @@ test('forward Greeks are the Rust ForwardGreeks object', () => {
 });
 
 test('hestonPrice dispatches the put through Rust', () => {
-  const args = [100, 100, 1, 0.05, 0.02, 2, 0.04, 0.3, -0.7, 0.04];
-  const call = models.hestonPrice(...args);
-  const put = models.hestonPrice(...args, false);
+  const params = { r: 0.05, q: 0.02, v0: 0.04, kappa: 2, theta: 0.04, sigma_v: 0.3, rho: -0.7 };
+  const call = models.hestonPrice(100, 100, 1, params);
+  const put = models.hestonPrice(100, 100, 1, params, false);
   const parity = call - put - (100 * Math.exp(-0.02) - 100 * Math.exp(-0.05));
   assert.ok(Math.abs(parity) < 1e-8, `parity residual ${parity}`);
 });
 
 test('priceHeston defaults numPaths and seed from the Rust registry and returns MoneyEstimate', () => {
-  const heston = [100, 100, 0.05, 0, 2, 0.04, 0.3, -0.7, 0.04, 1];
-  const est = models.monteCarlo.priceHeston(...heston, true, undefined, undefined, 1);
+  const params = { r: 0.05, q: 0, v0: 0.04, kappa: 2, theta: 0.04, sigma_v: 0.3, rho: -0.7 };
+  const est = models.monteCarlo.priceHeston(100, 100, 1, params, true, { num_steps: 1 });
   assert.equal(est.num_paths, 100000);
   assert.equal(typeof est.mean.amount, 'string');
   assert.equal(est.mean.currency, 'USD');
@@ -76,9 +76,17 @@ test('priceHeston defaults numPaths and seed from the Rust registry and returns 
     assert.equal(key in est, false, `${key} is not a MoneyEstimate field`);
   }
   // The registry seed is fixed, so the default run is reproducible.
-  const again = models.monteCarlo.priceHeston(...heston, true, null, null, 1);
+  const again = models.monteCarlo.priceHeston(100, 100, 1, params, true, {
+    num_paths: null,
+    seed: null,
+    num_steps: 1,
+  });
   assert.deepEqual(again, est);
-  const explicit = models.monteCarlo.priceHeston(...heston, false, 500, 7n, 4);
+  const explicit = models.monteCarlo.priceHeston(100, 100, 1, params, false, {
+    num_paths: 500,
+    seed: 7n,
+    num_steps: 4,
+  });
   assert.equal(explicit.num_paths, 500);
 });
 
@@ -136,7 +144,15 @@ test('optionCalculation prices, inverts and returns the model Greeks in one call
   assert.equal(priced.implied_vol, 0.25);
   assert.deepEqual(priced.greeks, {
     kind: 'black_scholes',
-    ...models.bsGreeks(100, 105, 0.03, 0.01, 0.25, 0.75, false),
+    ...models.bsGreeks({
+      spot: 100,
+      strike: 105,
+      rate: 0.03,
+      dividend_yield: 0.01,
+      volatility: 0.25,
+      time_to_expiry: 0.75,
+      option_type: 'put',
+    }),
   });
   const bachelier = {
     kind: 'bachelier',

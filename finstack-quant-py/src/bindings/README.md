@@ -127,7 +127,7 @@ pub struct PyCurrency {
 - Every public function and constructor carries `#[pyo3(text_signature = "...")]`
   and a `///` doc comment documenting each caller-supplied input. Both are gated:
   `scripts/check_pyo3_doc_placeholders.py` and `scripts/check_python_api_input_docs.py`,
-  wired into `mise run python-lint` and `mise run python-doc`.
+  wired into `mise run python-lint`.
 - Result wrappers carry typed getters, `to_json`, a `#[staticmethod] from_json`, and
   `to_dataframe()` (plus `to_series()` for 1-D labeled vectors). Computation entry
   points return the typed wrapper, not a JSON string; only `*_json`-suffixed
@@ -195,7 +195,6 @@ against the built extension.
 mise run rust-lint          # fmt --check + clippy --workspace --lib --bins --tests --examples -D warnings
 mise run python-build       # maturin develop; required before any pytest run
 mise run python-lint        # ruff + the two PyO3/Python doc checkers
-mise run python-doc         # doc completeness gates on their own
 uv run pytest finstack-quant-py/tests/parity -q      # contract topology + return shapes
 uv run pytest finstack-quant-py/tests -q -m 'not slow'
 ```

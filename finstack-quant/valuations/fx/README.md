@@ -103,7 +103,7 @@ reached through the standard metric registry.
 
 ## Registration
 
-The general checklist is in [`../src/instruments/README.md`](../src/instruments/README.md#adding-an-instrument).
+The general checklist is [`../ADDING_AN_INSTRUMENT.md`](../ADDING_AN_INSTRUMENT.md).
 Landing sites for this family:
 
 | Step | Where |
@@ -112,7 +112,7 @@ Landing sites for this family:
 | Instrument key | `InstrumentType` variant in `../core/src/pricer/keys.rs` |
 | JSON tag | `with_instrument_json_registry!` in `../src/instruments/json_loader.rs` (umbrella), category `"fx"`. Tags: `fx_spot`, `fx_swap`, `fx_forward`, `ndf`, `fx_option`, `fx_digital_option`, `fx_touch_option`, `fx_barrier_option`, `fx_variance_swap`, `fx_future`, `fx_future_option`, `quanto_option` |
 | Metrics | `register_<name>_metrics` in the leaf's `metrics/`, called from `register_metrics` in `family.rs` |
-| Schemas | `mise run rust-gen-schemas`, verified by `mise run rust-check-schemas` |
+| Schemas | `mise run gen-write`, verified by `mise run gen-check` |
 
 `FxOption` is registered under `ModelKey::Black76` even though the pricer is
 Garman–Kohlhagen in spot form; the two are equivalent through the CIP forward.

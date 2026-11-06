@@ -9,16 +9,8 @@ const base = "https://finstack_quant.dev/schemas/";
 const market = `${base}market_data/1/market_context_state.schema.json`;
 const result = `${base}results/1/valuation_result.schema.json`;
 const calibration = `${base}calibration/1/calibration.schema.json`;
-const price = [
-  "valuations.instruments.priceInstrument",
-  "ValuationInstrumentsNamespace",
-  "priceInstrument",
-];
-const metricMetadata = [
-  "valuations.instruments.metricMetadata",
-  "ValuationInstrumentsNamespace",
-  "metricMetadata",
-];
+const price = "valuations.instruments.priceInstrument";
+const metricMetadata = "valuations.instruments.metricMetadata";
 const displays = [
   {
     id: "instrument-form",
@@ -97,11 +89,7 @@ const displays = [
     id: "covenant-compliance",
     schema: `${base}covenants/1/dated_covenant_reports.schema.json`,
     pointer: "#",
-    api: [
-      "statements_analytics.evaluateCovenants",
-      "StatementsAnalyticsNamespace",
-      "evaluateCovenants",
-    ],
+    api: "statements_analytics.evaluateCovenants",
     route: "typed",
     convention:
       "Returned DatedCovenantReports rows in input order and their verdicts; a covenant without a report on a date shows a dash. Rust evaluates every statement result period at its end date with the covenants applicable on that date, reading a metric only where an applicable covenant needs it, so covenant windows decide which metrics a date requires; the component builds no rows.",
@@ -118,11 +106,7 @@ const displays = [
     id: "covenant-breach-forecast",
     schema: `${base}covenants/1/future_breach.schema.json`,
     pointer: "#",
-    api: [
-      "statements_analytics.forecastBreaches",
-      "StatementsAnalyticsNamespace",
-      "forecastBreaches",
-    ],
+    api: "statements_analytics.forecastBreaches",
     route: "typed",
     convention:
       "Returned FutureBreach rows in the order supplied (Rust sorts by breach date, then covenant id) with every supplied digit: projected value, threshold and headroom in the metric's own units and the breach probability as a fraction. Rust takes every statement result period as a test date, honours windows, waivers and threshold schedules, skips non-numeric covenants and starts the horizon the day before the first period; the generated covenant_forecast_config form is passed through as JSON text for Rust to validate. Nothing is forecast, filtered or sorted in the UI.",
@@ -131,11 +115,7 @@ const displays = [
     id: "cashflow-viewer",
     schema: `${base}results/1/instrument_cashflow.schema.json`,
     pointer: "#",
-    api: [
-      "valuations.instruments.instrumentCashflows",
-      "ValuationInstrumentsNamespace",
-      "instrumentCashflows",
-    ],
+    api: "valuations.instruments.instrumentCashflows",
     route: "native-envelope-table",
     convention:
       "The returned envelope object, validated against the Rust-generated cashflow schema. Native row currency and reporting-currency PV; Rust supplies total and reconciliation. beginning_balance and ending_balance show as supplied (per row for bonds, term loans and revolvers, per period for agency MBS), never accumulated, and their columns hide only when no row carries one. Its JSON view is a host serialization, not native text. The optional annual ladder is cashflows.calendarYearLadder per row currency (worker partition, first-appearance order) over each flow's native_pv: row-currency PV before FX conversion and any scenario price shock.",
@@ -162,47 +142,35 @@ const displays = [
     id: "vol-cube-explorer",
     schema: market,
     pointer: "#/properties/vol_cubes",
-    api: ["models.volatility.getCubeVol", "VolatilityNamespace", "getCubeVol"],
+    api: "models.volatility.getCubeVol",
     route: "typed",
     convention:
       'Annualized volatility in the request\'s wire VolatilityConvention: decimal Black for "lognormal", absolute rate units for "normal"; shifted lognormal is rejected natively. Supply stored cube and explicit expiry, tenor, strike. Fixed-tenor and fixed-expiry slices are Rust-materialized (vol-cube-tenor-slice, vol-cube-expiry-slice).',
   },
   {
     id: "vol-cube-tenor-slice",
-    api: [
-      "models.volatility.materializeCubeTenorSlice",
-      "VolatilityNamespace",
-      "materializeCubeTenorSlice",
-    ],
+    api: "models.volatility.materializeCubeTenorSlice",
     route: "returned-surface",
     convention:
       "Returned VolSurface JSON (expiry by strike) in the request's VolatilityConvention: normal, or Black/shifted-Black with displacements as Rust returns them; fixed tenor in years and absolute strikes in forward-rate units are explicit caller input. Off-node tenors are Rust-interpolated.",
   },
   {
     id: "vol-cube-expiry-slice",
-    api: [
-      "models.volatility.materializeCubeExpirySlice",
-      "VolatilityNamespace",
-      "materializeCubeExpirySlice",
-    ],
+    api: "models.volatility.materializeCubeExpirySlice",
     route: "returned-slice",
     convention:
       "Returned VolCubeExpirySlice JSON (tenor by strike, tenor-major) in the request's VolatilityConvention: normal, or Black/shifted-Black with displacements as Rust returns them; fixed expiry in years and absolute strikes are explicit caller input. Off-node expiries are Rust-interpolated.",
   },
   {
     id: "vol-cube-node-smile",
-    api: ["models.volatility.SabrSmile", "SabrSmile", "generateSmile"],
+    api: "models.volatility.SabrSmile#generateSmile",
     route: "returned-smile",
     convention:
       "SabrSmile of one stored cube node (paramsAt, forwardAt, the node expiry): normal volatility when beta < 1e-4, Black otherwise, as returned. validateNoArbitrage takes an explicit continuously compounded decimal rate; repairArbitrage runs only when the caller supplies its passes. Never routed through a surface check.",
   },
   {
     id: "surface-arbitrage-badge",
-    api: [
-      "models.volatility.checkSurface",
-      "VolatilityNamespace",
-      "checkSurface",
-    ],
+    api: "models.volatility.checkSurface",
     route: "returned-report",
     convention:
       "Returned ArbitrageReport of a stored surface (core.VolSurface.fromJson) with every check enabled and host-supplied forwards in strike units (one broadcast or one per expiry; never inferred, and no request without them); the tolerance is sent only when supplied. Counts by type and severity and the violations as returned, most severe first; a convention Rust does not check (normal, shifted Black, tenor axis) shows its native error as not checked.",
@@ -211,33 +179,21 @@ const displays = [
     id: "fx-delta-surface",
     schema: market,
     pointer: "#/properties/fx_delta_vol_surfaces",
-    api: [
-      "models.volatility.getFxDeltaVol",
-      "VolatilityNamespace",
-      "getFxDeltaVol",
-    ],
+    api: "models.volatility.getFxDeltaVol",
     route: "typed",
     convention:
       "Annualized Black volatility as decimal; forward is explicit caller input for evaluated samples. The strike grid is Rust-materialized (fx-strike-grid).",
   },
   {
     id: "fx-strike-grid",
-    api: [
-      "models.volatility.materializeFxDeltaSurface",
-      "VolatilityNamespace",
-      "materializeFxDeltaSurface",
-    ],
+    api: "models.volatility.materializeFxDeltaSurface",
     route: "returned-surface",
     convention:
       "Returned VolSurface JSON (expiry by strike, Rust quote type and interpolation metadata); spot domestic per unit of foreign and continuously compounded decimal rates are explicit caller input, never defaulted or looked up.",
   },
   {
     id: "fx-delta-pillars",
-    api: [
-      "models.volatility.getFxDeltaPillarVols",
-      "VolatilityNamespace",
-      "getFxDeltaPillarVols",
-    ],
+    api: "models.volatility.getFxDeltaPillarVols",
     route: "typed-array",
     convention:
       "Float64Array: ATM, 25-delta put, 25-delta call annualized decimal vols.",
@@ -259,14 +215,14 @@ const displays = [
   },
   {
     id: "calibration-report",
-    api: ["calibration.calibrate", "CalibrationNamespace", "calibrate"],
+    api: "calibration.calibrate",
     route: "returned-report",
     convention:
       "Returned reports and final_market; preserve diagnostics and error metadata.",
   },
   {
     id: "calibration-fit-chart",
-    api: ["calibration.calibrate", "CalibrationNamespace", "calibrate"],
+    api: "calibration.calibrate",
     route: "returned-residuals",
     convention:
       "Residuals per step in solver units; no quote-space repricing or cross-step aggregation.",
@@ -276,124 +232,84 @@ const displays = [
     id: "market-scenario-builder",
     schema: `${base}scenarios/1/scenario_spec.schema.json`,
     pointer: "#",
-    api: [
-      "scenarios.listBuiltinTemplateMetadata",
-      "ScenariosNamespace",
-      "listBuiltinTemplateMetadata",
-    ],
+    api: "scenarios.listBuiltinTemplateMetadata",
     route: "schema",
     convention:
       "Canonical ScenarioSpec wire fields; templates, components, composition and added operations are returned by Rust, template metadata is shown as returned and template ids are placeholders the user maps to market ids.",
   },
   {
     id: "market-scenario-report",
-    api: ["scenarios.applyScenario", "ScenariosNamespace", "applyScenario"],
+    api: "scenarios.applyScenario",
     route: "returned-report",
     convention:
       "Returned ApplicationReport counters, applied shocks, time roll with carry and warnings; nothing summed or converted. The workbench prices the shocked market at the returned valuation date with the base model and metrics and shows both valuations; no P&L is computed.",
   },
   {
     id: "horizon-return-report",
-    api: [
-      "scenarios.computeHorizonReturn",
-      "ScenariosNamespace",
-      "computeHorizonReturn",
-    ],
+    api: "scenarios.computeHorizonReturn",
     route: "returned-report",
     convention:
       "Returned HorizonReport: Rust's summary total and annualized return and factor contributions as decimal fractions of the initial value (null shown as not defined, never 0), horizon calendar days, exact initial and terminal values, horizonResultExplainText, the PnlAttribution and the ApplicationReport. Omitted method, config and calendar are left to Rust; nothing is computed in TypeScript.",
   },
   {
     id: "pnl-attribution-report",
-    api: [
-      "attribution.attributePnlMany",
-      "AttributionNamespace",
-      "attributePnlMany",
-    ],
+    api: "attribution.attributePnlMany",
     route: "returned-report",
     convention:
       "Returned PnlAttribution: total, mark-to-market and endpoint values and every factor bucket as exact money; the waterfall only from waterfall_steps pv_before/pv_after; the residual with the returned residual_pct and tolerances, with a verdict only from pnlAttributionResidualWithinTolerance; shares only from pnlAttributionPctOfTotal; explain only from pnlAttributionExplainText. Nothing is summed, differenced or converted.",
   },
   {
     id: "scenario-heatmap",
-    api: [
-      "valuations.instruments.trancheScenarioTable",
-      "ValuationInstrumentsNamespace",
-      "trancheScenarioTable",
-    ],
+    api: "valuations.instruments.trancheScenarioTable",
     route: "returned-measures",
     convention:
       "Returned ScenarioCell measures only, in the units scenarioTableFieldUnits states: Rust clean settlement price in percent of current tranche balance, WAL in years, writedown in the table's currency.",
   },
   {
     id: "tranche-analytics",
-    api: [
-      "valuations.instruments.trancheMetrics",
-      "ValuationInstrumentsNamespace",
-      "trancheMetrics",
-    ],
+    api: "valuations.instruments.trancheMetrics",
     route: "returned-metrics",
     convention:
       "Returned TrancheMetrics fields in the units each Rust field documents; break-even CDR, discount margin and OAS as returned decimals; prices percent of current tranche balance; no price default; cash flows by date only from TrancheCashflows::to_table, with its dates joined and summed in Rust.",
   },
   {
     id: "pool-report",
-    api: [
-      "valuations.instruments.poolReport",
-      "ValuationInstrumentsNamespace",
-      "poolReport",
-    ],
+    api: "valuations.instruments.poolReport",
     route: "returned-report",
     convention:
       "Returned PoolReport fields in the units poolReportFieldUnits states: statistics, Moody's WARF and concentration tables by obligor, industry and rating, in Rust's row order with balance_pct in percent points of total_balance. A null key is shown as missing, never dropped, and a null statistic as missing, never zero; nothing is summed, sorted or grouped here.",
   },
   {
     id: "waterfall-report",
-    api: [
-      "StructuredCredit#runSimulation",
-      "StructuredCredit",
-      "runSimulation",
-    ],
+    api: "StructuredCredit#runSimulation",
     route: "returned-report",
     convention:
       "Returned SimulationDiagnostics.periods in payment order, in the deal currency each Money states: the period's WaterfallDistribution, and on expand its tier allocations and payment records in execution order, diversions and non-waterfall payments with their own dates. The is_principal, diverted and had_diversions flags are Rust's. Nothing is summed, joined by date, sorted or classified here.",
   },
   {
     id: "coverage-test-chart",
-    api: [
-      "StructuredCredit#runSimulation",
-      "StructuredCredit",
-      "runSimulation",
-    ],
+    api: "StructuredCredit#runSimulation",
     route: "returned-report",
     convention:
       "Returned SimulationDiagnostics.first_breaches in Rust's order and, for the selected test, periods[].coverage_tests' ratio, trigger_level, cushion and passing on the dates Rust recorded them, in the units simulationFieldUnits states. The first breach date, cushion and pass or fail are Rust's. A test recorded on fewer dates than the deal has periods states the counts returned, and a null ratio or cushion is shown as no claim outstanding with no dot. waterfall.diverted_cash and diverted_amounts are shown for the deal, not attributed to a test. Nothing is computed, joined by date, sorted or classified here.",
   },
   {
     id: "credit-enhancement-chart",
-    api: [
-      "StructuredCredit#runSimulation",
-      "StructuredCredit",
-      "runSimulation",
-    ],
+    api: "StructuredCredit#runSimulation",
     route: "returned-report",
     convention:
       "Returned periods[].credit_enhancement by tranche, a decimal share of the collateral beneath it at period end, and periods[].excess_spread, realized that period and annualized as a decimal of the opening pool balance (pool interest less debt coupons due, waterfall fees and net charge-offs), in the units simulationFieldUnits states. One period is listed, not charted. Nothing is computed, grouped, joined by date, sorted or classified here.",
   },
   {
     id: "equity-tranche-card",
-    api: [
-      "StructuredCredit#equityMetrics",
-      "StructuredCredit",
-      "equityMetrics",
-    ],
+    api: "StructuredCredit#equityMetrics",
     route: "returned-report",
     convention:
       "Returned EquityMetrics in the units equityMetricsFieldUnits states: invested in the deal currency; irr an annual XIRR decimal on ACT/365F, or null when no rate solves, stated rather than drawn as zero; moic total distributions over invested; nav_pct distributions discounted on the deal's discount curve as a percent of current balance; cash_on_cash each distribution as an unannualized decimal share of invested. Rust chooses the equity tranche and returns null for moic and cash_on_cash when nothing is invested, stated rather than drawn as zero; a returned zero is drawn as zero. A blank purchase price is omitted, so Rust's par default applies. Nothing is computed, rescaled or classified here.",
   },
   {
     id: "performance-report",
-    api: ["analytics.Performance#summary", "Performance", "summary"],
+    api: "analytics.Performance#summary",
     route: "returned-analytics",
     deferred: "machine-readable-units",
     convention:
@@ -401,18 +317,14 @@ const displays = [
   },
   {
     id: "correlation-heatmap",
-    api: [
-      "analytics.Performance#correlationMatrix",
-      "Performance",
-      "correlationMatrix",
-    ],
+    api: "analytics.Performance#correlationMatrix",
     route: "returned-analytics",
     convention:
       "Returned analytics.Performance correlationMatrix of a host-supplied panel: Pearson coefficients in Rust's ticker order as a diverging heatmap over the fixed correlation range [-1, 0, 1] (presentation only) and a table, with the Repaired stamp shown only when Rust's repaired flag is true. Nothing is estimated, clamped, reordered or inferred here; Rust returns a unit diagonal and every coefficient inside [-1, 1].",
   },
   {
     id: "benchmark-report",
-    api: ["analytics.Performance#greeks", "Performance", "greeks"],
+    api: "analytics.Performance#greeks",
     route: "returned-analytics",
     deferred: "machine-readable-units",
     convention:
@@ -420,14 +332,14 @@ const displays = [
   },
   {
     id: "portfolio-summary",
-    api: ["portfolio.valuePortfolio", "PortfolioNamespace", "valuePortfolio"],
+    api: "portfolio.valuePortfolio",
     route: "returned-valuation",
     convention:
       "Returned PortfolioValuation: total_base_currency and by_entity as exact returned money (entity rows in Portfolio#entityIds registration order), the stamped fx_collapse_policy shown as text, degraded_positions with each risk_error; nothing summed or converted.",
   },
   {
     id: "positions-table",
-    api: ["portfolio.valuePortfolio", "PortfolioNamespace", "valuePortfolio"],
+    api: "portfolio.valuePortfolio",
     route: "returned-valuation",
     deferred: "machine-readable-units",
     convention:
@@ -435,11 +347,7 @@ const displays = [
   },
   {
     id: "portfolio-metrics",
-    api: [
-      "portfolio.aggregateMetrics",
-      "PortfolioNamespace",
-      "aggregateMetrics",
-    ],
+    api: "portfolio.aggregateMetrics",
     route: "returned-metrics",
     deferred: "machine-readable-units",
     convention:
@@ -449,43 +357,35 @@ const displays = [
     id: "portfolio-margin-report",
     schema: `${base}portfolio/1/portfolio_margin_result.schema.json`,
     pointer: "#",
-    api: ["portfolio.portfolioMargin", "PortfolioNamespace", "portfolioMargin"],
+    api: "portfolio.portfolioMargin",
     route: "returned-report",
     convention:
       "Returned PortfolioMarginResult: every total as exact base-currency money (including a -0 variation margin, as returned), total_positions and positions_without_margin as returned counts, netting sets in returned order with the returned is_approximate flag beside an always-shown Indicative badge, by_csa collateral in the netting sets' CSA order, degraded positions, and the selected set's im_breakdown and SIMM sensitivities. Omitted collateral is left to Rust; nothing summed, netted or converted.",
   },
   {
     id: "portfolio-attribution-report",
-    api: [
-      "portfolio.attributePortfolioPnl",
-      "PortfolioNamespace",
-      "attributePortfolioPnl",
-    ],
+    api: "portfolio.attributePortfolioPnl",
     route: "returned-report",
     convention:
       "Returned PortfolioAttribution: total_pnl and every base-currency bucket as exact money with shares only from portfolioAttributionPctOfTotalByBucket, the reconciliation verdict, gap and tolerance only from portfolioAttributionReconciliationCheck at the host's tolerance, explain only from portfolioAttributionExplainText, and result_invalid as returned; by_position rows in returned order in each instrument's currency, one column per book bucket filled from that position's pnlAttributionPctOfTotalByBucket, and the selected position through pnl-attribution-report. The method is required and chosen by the user; nothing is summed, differenced or converted.",
   },
   {
     id: "portfolio-returns",
-    api: ["portfolio.twrrLinked", "PortfolioNamespace", "twrrLinked"],
+    api: "portfolio.twrrLinked",
     route: "returned-report",
     convention:
       "Returned twrrLinked LinkedReturn: cumulative, annualised, is_annualised and num_periods as returned, the annualised figure labelled per year only when Rust's is_annualised says so; the twrrModifiedDietz period return as a decimal for the period, not annualised; the mwrXirr return as an annualised decimal on Act/365F. Inputs are the host's returns, horizon in 365-day years, one period's values and flows with their fractions of the period remaining (contributions positive) and dated investor flows (contributions negative); nothing is defaulted, derived from dates, sign-flipped, summed or compared, and each form shows its native error.",
   },
   {
     id: "brinson-report",
-    api: ["portfolio.brinsonLinked", "PortfolioNamespace", "brinsonLinked"],
+    api: "portfolio.brinsonLinked",
     route: "returned-report",
     convention:
       "Returned brinsonLinked CarinoLinkedAttribution: portfolio_return_compounded and benchmark_return_compounded, each linked sector's allocation, selection, interaction and total with linked_allocation, linked_selection and linked_interaction as the footer, and every period's portfolio, benchmark and excess returns, sector effects and returned totals, all decimals of return in returned order. Inputs are the host's chronological SectorPeriod rows with any period names; nothing is defaulted, summed, differenced, linked or stacked, and the compounded active return is not shown because Rust returns only its two sides.",
   },
   {
     id: "exposure-report",
-    api: [
-      "portfolio.primitiveExposures",
-      "PortfolioNamespace",
-      "primitiveExposures",
-    ],
+    api: "portfolio.primitiveExposures",
     route: "returned-report",
     convention:
       "Returned primitiveExposures PortfolioPrimitiveExposureReport: each aggregate's net and gross quantity and value in base_currency, ordered by primitive id as returned and charted side by side (never stacked); each requested additive metric's net_measures and gross_measures entry per primitive under its returned id; and the position-aware paths with their position-scaled quantity and value. The optional sensitivity section shows computeFactorSensitivities (positions by factor ids, base currency) as returned. Inputs are the host's book, market, additive metric ids (omitted is none: quantity and value only) and any factor definitions and bump config; nothing is summed, netted, converted or re-sorted.",
@@ -494,171 +394,119 @@ const displays = [
     id: "scenario-pnl-table",
     schema: `${base}portfolio/1/scenario_pnl_batch_item.schema.json`,
     pointer: "#",
-    api: [
-      "portfolio.scenarioPnlBatch",
-      "PortfolioNamespace",
-      "scenarioPnlBatch",
-    ],
+    api: "portfolio.scenarioPnlBatch",
     route: "returned-pnl",
     convention:
       "Returned ScenarioPnlBatchItem per scenario in batch order: by_position money in Portfolio#positionIds (spec) order, the total row from pnl.total in the base currency, the totals charted as returned and each ApplicationReport; nothing summed or differenced. The batch fails whole on the earliest failing scenario.",
   },
   {
     id: "merton-calculator",
-    api: ["models.credit.mertonReport", "MertonModel", "defaultProbabilities"],
+    api: "models.credit.MertonModel#defaultProbabilities",
     route: "returned-model",
     convention:
       "Returned models.credit.MertonModel results of a model from canonical MertonModel JSON (natively validated) or from a KMV equity calibration Rust performs: default probabilities, distances to default, implied spreads (recovery as a fraction of par) and debt spreads per requested horizon, the CDS par spread and implied equity at the requested maturity, and models.credit.pd.MasterScale.defaultCalibration grades of the default probabilities. Decimals as returned (spreads per year, probabilities and volatilities as fractions), no unit inferred; a measure Rust rejects for the model shows its native error beside the rest.",
   },
   {
     id: "curve-query",
-    api: [
-      "models.volatility.getSurfaceVol",
-      "VolatilityNamespace",
-      "getSurfaceVol",
-    ],
+    api: "models.volatility.getSurfaceVol",
     route: "returned-model",
     convention:
       "Returned native values of one stored object per supplied point: DiscountCurve.df and zeroRate (default continuous compounding) and forward (continuously compounded, year fractions only), ForwardCurve.rate (simple, on the curve day count), HazardCurve.sp and hazardRate, and models.volatility.getSurfaceVol (expiry in years, strike in the surface's units, inside the grid). Curve dates pass through as ISO text for Rust to convert with the curve day count; no date, unit or tenor conversion happens here. A point Rust rejects keeps its native error in its cell.",
   },
   {
     id: "yield-workout-ladder",
-    api: [
-      "valuations.instruments.bondWorkoutLadder",
-      "ValuationInstrumentsNamespace",
-      "bondWorkoutLadder",
-    ],
+    api: "valuations.instruments.bondWorkoutLadder",
     route: "returned-report",
     convention:
       "Returned BondWorkoutLadder of one bond: one row per call, put and maturity exit in Rust's date order, every yield solved at the one price shown. The worst row is the one is_worst marks, the exit the ytw metric selects; no yield is compared here. Yield and I-spread units are what metricMetadata declares for ytw and i_spread, and a null yield is shown as no yield, never zero. Z-spread is not reported per exit.",
   },
   {
     id: "statement-export",
-    api: [
-      "statements.statementResultToTableWide",
-      "StatementsNamespace",
-      "statementResultToTableWide",
-    ],
+    api: "statements.statementResultToTableWide",
     route: "returned-report",
     convention:
       "Returned TableEnvelope of one StatementResult in the wide or long layout the user picks, statementResultToTableLong for long, in Rust's row and column order. The CSV holds exactly those cells: RFC 4180 quoting, the native column names as its header, and each number as String(value), unrounded. A cell Rust holds with no value (NaN, null in JSON) shows as undefined and is an empty field, never zero. Nothing is computed here.",
   },
   {
     id: "normalization-editor",
-    api: ["statements.normalize", "StatementsNamespace", "normalize"],
+    api: "statements.normalize",
     route: "returned-report",
     convention:
       "Returned NormalizationResult per period of the target node, in Rust's period order, in the target's units (its currency when monetary). Each adjustment carries its raw amount, its capped amount, Rust's is_capped and adjusted_value, the target through that step; the bridge draws each step from the previous step's adjusted_value (base_value for the first) to its own, and the base and final value from zero. Nothing is summed, capped or classified here; a duplicate id, a missing node or a non-finite base shows the native error.",
   },
   {
     id: "capital-structure-report",
-    api: [
-      "statements_analytics.capitalStructureSummary",
-      "StatementsAnalyticsNamespace",
-      "capitalStructureSummary",
-    ],
+    api: "statements_analytics.capitalStructureSummary",
     route: "returned-report",
     convention:
       "Returned CapitalStructureSummary at the configured period, in its currency: money as Rust's exact decimal strings, ratios in turns and shares of debt as decimal fractions (shown as percent digits). Tranches in Rust's rank-then-declaration order with cumulative debt, leverage and interest coverage through each payment class; the maturity wall in Rust's year order, each bar drawn from zero to its returned amount. A null ratio (short LTM window, non-positive EBITDA or debt) or a live NaN shows as undefined beside Rust's ltm_periods_found and ltm_periods_required; negative net debt and net leverage show as returned. Nothing is summed, netted or divided here; a model with no capital structure or a missing node shows the native error.",
   },
   {
     id: "relative-value-table",
-    api: [
-      "statements_analytics.relativeValueReport",
-      "StatementsAnalyticsNamespace",
-      "relativeValueReport",
-    ],
+    api: "statements_analytics.relativeValueReport",
     route: "returned-report",
     convention:
       "Returned RelativeValueReport of a host-supplied subject and universe, metrics in their own units as supplied (monetary ones in one currency, normalized by the host). The comps table has the subject first, marked by Rust's is_subject, then the peers in universe order, one returned value per configured multiple. Per multiple: the subject value, percentile (a 0-1 share, shown as a percent and drawn as a bar from zero to it), z-score and peer statistics. Per dimension: Rust's subject values, percentile, z-score, regression, direction-adjusted signal (positive meaning cheap; -0 shown as 0) and exclusion reason, and a scatter of the returned points, the subject found by comparing company_id with subject_id and the line drawn through each point's returned fitted_y in order of x. The composite score and confidence, or Rust's composite_excluded_reason. A null or live NaN shows as undefined; nothing is computed here, and a misspelt field shows the native error.",
   },
   {
     id: "wacc-calculator",
-    api: ["statements_analytics.wacc", "StatementsAnalyticsNamespace", "wacc"],
+    api: "statements_analytics.wacc",
     route: "returned-report",
     convention:
       "Returned WACC of the five entered decimals, itself a decimal. The two capital weights are separate inputs; nothing is blended, defaulted or checked here, and weights that do not sum to one or a tax rate outside [0, 1] show the native error. Applying the rate to a DCF is an explicit user action that passes the returned number unchanged.",
   },
   {
     id: "quote-converter",
-    api: [
-      "valuations.instruments.computeQuotes",
-      "ValuationInstrumentsNamespace",
-      "computeQuotes",
-    ],
+    api: "valuations.instruments.computeQuotes",
     route: "returned-report",
     convention:
       "Returned BondQuoteSet of one bond from the one quote entered: every price, yield and spread in Rust's field order, each the metric of the same name at that clean price. Quote kinds are the branches of the BondQuoteInput schema. Units are the labels bondQuoteSetFieldUnits returns for each field, which Rust tests against metricMetadata. A null field is shown as no value, never zero, and a quote that cannot be solved shows the native error. Nothing is converted or compared here.",
   },
   {
     id: "bond-credit-card",
-    api: [
-      "valuations.instruments.priceInstrumentWithMarket",
-      "ValuationInstrumentsNamespace",
-      "priceInstrumentWithMarket",
-    ],
+    api: "valuations.instruments.priceInstrumentWithMarket",
     route: "returned-model",
     convention:
       "Returned measures of one bond, each metric id priced on its own valuations.instruments.priceInstrumentWithMarket call because one failing id fails a whole native request; an id's native error stays in its row, so no script decides whether a bond has a government curve or is hazard-priced. The card chooses which ids to show and keeps those metricsForInstrument lists for the type. Units and groups are what metricMetadata declares (not declared when it says unknown, as for breakeven, whose unit follows its target); values are never rescaled, classified, summed or derived. theta_period and breakeven_config come from the MetricPricingOverrides schema's form and reach Rust as the request's metricPricingOverrides; no horizon, target or mode is assumed.",
   },
   {
     id: "convertible-card",
-    api: [
-      "valuations.instruments.convertibleSpotLadder",
-      "ValuationInstrumentsNamespace",
-      "convertibleSpotLadder",
-    ],
+    api: "valuations.instruments.convertibleSpotLadder",
     route: "returned-report",
     convention:
       "Returned ConvertibleSpotLadder of one convertible on the tree model: one row per share price in Rust's ascending order, the share prices the ones entered or Rust's default ladder. Each row's price, delta, parity, conversion value, premium and floor are the metrics of those names at that share price, with volatility, rates and credit as supplied. The regime and the market row are what Rust returned; nothing is classified or compared here. Regime is one market convention, delta over the conversion ratio on the 40 and 80 delta bands. A null hedge ratio, regime or premium shows as undefined, never zero. Metric rows are each priced on their own valuations.instruments.priceInstrumentWithMarket call, so an id's native error stays in its row; column units are what metricMetadata declares.",
   },
   {
     id: "loan-yield-card",
-    api: [
-      "valuations.instruments.priceInstrumentWithMarket",
-      "ValuationInstrumentsNamespace",
-      "priceInstrumentWithMarket",
-    ],
+    api: "valuations.instruments.priceInstrumentWithMarket",
     route: "returned-model",
     convention:
       "Returned measures of one loan, each metric id priced on its own valuations.instruments.priceInstrumentWithMarket call because one failing id fails a whole native request; an id's native error stays in its row. The card chooses which ids to show and keeps those metricsForInstrument lists for the type. Units and groups are what metricMetadata declares (not declared when it says unknown); values are never rescaled, classified, summed or derived. Yields and discount margin solve to a quoted clean price when the instrument carries one, otherwise to the model price; embedded_option_value is callable less straight at one spread under the tree model; recovery01 and jump_to_default price on a credit curve under the tree model.",
   },
   {
     id: "liability-management-card",
-    api: [
-      "models.credit.liabilityManagement.analyzeExchangeOffer",
-      "CreditLiabilityManagementNamespace",
-      "analyzeExchangeOffer",
-    ],
+    api: "models.credit.liabilityManagement.analyzeExchangeOffer",
     route: "returned-model",
     convention:
       "Returned models.credit.liabilityManagement.analyzeExchangeOffer and analyzeLme results as Rust returned them. The tender recommendation is Rust's tender_recommended field; tenderRecommendationHurdle shows beside it as supplied and is never compared here. Amounts are in one caller-defined unit with no currency conversion; percentages are fractions and leverage a multiple. The LME price input is a price, an extension fee or a transferred-asset fraction by structure, as the facade documents.",
   },
   {
     id: "recovery-waterfall",
-    api: [
-      "models.credit.recoveryWaterfall.allocateRecovery",
-      "CreditRecoveryWaterfallNamespace",
-      "allocateRecovery",
-    ],
+    api: "models.credit.recoveryWaterfall.allocateRecovery",
     route: "returned-model",
     convention:
       "Returned models.credit.recoveryWaterfall.allocateRecovery, models.credit.lgd.WorkoutLgd evaluate and seniorityRecoveryStats results as Rust returned them. Allocations are in Rust's priority-then-entry order; each claim's total, collateral and general recovery, recovery rate and deficiency, and the estate's distributed and undistributed totals, are Rust's fields, never summed or divided here. Amounts are in one caller-defined unit with no currency conversion; rates are fractions. Seniority classes and collateral types are the generated SeniorityClass and WorkoutCollateralType contracts; calibration ids are seniorityCalibrationIds, default first. A class a calibration lacks shows Rust's error.",
   },
   {
     id: "option-calculator",
-    api: ["models.optionCalculation", "ModelsNamespace", "optionCalculation"],
+    api: "models.optionCalculation",
     route: "returned-model",
     convention:
       "Returned OptionCalculationResult of one European option (models.optionCalculation): the price at an entered volatility, or the implied volatility of an entered price, and the model's Greeks at that volatility. Decimals as returned; the labels state what the facade documents (Black-76 prices discounted, Bachelier undiscounted; Black-Scholes vega and rhos per 1% move, theta per day; forward-Greek vega per unit of volatility). Rust validates every input, including a price below intrinsic value; no scaling or validity rule is applied here.",
   },
   {
     id: "credit-scorecard",
-    api: [
-      "models.credit.scoring.creditScoreReport",
-      "CreditScoringNamespace",
-      "creditScoreReport",
-    ],
+    api: "models.credit.scoring.creditScoreReport",
     route: "returned-model",
     convention:
       "Returned models.credit.scoring.creditScoreReport of one model (Altman Z, Z', Z'' or EM, Ohlson O, Zmijewski) over ratios entered in the fields of its generated input contract and sent as the Rust CreditScoreRequest: score, zone and implied PD as returned (probabilities as fractions), and the default master-scale grade Rust assigns the implied PD, or no grade when the result has no implied PD (the Altman models). No zone, threshold or grade is derived here.",
@@ -667,22 +515,14 @@ const displays = [
     id: "portfolio-risk-report",
     schema: `${base}models/1/position_risk_report.schema.json`,
     pointer: "#",
-    api: [
-      "models.factor.risk.positionRiskReport",
-      "FactorRiskNamespace",
-      "positionRiskReport",
-    ],
+    api: "models.factor.risk.positionRiskReport",
     route: "returned-report",
     convention:
       "Returned models.factor.risk PositionRiskReport of a parametric or historical source: portfolio VaR and ES, confidence, method and the Euler residual (null for historical) as returned, component VaR charted and tabulated in returned order with relative, marginal and incremental VaR and the ES contributions; the risk budget against the supplied target shares (has_breach, total_overbudget, utilization and excess as returned, an omitted threshold left to Rust); the stress attribution of a historical source's P&L in Rust's largest-driver-first order with the tail scenarios worst first. Losses negative, in the units of the supplied weights or P&L; nothing summed, flagged or re-sorted. The factor section shows models.factor.risk.decomposeFactors of portfolio.computeFactorSensitivities (positions in Portfolio order, factors in definition order, base currency) as returned under the returned measure, an omitted measure and bump config left to Rust.",
   },
   {
     id: "transition-matrix-heatmap",
-    api: [
-      "models.credit.migration.TransitionMatrix#toRows",
-      "TransitionMatrix",
-      "toRows",
-    ],
+    api: "models.credit.migration.TransitionMatrix#toRows",
     route: "returned-model",
     convention:
       "Returned models.credit.migration results: TransitionMatrix rows and default probabilities in RatingScale order, the GeneratorMatrix rows with its roundTripError and regularizationL1, and the default probabilities of project(generator, t) per requested horizon. Decimals as returned; an omitted round-trip tolerance is left to Rust. Heatmap colour domains are presentation only: [0, 1] for probabilities, the intensities' extent (centred on zero) for the generator.",
@@ -699,11 +539,7 @@ const displays = [
     id: "simm-report",
     schema: `${base}margin/1/im_result.schema.json`,
     pointer: "#",
-    api: [
-      "margin.SimmCalculator#calculateFromSensitivities",
-      "SimmCalculator",
-      "calculateFromSensitivities",
-    ],
+    api: "margin.SimmCalculator#calculateFromSensitivities",
     route: "returned-report",
     convention:
       "Returned ImResult of SimmCalculator#calculateFromSensitivities in the set's own base currency (Rust accepts only USD): exact amount and breakdown money, methodology, as_of, mpor_days, the approximation flag beside an always-shown Indicative badge, and the simm_detail risk-class margins, buckets and weighted sensitivities as returned. Omitted version and MPOR are left to Rust.",
@@ -728,7 +564,7 @@ const displays = [
     id: "margin-call-table",
     schema: `${base}margin/1/vm_result.schema.json`,
     pointer: "#",
-    api: ["margin.VmCalculator#calculate", "VmCalculator", "calculate"],
+    api: "margin.VmCalculator#calculate",
     route: "returned-report",
     convention:
       "Returned VmResult of VmCalculator#calculate in the CSA's own base currency, with Rust's vmResultRequiresCall decision and vmResultNetMargin (post minus collect, positive when the desk posts, major units); its money terms as exact returned money; the generateMarginCalls schedule in returned order and the marginCallDates list. Nothing netted, thresholded or rounded in the UI.",
@@ -736,47 +572,100 @@ const displays = [
 ];
 
 export async function generateProvenance(repo, contracts, fixtureManifest) {
-  const declarationPath = "finstack-quant-wasm/index.d.ts";
-  const text = await readFile(resolve(repo, declarationPath), "utf8");
-  const ast = ts.createSourceFile(
-    declarationPath,
-    text,
-    ts.ScriptTarget.Latest,
-    true,
-  );
-  // Published owners: namespace interfaces and declared handle classes (such
-  // as analytics.Performance, merged with a same-named interface).
-  const owners = Map.groupBy(
-    ast.statements.filter(
-      (node) =>
+  // The facade (`index.d.ts`) declares the namespaces and the members it adds
+  // to wasm-bindgen classes; every other member is `typeof wasm.X`, declared in
+  // the package's generated `pkg/finstack_quant_wasm.d.ts`.
+  const facadePath = "finstack-quant-wasm/index.d.ts";
+  const packagePath = "finstack-quant-wasm/pkg/finstack_quant_wasm.d.ts";
+  const parse = async (path) =>
+    ts.createSourceFile(
+      path,
+      await readFile(resolve(repo, path), "utf8"),
+      ts.ScriptTarget.Latest,
+      true,
+    );
+  const sources = [
+    { path: facadePath, ast: await parse(facadePath) },
+    { path: packagePath, ast: await parse(packagePath) },
+  ];
+  // Published owners, facade first so its added members win: namespace
+  // interfaces, the facade's augmentations of package classes, and the
+  // package's classes and interfaces.
+  const owners = new Map();
+  const functions = new Map();
+  const collect = (source, statements) => {
+    for (const node of statements) {
+      if (
+        ts.isModuleDeclaration(node) &&
+        node.body &&
+        ts.isModuleBlock(node.body)
+      )
+        collect(source, node.body.statements);
+      if (
         (ts.isInterfaceDeclaration(node) || ts.isClassDeclaration(node)) &&
-        node.name,
-    ),
-    (node) => node.name.text,
-  );
+        node.name
+      ) {
+        if (!owners.has(node.name.text)) owners.set(node.name.text, []);
+        owners.get(node.name.text).push({ source, node });
+      }
+      if (
+        ts.isFunctionDeclaration(node) &&
+        node.name &&
+        source.path === packagePath
+      )
+        functions.set(node.name.text, { source, node });
+    }
+  };
+  for (const source of sources) collect(source, source.ast.statements);
   const digest = (value) => createHash("sha256").update(value).digest("hex");
-  function apiSource([name, owner, method]) {
-    const member = owners
-      .get(owner)
-      ?.flatMap((node) => [...node.members])
-      .find((node) => node.name?.getText(ast) === method);
-    if (
-      !member ||
-      !(ts.isMethodSignature(member) || ts.isMethodDeclaration(member))
-    )
-      throw new Error(`Missing published API: ${owner}.${method}`);
-    const declaration = member.getFullText(ast).trim();
+  // The declaration of `owner.method`: a method of a class or augmentation, a
+  // facade wrapper's function type, or the package function a namespace
+  // member re-exports (`typeof wasm.X`).
+  function resolveMember(owner, method) {
+    for (const { source, node } of owners.get(owner) ?? []) {
+      const member = node.members.find(
+        (candidate) => candidate.name?.getText(source.ast) === method,
+      );
+      if (!member) continue;
+      if (ts.isMethodSignature(member) || ts.isMethodDeclaration(member))
+        return { source, node: member, signature: member };
+      if (ts.isPropertySignature(member) && member.type) {
+        if (ts.isFunctionTypeNode(member.type))
+          return { source, node: member, signature: member.type };
+        if (ts.isTypeQueryNode(member.type)) {
+          const target = functions.get(
+            member.type.exprName.getText(source.ast).replace(/^wasm\./, ""),
+          );
+          if (target) return { ...target, signature: target.node };
+        }
+      }
+    }
+    throw new Error(`Missing published API: ${owner}.${method}`);
+  }
+  // A facade path names its owner as the generator does: `ns.sub.fn` is a
+  // member of `NsSubNamespace`; `ns.Class#method` a member of `Class`.
+  const pascal = (segment) =>
+    segment.replace(/(^|_)([a-z])/g, (_, __, letter) => letter.toUpperCase());
+  function apiSource(name) {
+    const [path, classMethod] = name.split("#");
+    const segments = path.split(".");
+    const owner = classMethod
+      ? segments.at(-1)
+      : `${segments.slice(0, -1).map(pascal).join("")}Namespace`;
+    const method = classMethod ?? segments.at(-1);
+    const { source, node, signature } = resolveMember(owner, method);
+    const declaration = node.getFullText(source.ast).trim();
     return {
       name,
-      source: declarationPath,
+      source: source.path,
       owner,
       member: method,
-      inputs: member.parameters.map((parameter) => ({
-        name: parameter.name.getText(ast),
-        type: parameter.type.getText(ast),
+      inputs: signature.parameters.map((parameter) => ({
+        name: parameter.name.getText(source.ast),
+        type: parameter.type.getText(source.ast),
         optional: Boolean(parameter.questionToken),
       })),
-      returns: member.type.getText(ast),
+      returns: signature.type.getText(source.ast),
       declaration,
       sha256: digest(declaration),
     };
@@ -831,19 +720,24 @@ export async function generateProvenance(repo, contracts, fixtureManifest) {
     "ValuationDetails",
     "MonteCarloValuationDetails",
     "MoneyValue",
-    "VolCubeConstructor",
-    "FxDeltaVolSurfaceConstructor",
-    "SabrSmileConstructor",
+    "VolCube",
+    "FxDeltaVolSurface",
+    "SabrSmile",
   ];
   const hostDeclarations = hostTypes.map((name) => {
-    const node = ast.statements.find(
-      (node) => node.name?.getText(ast) === name,
-    );
-    if (!node) throw new Error(`Missing host type: ${name}`);
-    const declaration = node.getFullText(ast).trim();
+    const found = sources
+      .map((source) => ({
+        source,
+        node: source.ast.statements.find(
+          (node) => node.name?.getText(source.ast) === name,
+        ),
+      }))
+      .find(({ node }) => node);
+    if (!found) throw new Error(`Missing host type: ${name}`);
+    const declaration = found.node.getFullText(found.source.ast).trim();
     return {
       name,
-      source: declarationPath,
+      source: found.source.path,
       declaration,
       sha256: digest(declaration),
     };

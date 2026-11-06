@@ -287,17 +287,17 @@ fn compute_taylor_result(
     ] {
         let compute = |curve_id: &CurveId| {
             let mut repricings = 0;
-            let result = compute_curve_factor(
+            let result = compute_curve_factor(CurveFactorInputs {
                 kind,
-                &instrument_t0,
+                instrument: &instrument_t0,
                 market_t0,
                 market_t1,
                 as_of_t0,
                 pv_t0,
                 curve_id,
                 config,
-                &mut repricings,
-            );
+                repricings: &mut repricings,
+            });
             (curve_id.clone(), result, repricings)
         };
         for (curve_id, result, repricings) in map_policy(execution_policy, curve_ids, compute) {
@@ -407,8 +407,8 @@ fn compute_taylor_result(
     let compute_vol =
         |dependency: &finstack_quant_valuations::instruments::VolatilityDependency| {
             let mut repricings = 0;
-            let result = compute_vol_factor(
-                &instrument_t0,
+            let result = compute_vol_factor(VolFactorInputs {
+                instrument: &instrument_t0,
                 market_t0,
                 market_t1,
                 as_of_t0,
@@ -416,8 +416,8 @@ fn compute_taylor_result(
                 dependency,
                 reference_expiry_years,
                 config,
-                &mut repricings,
-            );
+                repricings: &mut repricings,
+            });
             (dependency.vol_surface_id.clone(), result, repricings)
         };
     let vol_results = map_policy(execution_policy, &surface_dependencies, compute_vol);
@@ -806,6 +806,20 @@ enum CurveKind {
     Forward,
 }
 
+/// Inputs of [`compute_curve_factor`]: the shared T0/T1 endpoints plus the curve
+/// being attributed and its repricing counter.
+struct CurveFactorInputs<'a> {
+    kind: CurveKind,
+    instrument: &'a Arc<dyn Instrument>,
+    market_t0: &'a MarketContext,
+    market_t1: &'a MarketContext,
+    as_of_t0: Date,
+    pv_t0: Money,
+    curve_id: &'a CurveId,
+    config: &'a TaylorAttributionConfig,
+    repricings: &'a mut usize,
+}
+
 /// Compute rates-curve sensitivity attribution for a single curve — KEY-RATE
 /// AWARE.
 ///
@@ -817,18 +831,18 @@ enum CurveKind {
 /// curve, forward rate for a forward curve):
 ///
 ///   explained = Σ_bucket  DV01_bucket × Δr_bucket
-#[allow(clippy::too_many_arguments)]
-fn compute_curve_factor(
-    kind: CurveKind,
-    instrument: &Arc<dyn Instrument>,
-    market_t0: &MarketContext,
-    market_t1: &MarketContext,
-    as_of_t0: Date,
-    pv_t0: Money,
-    curve_id: &CurveId,
-    config: &TaylorAttributionConfig,
-    repricings: &mut usize,
-) -> Result<TaylorFactorResult> {
+fn compute_curve_factor(inputs: CurveFactorInputs<'_>) -> Result<TaylorFactorResult> {
+    let CurveFactorInputs {
+        kind,
+        instrument,
+        market_t0,
+        market_t1,
+        as_of_t0,
+        pv_t0,
+        curve_id,
+        config,
+        repricings,
+    } = inputs;
     // Realized per-tenor moves on the standard bucket grid (bp).
     let per_tenor_move_bp: Vec<f64> = match kind {
         CurveKind::Discount => {
@@ -1142,6 +1156,21 @@ fn compute_credit_factor(inputs: CreditFactorInputs<'_>) -> Result<TaylorFactorR
     })
 }
 
+/// Inputs of [`compute_vol_factor`]: the shared T0/T1 endpoints plus the
+/// vol-surface dependency, the instrument's reference expiry (years, Act/365)
+/// and its repricing counter.
+struct VolFactorInputs<'a> {
+    instrument: &'a Arc<dyn Instrument>,
+    market_t0: &'a MarketContext,
+    market_t1: &'a MarketContext,
+    as_of_t0: Date,
+    pv_t0: Money,
+    dependency: &'a finstack_quant_valuations::instruments::VolatilityDependency,
+    reference_expiry_years: Option<f64>,
+    config: &'a TaylorAttributionConfig,
+    repricings: &'a mut usize,
+}
+
 /// Compute volatility (vega) attribution for a single vol-surface dependency.
 ///
 /// The realized move is measured at the instrument's own reference point when
@@ -1152,18 +1181,18 @@ fn compute_credit_factor(inputs: CreditFactorInputs<'_>) -> Result<TaylorFactorR
 /// actually experienced. When either reference coordinate is missing,
 /// `measure_vol_surface_shift` falls back to the surface average and the
 /// caller records a metadata note.
-#[allow(clippy::too_many_arguments)]
-fn compute_vol_factor(
-    instrument: &Arc<dyn Instrument>,
-    market_t0: &MarketContext,
-    market_t1: &MarketContext,
-    as_of_t0: Date,
-    pv_t0: Money,
-    dependency: &finstack_quant_valuations::instruments::VolatilityDependency,
-    reference_expiry_years: Option<f64>,
-    config: &TaylorAttributionConfig,
-    repricings: &mut usize,
-) -> Result<TaylorFactorResult> {
+fn compute_vol_factor(inputs: VolFactorInputs<'_>) -> Result<TaylorFactorResult> {
+    let VolFactorInputs {
+        instrument,
+        market_t0,
+        market_t1,
+        as_of_t0,
+        pv_t0,
+        dependency,
+        reference_expiry_years,
+        config,
+        repricings,
+    } = inputs;
     let vol_surface_id = &dependency.vol_surface_id;
     let bumped_up = bump_surface_vol_absolute(market_t0, vol_surface_id.as_str(), config.vol_bump)?;
     *repricings += 1;
@@ -2311,20 +2340,20 @@ mod tests {
             1.0,
         )
         .unwrap();
-        let factor = compute_curve_factor(
-            CurveKind::Discount,
-            &instrument,
-            &opening,
-            &closing,
-            start,
-            instrument.value(&opening, start).unwrap(),
-            &CurveId::new("HEDGE"),
-            &TaylorAttributionConfig {
+        let factor = compute_curve_factor(CurveFactorInputs {
+            kind: CurveKind::Discount,
+            instrument: &instrument,
+            market_t0: &opening,
+            market_t1: &closing,
+            as_of_t0: start,
+            pv_t0: instrument.value(&opening, start).unwrap(),
+            curve_id: &CurveId::new("HEDGE"),
+            config: &TaylorAttributionConfig {
                 include_gamma: true,
                 ..Default::default()
             },
-            &mut 0,
-        )
+            repricings: &mut 0,
+        })
         .unwrap();
         let expected = 0.5
             * (1_000_000.0 * (-rate).exp() - 25.0 * short_notional * (-5.0 * rate).exp())

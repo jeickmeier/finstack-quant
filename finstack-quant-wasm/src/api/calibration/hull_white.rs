@@ -38,9 +38,9 @@ fn parse_frequency(frequency: Option<&str>) -> finstack_quant_core::Result<SwapF
 /// `calibrate_hull_white_to_swaptions`).
 /// @param discount - Discount curve the swap annuities and forward swap rates are read from; its base date is the valuation date.
 /// @param quotes - Array (or JSON) of at least two `SwaptionQuote` objects: `expiry` and `tenor` in years, `volatility` as a decimal, `is_normal_vol`.
-/// @param fit_tolerance - Required positive maximum reconstructed quote error: decimal rate volatility for normal quotes, relative volatility for Black quotes.
+/// @param fitTolerance - Required positive maximum reconstructed quote error: decimal rate volatility for normal quotes, relative volatility for Black quotes.
 /// @param frequency - Fixed-leg payment frequency: `"annual"`, `"semi_annual"` or `"quarterly"`; defaults to `"semi_annual"`.
-/// @param initial_guess - Optional `HullWhiteCalibrationParams` solver seed (`kappa`, `sigma`); omitted uses the built-in starting point.
+/// @param initialGuess - Optional `HullWhiteCalibrationParams` solver seed (`kappa`, `sigma`); omitted uses the built-in starting point.
 /// @returns `[params, report]`: the fitted `HullWhiteCalibrationParams` and the `CalibrationReport` with per-quote residuals in volatility units.
 ///
 /// # Errors
@@ -48,12 +48,21 @@ fn parse_frequency(frequency: Option<&str>) -> finstack_quant_core::Result<SwapF
 /// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
 /// a `FinstackError` if fewer than two quotes are supplied, a quote or the
 /// frequency is invalid (`kind: "validation"`), or the solver fails to converge.
-#[wasm_bindgen(js_name = calibrateHullWhiteToSwaptions)]
+#[wasm_bindgen(js_name = calibrateHullWhiteToSwaptions, unchecked_return_type = "[generated.models.HullWhiteCalibrationParams, generated.calibration.CalibrationReport]")]
 pub fn calibrate_hull_white_to_swaptions(
     discount: &JsDiscountCurve,
+    #[wasm_bindgen(
+        unchecked_param_type = "readonly generated.calibration.SwaptionQuote[] | string"
+    )]
     quotes: JsValue,
+    #[wasm_bindgen(js_name = "fitTolerance", unchecked_param_type = "number")]
     fit_tolerance: JsValue,
+    #[wasm_bindgen(unchecked_optional_param_type = "generated.calibration.SwapFrequency | null")]
     frequency: Option<JsValue>,
+    #[wasm_bindgen(
+        js_name = "initialGuess",
+        unchecked_optional_param_type = "generated.models.HullWhiteCalibrationParams | string | null"
+    )]
     initial_guess: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let quotes: Vec<SwaptionQuote> = from_js_json(&quotes, "quotes")?;
@@ -99,10 +108,17 @@ fn calibrate_to_cap_floors_inner(
 /// @param discount - Discounting curve handle; its base date is the valuation date.
 /// @param quotes - `CapFloorQuote` array or JSON, as the published function takes it.
 /// @param config - Calibration config object or JSON, as the published function takes it.
-#[wasm_bindgen(js_name = calibrateHullWhiteToCapFloorsWithoutForward)]
+/// @returns `[params, report]`: the calibrated Hull-White parameters and the calibration report, as the published function returns them.
+#[wasm_bindgen(js_name = calibrateHullWhiteToCapFloorsWithoutForward, unchecked_return_type = "[generated.models.HullWhiteCalibrationParams, generated.calibration.CalibrationReport]")]
 pub fn calibrate_hull_white_to_cap_floors_without_forward(
     discount: &JsDiscountCurve,
+    #[wasm_bindgen(
+        unchecked_param_type = "readonly generated.calibration.CapFloorQuote[] | string"
+    )]
     quotes: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.calibration.CapFloorCalibrationConfig | string"
+    )]
     config: JsValue,
 ) -> Result<JsValue, JsValue> {
     calibrate_to_cap_floors_inner(discount, quotes, config, None)
@@ -113,10 +129,17 @@ pub fn calibrate_hull_white_to_cap_floors_without_forward(
 /// @param quotes - `CapFloorQuote` array or JSON, as the published function takes it.
 /// @param config - Calibration config object or JSON, as the published function takes it.
 /// @param forward - Curve handle projecting the caplet forwards.
-#[wasm_bindgen(js_name = calibrateHullWhiteToCapFloorsWithForward)]
+/// @returns `[params, report]`: the calibrated Hull-White parameters and the calibration report, as the published function returns them.
+#[wasm_bindgen(js_name = calibrateHullWhiteToCapFloorsWithForward, unchecked_return_type = "[generated.models.HullWhiteCalibrationParams, generated.calibration.CalibrationReport]")]
 pub fn calibrate_hull_white_to_cap_floors_with_forward(
     discount: &JsDiscountCurve,
+    #[wasm_bindgen(
+        unchecked_param_type = "readonly generated.calibration.CapFloorQuote[] | string"
+    )]
     quotes: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.calibration.CapFloorCalibrationConfig | string"
+    )]
     config: JsValue,
     forward: &JsDiscountCurve,
 ) -> Result<JsValue, JsValue> {
@@ -148,10 +171,17 @@ fn bootstrap_sigma_schedule_inner(
 /// @param discount - Discounting curve handle; its base date is the valuation date.
 /// @param quotes - `CapFloorQuote` array or JSON, as the published function takes it.
 /// @param config - Calibration config object or JSON, as the published function takes it.
-#[wasm_bindgen(js_name = bootstrapHullWhiteSigmaScheduleToCapFloorsWithoutForward)]
+/// @returns `[params, report]`: the calibrated Hull-White parameters and the calibration report, as the published function returns them.
+#[wasm_bindgen(js_name = bootstrapHullWhiteSigmaScheduleToCapFloorsWithoutForward, unchecked_return_type = "[HullWhiteParams, generated.calibration.CalibrationReport]")]
 pub fn bootstrap_hull_white_sigma_schedule_to_cap_floors_without_forward(
     discount: &JsDiscountCurve,
+    #[wasm_bindgen(
+        unchecked_param_type = "readonly generated.calibration.CapFloorQuote[] | string"
+    )]
     quotes: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.calibration.PiecewiseSigmaCalibrationConfig | string"
+    )]
     config: JsValue,
 ) -> Result<js_sys::Array, JsValue> {
     bootstrap_sigma_schedule_inner(discount, quotes, config, None)
@@ -162,10 +192,17 @@ pub fn bootstrap_hull_white_sigma_schedule_to_cap_floors_without_forward(
 /// @param quotes - `CapFloorQuote` array or JSON, as the published function takes it.
 /// @param config - Calibration config object or JSON, as the published function takes it.
 /// @param forward - Curve handle projecting the caplet forwards.
-#[wasm_bindgen(js_name = bootstrapHullWhiteSigmaScheduleToCapFloorsWithForward)]
+/// @returns `[params, report]`: the calibrated Hull-White parameters and the calibration report, as the published function returns them.
+#[wasm_bindgen(js_name = bootstrapHullWhiteSigmaScheduleToCapFloorsWithForward, unchecked_return_type = "[HullWhiteParams, generated.calibration.CalibrationReport]")]
 pub fn bootstrap_hull_white_sigma_schedule_to_cap_floors_with_forward(
     discount: &JsDiscountCurve,
+    #[wasm_bindgen(
+        unchecked_param_type = "readonly generated.calibration.CapFloorQuote[] | string"
+    )]
     quotes: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.calibration.PiecewiseSigmaCalibrationConfig | string"
+    )]
     config: JsValue,
     forward: &JsDiscountCurve,
 ) -> Result<js_sys::Array, JsValue> {

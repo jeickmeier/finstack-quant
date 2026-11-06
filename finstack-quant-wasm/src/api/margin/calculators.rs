@@ -43,7 +43,9 @@ fn schedule_asset_class(
 ///
 /// Throws if `result` is malformed.
 #[wasm_bindgen(js_name = vmResultNetMargin)]
-pub fn vm_result_net_margin(result: JsValue) -> Result<f64, JsValue> {
+pub fn vm_result_net_margin(
+    #[wasm_bindgen(unchecked_param_type = "VmResult | string")] result: JsValue,
+) -> Result<f64, JsValue> {
     let result: fm::calculators::VmResult = from_js_json(&result, "result")?;
     Ok(result.net_margin().amount())
 }
@@ -56,7 +58,9 @@ pub fn vm_result_net_margin(result: JsValue) -> Result<f64, JsValue> {
 ///
 /// Throws if `result` is malformed.
 #[wasm_bindgen(js_name = vmResultRequiresCall)]
-pub fn vm_result_requires_call(result: JsValue) -> Result<bool, JsValue> {
+pub fn vm_result_requires_call(
+    #[wasm_bindgen(unchecked_param_type = "VmResult | string")] result: JsValue,
+) -> Result<bool, JsValue> {
     let result: fm::calculators::VmResult = from_js_json(&result, "result")?;
     Ok(result.requires_call())
 }
@@ -95,7 +99,9 @@ impl JsVmCalculator {
     ///
     /// Throws if `csa` is malformed, has unknown fields, or fails CSA validation.
     #[wasm_bindgen(constructor)]
-    pub fn new(csa: JsValue) -> Result<JsVmCalculator, JsValue> {
+    pub fn new(
+        #[wasm_bindgen(unchecked_param_type = "CsaSpec | string")] csa: JsValue,
+    ) -> Result<JsVmCalculator, JsValue> {
         let csa = parse_csa(&csa, "csa")?;
         Ok(Self {
             inner: fm::calculators::VmCalculator::new(csa),
@@ -107,16 +113,16 @@ impl JsVmCalculator {
     /// # Errors
     ///
     /// Throws if the specification cannot be converted to a JavaScript value.
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, unchecked_return_type = "CsaSpec")]
     pub fn csa(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner.get_csa())
     }
 
     /// Calculate variation margin for one date.
     /// @param exposure - Signed mark-to-market in `currency`: positive means the counterparty owes the desk.
-    /// @param posted_collateral - Signed collateral balance in `currency`: positive held, negative posted, including pending agreed calls.
+    /// @param postedCollateral - Signed collateral balance in `currency`: positive held, negative posted, including pending agreed calls.
     /// @param currency - ISO-4217 code; must equal the CSA base currency.
-    /// @param as_of - ISO-8601 valuation date; a date that is not a business day of the CSA calendar is rolled to the next one (Following), and the settlement date is derived from that call date.
+    /// @param asOf - ISO-8601 valuation date; a date that is not a business day of the CSA calendar is rolled to the next one (Following), and the settlement date is derived from that call date.
     /// @returns The `VmResult` as a plain object: `date` (the call date, a CSA business day), `settlement_date`, and Money amounts `gross_exposure`, `threshold`, `independent_amount`, `net_exposure`, `collateral_balance`, `unrounded_call`, `mta`, `rounding_increment`, `post_amount` and `collect_amount`.
     ///
     /// # Errors
@@ -124,12 +130,14 @@ impl JsVmCalculator {
     /// Throws if the currency is unknown or differs from the CSA base
     /// currency, an amount is non-finite, the date is not ISO 8601, or the CSA
     /// calendar is not registered.
+    #[wasm_bindgen(unchecked_return_type = "VmResult")]
     pub fn calculate(
         &self,
-        exposure: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] exposure: JsValue,
+        #[wasm_bindgen(js_name = "postedCollateral", unchecked_param_type = "number")]
         posted_collateral: JsValue,
-        currency: JsValue,
-        as_of: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+        #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
     ) -> Result<JsValue, JsValue> {
         let currency = js_currency(&currency, "currency")?;
         let exposure = js_money(&exposure, "exposure", currency)?;
@@ -145,7 +153,7 @@ impl JsVmCalculator {
 
     /// Run an exposure time series into a margin-call schedule.
     /// @param exposures - Array of `[date, exposure]` pairs: ISO-8601 date and signed exposure in the CSA base currency (positive means the counterparty owes the desk), processed in the order given; a date that is not a business day of the CSA calendar is rolled to the next one (Following).
-    /// @param initial_collateral - Collateral balance before the first date, in major units of the CSA base currency.
+    /// @param initialCollateral - Collateral balance before the first date, in major units of the CSA base currency.
     /// @returns One `MarginCall` plain object per call (`call_date` on a CSA business day, `settlement_date`, `call_type`, `amount`, `mtm_trigger`, `threshold`, `mta_applied`); dates without a call produce no entry.
     ///
     /// # Errors
@@ -153,10 +161,12 @@ impl JsVmCalculator {
     /// Throws if `exposures` is not an array of `[string, number]` pairs, an
     /// amount is non-finite, a date is not ISO 8601, or the CSA calendar is
     /// not registered.
-    #[wasm_bindgen(js_name = generateMarginCalls)]
+    #[wasm_bindgen(js_name = generateMarginCalls, unchecked_return_type = "MarginCall[]")]
     pub fn generate_margin_calls(
         &self,
+        #[wasm_bindgen(unchecked_param_type = "readonly (readonly [string, number])[] | string")]
         exposures: JsValue,
+        #[wasm_bindgen(js_name = "initialCollateral", unchecked_param_type = "number")]
         initial_collateral: JsValue,
     ) -> Result<JsValue, JsValue> {
         let currency = self.inner.get_csa().base_currency;
@@ -191,7 +201,11 @@ impl JsVmCalculator {
     ///
     /// Throws if a date is not ISO 8601 or the CSA calendar is not registered.
     #[wasm_bindgen(js_name = marginCallDates)]
-    pub fn margin_call_dates(&self, start: JsValue, end: JsValue) -> Result<Vec<String>, JsValue> {
+    pub fn margin_call_dates(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] start: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] end: JsValue,
+    ) -> Result<Vec<String>, JsValue> {
         let start = js_date(&start, "start")?;
         let end = js_date(&end, "end")?;
         Ok(self
@@ -245,14 +259,17 @@ impl JsScheduleImCalculator {
     }
 
     /// Calculator on a schedule from the embedded margin registry.
-    /// @param schedule_id - Schedule identifier in the registry, for example `"bcbs_iosco"` (`margin.constants().BCBS_IOSCO_SCHEDULE_ID`).
+    /// @param scheduleId - Schedule identifier in the registry, for example `"bcbs_iosco"` (`margin.constants().BCBS_IOSCO_SCHEDULE_ID`).
     /// @returns A `ScheduleImCalculator` handle.
     ///
     /// # Errors
     ///
     /// Throws if `schedule_id` is unknown or the registry data is invalid.
     #[wasm_bindgen(js_name = fromRegistryId)]
-    pub fn from_registry_id(schedule_id: JsValue) -> Result<JsScheduleImCalculator, JsValue> {
+    pub fn from_registry_id(
+        #[wasm_bindgen(js_name = "scheduleId", unchecked_param_type = "string")]
+        schedule_id: JsValue,
+    ) -> Result<JsScheduleImCalculator, JsValue> {
         let schedule_id = js_string(&schedule_id, "scheduleId")?;
         Ok(Self {
             inner: fm::calculators::im::schedule::ScheduleImCalculator::from_registry_id(
@@ -289,15 +306,20 @@ impl JsScheduleImCalculator {
     }
 
     /// Look up a schedule rate.
-    /// @param asset_class - Lower-case schedule asset class label such as `"interest_rate"`.
-    /// @param maturity_years - Remaining maturity in years; finite and non-negative.
+    /// @param assetClass - Lower-case schedule asset class label such as `"interest_rate"`.
+    /// @param maturityYears - Remaining maturity in years; finite and non-negative.
     /// @returns The IM rate as a decimal fraction of notional (0.04 is 4%).
     ///
     /// # Errors
     ///
     /// Throws if the asset class is unknown, the maturity is negative or
     /// non-finite, or the selected rate is outside `[0, 1]`.
-    pub fn rate(&self, asset_class: JsValue, maturity_years: JsValue) -> Result<f64, JsValue> {
+    pub fn rate(
+        &self,
+        #[wasm_bindgen(js_name = "assetClass", unchecked_param_type = "string")]
+        asset_class: JsValue,
+        #[wasm_bindgen(js_name = "maturityYears", unchecked_param_type = "number")] maturity_years: JsValue,
+    ) -> Result<f64, JsValue> {
         let asset_class = schedule_asset_class(&js_string(&asset_class, "assetClass")?)?;
         self.inner
             .rate(asset_class, js_f64(&maturity_years, "maturityYears")?)
@@ -307,22 +329,23 @@ impl JsScheduleImCalculator {
     /// Gross schedule IM for an explicit notional: `abs(notional) * rate`.
     /// @param notional - Regulatory notional or exposure base, in major units of `currency`; its absolute value is used.
     /// @param currency - ISO-4217 currency of the notional and of the result.
-    /// @param asset_class - Lower-case schedule asset class label such as `"interest_rate"`.
-    /// @param maturity_years - Remaining maturity in years used for the rate lookup.
-    /// @param as_of - ISO-8601 calculation date stamped on the result.
+    /// @param assetClass - Lower-case schedule asset class label such as `"interest_rate"`.
+    /// @param maturityYears - Remaining maturity in years used for the rate lookup.
+    /// @param asOf - ISO-8601 calculation date stamped on the result.
     /// @returns The `ImResult` as a plain object, with one breakdown entry keyed by the asset class.
     ///
     /// # Errors
     ///
     /// Throws if the currency, asset class, amount, maturity or date is invalid.
-    #[wasm_bindgen(js_name = calculateForNotional)]
+    #[wasm_bindgen(js_name = calculateForNotional, unchecked_return_type = "ImResult")]
     pub fn calculate_for_notional(
         &self,
-        notional: JsValue,
-        currency: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] notional: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+        #[wasm_bindgen(js_name = "assetClass", unchecked_param_type = "string")]
         asset_class: JsValue,
-        maturity_years: JsValue,
-        as_of: JsValue,
+        #[wasm_bindgen(js_name = "maturityYears", unchecked_param_type = "number")] maturity_years: JsValue,
+        #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
     ) -> Result<JsValue, JsValue> {
         let currency = js_currency(&currency, "currency")?;
         let notional = js_money(&notional, "notional", currency)?;
@@ -343,7 +366,7 @@ impl JsScheduleImCalculator {
     /// trade-specific gross IM across the netting set.
     /// @param positions - Array of `[signedMtm, grossNotional, assetClass, maturityYears]` tuples in the common reporting currency: MTM signs determine NGR; each absolute notional receives its own class and maturity rate.
     /// @param currency - ISO-4217 reporting currency of every MTM, notional and of the result.
-    /// @param as_of - ISO-8601 calculation date stamped on the result.
+    /// @param asOf - ISO-8601 calculation date stamped on the result.
     /// @returns The NGR-adjusted `ImResult` as a plain object, or `undefined` for an empty position list or zero gross notional.
     ///
     /// # Errors
@@ -351,12 +374,15 @@ impl JsScheduleImCalculator {
     /// Throws if `positions` is not an array of `[number, number, string,
     /// number]` tuples, or the currency, an asset class, an amount or the date
     /// is invalid.
-    #[wasm_bindgen(js_name = calculateNettingSetWithNgr)]
+    #[wasm_bindgen(js_name = calculateNettingSetWithNgr, unchecked_return_type = "ImResult | undefined")]
     pub fn calculate_netting_set_with_ngr(
         &self,
+        #[wasm_bindgen(
+            unchecked_param_type = "readonly (readonly [number, number, string, number])[] | string"
+        )]
         positions: JsValue,
-        currency: JsValue,
-        as_of: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+        #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
     ) -> Result<JsValue, JsValue> {
         let currency = js_currency(&currency, "currency")?;
         let as_of = js_date(&as_of, "asOf")?;
@@ -442,7 +468,10 @@ impl JsHaircutImCalculator {
     ///
     /// Throws if `schedule` is malformed or has unknown fields.
     #[wasm_bindgen(js_name = fromSchedule)]
-    pub fn from_schedule(schedule: JsValue) -> Result<JsHaircutImCalculator, JsValue> {
+    pub fn from_schedule(
+        #[wasm_bindgen(unchecked_param_type = "EligibleCollateralSchedule | string")]
+        schedule: JsValue,
+    ) -> Result<JsHaircutImCalculator, JsValue> {
         let schedule: fm::types::EligibleCollateralSchedule = from_js_json(&schedule, "schedule")?;
         Ok(Self {
             inner: fm::calculators::im::HaircutImCalculator::new(schedule),
@@ -450,7 +479,7 @@ impl JsHaircutImCalculator {
     }
 
     /// Copy configured to select an eligible entry by collateral maturity and rating.
-    /// @param remaining_years - Residual collateral maturity in years; finite and non-negative.
+    /// @param remainingYears - Residual collateral maturity in years; finite and non-negative.
     /// @param rating - Credit rating such as `"AAA"` or `"A-"`; required when the schedule imposes a minimum rating (no rating is inferred).
     /// @returns A new `HaircutImCalculator` handle using these terms for eligibility, haircut and FX add-on lookup.
     ///
@@ -460,8 +489,9 @@ impl JsHaircutImCalculator {
     #[wasm_bindgen(js_name = withCollateralTerms)]
     pub fn with_collateral_terms(
         &self,
+        #[wasm_bindgen(js_name = "remainingYears", unchecked_param_type = "number")]
         remaining_years: JsValue,
-        rating: Option<JsValue>,
+        #[wasm_bindgen(unchecked_optional_param_type = "string | null")] rating: Option<JsValue>,
     ) -> Result<JsHaircutImCalculator, JsValue> {
         let remaining_years = js_f64(&remaining_years, "remainingYears")?;
         let rating = js_opt_string(rating.as_ref(), "rating")?
@@ -483,7 +513,7 @@ impl JsHaircutImCalculator {
     /// # Errors
     ///
     /// Throws if the schedule cannot be converted to a JavaScript value.
-    #[wasm_bindgen(getter, js_name = eligibleCollateral)]
+    #[wasm_bindgen(getter, js_name = eligibleCollateral, unchecked_return_type = "EligibleCollateralSchedule")]
     pub fn eligible_collateral(&self) -> Result<JsValue, JsValue> {
         to_js_value(self.inner.eligible_collateral())
     }
@@ -495,7 +525,7 @@ impl JsHaircutImCalculator {
     }
 
     /// Look up the haircut for a collateral asset class.
-    /// @param asset_class - `CollateralAssetClass` wire label such as `"government_bonds"`.
+    /// @param assetClass - `CollateralAssetClass` wire label such as `"government_bonds"`.
     /// @returns The base haircut as a decimal fraction, without the FX add-on.
     ///
     /// # Errors
@@ -503,31 +533,38 @@ impl JsHaircutImCalculator {
     /// Throws if the label is unknown or no schedule or standard haircut
     /// exists for the asset class.
     #[wasm_bindgen(js_name = haircutFor)]
-    pub fn haircut_for(&self, asset_class: JsValue) -> Result<f64, JsValue> {
+    pub fn haircut_for(
+        &self,
+        #[wasm_bindgen(js_name = "assetClass", unchecked_param_type = "CollateralAssetClass")]
+        asset_class: JsValue,
+    ) -> Result<f64, JsValue> {
         let asset_class = collateral_asset_class(&asset_class, "assetClass")?;
         self.inner.haircut_for(&asset_class).map_err(to_js_err)
     }
 
     /// Haircut IM for an explicit collateral value and asset class.
-    /// @param collateral_value - Collateral market value in major units of `currency`; finite and non-negative.
+    /// @param collateralValue - Collateral market value in major units of `currency`; finite and non-negative.
     /// @param currency - ISO-4217 currency of the collateral value and of the result.
-    /// @param asset_class - `CollateralAssetClass` wire label used for the haircut lookup and as the breakdown key.
-    /// @param currency_mismatch - Whether to add the asset class's FX mismatch add-on.
-    /// @param as_of - ISO-8601 calculation date stamped on the result.
+    /// @param assetClass - `CollateralAssetClass` wire label used for the haircut lookup and as the breakdown key.
+    /// @param currencyMismatch - Whether to add the asset class's FX mismatch add-on.
+    /// @param asOf - ISO-8601 calculation date stamped on the result.
     /// @returns The `ImResult` as a plain object; its MPOR is the repo haircut horizon (`HAIRCUT_MPOR_DAYS`, 2 business days).
     ///
     /// # Errors
     ///
     /// Throws if the currency, amount or date is invalid, or the haircut or
     /// FX add-on cannot be resolved.
-    #[wasm_bindgen(js_name = calculateForCollateral)]
+    #[wasm_bindgen(js_name = calculateForCollateral, unchecked_return_type = "ImResult")]
     pub fn calculate_for_collateral(
         &self,
+        #[wasm_bindgen(js_name = "collateralValue", unchecked_param_type = "number")]
         collateral_value: JsValue,
-        currency: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+        #[wasm_bindgen(js_name = "assetClass", unchecked_param_type = "CollateralAssetClass")]
         asset_class: JsValue,
+        #[wasm_bindgen(js_name = "currencyMismatch", unchecked_param_type = "boolean")]
         currency_mismatch: JsValue,
-        as_of: JsValue,
+        #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
     ) -> Result<JsValue, JsValue> {
         let currency = js_currency(&currency, "currency")?;
         let collateral_value = js_money(&collateral_value, "collateralValue", currency)?;

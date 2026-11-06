@@ -224,7 +224,7 @@
       "sha256": "3249a98cc852023ab688ea7442956566c6b9ee37e40389f6ba32f8a3e675469b"
     },
     {
-      "path": "finstack-quant/core/src/dates/calendar/rule_coverage_tests.rs",
+      "path": "finstack-quant/core/src/dates/calendar/tests/rule_coverage.rs",
       "classification": "test",
       "records": [
         "CORE-CONVENTIONS-004",
@@ -234,7 +234,7 @@
       "sha256": "e500badd2f4234aea45fda8a1a4448579fdc6ca76ecd9a8c607be6f6ab38ca77"
     },
     {
-      "path": "finstack-quant/core/src/dates/calendar/rule_tests.rs",
+      "path": "finstack-quant/core/src/dates/calendar/tests/rule.rs",
       "classification": "test",
       "records": [
         "CORE-CONVENTIONS-004",
@@ -260,7 +260,7 @@
         "CORE-CONVENTIONS-004",
         "CORE-CONVENTIONS-006"
       ],
-      "reason": "Holiday bit materialization, prefix-count intervals and daily-scan fallback outside 1970\u20132150, with rule-identity cache key.",
+      "reason": "Holiday bit materialization, prefix-count intervals and daily-scan fallback outside 1970–2150, with rule-identity cache key.",
       "sha256": "0a39d0b369029285802915701615b27c1296aacdb1a2166cabb6c17ff1cfacd1"
     },
     {
@@ -488,7 +488,7 @@
       "records": [
         "CORE-CONVENTIONS-010"
       ],
-      "reason": "Actual generated published class-date table: Class A 2025, A/B/C/D 2026\u20132027; all rows inspected and source consistency checked.",
+      "reason": "Actual generated published class-date table: Class A 2025, A/B/C/D 2026–2027; all rows inspected and source consistency checked.",
       "sha256": "09a1d4ef470720a57a2ec0f6e2b3e6a593e8681cbb124072d43ea181d3391f6e"
     },
     {

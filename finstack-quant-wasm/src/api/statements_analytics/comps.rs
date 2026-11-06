@@ -19,8 +19,12 @@ use wasm_bindgen::prelude::*;
 /// return `undefined` rather than rejecting.
 /// @param values - Peer observations forming the comparison universe; non-finite entries are ignored.
 /// @param value - Subject-company metric value to rank against the peer sample.
-#[wasm_bindgen(js_name = percentileRank)]
-pub fn percentile_rank(values: JsValue, value: JsValue) -> Result<Option<JsValue>, JsValue> {
+/// @returns Percentile rank in `[0, 1]`, or `undefined` when `values` is empty.
+#[wasm_bindgen(js_name = percentileRank, unchecked_return_type = "number | undefined")]
+pub fn percentile_rank(
+    #[wasm_bindgen(unchecked_param_type = "number[]")] values: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] value: JsValue,
+) -> Result<Option<JsValue>, JsValue> {
     let value = js_f64(&value, "value")?;
     let values = js_f64_seq(&values, "values")?;
     match fc::percentile_rank(&values, value) {
@@ -41,8 +45,12 @@ pub fn percentile_rank(values: JsValue, value: JsValue) -> Result<Option<JsValue
 /// non-finite `value` return `undefined` rather than rejecting.
 /// @param values - Peer observations the subject is standardized against; non-finite entries are ignored.
 /// @param value - Subject-company metric value to standardize against the peer sample.
-#[wasm_bindgen(js_name = zScore)]
-pub fn z_score(values: JsValue, value: JsValue) -> Result<Option<JsValue>, JsValue> {
+/// @returns Standardized z-score, or `undefined` when variance is zero or the sample is too small.
+#[wasm_bindgen(js_name = zScore, unchecked_return_type = "number | undefined")]
+pub fn z_score(
+    #[wasm_bindgen(unchecked_param_type = "number[]")] values: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] value: JsValue,
+) -> Result<Option<JsValue>, JsValue> {
     let value = js_f64(&value, "value")?;
     let values = js_f64_seq(&values, "values")?;
     match fc::z_score(&values, value) {
@@ -61,8 +69,11 @@ pub fn z_score(values: JsValue, value: JsValue) -> Result<Option<JsValue>, JsVal
 /// Rejects when `values` is not a numeric JavaScript array or the statistics
 /// cannot be serialized. No finite observations return `undefined`.
 /// @param values - Peer metric observations; non-finite entries are ignored.
-#[wasm_bindgen(js_name = peerStats)]
-pub fn peer_stats(values: JsValue) -> Result<Option<JsValue>, JsValue> {
+/// @returns Descriptive peer statistics, or `undefined` when `values` is empty.
+#[wasm_bindgen(js_name = peerStats, unchecked_return_type = "PeerStats | undefined")]
+pub fn peer_stats(
+    #[wasm_bindgen(unchecked_param_type = "number[]")] values: JsValue,
+) -> Result<Option<JsValue>, JsValue> {
     let values = js_f64_seq(&values, "values")?;
     match fc::peer_stats(&values) {
         Some(stats) => to_js_value(&stats).map(Some),
@@ -79,16 +90,17 @@ pub fn peer_stats(values: JsValue) -> Result<Option<JsValue>, JsValue> {
 /// the regression result cannot be serialized. Fewer than three paired values
 /// or an unidentifiable fit returns `undefined`, as do unequal lengths and
 /// non-finite numeric inputs or outputs.
-/// @param x_values - Comparable-company independent-variable values aligned with y_values.
-/// @param y_values - Comparable-company dependent-variable values aligned with x_values.
-/// @param subject_x - Subject company's independent-variable value for the fitted regression.
-/// @param subject_y - Subject company's observed dependent-variable value for relative-value comparison.
-#[wasm_bindgen(js_name = regressionFairValue)]
+/// @param xValues - Comparable-company independent-variable values aligned with y_values.
+/// @param yValues - Comparable-company dependent-variable values aligned with x_values.
+/// @param subjectX - Subject company's independent-variable value for the fitted regression.
+/// @param subjectY - Subject company's observed dependent-variable value for relative-value comparison.
+/// @returns Fitted intercept, slope, R², subject fitted value and residual, or `undefined` if unidentifiable.
+#[wasm_bindgen(js_name = regressionFairValue, unchecked_return_type = "RegressionResult | undefined")]
 pub fn regression_fair_value(
-    x_values: JsValue,
-    y_values: JsValue,
-    subject_x: JsValue,
-    subject_y: JsValue,
+    #[wasm_bindgen(js_name = "xValues", unchecked_param_type = "number[]")] x_values: JsValue,
+    #[wasm_bindgen(js_name = "yValues", unchecked_param_type = "number[]")] y_values: JsValue,
+    #[wasm_bindgen(js_name = "subjectX", unchecked_param_type = "number")] subject_x: JsValue,
+    #[wasm_bindgen(js_name = "subjectY", unchecked_param_type = "number")] subject_y: JsValue,
 ) -> Result<Option<JsValue>, JsValue> {
     let subject_x = js_f64(&subject_x, "subjectX")?;
     let subject_y = js_f64(&subject_y, "subjectY")?;
@@ -108,12 +120,17 @@ pub fn regression_fair_value(
 /// `multiple` is not a supported canonical identifier, or the computed value
 /// cannot be serialized. Missing, `null` or non-finite inputs and
 /// non-positive denominators return `undefined`.
-/// @param company_metrics - Flat snake_case metric object (`enterprise_value`, `ebitda`, ...) supplying numerator and denominator inputs; a `null` value means the metric is missing.
+/// @param companyMetrics - Flat snake_case metric object (`enterprise_value`, `ebitda`, ...) supplying numerator and denominator inputs; a `null` value means the metric is missing.
 /// @param multiple - Supported valuation multiple identifier, such as EV/EBITDA or P/E.
-#[wasm_bindgen(js_name = computeMultiple)]
+/// @returns The requested multiple, or `undefined` when inputs are missing or the denominator is not positive.
+#[wasm_bindgen(js_name = computeMultiple, unchecked_return_type = "number | undefined")]
 pub fn compute_multiple(
+    #[wasm_bindgen(
+        js_name = "companyMetrics",
+        unchecked_param_type = "Record<string, number | null | undefined> | string"
+    )]
     company_metrics: JsValue,
-    multiple: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] multiple: JsValue,
 ) -> Result<Option<JsValue>, JsValue> {
     let multiple: &str = &js_string(&multiple, "multiple")?;
     let metrics_map: std::collections::BTreeMap<String, Option<f64>> =
@@ -135,10 +152,14 @@ pub fn compute_multiple(
 /// has usable data, the composite is non-finite, or the result cannot be
 /// serialized to JavaScript. Unusable dimensions are excluded; regression
 /// dimensions do not fall back to univariate scoring.
-/// @param peer_set - Comparable-company metric records used to score relative value.
+/// @param peerSet - Comparable-company metric records used to score relative value.
 /// @param dimensions - Metric dimensions and finite non-negative relative weights (zero disables, positive usable weights are normalized); each has one optional `x_extractor` for single-factor regression, or null for distribution scoring.
-#[wasm_bindgen(js_name = scoreRelativeValue)]
-pub fn score_relative_value(peer_set: JsValue, dimensions: JsValue) -> Result<JsValue, JsValue> {
+/// @returns Composite rich/cheap score with per-dimension diagnostics.
+#[wasm_bindgen(js_name = scoreRelativeValue, unchecked_return_type = "RelativeValueResult")]
+pub fn score_relative_value(
+    #[wasm_bindgen(js_name = "peerSet", unchecked_param_type = "unknown")] peer_set: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "unknown[]")] dimensions: JsValue,
+) -> Result<JsValue, JsValue> {
     let ps: fc::PeerSet = from_js_json(&peer_set, "peerSet")?;
     let dims: Vec<fc::ScoringDimension> = from_js_json(&dimensions, "dimensions")?;
     let result = fc::score_relative_value(&ps, &dims).map_err(to_js_err)?;
@@ -158,10 +179,19 @@ pub fn score_relative_value(peer_set: JsValue, dimensions: JsValue) -> Result<Js
 /// @param config - `RelativeValueReportConfig` (object or JSON): `filter` (optional; a `PeerFilter` in which every field is optional, an omitted field meaning no constraint and an unknown one rejected; an omitted filter makes every other company a peer), `period_basis` (required; `"ltm"`, `"ntm"` or `{custom: "<label>"}`; it labels the report and the metrics are used as given), `dimensions` (required; `ScoringDimension` objects with finite non-negative weights, zero disabling one; may be empty when `multiples` is not) and `multiples` (required; multiple identifiers such as `"ev_ebitda"`, the columns in order; may be empty when `dimensions` is not).
 /// @returns `RelativeValueReport` plain object: `subject_id`, `period_basis`, `peer_count`, `excluded_count` (universe members the filter dropped, not counting the subject), `companies` (subject first, then peers in universe order: `id`, `is_subject`, `values` with one number or null per configured multiple), `multiples` in config order (`multiple`, `subject_value`, `peer_stats`, `percentile`, `z_score`), `dimensions` in config order including excluded ones (`label`, `weight`, `direction`, `y`, `x`, `subject_y`, `subject_x`, `peer_stats`, `percentile`, `z_score`, `regression`, `signal` positive meaning cheap, `excluded_reason`, and `points` for the scatter with `company_id`, `is_subject` (true on the subject's point, first when the subject has both metrics), `x`, `y`, `fitted_y`), `composite` (the `scoreRelativeValue` result, or null) and `composite_excluded_reason` (`no_dimensions`, `no_usable_dimension`, `non_finite_score`, or null).
 /// @throws If an argument is malformed or carries an unknown field (a misspelt `CompanyMetrics` or `PeerFilter` key included), `dimensions` and `multiples` are both empty, or a weight is negative or non-finite (kind `validation`). No usable dimension is not an error: the table is returned with a null `composite`.
-#[wasm_bindgen(js_name = relativeValueReport)]
+#[wasm_bindgen(js_name = relativeValueReport, unchecked_return_type = "generated.statements_analytics.RelativeValueReport")]
 pub fn relative_value_report(
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.CompanyMetrics | string"
+    )]
     subject: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.CompanyMetrics[] | string"
+    )]
     universe: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.RelativeValueReportConfig | string"
+    )]
     config: JsValue,
 ) -> Result<JsValue, JsValue> {
     let subject: fc::CompanyMetrics = from_js_json(&subject, "subject")?;
@@ -176,8 +206,13 @@ pub fn relative_value_report(
 /// @param report - `RelativeValueReport` plain object or JSON string, as `relativeValueReport` returns it.
 /// @returns `TableEnvelope` with `id` (string) and `is_subject` (boolean) columns, then one nullable float column per configured multiple named by its wire form (`ev_ebitda`, `pe`, ...), in config order; rows are the subject first, then the peers in universe order, and a value Rust cannot compute is null.
 /// @throws Error - Throws with kind `validation` if `report` does not match the `RelativeValueReport` schema, a multiple appears twice, or a company row does not hold one value per multiple.
-#[wasm_bindgen(js_name = relativeValueReportTable)]
-pub fn relative_value_report_table(report: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = relativeValueReportTable, unchecked_return_type = "TableEnvelope")]
+pub fn relative_value_report_table(
+    #[wasm_bindgen(
+        unchecked_param_type = "generated.statements_analytics.RelativeValueReport | string"
+    )]
+    report: JsValue,
+) -> Result<JsValue, JsValue> {
     let report: fc::RelativeValueReport = from_js_json(&report, "report")?;
     to_js_value(&report.to_table().map_err(to_js_err)?)
 }

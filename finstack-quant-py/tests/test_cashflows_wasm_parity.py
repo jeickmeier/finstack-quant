@@ -355,7 +355,9 @@ def _coupon_type_wire(coupon_type: CouponType) -> Any:
 
 def _rate_spec_field(field: str, value: Any) -> Any:
     """Wire form of a floating-rate enum without ``to_json``, read back from a spec that embeds it."""
-    spec = FloatingRateSpec("USD-SOFR", "0", Tenor.parse("3M"), **{field: value})
+    spec = FloatingRateSpec(
+        forward_curve_id="USD-SOFR", spread_bp="0", reset_frequency=Tenor.parse("3M"), **{field: value}
+    )
     return json.loads(spec.to_json())[field]
 
 
@@ -365,7 +367,16 @@ def _coupon_fee_floating() -> Any:
         _coupon_type_wire(CouponType.split("0.6", "0.4")),
         wire(undrawn),
         wire(FeeSpec.fixed(dt.date(2025, 3, 1), usd(25_000))),
-        wire(FeeSpec.periodic_bp(undrawn, "37.5", Tenor.parse("3M"), DayCount.ACT_360, "usny", "modified_following")),
+        wire(
+            FeeSpec.periodic_bp(
+                base=undrawn,
+                bp="37.5",
+                frequency=Tenor.parse("3M"),
+                day_count=DayCount.ACT_360,
+                calendar_id="usny",
+                business_day_convention="modified_following",
+            )
+        ),
         _rate_spec_field("fallback", FloatingRateFallback.fixed_rate("0.03")),
         _rate_spec_field("compounding", FloatingLegCompounding.compounded_in_arrears(5)),
         _rate_spec_field("compounding", FloatingLegCompounding.compounded_with_observation_shift(2)),

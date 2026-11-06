@@ -28,7 +28,7 @@ Alternatives are direct return of refitted curves or lossless replay on a shared
 - Implementation: [recalibration/rates.rs](../../../../finstack-quant/calibration/src/recalibration/rates.rs) — quote selection, fresh policy, discount ratio and forward delta overlays.
 - Implementation: [recalibration/mod.rs](../../../../finstack-quant/calibration/src/recalibration/mod.rs) — strict fit gate.
 - Implementation: [build/rates.rs](../../../../finstack-quant/calibration/src/build/rates.rs) — actual pillar date contrast.
-- Test evidence: [src/recalibration/rates_review_tests.rs](../../../../finstack-quant/calibration/src/recalibration/rates_review_tests.rs) — direct versus replay bumped swaps, composition and zero-shock identity; inspected or located, not executed.
+- Test evidence: [src/recalibration/tests/rates_review.rs](../../../../finstack-quant/calibration/src/recalibration/tests/rates_review.rs) — direct versus replay bumped swaps, composition and zero-shock identity; inspected or located, not executed.
 - Test evidence: [src/recalibration/rates.rs](../../../../finstack-quant/calibration/src/recalibration/rates.rs) — source grid/floor/FX metadata and mixed quote restoration regressions; inspected or located, not executed.
 - Reference gap: no method-specific independent source or external benchmark is established by this record; source and regression evidence describe implementation behavior.
 

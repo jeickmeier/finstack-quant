@@ -20,15 +20,14 @@ pub(super) fn contractual_reset_date(start: Date, spec: &FloatingCouponSpec) -> 
     )
 }
 
-#[allow(clippy::too_many_arguments)]
+/// Compile the overnight coupon accruing over `(start, end)` on the tree grid.
 pub(super) fn build_overnight_coupon(
     tree: &RatesCreditTree,
     market: &MarketContext,
     discount: &dyn Discounting,
     as_of: Date,
     times: &[f64],
-    start: Date,
-    end: Date,
+    (start, end): (Date, Date),
     spec: &FloatingCouponSpec,
 ) -> Result<(OvernightCoupon, FloatingRateObservation)> {
     let method = spec.rate_spec.compounding.ok_or_else(|| {
@@ -190,7 +189,6 @@ pub(super) fn coupon_fractions(coupon_type: CouponType) -> Result<(f64, f64)> {
     Ok((cash, pik))
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn build_make_whole_claim(
     call: &CallPut,
     exercise_date: Date,

@@ -34,7 +34,7 @@ test('metric override patches preserve omitted fields and explicitly clear nulla
       '2024-05-01',
       'discounting',
       ['theta', 'theta_period_days'],
-      patch === undefined ? undefined : JSON.stringify(patch)
+      patch === undefined ? undefined : JSON.stringify({ metric_pricing_overrides: patch })
     );
   const weekly = price();
   assert.equal(weekly.measures.theta_period_days, 7);

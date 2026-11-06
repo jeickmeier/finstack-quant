@@ -10,6 +10,7 @@ Covers:
 
 from __future__ import annotations
 
+import json
 import pickle
 
 import pytest
@@ -54,7 +55,15 @@ def test_vanilla_expiry_payoff_matches_intrinsic() -> None:
 
 
 def test_bs_greeks_is_typed_with_pandas_exits() -> None:
-    g = bs_greeks(100.0, 100.0, 0.05, 0.02, 0.2, 1.0, True)
+    g = bs_greeks({
+        "spot": 100.0,
+        "strike": 100.0,
+        "rate": 0.05,
+        "dividend_yield": 0.02,
+        "volatility": 0.2,
+        "time_to_expiry": 1.0,
+        "option_type": "call",
+    })
     assert 0.0 < g.delta < 1.0
     assert g.is_valid()
     assert g.to_series().index.tolist() == ["delta", "gamma", "vega", "theta", "rho_r", "rho_q"]
@@ -64,9 +73,21 @@ def test_bs_greeks_is_typed_with_pandas_exits() -> None:
     assert "rho_r=" in repr(g)
 
 
-def test_bs_greeks_keyword_vocabulary() -> None:
-    g = bs_greeks(spot=100.0, strike=100.0, rate=0.05, div_yield=0.0, vol=0.2, expiry=1.0, is_call=True)
+def test_bs_greeks_market_accepts_json_text_and_rejects_unknown_keys() -> None:
+    market = {
+        "spot": 100.0,
+        "strike": 100.0,
+        "rate": 0.05,
+        "dividend_yield": 0.0,
+        "volatility": 0.2,
+        "time_to_expiry": 1.0,
+        "option_type": "call",
+    }
+    g = bs_greeks(json.dumps(market))
     assert abs(g.delta - 0.6368) < 1e-3
+    assert g == bs_greeks(market)
+    with pytest.raises(ValueError, match="OptionMarketParams"):
+        bs_greeks({**market, "is_call": True})
 
 
 def test_bs_implied_vol_rejects_expired_option() -> None:
@@ -81,8 +102,26 @@ def test_new_closed_form_bindings_run() -> None:
     assert abs(bachelier_greeks(0.03, 0.03, 0.0075, 1.0, True).delta - 0.5) < 1e-9
     assert black_shifted_price(-0.005, -0.005, 0.25, 1.0, 0.03, True) > 0.0
     assert black_shifted_vega(-0.005, -0.005, 0.25, 1.0, 0.03) > 0.0
-    assert barrier_option_price(100.0, 100.0, 80.0, 0.05, 0.0, 0.2, 1.0, "down", "out", is_call=False) > 0.0
-    p = heston_price(100.0, 100.0, 1.0, 0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04)
+    assert (
+        barrier_option_price(
+            {
+                "spot": 100.0,
+                "strike": 100.0,
+                "rate": 0.05,
+                "dividend_yield": 0.0,
+                "volatility": 0.2,
+                "time_to_expiry": 1.0,
+                "option_type": "put",
+            },
+            80.0,
+            "down",
+            "out",
+        )
+        > 0.0
+    )
+    p = heston_price(
+        100.0, 100.0, 1.0, {"r": 0.05, "q": 0.02, "v0": 0.04, "kappa": 2.0, "theta": 0.04, "sigma_v": 0.3, "rho": -0.7}
+    )
     assert 5.0 < p < 15.0
 
 
@@ -200,30 +239,82 @@ def test_sabr_fixed_shift_and_atm_pinning() -> None:
 
 def test_barrier_knock_in_plus_knock_out_equals_vanilla() -> None:
     spot, strike, barrier, r, q, sigma, t = 100.0, 100.0, 110.0, 0.05, 0.02, 0.2, 1.0
-    up_in = barrier_option_price(spot, strike, barrier, r, q, sigma, t, "up", "in")
-    up_out = barrier_option_price(spot, strike, barrier, r, q, sigma, t, "up", "out")
+    up_in = barrier_option_price(
+        {
+            "spot": spot,
+            "strike": strike,
+            "rate": r,
+            "dividend_yield": q,
+            "volatility": sigma,
+            "time_to_expiry": t,
+            "option_type": "call",
+        },
+        barrier,
+        "up",
+        "in",
+    )
+    up_out = barrier_option_price(
+        {
+            "spot": spot,
+            "strike": strike,
+            "rate": r,
+            "dividend_yield": q,
+            "volatility": sigma,
+            "time_to_expiry": t,
+            "option_type": "call",
+        },
+        barrier,
+        "up",
+        "out",
+    )
     vanilla = bs_price(spot, strike, r, q, sigma, t, True)
     assert abs(up_in + up_out - vanilla) < 1e-6
 
 
 def test_asian_arithmetic_ge_geometric_for_call() -> None:
     # Arithmetic Asian call dominates the geometric Asian call (AM >= GM).
-    arith = asian_option_price(100.0, 100.0, 0.05, 0.02, 0.3, 1.0, 12, "arithmetic", True)
-    geom = asian_option_price(100.0, 100.0, 0.05, 0.02, 0.3, 1.0, 12, "geometric", True)
+    arith = asian_option_price(
+        {
+            "spot": 100.0,
+            "strike": 100.0,
+            "rate": 0.05,
+            "dividend_yield": 0.02,
+            "volatility": 0.3,
+            "time_to_expiry": 1.0,
+            "option_type": "call",
+        },
+        12,
+        "arithmetic",
+    )
+    geom = asian_option_price(
+        {
+            "spot": 100.0,
+            "strike": 100.0,
+            "rate": 0.05,
+            "dividend_yield": 0.02,
+            "volatility": 0.3,
+            "time_to_expiry": 1.0,
+            "option_type": "call",
+        },
+        12,
+        "geometric",
+    )
     assert arith >= geom - 1e-9
 
 
 def test_lookback_floating_strike_call_positive() -> None:
     p = lookback_option_price(
-        spot=100.0,
-        strike=0.0,  # ignored for floating
-        rate=0.05,
-        div_yield=0.02,
-        vol=0.2,
-        expiry=1.0,
-        extremum=100.0,
+        {
+            "spot": 100.0,
+            "strike": 0.0,
+            "rate": 0.05,
+            "dividend_yield": 0.02,
+            "volatility": 0.2,
+            "time_to_expiry": 1.0,
+            "option_type": "call",
+        },
+        100.0,
         strike_type="floating",
-        is_call=True,
     )
     assert p > 0.0
 
@@ -233,29 +324,56 @@ def test_lookback_floating_strike_call_positive() -> None:
     [("fixed", True, 24.326644378668), ("floating", False, 21.429719498063)],
 )
 def test_seasoned_lookback_matches_extremum_payoff(strike_type: str, is_call: bool, expected: float) -> None:
-    price = lookback_option_price(100.0, 100.0, 0.05, 0.02, 0.2, 1.0, 120.0, strike_type, is_call)
+    price = lookback_option_price(
+        {
+            "spot": 100.0,
+            "strike": 100.0,
+            "rate": 0.05,
+            "dividend_yield": 0.02,
+            "volatility": 0.2,
+            "time_to_expiry": 1.0,
+            "option_type": ("call" if is_call else "put"),
+        },
+        120.0,
+        strike_type,
+    )
     assert price == pytest.approx(expected, abs=1e-8, rel=0)
 
 
 def test_quanto_option_price_call_positive() -> None:
     p = quanto_option_price(
-        spot=100.0,
-        strike=100.0,
-        expiry=1.0,
-        rate_domestic=0.05,
-        rate_foreign=0.03,
-        div_yield=0.01,
-        vol_asset=0.2,
-        vol_fx=0.1,
-        correlation=-0.2,
-        is_call=True,
+        {
+            "spot": 100.0,
+            "strike": 100.0,
+            "rate": 0.05,
+            "dividend_yield": 0.01,
+            "volatility": 0.2,
+            "time_to_expiry": 1.0,
+            "option_type": "call",
+        },
+        0.03,
+        0.1,
+        -0.2,
     )
     assert p > 0.0
 
 
 def test_barrier_unknown_direction_raises() -> None:
     with pytest.raises(ValueError, match=r"barrier spec|direction"):
-        barrier_option_price(100.0, 100.0, 110.0, 0.05, 0.02, 0.2, 1.0, "sideways", "in")
+        barrier_option_price(
+            {
+                "spot": 100.0,
+                "strike": 100.0,
+                "rate": 0.05,
+                "dividend_yield": 0.02,
+                "volatility": 0.2,
+                "time_to_expiry": 1.0,
+                "option_type": "call",
+            },
+            110.0,
+            "sideways",
+            "in",
+        )
 
 
 def test_sabr_calibration_returns_diagnostics_with_parameters() -> None:

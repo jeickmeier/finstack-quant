@@ -91,7 +91,7 @@
   ],
   "files": [
     {
-      "path": "finstack-quant/calibration/src/hazard_curve_tests.rs",
+      "path": "finstack-quant/calibration/src/tests/hazard_curve.rs",
       "classification": "test",
       "records": [
         "CALIBRATION-TARGETS-001",
@@ -181,7 +181,7 @@
       "sha256": "33183b06c61fbdda5c4b7c97d520c1d99ee65c486edab8f5b8257a248fb8c861"
     },
     {
-      "path": "finstack-quant/calibration/src/repricing_tests.rs",
+      "path": "finstack-quant/calibration/src/tests/repricing.rs",
       "classification": "test",
       "records": [
         "CALIBRATION-TARGETS-003",

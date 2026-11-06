@@ -18,7 +18,7 @@ def _exposure(**kwargs: object) -> Exposure:
         "ead": 1_000_000.0,
         "lgd": 0.45,
         "eir": 0.06,
-        "remaining_maturity": 1.0,
+        "remaining_maturity_years": 1.0,
         "current_pd": 0.02,
         "origination_pd": 0.015,
     }
@@ -30,8 +30,8 @@ def test_classify_stage_uses_canonical_defaults_and_backstop_toggles() -> None:
     """Exposure and classification defaults are resolved by canonical Rust."""
     from finstack_quant.statements_analytics import Stage, StagingConfig, classify_stage
 
-    exposure = _exposure(ead=100.0, lgd=0.4, eir=0.05, remaining_maturity=5.0)
-    assert exposure.dpd == 0
+    exposure = _exposure(ead=100.0, lgd=0.4, eir=0.05, remaining_maturity_years=5.0)
+    assert exposure.days_past_due == 0
     assert exposure.undrawn == 0.0
     assert exposure.ccf == 0.75
 
@@ -40,13 +40,13 @@ def test_classify_stage_uses_canonical_defaults_and_backstop_toggles() -> None:
     assert clean.stage.value == "stage1"
     assert clean.triggers == ["no_trigger"]
 
-    exposure.dpd = 30
+    exposure.days_past_due = 30
     assert classify_stage(exposure).stage is Stage.Stage2
 
     no_dpd = StagingConfig(dpd_stage2_threshold=2**32 - 1, dpd_stage3_threshold=2**32 - 1)
     assert classify_stage(exposure, no_dpd).stage is Stage.Stage1
 
-    exposure.dpd = 91
+    exposure.days_past_due = 91
     assert classify_stage(exposure).stage is Stage.Stage3
     assert classify_stage(exposure, no_dpd).stage is Stage.Stage1
 
@@ -55,7 +55,7 @@ def test_classify_stage_uses_default_or_explicit_pd_threshold() -> None:
     """The SICR PD-delta threshold comes from ``StagingConfig``, not the binding."""
     from finstack_quant.statements_analytics import Stage, StagingConfig, classify_stage
 
-    exposure = _exposure(ead=100.0, lgd=0.4, eir=0.05, remaining_maturity=5.0, current_pd=0.026)
+    exposure = _exposure(ead=100.0, lgd=0.4, eir=0.05, remaining_maturity_years=5.0, current_pd=0.026)
     assert classify_stage(exposure).stage is Stage.Stage2
 
     relaxed = StagingConfig(pd_delta_absolute=0.02)
@@ -75,7 +75,7 @@ def test_classify_then_measure_workflow() -> None:
     """The classify-then-measure workflow composes without a string round-trip."""
     from finstack_quant.statements_analytics import classify_stage, compute_ecl
 
-    exposure = _exposure(remaining_maturity=5.0)
+    exposure = _exposure(remaining_maturity_years=5.0)
     stage = classify_stage(exposure).stage
     result = compute_ecl(exposure, [(0.0, 0.0), (5.0, 0.10)], stage=stage)
     assert result.stage is stage
@@ -130,7 +130,7 @@ def test_weighted_result_exposes_bucket_audit_trail() -> None:
     from finstack_quant.statements_analytics import WeightedEclResult, compute_ecl_weighted
 
     result = compute_ecl_weighted(
-        _exposure(remaining_maturity=2.0),
+        _exposure(remaining_maturity_years=2.0),
         [(1.0, [(0.0, 0.0), (2.0, 0.04)])],
         stage="stage2",
     )
@@ -176,10 +176,10 @@ def test_compute_ecl_ead_schedule_reduces_lifetime_ecl() -> None:
     from finstack_quant.statements_analytics import compute_ecl
 
     curve = [(0.0, 0.0), (5.0, 0.10)]
-    bullet = compute_ecl(_exposure(remaining_maturity=5.0), curve, stage="stage2").ecl
+    bullet = compute_ecl(_exposure(remaining_maturity_years=5.0), curve, stage="stage2").ecl
     amortizing = compute_ecl(
         _exposure(
-            remaining_maturity=5.0,
+            remaining_maturity_years=5.0,
             ead_schedule=[(0.0, 1_000_000.0), (5.0, 0.0)],
         ),
         curve,
@@ -235,7 +235,7 @@ def test_compute_ecl_requires_stage_and_honours_custom_staging_policy() -> None:
         compute_ecl_weighted,
     )
 
-    exposure = _exposure(remaining_maturity=3.0, current_pd=0.03, origination_pd=0.015)
+    exposure = _exposure(remaining_maturity_years=3.0, current_pd=0.03, origination_pd=0.015)
     schedule = [(1.0, 0.02), (3.0, 0.06)]
     lenient = StagingConfig(pd_delta_absolute=0.05, pd_delta_relative=None)
 
@@ -256,6 +256,7 @@ def test_compute_ecl_requires_stage_and_honours_custom_staging_policy() -> None:
 def test_exposure_counters_default_from_rust() -> None:
     """STMT-006: DPD and cure counters default to the Rust ``Exposure`` default."""
     exposure = _exposure()
-    assert (exposure.dpd, exposure.consecutive_performing_periods) == (0, 0)
-    explicit_none = _exposure(dpd=None, consecutive_performing_periods=None)
-    assert (explicit_none.dpd, explicit_none.consecutive_performing_periods) == (0, 0)
+    assert (exposure.days_past_due, exposure.consecutive_performing_periods) == (0, 0)
+    # An omitted keyword takes the Rust default; ``None`` is not a spelling of it.
+    with pytest.raises(ValueError, match="null, expected u32"):
+        _exposure(days_past_due=None)

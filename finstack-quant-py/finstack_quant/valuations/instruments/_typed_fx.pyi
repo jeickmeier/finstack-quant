@@ -126,9 +126,7 @@ class FxForward:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
-        market_history: MarketHistory | dict[str, Any] | str | None = None,
-        explain: bool = False,
+        extras: dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this instrument and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -145,15 +143,19 @@ class FxForward:
             Model key (``"discounting"`` is the native model).
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
-        metric_pricing_overrides : MetricPricingOverrides | dict[str, Any] | str, optional
-            Metric-time overrides merged into
-            ``instrument.spec.metric_pricing_overrides`` before pricing
-            (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
-        market_history : MarketHistory | dict[str, Any] | str, optional
-            ``MarketHistory`` scenarios required by ``hvar`` /
-            ``expected_shortfall``.
-        explain : bool, default False
-            When ``True``, attach a step trace as ``result.explanation``.
+        extras : dict[str, Any] or str, optional
+            The rarer pricing inputs, as a dict or JSON text in the shape of the
+            Rust ``PriceExtras``; every key is optional and an unknown key raises
+            ``ValueError``. ``metric_pricing_overrides`` (a ``MetricPricingOverrides``
+            or dict) is merged into ``instrument.spec.metric_pricing_overrides``
+            before pricing (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``):
+            only the keys present replace stored controls, ``bump_config`` keys
+            merge into the stored bump configuration and an explicit ``None``
+            clears a control; omitted keeps the instrument's overrides. ``market_history`` (a ``MarketHistory`` or dict)
+            holds the historical scenarios ``hvar`` and ``expected_shortfall``
+            require; omitted prices without history. ``explain`` (bool, default
+            ``False``) attaches a step trace as ``result.explanation`` when
+            ``True``. ``None`` (the default) means no extras.
 
         Returns
         -------
@@ -283,8 +285,8 @@ class FxForward:
         dict[str, object]
             Bump sizes, theta period and the other metric settings stored on
             the instrument; unset fields are ``None`` or omitted. A
-            ``metric_pricing_overrides`` argument to ``price`` is merged over it
-            per call.
+            ``price(..., extras={"metric_pricing_overrides": ...})`` patch is
+            merged over it per call.
 
         Notes
         -----
@@ -347,22 +349,7 @@ class FxForward:
         """
         ...
     @staticmethod
-    def from_trade_date(
-        id: str,
-        base_currency: Currency | str,
-        quote_currency: Currency | str,
-        trade_date: datetime.date | datetime.datetime | pd.Timestamp | str,
-        tenor: Tenor | str,
-        notional: Money | float,
-        domestic_discount_curve_id: str,
-        foreign_discount_curve_id: str,
-        *,
-        base_calendar_id: str | None = None,
-        quote_calendar_id: str | None = None,
-        settlement_days: int | None = None,
-        business_day_convention: BusinessDayConvention | str | None = None,
-        end_of_month: bool = False,
-    ) -> FxForward:
+    def from_trade_date(params: dict[str, Any] | str) -> FxForward:
         """
         Build a forward from a trade date and a standard FX tenor (mirrors Rust
         ``FxForward::from_trade_date``): the spot date is rolled from
@@ -372,39 +359,35 @@ class FxForward:
 
         Parameters
         ----------
-        id : str
-            Unique instrument identifier.
-        base_currency : Currency | str
-            Base (foreign) currency; notional currency.
-        quote_currency : Currency | str
-            Quote (domestic) currency; PV currency.
-        trade_date : datetime.date | datetime.datetime | pd.Timestamp | str
-            Trade date from which spot is rolled.
-        tenor : Tenor | str
-            Standard FX tenor from spot, e.g. ``"3M"``.
-        notional : Money | float
-            Notional in ``base_currency``; a bare float is tagged with that currency.
-        domestic_discount_curve_id : str
-            Quote-currency discount curve identifier.
-        foreign_discount_curve_id : str
-            Base-currency discount curve identifier.
-        base_calendar_id : str | None
-            Base-currency holiday calendar; ``None`` counts weekdays only, except
-            that a USD leg uses ``"usny"``.
-        quote_calendar_id : str | None
-            Quote-currency holiday calendar; ``None`` counts weekdays only, except
-            that a USD leg uses ``"usny"``.
-        settlement_days : int | None
-            Contractual T+N spot lag in business days (non-negative), honored as
-            given (for example ``1`` for tom-next); ``None`` uses
-            :func:`finstack_quant.core.dates.fx_standard_settlement_days` for the pair.
-        business_day_convention : BusinessDayConvention | str | None
-            Roll rule applied to the maturity: a ``BusinessDayConvention`` or a
-            canonical name accepted by ``adjust``, ignoring surrounding whitespace
-            and ASCII case. ``None`` selects the Rust ``FxForward::from_trade_date``
-            default, Modified Following.
-        end_of_month : bool, default False
-            Apply the FX end-of-month rule when spot falls on month end.
+        params : dict[str, Any] | str
+            ``FxForwardTradeDateParams`` as a dict or JSON text. Required keys:
+
+            - ``id`` (str): unique instrument identifier.
+            - ``base_currency`` / ``quote_currency`` (Currency | str): base
+              (foreign, notional) and quote (domestic, PV) ISO-4217 codes.
+            - ``trade_date`` (datetime.date | str): ISO 8601 date from which spot is rolled.
+            - ``tenor`` (Tenor | dict): a ``Tenor`` (``Tenor.parse("3M")``) or its wire dict
+              ``{"count": 3, "unit": "months"}``: standard FX tenor from spot.
+            - ``notional`` (Money | dict): notional in ``base_currency``, a
+              ``Money`` or its wire dict ``{"amount": "1000000", "currency": "USD"}``.
+            - ``domestic_discount_curve_id`` / ``foreign_discount_curve_id``
+              (str): quote- and base-currency discount curves.
+
+            Optional keys (omit for the default):
+
+            - ``end_of_month`` (bool, default ``False``): apply the FX
+              end-of-month rule when spot falls on month end.
+            - ``base_calendar_id`` / ``quote_calendar_id`` (str): holiday
+              calendars; omitted counts weekdays only, except that a USD leg
+              uses ``"usny"``.
+            - ``settlement_days`` (int): contractual T+N spot lag in business
+              days (non-negative), honored as given (for example ``1`` for
+              tom-next); omitted uses
+              :func:`finstack_quant.core.dates.fx_standard_settlement_days` for
+              the pair.
+            - ``business_day_convention`` (str): serde name of the maturity roll
+              rule (``"modified_following"``, ``"following"``, ...); omitted
+              selects Modified Following.
 
         Returns
         -------
@@ -414,17 +397,28 @@ class FxForward:
         Raises
         ------
         ValueError
-            If the currencies coincide, the tenor/date is invalid, or the
-            notional currency differs from ``base_currency``.
+            If ``params`` has a missing, unknown or malformed key, the
+            currencies coincide, the tenor/date is invalid, or the notional
+            currency differs from ``base_currency``.
         KeyError
             If a calendar identifier is unknown.
 
         Examples
         --------
+        >>> from finstack_quant.core.dates import Tenor
+        >>> from finstack_quant.core.money import Money
         >>> from finstack_quant.valuations.instruments import FxForward
-        >>> fwd = FxForward.from_trade_date(
-        ...     "EURUSD-3M", "EUR", "USD", "2025-01-15", "3M", 1_000_000.0, "USD-OIS", "EUR-OIS"
-        ... )
+        >>> fwd = FxForward.from_trade_date({
+        ...     "id": "EURUSD-3M",
+        ...     "base_currency": "EUR",
+        ...     "quote_currency": "USD",
+        ...     "trade_date": "2025-01-15",
+        ...     "tenor": Tenor.parse("3M"),
+        ...     "notional": Money(1_000_000.0, "EUR"),
+        ...     "domestic_discount_curve_id": "USD-OIS",
+        ...     "foreign_discount_curve_id": "EUR-OIS",
+        ...     "end_of_month": False,
+        ... })
         >>> fwd.contract_rate is None
         True
         """
@@ -1197,9 +1191,7 @@ class FxOption:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
-        market_history: MarketHistory | dict[str, Any] | str | None = None,
-        explain: bool = False,
+        extras: dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this instrument and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -1216,15 +1208,19 @@ class FxOption:
             Model key (``"black76"`` (Garman–Kohlhagen) is the native model).
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
-        metric_pricing_overrides : MetricPricingOverrides | dict[str, Any] | str, optional
-            Metric-time overrides merged into
-            ``instrument.spec.metric_pricing_overrides`` before pricing
-            (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
-        market_history : MarketHistory | dict[str, Any] | str, optional
-            ``MarketHistory`` scenarios required by ``hvar`` /
-            ``expected_shortfall``.
-        explain : bool, default False
-            When ``True``, attach a step trace as ``result.explanation``.
+        extras : dict[str, Any] or str, optional
+            The rarer pricing inputs, as a dict or JSON text in the shape of the
+            Rust ``PriceExtras``; every key is optional and an unknown key raises
+            ``ValueError``. ``metric_pricing_overrides`` (a ``MetricPricingOverrides``
+            or dict) is merged into ``instrument.spec.metric_pricing_overrides``
+            before pricing (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``):
+            only the keys present replace stored controls, ``bump_config`` keys
+            merge into the stored bump configuration and an explicit ``None``
+            clears a control; omitted keeps the instrument's overrides. ``market_history`` (a ``MarketHistory`` or dict)
+            holds the historical scenarios ``hvar`` and ``expected_shortfall``
+            require; omitted prices without history. ``explain`` (bool, default
+            ``False``) attaches a step trace as ``result.explanation`` when
+            ``True``. ``None`` (the default) means no extras.
 
         Returns
         -------
@@ -1354,8 +1350,8 @@ class FxOption:
         dict[str, object]
             Bump sizes, theta period and the other metric settings stored on
             the instrument; unset fields are ``None`` or omitted. A
-            ``metric_pricing_overrides`` argument to ``price`` is merged over it
-            per call.
+            ``price(..., extras={"metric_pricing_overrides": ...})`` patch is
+            merged over it per call.
 
         Notes
         -----
@@ -1418,49 +1414,32 @@ class FxOption:
         """
         ...
     @staticmethod
-    def european(
-        id: str,
-        base_currency: Currency | str,
-        quote_currency: Currency | str,
-        strike: float,
-        expiry: datetime.date | datetime.datetime | pd.Timestamp | str,
-        notional: Money | float,
-        vol_surface_id: str,
-        option_type: Literal["call", "put"],
-        delta_convention_kind: Literal["spot", "forward", "premium_adjusted_spot", "premium_adjusted_forward"],
-        premium_currency: Currency | str,
-        venue: str,
-    ) -> FxOption:
+    def european(params: dict[str, Any] | str) -> FxOption:
         """
         Build a European FX option with currency-derived OIS curves (mirrors Rust
-        ``FxOption::european``): discount curves default to ``"<QUOTE>-OIS"``
-        (domestic) and ``"<BASE>-OIS"`` (foreign), with the pre-configured
-        EUR/USD and GBP/USD underlying presets when applicable.
+        ``FxOption::european``): discount curves are ``"<QUOTE>-OIS"``
+        (domestic) and ``"<BASE>-OIS"`` (foreign) and the model day count is
+        ACT/365F.
 
         Parameters
         ----------
-        id : str
-            Unique instrument identifier.
-        base_currency : Currency | str
-            Base (foreign) currency; notional currency.
-        quote_currency : Currency | str
-            Quote (domestic) currency.
-        strike : float
-            Strike, quote currency per unit of base currency.
-        expiry : datetime.date | datetime.datetime | pd.Timestamp | str
-            Expiry date.
-        notional : Money | float
-            Notional in ``base_currency``; a bare float is tagged with that currency.
-        vol_surface_id : str
-            FX volatility surface identifier.
-        option_type : {"call", "put"}
-            Call or put on the base currency.
-        delta_convention_kind : {"spot", "forward", "premium_adjusted_spot", "premium_adjusted_forward"}
-            Delta convention quoted by the venue.
-        premium_currency : Currency | str
-            Currency in which the premium is paid (base or quote).
-        venue : str
-            Non-empty market venue / quoting-source identifier.
+        params : dict[str, Any] | str
+            ``FxOptionParams`` as a dict or JSON text. Every key is required:
+
+            - ``id`` (str): unique instrument identifier.
+            - ``base_currency`` / ``quote_currency`` (Currency | str): base
+              (foreign, notional) and quote (domestic) ISO-4217 codes.
+            - ``strike`` (float): quote currency per unit of base currency.
+            - ``expiry`` (datetime.date | str): ISO 8601 date; the cash payoff settles on it.
+            - ``notional`` (Money | dict): notional in ``base_currency``, a
+              ``Money`` or its wire dict ``{"amount": "1000000", "currency": "USD"}``.
+            - ``vol_surface_id`` (str): FX volatility surface identifier.
+            - ``option_type`` (str): ``"call"`` or ``"put"`` on the base currency.
+            - ``delta_convention`` (dict): ``{"kind", "premium_currency",
+              "venue"}`` with ``kind`` one of ``"spot"``, ``"forward"``,
+              ``"premium_adjusted_spot"``, ``"premium_adjusted_forward"``,
+              ``premium_currency`` the base or quote code and ``venue`` a
+              non-empty quoting-source identifier.
 
         Returns
         -------
@@ -1470,25 +1449,25 @@ class FxOption:
         Raises
         ------
         ValueError
-            If the currencies coincide, ``premium_currency`` is neither leg,
-            ``venue`` is blank, or the notional is not positive.
+            If ``params`` has a missing, unknown or malformed key, the
+            currencies coincide, the premium currency is neither leg, the venue
+            is blank, or the notional is not positive.
 
         Examples
         --------
+        >>> from finstack_quant.core.money import Money
         >>> from finstack_quant.valuations.instruments import FxOption
-        >>> opt = FxOption.european(
-        ...     "EURUSD-CALL",
-        ...     "EUR",
-        ...     "USD",
-        ...     1.12,
-        ...     "2025-06-15",
-        ...     1_000_000.0,
-        ...     "EURUSD-VOL",
-        ...     "call",
-        ...     "spot",
-        ...     "USD",
-        ...     "desk",
-        ... )
+        >>> opt = FxOption.european({
+        ...     "id": "EURUSD-CALL",
+        ...     "base_currency": "EUR",
+        ...     "quote_currency": "USD",
+        ...     "strike": 1.12,
+        ...     "expiry": "2025-06-15",
+        ...     "notional": Money(1_000_000.0, "EUR"),
+        ...     "vol_surface_id": "EURUSD-VOL",
+        ...     "option_type": "call",
+        ...     "delta_convention": {"kind": "spot", "premium_currency": "USD", "venue": "desk"},
+        ... })
         >>> (opt.domestic_discount_curve_id, opt.foreign_discount_curve_id)
         ('USD-OIS', 'EUR-OIS')
         """
@@ -1780,7 +1759,7 @@ class FxOptionBuilder:
     ...     .quote_currency("USD")
     ...     .strike(1.12)
     ...     .option_type("call")
-    ...     .delta_convention("spot", "USD", "desk")
+    ...     .delta_convention({"kind": "spot", "premium_currency": "USD", "venue": "desk"})
     ...     .expiry("2025-06-15")
     ...     .notional(Money(1_000_000.0, Currency("EUR")))
     ...     .domestic_discount_curve_id("USD-OIS")
@@ -1892,23 +1871,20 @@ class FxOptionBuilder:
             If the builder was already consumed by ``build()`` or ``value`` is not a recognized option type.
         """
         ...
-    def delta_convention(
-        self,
-        kind: Literal["spot", "forward", "premium_adjusted_spot", "premium_adjusted_forward"],
-        premium_currency: Currency | str,
-        venue: str,
-    ) -> FxOptionBuilder:
+    def delta_convention(self, value: dict[str, Any] | str) -> FxOptionBuilder:
         """
         Set the pair/venue delta convention and premium currency.
 
         Parameters
         ----------
-        kind : {"spot", "forward", "premium_adjusted_spot", "premium_adjusted_forward"}
-            Delta convention quoted by the venue.
-        premium_currency : Currency | str
-            Currency in which the FX option premium is paid.
-        venue : str
-            Non-empty market venue or quoting-source identifier.
+        value : dict[str, Any] | str
+            ``FxDeltaConvention`` serde form, as a ``dict`` or JSON string,
+            every key required: ``kind`` (``"spot"``, ``"forward"``,
+            ``"premium_adjusted_spot"`` or ``"premium_adjusted_forward"``),
+            ``premium_currency`` (ISO-4217 code or ``Currency``; must be the
+            base or quote currency, checked by ``build()``) and ``venue``
+            (non-blank market venue or quoting-source identifier). The
+            ``FxOption.delta_convention`` getter returns this shape.
 
         Returns
         -------
@@ -1918,7 +1894,7 @@ class FxOptionBuilder:
         Raises
         ------
         ValueError
-            If the builder was already consumed by ``build()``, ``kind`` is unknown or ``venue`` is blank.
+            If the builder was already consumed by ``build()``, ``value`` does not match the ``FxDeltaConvention`` shape (an unknown ``kind`` or key, a missing key) or ``venue`` is blank.
         """
         ...
     def expiry(self, value: datetime.date | datetime.datetime | pd.Timestamp | str) -> FxOptionBuilder:

@@ -48,4 +48,4 @@ pub(crate) mod metrics;
 pub(crate) mod pricer;
 pub(crate) mod types;
 
-pub use types::{CmsSwap, FundingLeg, FundingLegSpec, FundingPeriod};
+pub use types::{CmsSwap, CmsSwapScheduleParams, FundingLeg, FundingLegSpec, FundingPeriod};

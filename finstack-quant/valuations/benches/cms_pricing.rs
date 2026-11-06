@@ -193,23 +193,25 @@ fn bench_cms_swap_period_count(c: &mut Criterion) {
     let end = start + time::Duration::days(end_days);
 
     let swap = CmsSwap::from_schedule(
-        "CMSSWAP-BENCH",
-        start,
-        end,
-        Tenor::quarterly(),
-        Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).unwrap(),
-        Decimal::ZERO,
-        FundingLegSpec::Fixed {
-            rate: Decimal::new(3, 2),
-            day_count: DayCount::Thirty360,
+        finstack_quant_valuations::instruments::rates::cms_swap::CmsSwapScheduleParams {
+            id: "CMSSWAP-BENCH".into(),
+            start_date: start,
+            maturity: end,
+            cms_frequency: Tenor::quarterly(),
+            cms_tenor: Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).unwrap(),
+            cms_spread_bp: Decimal::ZERO,
+            funding_leg: FundingLegSpec::Fixed {
+                rate: Decimal::new(3, 2),
+                day_count: DayCount::Thirty360,
+            },
+            notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+            day_count: DayCount::Act360,
+            index_id: IndexId::new("USD-SOFR-OIS"),
+            side: PayReceive::Receive,
+            discount_curve_id: "USD-OIS".into(),
+            forward_curve_id: "USD-LIBOR-3M".into(),
+            vol_surface_id: "USD-CMS10Y-VOL".into(),
         },
-        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
-        DayCount::Act360,
-        IndexId::new("USD-SOFR-OIS"),
-        PayReceive::Receive,
-        "USD-OIS",
-        "USD-LIBOR-3M",
-        "USD-CMS10Y-VOL",
     )
     .unwrap();
 

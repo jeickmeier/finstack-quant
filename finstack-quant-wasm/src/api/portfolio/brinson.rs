@@ -8,15 +8,19 @@ use wasm_bindgen::prelude::*;
 ///
 /// Accepts a JSON array of `SectorPeriod` objects and returns a structured
 /// `BrinsonPeriodResult` object.
-/// @param sectors_json - Sector-classification JSON.
+/// @param sectorsJson - Sector-classification JSON.
 ///
 /// # Errors
 ///
 /// Throws a JavaScript exception if `sectorsJson` is malformed, contains no
 /// sectors or a non-finite weight or return, portfolio or benchmark weights do
 /// not sum to one, or the result cannot be converted to a JavaScript value.
-#[wasm_bindgen(js_name = brinsonFachler)]
-pub fn brinson_fachler(sectors_json: JsValue) -> Result<JsValue, JsValue> {
+/// @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
+#[wasm_bindgen(js_name = brinsonFachler, unchecked_return_type = "BrinsonPeriodResult")]
+pub fn brinson_fachler(
+    #[wasm_bindgen(js_name = "sectorsJson", unchecked_param_type = "JsonInput")]
+    sectors_json: JsValue,
+) -> Result<JsValue, JsValue> {
     let sectors: Vec<finstack_quant_portfolio::brinson::SectorPeriod> =
         from_js_json(&sectors_json, "sectorsJson")?;
     let result = finstack_quant_portfolio::brinson::brinson_fachler(&sectors).map_err(to_js_err)?;
@@ -30,15 +34,19 @@ pub fn brinson_fachler(sectors_json: JsValue) -> Result<JsValue, JsValue> {
 /// returns a structured `CarinoLinkedAttribution` object whose linked effects
 /// reconstruct the geometrically compounded active return. To link raw sector
 /// inputs, attribute each period with `brinsonFachler` first.
-/// @param periods_json - Chronological JSON array of `BrinsonPeriodResult` objects with identical sector ordering in every period.
+/// @param periodsJson - Chronological JSON array of `BrinsonPeriodResult` objects with identical sector ordering in every period.
 ///
 /// # Errors
 ///
 /// Throws a JavaScript exception if `periodsJson` is malformed, the sequence is
 /// empty or changes sector ordering, or a period return is non-finite or at
 /// most `-1`.
-#[wasm_bindgen(js_name = carinoLink)]
-pub fn carino_link(periods_json: JsValue) -> Result<JsValue, JsValue> {
+/// @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
+#[wasm_bindgen(js_name = carinoLink, unchecked_return_type = "CarinoLinkedAttribution")]
+pub fn carino_link(
+    #[wasm_bindgen(js_name = "periodsJson", unchecked_param_type = "JsonInput")]
+    periods_json: JsValue,
+) -> Result<JsValue, JsValue> {
     let periods: Vec<finstack_quant_portfolio::brinson::BrinsonPeriodResult> =
         from_js_json(&periods_json, "periodsJson")?;
     let result = finstack_quant_portfolio::brinson::carino_link(&periods).map_err(to_js_err)?;
@@ -63,8 +71,11 @@ pub fn carino_link(periods_json: JsValue) -> Result<JsValue, JsValue> {
 /// sectors, a non-finite input, or weights not summing to one; the message
 /// names the zero-based period), the sector ordering changes between periods,
 /// or a period return is at most `-1` (kind `validation`).
-#[wasm_bindgen(js_name = brinsonLinked)]
-pub fn brinson_linked(periods: JsValue) -> Result<JsValue, JsValue> {
+/// @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
+#[wasm_bindgen(js_name = brinsonLinked, unchecked_return_type = "CarinoLinkedAttribution")]
+pub fn brinson_linked(
+    #[wasm_bindgen(unchecked_param_type = "generated.portfolio.SectorPeriod[][] | string")] periods: JsValue,
+) -> Result<JsValue, JsValue> {
     let periods: Vec<Vec<finstack_quant_portfolio::brinson::SectorPeriod>> =
         from_js_json(&periods, "periods")?;
     let result = finstack_quant_portfolio::brinson::brinson_linked(&periods).map_err(to_js_err)?;

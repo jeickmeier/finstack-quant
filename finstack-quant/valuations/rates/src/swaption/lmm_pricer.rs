@@ -7,7 +7,7 @@
 use crate::swaption::BermudanSwaption;
 use crate::swaption::BermudanType;
 use crate::swaption::bermudan::{apply_exercise_today, require_discount_curve, settled_result};
-use crate::swaption::pricing::lmm_bermudan::price_bermudan_lmm;
+use crate::swaption::pricing::lmm_bermudan::{LmmBermudanSwap, price_bermudan_lmm};
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::dates::{DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -361,11 +361,13 @@ impl Pricer for BermudanSwaptionLmmPricer {
         let estimate = price_bermudan_lmm(
             &lmm_params,
             &exercise_times,
-            strike,
-            is_payer,
-            notional,
-            df_terminal,
-            currency,
+            &LmmBermudanSwap {
+                strike,
+                payer: is_payer,
+                notional,
+                discount_factor_terminal: df_terminal,
+                currency,
+            },
             &self.config,
         )?;
 
@@ -398,18 +400,18 @@ mod tests {
         let as_of = date!(2025 - 01 - 02);
         let start = date!(2026 - 01 - 02);
         let end = date!(2031 - 01 - 02);
-        let mut option = BermudanSwaption::new(
-            "LMM-DOMAIN",
-            OptionType::Call,
-            Money::from((10_000_000_i64, Currency::USD)),
-            0.02,
-            start,
-            end,
-            BermudanSchedule::new(vec![start]),
-            "D",
-            "D",
-            "UNUSED",
-        )
+        let mut option = BermudanSwaption::new(crate::swaption::BermudanSwaptionParams {
+            id: "LMM-DOMAIN".into(),
+            option_type: OptionType::Call,
+            notional: Money::from((10_000_000_i64, Currency::USD)),
+            strike: 0.02,
+            underlying_start_date: start,
+            underlying_maturity: end,
+            exercise_schedule: BermudanSchedule::new(vec![start]),
+            discount_curve_id: "D".into(),
+            forward_curve_id: "D".into(),
+            vol_surface_id: "UNUSED".into(),
+        })
         .expect("valid contract");
         option.underlying_fixed_leg.frequency = Tenor::annual();
         option.underlying_fixed_leg.day_count = DayCount::Act360;

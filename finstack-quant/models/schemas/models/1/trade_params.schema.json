@@ -34,7 +34,8 @@
           "type": "number"
         },
         "observation_days": {
-          "description": "Observation window in trading days for volume/spread statistics.\n\nDefaults to 20 (one calendar month). Used to qualify the\nstatistical reliability of ADV and spread estimates.",
+          "default": 20,
+          "description": "Observation window in trading days for volume/spread statistics.\n\nDefaults to 20 (one calendar month) when omitted from the wire form.\nUsed to qualify the statistical reliability of ADV and spread\nestimates.",
           "format": "uint32",
           "minimum": 0,
           "type": "integer"
@@ -46,7 +47,8 @@
         },
         "spread_volatility_kind": {
           "$ref": "#/$defs/SpreadVolatilityKind",
-          "description": "Interpretation of [`Self::spread_volatility`]: relative or absolute."
+          "default": "relative",
+          "description": "Interpretation of [`Self::spread_volatility`]: relative or absolute\n(`relative` when omitted from the wire form)."
         }
       },
       "required": [
@@ -56,9 +58,7 @@
         "ask",
         "avg_daily_volume",
         "avg_trade_size",
-        "spread_volatility",
-        "spread_volatility_kind",
-        "observation_days"
+        "spread_volatility"
       ],
       "type": "object"
     },

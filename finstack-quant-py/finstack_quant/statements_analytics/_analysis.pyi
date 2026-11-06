@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 import pandas as pd
 from finstack_quant.statements import FinancialModelSpec, StatementResult
@@ -732,7 +733,15 @@ class GoalSeekResult:
     >>> _ = b.periods("2025Q1..Q1", None)
     >>> _ = b.value("revenue", [("2025Q1", 100.0)])
     >>> _ = b.compute("profit", "revenue * 0.5")
-    >>> result = goal_seek(b.build(), "profit", "2025Q1", 60.0, "revenue", "2025Q1", True)
+    >>> spec = {
+    ...     "target_node": "profit",
+    ...     "target_period": "2025Q1",
+    ...     "target_value": 60.0,
+    ...     "driver_node": "revenue",
+    ...     "driver_period": "2025Q1",
+    ...     "update_model": True,
+    ... }
+    >>> result = goal_seek(b.build(), spec)
     >>> round(result.solved_value, 6), result.model is None
     (120.0, False)
     >>> round(GoalSeekResult.from_json(result.to_json()).solved_value, 6)
@@ -1088,38 +1097,34 @@ def generate_tornado_entries(result: Any, metric_node: str, period: str) -> list
     ['revenue@2025Q2']
     """
 
-def goal_seek(
-    model: Any,
-    target_node: str,
-    target_period: str,
-    target_value: float,
-    driver_node: str,
-    driver_period: str,
-    update_model: bool,
-    bounds: tuple[float, float] | None = None,
-) -> GoalSeekResult:
+def goal_seek(model: Any, spec: Mapping[str, Any] | str) -> GoalSeekResult:
     """Find the driver value that makes a target node reach a target value.
 
     Parameters
     ----------
     model : FinancialModelSpec | str
         A ``FinancialModelSpec`` object or a JSON string.
-    target_node : str
-        Node to drive towards ``target_value``.
-    target_period : str
-        Period string for the target (e.g. ``"2025Q4"``).
-    target_value : float
-        Desired value for the target node.
-    driver_node : str
-        Node whose value is adjusted to reach the target.
-    driver_period : str
-        Period string for the driver.
-    update_model : bool
-        If ``True``, the result's ``model`` is a copy of ``model`` with the
-        solved value written in; if ``False`` it is ``None``. Required, as in
-        Rust and WASM.
-    bounds : tuple[float, float] | None
-        Optional search bracket ``(lo, hi)`` in the driver node's units.
+    spec : dict | str
+        The Rust ``GoalSeekSpec`` serde form (the document WASM ``goalSeek``
+        takes as ``spec``), as a dict or JSON text. Unknown keys raise
+        ``ValueError``:
+
+        * ``target_node`` (str, required): node to drive towards
+          ``target_value``.
+        * ``target_period`` (str, required): period string for the target
+          (e.g. ``"2025Q4"``).
+        * ``target_value`` (float, required): desired value for the target
+          node, in its units; must be finite.
+        * ``driver_node`` (str, required): node whose value is adjusted to
+          reach the target.
+        * ``driver_period`` (str, required): period string for the driver.
+        * ``update_model`` (bool, required): if ``True``, the result's
+          ``model`` is a copy of ``model`` with the solved value written in;
+          if ``False`` it is ``None``.
+        * ``bounds`` (tuple[float, float] | list[float] | None, optional):
+          search bracket ``(lo, hi)`` in the driver node's units, both finite
+          with ``lo < hi``; ``None`` (the default) searches outward from the
+          driver's current value.
 
     Returns
     -------
@@ -1132,10 +1137,10 @@ def goal_seek(
     Raises
     ------
     ValueError
-        If a period does not parse, ``target_node`` or ``driver_node`` is
-        missing, the solver fails to converge, the bracket does not contain a
-        root, or the final objective residual exceeds 1e-9 times
-        max(1, abs(target_value)).
+        If ``spec`` is malformed (a missing or unknown key included), a period
+        does not parse, ``target_node`` or ``driver_node`` is missing, the
+        solver fails to converge, the bracket does not contain a root, or the
+        final objective residual exceeds 1e-9 times max(1, abs(target_value)).
 
     Examples
     --------
@@ -1145,7 +1150,15 @@ def goal_seek(
     >>> _ = b.periods("2025Q1..Q1", None)
     >>> _ = b.value("revenue", [("2025Q1", 100.0)])
     >>> _ = b.compute("profit", "revenue * 0.5")
-    >>> round(goal_seek(b.build(), "profit", "2025Q1", 60.0, "revenue", "2025Q1", False).solved_value, 6)
+    >>> spec = {
+    ...     "target_node": "profit",
+    ...     "target_period": "2025Q1",
+    ...     "target_value": 60.0,
+    ...     "driver_node": "revenue",
+    ...     "driver_period": "2025Q1",
+    ...     "update_model": False,
+    ... }
+    >>> round(goal_seek(b.build(), spec).solved_value, 6)
     120.0
     """
 

@@ -241,17 +241,17 @@ test('floating horizons preserve opening-day and crossed fixings for every metho
     })
   );
   for (const issueDate of [origin, '2025-01-03']) {
-    const bond = valuations.instruments.Bond.floating(
-      'HORIZON-FRN',
-      new core.Money(1000000, new core.Currency('USD')),
-      'USD-SOFR-3M',
-      new core.Bps(150),
-      issueDate,
-      '2026-01-03',
-      core.Tenor.quarterly(),
-      core.DayCount.act360(),
-      'USD-OIS'
-    );
+    const bond = valuations.instruments.Bond.floating({
+      id: 'HORIZON-FRN',
+      notional: { amount: '1000000', currency: 'USD' },
+      forward_curve_id: 'USD-SOFR-3M',
+      spread_bp: 150,
+      issue_date: issueDate,
+      maturity: '2026-01-03',
+      frequency: { count: 3, unit: 'months' },
+      day_count: 'act_360',
+      discount_curve_id: 'USD-OIS',
+    });
     const original = bond.toJson();
     const envelope = JSON.parse(original);
     envelope.instrument.spec.cashflow_spec.floating.rate_spec.reset_lag_days = 0;

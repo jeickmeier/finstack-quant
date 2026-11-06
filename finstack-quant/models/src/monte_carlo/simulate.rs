@@ -101,6 +101,7 @@ use serde::{Deserialize, Serialize};
 
 mod fractional;
 #[cfg(test)]
+#[path = "simulate/tests/non_markov.rs"]
 mod non_markov_tests;
 #[cfg(test)]
 mod tests;

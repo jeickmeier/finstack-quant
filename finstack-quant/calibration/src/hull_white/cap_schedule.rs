@@ -134,5 +134,4 @@ pub(super) fn prepare_cap_floor_schedules(
 }
 
 #[cfg(test)]
-#[path = "cap_schedule_tests.rs"]
 mod tests;

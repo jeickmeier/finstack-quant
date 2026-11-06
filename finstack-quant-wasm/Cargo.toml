@@ -34,8 +34,9 @@ finstack-quant-portfolio = { path = "../finstack-quant/portfolio", version = "0.
 # also switches on `json-schema` (the per-crate schema registries) in each
 # domain crate above.
 finstack-quant = { path = "../finstack-quant", version = "0.11.0-dev.202610210600", default-features = false, features = ["jsonschema-validate"] }
-wasm-bindgen = "0.2.114"
-js-sys = "0.3"
+wasm-bindgen = "0.2.130"
+finstack-quant-wasm-macros = { path = "macros" }
+js-sys = "0.3.107"
 serde = { workspace = true }
 serde-wasm-bindgen = "0.6"
 serde_json = { workspace = true }
@@ -105,7 +106,3 @@ workspace = true
 [[test]]
 name = "wasm"
 path = "tests/wasm.rs"
-
-[[test]]
-name = "dts_contract"
-path = "tests/dts_contract.rs"

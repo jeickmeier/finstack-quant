@@ -34,8 +34,10 @@ where
 /// # Errors
 ///
 /// Throws a validation error for any other spelling, including `"SIMM"`.
-#[wasm_bindgen(js_name = imMethodologyFromStr)]
-pub fn im_methodology_from_str(s: JsValue) -> Result<String, JsValue> {
+#[wasm_bindgen(js_name = imMethodologyFromStr, unchecked_return_type = "ImMethodology")]
+pub fn im_methodology_from_str(
+    #[wasm_bindgen(unchecked_param_type = "string")] s: JsValue,
+) -> Result<String, JsValue> {
     Ok(parse_label::<fm::types::ImMethodology>(&s, "s")?.to_string())
 }
 
@@ -50,8 +52,10 @@ pub fn im_methodology_from_str(s: JsValue) -> Result<String, JsValue> {
 /// # Errors
 ///
 /// Throws a validation error for any other spelling.
-#[wasm_bindgen(js_name = marginTenorFromStr)]
-pub fn margin_tenor_from_str(s: JsValue) -> Result<String, JsValue> {
+#[wasm_bindgen(js_name = marginTenorFromStr, unchecked_return_type = "MarginTenor")]
+pub fn margin_tenor_from_str(
+    #[wasm_bindgen(unchecked_param_type = "string")] s: JsValue,
+) -> Result<String, JsValue> {
     Ok(parse_label::<fm::types::MarginTenor>(&s, "s")?.to_string())
 }
 
@@ -66,8 +70,10 @@ pub fn margin_tenor_from_str(s: JsValue) -> Result<String, JsValue> {
 /// # Errors
 ///
 /// Throws a validation error for any other spelling.
-#[wasm_bindgen(js_name = marginCallTypeFromStr)]
-pub fn margin_call_type_from_str(s: JsValue) -> Result<String, JsValue> {
+#[wasm_bindgen(js_name = marginCallTypeFromStr, unchecked_return_type = "MarginCallType")]
+pub fn margin_call_type_from_str(
+    #[wasm_bindgen(unchecked_param_type = "string")] s: JsValue,
+) -> Result<String, JsValue> {
     Ok(parse_label::<fm::types::MarginCallType>(&s, "s")?.to_string())
 }
 
@@ -82,8 +88,10 @@ pub fn margin_call_type_from_str(s: JsValue) -> Result<String, JsValue> {
 /// # Errors
 ///
 /// Throws a `TypeError` when `ccp` is not a string.
-#[wasm_bindgen(js_name = clearingStatusCleared)]
-pub fn clearing_status_cleared(ccp: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = clearingStatusCleared, unchecked_return_type = "ClearingStatus")]
+pub fn clearing_status_cleared(
+    #[wasm_bindgen(unchecked_param_type = "string")] ccp: JsValue,
+) -> Result<JsValue, JsValue> {
     let ccp = js_string(&ccp, "ccp")?;
     to_js_value(&fm::types::ClearingStatus::Cleared { ccp })
 }
@@ -99,13 +107,15 @@ pub fn clearing_status_cleared(ccp: JsValue) -> Result<JsValue, JsValue> {
 /// # Errors
 ///
 /// Throws a validation error for any other spelling.
-#[wasm_bindgen(js_name = collateralAssetClassFromStr)]
-pub fn collateral_asset_class_from_str(s: JsValue) -> Result<String, JsValue> {
+#[wasm_bindgen(js_name = collateralAssetClassFromStr, unchecked_return_type = "CollateralAssetClass")]
+pub fn collateral_asset_class_from_str(
+    #[wasm_bindgen(unchecked_param_type = "string")] s: JsValue,
+) -> Result<String, JsValue> {
     Ok(parse_label::<fm::types::CollateralAssetClass>(&s, "s")?.to_string())
 }
 
 /// BCBS-IOSCO standard haircut for a collateral asset class.
-/// @param asset_class - `CollateralAssetClass` wire label such as `"government_bonds"`.
+/// @param assetClass - `CollateralAssetClass` wire label such as `"government_bonds"`.
 /// @returns The haircut as a decimal fraction of collateral value (0.02 is 2%).
 ///
 /// # Errors
@@ -113,14 +123,17 @@ pub fn collateral_asset_class_from_str(s: JsValue) -> Result<String, JsValue> {
 /// Throws a validation error for an unknown label, or if the embedded margin
 /// registry cannot be loaded.
 #[wasm_bindgen(js_name = collateralAssetClassStandardHaircut)]
-pub fn collateral_asset_class_standard_haircut(asset_class: JsValue) -> Result<f64, JsValue> {
+pub fn collateral_asset_class_standard_haircut(
+    #[wasm_bindgen(js_name = "assetClass", unchecked_param_type = "CollateralAssetClass")]
+    asset_class: JsValue,
+) -> Result<f64, JsValue> {
     parse_label::<fm::types::CollateralAssetClass>(&asset_class, "assetClass")?
         .standard_haircut()
         .map_err(to_js_err)
 }
 
 /// Additional haircut applied when collateral and exposure currencies differ.
-/// @param asset_class - `CollateralAssetClass` wire label such as `"government_bonds"`.
+/// @param assetClass - `CollateralAssetClass` wire label such as `"government_bonds"`.
 /// @returns The FX add-on as a decimal fraction of collateral value (0.08 is 8%).
 ///
 /// # Errors
@@ -128,7 +141,10 @@ pub fn collateral_asset_class_standard_haircut(asset_class: JsValue) -> Result<f
 /// Throws a validation error for an unknown label, or if the embedded margin
 /// registry cannot be loaded.
 #[wasm_bindgen(js_name = collateralAssetClassFxAddon)]
-pub fn collateral_asset_class_fx_addon(asset_class: JsValue) -> Result<f64, JsValue> {
+pub fn collateral_asset_class_fx_addon(
+    #[wasm_bindgen(js_name = "assetClass", unchecked_param_type = "CollateralAssetClass")]
+    asset_class: JsValue,
+) -> Result<f64, JsValue> {
     parse_label::<fm::types::CollateralAssetClass>(&asset_class, "assetClass")?
         .fx_addon()
         .map_err(to_js_err)
@@ -139,17 +155,18 @@ pub fn collateral_asset_class_fx_addon(asset_class: JsValue) -> Result<f64, JsVa
 // ---------------------------------------------------------------------------
 
 /// Netting set identifier for a bilateral CSA relationship.
-/// @param counterparty_id - Counterparty identifier.
-/// @param csa_id - CSA agreement identifier.
+/// @param counterpartyId - Counterparty identifier.
+/// @param csaId - CSA agreement identifier.
 /// @returns The `NettingSetId` value `{ kind: "bilateral", counterparty_id, csa_id }`.
 ///
 /// # Errors
 ///
 /// Throws a `TypeError` when an argument is not a string.
-#[wasm_bindgen(js_name = nettingSetIdBilateral)]
+#[wasm_bindgen(js_name = nettingSetIdBilateral, unchecked_return_type = "NettingSetId")]
 pub fn netting_set_id_bilateral(
+    #[wasm_bindgen(js_name = "counterpartyId", unchecked_param_type = "string")]
     counterparty_id: JsValue,
-    csa_id: JsValue,
+    #[wasm_bindgen(js_name = "csaId", unchecked_param_type = "string")] csa_id: JsValue,
 ) -> Result<JsValue, JsValue> {
     let counterparty_id = js_string(&counterparty_id, "counterpartyId")?;
     let csa_id = js_string(&csa_id, "csaId")?;
@@ -157,14 +174,16 @@ pub fn netting_set_id_bilateral(
 }
 
 /// Netting set identifier for trades cleared through one CCP.
-/// @param ccp_id - CCP identifier; also used as the counterparty id.
+/// @param ccpId - CCP identifier; also used as the counterparty id.
 /// @returns The `NettingSetId` value `{ kind: "cleared", ccp_id }`.
 ///
 /// # Errors
 ///
 /// Throws a `TypeError` when `ccp_id` is not a string.
-#[wasm_bindgen(js_name = nettingSetIdCleared)]
-pub fn netting_set_id_cleared(ccp_id: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = nettingSetIdCleared, unchecked_return_type = "NettingSetId")]
+pub fn netting_set_id_cleared(
+    #[wasm_bindgen(js_name = "ccpId", unchecked_param_type = "string")] ccp_id: JsValue,
+) -> Result<JsValue, JsValue> {
     let ccp_id = js_string(&ccp_id, "ccpId")?;
     to_js_value(&fm::types::NettingSetId::cleared(ccp_id))
 }
@@ -186,7 +205,7 @@ pub(super) fn parse_csa(csa: &JsValue, label: &str) -> Result<fm::types::CsaSpec
 /// # Errors
 ///
 /// Throws if the embedded margin registry cannot be loaded.
-#[wasm_bindgen(js_name = csaSpecUsdRegulatory)]
+#[wasm_bindgen(js_name = csaSpecUsdRegulatory, unchecked_return_type = "CsaSpec")]
 pub fn csa_spec_usd_regulatory() -> Result<JsValue, JsValue> {
     to_js_value(&fm::types::CsaSpec::usd_regulatory().map_err(to_js_err)?)
 }
@@ -197,7 +216,7 @@ pub fn csa_spec_usd_regulatory() -> Result<JsValue, JsValue> {
 /// # Errors
 ///
 /// Throws if the embedded margin registry cannot be loaded.
-#[wasm_bindgen(js_name = csaSpecEurRegulatory)]
+#[wasm_bindgen(js_name = csaSpecEurRegulatory, unchecked_return_type = "CsaSpec")]
 pub fn csa_spec_eur_regulatory() -> Result<JsValue, JsValue> {
     to_js_value(&fm::types::CsaSpec::eur_regulatory().map_err(to_js_err)?)
 }
@@ -205,7 +224,7 @@ pub fn csa_spec_eur_regulatory() -> Result<JsValue, JsValue> {
 /// Regulatory CSA specification for any supported base currency.
 /// @param currency - ISO-4217 base currency of the agreement; every CSA amount is in it.
 /// @param id - Identifier stamped on the specification; must be non-empty (an empty or whitespace-only id is rejected).
-/// @param collateral_curve - Curve id used to discount and accrue interest on collateral, for example `"USD-OIS"`.
+/// @param collateralCurve - Curve id used to discount and accrue interest on collateral, for example `"USD-OIS"`.
 /// @returns The `CsaSpec` as a plain object.
 ///
 /// # Errors
@@ -213,11 +232,11 @@ pub fn csa_spec_eur_regulatory() -> Result<JsValue, JsValue> {
 /// Throws a `validation` error for an empty or whitespace-only id or an
 /// empty collateral curve; throws for an unknown currency, or if the embedded
 /// margin registry has no regulatory terms for it or cannot be loaded.
-#[wasm_bindgen(js_name = csaSpecRegulatory)]
+#[wasm_bindgen(js_name = csaSpecRegulatory, unchecked_return_type = "CsaSpec")]
 pub fn csa_spec_regulatory(
-    currency: JsValue,
-    id: JsValue,
-    collateral_curve: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    #[wasm_bindgen(js_name = "collateralCurve", unchecked_param_type = "string")] collateral_curve: JsValue,
 ) -> Result<JsValue, JsValue> {
     let currency = js_currency(&currency, "currency")?;
     let id = js_string(&id, "id")?;
@@ -234,19 +253,19 @@ pub fn csa_spec_regulatory(
 /// @param config - `FinstackConfig` handle whose `"margin.registry.v1"` extension (if any) overlays the embedded margin registry.
 /// @param currency - ISO-4217 base currency of the agreement; every CSA amount is in it.
 /// @param id - Identifier stamped on the specification; must be non-empty.
-/// @param collateral_curve - Curve id used to discount and accrue interest on collateral, for example `"USD-OIS"`.
+/// @param collateralCurve - Curve id used to discount and accrue interest on collateral, for example `"USD-OIS"`.
 /// @returns The `CsaSpec` as a plain object.
 ///
 /// # Errors
 ///
 /// Throws for an unknown currency or empty id, or if the overlay is
 /// malformed or fails registry validation.
-#[wasm_bindgen(js_name = csaSpecRegulatoryFromConfig)]
+#[wasm_bindgen(js_name = csaSpecRegulatoryFromConfig, unchecked_return_type = "CsaSpec")]
 pub fn csa_spec_regulatory_from_config(
     config: &JsFinstackConfig,
-    currency: JsValue,
-    id: JsValue,
-    collateral_curve: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    #[wasm_bindgen(js_name = "collateralCurve", unchecked_param_type = "string")] collateral_curve: JsValue,
 ) -> Result<JsValue, JsValue> {
     let currency = js_currency(&currency, "currency")?;
     let id = js_string(&id, "id")?;
@@ -262,19 +281,23 @@ pub fn csa_spec_regulatory_from_config(
 /// @param threshold - VM threshold in major units of the CSA base currency; exposure below it is uncollateralized.
 /// @param mta - Minimum transfer amount in major units of the CSA base currency.
 /// @param rounding - Optional rounding increment in major units of the base currency; omitted keeps the current one.
-/// @param independent_amount - Optional independent amount in major units of the base currency; omitted keeps the current one.
+/// @param independentAmount - Optional independent amount in major units of the base currency; omitted keeps the current one.
 /// @returns The updated `CsaSpec` as a plain object.
 ///
 /// # Errors
 ///
 /// Throws if `csa` is malformed or invalid, or an amount is non-finite,
 /// negative, or otherwise rejected by the CSA validation.
-#[wasm_bindgen(js_name = csaSpecWithVmThreshold)]
+#[wasm_bindgen(js_name = csaSpecWithVmThreshold, unchecked_return_type = "CsaSpec")]
 pub fn csa_spec_with_vm_threshold(
-    csa: JsValue,
-    threshold: JsValue,
-    mta: JsValue,
-    rounding: Option<JsValue>,
+    #[wasm_bindgen(unchecked_param_type = "CsaSpec | string")] csa: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] threshold: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] mta: JsValue,
+    #[wasm_bindgen(unchecked_optional_param_type = "number | null")] rounding: Option<JsValue>,
+    #[wasm_bindgen(
+        js_name = "independentAmount",
+        unchecked_optional_param_type = "number | null"
+    )]
     independent_amount: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let csa = parse_csa(&csa, "csa")?;
@@ -295,7 +318,7 @@ pub fn csa_spec_with_vm_threshold(
 /// Copy of a CSA with initial margin terms.
 /// @param csa - `CsaSpec` (object or JSON) to copy.
 /// @param methodology - `ImMethodology` wire label such as `"simm"` or `"schedule"`.
-/// @param mpor_days - Margin period of risk in business days.
+/// @param mporDays - Margin period of risk in business days.
 /// @param threshold - IM threshold in major units of the CSA base currency.
 /// @param mta - IM minimum transfer amount in major units of the CSA base currency.
 /// @param segregated - Whether posted IM is segregated and unavailable to meet VM; omitted keeps the margin-registry default for `methodology` (`true` for SIMM and schedule IM, `false` for clearing-house and haircut IM).
@@ -306,14 +329,14 @@ pub fn csa_spec_with_vm_threshold(
 /// Throws if `csa` is malformed or invalid, the methodology label is
 /// unknown, `mpor_days` is not a non-negative integer, or an amount is
 /// rejected by the CSA validation.
-#[wasm_bindgen(js_name = csaSpecWithIm)]
+#[wasm_bindgen(js_name = csaSpecWithIm, unchecked_return_type = "CsaSpec")]
 pub fn csa_spec_with_im(
-    csa: JsValue,
-    methodology: JsValue,
-    mpor_days: JsValue,
-    threshold: JsValue,
-    mta: JsValue,
-    segregated: Option<JsValue>,
+    #[wasm_bindgen(unchecked_param_type = "CsaSpec | string")] csa: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "ImMethodology")] methodology: JsValue,
+    #[wasm_bindgen(js_name = "mporDays", unchecked_param_type = "number")] mpor_days: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] threshold: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] mta: JsValue,
+    #[wasm_bindgen(unchecked_optional_param_type = "boolean | null")] segregated: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let csa = parse_csa(&csa, "csa")?;
     let methodology = parse_label::<fm::types::ImMethodology>(&methodology, "methodology")?;
@@ -332,18 +355,20 @@ pub fn csa_spec_with_im(
 /// Turns gross model IM into the collateral target after the CSA threshold
 /// and the signed, MTA-filtered transfer against the current balance.
 /// @param csa - `CsaSpec` (object or JSON) carrying initial margin terms.
-/// @param gross_initial_margin - Gross model IM before contractual terms, in major units of the CSA base currency.
-/// @param current_collateral - Existing balance of this one-way IM account, in major units of the CSA base currency.
+/// @param grossInitialMargin - Gross model IM before contractual terms, in major units of the CSA base currency.
+/// @param currentCollateral - Existing balance of this one-way IM account, in major units of the CSA base currency.
 /// @returns The `ImCollateralResult` as a plain object (Money amounts as `{amount, currency}`).
 ///
 /// # Errors
 ///
 /// Throws if `csa` is malformed, invalid or has no initial margin terms, or an
 /// amount is non-finite or negative.
-#[wasm_bindgen(js_name = csaSpecApplyImTerms)]
+#[wasm_bindgen(js_name = csaSpecApplyImTerms, unchecked_return_type = "ImCollateralResult")]
 pub fn csa_spec_apply_im_terms(
-    csa: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "CsaSpec | string")] csa: JsValue,
+    #[wasm_bindgen(js_name = "grossInitialMargin", unchecked_param_type = "number")]
     gross_initial_margin: JsValue,
+    #[wasm_bindgen(js_name = "currentCollateral", unchecked_param_type = "number")]
     current_collateral: JsValue,
 ) -> Result<JsValue, JsValue> {
     let csa = parse_csa(&csa, "csa")?;
@@ -360,7 +385,9 @@ pub fn csa_spec_apply_im_terms(
 /// Throws if `csa` is malformed, has unknown fields, mixes currencies, has a
 /// negative or non-finite amount, or names an unregistered calendar.
 #[wasm_bindgen(js_name = csaSpecValidate)]
-pub fn csa_spec_validate(csa: JsValue) -> Result<(), JsValue> {
+pub fn csa_spec_validate(
+    #[wasm_bindgen(unchecked_param_type = "CsaSpec | string")] csa: JsValue,
+) -> Result<(), JsValue> {
     parse_csa(&csa, "csa").map(|_| ())
 }
 
@@ -381,7 +408,7 @@ fn parse_schedule(
 /// # Errors
 ///
 /// Throws if the embedded margin registry cannot be loaded.
-#[wasm_bindgen(js_name = eligibleCollateralScheduleCashOnly)]
+#[wasm_bindgen(js_name = eligibleCollateralScheduleCashOnly, unchecked_return_type = "EligibleCollateralSchedule")]
 pub fn eligible_collateral_schedule_cash_only() -> Result<JsValue, JsValue> {
     to_js_value(&fm::types::EligibleCollateralSchedule::cash_only().map_err(to_js_err)?)
 }
@@ -392,7 +419,7 @@ pub fn eligible_collateral_schedule_cash_only() -> Result<JsValue, JsValue> {
 /// # Errors
 ///
 /// Throws if the embedded margin registry cannot be loaded.
-#[wasm_bindgen(js_name = eligibleCollateralScheduleBcbsStandard)]
+#[wasm_bindgen(js_name = eligibleCollateralScheduleBcbsStandard, unchecked_return_type = "EligibleCollateralSchedule")]
 pub fn eligible_collateral_schedule_bcbs_standard() -> Result<JsValue, JsValue> {
     to_js_value(&fm::types::EligibleCollateralSchedule::bcbs_standard().map_err(to_js_err)?)
 }
@@ -403,23 +430,23 @@ pub fn eligible_collateral_schedule_bcbs_standard() -> Result<JsValue, JsValue> 
 /// # Errors
 ///
 /// Throws if the embedded margin registry cannot be loaded.
-#[wasm_bindgen(js_name = eligibleCollateralScheduleUsTreasuries)]
+#[wasm_bindgen(js_name = eligibleCollateralScheduleUsTreasuries, unchecked_return_type = "EligibleCollateralSchedule")]
 pub fn eligible_collateral_schedule_us_treasuries() -> Result<JsValue, JsValue> {
     to_js_value(&fm::types::EligibleCollateralSchedule::us_treasuries().map_err(to_js_err)?)
 }
 
 /// Named eligible-collateral schedule from a config's margin-registry overlay.
 /// @param config - `FinstackConfig` handle whose `"margin.registry.v1"` extension (if any) overlays the embedded margin registry; configured schedules take precedence.
-/// @param schedule_id - Registry id of the schedule, e.g. `"bcbs_standard"`, `"cash_only"`, `"us_treasuries"` or an id the overlay adds.
+/// @param scheduleId - Registry id of the schedule, e.g. `"bcbs_standard"`, `"cash_only"`, `"us_treasuries"` or an id the overlay adds.
 /// @returns A copy of the merged registry's `EligibleCollateralSchedule` as a plain object.
 ///
 /// # Errors
 ///
 /// Throws if the overlay is malformed or `schedule_id` names no schedule.
-#[wasm_bindgen(js_name = eligibleCollateralScheduleFromFinstackConfig)]
+#[wasm_bindgen(js_name = eligibleCollateralScheduleFromFinstackConfig, unchecked_return_type = "EligibleCollateralSchedule")]
 pub fn eligible_collateral_schedule_from_finstack_config(
     config: &JsFinstackConfig,
-    schedule_id: JsValue,
+    #[wasm_bindgen(js_name = "scheduleId", unchecked_param_type = "string")] schedule_id: JsValue,
 ) -> Result<JsValue, JsValue> {
     let schedule_id = js_string(&schedule_id, "scheduleId")?;
     let schedule =
@@ -430,7 +457,7 @@ pub fn eligible_collateral_schedule_from_finstack_config(
 
 /// Whether a schedule accepts an asset class, by entry or through its default haircut.
 /// @param schedule - `EligibleCollateralSchedule` (object or JSON).
-/// @param asset_class - `CollateralAssetClass` wire label such as `"government_bonds"`.
+/// @param assetClass - `CollateralAssetClass` wire label such as `"government_bonds"`.
 /// @returns `true` when the asset class is listed or the schedule has a default haircut.
 ///
 /// # Errors
@@ -438,7 +465,8 @@ pub fn eligible_collateral_schedule_from_finstack_config(
 /// Throws if `schedule` is malformed or the asset class label is unknown.
 #[wasm_bindgen(js_name = eligibleCollateralScheduleIsEligible)]
 pub fn eligible_collateral_schedule_is_eligible(
-    schedule: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "EligibleCollateralSchedule | string")] schedule: JsValue,
+    #[wasm_bindgen(js_name = "assetClass", unchecked_param_type = "CollateralAssetClass")]
     asset_class: JsValue,
 ) -> Result<bool, JsValue> {
     let schedule = parse_schedule(&schedule, "schedule")?;
@@ -448,7 +476,7 @@ pub fn eligible_collateral_schedule_is_eligible(
 
 /// Haircut a schedule applies to an asset class.
 /// @param schedule - `EligibleCollateralSchedule` (object or JSON).
-/// @param asset_class - `CollateralAssetClass` wire label such as `"government_bonds"`.
+/// @param assetClass - `CollateralAssetClass` wire label such as `"government_bonds"`.
 /// @returns The haircut as a decimal fraction, or `undefined` when the asset class is not eligible.
 ///
 /// # Errors
@@ -456,7 +484,8 @@ pub fn eligible_collateral_schedule_is_eligible(
 /// Throws if `schedule` is malformed or the asset class label is unknown.
 #[wasm_bindgen(js_name = eligibleCollateralScheduleHaircutFor)]
 pub fn eligible_collateral_schedule_haircut_for(
-    schedule: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "EligibleCollateralSchedule | string")] schedule: JsValue,
+    #[wasm_bindgen(js_name = "assetClass", unchecked_param_type = "CollateralAssetClass")]
     asset_class: JsValue,
 ) -> Result<Option<f64>, JsValue> {
     let schedule = parse_schedule(&schedule, "schedule")?;
@@ -466,8 +495,8 @@ pub fn eligible_collateral_schedule_haircut_for(
 
 /// Haircut a schedule applies to an asset class at a given remaining maturity.
 /// @param schedule - `EligibleCollateralSchedule` (object or JSON).
-/// @param asset_class - `CollateralAssetClass` wire label such as `"government_bonds"`.
-/// @param remaining_years - Remaining maturity of the collateral in years.
+/// @param assetClass - `CollateralAssetClass` wire label such as `"government_bonds"`.
+/// @param remainingYears - Remaining maturity of the collateral in years.
 /// @returns The haircut as a decimal fraction, or `undefined` when no entry admits that maturity.
 ///
 /// # Errors
@@ -475,8 +504,10 @@ pub fn eligible_collateral_schedule_haircut_for(
 /// Throws if `schedule` is malformed or the asset class label is unknown.
 #[wasm_bindgen(js_name = eligibleCollateralScheduleHaircutForMaturity)]
 pub fn eligible_collateral_schedule_haircut_for_maturity(
-    schedule: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "EligibleCollateralSchedule | string")] schedule: JsValue,
+    #[wasm_bindgen(js_name = "assetClass", unchecked_param_type = "CollateralAssetClass")]
     asset_class: JsValue,
+    #[wasm_bindgen(js_name = "remainingYears", unchecked_param_type = "number")]
     remaining_years: JsValue,
 ) -> Result<Option<f64>, JsValue> {
     let schedule = parse_schedule(&schedule, "schedule")?;
@@ -494,9 +525,12 @@ pub fn eligible_collateral_schedule_haircut_for_maturity(
 ///
 /// Throws if `schedule` is malformed, `allocations` is not an array of
 /// `[string, number]` pairs, or an asset class label is unknown.
-#[wasm_bindgen(js_name = eligibleCollateralScheduleCheckConcentrationLimits)]
+#[wasm_bindgen(js_name = eligibleCollateralScheduleCheckConcentrationLimits, unchecked_return_type = "ConcentrationBreach[]")]
 pub fn eligible_collateral_schedule_check_concentration_limits(
-    schedule: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "EligibleCollateralSchedule | string")] schedule: JsValue,
+    #[wasm_bindgen(
+        unchecked_param_type = "readonly (readonly [CollateralAssetClass, number])[] | string"
+    )]
     allocations: JsValue,
 ) -> Result<JsValue, JsValue> {
     let schedule = parse_schedule(&schedule, "schedule")?;
@@ -527,7 +561,7 @@ pub fn eligible_collateral_schedule_check_concentration_limits(
 /// # Errors
 ///
 /// Throws if the value cannot be converted to a JavaScript value.
-#[wasm_bindgen(js_name = marginConstants)]
+#[wasm_bindgen(js_name = marginConstants, unchecked_return_type = "MarginConstants")]
 pub fn margin_constants() -> Result<JsValue, JsValue> {
     to_js_value(&fm::constants::MarginConstants::current())
 }

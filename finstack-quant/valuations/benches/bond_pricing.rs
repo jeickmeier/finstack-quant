@@ -265,15 +265,17 @@ fn create_floating_note(maturity_years: i32) -> Bond {
     let issue = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let maturity = Date::from_calendar_date(2025 + maturity_years, Month::January, 1).unwrap();
     let mut bond = Bond::floating(
-        format!("FRN-{}Y", maturity_years),
-        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-        "USD-SOFR-3M",
-        150,
-        issue,
-        maturity,
-        Tenor::quarterly(),
-        DayCount::Act360,
-        "USD-OIS",
+        finstack_quant_valuations::instruments::fixed_income::bond::FloatingBondParams {
+            id: format!("FRN-{}Y", maturity_years).into(),
+            notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            forward_curve_id: "USD-SOFR-3M".into(),
+            spread_bp: 150.into(),
+            issue_date: issue,
+            maturity,
+            frequency: Tenor::quarterly(),
+            day_count: DayCount::Act360,
+            discount_curve_id: "USD-OIS".into(),
+        },
     )
     .expect("Bond::floating should succeed with valid parameters");
     bond.instrument_pricing_overrides =
@@ -455,15 +457,17 @@ fn create_stochastic_hazard_callable(
     let maturity = Date::from_calendar_date(2025 + maturity_years, Month::January, 1).unwrap();
     let mut bond = if floating_pik {
         let mut bond = Bond::floating(
-            format!("FRN-PIK-CALL-{}Y", maturity_years),
-            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-            "USD-SOFR-3M",
-            200,
-            issue,
-            maturity,
-            Tenor::quarterly(),
-            DayCount::Act360,
-            "USD-OIS",
+            finstack_quant_valuations::instruments::fixed_income::bond::FloatingBondParams {
+                id: format!("FRN-PIK-CALL-{}Y", maturity_years).into(),
+                notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+                forward_curve_id: "USD-SOFR-3M".into(),
+                spread_bp: 200.into(),
+                issue_date: issue,
+                maturity,
+                frequency: Tenor::quarterly(),
+                day_count: DayCount::Act360,
+                discount_curve_id: "USD-OIS".into(),
+            },
         )
         .expect("floating PIK benchmark bond");
         if let CashflowSpec::Floating(spec) = &mut bond.cashflow_spec {

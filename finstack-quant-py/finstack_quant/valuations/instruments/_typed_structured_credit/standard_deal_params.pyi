@@ -46,13 +46,19 @@ class StandardDealParams:
     >>> from finstack_quant.valuations.instruments import StandardDealParams, StructuredCredit
     >>> deal = StructuredCredit.example()
     >>> params = StandardDealParams(
-    ...     deal.id, deal.pool, deal.tranches, deal.closing_date, deal.maturity, deal.discount_curve_id
+    ...     id=deal.id,
+    ...     pool=deal.pool,
+    ...     tranches=deal.tranches,
+    ...     closing_date=deal.closing_date,
+    ...     maturity=deal.maturity,
+    ...     discount_curve_id=deal.discount_curve_id,
     ... )
     >>> params.calendar_id is None
     True
     """
     def __init__(
         self,
+        *,
         id: str,
         pool: AssetPool,
         tranches: TrancheStructure,
@@ -63,6 +69,9 @@ class StandardDealParams:
     ) -> None:
         """Store standard-deal inputs without selecting assumptions.
 
+        Every field is keyword-only: Rust reads the keywords as the
+        ``StandardDealParams`` wire struct and rejects an unknown keyword.
+
         Parameters
         ----------
         id : str
@@ -71,12 +80,11 @@ class StandardDealParams:
             Collateral balances and terms in the pool currency.
         tranches : TrancheStructure
             Liability capital structure and coupon terms.
-        closing_date : datetime.date | datetime.datetime | pandas.Timestamp | str
-            Contractual inception date or ISO-8601 YYYY-MM-DD string. A timezone-aware
-            timestamp contributes its wall-clock date without timezone conversion.
-        maturity : datetime.date | datetime.datetime | pandas.Timestamp | str
+        closing_date : datetime.date | str
+            Contractual inception date or ISO-8601 YYYY-MM-DD string.
+        maturity : datetime.date | str
             Legal final date or ISO-8601 YYYY-MM-DD string, validated by ``new_standard``
-            to follow closing. Timezone-aware inputs retain their wall-clock date.
+            to follow closing.
         discount_curve_id : str
             Identifier of the market discount curve used for tranche valuation.
         calendar_id : str | None
@@ -86,9 +94,11 @@ class StandardDealParams:
         Raises
         ------
         ValueError
-            If a date string is malformed or its calendar components are invalid.
+            If a required field is missing, a keyword is unknown, or a date
+            string is malformed.
         TypeError
-            If either date is not a string or an object with integer year/month/day attributes.
+            If a positional argument is passed, or a value is not
+            JSON-encodable (neither a wire value nor a typed wrapper).
         """
         ...
     @property

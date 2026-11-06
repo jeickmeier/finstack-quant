@@ -2,8 +2,8 @@ import { checking, emit } from "../../scripts/fixture-output.mjs";
 import { native, readRepoJson } from "../../scripts/fixture-inputs.mjs";
 // The reporting_performance_tearsheet.ipynb panel: 756 business days from
 // 2023-01-02, fund 0.0008 + 0.012·sin(i/30), plus a slower benchmark wave.
-// Rounded to twelve decimal places to remove last-bit Math.sin differences
-// between JavaScript engines without materially changing the return series.
+// Rounded to six decimal places: Node patch releases disagree in the last
+// bits of Math.sin, and the fixture check compares those bits.
 const dates = [];
 for (let day = Date.UTC(2023, 0, 2); dates.length < 756; day += 86_400_000) {
   const weekday = new Date(day).getUTCDay();

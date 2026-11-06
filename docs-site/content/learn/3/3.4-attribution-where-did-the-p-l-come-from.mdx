@@ -144,7 +144,16 @@ fields=["carry","rates_curves_pnl","credit_curves_pnl","inflation_curves_pnl","c
 waterfall_totals=dict.fromkeys(fields,0.0);waterfall_totals["reporting_fx_translation"]=0.0
 instrument_rows=[]
 for iid,env in instruments("base").items():
- result=attribute_pnl(json.dumps(env),m0,m1,a0,a1,{"waterfall":default_waterfall_order()})
+ result=attribute_pnl(
+     json.dumps(env),
+     {
+         "market_t0": m0,
+         "market_t1": m1,
+         "as_of_t0": a0,
+         "as_of_t1": a1,
+         "method": {"waterfall":default_waterfall_order()},
+     },
+ )
  result_wire=json.loads(result.to_json())
  p0=price_instrument(json.dumps(env),m0,a0).value.amount
  p1=price_instrument(json.dumps(env),m1,a1).value.amount
@@ -158,7 +167,16 @@ actual_usd=sum(row["usd_pnl"] for row in instrument_rows)
 print(pd.DataFrame(instrument_rows).to_string(index=False))
 print("USD factor waterfall:",waterfall_totals)
 Path("book-pnl-waterfall.svg").write_text(waterfall_chart(list(waterfall_totals),list(waterfall_totals.values()),theme=INSTITUTIONAL))
-taylor=attribute_pnl(json.dumps(instruments("base")["USD-CORP"]),m0,m1,a0,a1,{"taylor":{"include_gamma":True,"rate_bump_bp":1.0,"credit_spread_bump_bp":1.0,"vol_bump":.01}})
+taylor=attribute_pnl(
+    json.dumps(instruments("base")["USD-CORP"]),
+    {
+        "market_t0": m0,
+        "market_t1": m1,
+        "as_of_t0": a0,
+        "as_of_t1": a1,
+        "method": {"taylor":{"include_gamma":True,"rate_bump_bp":1.0,"credit_spread_bump_bp":1.0,"vol_bump":.01}},
+    },
+)
 print("USD bond Taylor residual, USD:",taylor.residual)
 print("Taylor residual is disclosed approximation error, not added to explained factors as skill.")
 ```

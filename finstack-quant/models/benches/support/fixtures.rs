@@ -102,16 +102,18 @@ pub fn lookback_call(num_steps: usize) -> Lookback {
 pub fn barrier_up_out(num_steps: usize) -> BarrierOptionPayoff {
     let grid = TimeGrid::uniform(1.0, num_steps).expect("valid grid");
     BarrierOptionPayoff::new(
-        STRIKE,
-        120.0,
-        BarrierType::UpAndOut,
-        OptionType::Call,
-        None,
-        1.0,
-        num_steps,
-        VOL,
-        &grid,
-        BarrierMonitoring::Continuous { start_step: 0 },
+        finstack_quant_models::monte_carlo::payoff::barrier::BarrierOptionParams {
+            strike: STRIKE,
+            barrier: 120.0,
+            barrier_type: BarrierType::UpAndOut,
+            option_type: OptionType::Call,
+            rebate: None,
+            notional: 1.0,
+            maturity_step: num_steps,
+            sigma: VOL,
+            time_grid: &grid,
+            monitoring: BarrierMonitoring::Continuous { start_step: 0 },
+        },
     )
 }
 

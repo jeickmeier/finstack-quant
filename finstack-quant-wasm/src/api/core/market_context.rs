@@ -86,8 +86,11 @@ impl JsMarketContext {
     ///   required `schema_version: 1`. Unknown fields are rejected.
     /// @returns A `MarketContext` handle that can be reused across pricing calls; release it with free().
     /// @throws Error - Throws a `ContractValidationError` with kind `validation` when the JSON is malformed, exceeds the canonical byte or depth limits (`code` `limit_exceeded`), has a missing or unsupported schema version, or has invalid market objects, duplicate ids or unresolved curve references (`code` `report`, with the diagnostics on `error.report`), and a `TypeError` when `json` is neither a string nor a plain object.
+    /// @param json - Canonical MarketContext JSON (string or plain object), the same payload accepted by pricing `marketJson` arguments, with the required `schema_version: 1`. Unknown fields are rejected.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsMarketContext, JsValue> {
+    pub fn from_json(
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+    ) -> Result<JsMarketContext, JsValue> {
         let json: &str = &json_text(&json, "json")?;
         let (inner, _report) =
             MarketContext::from_state_slice(json.as_bytes(), &LoadLimits::default())
@@ -111,7 +114,7 @@ impl JsMarketContext {
     /// # Arguments
     ///
     /// * `curve` - The `DiscountCurve` to store; an item with the same id is replaced.
-    #[wasm_bindgen(js_name = insertDiscountCurve)]
+    #[wasm_bindgen(skip_typescript, js_name = insertDiscountCurve)]
     pub fn insert_discount_curve(&mut self, curve: &JsDiscountCurve) {
         self.context_mut().insert_mut(Arc::clone(&curve.inner));
     }
@@ -121,7 +124,7 @@ impl JsMarketContext {
     /// # Arguments
     ///
     /// * `curve` - The `ForwardCurve` to store; an item with the same id is replaced.
-    #[wasm_bindgen(js_name = insertForwardCurve)]
+    #[wasm_bindgen(skip_typescript, js_name = insertForwardCurve)]
     pub fn insert_forward_curve(&mut self, curve: &JsForwardCurve) {
         self.context_mut().insert_mut(Arc::clone(&curve.inner));
     }
@@ -131,7 +134,7 @@ impl JsMarketContext {
     /// # Arguments
     ///
     /// * `curve` - The `HazardCurve` to store; an item with the same id is replaced.
-    #[wasm_bindgen(js_name = insertHazardCurve)]
+    #[wasm_bindgen(skip_typescript, js_name = insertHazardCurve)]
     pub fn insert_hazard_curve(&mut self, curve: &JsHazardCurve) {
         self.context_mut().insert_mut(Arc::clone(&curve.inner));
     }
@@ -141,7 +144,7 @@ impl JsMarketContext {
     /// # Arguments
     ///
     /// * `curve` - The `InflationCurve` to store; an item with the same id is replaced.
-    #[wasm_bindgen(js_name = insertInflationCurve)]
+    #[wasm_bindgen(skip_typescript, js_name = insertInflationCurve)]
     pub fn insert_inflation_curve(&mut self, curve: &JsInflationCurve) {
         self.context_mut().insert_mut(Arc::clone(&curve.inner));
     }
@@ -151,7 +154,7 @@ impl JsMarketContext {
     /// # Arguments
     ///
     /// * `curve` - The `PriceCurve` to store; an item with the same id is replaced.
-    #[wasm_bindgen(js_name = insertPriceCurve)]
+    #[wasm_bindgen(skip_typescript, js_name = insertPriceCurve)]
     pub fn insert_price_curve(&mut self, curve: &JsPriceCurve) {
         self.context_mut().insert_mut(Arc::clone(&curve.inner));
     }
@@ -161,7 +164,7 @@ impl JsMarketContext {
     /// # Arguments
     ///
     /// * `curve` - The `BaseCorrelationCurve` to store; an item with the same id is replaced.
-    #[wasm_bindgen(js_name = insertBaseCorrelationCurve)]
+    #[wasm_bindgen(skip_typescript, js_name = insertBaseCorrelationCurve)]
     pub fn insert_base_correlation_curve(&mut self, curve: &JsBaseCorrelationCurve) {
         self.context_mut().insert_mut(Arc::clone(&curve.inner));
     }
@@ -171,7 +174,7 @@ impl JsMarketContext {
     /// # Arguments
     ///
     /// * `curve` - The `VolSurface` to store; an item with the same id is replaced.
-    #[wasm_bindgen(js_name = insertVolSurface)]
+    #[wasm_bindgen(skip_typescript, js_name = insertVolSurface)]
     pub fn insert_vol_surface(&mut self, curve: &JsVolSurface) {
         self.context_mut()
             .insert_surface_mut(Arc::clone(&curve.inner));
@@ -182,7 +185,7 @@ impl JsMarketContext {
     /// # Arguments
     ///
     /// * `curve` - The `FxDeltaVolSurface` to store; an item with the same id is replaced.
-    #[wasm_bindgen(js_name = insertFxDeltaVolSurface)]
+    #[wasm_bindgen(skip_typescript, js_name = insertFxDeltaVolSurface)]
     pub fn insert_fx_delta_vol_surface(&mut self, curve: &JsFxDeltaVolSurface) {
         self.context_mut()
             .insert_fx_delta_vol_surface_mut(Arc::clone(&curve.inner));
@@ -193,7 +196,7 @@ impl JsMarketContext {
     /// # Arguments
     ///
     /// * `curve` - The `VolCube` to store; an item with the same id is replaced.
-    #[wasm_bindgen(js_name = insertVolCube)]
+    #[wasm_bindgen(skip_typescript, js_name = insertVolCube)]
     pub fn insert_vol_cube(&mut self, curve: &JsVolCube) {
         self.context_mut()
             .insert_vol_cube_mut(Arc::clone(&curve.inner));
@@ -207,6 +210,7 @@ impl JsMarketContext {
     ///   and is shared, so later `setQuotes` calls on it are visible here.
     ///
     /// @returns This context, updated in place, so calls can be chained.
+    /// @param fx - FX matrix to attach; it replaces any matrix already attached and is shared, so later `setQuotes` calls on it are visible here.
     #[wasm_bindgen(js_name = insertFx)]
     pub fn insert_fx(&mut self, fx: &JsFxMatrix) {
         self.context_mut().insert_fx_mut(Arc::clone(&fx.inner));
@@ -227,12 +231,15 @@ impl JsMarketContext {
     /// @throws `TypeError` (kind `invalid_type`) for a mistyped argument;
     /// `FinstackError` (kind `validation`) for an unknown currency or a
     /// value that is not finite (Rust `MarketScalar::from_parts`).
+    /// @param id - Identifier to store the scalar under.
+    /// @param value - Finite scalar value: an index level, a spot price, a recovery assumption and so on.
+    /// @param currency - ISO-4217 code that makes the scalar a monetary price; omitted stores a unitless number.
     #[wasm_bindgen(js_name = insertPrice)]
     pub fn insert_price(
         &mut self,
-        id: JsValue,
-        value: JsValue,
-        currency: Option<JsValue>,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] value: JsValue,
+        #[wasm_bindgen(unchecked_optional_param_type = "string | null")] currency: Option<JsValue>,
     ) -> Result<(), JsValue> {
         let id = js_string(&id, "id")?;
         let scalar = MarketScalar::from_parts(
@@ -256,10 +263,12 @@ impl JsMarketContext {
     /// @throws `TypeError` if `id` is not a string; `FinstackError` (kind
     /// `validation`) if the constituent count, recovery or issuer coverage is
     /// invalid, or a curve the index needs is absent or of the wrong type.
+    /// @param id - Identifier of the index, such as `"CDX-IG-43"`.
+    /// @param data - Constituent count, recovery, index hazard curve and base-correlation curve of the index.
     #[wasm_bindgen(js_name = insertCreditIndex)]
     pub fn insert_credit_index(
         &mut self,
-        id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
         data: &JsCreditIndexData,
     ) -> Result<(), JsValue> {
         let id = js_string(&id, "id")?;
@@ -276,6 +285,7 @@ impl JsMarketContext {
     /// * `series` - Series to store; one with the same id is replaced.
     ///
     /// @returns This context, updated in place, so calls can be chained.
+    /// @param series - Series to store; one with the same id is replaced.
     #[wasm_bindgen(js_name = insertSeries)]
     pub fn insert_series(&mut self, series: &JsScalarTimeSeries) {
         self.context_mut().insert_series_mut(series.inner.clone());
@@ -289,6 +299,7 @@ impl JsMarketContext {
     /// * `index` - Inflation index to store; one with the same id is replaced.
     ///
     /// @returns This context, updated in place, so calls can be chained.
+    /// @param index - Inflation index to store; one with the same id is replaced.
     #[wasm_bindgen(js_name = insertInflationIndex)]
     pub fn insert_inflation_index(&mut self, index: &JsInflationIndex) {
         self.context_mut()
@@ -304,8 +315,12 @@ impl JsMarketContext {
     /// @returns The stored `DiscountCurve`; it shares the context's data.
     /// @throws `TypeError` if `id` is not a string; `FinstackError` (kind
     /// `not_found`) if no such item is stored under `id`.
+    /// @param id - Identifier the item was inserted under.
     #[wasm_bindgen(js_name = getDiscount)]
-    pub fn get_discount(&self, id: JsValue) -> Result<JsDiscountCurve, JsValue> {
+    pub fn get_discount(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    ) -> Result<JsDiscountCurve, JsValue> {
         self.inner
             .get_discount(js_string(&id, "id")?)
             .map(|inner| JsDiscountCurve { inner })
@@ -321,8 +336,12 @@ impl JsMarketContext {
     /// @returns The stored `ForwardCurve`; it shares the context's data.
     /// @throws `TypeError` if `id` is not a string; `FinstackError` (kind
     /// `not_found`) if no such item is stored under `id`.
+    /// @param id - Identifier the item was inserted under.
     #[wasm_bindgen(js_name = getForward)]
-    pub fn get_forward(&self, id: JsValue) -> Result<JsForwardCurve, JsValue> {
+    pub fn get_forward(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    ) -> Result<JsForwardCurve, JsValue> {
         self.inner
             .get_forward(js_string(&id, "id")?)
             .map(|inner| JsForwardCurve { inner })
@@ -338,8 +357,12 @@ impl JsMarketContext {
     /// @returns The stored `HazardCurve`; it shares the context's data.
     /// @throws `TypeError` if `id` is not a string; `FinstackError` (kind
     /// `not_found`) if no such item is stored under `id`.
+    /// @param id - Identifier the item was inserted under.
     #[wasm_bindgen(js_name = getHazard)]
-    pub fn get_hazard(&self, id: JsValue) -> Result<JsHazardCurve, JsValue> {
+    pub fn get_hazard(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    ) -> Result<JsHazardCurve, JsValue> {
         self.inner
             .get_hazard(js_string(&id, "id")?)
             .map(|inner| JsHazardCurve { inner })
@@ -355,8 +378,12 @@ impl JsMarketContext {
     /// @returns The stored `BaseCorrelationCurve`; it shares the context's data.
     /// @throws `TypeError` if `id` is not a string; `FinstackError` (kind
     /// `not_found`) if no such item is stored under `id`.
+    /// @param id - Identifier the item was inserted under.
     #[wasm_bindgen(js_name = getBaseCorrelation)]
-    pub fn get_base_correlation(&self, id: JsValue) -> Result<JsBaseCorrelationCurve, JsValue> {
+    pub fn get_base_correlation(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    ) -> Result<JsBaseCorrelationCurve, JsValue> {
         self.inner
             .get_base_correlation(js_string(&id, "id")?)
             .map(JsBaseCorrelationCurve::from_inner)
@@ -372,8 +399,12 @@ impl JsMarketContext {
     /// @returns The stored `InflationCurve`; it shares the context's data.
     /// @throws `TypeError` if `id` is not a string; `FinstackError` (kind
     /// `not_found`) if no such item is stored under `id`.
+    /// @param id - Identifier the item was inserted under.
     #[wasm_bindgen(js_name = getInflationCurve)]
-    pub fn get_inflation_curve(&self, id: JsValue) -> Result<JsInflationCurve, JsValue> {
+    pub fn get_inflation_curve(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    ) -> Result<JsInflationCurve, JsValue> {
         self.inner
             .get_inflation_curve(js_string(&id, "id")?)
             .map(JsInflationCurve::from_inner)
@@ -389,8 +420,12 @@ impl JsMarketContext {
     /// @returns The stored `PriceCurve`; it shares the context's data.
     /// @throws `TypeError` if `id` is not a string; `FinstackError` (kind
     /// `not_found`) if no such item is stored under `id`.
+    /// @param id - Identifier the item was inserted under.
     #[wasm_bindgen(js_name = getPriceCurve)]
-    pub fn get_price_curve(&self, id: JsValue) -> Result<JsPriceCurve, JsValue> {
+    pub fn get_price_curve(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    ) -> Result<JsPriceCurve, JsValue> {
         self.inner
             .get_price_curve(js_string(&id, "id")?)
             .map(JsPriceCurve::from_inner)
@@ -406,8 +441,12 @@ impl JsMarketContext {
     /// @returns The stored `PriceCurve`; it shares the context's data.
     /// @throws `TypeError` if `id` is not a string; `FinstackError` (kind
     /// `not_found`) if no such item is stored under `id`.
+    /// @param id - Identifier the item was inserted under.
     #[wasm_bindgen(js_name = getVolIndexCurve)]
-    pub fn get_vol_index_curve(&self, id: JsValue) -> Result<JsPriceCurve, JsValue> {
+    pub fn get_vol_index_curve(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    ) -> Result<JsPriceCurve, JsValue> {
         self.inner
             .get_vol_index_curve(js_string(&id, "id")?)
             .map(JsPriceCurve::from_inner)
@@ -423,8 +462,12 @@ impl JsMarketContext {
     /// @returns The stored `InflationIndex`; it shares the context's data.
     /// @throws `TypeError` if `id` is not a string; `FinstackError` (kind
     /// `not_found`) if no such item is stored under `id`.
+    /// @param id - Identifier the item was inserted under.
     #[wasm_bindgen(js_name = getInflationIndex)]
-    pub fn get_inflation_index(&self, id: JsValue) -> Result<JsInflationIndex, JsValue> {
+    pub fn get_inflation_index(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    ) -> Result<JsInflationIndex, JsValue> {
         self.inner
             .get_inflation_index(js_string(&id, "id")?)
             .map(JsInflationIndex::from_inner)
@@ -440,8 +483,12 @@ impl JsMarketContext {
     /// @returns The stored `VolSurface`; it shares the context's data.
     /// @throws `TypeError` if `id` is not a string; `FinstackError` (kind
     /// `not_found`) if no such item is stored under `id`.
+    /// @param id - Identifier the item was inserted under.
     #[wasm_bindgen(js_name = getSurface)]
-    pub fn get_surface(&self, id: JsValue) -> Result<JsVolSurface, JsValue> {
+    pub fn get_surface(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    ) -> Result<JsVolSurface, JsValue> {
         self.inner
             .get_surface(js_string(&id, "id")?)
             .map(JsVolSurface::from_inner)
@@ -457,8 +504,12 @@ impl JsMarketContext {
     /// @returns The stored `FxDeltaVolSurface`; it shares the context's data.
     /// @throws `TypeError` if `id` is not a string; `FinstackError` (kind
     /// `not_found`) if no such item is stored under `id`.
+    /// @param id - Identifier the item was inserted under.
     #[wasm_bindgen(js_name = getFxDeltaVolSurface)]
-    pub fn get_fx_delta_vol_surface(&self, id: JsValue) -> Result<JsFxDeltaVolSurface, JsValue> {
+    pub fn get_fx_delta_vol_surface(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    ) -> Result<JsFxDeltaVolSurface, JsValue> {
         self.inner
             .get_fx_delta_vol_surface(js_string(&id, "id")?)
             .map(|inner| JsFxDeltaVolSurface { inner })
@@ -474,8 +525,12 @@ impl JsMarketContext {
     /// @returns The stored `VolCube`; it shares the context's data.
     /// @throws `TypeError` if `id` is not a string; `FinstackError` (kind
     /// `not_found`) if no such item is stored under `id`.
+    /// @param id - Identifier the item was inserted under.
     #[wasm_bindgen(js_name = getVolCube)]
-    pub fn get_vol_cube(&self, id: JsValue) -> Result<JsVolCube, JsValue> {
+    pub fn get_vol_cube(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    ) -> Result<JsVolCube, JsValue> {
         self.inner
             .get_vol_cube(js_string(&id, "id")?)
             .map(|inner| JsVolCube { inner })
@@ -491,8 +546,12 @@ impl JsMarketContext {
     /// @returns The stored `CreditIndexData`; it shares the context's data.
     /// @throws `TypeError` if `id` is not a string; `FinstackError` (kind
     /// `not_found`) if no such item is stored under `id`.
+    /// @param id - Identifier the item was inserted under.
     #[wasm_bindgen(js_name = getCreditIndex)]
-    pub fn get_credit_index(&self, id: JsValue) -> Result<JsCreditIndexData, JsValue> {
+    pub fn get_credit_index(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    ) -> Result<JsCreditIndexData, JsValue> {
         self.inner
             .get_credit_index(js_string(&id, "id")?)
             .map(JsCreditIndexData::from_inner)
@@ -509,8 +568,12 @@ impl JsMarketContext {
     /// `{ price: { amount, currency } }` for a monetary price.
     /// @throws `TypeError` if `id` is not a string; `FinstackError` (kind
     /// `not_found`) if no scalar is stored under `id`.
-    #[wasm_bindgen(js_name = getPrice)]
-    pub fn get_price(&self, id: JsValue) -> Result<JsValue, JsValue> {
+    /// @param id - Identifier the scalar was inserted under.
+    #[wasm_bindgen(js_name = getPrice, unchecked_return_type = "MarketScalar")]
+    pub fn get_price(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let scalar = self
             .inner
             .get_price(js_string(&id, "id")?)
@@ -527,8 +590,12 @@ impl JsMarketContext {
     /// @returns A copy of the stored `ScalarTimeSeries`.
     /// @throws `TypeError` if `id` is not a string; `FinstackError` (kind
     /// `not_found`) if no series is stored under `id`.
+    /// @param id - Identifier the series was inserted under.
     #[wasm_bindgen(js_name = getSeries)]
-    pub fn get_series(&self, id: JsValue) -> Result<JsScalarTimeSeries, JsValue> {
+    pub fn get_series(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    ) -> Result<JsScalarTimeSeries, JsValue> {
         self.inner
             .get_series(js_string(&id, "id")?)
             .map(|series| JsScalarTimeSeries {
@@ -576,12 +643,15 @@ impl JsMarketContext {
     /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
     /// `not_found`) if no FX matrix is attached or the pair has no rate, or
     /// kind `validation` for a malformed date.
+    /// @param amount - Monetary amount to convert.
+    /// @param targetCurrency - Destination `Currency` object; an amount already in it is returned unchanged.
+    /// @param asOf - ISO-8601 date of the FX rate lookup.
     #[wasm_bindgen(js_name = convertMoney)]
     pub fn convert_money(
         &self,
         amount: &JsMoney,
-        target_currency: &JsCurrency,
-        as_of: JsValue,
+        #[wasm_bindgen(js_name = "targetCurrency")] target_currency: &JsCurrency,
+        #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
     ) -> Result<JsConvertedMoney, JsValue> {
         let as_of = js_date(&as_of, "asOf")?;
         self.inner
@@ -599,8 +669,12 @@ impl JsMarketContext {
     /// @returns `true` when a curve, surface, price, series, index, dividend
     /// schedule is registered under `id`.
     /// @throws `TypeError` if `id` is not a string.
+    /// @param id - Identifier to look for.
     #[wasm_bindgen(js_name = contains)]
-    pub fn contains(&self, id: JsValue) -> Result<bool, JsValue> {
+    pub fn contains(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    ) -> Result<bool, JsValue> {
         Ok(self.inner.contains(js_string(&id, "id")?))
     }
 
@@ -642,7 +716,7 @@ impl JsMarketContext {
     /// `credit_index_count`, `dividend_schedule_count` and
     /// `fx_delta_vol_surface_count`.
     /// @throws If the counts cannot be converted (not expected).
-    #[wasm_bindgen(js_name = stats)]
+    #[wasm_bindgen(js_name = stats, unchecked_return_type = "ContextStats")]
     pub fn stats(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner.stats())
     }
@@ -658,8 +732,12 @@ impl JsMarketContext {
     /// @returns A new `MarketContext`; this context is unchanged.
     /// @throws `TypeError` if `days` is not an integer; `FinstackError` if a
     /// curve cannot be rolled (for example no pillar remains).
+    /// @param days - Calendar days to advance each curve's base date; the curves keep their shape and drop expired pillars.
     #[wasm_bindgen(js_name = rollForward)]
-    pub fn roll_forward(&self, days: JsValue) -> Result<JsMarketContext, JsValue> {
+    pub fn roll_forward(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] days: JsValue,
+    ) -> Result<JsMarketContext, JsValue> {
         let days: i64 = js_int(&days, "days")?;
         self.inner
             .roll_forward(days)
@@ -698,6 +776,19 @@ impl JsMarketContext {
 /// const usd = new core.Currency("USD");
 /// const converted = market.convertMoney(new core.Money(100, new core.Currency("EUR")), usd, "2025-01-02");
 /// converted.rate?.triangulated; // false
+/// ```
+///
+/// @example
+/// ```typescript
+/// import init, { core } from "finstack-quant-wasm";
+/// await init();
+/// const fx = new core.FxMatrix();
+/// fx.setQuotes([["EUR", "USD", 1.1]]);
+/// const market = new core.MarketContext();
+/// market.insertFx(fx);
+/// const usd = new core.Currency("USD");
+/// const converted = market.convertMoney(new core.Money(100, new core.Currency("EUR")), usd, "2025-01-02");
+/// console.log(converted.amount.amount, converted.rate?.triangulated);
 /// ```
 #[wasm_bindgen(js_name = ConvertedMoney)]
 pub struct JsConvertedMoney {
@@ -744,8 +835,11 @@ impl JsConvertedMoney {
     ///
     /// @returns The parsed `ConvertedMoney`.
     /// @throws `FinstackError` (kind `validation`) if `json` is malformed or has unknown or missing fields.
+    /// @param json - Canonical ConvertedMoney JSON text or plain object; unknown fields are rejected.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsConvertedMoney, JsValue> {
+    pub fn from_json(
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+    ) -> Result<JsConvertedMoney, JsValue> {
         from_js_json::<ConvertedMoney>(&json, "json").map(|inner| JsConvertedMoney { inner })
     }
 }

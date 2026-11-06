@@ -22,8 +22,6 @@ notes.
   and market practice.
 - [Financial methodologies](decisions/financial/README.md): calculation-to-method
   inventory, adoption rationale, selection behavior, and open evidence gaps.
-- [`superpowers/specs/`](superpowers/specs/): design specs for planned or
-  recently landed work.
 - [`SERDE_STABILITY.md`](SERDE_STABILITY.md): canonical serde contract rules,
   source-of-truth policy, and reproducible generation requirements.
 - [`CONTRACTS.md`](CONTRACTS.md): current persisted-contract matrix, strict
@@ -73,14 +71,8 @@ mise run python-examples
   principles, and binding-change checklist.
 - [`../INVARIANTS.md`](../INVARIANTS.md): cross-crate numerical and API
   invariants that must hold across releases.
-- [`SERDE_STABILITY.md`](SERDE_STABILITY.md): wire-format and schema-version
-  policy for persisted payloads.
 - [`CONTRACTS.md`](CONTRACTS.md): maintained contract catalog, including
   generation and CI drift checks.
-- [`superpowers/specs/`](superpowers/specs/): design specs for planned or
-  recently implemented feature work.
-- [`superpowers/plans/`](superpowers/plans/): implementation plans. Do not edit
-  active plan files unless the current task explicitly requires it.
 - [`REMOVING_THE_UI.md`](REMOVING_THE_UI.md): how to remove the component
   registry without taking the quant engine or the analyst reader with it.
 

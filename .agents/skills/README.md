@@ -81,4 +81,4 @@ editing rather than reorganizing it.
 Add a new top-level skill only when the trigger, workflow, and output are all
 distinct. Otherwise add a reference, example, output, or eval to an existing
 skill. When adding one, update this table and
-[`CHANGELOG.md`](CHANGELOG.md) in the same change.
+[`changelog/unreleased.md`](../../changelog/unreleased.md) in the same change.

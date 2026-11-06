@@ -12,6 +12,7 @@ use crate::bindings::core::currency::PyCurrency;
 use crate::bindings::core::dates::periods::PyPeriod;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::py_to_date;
+use crate::bindings::module_utils::spec_from_py;
 use crate::bindings::pydoc::pydoc;
 use crate::errors::{core_to_py, statements_to_py, value_error};
 use finstack_quant_core::dates::{Period, PeriodId};
@@ -422,132 +423,43 @@ impl PyModelBuilder {
         Ok(slf)
     }
 
-    #[pyo3(
-        text_signature = "($self, id, notional, fixed_rate, start_date, maturity_date, discount_curve_id, forward_curve_id)"
-    )]
+    #[pyo3(text_signature = "($self, params)")]
     #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.add_swap")]
-    #[allow(clippy::too_many_arguments)]
     fn add_swap<'py>(
         mut slf: PyRefMut<'py, Self>,
-        id: &str,
-        notional: PyRef<'_, PyMoney>,
-        fixed_rate: f64,
-        start_date: &Bound<'_, PyAny>,
-        maturity_date: &Bound<'_, PyAny>,
-        discount_curve_id: &str,
-        forward_curve_id: &str,
+        params: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let notional = notional.inner;
-        let start = py_to_date(start_date)?;
-        let maturity = py_to_date(maturity_date)?;
-        let params = SwapParams {
-            id: id.to_string(),
-            notional,
-            fixed_rate,
-            start_date: start,
-            maturity_date: maturity,
-            discount_curve_id: discount_curve_id.to_string(),
-            forward_curve_id: forward_curve_id.to_string(),
-        };
+        let params: SwapParams = spec_from_py(params.py(), params, "SwapParams")?;
         slf.builder_mut()?
             .add_swap(params)
             .map_err(statements_to_py)?;
         Ok(slf)
     }
 
-    #[pyo3(
-        text_signature = "($self, id, notional, coupon_rate, issue_date, maturity_date, convention, discount_curve_id)"
-    )]
+    #[pyo3(text_signature = "($self, params)")]
     #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.add_bond_with_convention")]
-    #[allow(clippy::too_many_arguments)]
     fn add_bond_with_convention<'py>(
         mut slf: PyRefMut<'py, Self>,
-        id: &str,
-        notional: PyRef<'_, PyMoney>,
-        coupon_rate: f64,
-        issue_date: &Bound<'_, PyAny>,
-        maturity_date: &Bound<'_, PyAny>,
-        convention: &str,
-        discount_curve_id: &str,
+        params: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let notional = notional.inner;
-        let issue = py_to_date(issue_date)?;
-        let maturity = py_to_date(maturity_date)?;
-        let convention: finstack_quant_valuations::instruments::BondConvention =
-            finstack_quant_core::wire::serde_parse(convention).map_err(|e| {
-                value_error(format!(
-                    "invalid bond convention {convention:?}: {e}; expected one of \
-                     us_treasury, us_agency, german_bund, uk_gilt, french_oat, jgb, \
-                     us_corporate, eur_corporate"
-                ))
-            })?;
-        let rate = finstack_quant_core::types::Rate::from_decimal(coupon_rate)
-            .map_err(crate::errors::core_to_py)?;
-        let params = BondConventionParams {
-            id: id.to_string(),
-            notional,
-            coupon_rate: rate,
-            issue_date: issue,
-            maturity_date: maturity,
-            convention,
-            discount_curve_id: discount_curve_id.to_string(),
-        };
+        let params: BondConventionParams =
+            spec_from_py(params.py(), params, "BondConventionParams")?;
         slf.builder_mut()?
             .add_bond_with_convention(params)
             .map_err(statements_to_py)?;
         Ok(slf)
     }
 
-    #[pyo3(
-        signature = (id, notional, fixed_rate, start_date, maturity_date, discount_curve_id, forward_curve_id, fixed_frequency, fixed_day_count, float_frequency, float_day_count, business_day_convention=None),
-        text_signature = "($self, id, notional, fixed_rate, start_date, maturity_date, discount_curve_id, forward_curve_id, fixed_frequency, fixed_day_count, float_frequency, float_day_count, business_day_convention=None)"
-    )]
+    #[pyo3(text_signature = "($self, params, conventions)")]
     #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.add_swap_with_conventions")]
-    #[allow(clippy::too_many_arguments)]
     fn add_swap_with_conventions<'py>(
         mut slf: PyRefMut<'py, Self>,
-        id: &str,
-        notional: PyRef<'_, PyMoney>,
-        fixed_rate: f64,
-        start_date: &Bound<'_, PyAny>,
-        maturity_date: &Bound<'_, PyAny>,
-        discount_curve_id: &str,
-        forward_curve_id: &str,
-        fixed_frequency: &Bound<'_, PyAny>,
-        fixed_day_count: PyRef<'_, crate::bindings::core::dates::daycount::PyDayCount>,
-        float_frequency: &Bound<'_, PyAny>,
-        float_day_count: PyRef<'_, crate::bindings::core::dates::daycount::PyDayCount>,
-        business_day_convention: Option<&Bound<'_, PyAny>>,
+        params: &Bound<'_, PyAny>,
+        conventions: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let notional = notional.inner;
-        let start = py_to_date(start_date)?;
-        let maturity = py_to_date(maturity_date)?;
-        let fixed_frequency = crate::bindings::core::dates::tenor::extract_tenor(fixed_frequency)?;
-        let float_frequency = crate::bindings::core::dates::tenor::extract_tenor(float_frequency)?;
-        let fixed_day_count = fixed_day_count.inner;
-        let float_day_count = float_day_count.inner;
-        let resolved_business_day_convention = match business_day_convention {
-            Some(obj) => {
-                crate::bindings::core::dates::calendar::extract_business_day_convention(obj)?
-            }
-            None => finstack_quant_core::dates::BusinessDayConvention::default(),
-        };
-        let params = SwapParams {
-            id: id.to_string(),
-            notional,
-            fixed_rate,
-            start_date: start,
-            maturity_date: maturity,
-            discount_curve_id: discount_curve_id.to_string(),
-            forward_curve_id: forward_curve_id.to_string(),
-        };
-        let conventions = SwapConventions {
-            fixed_frequency,
-            fixed_day_count,
-            float_frequency,
-            float_day_count,
-            business_day_convention: resolved_business_day_convention,
-        };
+        let params: SwapParams = spec_from_py(params.py(), params, "SwapParams")?;
+        let conventions: SwapConventions =
+            spec_from_py(conventions.py(), conventions, "SwapConventions")?;
         slf.builder_mut()?
             .add_swap_with_conventions(params, conventions)
             .map_err(statements_to_py)?;

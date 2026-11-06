@@ -15,6 +15,17 @@ use wasm_bindgen::prelude::*;
 /// returned handle); `build()` validates the portfolio and returns a reusable
 /// `Portfolio`. Positions that name the standalone entity get it created
 /// automatically.
+///
+/// @example
+/// ```typescript
+/// const book = portfolio.Portfolio.builder("book", "USD", "2025-01-01")
+///   .name("Desk book")
+///   .entity({ id: "ACME", name: null })
+///   .tag("desk", "rates")
+///   .build();
+/// console.log(book.entityIds);
+/// book.free();
+/// ```
 #[wasm_bindgen(js_name = PortfolioBuilder)]
 pub struct JsPortfolioBuilder {
     inner: PortfolioBuilder,
@@ -50,7 +61,10 @@ impl JsPortfolioBuilder {
     /// # Errors
     ///
     /// Throws a `TypeError` (kind `invalid_type`) if `name` is not a string.
-    pub fn name(self, name: JsValue) -> Result<JsPortfolioBuilder, JsValue> {
+    pub fn name(
+        self,
+        #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
+    ) -> Result<JsPortfolioBuilder, JsValue> {
         let name = js_string(&name, "name")?;
         Ok(Self {
             inner: self.inner.name(name),
@@ -66,7 +80,10 @@ impl JsPortfolioBuilder {
     /// Throws a `TypeError` (kind `invalid_type`) if `entity` is not a JSON
     /// string or plain object, and a `FinstackError` (kind `validation`) if it
     /// does not match the `Entity` schema.
-    pub fn entity(self, entity: JsValue) -> Result<JsPortfolioBuilder, JsValue> {
+    pub fn entity(
+        self,
+        #[wasm_bindgen(unchecked_param_type = "Entity | string")] entity: JsValue,
+    ) -> Result<JsPortfolioBuilder, JsValue> {
         let entity: Entity = from_js_json(&entity, "entity")?;
         Ok(Self {
             inner: self.inner.entity(entity),
@@ -83,7 +100,10 @@ impl JsPortfolioBuilder {
     /// string or plain object, and a `FinstackError` (kind `validation`) if it
     /// does not match the `PositionSpec` schema, carries no `instrument_spec`,
     /// the instrument cannot be built, or `quantity` is not finite.
-    pub fn position(self, position: JsValue) -> Result<JsPortfolioBuilder, JsValue> {
+    pub fn position(
+        self,
+        #[wasm_bindgen(unchecked_param_type = "PositionSpec | string")] position: JsValue,
+    ) -> Result<JsPortfolioBuilder, JsValue> {
         let spec = from_js_json(&position, "position")?;
         let position = Position::from_spec(spec).map_err(to_js_err)?;
         Ok(Self {
@@ -100,7 +120,11 @@ impl JsPortfolioBuilder {
     ///
     /// Throws a `TypeError` (kind `invalid_type`) if either argument is not a
     /// string.
-    pub fn tag(self, key: JsValue, value: JsValue) -> Result<JsPortfolioBuilder, JsValue> {
+    pub fn tag(
+        self,
+        #[wasm_bindgen(unchecked_param_type = "string")] key: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] value: JsValue,
+    ) -> Result<JsPortfolioBuilder, JsValue> {
         let key = js_string(&key, "key")?;
         let value = js_string(&value, "value")?;
         Ok(Self {
@@ -118,7 +142,11 @@ impl JsPortfolioBuilder {
     /// Throws a `TypeError` (kind `invalid_type`) if `key` is not a string or
     /// `value` is not a JSON string or plain object, and a `FinstackError`
     /// (kind `validation`) if a string `value` is not valid JSON.
-    pub fn meta(self, key: JsValue, value: JsValue) -> Result<JsPortfolioBuilder, JsValue> {
+    pub fn meta(
+        self,
+        #[wasm_bindgen(unchecked_param_type = "string")] key: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] value: JsValue,
+    ) -> Result<JsPortfolioBuilder, JsValue> {
         let key = js_string(&key, "key")?;
         let value: serde_json::Value = from_js_json(&value, "value")?;
         Ok(Self {

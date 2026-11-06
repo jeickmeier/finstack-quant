@@ -262,14 +262,12 @@ impl PyRevolvingCreditBuilder {
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCreditBuilder.commitment")]
-    #[pyo3(signature = (value, currency=None))]
-    #[pyo3(text_signature = "($self, value, currency=None)")]
+    #[pyo3(text_signature = "($self, value)")]
     fn commitment<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
-        currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let money = money_from_py(value, currency, "commitment")?;
+        let money = money_from_py(value, "commitment")?;
         builder_set!(
             slf,
             commitment,
@@ -279,14 +277,12 @@ impl PyRevolvingCreditBuilder {
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCreditBuilder.drawn")]
-    #[pyo3(signature = (value, currency=None))]
-    #[pyo3(text_signature = "($self, value, currency=None)")]
+    #[pyo3(text_signature = "($self, value)")]
     fn drawn<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
-        currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let money = money_from_py(value, currency, "drawn")?;
+        let money = money_from_py(value, "drawn")?;
         builder_set!(
             slf,
             drawn,

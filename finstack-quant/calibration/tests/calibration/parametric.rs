@@ -515,9 +515,9 @@ fn parametric_delivered_curve_reprices_ois_with_payment_lag_analytically() {
             fixed_rate: 0.0,
             start_date,
             maturity,
-            index_id: "USD-SOFR-OIS",
-            discount_curve_id: "USD-NS-OIS",
-            forward_curve_id: "USD-NS-OIS",
+            index_id: "USD-SOFR-OIS".into(),
+            discount_curve_id: "USD-NS-OIS".into(),
+            forward_curve_id: "USD-NS-OIS".into(),
         })
         .expect("OIS contract");
         let fixed = &swap.fixed_leg;

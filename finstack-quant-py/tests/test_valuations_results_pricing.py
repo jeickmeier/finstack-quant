@@ -79,21 +79,21 @@ def _swap() -> InterestRateSwap:
     start = datetime.date(2024, 1, 17)
     end = datetime.date(2029, 1, 17)
     fixed = FixedLegSpec(
-        "USD-OIS",
-        0.04,
-        Tenor.semi_annual(),
-        DayCount.THIRTY_360,
-        start,
-        end,
+        discount_curve_id="USD-OIS",
+        rate="0.04",
+        frequency=Tenor.semi_annual(),
+        day_count=DayCount.THIRTY_360,
+        start=start,
+        end=end,
     )
     floating = FloatLegSpec(
-        "USD-OIS",
-        "USD-SOFR-3M",
-        0.0,
-        Tenor.quarterly(),
-        DayCount.ACT_360,
-        start,
-        end,
+        discount_curve_id="USD-OIS",
+        forward_curve_id="USD-SOFR-3M",
+        spread_bp="0",
+        frequency=Tenor.quarterly(),
+        day_count=DayCount.ACT_360,
+        start=start,
+        end=end,
     )
     return (
         InterestRateSwap
@@ -249,23 +249,23 @@ def test_validation_failure_raises_value_error() -> None:
         .side("pay")
         .fixed_leg(
             FixedLegSpec(
-                "USD-OIS",
-                0.04,
-                Tenor.semi_annual(),
-                DayCount.THIRTY_360,
-                start,
-                end,
+                discount_curve_id="USD-OIS",
+                rate="0.04",
+                frequency=Tenor.semi_annual(),
+                day_count=DayCount.THIRTY_360,
+                start=start,
+                end=end,
             )
         )
         .float_leg(
             FloatLegSpec(
-                "USD-OIS",
-                "USD-SOFR-3M",
-                0.0,
-                Tenor.quarterly(),
-                DayCount.ACT_360,
-                start,
-                end,
+                discount_curve_id="USD-OIS",
+                forward_curve_id="USD-SOFR-3M",
+                spread_bp="0",
+                frequency=Tenor.quarterly(),
+                day_count=DayCount.ACT_360,
+                start=start,
+                end=end,
             )
         )
         .build()
@@ -298,22 +298,29 @@ def test_price_instrument_keyword_and_typed_options() -> None:
     assert pickle.loads(pickle.dumps(opts)) == opts  # noqa: S301
     assert "theta_period='1W'" in repr(opts)
 
-    typed = price_instrument(_bond(), market, AS_OF, metrics=["theta"], metric_pricing_overrides=opts)
+    typed = price_instrument(_bond(), market, AS_OF, metrics=["theta"], extras={"metric_pricing_overrides": opts})
     as_dict = price_instrument(
         _bond(),
         market,
         AS_OF,
         metrics=["theta"],
-        metric_pricing_overrides={"theta_period": {"count": 1, "unit": "weeks"}, "theta_day_basis": "trading_252"},
+        extras={
+            "metric_pricing_overrides": {
+                "theta_period": {"count": 1, "unit": "weeks"},
+                "theta_day_basis": "trading_252",
+            }
+        },
     )
     as_str = price_instrument(
         _bond(),
         market,
         AS_OF,
         metrics=["theta"],
-        metric_pricing_overrides=json.dumps({
-            "theta_period": {"count": 1, "unit": "weeks"},
-            "theta_day_basis": "trading_252",
+        extras=json.dumps({
+            "metric_pricing_overrides": {
+                "theta_period": {"count": 1, "unit": "weeks"},
+                "theta_day_basis": "trading_252",
+            }
         }),
     )
     assert typed["theta"] == as_dict["theta"] == as_str["theta"]
@@ -357,9 +364,9 @@ def test_market_history_typed_twin() -> None:
     assert frame["shift"].tolist() == [0.001, -0.0005]
     assert (frame["type"] == "discount_rate").all()
 
-    typed = price_instrument(_bond(), _market(), AS_OF, metrics=["hvar"], market_history=history)
+    typed = price_instrument(_bond(), _market(), AS_OF, metrics=["hvar"], extras={"market_history": history})
     as_dict = price_instrument(
-        _bond(), _market(), AS_OF, metrics=["hvar"], market_history=json.loads(history.to_json())
+        _bond(), _market(), AS_OF, metrics=["hvar"], extras={"market_history": json.loads(history.to_json())}
     )
     assert typed["hvar"] == as_dict["hvar"]
 
@@ -444,7 +451,7 @@ def test_partial_metric_override_patch_retains_existing_theta_period(patch: dict
     baseline = price_instrument(raw, _market(), AS_OF, metrics=["theta"])
     prepared = json.loads(validate_instrument_json(raw, metric_pricing_overrides=patch))
     assert prepared["instrument"]["spec"]["metric_pricing_overrides"]["theta_period"] == period
-    patched = price_instrument(raw, _market(), AS_OF, metrics=["theta"], metric_pricing_overrides=patch)
+    patched = price_instrument(raw, _market(), AS_OF, metrics=["theta"], extras={"metric_pricing_overrides": patch})
     assert patched["theta"] == pytest.approx(baseline["theta"])
 
 
@@ -455,7 +462,7 @@ def test_explicit_null_metric_override_patch_clears_theta_period() -> None:
     }
     raw = json.dumps(document)
     patched = price_instrument(
-        raw, _market(), AS_OF, metrics=["theta"], metric_pricing_overrides={"theta_period": None}
+        raw, _market(), AS_OF, metrics=["theta"], extras={"metric_pricing_overrides": {"theta_period": None}}
     )
     baseline = price_instrument(_bond(), _market(), AS_OF, metrics=["theta"])
     assert patched["theta"] == pytest.approx(baseline["theta"])
@@ -486,11 +493,32 @@ def test_every_pricing_entry_point_accepts_the_same_metric_pricing_overrides_typ
     bond = _bond()
     typed = MetricPricingOverrides(theta_period="1W")
     as_dict = {"theta_period": {"count": 1, "unit": "weeks"}}
-    expected = price_instrument(bond, market, AS_OF, metrics=["theta"], metric_pricing_overrides=typed)["theta"]
+    expected = price_instrument(bond, market, AS_OF, metrics=["theta"], extras={"metric_pricing_overrides": typed})[
+        "theta"
+    ]
+    for extras in (
+        {"metric_pricing_overrides": typed},
+        {"metric_pricing_overrides": as_dict},
+        json.dumps({"metric_pricing_overrides": as_dict}),
+    ):
+        assert bond.price(market, AS_OF, metrics=["theta"], extras=extras)["theta"] == expected
+        assert price_instrument(bond.to_json(), market, AS_OF, metrics=["theta"], extras=extras)["theta"] == expected
     for value in (typed, as_dict, json.dumps(as_dict)):
-        assert bond.price(market, AS_OF, metrics=["theta"], metric_pricing_overrides=value)["theta"] == expected
         prepared = json.loads(validate_instrument_json(bond.to_json(), metric_pricing_overrides=value))
         assert prepared["instrument"]["spec"]["metric_pricing_overrides"]["theta_period"] == as_dict["theta_period"]
+
+
+def test_price_extras_rejects_unknown_keys_and_the_retired_keywords() -> None:
+    market = _market()
+    bond = _bond()
+    with pytest.raises(ValueError, match="PriceExtras"):
+        price_instrument(bond, market, AS_OF, extras={"explian": True})  # schema-rejection-test: unknown extras key
+    with pytest.raises(ValueError, match="PriceExtras"):
+        bond.price(market, AS_OF, extras='{"history": {}}')  # schema-rejection-test: unknown extras key
+    with pytest.raises(TypeError):
+        price_instrument(bond, market, AS_OF, explain=True)  # schema-rejection-test: retired kwarg explain
+    with pytest.raises(TypeError):
+        bond.price(market, AS_OF, market_history={})  # schema-rejection-test: retired kwarg market_history
 
 
 def test_pricing_entry_points_reject_retired_pricing_options_keyword() -> None:
@@ -529,7 +557,9 @@ def _rate_history() -> MarketHistory:
 def test_calculate_var_single_instrument_matches_hvar_metric() -> None:
     history = _rate_history()
     result = calculate_var([_bond()], _market(), history, AS_OF)
-    metric = price_instrument(_bond(), _market(), AS_OF, metrics=["hvar", "expected_shortfall"], market_history=history)
+    metric = price_instrument(
+        _bond(), _market(), AS_OF, metrics=["hvar", "expected_shortfall"], extras={"market_history": history}
+    )
 
     assert isinstance(result, VarResult)
     assert result.num_scenarios == 3

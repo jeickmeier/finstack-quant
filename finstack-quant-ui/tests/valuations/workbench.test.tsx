@@ -38,6 +38,7 @@ import { createModelsService } from "@/workers/services/models";
 import calibrationCases from "../calibration/cases.json";
 import marketScenarios from "../scenarios/application/cases.json";
 import { createClient } from "../shared/worker/client";
+import { priceExtras } from "../shared/price-extras.mjs";
 const bondDisplay = formatRawMoney(fixture.result.value);
 vi.mock(
   "@/hooks/shared/use-finstack/client",
@@ -244,8 +245,7 @@ beforeEach(() => {
             request.asOf,
             request.model,
             request.metrics,
-            request.metricPricingOverrides,
-            request.marketHistory,
+            priceExtras(request),
           );
         } catch (error) {
           throw new FinstackError(errorValue(error));

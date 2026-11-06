@@ -122,7 +122,9 @@ Shared conversion helpers are one level up in [`../utils/`](../utils): `to_js_va
 build artifact. A binding becomes public only when it is added to a facade file:
 
 ```
-src/api/<domain>/*.rs   →   exports/<domain>.js   →   index.js   →   index.d.ts
+src/api/<domain>/*.rs   →   exports/<domain>.js   →   index.js
+        ↓ (wasm-bindgen)                              ↓ (gen-facade-dts.mjs)
+pkg/finstack_quant_wasm.d.ts   ─────────────────→   index.d.ts
 ```
 
 The `Feeds` column above names the JS namespace, which is not always the filename.
@@ -143,12 +145,19 @@ makes the context of `DayCount.yearFraction` / `signedYearFraction` optional
 `FxMatrix.rate(base, quote, date, policy?)` (the Rust-default
 `new FxConversionPolicy()`, cashflow date). wasm-bindgen cannot take an optional handle by
 reference (and a by-value `Option<Handle>` consumes the caller's object), so
-optional handle arguments are completed here. Check the facade before
+optional handle arguments are completed here; the Rust parameter is declared
+optional with `unchecked_optional_param_type`. Check the facade before
 assuming a JS signature equals the Rust one.
 
-`index.d.ts` is hand-maintained and is the authoritative published contract. A new
-export that is not in it is invisible to TypeScript users, and
-`tests/dts_contract.rs` fails.
+The published TypeScript comes from this tree. The `#[wasm_bindgen]`
+attributes type every `JsValue` parameter and return (`unchecked_param_type`,
+`unchecked_optional_param_type`, `unchecked_return_type`) and give snake_case
+parameters a camelCase `js_name`; the Rustdoc above each item is its JSDoc.
+wasm-bindgen writes both into `pkg/finstack_quant_wasm.d.ts`, and
+`scripts/gen-facade-dts.mjs` (`mise run gen-write`) generates `index.d.ts` over
+it. Host-only types live in `../prelude.d.ts`, appended by the
+`typescript_custom_section` in `../lib.rs`. A raw method the facade replaces is
+marked `skip_typescript` so it is not declared.
 
 ## Structural rules
 
@@ -227,9 +236,20 @@ export that is not in it is invisible to TypeScript users, and
   `valuationResultToJson` turns such a result back into canonical JSON.
 
 - **Doc comments before the attribute.** Every JS-facing callable documents each
-  caller-supplied input with a substantive `@param` in its `///` block, placed
-  _above_ `#[wasm_bindgen]`. `scripts/check_wasm_api_input_docs.py` (via
-  `mise run wasm-doc`) enforces this.
+  caller-supplied input with a substantive `@param` (its camelCase name), its
+  return and its thrown kinds in its `///` block, placed _above_
+  `#[wasm_bindgen]`; each class carries a runnable `@example`.
+  `scripts/check-typescript-docs.mjs` (via `mise run wasm-doc`) checks the
+  resulting declarations.
+
+- **No `any`.** Every `JsValue` parameter and return carries its
+  `unchecked_*_type`; `tests/facade/typed_declarations.test.mjs` fails on any
+  `any` in the published declarations.
+
+- **Docs forwarded through `macro_rules!`.** rustc passes `///` lines given to a
+  macro invocation on as raw strings, which wasm-bindgen 0.2.130 prints with
+  their `r"` prefix. Put `#[finstack_quant_wasm_macros::plain_docs]` before the
+  `#[wasm_bindgen]` of the item the macro body emits.
 
 ## Adding a binding
 
@@ -237,9 +257,12 @@ export that is not in it is invisible to TypeScript users, and
    `pub mod` line if the domain warrants a split (only `core`, `analytics`,
    `portfolio`, `statements_analytics`, and `valuations` are split today).
 2. Give it a `js_name` matching the canonical Rust name, `///` docs with `@param`
-   per input, `to_js_value` for structured returns, and `to_js_err` for failures.
+   per input, `unchecked_*_type` on each `JsValue`, a camelCase `js_name` on each
+   snake_case parameter, `to_js_value` for structured returns, and `to_js_err`
+   for failures.
 3. Add it to the matching `../../exports/*.js` namespace.
-4. Declare it in `../../index.d.ts`.
+4. Run `mise run gen-write`: it regenerates `../../index.d.ts` and
+   `../../facade-surface.json`.
 5. Extend the matching `../../tests/wasm_*.rs` suite — the names track subject
    area, not domain (`wasm_math.rs`, `wasm_core_market_data.rs`,
    `wasm_credit_factor_hierarchy.rs`), so pick by content — and, where the JS
@@ -254,22 +277,21 @@ export that is not in it is invisible to TypeScript users, and
 
 `../../tests/` holds four layers, described in
 [`../../tests/README.md`](../../tests/README.md): `wasm_*.rs` (wasm-bindgen tests
-per domain), `dts_contract.rs` and `return_shapes.rs` (native, contract pins),
-`typescript/` (`tsc` compile checks under two `lib` targets), and `facade/`
-(Node test runner against the built package).
+per domain), `return_shapes.rs` and `boundary_signatures.rs` (native, source
+checks), `typescript/` (`tsc` compile checks of the declarations), and `facade/`
+(Node test runner against the built package and its declarations).
 
 ```bash
 mise run rust-lint     # clippy --workspace covers this crate
 mise run wasm-lint     # prettier + eslint + the to_js_value serializer check
-mise run wasm-doc      # @param completeness on every JS-facing callable
-mise run wasm-test     # wasm-pack test --node, then build web+node, then the facade tests
-mise run rust-test-integration -- finstack-quant-wasm dts_contract
+mise run wasm-doc      # JSDoc completeness and sample type checks on the declarations
+mise run wasm-test     # wasm-pack test --node, build web+node, facade and declaration tests
 mise run rust-test-filter -- finstack-quant-wasm return_shapes --integration wasm
 ```
 
-`mise run rust-test` runs this crate's lib tests and both native test targets:
-`dts_contract`, and the `wasm` binary, whose only host-runnable modules are
-`return_shapes` and `boundary_signatures`. The `wasm_*.rs` suites need a wasm
+`mise run rust-test` runs this crate's lib tests and its native `wasm` test
+binary, whose only host-runnable modules are `return_shapes` and
+`boundary_signatures`. The `wasm_*.rs` suites need a wasm
 runtime and come in through `mise run wasm-test`. Never run `cargo test`
 directly in this workspace.
 

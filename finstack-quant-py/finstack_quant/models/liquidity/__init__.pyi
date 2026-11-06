@@ -60,31 +60,46 @@ class LiquidityProfile:
         Non-negative average trade size in shares/contracts.
     spread_volatility : float
         Non-negative spread standard deviation; ``0.0`` when unavailable.
-    spread_volatility_kind : str, optional
-        ``"relative"`` or ``"absolute"``. ``None`` uses the Rust default
-        ``SpreadVolatilityKind::default()`` (``"relative"``).
-    observation_days : int, optional
-        Trading-day window behind the volume and spread statistics; at least 1.
-        ``None`` uses the Rust default
-        ``LiquidityProfile::DEFAULT_OBSERVATION_DAYS`` (20).
+    spread_volatility_kind : str
+        ``"relative"`` (default, the Rust ``SpreadVolatilityKind`` default)
+        or ``"absolute"``.
+    observation_days : int
+        Trading-day window behind the volume and spread statistics; at least 1
+        (default 20, ``LiquidityProfile::DEFAULT_OBSERVATION_DAYS``).
+
+    Every field is keyword-only: Rust reads the keywords as the
+    ``LiquidityProfile`` wire struct, supplies the two defaults and rejects
+    an unknown keyword.
 
     Raises
     ------
     ValueError
-        If a price is non-positive, the market is crossed, a statistic is
-        negative or non-finite, ``spread_volatility_kind`` is unknown, or
+        If a required field is missing, a keyword is unknown, a price is
+        non-positive, the market is crossed, a statistic is negative or
+        non-finite, ``spread_volatility_kind`` is unknown, or
         ``observation_days`` is 0.
+    TypeError
+        If a positional argument is passed.
 
     Examples
     --------
     >>> from finstack_quant.models.liquidity import LiquidityProfile
-    >>> profile = LiquidityProfile("ACME", 100.0, 99.95, 100.05, 1_000_000.0, 500.0, 0.0002)
+    >>> profile = LiquidityProfile(
+    ...     instrument_id="ACME",
+    ...     mid=100.0,
+    ...     bid=99.95,
+    ...     ask=100.05,
+    ...     avg_daily_volume=1_000_000.0,
+    ...     avg_trade_size=500.0,
+    ...     spread_volatility=0.0002,
+    ... )
     >>> (round(profile.spread, 6), round(profile.relative_spread, 6), profile.spread_volatility_kind)
     (0.1, 0.001, 'relative')
     """
 
     def __init__(
         self,
+        *,
         instrument_id: str,
         mid: float,
         bid: float,
@@ -92,8 +107,8 @@ class LiquidityProfile:
         avg_daily_volume: float,
         avg_trade_size: float,
         spread_volatility: float,
-        spread_volatility_kind: str | None = None,
-        observation_days: int | None = None,
+        spread_volatility_kind: str = "relative",
+        observation_days: int = 20,
     ) -> None: ...
     @property
     def instrument_id(self) -> str:
@@ -319,7 +334,15 @@ class LiquidityProfile:
         Examples
         --------
         >>> from finstack_quant.models.liquidity import LiquidityProfile
-        >>> p = LiquidityProfile("ACME", 100.0, 99.95, 100.05, 1e6, 500.0, 0.0)
+        >>> p = LiquidityProfile(
+        ...     instrument_id="ACME",
+        ...     mid=100.0,
+        ...     bid=99.95,
+        ...     ask=100.05,
+        ...     avg_daily_volume=1e6,
+        ...     avg_trade_size=500.0,
+        ...     spread_volatility=0.0,
+        ... )
         >>> LiquidityProfile.from_json(p.to_json()) == p
         True
         """
@@ -347,7 +370,15 @@ class LiquidityProfile:
         Examples
         --------
         >>> from finstack_quant.models.liquidity import LiquidityProfile
-        >>> p = LiquidityProfile("ACME", 100.0, 99.95, 100.05, 1e6, 500.0, 0.0)
+        >>> p = LiquidityProfile(
+        ...     instrument_id="ACME",
+        ...     mid=100.0,
+        ...     bid=99.95,
+        ...     ask=100.05,
+        ...     avg_daily_volume=1e6,
+        ...     avg_trade_size=500.0,
+        ...     spread_volatility=0.0,
+        ... )
         >>> LiquidityProfile.from_json(p.to_json()).instrument_id
         'ACME'
         """
@@ -399,7 +430,15 @@ class TradeParams:
     Examples
     --------
     >>> from finstack_quant.models.liquidity import LiquidityProfile, TradeParams
-    >>> profile = LiquidityProfile("ACME", 100.0, 99.95, 100.05, 1e6, 500.0, 0.0)
+    >>> profile = LiquidityProfile(
+    ...     instrument_id="ACME",
+    ...     mid=100.0,
+    ...     bid=99.95,
+    ...     ask=100.05,
+    ...     avg_daily_volume=1e6,
+    ...     avg_trade_size=500.0,
+    ...     spread_volatility=0.0,
+    ... )
     >>> params = TradeParams(10_000.0, 1.0, 0.02, profile)
     >>> params.effective_reference_price
     100.0
@@ -542,7 +581,15 @@ class TradeParams:
         Examples
         --------
         >>> from finstack_quant.models.liquidity import LiquidityProfile, TradeParams
-        >>> profile = LiquidityProfile("ACME", 100.0, 99.95, 100.05, 1e6, 500.0, 0.0)
+        >>> profile = LiquidityProfile(
+        ...     instrument_id="ACME",
+        ...     mid=100.0,
+        ...     bid=99.95,
+        ...     ask=100.05,
+        ...     avg_daily_volume=1e6,
+        ...     avg_trade_size=500.0,
+        ...     spread_volatility=0.0,
+        ... )
         >>> TradeParams.from_json(TradeParams(10.0, 1.0, 0.02, profile).to_json()).quantity
         10.0
         """
@@ -570,7 +617,15 @@ class TradeParams:
         Examples
         --------
         >>> from finstack_quant.models.liquidity import LiquidityProfile, TradeParams
-        >>> profile = LiquidityProfile("ACME", 100.0, 99.95, 100.05, 1e6, 500.0, 0.0)
+        >>> profile = LiquidityProfile(
+        ...     instrument_id="ACME",
+        ...     mid=100.0,
+        ...     bid=99.95,
+        ...     ask=100.05,
+        ...     avg_daily_volume=1e6,
+        ...     avg_trade_size=500.0,
+        ...     spread_volatility=0.0,
+        ... )
         >>> TradeParams.from_json(TradeParams(10.0, 1.0, 0.02, profile).to_json()).horizon_days
         1.0
         """
@@ -816,7 +871,15 @@ class ExecutionTrajectory:
     Examples
     --------
     >>> from finstack_quant.models.liquidity import KyleLambdaModel, LiquidityProfile, TradeParams
-    >>> profile = LiquidityProfile("ACME", 100.0, 99.95, 100.05, 1e6, 500.0, 0.0)
+    >>> profile = LiquidityProfile(
+    ...     instrument_id="ACME",
+    ...     mid=100.0,
+    ...     bid=99.95,
+    ...     ask=100.05,
+    ...     avg_daily_volume=1e6,
+    ...     avg_trade_size=500.0,
+    ...     spread_volatility=0.0,
+    ... )
     >>> traj = KyleLambdaModel(0.001).optimal_trajectory(TradeParams(1_000.0, 2.0, 0.02, profile), 4)
     >>> (len(traj.quantities), len(traj.remaining), traj.remaining[-1])
     (4, 5, 0.0)
@@ -921,7 +984,15 @@ class ExecutionTrajectory:
         Examples
         --------
         >>> from finstack_quant.models.liquidity import KyleLambdaModel, LiquidityProfile, TradeParams
-        >>> profile = LiquidityProfile("ACME", 100.0, 99.95, 100.05, 1e6, 500.0, 0.0)
+        >>> profile = LiquidityProfile(
+        ...     instrument_id="ACME",
+        ...     mid=100.0,
+        ...     bid=99.95,
+        ...     ask=100.05,
+        ...     avg_daily_volume=1e6,
+        ...     avg_trade_size=500.0,
+        ...     spread_volatility=0.0,
+        ... )
         >>> traj = KyleLambdaModel(0.001).optimal_trajectory(TradeParams(1_000.0, 2.0, 0.02, profile), 4)
         >>> traj.to_dataframe().columns.tolist()
         ['t', 'holdings', 'trade']
@@ -949,7 +1020,15 @@ class ExecutionTrajectory:
         ...     LiquidityProfile,
         ...     TradeParams,
         ... )
-        >>> profile = LiquidityProfile("ACME", 100.0, 99.95, 100.05, 1e6, 500.0, 0.0)
+        >>> profile = LiquidityProfile(
+        ...     instrument_id="ACME",
+        ...     mid=100.0,
+        ...     bid=99.95,
+        ...     ask=100.05,
+        ...     avg_daily_volume=1e6,
+        ...     avg_trade_size=500.0,
+        ...     spread_volatility=0.0,
+        ... )
         >>> traj = KyleLambdaModel(0.001).optimal_trajectory(TradeParams(1_000.0, 2.0, 0.02, profile), 2)
         >>> ExecutionTrajectory.from_json(traj.to_json()).quantities == traj.quantities
         True
@@ -1256,7 +1335,15 @@ class AlmgrenChrissModel:
         Examples
         --------
         >>> from finstack_quant.models.liquidity import AlmgrenChrissModel, LiquidityProfile
-        >>> profile = LiquidityProfile("ACME", 100.0, 99.95, 100.05, 1e6, 500.0, 0.0)
+        >>> profile = LiquidityProfile(
+        ...     instrument_id="ACME",
+        ...     mid=100.0,
+        ...     bid=99.95,
+        ...     ask=100.05,
+        ...     avg_daily_volume=1e6,
+        ...     avg_trade_size=500.0,
+        ...     spread_volatility=0.0,
+        ... )
         >>> AlmgrenChrissModel.from_profile(profile, 0.02).delta
         0.5
         """
@@ -1331,7 +1418,15 @@ class AlmgrenChrissModel:
         Examples
         --------
         >>> from finstack_quant.models.liquidity import AlmgrenChrissModel, LiquidityProfile, TradeParams
-        >>> profile = LiquidityProfile("ACME", 100.0, 99.95, 100.05, 1e6, 500.0, 0.0)
+        >>> profile = LiquidityProfile(
+        ...     instrument_id="ACME",
+        ...     mid=100.0,
+        ...     bid=99.95,
+        ...     ask=100.05,
+        ...     avg_daily_volume=1e6,
+        ...     avg_trade_size=500.0,
+        ...     spread_volatility=0.0,
+        ... )
         >>> model = AlmgrenChrissModel.from_profile(profile, 0.02)
         >>> model.estimate_cost(TradeParams(10_000.0, 1.0, 0.02, profile)).total_cost > 0.0
         True
@@ -1364,7 +1459,15 @@ class AlmgrenChrissModel:
         Examples
         --------
         >>> from finstack_quant.models.liquidity import AlmgrenChrissModel, LiquidityProfile, TradeParams
-        >>> profile = LiquidityProfile("ACME", 100.0, 99.95, 100.05, 1e6, 500.0, 0.0)
+        >>> profile = LiquidityProfile(
+        ...     instrument_id="ACME",
+        ...     mid=100.0,
+        ...     bid=99.95,
+        ...     ask=100.05,
+        ...     avg_daily_volume=1e6,
+        ...     avg_trade_size=500.0,
+        ...     spread_volatility=0.0,
+        ... )
         >>> model = AlmgrenChrissModel(1e-7, 1e-4, 1.0)
         >>> len(model.optimal_trajectory(TradeParams(10_000.0, 2.0, 0.02, profile), 4).quantities)
         4
@@ -1528,7 +1631,15 @@ class KyleLambdaModel:
         Examples
         --------
         >>> from finstack_quant.models.liquidity import KyleLambdaModel, LiquidityProfile, TradeParams
-        >>> profile = LiquidityProfile("ACME", 100.0, 99.95, 100.05, 1e6, 500.0, 0.0)
+        >>> profile = LiquidityProfile(
+        ...     instrument_id="ACME",
+        ...     mid=100.0,
+        ...     bid=99.95,
+        ...     ask=100.05,
+        ...     avg_daily_volume=1e6,
+        ...     avg_trade_size=500.0,
+        ...     spread_volatility=0.0,
+        ... )
         >>> KyleLambdaModel(0.001).estimate_cost(TradeParams(1_000.0, 1.0, 0.02, profile)).total_cost
         500.0
         """
@@ -1557,7 +1668,15 @@ class KyleLambdaModel:
         Examples
         --------
         >>> from finstack_quant.models.liquidity import KyleLambdaModel, LiquidityProfile, TradeParams
-        >>> profile = LiquidityProfile("ACME", 100.0, 99.95, 100.05, 1e6, 500.0, 0.0)
+        >>> profile = LiquidityProfile(
+        ...     instrument_id="ACME",
+        ...     mid=100.0,
+        ...     bid=99.95,
+        ...     ask=100.05,
+        ...     avg_daily_volume=1e6,
+        ...     avg_trade_size=500.0,
+        ...     spread_volatility=0.0,
+        ... )
         >>> KyleLambdaModel(0.001).optimal_trajectory(TradeParams(1_000.0, 2.0, 0.02, profile), 4).quantities
         [250.0, 250.0, 250.0, 250.0]
         """

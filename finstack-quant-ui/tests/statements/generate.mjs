@@ -47,17 +47,30 @@ await write(
 // illustrative assumptions in analyst-dcf-assumptions.json (the
 // dcf-assumptions-form shape; unset optional arguments stay unset).
 const dcf = JSON.parse(await read("analyst-dcf-assumptions.json"));
+const dcfOptions =
+  dcf.options === undefined ? undefined : JSON.stringify(dcf.options);
 const dcfArguments = [
   modelJson,
   dcf.wacc,
   dcf.terminalValue,
   dcf.ufcfNode,
   dcf.netDebtOverride,
-  dcf.options === undefined ? undefined : JSON.stringify(dcf.options),
+  dcfOptions,
 ];
 await write(
   "analyst-dcf.json",
-  serializeHost(native.evaluateDcf(...dcfArguments)),
+  serializeHost(
+    native.evaluateDcf(
+      modelJson,
+      {
+        wacc: dcf.wacc,
+        terminal_value: dcf.terminalValue,
+        ufcf_node: dcf.ufcfNode,
+        net_debt_override: dcf.netDebtOverride,
+      },
+      dcfOptions,
+    ),
+  ),
 );
 await write(
   "analyst-dcf-sensitivity.json",
@@ -106,16 +119,15 @@ const seek = JSON.parse(await read("analyst-goal-seek-run.json"));
 await write(
   "analyst-goal-seek.json",
   serializeHost(
-    native.goalSeek(
-      modelJson,
-      seek.targetNode,
-      seek.targetPeriod,
-      seek.targetValue,
-      seek.driverNode,
-      seek.driverPeriod,
-      false,
-      seek.bounds,
-    ),
+    native.goalSeek(modelJson, {
+      target_node: seek.targetNode,
+      target_period: seek.targetPeriod,
+      target_value: seek.targetValue,
+      driver_node: seek.driverNode,
+      driver_period: seek.driverPeriod,
+      update_model: false,
+      bounds: seek.bounds,
+    }),
   ),
 );
 // Since the last roll forward: the analyst model (actuals to 2025Q1) against

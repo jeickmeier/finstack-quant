@@ -477,7 +477,7 @@
       "sha256": "87db163cceafdeaab2506f39cc2f8c1265246f758c5f0cd7e433c5bbccaf3bca"
     },
     {
-      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/coverage_tests.rs",
+      "path": "finstack-quant/valuations/structured-credit/src/structured_credit/pricing/coverage.rs",
       "classification": "algorithm",
       "records": [
         "VALUATIONS-STRUCTURED-CREDIT-12",

@@ -1,12 +1,14 @@
 name: Checks
 
-# The fast tier: lint, generated-artifact drift, the uninstrumented fast tests
-# on all three surfaces, the component-registry check, and the supply-chain
-# audit, all in parallel after prime-cache. Budget: under 15 minutes wall clock on a warm master cache. No
-# coverage, doctests or slow tests; full-checks.yml runs those. Every job runs a
-# canonical mise task, so a failure reproduces locally with the same command
-# (`mise run all-ci` runs the set); the per-test time cap is CI-only and
-# reproduces with `NEXTEST_PROFILE=ci mise run rust-test`. pr.yml runs it for every pull request,
+# The fast tier, and `mise run all` split across runners: each job runs one
+# stage of `mise run all`, so change both together
+# (scripts/tests/test_gate_parity.py fails when they differ). Lint,
+# generated-artifact drift, the uninstrumented fast tests on all three
+# surfaces, the component-registry check, and the supply-chain audit, all in
+# parallel after prime-cache. Budget: under 15 minutes wall clock on a warm
+# master cache. No coverage, doctests or slow tests; full-checks.yml runs those.
+# The per-test time cap is CI-only and reproduces with
+# `NEXTEST_PROFILE=ci mise run rust-test`. pr.yml runs it for every pull request,
 # nightly.yml every night on master (saving the caches pull requests restore),
 # and release.yml as a gate for a tagged release.
 #
@@ -42,7 +44,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Provision toolchain (mise)
-        uses: jdx/mise-action@82a612c5ab8bcda7cc5db6b7e81a8e7584c3dc6e # v5.2.3
+        uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
         with:
           cache: true
           # Pull requests restore master's toolchain cache; a per-PR save is
@@ -72,7 +74,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Provision toolchain (mise)
-        uses: jdx/mise-action@82a612c5ab8bcda7cc5db6b7e81a8e7584c3dc6e # v5.2.3
+        uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
         with:
           cache: true
           cache_save: false
@@ -110,7 +112,7 @@ jobs:
           swap-size-gb: 10
 
       - name: Provision toolchain (mise)
-        uses: jdx/mise-action@82a612c5ab8bcda7cc5db6b7e81a8e7584c3dc6e # v5.2.3
+        uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
         with:
           cache: true
           cache_save: false
@@ -138,7 +140,7 @@ jobs:
       # Test Python is the single writer of the uv cache; every job syncs the
       # same uv.lock, so they share one key and concurrent saves would race.
       - name: Install uv
-        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           save-cache: false
 
@@ -163,10 +165,7 @@ jobs:
 
       # mise pre-commit-run uses `uv run --no-sync`. Plain `uv run` here used to
       # build the PyO3 extension (~20–25m) even though lint never needs it.
-      # Skip cargo-deny and osv-scanner here: the supply-chain job already owns them.
       - name: Run pre-commit checks
-        env:
-          SKIP: cargo-deny,osv-scanner
         run: mise run pre-commit-run
 
   # ============================================
@@ -193,7 +192,7 @@ jobs:
           swap-size-gb: 10
 
       - name: Provision toolchain (mise)
-        uses: jdx/mise-action@82a612c5ab8bcda7cc5db6b7e81a8e7584c3dc6e # v5.2.3
+        uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
         with:
           cache: true
           cache_save: false
@@ -211,7 +210,7 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/master' }}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           save-cache: false
 
@@ -219,10 +218,6 @@ jobs:
       - name: Install WASM dependencies
         run: npm ci --ignore-scripts
         working-directory: finstack-quant-wasm
-
-      # gen-check runs the registry generator in --check mode.
-      - name: Install component registry dependencies
-        run: mise run ui-sync
 
       - name: Set up Python environment
         run: |
@@ -259,7 +254,7 @@ jobs:
           swap-size-gb: 10
 
       - name: Provision toolchain (mise)
-        uses: jdx/mise-action@82a612c5ab8bcda7cc5db6b7e81a8e7584c3dc6e # v5.2.3
+        uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
         with:
           cache: true
           cache_save: false
@@ -308,7 +303,7 @@ jobs:
           swap-size-gb: 10
 
       - name: Provision toolchain (mise)
-        uses: jdx/mise-action@82a612c5ab8bcda7cc5db6b7e81a8e7584c3dc6e # v5.2.3
+        uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
         with:
           cache: true
           cache_save: false
@@ -326,7 +321,7 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/master' }}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           save-cache: ${{ github.ref == 'refs/heads/master' }}
 
@@ -373,7 +368,7 @@ jobs:
           swap-size-gb: 10
 
       - name: Provision toolchain (mise)
-        uses: jdx/mise-action@82a612c5ab8bcda7cc5db6b7e81a8e7584c3dc6e # v5.2.3
+        uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
         with:
           cache: true
           cache_save: false
@@ -435,7 +430,7 @@ jobs:
           swap-size-gb: 10
 
       - name: Provision toolchain (mise)
-        uses: jdx/mise-action@82a612c5ab8bcda7cc5db6b7e81a8e7584c3dc6e # v5.2.3
+        uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
         with:
           cache: true
           cache_save: false

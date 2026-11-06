@@ -15,19 +15,19 @@
 use crate::register_generic;
 pub use finstack_quant_valuations_core::pricer::*;
 
+mod catalog;
 mod json;
 
+pub use catalog::{
+    MetricCoordinate, MetricMetadata, list_models, list_models_grouped, list_standard_metrics,
+    list_standard_metrics_grouped, metric_metadata, metrics_for_instrument,
+};
 pub use json::{
-    EquityMetricsFieldUnits, MetricCoordinate, MetricFieldUnit, MetricMetadata, ParsedInstrument,
-    PoolReportFieldUnits, STANDARD_OPTION_GREEKS, ScenarioTableFieldUnits, SimulationFieldUnits,
-    TrancheSolveFieldUnits, bond_quote_set_field_units, equity_metrics_field_units,
-    instrument_envelope_from_spec, instrument_from_spec, list_models, list_models_grouped,
-    list_standard_metrics, list_standard_metrics_grouped, metric_metadata, metric_value,
-    metrics_for_instrument, parse_boxed_instrument_from_json, parse_boxed_instruments_from_json,
-    parse_instrument_from_json, parse_typed_instrument_json, pool_report_field_units,
+    ParsedInstrument, PriceExtras, STANDARD_OPTION_GREEKS, instrument_envelope_from_spec,
+    instrument_from_spec, metric_value, parse_boxed_instrument_from_json,
+    parse_boxed_instruments_from_json, parse_instrument_from_json, parse_typed_instrument_json,
     present_standard_option_greeks, pretty_instrument_json, price_instrument,
-    scenario_table_field_units, simulation_field_units, tranche_metric_field_units,
-    tranche_solve_field_units, validate_instrument_json, validate_typed_instrument_json,
+    validate_instrument_json, validate_typed_instrument_json,
 };
 
 use crate::instruments::credit_derivatives::CREDIT;

@@ -10,7 +10,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::closed_form::{bs_greeks_unchecked, bs_price_unchecked};
-use finstack_quant_models::types::OptionType;
+use finstack_quant_models::types::{OptionMarketParams, OptionType};
 
 const STRIKE_ZERO_TOL: f64 = 1e-12;
 
@@ -178,13 +178,15 @@ pub(crate) fn compute_greeks(
     }
 
     let greeks_unit = bs_greeks_unchecked(
-        spot,
-        inst.strike,
-        r_d,
-        r_f,
-        sigma,
-        t,
-        inst.option_type,
+        &OptionMarketParams {
+            spot,
+            strike: inst.strike,
+            rate: r_d,
+            volatility: sigma,
+            time_to_expiry: t,
+            dividend_yield: r_f,
+            option_type: inst.option_type,
+        },
         inst.metric_pricing_overrides.theta_days_per_year(),
     );
     let (d1, d2) = finstack_quant_models::closed_form::d1_d2(spot, inst.strike, r_d, sigma, t, r_f);

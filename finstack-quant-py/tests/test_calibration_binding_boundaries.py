@@ -1,6 +1,7 @@
 """Calibration bindings preserve canonical validation and loading limits."""
 
 from collections.abc import Callable
+import datetime
 import json
 
 import pytest
@@ -45,7 +46,8 @@ def test_swap_quote_preserves_finite_or_absent_spread(spread: float | None) -> N
     result = calibrate(
         CalibrationEnvelope(
             CalibrationPlan(
-                [CalibrationStep.discount("USD-OIS", "USD", "2026-09-30")], quote_sets={"USD-OIS": [quote.id]}
+                [CalibrationStep.discount("USD-OIS", {"currency": "USD", "base_date": "2026-09-30"})],
+                quote_sets={"USD-OIS": [quote.id]},
             ),
             market_data=[quote],
         )
@@ -58,36 +60,36 @@ def test_inflation_step_rejects_removed_seasonal_factors(seasonal_factors: objec
     with pytest.raises(ValueError, match="seasonal_factors"):
         CalibrationStep.inflation(
             "USD-CPI",
-            "USD",
-            "2026-09-30",
-            "USD-OIS",
-            "USA-CPI-U",
-            "3M",
-            320.0,
+            {
+                "currency": "USD",
+                "base_date": "2026-09-30",
+                "discount_curve_id": "USD-OIS",
+                "index": "USA-CPI-U",
+                "observation_lag": "3M",
+                "base_cpi": 320.0,
+                "seasonal_factors": seasonal_factors,
+            },
             quote_set="cpi-quotes",
-            seasonal_factors=seasonal_factors,
         )
 
 
 def test_cap_floor_step_preserves_required_index_and_rejects_frequency_override() -> None:
-    arguments = {
-        "id": "HW-CAPS",
+    params = {
         "discount_curve_id": "EUR-OIS",
         "forward_curve_id": "EUR-EURIBOR-3M",
         "index_id": "EUR-EURIBOR-3M",
         "currency": "EUR",
         "base_date": "2026-09-30",
-        "quote_set": "caps",
         "fit_tolerance": 1e-4,
     }
-    step = CalibrationStep.cap_floor_hull_white(**arguments)
+    step = CalibrationStep.cap_floor_hull_white("HW-CAPS", params, quote_set="caps")
     encoded = json.loads(step.to_json())
     assert encoded["index_id"] == "EUR-EURIBOR-3M"
     assert "payment_frequency" not in encoded
     assert CalibrationStep.from_json(step.to_json()).params["index_id"] == "EUR-EURIBOR-3M"
 
     with pytest.raises(ValueError, match="payment_frequency"):
-        CalibrationStep.cap_floor_hull_white(**arguments, payment_frequency="quarterly")
+        CalibrationStep.cap_floor_hull_white("HW-CAPS", {**params, "payment_frequency": "quarterly"}, quote_set="caps")
 
     del encoded["index_id"]
     with pytest.raises(ValueError, match="index_id"):
@@ -130,12 +132,23 @@ def test_omitted_optional_fields_take_the_rust_authoring_defaults_and_accept_non
     assert futures["convexity_adjustment"] == 0.0
     option = json.loads(VolQuote.option_vol("O", "AAPL", "2027-05-08", 155.0, 0.28, option_type=None).to_json())
     assert option["option_vol"]["option_type"] == "call"
-    hazard = CalibrationStep.hazard("ACME", "ACME", "USD", "2026-05-08", "USD-OIS", 0.4, seniority=None)
+    hazard = CalibrationStep.hazard(
+        "ACME",
+        {
+            "entity": "ACME",
+            "currency": "USD",
+            "base_date": "2026-05-08",
+            "discount_curve_id": "USD-OIS",
+            "recovery_rate": 0.4,
+            "seniority": None,
+        },
+    )
     assert hazard.params["seniority"] == "senior"
-    assert "model" not in CalibrationStep.vol_surface("V", "2026-05-08", "AAPL").params
+    surface = {"base_date": "2026-05-08", "underlying_ticker": "AAPL"}
+    assert "model" not in CalibrationStep.vol_surface("V", surface).params
     with pytest.raises(ValueError, match=r"unknown field.*model"):
-        CalibrationStep.vol_surface("V", "2026-05-08", "AAPL", model="sabr")
-    assert CalibrationStep.parametric("P", "2026-05-08", model=None).params["model"] == "ns"
+        CalibrationStep.vol_surface("V", {**surface, "model": "sabr"})
+    assert CalibrationStep.parametric("P", {"base_date": "2026-05-08", "model": None}).params["model"] == "ns"
 
 
 def test_hull_white_quote_flags_are_required() -> None:
@@ -159,14 +172,24 @@ def test_typed_market_data_feeds_the_envelope() -> None:
         RateQuote.swap("USD-SWAP-2Y", "USD-SOFR-OIS", "2Y", 0.049),
     ]
     plan = CalibrationPlan(
-        [CalibrationStep.discount("USD-OIS", "USD", "2026-05-08")],
+        [CalibrationStep.discount("USD-OIS", {"currency": "USD", "base_date": "2026-05-08"})],
         quote_sets={"USD-OIS": [quote.id for quote in quotes]},
     )
     data = [
         InflationQuote.inflation_swap("ZC5Y", "2031-05-08", 0.025, "USA-CPI-U", "USD"),
         InflationQuote.yoy_inflation_swap("YOY5Y", "2031-05-08", 0.024, "USA-CPI-U", "1Y", "USD"),
         XccyQuote("X5Y", "EUR-USD", "5Y", -12.5, spot_fx=1.1),
-        CdsTrancheQuote("IG-3-7", "CDX.NA.IG", 42, 0.03, 0.07, "2031-06-20", 0.01, 100.0, "USD", "isda_na"),
+        CdsTrancheQuote({
+            "id": "IG-3-7",
+            "index": "CDX.NA.IG",
+            "series": 42,
+            "attachment": 0.03,
+            "detachment": 0.07,
+            "maturity": "2031-06-20",
+            "upfront_pct": 0.01,
+            "coupon_bp": 100.0,
+            "convention": {"currency": "USD", "doc_clause": "isda_na"},
+        }),
         FxSpotDatum("EURUSD", "EUR", "USD", 1.1),
         PriceDatum("AAPL", 187.5),
         {"kind": "dividend_schedule", "id": "AAPL-DIVS", "underlying": "AAPL", "events": []},
@@ -202,7 +225,17 @@ def test_typed_quotes_expose_fields_and_reject_invalid_inputs() -> None:
     with pytest.raises(ValueError, match="spot_fx"):
         XccyQuote("X", "EUR-USD", "5Y", -12.5, spot_fx=-1.0)
     with pytest.raises(ValueError, match="attachment"):
-        CdsTrancheQuote("T", "CDX.NA.IG", 42, 0.08, 0.07, "2031-06-20", 0.01, 100.0, "USD", "isda_na")
+        CdsTrancheQuote({
+            "id": "T",
+            "index": "CDX.NA.IG",
+            "series": 42,
+            "attachment": 0.08,
+            "detachment": 0.07,
+            "maturity": "2031-06-20",
+            "upfront_pct": 0.01,
+            "coupon_bp": 100.0,
+            "convention": {"currency": "USD", "doc_clause": "isda_na"},
+        })
     cds = CdsQuote.par_spread("ACME-5Y", "ACME", "USD", "xr14", "5Y", 120.0, 0.4)
     assert (cds.entity, cds.recovery_rate) == ("ACME", 0.4)
     assert cds.convention == {"currency": "USD", "doc_clause": "xr14"}
@@ -283,27 +316,55 @@ def test_dividend_schedule_uses_direct_wire_fields() -> None:
         )
 
 
+class _CurrencyLike:
+    code = "USD"
+
+
+def test_calibration_currency_conversion_uses_the_core_contract() -> None:
+    def par_spread(currency: object) -> CdsQuote:
+        return CdsQuote.par_spread("CDS", "ACME", currency, "xr14", "5Y", 125.0, 0.4)
+
+    assert par_spread("USD").to_json() == par_spread(Currency("USD")).to_json()
+    with pytest.raises(TypeError, match="Currency or str"):
+        par_spread(_CurrencyLike())
+    with pytest.raises(ValueError, match=r"currency|Currency"):
+        par_spread("NOT-A-CURRENCY")
+
+
 @pytest.mark.parametrize(
     "factory",
     [
-        lambda currency: CalibrationStep.discount("USD-OIS", currency, "2026-05-08"),
-        lambda currency: CdsQuote.par_spread("CDS", "ACME", currency, "xr14", "5Y", 125.0, 0.4),
-        lambda currency: CdsQuote.upfront("CDS", "ACME", currency, "xr14", "5Y", 100.0, 0.01, 0.4),
-        lambda currency: CdsTrancheQuote(
-            "IG-3-7", "CDX.NA.IG", 42, 0.03, 0.07, "2031-06-20", 0.01, 100.0, currency, "isda_na"
-        ),
+        lambda currency: CalibrationStep.discount("USD-OIS", {"currency": currency, "base_date": "2026-05-08"}),
+        lambda currency: CdsQuote.upfront({
+            "id": "CDS",
+            "entity": "ACME",
+            "convention": {"currency": currency, "doc_clause": "xr14"},
+            "pillar": {"tenor": {"count": 5, "unit": "years"}},
+            "coupon_bp": 100.0,
+            "upfront_pct": 0.01,
+            "recovery_rate": 0.4,
+        }),
+        lambda currency: CdsTrancheQuote({
+            "id": "IG-3-7",
+            "index": "CDX.NA.IG",
+            "series": 42,
+            "attachment": 0.03,
+            "detachment": 0.07,
+            "maturity": "2031-06-20",
+            "upfront_pct": 0.01,
+            "coupon_bp": 100.0,
+            "convention": {"currency": currency, "doc_clause": "isda_na"},
+        }),
     ],
 )
-def test_calibration_currency_conversion_uses_the_core_contract(
+def test_calibration_params_objects_take_currency_wire_codes(
     factory: Callable[[object], CdsQuote | CdsTrancheQuote | CalibrationStep],
 ) -> None:
-    class CurrencyLike:
-        code = "USD"
-
+    """A params object takes the serde currency form; a ``Currency`` serializes to it."""
     assert factory("USD").to_json() == factory(Currency("USD")).to_json()
-    with pytest.raises(TypeError, match="Currency or str"):
-        factory(CurrencyLike())
-    with pytest.raises(ValueError, match=r"currency|Currency"):
+    with pytest.raises(TypeError, match="not JSON serializable"):
+        factory(_CurrencyLike())
+    with pytest.raises(ValueError, match="NOT-A-CURRENCY"):
         factory("NOT-A-CURRENCY")
 
 
@@ -328,3 +389,12 @@ def test_surface_calendar_uses_forward_moneyness() -> None:
     validate_calendar_spread(surface, ValidationConfig(tolerance=0.09), [100.0, 200.0])
     with pytest.raises(ValueError, match="volatility"):
         validate_surface(surface, ValidationConfig(check_arbitrage=False, max_volatility=0.1), [100.0, 200.0])
+
+
+def test_calibration_params_objects_take_python_dates() -> None:
+    """A ``datetime.date`` in a params object serializes to its ISO string."""
+    as_date = CalibrationStep.discount("D", {"currency": "USD", "base_date": datetime.date(2026, 5, 8)})
+    as_text = CalibrationStep.discount("D", {"currency": "USD", "base_date": "2026-05-08"})
+    assert as_date.to_json() == as_text.to_json()
+    with pytest.raises(ValueError, match="invalid discount step"):
+        CalibrationStep.discount("D", {"currency": "USD", "base_date": datetime.datetime(2026, 5, 8, 12)})

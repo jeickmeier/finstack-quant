@@ -118,6 +118,38 @@ pub struct ExercisePolicy {
     pub num_steps: usize,
 }
 
+/// Simulation and exercise inputs of one GBM LSMC run.
+///
+/// Shared by [`LsmcEngine::price`], [`LsmcEngine::fit_exercise_policy`],
+/// [`LsmcEngine::price_with_policy`] and [`LsmcEngine::price_unbiased`]; the
+/// two passes of the unbiased workflow reuse one value.
+pub struct LsmcInputs<'a, B: ?Sized> {
+    /// GBM process driving the simulated spot paths.
+    pub process: &'a GbmProcess,
+    /// Positive, finite initial spot level in payoff price units.
+    pub initial_spot: f64,
+    /// Remaining maturity in years on the model time axis; the paths use a
+    /// uniform grid of `num_steps` intervals over it.
+    pub time_to_maturity: f64,
+    /// Positive number of uniform time steps; also the last exercise date.
+    pub num_steps: usize,
+    /// Immediate exercise payoff (call or put intrinsic at a strike).
+    pub exercise: &'a AmericanExercise,
+    /// Regression basis used to approximate continuation values.
+    pub basis: &'a B,
+    /// Flat continuously compounded annual discount rate as a decimal,
+    /// applied as `exp(-discount_rate * t)`.
+    pub discount_rate: f64,
+}
+
+impl<B: ?Sized> Clone for LsmcInputs<'_, B> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<B: ?Sized> Copy for LsmcInputs<'_, B> {}
+
 #[derive(Clone, Copy)]
 struct PolicyTiming {
     discount_rate: f64,
@@ -393,7 +425,6 @@ fn fill_gbm_row(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn fill_gbm_antithetic_pair(
     disc: &ExactGbm,
     process: &GbmProcess,
@@ -401,8 +432,7 @@ fn fill_gbm_antithetic_pair(
     time_grid: &TimeGrid,
     num_steps: usize,
     path_rng: &mut PhiloxRng,
-    primary: &mut [f64],
-    anti: &mut [f64],
+    (primary, anti): (&mut [f64], &mut [f64]),
 ) {
     let mut state_p = [initial_spot];
     let mut state_a = [initial_spot];
@@ -564,9 +594,16 @@ impl LsmcPricer {
         let process = crate::monte_carlo::process::gbm::GbmParams::new(rate, div_yield, vol)
             .map(GbmProcess::new)?;
         let basis = lsmc_basis(basis, basis_degree, strike)?;
-        pricer.price(
-            &process, spot, expiry, num_steps, &exercise, &basis, currency, rate,
-        )
+        let inputs = LsmcInputs {
+            process: &process,
+            initial_spot: spot,
+            time_to_maturity: expiry,
+            num_steps,
+            exercise: &exercise,
+            basis: &basis,
+            discount_rate: rate,
+        };
+        pricer.price(&inputs, currency)
     }
 
     /// Two-pass unbiased American option price under GBM.
@@ -617,17 +654,16 @@ impl LsmcPricer {
         let process = crate::monte_carlo::process::gbm::GbmParams::new(rate, div_yield, vol)
             .map(GbmProcess::new)?;
         let basis = lsmc_basis(basis, basis_degree, strike)?;
-        pricer.price_unbiased(
-            &process,
-            spot,
-            expiry,
+        let inputs = LsmcInputs {
+            process: &process,
+            initial_spot: spot,
+            time_to_maturity: expiry,
             num_steps,
-            &exercise,
-            &basis,
-            currency,
-            rate,
-            pricing_seed,
-        )
+            exercise: &exercise,
+            basis: &basis,
+            discount_rate: rate,
+        };
+        pricer.price_unbiased(&inputs, currency, pricing_seed)
     }
 
     /// Resolve one pricing call's overrides against the construction-time
@@ -755,34 +791,28 @@ impl LsmcEngine {
     ///
     /// # Arguments
     ///
-    /// * `process` - Stochastic process
-    /// * `initial_spot` - Initial spot price
-    /// * `time_to_maturity` - Time to maturity
-    /// * `num_steps` - Number of time steps
-    /// * `exercise` - Immediate exercise payoff
-    /// * `basis` - Basis functions for regression
+    /// * `inputs` - GBM process, initial spot, maturity in years, step count,
+    ///   exercise payoff, regression basis and flat discount rate; see
+    ///   [`LsmcInputs`].
     /// * `currency` - Currency for result
-    /// * `discount_rate` - Risk-free rate for discounting
     ///
     /// # Returns
     ///
     /// Statistical estimate of the Bermudan value, including immediate exercise
     /// only when index `0` belongs to the exercise schedule.
-    #[allow(clippy::too_many_arguments)]
-    pub fn price<B>(
-        &self,
-        process: &GbmProcess,
-        initial_spot: f64,
-        time_to_maturity: f64,
-        num_steps: usize,
-        exercise: &AmericanExercise,
-        basis: &B,
-        currency: Currency,
-        discount_rate: f64,
-    ) -> Result<MoneyEstimate>
+    pub fn price<B>(&self, inputs: &LsmcInputs<'_, B>, currency: Currency) -> Result<MoneyEstimate>
     where
         B: BasisFunctions + ?Sized,
     {
+        let &LsmcInputs {
+            process,
+            initial_spot,
+            time_to_maturity,
+            num_steps,
+            exercise,
+            basis,
+            discount_rate,
+        } = inputs;
         let paths = self.generate_paths_with_seed(
             process,
             initial_spot,
@@ -837,7 +867,6 @@ impl LsmcEngine {
         let fill_chunk = |(path_id, rows): (usize, &mut [f64])| {
             let mut path_rng = rng.substream(path_id as u64);
             if antithetic {
-                let (primary, anti) = rows.split_at_mut(stride);
                 fill_gbm_antithetic_pair(
                     &disc,
                     process,
@@ -845,8 +874,7 @@ impl LsmcEngine {
                     &time_grid,
                     num_steps,
                     &mut path_rng,
-                    primary,
-                    anti,
+                    rows.split_at_mut(stride),
                 );
             } else {
                 fill_gbm_row(
@@ -911,27 +939,22 @@ impl LsmcEngine {
     ///
     /// # Arguments
     ///
-    /// * `process` - Stochastic process driving the simulated state variables over the grid
-    /// * `initial_spot` - Positive initial underlying spot level in the payoff currency.
-    /// * `time_to_maturity` - Remaining maturity in years on an ACT/365-style model time axis.
-    /// * `num_steps` - Positive number of time steps used to discretize the simulation horizon.
-    /// * `exercise` - Exercise policy that determines when the payoff may be realized.
-    /// * `basis` - Regression basis used to approximate continuation values.
-    /// * `discount_rate` - Continuously compounded annual discount rate in decimal units.
-    #[allow(clippy::too_many_arguments)]
-    pub fn fit_exercise_policy<B>(
-        &self,
-        process: &GbmProcess,
-        initial_spot: f64,
-        time_to_maturity: f64,
-        num_steps: usize,
-        exercise: &AmericanExercise,
-        basis: &B,
-        discount_rate: f64,
-    ) -> Result<ExercisePolicy>
+    /// * `inputs` - GBM process, initial spot, maturity in years, step count,
+    ///   exercise payoff, regression basis and flat discount rate of the
+    ///   training run; see [`LsmcInputs`].
+    pub fn fit_exercise_policy<B>(&self, inputs: &LsmcInputs<'_, B>) -> Result<ExercisePolicy>
     where
         B: BasisFunctions + ?Sized,
     {
+        let &LsmcInputs {
+            process,
+            initial_spot,
+            time_to_maturity,
+            num_steps,
+            exercise,
+            basis,
+            discount_rate,
+        } = inputs;
         let paths = self.generate_paths_with_seed(
             process,
             initial_spot,
@@ -969,33 +992,32 @@ impl LsmcEngine {
     ///
     /// # Arguments
     ///
-    /// * `process` - Stochastic process driving the simulated state variables over the grid
-    /// * `initial_spot` - Positive initial underlying spot level in the payoff currency.
-    /// * `time_to_maturity` - Remaining maturity in years on an ACT/365-style model time axis.
-    /// * `num_steps` - Positive number of time steps used to discretize the simulation horizon.
-    /// * `exercise` - Exercise policy that determines when the payoff may be realized.
-    /// * `basis` - Regression basis used to approximate continuation values.
-    /// * `policy` - Policy enum controlling error handling, unmatched keys, or fallbacks
+    /// * `inputs` - GBM process, initial spot, maturity in years, step count,
+    ///   exercise payoff, regression basis and flat discount rate of the
+    ///   pricing run; `num_steps` and the basis size must match `policy`. See
+    ///   [`LsmcInputs`].
+    /// * `policy` - Frozen exercise policy from [`Self::fit_exercise_policy`].
     /// * `currency` - ISO-4217 currency that defines scale, rounding, and display units
-    /// * `discount_rate` - Continuously compounded annual discount rate in decimal units.
     /// * `pricing_seed` - Deterministic random seed used to reproduce Monte Carlo paths.
-    #[allow(clippy::too_many_arguments)]
     pub fn price_with_policy<B>(
         &self,
-        process: &GbmProcess,
-        initial_spot: f64,
-        time_to_maturity: f64,
-        num_steps: usize,
-        exercise: &AmericanExercise,
-        basis: &B,
+        inputs: &LsmcInputs<'_, B>,
         policy: &ExercisePolicy,
         currency: Currency,
-        discount_rate: f64,
         pricing_seed: u64,
     ) -> Result<MoneyEstimate>
     where
         B: BasisFunctions + ?Sized,
     {
+        let &LsmcInputs {
+            process,
+            initial_spot,
+            time_to_maturity,
+            num_steps,
+            exercise,
+            basis,
+            discount_rate,
+        } = inputs;
         if !discount_rate.is_finite() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "LSMC discount_rate must be finite, got {discount_rate}"
@@ -1056,26 +1078,15 @@ impl LsmcEngine {
     ///
     /// # Arguments
     ///
-    /// * `process` - Stochastic process driving the simulated state variables over the grid
-    /// * `initial_spot` - Positive initial underlying spot level in the payoff currency.
-    /// * `time_to_maturity` - Remaining maturity in years on an ACT/365-style model time axis.
-    /// * `num_steps` - Positive number of time steps used to discretize the simulation horizon.
-    /// * `exercise` - Exercise policy that determines when the payoff may be realized.
-    /// * `basis` - Regression basis used to approximate continuation values.
+    /// * `inputs` - GBM process, initial spot, maturity in years, step count,
+    ///   exercise payoff, regression basis and flat discount rate shared by
+    ///   both passes; see [`LsmcInputs`].
     /// * `currency` - ISO-4217 currency that defines scale, rounding, and display units
-    /// * `discount_rate` - Continuously compounded annual discount rate in decimal units.
     /// * `pricing_seed` - Deterministic random seed used to reproduce Monte Carlo paths.
-    #[allow(clippy::too_many_arguments)]
     pub fn price_unbiased<B>(
         &self,
-        process: &GbmProcess,
-        initial_spot: f64,
-        time_to_maturity: f64,
-        num_steps: usize,
-        exercise: &AmericanExercise,
-        basis: &B,
+        inputs: &LsmcInputs<'_, B>,
         currency: Currency,
-        discount_rate: f64,
         pricing_seed: u64,
     ) -> Result<MoneyEstimate>
     where
@@ -1089,28 +1100,9 @@ impl LsmcEngine {
             ));
         }
 
-        let policy = self.fit_exercise_policy(
-            process,
-            initial_spot,
-            time_to_maturity,
-            num_steps,
-            exercise,
-            basis,
-            discount_rate,
-        )?;
+        let policy = self.fit_exercise_policy(inputs)?;
 
-        self.price_with_policy(
-            process,
-            initial_spot,
-            time_to_maturity,
-            num_steps,
-            exercise,
-            basis,
-            &policy,
-            currency,
-            discount_rate,
-            pricing_seed,
-        )
+        self.price_with_policy(inputs, &policy, currency, pricing_seed)
     }
 
     /// Fit continuation coefficients and retain the training-path values.
@@ -1471,7 +1463,18 @@ mod tests {
         let basis = PolynomialBasis::new(2).expect("valid regression basis");
 
         let result = pricer
-            .price(&gbm, 100.0, 1.0, 100, &put, &basis, Currency::USD, 0.05)
+            .price(
+                &LsmcInputs {
+                    process: &gbm,
+                    initial_spot: 100.0,
+                    time_to_maturity: 1.0,
+                    num_steps: 100,
+                    exercise: &put,
+                    basis: &basis,
+                    discount_rate: 0.05,
+                },
+                Currency::USD,
+            )
             .expect("LSMC pricing should succeed in test");
 
         assert!(result.mean.amount() > 0.0);
@@ -1496,7 +1499,18 @@ mod tests {
 
         let basis = PolynomialBasis::new(5).expect("valid regression basis");
 
-        let result = pricer.price(&gbm, 80.0, 1.0, 100, &put, &basis, Currency::USD, 0.05);
+        let result = pricer.price(
+            &LsmcInputs {
+                process: &gbm,
+                initial_spot: 80.0,
+                time_to_maturity: 1.0,
+                num_steps: 100,
+                exercise: &put,
+                basis: &basis,
+                discount_rate: 0.05,
+            },
+            Currency::USD,
+        );
 
         assert!(result.is_ok());
         let price = result.expect("LSMC pricing should succeed in test");
@@ -1523,7 +1537,18 @@ mod tests {
         };
         let basis = PolynomialBasis::new(3).expect("valid regression basis");
 
-        let result = pricer.price(&gbm, 100.0, 1.0, 100, &put, &basis, Currency::USD, 0.05);
+        let result = pricer.price(
+            &LsmcInputs {
+                process: &gbm,
+                initial_spot: 100.0,
+                time_to_maturity: 1.0,
+                num_steps: 100,
+                exercise: &put,
+                basis: &basis,
+                discount_rate: 0.05,
+            },
+            Currency::USD,
+        );
 
         assert!(result.is_ok());
         let price = result.expect("LSMC pricing should succeed in test");
@@ -1550,7 +1575,18 @@ mod tests {
         };
         let basis = PolynomialBasis::new(2).expect("valid regression basis");
 
-        let result = pricer.price(&gbm, 150.0, 0.5, 100, &put, &basis, Currency::USD, 0.05);
+        let result = pricer.price(
+            &LsmcInputs {
+                process: &gbm,
+                initial_spot: 150.0,
+                time_to_maturity: 0.5,
+                num_steps: 100,
+                exercise: &put,
+                basis: &basis,
+                discount_rate: 0.05,
+            },
+            Currency::USD,
+        );
 
         assert!(result.is_ok());
         let price = result.expect("LSMC pricing should succeed in test");
@@ -1619,14 +1655,16 @@ mod tests {
 
         let unbiased = pricer
             .price_unbiased(
-                &gbm,
-                100.0,
-                1.0,
-                100,
-                &put,
-                &basis,
+                &LsmcInputs {
+                    process: &gbm,
+                    initial_spot: 100.0,
+                    time_to_maturity: 1.0,
+                    num_steps: 100,
+                    exercise: &put,
+                    basis: &basis,
+                    discount_rate: 0.05,
+                },
                 Currency::USD,
-                0.05,
                 /* pricing_seed = */ 4243,
             )
             .expect("two-pass LSMC should succeed");
@@ -1645,14 +1683,16 @@ mod tests {
         let basis = PolynomialBasis::new(2).expect("valid regression basis");
 
         let result = pricer.price_unbiased(
-            &gbm,
-            100.0,
-            1.0,
-            20,
-            &put,
-            &basis,
+            &LsmcInputs {
+                process: &gbm,
+                initial_spot: 100.0,
+                time_to_maturity: 1.0,
+                num_steps: 20,
+                exercise: &put,
+                basis: &basis,
+                discount_rate: 0.05,
+            },
             Currency::USD,
-            0.05,
             /* pricing_seed = */ 7,
         );
         assert!(result.is_err());
@@ -1706,20 +1746,30 @@ mod tests {
         let basis_price = PolynomialBasis::new(3).expect("valid regression basis");
 
         let policy = pricer
-            .fit_exercise_policy(&gbm, 100.0, 1.0, 20, &put, &basis_train, 0.05)
+            .fit_exercise_policy(&LsmcInputs {
+                process: &gbm,
+                initial_spot: 100.0,
+                time_to_maturity: 1.0,
+                num_steps: 20,
+                exercise: &put,
+                basis: &basis_train,
+                discount_rate: 0.05,
+            })
             .unwrap();
 
         let err = pricer
             .price_with_policy(
-                &gbm,
-                100.0,
-                1.0,
-                20,
-                &put,
-                &basis_price,
+                &LsmcInputs {
+                    process: &gbm,
+                    initial_spot: 100.0,
+                    time_to_maturity: 1.0,
+                    num_steps: 20,
+                    exercise: &put,
+                    basis: &basis_price,
+                    discount_rate: 0.05,
+                },
                 &policy,
                 Currency::USD,
-                0.05,
                 999,
             )
             .expect_err("basis mismatch should be rejected");

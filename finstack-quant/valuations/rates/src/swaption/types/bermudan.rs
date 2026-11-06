@@ -96,6 +96,46 @@ pub struct BermudanSwaption {
     pub attributes: Attributes,
 }
 
+/// Inputs of [`BermudanSwaption::new`].
+///
+/// The underlying swap uses the USD-standard legs: semi-annual 30/360 fixed
+/// versus quarterly ACT/360 floating, with no holiday calendar; settlement is
+/// physical.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct BermudanSwaptionParams {
+    /// Unique instrument identifier.
+    pub id: InstrumentId,
+    /// `call` for a payer (right to pay fixed), `put` for a receiver (right
+    /// to receive fixed).
+    pub option_type: OptionType,
+    /// Swap notional; its currency is the payment currency.
+    pub notional: Money,
+    /// Fixed rate of the underlying swap as a decimal (0.03 = 3%).
+    pub strike: f64,
+    /// Effective date of the underlying swap.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub underlying_start_date: Date,
+    /// Maturity of the underlying swap (co-terminal for every exercise).
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub underlying_maturity: Date,
+    /// Exercise dates.
+    pub exercise_schedule: BermudanSchedule,
+    /// Discount curve for both legs.
+    pub discount_curve_id: CurveId,
+    /// Projection curve of the floating leg.
+    pub forward_curve_id: CurveId,
+    /// Swaption volatility cube.
+    pub vol_surface_id: CurveId,
+}
+
 impl BermudanSwaption {
     /// Parse a persisted `bermudan_swaption` instrument envelope.
     ///
@@ -271,50 +311,42 @@ impl BermudanSwaption {
     ///
     /// # Arguments
     ///
-    /// * `id` - Instrument identifier.
-    /// * `option_type` - [`OptionType::Call`] for a payer (right to pay fixed),
-    ///   [`OptionType::Put`] for a receiver (right to receive fixed).
-    /// * `notional` - Swap notional in the instrument currency.
-    /// * `strike` - Fixed rate of the underlying swap as a decimal (0.03 = 3%).
-    /// * `swap_start` - Effective date of the underlying swap.
-    /// * `swap_end` - Maturity of the underlying swap (co-terminal for every exercise).
-    /// * `exercise_schedule` - Exercise dates.
-    /// * `discount_curve_id` - Discount curve for both legs.
-    /// * `forward_curve_id` - Projection curve for the floating leg.
-    /// * `vol_surface_id` - Swaption volatility cube.
+    /// * `params` - Identifier, payer/receiver type, notional, strike,
+    ///   underlying swap dates, exercise schedule and curve ids; see
+    ///   [`BermudanSwaptionParams`].
     ///
     /// # Errors
     ///
     /// Returns an error if `strike` is not representable as `Decimal` (NaN or
     /// infinite) or the resulting instrument fails [`BermudanSwaption::validate`].
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        id: impl Into<InstrumentId>,
-        option_type: OptionType,
-        notional: Money,
-        strike: f64,
-        swap_start: Date,
-        swap_end: Date,
-        exercise_schedule: BermudanSchedule,
-        discount_curve_id: impl Into<CurveId>,
-        forward_curve_id: impl Into<CurveId>,
-        vol_surface_id: impl Into<CurveId>,
-    ) -> finstack_quant_core::Result<Self> {
+    pub fn new(params: BermudanSwaptionParams) -> finstack_quant_core::Result<Self> {
+        let BermudanSwaptionParams {
+            id,
+            option_type,
+            notional,
+            strike,
+            underlying_start_date: swap_start,
+            underlying_maturity: swap_end,
+            exercise_schedule,
+            discount_curve_id,
+            forward_curve_id,
+            vol_surface_id,
+        } = params;
         let strike = finstack_quant_core::decimal::f64_to_decimal(strike)?;
         let (underlying_fixed_leg, underlying_float_leg) =
             vanilla_underlier(VanillaSwaptionUnderlier::standard(
                 strike,
                 swap_start,
                 swap_end,
-                discount_curve_id.into(),
-                forward_curve_id.into(),
+                discount_curve_id,
+                forward_curve_id,
             ));
         let swaption = Self {
-            id: id.into(),
+            id,
             option_type,
             notional,
             settlement: SettlementType::Physical,
-            vol_surface_id: vol_surface_id.into(),
+            vol_surface_id,
             exercise_schedule,
             bermudan_type: BermudanType::CoTerminal,
             underlying_fixed_leg,

@@ -23,9 +23,11 @@ use wasm_bindgen::prelude::*;
 /// factor sets are empty; dimensions disagree; a value is non-finite; either
 /// weight vector does not sum to one; benchmark factor completeness is outside
 /// tolerance; or the result cannot be converted to a JavaScript value.
-#[wasm_bindgen(js_name = factorBrinsonAttribution)]
+/// @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
+#[wasm_bindgen(js_name = factorBrinsonAttribution, unchecked_return_type = "FactorBrinsonResult")]
 pub fn factor_brinson_attribution(
-    input_json: JsValue,
+    #[wasm_bindgen(js_name = "inputJson", unchecked_param_type = "JsonInput")] input_json: JsValue,
+    #[wasm_bindgen(js_name = "factorReturns", unchecked_param_type = "NumericArray")]
     factor_returns: JsValue,
 ) -> Result<JsValue, JsValue> {
     let factor_returns = js_f64_seq(&factor_returns, "factorReturns")?;

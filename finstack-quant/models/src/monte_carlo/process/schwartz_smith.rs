@@ -372,15 +372,15 @@ mod tests {
         );
         let payoff = Forward::long(0.0, 1.0, steps);
         let result = engine
-            .price(
-                &PhiloxRng::new(7),
-                &process,
-                &disc,
-                &process.initial_state(),
-                &payoff,
-                Currency::USD,
-                1.0,
-            )
+            .price(crate::monte_carlo::engine::McPricingInputs {
+                rng: &PhiloxRng::new(7),
+                process: &process,
+                disc: &disc,
+                initial_state: &process.initial_state(),
+                payoff: &payoff,
+                currency: Currency::USD,
+                discount_factor: 1.0,
+            })
             .expect("pricing");
 
         let futures = process.futures_price(t);

@@ -4,7 +4,9 @@ Absolute-priority recovery allocation with estate-inclusive collateral.
 Examples
 --------
 >>> from finstack_quant.models.credit import recovery_waterfall
->>> claim = recovery_waterfall.RecoveryClaim("SEN", "secured", 1, 100.0, 0.0, 0.0, 0.0)
+>>> claim = recovery_waterfall.RecoveryClaim(
+...     id="SEN", seniority="secured", priority=1, principal=100.0, accrued=0.0, penalties=0.0, collateral_haircut=0.0
+... )
 >>> result = recovery_waterfall.allocate_recovery(40.0, [claim])
 >>> (result.total_distributed, result.undistributed_estate, result.apr_satisfied)
 (40.0, 0.0, True)
@@ -31,13 +33,22 @@ class RecoveryClaim:
     Examples
     --------
     >>> from finstack_quant.models.credit import recovery_waterfall
-    >>> claim = recovery_waterfall.RecoveryClaim("SEN", "secured", 1, 100.0, 5.0, 0.0, 0.0)
+    >>> claim = recovery_waterfall.RecoveryClaim(
+    ...     id="SEN",
+    ...     seniority="secured",
+    ...     priority=1,
+    ...     principal=100.0,
+    ...     accrued=5.0,
+    ...     penalties=0.0,
+    ...     collateral_haircut=0.0,
+    ... )
     >>> (claim.id, claim.total_claim)
     ('SEN', 105.0)
     """
 
     def __init__(
         self,
+        *,
         id: str,
         seniority: str,
         priority: int,
@@ -49,6 +60,9 @@ class RecoveryClaim:
     ) -> None:
         """
         Create a claim for absolute-priority recovery allocation.
+
+        Every field is keyword-only: Rust reads the keywords as the
+        ``RecoveryClaim`` wire struct and rejects an unknown keyword.
 
         Parameters
         ----------
@@ -77,9 +91,28 @@ class RecoveryClaim:
             ``None`` for an unsecured claim (matching the Rust wire form,
             where the field may be omitted).
 
-        Notes
-        -----
-        Construction does not raise; arguments are stored as supplied.
+        Raises
+        ------
+        ValueError
+            If a required field is missing or a keyword is unknown; the
+            amounts themselves are validated by ``allocate_recovery``.
+        TypeError
+            If a positional argument is passed.
+
+        Examples
+        --------
+        >>> from finstack_quant.models.credit.recovery_waterfall import RecoveryClaim
+        >>> claim = RecoveryClaim(
+        ...     id="SEN",
+        ...     seniority="secured",
+        ...     priority=1,
+        ...     principal=100.0,
+        ...     accrued=0.0,
+        ...     penalties=0.0,
+        ...     collateral_haircut=0.0,
+        ... )
+        >>> claim.total_claim
+        100.0
         """
         ...
     @property
@@ -250,7 +283,15 @@ class RecoveryClaim:
         Examples
         --------
         >>> from finstack_quant.models.credit import recovery_waterfall
-        >>> value = recovery_waterfall.RecoveryClaim("SEN", "secured", 1, 100.0, 0.0, 0.0, 0.0)
+        >>> value = recovery_waterfall.RecoveryClaim(
+        ...     id="SEN",
+        ...     seniority="secured",
+        ...     priority=1,
+        ...     principal=100.0,
+        ...     accrued=0.0,
+        ...     penalties=0.0,
+        ...     collateral_haircut=0.0,
+        ... )
         >>> recovery_waterfall.RecoveryClaim.from_json(value.to_json()) == value
         True
         """
@@ -295,7 +336,15 @@ class RecoveryAllocation:
     Examples
     --------
     >>> from finstack_quant.models.credit import recovery_waterfall
-    >>> claim = recovery_waterfall.RecoveryClaim("SEN", "secured", 1, 100.0, 0.0, 0.0, 0.0)
+    >>> claim = recovery_waterfall.RecoveryClaim(
+    ...     id="SEN",
+    ...     seniority="secured",
+    ...     priority=1,
+    ...     principal=100.0,
+    ...     accrued=0.0,
+    ...     penalties=0.0,
+    ...     collateral_haircut=0.0,
+    ... )
     >>> allocation = recovery_waterfall.allocate_recovery(40.0, [claim]).allocations[0]
     >>> (allocation.id, allocation.total_recovery, allocation.recovery_rate)
     ('SEN', 40.0, 0.4)
@@ -470,7 +519,18 @@ class RecoveryAllocation:
         --------
         >>> from finstack_quant.models.credit import recovery_waterfall
         >>> value = recovery_waterfall.allocate_recovery(
-        ...     40.0, [recovery_waterfall.RecoveryClaim("SEN", "secured", 1, 100.0, 0.0, 0.0, 0.0)]
+        ...     40.0,
+        ...     [
+        ...         recovery_waterfall.RecoveryClaim(
+        ...             id="SEN",
+        ...             seniority="secured",
+        ...             priority=1,
+        ...             principal=100.0,
+        ...             accrued=0.0,
+        ...             penalties=0.0,
+        ...             collateral_haircut=0.0,
+        ...         )
+        ...     ],
         ... ).allocations[0]
         >>> recovery_waterfall.RecoveryAllocation.from_json(value.to_json()) == value
         True
@@ -531,7 +591,15 @@ class RecoveryWaterfallResult:
     Examples
     --------
     >>> from finstack_quant.models.credit import recovery_waterfall
-    >>> claim = recovery_waterfall.RecoveryClaim("SEN", "secured", 1, 100.0, 0.0, 0.0, 0.0)
+    >>> claim = recovery_waterfall.RecoveryClaim(
+    ...     id="SEN",
+    ...     seniority="secured",
+    ...     priority=1,
+    ...     principal=100.0,
+    ...     accrued=0.0,
+    ...     penalties=0.0,
+    ...     collateral_haircut=0.0,
+    ... )
     >>> result = recovery_waterfall.allocate_recovery(40.0, [claim])
     >>> (result.total_distributed, result.undistributed_estate, result.apr_satisfied)
     (40.0, 0.0, True)
@@ -733,7 +801,17 @@ def allocate_recovery(
     Examples
     --------
     >>> from finstack_quant.models.credit import recovery_waterfall
-    >>> claims = [recovery_waterfall.RecoveryClaim("SEN", "secured", 1, 100.0, 0.0, 0.0, 0.0)]
+    >>> claims = [
+    ...     recovery_waterfall.RecoveryClaim(
+    ...         id="SEN",
+    ...         seniority="secured",
+    ...         priority=1,
+    ...         principal=100.0,
+    ...         accrued=0.0,
+    ...         penalties=0.0,
+    ...         collateral_haircut=0.0,
+    ...     )
+    ... ]
     >>> recovery_waterfall.allocate_recovery(40.0, claims).allocations[0].recovery_rate
     0.4
 

@@ -34,7 +34,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::rates::hull_white::{
-    HullWhiteCalibrationParams, HullWhiteParams, capfloor_hw1f_scalar_keys,
+    HullWhiteCalibrationParams, HullWhiteParams, TermCapletPeriod, capfloor_hw1f_scalar_keys,
     capfloor_hw1f_sigma_schedule_key, hw_b, hw1f_term_caplet_price_from_dfs_with_model,
 };
 use finstack_quant_valuations_core::instruments::Instrument;
@@ -350,14 +350,16 @@ impl CapFloorHullWhitePricer {
                 notional
                     * hw1f_term_caplet_price_from_dfs_with_model(
                         &hw_model,
-                        pf_start,
-                        pf_end,
-                        df,
-                        t_fix,
-                        t_start,
-                        t_end,
-                        t_pay,
-                        tau,
+                        &TermCapletPeriod {
+                            pf_start,
+                            pf_end,
+                            pd_pay: df,
+                            t_fix,
+                            t_start,
+                            t_end,
+                            t_pay,
+                            accrual: tau,
+                        },
                         term_strike,
                         is_cap,
                     )?
@@ -931,19 +933,19 @@ mod tests {
     #[test]
     fn term_caplet_hw_pricer_uses_exact_zcb_option_formula() {
         let as_of = date(2024, 1, 2);
-        let mut caplet = CapFloor::new(
-            "TERM-HW-EXACT",
-            RateOptionType::Caplet,
-            Money::from((1_000_000_i64, Currency::USD)),
-            0.04,
-            date(2025, 1, 2),
-            date(2025, 4, 2),
-            None,
-            DayCount::Act360,
-            "USD-OIS",
-            "USD-SOFR-3M",
-            "USD-CAP-VOL",
-        )
+        let mut caplet = CapFloor::new(crate::cap_floor::CapFloorParams {
+            id: "TERM-HW-EXACT".into(),
+            rate_option_type: RateOptionType::Caplet,
+            notional: Money::from((1_000_000_i64, Currency::USD)),
+            strike: 0.04,
+            start_date: date(2025, 1, 2),
+            maturity: date(2025, 4, 2),
+            frequency: None,
+            day_count: DayCount::Act360,
+            discount_curve_id: "USD-OIS".into(),
+            forward_curve_id: "USD-SOFR-3M".into(),
+            vol_surface_id: "USD-CAP-VOL".into(),
+        })
         .expect("caplet");
         caplet
             .instrument_pricing_overrides
@@ -991,14 +993,16 @@ mod tests {
         let expected = caplet.notional.amount()
             * hw1f_term_caplet_price_from_dfs_with_model(
                 &model,
-                pf_start,
-                pf_end,
-                pd_pay,
-                t_fix,
-                t_start,
-                t_end,
-                t_pay,
-                period.accrual_year_fraction,
+                &TermCapletPeriod {
+                    pf_start,
+                    pf_end,
+                    pd_pay,
+                    t_fix,
+                    t_start,
+                    t_end,
+                    t_pay,
+                    accrual: period.accrual_year_fraction,
+                },
                 0.04,
                 true,
             )
@@ -1013,19 +1017,19 @@ mod tests {
     #[test]
     fn term_caplet_hw_spread_is_equivalent_to_strike_reduction() {
         let as_of = date(2024, 1, 2);
-        let mut with_spread = CapFloor::new(
-            "TERM-HW-SPREAD",
-            RateOptionType::Caplet,
-            Money::from((1_000_000_i64, Currency::USD)),
-            0.04,
-            date(2025, 1, 2),
-            date(2025, 4, 2),
-            None,
-            DayCount::Act360,
-            "USD-OIS",
-            "TEST-TERM-3M",
-            "USD-CAP-VOL",
-        )
+        let mut with_spread = CapFloor::new(crate::cap_floor::CapFloorParams {
+            id: "TERM-HW-SPREAD".into(),
+            rate_option_type: RateOptionType::Caplet,
+            notional: Money::from((1_000_000_i64, Currency::USD)),
+            strike: 0.04,
+            start_date: date(2025, 1, 2),
+            maturity: date(2025, 4, 2),
+            frequency: None,
+            day_count: DayCount::Act360,
+            discount_curve_id: "USD-OIS".into(),
+            forward_curve_id: "TEST-TERM-3M".into(),
+            vol_surface_id: "USD-CAP-VOL".into(),
+        })
         .expect("caplet");
         with_spread.spread_bp = rust_decimal::Decimal::from(100);
         with_spread
@@ -1063,19 +1067,19 @@ mod tests {
     #[test]
     fn compounded_moment_match_uses_date_specific_loadings_and_ou_covariance() {
         let as_of = date(2024, 12, 2);
-        let mut caplet = CapFloor::new(
-            "SOFR-HW-SENSITIVITY",
-            RateOptionType::Caplet,
-            Money::from((1_000_000_i64, Currency::USD)),
-            0.04,
-            date(2025, 1, 2),
-            date(2025, 4, 2),
-            None,
-            DayCount::Act360,
-            "USD-OIS",
-            "USD-SOFR-OIS",
-            "USD-CAP-VOL",
-        )
+        let mut caplet = CapFloor::new(crate::cap_floor::CapFloorParams {
+            id: "SOFR-HW-SENSITIVITY".into(),
+            rate_option_type: RateOptionType::Caplet,
+            notional: Money::from((1_000_000_i64, Currency::USD)),
+            strike: 0.04,
+            start_date: date(2025, 1, 2),
+            maturity: date(2025, 4, 2),
+            frequency: None,
+            day_count: DayCount::Act360,
+            discount_curve_id: "USD-OIS".into(),
+            forward_curve_id: "USD-SOFR-OIS".into(),
+            vol_surface_id: "USD-CAP-VOL".into(),
+        })
         .expect("caplet");
         caplet.overnight_coupon = Some(OvernightCouponConvention {
             compounding: FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 1 },
@@ -1162,19 +1166,19 @@ mod tests {
     #[test]
     fn compounded_full_coupon_loading_and_ou_variance_have_independent_cross_checks() {
         let as_of = date(2024, 12, 2);
-        let mut caplet = CapFloor::new(
-            "SOFR-HW-FULL-COUPON",
-            RateOptionType::Caplet,
-            Money::from((1_000_000_i64, Currency::USD)),
-            0.04,
-            date(2025, 1, 2),
-            date(2025, 2, 3),
-            None,
-            DayCount::Act360,
-            "USD-OIS",
-            "USD-SOFR-OIS",
-            "USD-CAP-VOL",
-        )
+        let mut caplet = CapFloor::new(crate::cap_floor::CapFloorParams {
+            id: "SOFR-HW-FULL-COUPON".into(),
+            rate_option_type: RateOptionType::Caplet,
+            notional: Money::from((1_000_000_i64, Currency::USD)),
+            strike: 0.04,
+            start_date: date(2025, 1, 2),
+            maturity: date(2025, 2, 3),
+            frequency: None,
+            day_count: DayCount::Act360,
+            discount_curve_id: "USD-OIS".into(),
+            forward_curve_id: "USD-SOFR-OIS".into(),
+            vol_surface_id: "USD-CAP-VOL".into(),
+        })
         .expect("caplet");
         caplet.overnight_coupon = Some(OvernightCouponConvention {
             compounding: FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
@@ -1257,19 +1261,19 @@ mod tests {
     #[test]
     fn compounded_hw_pricer_uses_cutoff_coupon_and_payment_delay() {
         let as_of = date(2024, 12, 2);
-        let mut delayed = CapFloor::new(
-            "SOFR-HW-COMPOUNDED",
-            RateOptionType::Caplet,
-            Money::from((1_000_000_i64, Currency::USD)),
-            0.04,
-            date(2025, 1, 2),
-            date(2025, 4, 2),
-            None,
-            DayCount::Act360,
-            "USD-OIS",
-            "USD-SOFR-OIS",
-            "USD-CAP-VOL",
-        )
+        let mut delayed = CapFloor::new(crate::cap_floor::CapFloorParams {
+            id: "SOFR-HW-COMPOUNDED".into(),
+            rate_option_type: RateOptionType::Caplet,
+            notional: Money::from((1_000_000_i64, Currency::USD)),
+            strike: 0.04,
+            start_date: date(2025, 1, 2),
+            maturity: date(2025, 4, 2),
+            frequency: None,
+            day_count: DayCount::Act360,
+            discount_curve_id: "USD-OIS".into(),
+            forward_curve_id: "USD-SOFR-OIS".into(),
+            vol_surface_id: "USD-CAP-VOL".into(),
+        })
         .expect("caplet");
         delayed.overnight_coupon = Some(OvernightCouponConvention {
             compounding: FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 1 },
@@ -1316,19 +1320,19 @@ mod tests {
         let fixing_date = date(2024, 1, 2);
         let as_of = date(2024, 2, 15);
         let payment_date = date(2024, 4, 2);
-        let mut caplet = CapFloor::new(
-            "FIXED-UNPAID-HW",
-            RateOptionType::Caplet,
-            Money::from((1_000_000_i64, Currency::USD)),
-            0.04,
-            fixing_date,
-            payment_date,
-            None,
-            DayCount::Act360,
-            "USD-OIS",
-            "TEST-TERM-3M",
-            "UNUSED-VOL",
-        )
+        let mut caplet = CapFloor::new(crate::cap_floor::CapFloorParams {
+            id: "FIXED-UNPAID-HW".into(),
+            rate_option_type: RateOptionType::Caplet,
+            notional: Money::from((1_000_000_i64, Currency::USD)),
+            strike: 0.04,
+            start_date: fixing_date,
+            maturity: payment_date,
+            frequency: None,
+            day_count: DayCount::Act360,
+            discount_curve_id: "USD-OIS".into(),
+            forward_curve_id: "TEST-TERM-3M".into(),
+            vol_surface_id: "UNUSED-VOL".into(),
+        })
         .expect("caplet");
         caplet
             .instrument_pricing_overrides
@@ -1364,19 +1368,19 @@ mod tests {
         let accrual_start = date(2025, 1, 2);
         let accrual_end = date(2025, 4, 2);
         let as_of = date(2025, 4, 3);
-        let mut caplet = CapFloor::new(
-            "FIXED-RFR-DELAYED",
-            RateOptionType::Caplet,
-            Money::from((1_000_000_i64, Currency::USD)),
-            0.04,
-            accrual_start,
-            accrual_end,
-            None,
-            DayCount::Act360,
-            "USD-OIS",
-            "USD-SOFR-OIS",
-            "UNUSED-VOL",
-        )
+        let mut caplet = CapFloor::new(crate::cap_floor::CapFloorParams {
+            id: "FIXED-RFR-DELAYED".into(),
+            rate_option_type: RateOptionType::Caplet,
+            notional: Money::from((1_000_000_i64, Currency::USD)),
+            strike: 0.04,
+            start_date: accrual_start,
+            maturity: accrual_end,
+            frequency: None,
+            day_count: DayCount::Act360,
+            discount_curve_id: "USD-OIS".into(),
+            forward_curve_id: "USD-SOFR-OIS".into(),
+            vol_surface_id: "UNUSED-VOL".into(),
+        })
         .expect("caplet");
         caplet.overnight_coupon = Some(OvernightCouponConvention {
             compounding: FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 1 },
@@ -1431,19 +1435,19 @@ mod tests {
         let kappa = 0.05;
         let sigma = 0.012;
         let short_rate = 0.045;
-        let mut caplet = CapFloor::new(
-            "SOFR-HW-MC-BENCHMARK",
-            RateOptionType::Caplet,
-            Money::from((1_000_000_i64, Currency::USD)),
-            0.04,
-            date(2025, 1, 2),
-            date(2025, 4, 2),
-            None,
-            DayCount::Act360,
-            "USD-OIS",
-            "USD-OIS",
-            "UNUSED-VOL",
-        )
+        let mut caplet = CapFloor::new(crate::cap_floor::CapFloorParams {
+            id: "SOFR-HW-MC-BENCHMARK".into(),
+            rate_option_type: RateOptionType::Caplet,
+            notional: Money::from((1_000_000_i64, Currency::USD)),
+            strike: 0.04,
+            start_date: date(2025, 1, 2),
+            maturity: date(2025, 4, 2),
+            frequency: None,
+            day_count: DayCount::Act360,
+            discount_curve_id: "USD-OIS".into(),
+            forward_curve_id: "USD-OIS".into(),
+            vol_surface_id: "UNUSED-VOL".into(),
+        })
         .expect("caplet");
         caplet.overnight_coupon = Some(OvernightCouponConvention {
             compounding: FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 1 },
@@ -1560,19 +1564,19 @@ mod tests {
     #[test]
     fn constant_sigma_schedule_matches_scalar_hw_price() {
         let as_of = date(2024, 12, 2);
-        let mut caplet = CapFloor::new(
-            "SOFR-HW-SCHEDULE",
-            RateOptionType::Caplet,
-            Money::from((1_000_000_i64, Currency::USD)),
-            0.04,
-            date(2025, 1, 2),
-            date(2025, 4, 2),
-            None,
-            DayCount::Act360,
-            "USD-OIS",
-            "USD-OIS",
-            "UNUSED-VOL",
-        )
+        let mut caplet = CapFloor::new(crate::cap_floor::CapFloorParams {
+            id: "SOFR-HW-SCHEDULE".into(),
+            rate_option_type: RateOptionType::Caplet,
+            notional: Money::from((1_000_000_i64, Currency::USD)),
+            strike: 0.04,
+            start_date: date(2025, 1, 2),
+            maturity: date(2025, 4, 2),
+            frequency: None,
+            day_count: DayCount::Act360,
+            discount_curve_id: "USD-OIS".into(),
+            forward_curve_id: "USD-OIS".into(),
+            vol_surface_id: "UNUSED-VOL".into(),
+        })
         .expect("caplet");
         caplet.overnight_coupon = Some(OvernightCouponConvention {
             compounding: FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 1 },
@@ -1618,19 +1622,19 @@ mod tests {
     #[test]
     fn persisted_sigma_schedule_resolves_before_legacy_scalar_sigma() {
         let as_of = date(2024, 12, 2);
-        let caplet = CapFloor::new(
-            "SOFR-HW-PERSISTED-SCHEDULE",
-            RateOptionType::Caplet,
-            Money::from((1_000_000_i64, Currency::USD)),
-            0.04,
-            date(2025, 1, 2),
-            date(2025, 4, 2),
-            None,
-            DayCount::Act360,
-            "USD-OIS",
-            "USD-OIS",
-            "UNUSED-VOL",
-        )
+        let caplet = CapFloor::new(crate::cap_floor::CapFloorParams {
+            id: "SOFR-HW-PERSISTED-SCHEDULE".into(),
+            rate_option_type: RateOptionType::Caplet,
+            notional: Money::from((1_000_000_i64, Currency::USD)),
+            strike: 0.04,
+            start_date: date(2025, 1, 2),
+            maturity: date(2025, 4, 2),
+            frequency: None,
+            day_count: DayCount::Act360,
+            discount_curve_id: "USD-OIS".into(),
+            forward_curve_id: "USD-OIS".into(),
+            vol_surface_id: "UNUSED-VOL".into(),
+        })
         .expect("caplet");
         let (kappa_key, _) = capfloor_hw1f_scalar_keys("USD-OIS");
         let schedule = ScalarTimeSeries::new(

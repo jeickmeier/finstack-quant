@@ -246,27 +246,27 @@ pub(super) fn currency_ladder() -> Result<Vec<Value>> {
 
 /// The tranche solvers' units.
 pub(super) fn tranche_solve_field_units() -> Result<Vec<Value>> {
-    example(&crate::pricer::tranche_solve_field_units())
+    example(&crate::results::tranche_solve_field_units())
 }
 
 /// The units of a USD scenario table's cells.
 pub(super) fn scenario_table_field_units() -> Result<Vec<Value>> {
-    example(&crate::pricer::scenario_table_field_units(Currency::USD))
+    example(&crate::results::scenario_table_field_units(Currency::USD))
 }
 
 /// The units of a USD equity tranche's metrics.
 pub(super) fn equity_metrics_field_units() -> Result<Vec<Value>> {
-    example(&crate::pricer::equity_metrics_field_units(Currency::USD))
+    example(&crate::results::equity_metrics_field_units(Currency::USD))
 }
 
 /// The units of a USD simulation's charted series.
 pub(super) fn simulation_field_units() -> Result<Vec<Value>> {
-    example(&crate::pricer::simulation_field_units(Currency::USD))
+    example(&crate::results::simulation_field_units(Currency::USD))
 }
 
 /// The unit of a tranche's CS01.
 pub(super) fn metric_field_unit() -> Result<Vec<Value>> {
-    let units = crate::pricer::tranche_metric_field_units(Currency::USD);
+    let units = crate::results::tranche_metric_field_units(Currency::USD);
     let unit = units
         .iter()
         .find(|unit| unit.field == "cs01")
@@ -380,7 +380,7 @@ pub(super) fn pool_report() -> Result<Vec<Value>> {
 
 /// The units of a USD pool report.
 pub(super) fn pool_report_field_units() -> Result<Vec<Value>> {
-    example(&crate::pricer::pool_report_field_units(Currency::USD))
+    example(&crate::results::pool_report_field_units(Currency::USD))
 }
 
 /// One quarterly interest payment on a senior floating-rate tranche.
@@ -442,6 +442,15 @@ fn simulation_diagnostics_value() -> Value {
 
 pub(super) fn simulation_diagnostics() -> Result<Vec<Value>> {
     example_from_json::<structured_credit::SimulationDiagnostics>(simulation_diagnostics_value())
+}
+
+/// Seasoned-pool account balances for `AssetPool::with_accounts`.
+pub(super) fn pool_accounts() -> Result<Vec<Value>> {
+    example(&structured_credit::PoolAccounts {
+        cumulative_defaults: Some(Money::new(8_000_000.0, Currency::USD)?),
+        collection_account: Some(Money::new(250_000.0, Currency::USD)?),
+        ..structured_credit::PoolAccounts::default()
+    })
 }
 
 /// The standard-constructor inputs of the canonical example CLO deal.
@@ -569,6 +578,222 @@ pub(super) fn merton_mc_result() -> Result<Vec<Value>> {
     )
 }
 
+/// A CDX.NA.IG 5Y protection-buyer trade.
+pub(super) fn cds_trade_params() -> Result<Vec<Value>> {
+    use crate::instruments::PayReceive;
+    use finstack_quant_core::types::{CurveId, InstrumentId};
+    example(
+        &crate::instruments::credit_derivatives::cds::CdsTradeParams {
+            id: InstrumentId::new("CDX-IG-42"),
+            notional: Money::from((10_000_000_i64, Currency::USD)),
+            side: PayReceive::Pay,
+            start: date(2024, time::Month::March, 20)?,
+            end: date(2029, time::Month::June, 20)?,
+            recovery_rate: 0.40,
+            discount_curve_id: CurveId::new("USD-OIS"),
+            credit_curve_id: CurveId::new("CDX.NA.IG.HAZARD"),
+        },
+    )
+}
+
+/// A 5Y USD SOFR + 200bp quarterly floating-rate note.
+pub(super) fn floating_bond_params() -> Result<Vec<Value>> {
+    use finstack_quant_core::dates::{DayCount, Tenor};
+    use finstack_quant_core::types::{Bps, CurveId, InstrumentId};
+    example(
+        &crate::instruments::fixed_income::bond::FloatingBondParams {
+            id: InstrumentId::new("FRN-001"),
+            notional: Money::from((1_000_000_i64, Currency::USD)),
+            forward_curve_id: CurveId::new("USD-SOFR-3M"),
+            spread_bp: Bps::new(200),
+            issue_date: date(2025, time::Month::January, 15)?,
+            maturity: date(2030, time::Month::January, 15)?,
+            frequency: Tenor::quarterly(),
+            day_count: DayCount::Act360,
+            discount_curve_id: CurveId::new("USD-OIS"),
+        },
+    )
+}
+
+/// A 3M EUR/USD forward on the pair's standard spot lag.
+pub(super) fn fx_forward_trade_date_params() -> Result<Vec<Value>> {
+    use finstack_quant_core::dates::Tenor;
+    use finstack_quant_core::types::{CurveId, InstrumentId};
+    example(
+        &crate::instruments::fx::fx_forward::FxForwardTradeDateParams {
+            id: InstrumentId::new("EURUSD-FWD-3M"),
+            base_currency: Currency::EUR,
+            quote_currency: Currency::USD,
+            trade_date: date(2025, time::Month::January, 15)?,
+            tenor: Tenor::parse("3M")?,
+            notional: Money::from((1_000_000_i64, Currency::EUR)),
+            domestic_discount_curve_id: CurveId::new("USD-OIS"),
+            foreign_discount_curve_id: CurveId::new("EUR-OIS"),
+            base_calendar_id: Some("target2".to_string()),
+            quote_calendar_id: Some("usny".to_string()),
+            settlement_days: None,
+            business_day_convention: None,
+            end_of_month: false,
+        },
+    )
+}
+
+/// A spot-start 6M EUR/USD swap, T+2 and Modified Following.
+pub(super) fn fx_swap_trade_date_params() -> Result<Vec<Value>> {
+    use finstack_quant_core::dates::{BusinessDayConvention, Tenor};
+    use finstack_quant_core::types::{CurveId, InstrumentId};
+    example(&crate::instruments::fx::fx_swap::FxSwapTradeDateParams {
+        id: InstrumentId::new("EURUSD-SWAP-6M"),
+        base_currency: Currency::EUR,
+        quote_currency: Currency::USD,
+        trade_date: date(2025, time::Month::January, 15)?,
+        far_tenor: Tenor::parse("6M")?,
+        notional: Money::from((1_000_000_i64, Currency::EUR)),
+        domestic_discount_curve_id: CurveId::new("USD-OIS"),
+        foreign_discount_curve_id: CurveId::new("EUR-OIS"),
+        base_calendar_id: Some("target2".to_string()),
+        quote_calendar_id: Some("usny".to_string()),
+        settlement_days: 2,
+        business_day_convention: BusinessDayConvention::ModifiedFollowing,
+        end_of_month: false,
+    })
+}
+
+/// A 3M USD/CNY NDF fixing two business days before maturity.
+pub(super) fn ndf_trade_date_params() -> Result<Vec<Value>> {
+    use finstack_quant_core::dates::{BusinessDayConvention, Tenor};
+    use finstack_quant_core::types::{CurveId, InstrumentId};
+    example(&crate::instruments::fx::ndf::NdfTradeDateParams {
+        id: InstrumentId::new("USDCNY-NDF-3M"),
+        base_currency: Currency::CNY,
+        settlement_currency: Currency::USD,
+        trade_date: date(2025, time::Month::January, 15)?,
+        tenor: Tenor::parse("3M")?,
+        notional: Money::from((10_000_000_i64, Currency::CNY)),
+        contract_rate: 7.25,
+        domestic_discount_curve_id: CurveId::new("USD-OIS"),
+        base_calendar_id: None,
+        settlement_calendar_id: Some("usny".to_string()),
+        settlement_days: 2,
+        fixing_offset_days: 2,
+        business_day_convention: BusinessDayConvention::ModifiedFollowing,
+        end_of_month: false,
+    })
+}
+
+/// A 6M EUR/USD call on forward delta, premium in USD.
+pub(super) fn fx_option_params() -> Result<Vec<Value>> {
+    use crate::instruments::fx::fx_option::{FxDeltaConvention, FxDeltaConventionKind};
+    use finstack_quant_core::types::{CurveId, InstrumentId};
+    example(&crate::instruments::fx::fx_option::FxOptionParams {
+        id: InstrumentId::new("EURUSD-CALL-6M"),
+        base_currency: Currency::EUR,
+        quote_currency: Currency::USD,
+        strike: 1.12,
+        expiry: date(2025, time::Month::July, 15)?,
+        notional: Money::from((1_000_000_i64, Currency::EUR)),
+        vol_surface_id: CurveId::new("EURUSD-VOL"),
+        option_type: finstack_quant_models::types::OptionType::Call,
+        delta_convention: FxDeltaConvention::new(
+            FxDeltaConventionKind::Forward,
+            Currency::USD,
+            "generic_interbank",
+        )?,
+    })
+}
+
+/// A 5Y USD 3% cap on 3M SOFR, quarterly ACT/360.
+pub(super) fn cap_floor_params() -> Result<Vec<Value>> {
+    use crate::instruments::rates::cap_floor::RateOptionType;
+    use finstack_quant_core::dates::{DayCount, Tenor};
+    use finstack_quant_core::types::{CurveId, InstrumentId};
+    example(&crate::instruments::rates::cap_floor::CapFloorParams {
+        id: InstrumentId::new("IRCAP-USD-5Y-3PCT"),
+        rate_option_type: RateOptionType::Cap,
+        notional: Money::from((10_000_000_i64, Currency::USD)),
+        strike: 0.03,
+        start_date: date(2024, time::Month::January, 3)?,
+        maturity: date(2029, time::Month::January, 3)?,
+        frequency: Some(Tenor::quarterly()),
+        day_count: DayCount::Act360,
+        discount_curve_id: CurveId::new("USD-OIS"),
+        forward_curve_id: CurveId::new("USD-SOFR-3M"),
+        vol_surface_id: CurveId::new("USD-CAPFLOOR-VOL"),
+    })
+}
+
+/// A 5Y quarterly pay-10Y-CMS swap against a fixed 3% funding leg.
+pub(super) fn cms_swap_schedule_params() -> Result<Vec<Value>> {
+    use crate::instruments::PayReceive;
+    use crate::instruments::rates::cms_swap::FundingLegSpec;
+    use finstack_quant_core::dates::{DayCount, Tenor};
+    use finstack_quant_core::types::{CurveId, IndexId, InstrumentId};
+    example(
+        &crate::instruments::rates::cms_swap::CmsSwapScheduleParams {
+            id: InstrumentId::new("CMS10Y-USD-5Y"),
+            start_date: date(2025, time::Month::March, 20)?,
+            maturity: date(2030, time::Month::March, 20)?,
+            cms_frequency: Tenor::quarterly(),
+            cms_tenor: Tenor::parse("10Y")?,
+            cms_spread_bp: rust_decimal::Decimal::ZERO,
+            funding_leg: FundingLegSpec::Fixed {
+                rate: rust_decimal::Decimal::new(3, 2),
+                day_count: DayCount::Thirty360,
+            },
+            notional: Money::from((10_000_000_i64, Currency::USD)),
+            day_count: DayCount::Act360,
+            index_id: IndexId::new("USD-SOFR-OIS"),
+            side: PayReceive::Pay,
+            discount_curve_id: CurveId::new("USD-OIS"),
+            forward_curve_id: CurveId::new("USD-SOFR-OIS"),
+            vol_surface_id: CurveId::new("USD-SWPNVOL"),
+        },
+    )
+}
+
+/// A 10NC2 payer Bermudan exercisable semi-annually after two years.
+pub(super) fn bermudan_swaption_params() -> Result<Vec<Value>> {
+    use crate::instruments::rates::swaption::BermudanSchedule;
+    use finstack_quant_core::dates::Tenor;
+    use finstack_quant_core::types::{CurveId, InstrumentId};
+    let swap_end = date(2037, time::Month::January, 17)?;
+    example(
+        &crate::instruments::rates::swaption::BermudanSwaptionParams {
+            id: InstrumentId::new("BERM-10NC2-USD"),
+            option_type: finstack_quant_models::types::OptionType::Call,
+            notional: Money::from((10_000_000_i64, Currency::USD)),
+            strike: 0.03,
+            underlying_start_date: date(2027, time::Month::January, 17)?,
+            underlying_maturity: swap_end,
+            exercise_schedule: BermudanSchedule::co_terminal(
+                date(2029, time::Month::January, 17)?,
+                swap_end,
+                Tenor::semi_annual(),
+            )?,
+            discount_curve_id: CurveId::new("USD-OIS"),
+            forward_curve_id: CurveId::new("USD-OIS"),
+            vol_surface_id: CurveId::new("USD-SWPNVOL"),
+        },
+    )
+}
+
+/// A 5Y USD SOFR OIS payer at 4%.
+pub(super) fn convention_swap_params() -> Result<Vec<Value>> {
+    use crate::instruments::PayReceive;
+    use finstack_quant_core::types::{CurveId, IndexId, InstrumentId};
+    example(&crate::instruments::rates::irs::ConventionSwapParams {
+        id: InstrumentId::new("USD-SOFR-OIS-5Y"),
+        notional: Money::from((1_000_000_i64, Currency::USD)),
+        side: PayReceive::Pay,
+        fixed_rate: 0.04,
+        start_date: date(2025, time::Month::January, 13)?,
+        maturity: date(2030, time::Month::January, 13)?,
+        index_id: IndexId::new("USD-SOFR-OIS"),
+        discount_curve_id: CurveId::new("USD-OIS"),
+        forward_curve_id: CurveId::new("USD-SOFR-OIS"),
+    })
+}
+
 pub(super) fn cds_index_params() -> Result<Vec<Value>> {
     example(
         &crate::instruments::credit_derivatives::cds_index::CdsIndexParams::cdx_na_ig(42, 1, 100.0),
@@ -622,6 +847,19 @@ pub(super) fn market_history() -> Result<Vec<Value>> {
             },
         ],
     })
+}
+
+/// A one-week theta horizon, the two-scenario market history above, and a
+/// step trace.
+pub(super) fn price_extras() -> Result<Vec<Value>> {
+    let history = market_history()?.into_iter().next().ok_or_else(|| {
+        finstack_quant_core::Error::Internal("market history example is empty".to_string())
+    })?;
+    example_from_json::<crate::pricer::PriceExtras>(json!({
+        "metric_pricing_overrides": {"theta_period": {"count": 1, "unit": "weeks"}},
+        "market_history": history,
+        "explain": true,
+    }))
 }
 
 pub(super) fn rate_index_conventions() -> Result<Vec<Value>> {

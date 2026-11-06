@@ -1,6 +1,7 @@
 """Stub declarations mirroring ``finstack-quant-py/src/bindings/models/monte_carlo/pricers.rs``."""
 
 from __future__ import annotations
+from typing import Any
 from finstack_quant.models.monte_carlo._results import LrmGreeks, MoneyEstimate
 
 class EuropeanPricer:
@@ -10,7 +11,15 @@ class EuropeanPricer:
     Examples
     --------
     >>> from finstack_quant.models.monte_carlo import EuropeanPricer
-    >>> EuropeanPricer(num_paths=1000, seed=1).price_gbm(100, 100, 0.05, 0.0, 0.2, 1.0, True).num_paths
+    >>> EuropeanPricer(num_paths=1000, seed=1).price_gbm({
+    ...     "spot": 100,
+    ...     "strike": 100,
+    ...     "rate": 0.05,
+    ...     "dividend_yield": 0.0,
+    ...     "volatility": 0.2,
+    ...     "time_to_expiry": 1.0,
+    ...     "option_type": "call",
+    ... }).num_paths
     1000
     """
 
@@ -108,13 +117,7 @@ class EuropeanPricer:
 
     def price_gbm(
         self,
-        spot: float,
-        strike: float,
-        rate: float,
-        div_yield: float,
-        vol: float,
-        expiry: float,
-        is_call: bool,
+        market: dict[str, Any] | str,
         num_steps: int | None = None,
         currency: str | None = None,
     ) -> MoneyEstimate:
@@ -123,20 +126,14 @@ class EuropeanPricer:
 
         Parameters
         ----------
-        spot : float
-            Spot price.
-        strike : float
-            Strike price.
-        rate : float
-            Risk-free rate (continuously compounded decimal).
-        div_yield : float
-            Dividend yield (continuously compounded decimal).
-        vol : float
-            Volatility (decimal).
-        expiry : float
-            Time to maturity in years.
-        is_call : bool
-            ``True`` for a call payoff, ``False`` for a put.
+        market : dict or str
+            Serde form of the Rust ``OptionMarketParams``, as a dict or JSON
+            text. Every key is required: ``spot`` (spot level at time 0) and
+            ``strike`` (same units); ``rate`` (continuously compounded
+            risk-free rate, decimal); ``dividend_yield`` (continuous dividend
+            yield, decimal); ``volatility`` (annualized GBM volatility,
+            decimal); ``time_to_expiry`` (years); ``option_type`` (``"call"``
+            or ``"put"``).
         num_steps : int, optional
             Time steps. Defaults to the registry default (``1``).
             Exact GBM is unbiased for any step size, so a European payoff
@@ -152,15 +149,34 @@ class EuropeanPricer:
         Examples
         --------
         >>> from finstack_quant.models.monte_carlo import EuropeanPricer
-        >>> EuropeanPricer(800, 0).price_gbm(100, 100, 0.05, 0.0, 0.2, 1.0, True, num_steps=52).num_paths
+        >>> EuropeanPricer(800, 0).price_gbm(
+        ...     {
+        ...         "spot": 100,
+        ...         "strike": 100,
+        ...         "rate": 0.05,
+        ...         "dividend_yield": 0.0,
+        ...         "volatility": 0.2,
+        ...         "time_to_expiry": 1.0,
+        ...         "option_type": "call",
+        ...     },
+        ...     num_steps=52,
+        ... ).num_paths
         800
-        >>> EuropeanPricer(800, 0).price_gbm(100, 100, 0.05, 0.0, 0.2, 1.0, False).mean.amount > 0
+        >>> EuropeanPricer(800, 0).price_gbm({
+        ...     "spot": 100,
+        ...     "strike": 100,
+        ...     "rate": 0.05,
+        ...     "dividend_yield": 0.0,
+        ...     "volatility": 0.2,
+        ...     "time_to_expiry": 1.0,
+        ...     "option_type": "put",
+        ... }).mean.amount > 0
         True
 
         Raises
         ------
         ValueError
-            If ``rate`` or ``div_yield`` is non-finite, ``vol`` is negative or non-finite,
+            If ``market`` has an unknown or missing key or a wrongly typed value, or ``rate`` or ``div_yield`` is non-finite, ``vol`` is negative or non-finite,
             ``expiry`` is non-finite or not strictly positive, ``num_steps`` is zero, the
             configured path count is zero or exceeds ``10_000_000``,
             ``currency`` is unknown, or discounting produces a non-finite value.
@@ -177,7 +193,15 @@ class PathDependentPricer:
     Examples
     --------
     >>> from finstack_quant.models.monte_carlo import PathDependentPricer
-    >>> PathDependentPricer(600, 2).price_asian(100, 100, 0.05, 0.0, 0.2, 1.0, True).num_paths
+    >>> PathDependentPricer(600, 2).price_asian({
+    ...     "spot": 100,
+    ...     "strike": 100,
+    ...     "rate": 0.05,
+    ...     "dividend_yield": 0.0,
+    ...     "volatility": 0.2,
+    ...     "time_to_expiry": 1.0,
+    ...     "option_type": "call",
+    ... }).num_paths
     600
     """
 
@@ -235,13 +259,7 @@ class PathDependentPricer:
 
     def price_asian(
         self,
-        spot: float,
-        strike: float,
-        rate: float,
-        div_yield: float,
-        vol: float,
-        expiry: float,
-        is_call: bool,
+        market: dict[str, Any] | str,
         num_steps: int | None = None,
         currency: str | None = None,
     ) -> MoneyEstimate:
@@ -250,20 +268,14 @@ class PathDependentPricer:
 
         Parameters
         ----------
-        spot : float
-            Spot price.
-        strike : float
-            Strike price.
-        rate : float
-            Risk-free rate (continuously compounded decimal).
-        div_yield : float
-            Dividend yield (continuously compounded decimal).
-        vol : float
-            Volatility (decimal).
-        expiry : float
-            Maturity in years.
-        is_call : bool
-            ``True`` for a call on the arithmetic average, ``False`` for a put.
+        market : dict or str
+            Serde form of the Rust ``OptionMarketParams``, as a dict or JSON
+            text. Every key is required: ``spot`` (spot level at time 0) and
+            ``strike`` (same units); ``rate`` (continuously compounded
+            risk-free rate, decimal); ``dividend_yield`` (continuous dividend
+            yield, decimal); ``volatility`` (annualized GBM volatility,
+            decimal); ``time_to_expiry`` (years); ``option_type`` (``"call"``
+            or ``"put"``).
         num_steps : int, optional
             Steps. Defaults to the registry default. The default fixing
             schedule is steps ``1..=num_steps`` and excludes the initial spot
@@ -280,15 +292,37 @@ class PathDependentPricer:
         --------
         >>> from finstack_quant.models.monte_carlo import PathDependentPricer
         >>> pricer = PathDependentPricer(400, 0)
-        >>> pricer.price_asian(100, 100, 0.05, 0.0, 0.2, 1.0, True, num_steps=12).num_paths
+        >>> pricer.price_asian(
+        ...     {
+        ...         "spot": 100,
+        ...         "strike": 100,
+        ...         "rate": 0.05,
+        ...         "dividend_yield": 0.0,
+        ...         "volatility": 0.2,
+        ...         "time_to_expiry": 1.0,
+        ...         "option_type": "call",
+        ...     },
+        ...     num_steps=12,
+        ... ).num_paths
         400
-        >>> pricer.price_asian(100, 100, 0.05, 0.0, 0.2, 1.0, False, num_steps=12).mean.amount > 0
+        >>> pricer.price_asian(
+        ...     {
+        ...         "spot": 100,
+        ...         "strike": 100,
+        ...         "rate": 0.05,
+        ...         "dividend_yield": 0.0,
+        ...         "volatility": 0.2,
+        ...         "time_to_expiry": 1.0,
+        ...         "option_type": "put",
+        ...     },
+        ...     num_steps=12,
+        ... ).mean.amount > 0
         True
 
         Raises
         ------
         ValueError
-            If ``rate`` or ``div_yield`` is non-finite, ``vol`` is negative or non-finite,
+            If ``market`` has an unknown or missing key or a wrongly typed value, or ``rate`` or ``div_yield`` is non-finite, ``vol`` is negative or non-finite,
             ``expiry`` is non-finite or not strictly positive, ``num_steps`` is zero, the
             configured path count is zero or exceeds ``10_000_000``,
             ``currency`` is unknown, or discounting produces a non-finite value.
@@ -300,13 +334,7 @@ class PathDependentPricer:
 
     def price_with_lrm_greeks(
         self,
-        spot: float,
-        strike: float,
-        rate: float,
-        div_yield: float,
-        vol: float,
-        expiry: float,
-        is_call: bool,
+        market: dict[str, Any] | str,
         num_steps: int | None = None,
         currency: str | None = None,
     ) -> LrmGreeks:
@@ -321,20 +349,14 @@ class PathDependentPricer:
 
         Parameters
         ----------
-        spot : float
-            Finite, strictly positive spot price at time zero.
-        strike : float
-            Strike price in the same units as ``spot``.
-        rate : float
-            Risk-free rate (continuously compounded decimal).
-        div_yield : float
-            Dividend yield (continuously compounded decimal).
-        vol : float
-            Annualized volatility (decimal), strictly positive.
-        expiry : float
-            Maturity in years.
-        is_call : bool
-            ``True`` for a call on the arithmetic average, ``False`` for a put.
+        market : dict or str
+            Serde form of the Rust ``OptionMarketParams``, as a dict or JSON
+            text. Every key is required: ``spot`` (spot level at time 0) and
+            ``strike`` (same units); ``rate`` (continuously compounded
+            risk-free rate, decimal); ``dividend_yield`` (continuous dividend
+            yield, decimal); ``volatility`` (annualized GBM volatility,
+            decimal); ``time_to_expiry`` (years); ``option_type`` (``"call"``
+            or ``"put"``).
         num_steps : int, optional
             Time-grid steps, each an averaging date. Defaults to the registry
             value ``convenience.greeks.lrm_num_steps`` (32), not the 252 steps
@@ -354,7 +376,7 @@ class PathDependentPricer:
         Raises
         ------
         ValueError
-            If ``spot``, ``vol`` or ``expiry`` is not finite and strictly
+            If ``market`` has an unknown or missing key or a wrongly typed value, or ``spot``, ``vol`` or ``expiry`` is not finite and strictly
             positive, ``rate`` or ``div_yield`` is non-finite, ``num_steps``
             is zero, the pricer uses Sobol or antithetic sampling,
             ``num_paths`` exceeds ``100_000``, ``num_paths * (num_steps + 1)``
@@ -365,7 +387,15 @@ class PathDependentPricer:
         Examples
         --------
         >>> from finstack_quant.models.monte_carlo import PathDependentPricer
-        >>> greeks = PathDependentPricer().price_with_lrm_greeks(100, 100, 0.04, 0.01, 0.25, 1.0, True)
+        >>> greeks = PathDependentPricer().price_with_lrm_greeks({
+        ...     "spot": 100,
+        ...     "strike": 100,
+        ...     "rate": 0.04,
+        ...     "dividend_yield": 0.01,
+        ...     "volatility": 0.25,
+        ...     "time_to_expiry": 1.0,
+        ...     "option_type": "call",
+        ... })
         >>> 0.0 < greeks.delta.mean < 1.0
         True
         >>> greeks.vega.stderr > 0.0
@@ -483,7 +513,15 @@ class LsmcPricer:
     Examples
     --------
     >>> from finstack_quant.models.monte_carlo import LsmcPricer
-    >>> LsmcPricer(300, 0, num_steps=10).price_american(100, 100, 0.05, 0.0, 0.3, 1.0, False).num_paths
+    >>> LsmcPricer(300, 0, num_steps=10).price_american({
+    ...     "spot": 100,
+    ...     "strike": 100,
+    ...     "rate": 0.05,
+    ...     "dividend_yield": 0.0,
+    ...     "volatility": 0.3,
+    ...     "time_to_expiry": 1.0,
+    ...     "option_type": "put",
+    ... }).num_paths
     300
     """
 
@@ -640,13 +678,7 @@ class LsmcPricer:
 
     def price_american(
         self,
-        spot: float,
-        strike: float,
-        rate: float,
-        div_yield: float,
-        vol: float,
-        expiry: float,
-        is_call: bool,
+        market: dict[str, Any] | str,
         currency: str | None = None,
         num_steps: int | None = None,
         basis: str | None = None,
@@ -661,20 +693,14 @@ class LsmcPricer:
 
         Parameters
         ----------
-        spot : float
-            Spot price.
-        strike : float
-            Strike price.
-        rate : float
-            Risk-free rate (continuously compounded decimal).
-        div_yield : float
-            Dividend yield (continuously compounded decimal).
-        vol : float
-            Volatility (decimal).
-        expiry : float
-            Maturity in years.
-        is_call : bool
-            ``True`` for a call, ``False`` for a put.
+        market : dict or str
+            Serde form of the Rust ``OptionMarketParams``, as a dict or JSON
+            text. Every key is required: ``spot`` (spot level at time 0) and
+            ``strike`` (same units); ``rate`` (continuously compounded
+            risk-free rate, decimal); ``dividend_yield`` (continuous dividend
+            yield, decimal); ``volatility`` (annualized GBM volatility,
+            decimal); ``time_to_expiry`` (years); ``option_type`` (``"call"``
+            or ``"put"``).
         currency : str, optional
             ISO currency code. Defaults to USD.
         num_steps : int, optional
@@ -696,13 +722,21 @@ class LsmcPricer:
         Examples
         --------
         >>> from finstack_quant.models.monte_carlo import LsmcPricer
-        >>> LsmcPricer(200, 0, num_steps=8).price_american(100, 100, 0.05, 0.0, 0.25, 1.0, False).num_paths
+        >>> LsmcPricer(200, 0, num_steps=8).price_american({
+        ...     "spot": 100,
+        ...     "strike": 100,
+        ...     "rate": 0.05,
+        ...     "dividend_yield": 0.0,
+        ...     "volatility": 0.25,
+        ...     "time_to_expiry": 1.0,
+        ...     "option_type": "put",
+        ... }).num_paths
         200
 
         Raises
         ------
         ValueError
-            If ``strike`` is non-finite or non-positive, or is no greater than ``1e-14``
+            If ``market`` has an unknown or missing key or a wrongly typed value, or ``strike`` is non-finite or non-positive, or is no greater than ``1e-14``
             with the normalized-polynomial basis; ``rate`` or ``div_yield``
             is non-finite; ``vol`` is negative or non-finite; ``expiry`` is
             non-finite or not strictly positive;
@@ -717,13 +751,7 @@ class LsmcPricer:
 
     def price_american_unbiased(
         self,
-        spot: float,
-        strike: float,
-        rate: float,
-        div_yield: float,
-        vol: float,
-        expiry: float,
-        is_call: bool,
+        market: dict[str, Any] | str,
         pricing_seed: int,
         currency: str | None = None,
         num_steps: int | None = None,
@@ -739,20 +767,14 @@ class LsmcPricer:
 
         Parameters
         ----------
-        spot : float
-            Spot price.
-        strike : float
-            Strike price.
-        rate : float
-            Risk-free rate (continuously compounded decimal).
-        div_yield : float
-            Dividend yield (continuously compounded decimal).
-        vol : float
-            Volatility (decimal).
-        expiry : float
-            Maturity in years.
-        is_call : bool
-            ``True`` for a call, ``False`` for a put.
+        market : dict or str
+            Serde form of the Rust ``OptionMarketParams``, as a dict or JSON
+            text. Every key is required: ``spot`` (spot level at time 0) and
+            ``strike`` (same units); ``rate`` (continuously compounded
+            risk-free rate, decimal); ``dividend_yield`` (continuous dividend
+            yield, decimal); ``volatility`` (annualized GBM volatility,
+            decimal); ``time_to_expiry`` (years); ``option_type`` (``"call"``
+            or ``"put"``).
         pricing_seed : int
             Seed for the pricing pass; must differ from the pricer's training
             seed (passing the same value reintroduces the in-sample bias and
@@ -778,7 +800,7 @@ class LsmcPricer:
         Raises
         ------
         ValueError
-            If ``pricing_seed`` equals the pricer's training seed; the time-step
+            If ``market`` has an unknown or missing key or a wrongly typed value, or ``pricing_seed`` equals the pricer's training seed; the time-step
             or independent path count is outside the documented range; or each
             pass exceeds ``64_000_000`` retained spot values including time zero
             and both rows of each antithetic pair. The input validation errors

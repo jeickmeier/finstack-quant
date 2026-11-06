@@ -72,7 +72,7 @@ finstack-quant/
 │   ├── test-utils/               # golden-test helpers (dev-dependency only)
 │   └── tests/                    # umbrella-level integration tests
 ├── finstack-quant-py/            # PyO3 bindings; builds the `finstack_quant` package
-├── finstack-quant-wasm/          # wasm-bindgen bindings + hand-written JS facade
+├── finstack-quant-wasm/          # wasm-bindgen bindings + hand-written JS facade (macros/: plain_docs)
 ├── finstack-quant-ui/            # shadcn registry; crate-first React components
 ├── docs-site/                    # documentation site and registry gallery
 ├── benchmarks/                   # materialization benchmark fixtures and notes
@@ -83,66 +83,14 @@ finstack-quant/
 └── mise.toml                     # toolchain pins and dev tasks
 ```
 
-## Crate map
+## Architecture
 
-`finstack-quant` is the umbrella crate. It re-exports all fourteen domain
-crates, so one dependency reaches the whole API. Default features enable
-JSON Schema generation and validation; they do not change pricing behavior.
-
-| Crate | Umbrella path | Provides |
-|---|---|---|
-| [`finstack-quant-core`](finstack-quant/core/README.md) | `finstack_quant::core` | `Money`/`Currency`/`Rate`, FX providers, dates and calendars, term structures, math, expression engine, config, `table` envelope |
-| [`finstack-quant-analytics`](finstack-quant/analytics/README.md) | `finstack_quant::analytics` | `Performance` entry point: return/risk scalars, drawdowns, rolling windows, alpha/beta, basic factor models |
-| [`finstack-quant-attribution`](finstack-quant/attribution/README.md) | `finstack_quant::attribution` | Multi-period P&L attribution: simple bridge, metrics-based, parallel, waterfall, Taylor |
-| [`finstack-quant-calibration`](finstack-quant/calibration/README.md) | `finstack_quant::calibration` | Quote ingestion, market construction, calibration engines, explicit model fitting, and cached quote replay |
-| [`finstack-quant-cashflows`](finstack-quant/cashflows/README.md) | `finstack_quant::cashflows` | Schedule construction, accrual, currency-preserving aggregation |
-| [`finstack-quant-covenants`](finstack-quant/covenants/README.md) | `finstack_quant::covenants` | Covenant specs, evaluation engine, threshold schedules, forecasting, standard packages |
-| [`finstack-quant-features`](finstack-quant/features/README.md) | `finstack_quant::features` | Time-series, cross-sectional, and panel feature transforms over `Option<f64>` columns |
-| [`finstack-quant-margin`](finstack-quant/margin/README.md) | `finstack_quant::margin` | CSA/repo terms, VM and IM engines (SIMM, schedule, haircut, CCP), collateral metrics, XVA config, regulatory capital |
-| [`finstack-quant-models`](finstack-quant/models/README.md) | `finstack_quant::models` | Closed-form/Fourier formulas, volatility, rates/DTSM, credit and structured-credit pool models, liquidity, PDE/tree engines, and Monte Carlo |
-| [`finstack-quant-factor`](finstack-quant/factor/README.md) | `finstack_quant::models::factor` | Factor definitions and matching, covariance, sensitivity matrices, risk decomposition, and hierarchical credit-factor calibration |
-| [`finstack-quant-valuations`](finstack-quant/valuations/README.md) | `finstack_quant::valuations` | Instruments, market resolution, pricing registries, recalibration provider contract, metrics, and result envelopes |
-| [`finstack-quant-statements`](finstack-quant/statements/README.md) | `finstack_quant::statements` | Statement model graph, DSL formulas, forecasting, corkscrews, deterministic period evaluation |
-| [`finstack-quant-statements-analytics`](finstack-quant/statements-analytics/README.md) | `finstack_quant::statements_analytics` | Sensitivity, scenario sets, variance, DCF, goal seek, covenant forecasting, backtesting, templates |
-| [`finstack-quant-portfolio`](finstack-quant/portfolio/README.md) | `finstack_quant::portfolio` | Entities and positions, valuation and metric aggregation, grouping, optimization, risk decomposition, materialization |
-| [`finstack-quant-scenarios`](finstack-quant/scenarios/README.md) | `finstack_quant::scenarios` | Deterministic market/instrument/statement shocks and time rolls as serde-stable specs, template registry, composition, phase-ordered apply, horizon P&L |
-
-### Crates that are not re-exported
-
-Depend on these directly when you need them:
-
-| Crate | Path | Purpose |
-|---|---|---|
-| [`finstack-quant-arrow`](finstack-quant/arrow-interchange/README.md) | `finstack-quant/arrow-interchange/` | Export a `core::table::TableEnvelope` as an Arrow `RecordBatch` |
-| [`finstack-quant-test-utils`](finstack-quant/test-utils/README.md) | `finstack-quant/test-utils/` | Golden-test framework shared across crates; dev-dependency only |
-| `finstack-quant-valuations-macros` | `finstack-quant/valuations/macros/` | `FinancialBuilder` derive used inside `valuations` |
-
-### Dependency direction
-
-Every domain crate depends on `core`, as does `arrow-interchange`; `test-utils`
-and `valuations-macros` have no in-workspace dependencies. The rest of the
-edges, read off the manifests:
-
-| Crate | Also depends on |
-|---|---|
-| `analytics`, `cashflows`, `covenants`, `features`, `margin` | nothing else in-workspace |
-| `models` | `cashflows` |
-| `factor` | `analytics` |
-| `valuations` | `cashflows`, `covenants`, `margin`, `models`, `valuations-core`, `valuations-{rates,fixed-income,structured-credit,credit,equity,fx,exotics}`, `valuations-macros` |
-| `calibration` | `cashflows`, `models`, `valuations-{core,credit,rates}` |
-| `attribution` | `calibration`, `cashflows`, `factor`, `models`, `valuations` |
-| `statements` | `cashflows`, `valuations` |
-| `statements-analytics` | `covenants`, `models`, `statements`, `valuations` |
-| `scenarios` | `attribution`, `calibration`, `cashflows`, `models`, `statements`, `valuations` |
-| `portfolio` | `attribution`, `calibration`, `cashflows`, `factor`, `margin`, `scenarios`, `valuations` |
-
-`valuations` is the mid-stack hub and `portfolio` is the top. No Rust crate
-depends on a binding crate, and `core` never depends on `models`.
-
-No cargo feature selects financial behavior. Workspace features are
-`json-schema` and `jsonschema-validate` (default on most crates, including
-the umbrella) and `extension-module` (PyO3 linking). The WASM package's TypeScript contract types are generated
-from the checked-in JSON Schemas, not from a cargo feature.
+`finstack-quant` is the umbrella crate: it re-exports all fourteen domain
+crates, so one dependency reaches the whole API. Default features enable JSON
+Schema generation and validation; no cargo feature selects financial behavior.
+The crate map (what each crate owns, with a link to its README), the
+dependency direction and the cross-cutting invariants are in
+[`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Quick start
 
@@ -197,7 +145,7 @@ settle = adjust(
     HolidayCalendar("usny"),
 )
 
-print(amount.format())  # 'USD 1000000.00'
+print(str(amount))      # 'USD 1000000.00'
 print(settle)           # 2025-01-06
 ```
 
@@ -231,7 +179,8 @@ The published entry point is
 the fourteen domain namespaces plus `schema` assembled in
 `finstack-quant-wasm/exports/`. TypeScript
 declarations live in
-[`finstack-quant-wasm/index.d.ts`](finstack-quant-wasm/index.d.ts). The
+[`finstack-quant-wasm/index.d.ts`](finstack-quant-wasm/index.d.ts), generated
+over the declarations wasm-bindgen writes from the Rust bindings. The
 `wasm-pack` output under `pkg/` and `pkg-node/` is generated build output, not
 the public API. See
 [`finstack-quant-wasm/README.md`](finstack-quant-wasm/README.md).
@@ -326,8 +275,8 @@ Python list. Ten registry domains publish schemas today (`attribution`, `calibra
 `valuations`). Their Python and WASM schema namespaces mirror domain ownership, with the
 factor registry at `models.factor.schema`.
 
-Regenerate with `mise run rust-gen-schemas`; check for drift with
-`mise run rust-check-schemas`.
+Regenerate with `mise run gen-write`; check for drift with
+`mise run gen-check`.
 
 ## Notebook curriculum
 
@@ -401,29 +350,25 @@ are written for POSIX shells.
 
 ## Common commands
 
-`mise.toml` defines tasks named `<domain>-<action>`. `all-*` fans out across
-all three languages, `rust-*` / `python-*` / `wasm-*` are per-language, and the
-rest are narrower (`gen-*`, `ui-*`, `docs-site-*`, `wheel-*`, `pre-commit-run`).
-`*-fmt` tasks mutate; `*-lint` tasks are check-only. Run `mise tasks` for the
-full list.
+`mise.toml` defines tasks named `<domain>-<action>`. `rust-*` / `python-*` /
+`wasm-*` / `ui-*` are per-surface, `gen-*` covers generated files, and `all`
+is the gate. `*-fmt` tasks mutate; `*-lint` tasks are check-only. Run
+`mise tasks` for the full list; [`scripts/README.md`](scripts/README.md) maps
+every checker to the convention it enforces and the stage that runs it.
 
 | Command | Purpose |
 |---|---|
-| `mise run all` | Run the complete test and lint gates without a separate preliminary build |
-| `mise run all-build` | Explicitly build Rust, Python, and WASM artifacts |
-| `mise run all-lint` | Lint Rust, Python, and WASM (check-only) |
+| `mise run all` | The pre-PR gate: exactly what CI runs on a pull request; `--full` adds the nightly tier (docs, doctests, slow suites) without coverage, `--release` the release gates |
+| `mise run gen-write` | Regenerate every generated file: schemas, fixtures, TypeScript bindings and declarations, UI files, the facade surface and the registry snapshot |
+| `mise run gen-check` | Fail if any generated file is stale (non-mutating) |
 | `mise run all-fmt` | Format Rust, Python, and WASM; auto-fix Python and WASM (mutating) |
+| `mise run all-build` | Explicitly build Rust, Python, and WASM artifacts |
 | `mise run rust-fix` | Apply clippy --fix across the Rust workspace (mutating) |
-| `mise run all-test` | Run Rust, Python, and WASM tests |
-| `mise run all-ci` | Regenerate derived artifacts, then run the PR checks (the fast CI tier) locally; `--full` adds the nightly full tier without coverage, `--release` the full tier plus the release gates |
 | `mise run rust-build` | Build the Rust workspace excluding the binding crates |
 | `mise run rust-test` | Run native Rust tests via `cargo nextest`; `--doctest` runs only the doctests |
 | `mise run rust-lint` | `cargo fmt --check` plus clippy with `-D warnings` across the workspace |
 | `mise run rust-doc` | Build workspace docs and enforce input docs |
 | `mise run rust-bench` | Run Criterion benchmarks with reduced measurement timing |
-| `mise run gen-write` | Regenerate checked-in schemas, fixtures, and TypeScript bindings |
-| `mise run rust-gen-schemas` | Regenerate typed JSON schemas from Rust types |
-| `mise run rust-check-schemas` | Verify JSON schemas match Rust types |
 | `mise run python-build` | Build the Python extension in place (dev profile) |
 | `mise run python-build -- --release` | Build the Python extension in release mode |
 | `mise run python-test` | Build the dev extension, then run fast Python tests |
@@ -436,8 +381,7 @@ full list.
 | `mise run wasm-test` | Run wasm-bindgen and Node facade tests |
 | `mise run wasm-test-built` | Rerun Node facade tests against the already built WASM package |
 | `mise run ui-fmt` | Format the UI package with Prettier (mutating) |
-| `mise run ui-typecheck` | Type-check the UI package with `tsc` |
-| `mise run ui-test` | Run the UI Vitest suite |
+| `mise run ui-check` | The UI gate: generator and fixture drift, formatting, registry and token rules, `tsc`, and Vitest |
 | `mise run docs-site-install` | Install everything the docs site needs, from a fresh clone |
 | `mise run docs-site-dev` | Serve the docs site at <http://localhost:3000> |
 | `mise run docs-site-build` | Execute every lesson and notebook, check the evidence, and export the static site |
@@ -463,7 +407,7 @@ at link time. CI sets `CARGO_INCREMENTAL=0` because its build cache does not
 restore `target/incremental`. `python3 scripts/clean_workspace.py --incremental`
 reclaims the incremental caches.
 
-Benchmarks are measurement tasks and stay outside `all-test`, nextest,
+Benchmarks are measurement tasks and stay outside `mise run all`, nextest,
 `rust-fix`, and `rust-lint`. `rust-fmt` still formats bench sources. CI does not
 run them; use `mise run rust-bench` or `mise run rust-bench-crate` to measure locally.
 `scripts/materialization_bench.sh` runs the portfolio materialization
@@ -479,7 +423,7 @@ benchmarks in all three languages; see
 | [`docs/REFERENCES.md`](docs/REFERENCES.md) | Canonical sources for formulas, conventions, and market practice |
 | [`docs/CONTRACTS.md`](docs/CONTRACTS.md) | Persisted-contract matrix, strict loaders, generated schemas |
 | [`docs/SERDE_STABILITY.md`](docs/SERDE_STABILITY.md) | Wire-format and schema-version policy |
-| [`CHANGELOG.md`](CHANGELOG.md) | Release history, including breaking changes |
+| [`changelog/`](changelog/README.md) | Release history, one file per release with its notes and breaking changes; [`unreleased.md`](changelog/unreleased.md) holds pending changes |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Development setup, principles, binding-change checklist, branching, pull requests, releases |
 | [`.github/workflows/README.md`](.github/workflows/README.md) | CI workflows, jobs, and their local `mise` equivalents |
 | [`AGENTS.md`](AGENTS.md) | Repository operating rules for automated contributors |

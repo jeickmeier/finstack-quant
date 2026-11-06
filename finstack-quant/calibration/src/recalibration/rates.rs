@@ -960,7 +960,7 @@ pub(crate) fn find_closest_quote(
 }
 
 #[cfg(test)]
-#[path = "rates_review_tests.rs"]
+#[path = "tests/rates_review.rs"]
 mod review_regressions;
 
 #[cfg(test)]

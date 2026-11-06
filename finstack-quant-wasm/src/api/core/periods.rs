@@ -97,8 +97,11 @@ impl JsPeriodKind {
     /// @returns The matching `PeriodKind`.
     /// @throws `TypeError` (kind `invalid_type`) if `name` is not a string;
     /// `FinstackError` (kind `validation`) if no frequency matches.
+    /// @param name - Frequency name such as `"daily"`, `"monthly"`, `"quarterly"`, `"semi_annual"` or `"annual"`.
     #[wasm_bindgen(js_name = fromName)]
-    pub fn from_name(name: JsValue) -> Result<JsPeriodKind, JsValue> {
+    pub fn from_name(
+        #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
+    ) -> Result<JsPeriodKind, JsValue> {
         js_string(&name, "name")?
             .parse::<PeriodKind>()
             .map(Self::from_inner)
@@ -124,8 +127,12 @@ impl JsPeriodKind {
     /// last valid day of the target month.
     /// @throws `TypeError` if `first` is not an integer; `FinstackError` (kind
     /// `validation`) if it is outside the supported date range.
+    /// @param first - First return-aligned observation date, as days since 1970-01-01.
     #[wasm_bindgen(js_name = priorObservationDate)]
-    pub fn prior_observation_date(&self, first: JsValue) -> Result<i32, JsValue> {
+    pub fn prior_observation_date(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] first: JsValue,
+    ) -> Result<i32, JsValue> {
         let first = js_epoch_days(&first, "first")?;
         self.inner
             .prior_observation_date(first)
@@ -151,8 +158,18 @@ impl JsPeriodKind {
 /// await init();
 /// const q1 = core.PeriodId.quarter(2025, 1);
 /// q1.toString(); // "2025Q1"
-/// q1.next().toString(); // "2025Q2"
-/// core.PeriodId.parse("2025M12").next().toString(); // "2026M01"
+/// q1.shift(1).toString(); // "2025Q2"
+/// core.PeriodId.parse("2025M12").shift(1).toString(); // "2026M01"
+/// ```
+///
+/// @example
+/// ```typescript
+/// import init, { core } from "finstack-quant-wasm";
+/// await init();
+/// const q1 = core.PeriodId.quarter(2025, 1);
+/// q1.toString(); // "2025Q1"
+/// q1.shift(1).toString(); // "2025Q2"
+/// core.PeriodId.parse("2025M12").shift(1).toString(); // "2026M01"
 /// ```
 #[wasm_bindgen(js_name = PeriodId)]
 #[derive(Clone, Copy, Debug)]
@@ -179,8 +196,11 @@ impl JsPeriodId {
     /// @returns The parsed `PeriodId`.
     /// @throws `TypeError` (kind `invalid_type`) if `code` is not a string;
     /// `FinstackError` (kind `validation`) if it is not a period code.
+    /// @param code - Period code such as `"2025Q1"`, `"2025M03"`, `"2025H1"`, `"2025W05"`, `"2025D032"`, `"2025"`, or a fiscal code such as `"FY2025Q1"`.
     #[wasm_bindgen(js_name = parse)]
-    pub fn parse(code: JsValue) -> Result<JsPeriodId, JsValue> {
+    pub fn parse(
+        #[wasm_bindgen(unchecked_param_type = "string")] code: JsValue,
+    ) -> Result<JsPeriodId, JsValue> {
         js_string(&code, "code")?
             .parse::<PeriodId>()
             .map(Self::from_inner)
@@ -197,8 +217,13 @@ impl JsPeriodId {
     /// @returns The monthly `PeriodId`.
     /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
     /// `validation`) if `month` is outside `1..=12`.
+    /// @param year - Calendar year of the period.
+    /// @param month - Month number, `1` through `12`.
     #[wasm_bindgen(js_name = month)]
-    pub fn month(year: JsValue, month: JsValue) -> Result<JsPeriodId, JsValue> {
+    pub fn month(
+        #[wasm_bindgen(unchecked_param_type = "number")] year: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] month: JsValue,
+    ) -> Result<JsPeriodId, JsValue> {
         PeriodId::month(js_int(&year, "year")?, js_uint(&month, "month")?)
             .map(Self::from_inner)
             .map_err(to_js_err)
@@ -214,8 +239,13 @@ impl JsPeriodId {
     /// @returns The quarterly `PeriodId`.
     /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
     /// `validation`) if `quarter` is outside `1..=4`.
+    /// @param year - Calendar year of the period.
+    /// @param quarter - Quarter number, `1` through `4`.
     #[wasm_bindgen(js_name = quarter)]
-    pub fn quarter(year: JsValue, quarter: JsValue) -> Result<JsPeriodId, JsValue> {
+    pub fn quarter(
+        #[wasm_bindgen(unchecked_param_type = "number")] year: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] quarter: JsValue,
+    ) -> Result<JsPeriodId, JsValue> {
         PeriodId::quarter(js_int(&year, "year")?, js_uint(&quarter, "quarter")?)
             .map(Self::from_inner)
             .map_err(to_js_err)
@@ -229,8 +259,11 @@ impl JsPeriodId {
     ///
     /// @returns The annual `PeriodId`.
     /// @throws `TypeError` if `year` is not an integer.
+    /// @param year - Calendar year of the period.
     #[wasm_bindgen(js_name = annual)]
-    pub fn annual(year: JsValue) -> Result<JsPeriodId, JsValue> {
+    pub fn annual(
+        #[wasm_bindgen(unchecked_param_type = "number")] year: JsValue,
+    ) -> Result<JsPeriodId, JsValue> {
         Ok(Self::from_inner(PeriodId::annual(js_int(&year, "year")?)))
     }
 
@@ -244,8 +277,13 @@ impl JsPeriodId {
     /// @returns The semi-annual `PeriodId`.
     /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
     /// `validation`) if `half` is not `1` or `2`.
+    /// @param year - Calendar year of the period.
+    /// @param half - Half number, `1` or `2`.
     #[wasm_bindgen(js_name = half)]
-    pub fn half(year: JsValue, half: JsValue) -> Result<JsPeriodId, JsValue> {
+    pub fn half(
+        #[wasm_bindgen(unchecked_param_type = "number")] year: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] half: JsValue,
+    ) -> Result<JsPeriodId, JsValue> {
         PeriodId::half(js_int(&year, "year")?, js_uint(&half, "half")?)
             .map(Self::from_inner)
             .map_err(to_js_err)
@@ -261,8 +299,13 @@ impl JsPeriodId {
     /// @returns The weekly `PeriodId`.
     /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
     /// `validation`) if `week` is not valid for `year`.
+    /// @param year - ISO week-year of the period.
+    /// @param week - ISO week number, `1` through `52` (or `53` in long years).
     #[wasm_bindgen(js_name = week)]
-    pub fn week(year: JsValue, week: JsValue) -> Result<JsPeriodId, JsValue> {
+    pub fn week(
+        #[wasm_bindgen(unchecked_param_type = "number")] year: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] week: JsValue,
+    ) -> Result<JsPeriodId, JsValue> {
         PeriodId::week(js_int(&year, "year")?, js_uint(&week, "week")?)
             .map(Self::from_inner)
             .map_err(to_js_err)
@@ -279,8 +322,13 @@ impl JsPeriodId {
     /// @returns The daily `PeriodId`.
     /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
     /// `validation`) if `ordinal` is not valid for `year`.
+    /// @param year - Calendar year of the period.
+    /// @param ordinal - One-based day of the year, `1` through `365` (or `366` in leap years).
     #[wasm_bindgen(js_name = day)]
-    pub fn day(year: JsValue, ordinal: JsValue) -> Result<JsPeriodId, JsValue> {
+    pub fn day(
+        #[wasm_bindgen(unchecked_param_type = "number")] year: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] ordinal: JsValue,
+    ) -> Result<JsPeriodId, JsValue> {
         PeriodId::day(js_int(&year, "year")?, js_uint(&ordinal, "ordinal")?)
             .map(Self::from_inner)
             .map_err(to_js_err)
@@ -324,8 +372,12 @@ impl JsPeriodId {
     /// overflow, or for a fiscal daily identifier that would leave days
     /// `1..=365`, whose length depends on the fiscal calendar (use
     /// `nextFiscal` / `prevFiscal`).
+    /// @param periods - Whole number of periods to move; negative moves back and `0` returns the identifier unchanged.
     #[wasm_bindgen(js_name = shift)]
-    pub fn shift(&self, periods: JsValue) -> Result<JsPeriodId, JsValue> {
+    pub fn shift(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] periods: JsValue,
+    ) -> Result<JsPeriodId, JsValue> {
         let periods: i32 = crate::utils::input::js_int(&periods, "periods")?;
         self.inner
             .shift(periods)
@@ -343,8 +395,12 @@ impl JsPeriodId {
     /// @throws `FinstackError` (kind `validation`) if the configuration has an
     /// invalid fiscal start date for the year or the fiscal-year boundary is
     /// outside the supported date range.
+    /// @param fiscalConfig - Fiscal-year start used to size fiscal weeks and days.
     #[wasm_bindgen(js_name = nextFiscal)]
-    pub fn next_fiscal(&self, fiscal_config: &JsFiscalConfig) -> Result<JsPeriodId, JsValue> {
+    pub fn next_fiscal(
+        &self,
+        #[wasm_bindgen(js_name = "fiscalConfig")] fiscal_config: &JsFiscalConfig,
+    ) -> Result<JsPeriodId, JsValue> {
         self.inner
             .next_fiscal(fiscal_config.inner)
             .map(Self::from_inner)
@@ -361,8 +417,12 @@ impl JsPeriodId {
     /// @throws `FinstackError` (kind `validation`) if the configuration has an
     /// invalid fiscal start date for the year or the fiscal-year boundary is
     /// outside the supported date range.
+    /// @param fiscalConfig - Fiscal-year start used to size fiscal weeks and days.
     #[wasm_bindgen(js_name = prevFiscal)]
-    pub fn prev_fiscal(&self, fiscal_config: &JsFiscalConfig) -> Result<JsPeriodId, JsValue> {
+    pub fn prev_fiscal(
+        &self,
+        #[wasm_bindgen(js_name = "fiscalConfig")] fiscal_config: &JsFiscalConfig,
+    ) -> Result<JsPeriodId, JsValue> {
         self.inner
             .prev_fiscal(fiscal_config.inner)
             .map(Self::from_inner)
@@ -417,8 +477,14 @@ impl JsFiscalConfig {
     /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
     /// `validation`) if `startMonth` is outside `1..=12` or `startDay` is
     /// outside `1..=31`.
+    /// @param startMonth - Month the fiscal year starts in, `1` (January) through `12`.
+    /// @param startDay - Day of that month the fiscal year starts on, `1` through `31`; validity for a specific year (for example 30 February) is checked when the configuration is applied.
     #[wasm_bindgen(constructor)]
-    pub fn new(start_month: JsValue, start_day: JsValue) -> Result<JsFiscalConfig, JsValue> {
+    pub fn new(
+        #[wasm_bindgen(js_name = "startMonth", unchecked_param_type = "number")]
+        start_month: JsValue,
+        #[wasm_bindgen(js_name = "startDay", unchecked_param_type = "number")] start_day: JsValue,
+    ) -> Result<JsFiscalConfig, JsValue> {
         FiscalConfig::new(
             js_uint(&start_month, "startMonth")?,
             js_uint(&start_day, "startDay")?,
@@ -494,8 +560,17 @@ impl JsFiscalConfig {
 /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
 /// `validation`) if the range or the cutoff cannot be parsed or the two ends
 /// are incompatible.
-#[wasm_bindgen(js_name = buildPeriods)]
-pub fn build_periods(spec: JsValue, actuals_cutoff: Option<JsValue>) -> Result<JsValue, JsValue> {
+/// @param spec - Period range such as `"2025Q1..Q4"` or `"2025M01..2025M12"`; both ends must use the same frequency.
+/// @param actualsCutoff - Inclusive period code up to which periods are marked actual (`is_actual: true`); omitted marks every period as forecast.
+#[wasm_bindgen(js_name = buildPeriods, unchecked_return_type = "PeriodPlan")]
+pub fn build_periods(
+    #[wasm_bindgen(unchecked_param_type = "string")] spec: JsValue,
+    #[wasm_bindgen(
+        js_name = "actualsCutoff",
+        unchecked_optional_param_type = "string | null"
+    )]
+    actuals_cutoff: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
     let spec = js_string(&spec, "spec")?;
     let cutoff = js_opt_string(actuals_cutoff.as_ref(), "actualsCutoff")?;
     let plan = rust_build_periods(&spec, cutoff.as_deref()).map_err(to_js_err)?;
@@ -518,10 +593,17 @@ pub fn build_periods(spec: JsValue, actuals_cutoff: Option<JsValue>) -> Result<J
 /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
 /// `validation`) if a fiscal identifier cannot be parsed or the configuration
 /// produces invalid calendar boundaries.
-#[wasm_bindgen(js_name = buildFiscalPeriods)]
+/// @param spec - Fiscal period range such as `"FY2025Q1..Q4"`.
+/// @param fiscalConfig - Fiscal-year start that maps fiscal periods to calendar dates.
+/// @param actualsCutoff - Inclusive fiscal period code up to which periods are marked actual; omitted marks every period as forecast.
+#[wasm_bindgen(js_name = buildFiscalPeriods, unchecked_return_type = "PeriodPlan")]
 pub fn build_fiscal_periods(
-    spec: JsValue,
-    fiscal_config: &JsFiscalConfig,
+    #[wasm_bindgen(unchecked_param_type = "string")] spec: JsValue,
+    #[wasm_bindgen(js_name = "fiscalConfig")] fiscal_config: &JsFiscalConfig,
+    #[wasm_bindgen(
+        js_name = "actualsCutoff",
+        unchecked_optional_param_type = "string | null"
+    )]
     actuals_cutoff: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let spec = js_string(&spec, "spec")?;

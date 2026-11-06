@@ -71,7 +71,6 @@ impl PyEcfSweepSpec {
         ),
         text_signature = "(ebitda_node, sweep_percentage, taxes_node=None, capex_node=None, working_capital_node=None, cash_interest_node=None, target_instrument_id=None)"
     )]
-    #[allow(clippy::too_many_arguments)]
     fn new(
         ebitda_node: String,
         sweep_percentage: f64,

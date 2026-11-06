@@ -190,13 +190,13 @@ The coupon changes from 5.5% to 6.5% in January 2027. Exported flows make the co
 import json
 from datetime import date
 from finstack_quant.cashflows.builder import CashFlowSchedule,StepUpCouponSpec,ScheduleParams
-from finstack_quant.core.dates import DayCount
+from finstack_quant.core.dates import DayCount, Tenor
 from finstack_quant.core.money import Money
 from finstack_quant.valuations.instruments import bond_from_cashflows_json,price_instrument,instrument_cashflows
 from _shared.analyst_book import build_market
 AS_OF = date(2025, 1, 15)
 step_schedule=(CashFlowSchedule.builder().principal(Money(2_000_000,'USD'),date(2024,1,15),date(2030,1,15))
- .step_up_cf(StepUpCouponSpec(0.055,[(date(2027,1,15),0.065)],ScheduleParams('6M',DayCount.THIRTY_360,'weekends_only'))).build())
+ .step_up_cf(StepUpCouponSpec(0.055,[(date(2027,1,15),0.065)],ScheduleParams(frequency=Tenor.parse('6M'), day_count=DayCount.THIRTY_360, calendar_id='weekends_only'))).build())
 step_bond=bond_from_cashflows_json('STEP-UP',step_schedule.to_json(),'USD-OIS')
 step_price=price_instrument(step_bond,build_market('foundations'),AS_OF,metrics=['ytm'])
 print({'stepup_price_USD':step_price.price,'curve_implied_street_ytm':step_price.get_metric('ytm')})

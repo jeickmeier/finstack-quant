@@ -88,19 +88,19 @@ mod tests {
     #[test]
     fn theta_expiry_uses_shared_rfr_cutoff_fixing() {
         let as_of = date!(2024 - 01 - 02);
-        let mut option = CapFloor::new(
-            "RFR-THETA-FIXING",
-            RateOptionType::Caplet,
-            Money::from((1_000_000_i64, Currency::USD)),
-            0.05,
-            date!(2024 - 01 - 03),
-            date!(2024 - 04 - 03),
-            None,
-            DayCount::Act360,
-            "USD-OIS",
-            "USD-SOFR-OIS",
-            "USD-CAP-VOL",
-        )
+        let mut option = CapFloor::new(crate::cap_floor::CapFloorParams {
+            id: "RFR-THETA-FIXING".into(),
+            rate_option_type: RateOptionType::Caplet,
+            notional: Money::from((1_000_000_i64, Currency::USD)),
+            strike: 0.05,
+            start_date: date!(2024 - 01 - 03),
+            maturity: date!(2024 - 04 - 03),
+            frequency: None,
+            day_count: DayCount::Act360,
+            discount_curve_id: "USD-OIS".into(),
+            forward_curve_id: "USD-SOFR-OIS".into(),
+            vol_surface_id: "USD-CAP-VOL".into(),
+        })
         .expect("caplet");
         option.overnight_coupon = Some(OvernightCouponConvention {
             compounding: FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 1 },
@@ -128,19 +128,19 @@ mod tests {
     #[test]
     fn theta_skips_paid_period_before_resolving_fixing() {
         let as_of = date!(2025 - 04 - 03);
-        let option = CapFloor::new(
-            "PAID-THETA",
-            RateOptionType::Caplet,
-            Money::from((1_000_000_i64, Currency::USD)),
-            0.05,
-            date!(2025 - 01 - 02),
-            date!(2025 - 04 - 02),
-            None,
-            DayCount::Act360,
-            "USD-OIS",
-            "TEST-TERM-3M",
-            "USD-CAP-VOL",
-        )
+        let option = CapFloor::new(crate::cap_floor::CapFloorParams {
+            id: "PAID-THETA".into(),
+            rate_option_type: RateOptionType::Caplet,
+            notional: Money::from((1_000_000_i64, Currency::USD)),
+            strike: 0.05,
+            start_date: date!(2025 - 01 - 02),
+            maturity: date!(2025 - 04 - 02),
+            frequency: None,
+            day_count: DayCount::Act360,
+            discount_curve_id: "USD-OIS".into(),
+            forward_curve_id: "TEST-TERM-3M".into(),
+            vol_surface_id: "USD-CAP-VOL".into(),
+        })
         .expect("caplet");
 
         let next = next_option_theta_expiry(&option, &MarketContext::new(), as_of)
@@ -152,19 +152,19 @@ mod tests {
     #[test]
     fn theta_uses_delayed_payment_after_contractual_maturity() {
         let as_of = date!(2025 - 04 - 03);
-        let mut option = CapFloor::new(
-            "DELAYED-THETA",
-            RateOptionType::Caplet,
-            Money::from((1_000_000_i64, Currency::USD)),
-            0.05,
-            date!(2025 - 01 - 02),
-            date!(2025 - 04 - 02),
-            None,
-            DayCount::Act360,
-            "USD-OIS",
-            "USD-SOFR-OIS",
-            "USD-CAP-VOL",
-        )
+        let mut option = CapFloor::new(crate::cap_floor::CapFloorParams {
+            id: "DELAYED-THETA".into(),
+            rate_option_type: RateOptionType::Caplet,
+            notional: Money::from((1_000_000_i64, Currency::USD)),
+            strike: 0.05,
+            start_date: date!(2025 - 01 - 02),
+            maturity: date!(2025 - 04 - 02),
+            frequency: None,
+            day_count: DayCount::Act360,
+            discount_curve_id: "USD-OIS".into(),
+            forward_curve_id: "USD-SOFR-OIS".into(),
+            vol_surface_id: "USD-CAP-VOL".into(),
+        })
         .expect("caplet");
         option.overnight_coupon = Some(OvernightCouponConvention {
             compounding: FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 1 },

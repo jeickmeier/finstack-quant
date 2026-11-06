@@ -57,10 +57,17 @@ impl JsEvaluator {
     /// attached, and each later result carries its report as `check_report`.
     /// The evaluator is updated in place.
     ///
-    /// @param suite_spec - `CheckSuiteSpec` naming the built-in and formula checks to run (object or JSON).
+    /// @param suiteSpec - `CheckSuiteSpec` naming the built-in and formula checks to run (object or JSON).
     /// @throws Error with kind `validation` if `suiteSpec` is malformed or cannot be resolved.
     #[wasm_bindgen(js_name = withChecks)]
-    pub fn with_checks(&mut self, suite_spec: JsValue) -> Result<(), JsValue> {
+    pub fn with_checks(
+        &mut self,
+        #[wasm_bindgen(
+            js_name = "suiteSpec",
+            unchecked_param_type = "generated.statements.CheckSuiteSpec | string"
+        )]
+        suite_spec: JsValue,
+    ) -> Result<(), JsValue> {
         let spec: CheckSuiteSpec = from_js_json(&suite_spec, "suiteSpec")?;
         let suite = spec.resolve().map_err(to_js_err)?;
         let evaluator = std::mem::replace(&mut self.inner, Evaluator::new());
@@ -81,7 +88,11 @@ impl JsEvaluator {
     /// @param model - `FinancialModelSpec` to evaluate (object or JSON).
     /// @returns `StatementResult` plain object: node values per period, value types, evaluation metadata, capital-structure cashflows and the optional check report.
     /// @throws Error with kind `validation` if the model is malformed, fails semantic validation, or a formula fails to evaluate; kind `not_found` if a formula references a missing node or a capital-structure instrument needs market data; kind `computation` for a dependency cycle or a capital-structure failure.
-    pub fn evaluate(&mut self, model: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(unchecked_return_type = "StatementResult")]
+    pub fn evaluate(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let model =
             FinancialModelSpec::from_json(&json_text(&model, "model")?).map_err(to_js_err)?;
         to_js_value(&self.inner.evaluate(&model).map_err(to_js_err)?)
@@ -96,15 +107,15 @@ impl JsEvaluator {
     ///
     /// @param model - `FinancialModelSpec` to evaluate (object or JSON).
     /// @param market - `MarketContext` state supplying curves, quotes and FX (object or JSON).
-    /// @param as_of - ISO 8601 date (`"2025-01-15"`): the pricing date for capital-structure instruments and the cutoff for explicit-value visibility. An actual whose availability date falls after `asOf` is hidden, so the node falls back to its forecast or formula, and a value-only node then fails.
+    /// @param asOf - ISO 8601 date (`"2025-01-15"`): the pricing date for capital-structure instruments and the cutoff for explicit-value visibility. An actual whose availability date falls after `asOf` is hidden, so the node falls back to its forecast or formula, and a value-only node then fails.
     /// @returns `StatementResult` plain object, including `cs_cashflows` for capital-structure models.
     /// @throws Error with kind `validation` if an input is malformed, `asOf` is not an ISO date, or a formula fails to evaluate; kind `not_found` if a node or market datum is missing; kind `computation` for a dependency cycle or a capital-structure failure.
-    #[wasm_bindgen(js_name = evaluateWithMarket)]
+    #[wasm_bindgen(js_name = evaluateWithMarket, unchecked_return_type = "StatementResult")]
     pub fn evaluate_with_market(
         &mut self,
-        model: JsValue,
-        market: JsValue,
-        as_of: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] market: JsValue,
+        #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
     ) -> Result<JsValue, JsValue> {
         let model =
             FinancialModelSpec::from_json(&json_text(&model, "model")?).map_err(to_js_err)?;
@@ -128,10 +139,11 @@ impl JsEvaluator {
     /// @param config - `MonteCarloConfig`: `n_paths`, `seed`, optional `percentiles` (fractions in `[0, 1]`) and `include_path_data` (object or JSON).
     /// @returns `MonteCarloResults` plain object with percentile summaries per metric, the distinct forecast-period `warnings` (each reported once however many paths raised it; actual periods are not simulated and are omitted) and, when requested, the per-path table.
     /// @throws Error with kind `validation` if an input is malformed, `n_paths` is zero, or a path fails to evaluate; kind `not_found` if a formula references a missing node or a capital-structure instrument needs market data; kind `computation` for a capital-structure failure on a path.
-    #[wasm_bindgen(js_name = evaluateMonteCarlo)]
+    #[wasm_bindgen(js_name = evaluateMonteCarlo, unchecked_return_type = "MonteCarloResults")]
     pub fn evaluate_monte_carlo(
         &mut self,
-        model: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "generated.statements.MonteCarloConfig | string")]
         config: JsValue,
     ) -> Result<JsValue, JsValue> {
         let model =
@@ -215,7 +227,10 @@ impl JsRegistry {
     /// @param json - `MetricRegistry` document: `namespace`, `schema_version` (`1`) and `metrics` (object or JSON text).
     /// @throws Error with kind `validation` if the document is malformed, a formula does not compile, a metric identifier is duplicated, or a metric depends on an unknown metric.
     #[wasm_bindgen(js_name = loadFromJsonStr)]
-    pub fn load_from_json_str(&mut self, json: JsValue) -> Result<(), JsValue> {
+    pub fn load_from_json_str(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+    ) -> Result<(), JsValue> {
         self.inner
             .load_from_json_str(&json_text(&json, "json")?)
             .map(|_| ())
@@ -226,10 +241,14 @@ impl JsRegistry {
     ///
     /// Twin of Python `Registry.has` (Rust `Registry::has`).
     ///
-    /// @param qualified_id - Metric identifier as `namespace.metric`, e.g. `"fin.gross_margin"`.
+    /// @param qualifiedId - Metric identifier as `namespace.metric`, e.g. `"fin.gross_margin"`.
     /// @returns `true` when the metric exists.
     /// @throws TypeError with kind `invalid_type` if `qualifiedId` is not a string.
-    pub fn has(&self, qualified_id: JsValue) -> Result<bool, JsValue> {
+    pub fn has(
+        &self,
+        #[wasm_bindgen(js_name = "qualifiedId", unchecked_param_type = "string")]
+        qualified_id: JsValue,
+    ) -> Result<bool, JsValue> {
         Ok(self.inner.has(&js_string(&qualified_id, "qualifiedId")?))
     }
 
@@ -239,7 +258,7 @@ impl JsRegistry {
     ///
     /// @returns `namespace.metric` identifiers in registration order.
     /// @throws Error only if the list cannot be converted to a JavaScript array.
-    #[wasm_bindgen(js_name = metricIds)]
+    #[wasm_bindgen(js_name = metricIds, unchecked_return_type = "string[]")]
     pub fn metric_ids(&self) -> Result<JsValue, JsValue> {
         let ids: Vec<&str> = self.inner.all_metrics().map(|(id, _)| id).collect();
         to_js_value(&ids)
@@ -249,10 +268,15 @@ impl JsRegistry {
     ///
     /// Twin of Python `Registry.get` (Rust `Registry::get`).
     ///
-    /// @param qualified_id - Metric identifier as `namespace.metric`, e.g. `"fin.gross_margin"`.
+    /// @param qualifiedId - Metric identifier as `namespace.metric`, e.g. `"fin.gross_margin"`.
     /// @returns `MetricDefinition` plain object: `id`, `name`, `formula` and the optional description, category, unit type, requirements and tags.
     /// @throws Error with kind `not_found` if the metric is not registered.
-    pub fn get(&self, qualified_id: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(unchecked_return_type = "generated.statements.MetricDefinition")]
+    pub fn get(
+        &self,
+        #[wasm_bindgen(js_name = "qualifiedId", unchecked_param_type = "string")]
+        qualified_id: JsValue,
+    ) -> Result<JsValue, JsValue> {
         let stored = self
             .inner
             .get(&js_string(&qualified_id, "qualifiedId")?)
@@ -265,11 +289,15 @@ impl JsRegistry {
     /// Twin of Python `Registry.get_dependencies` (Rust
     /// `Registry::get_dependencies`).
     ///
-    /// @param qualified_id - Metric identifier as `namespace.metric`, e.g. `"fin.gross_margin"`.
+    /// @param qualifiedId - Metric identifier as `namespace.metric`, e.g. `"fin.gross_margin"`.
     /// @returns Qualified identifiers of the metrics to add before `qualifiedId`, in dependency order.
     /// @throws Error with kind `not_found` if the metric or one of its dependencies is not registered, and kind `validation` if the dependencies form a cycle.
-    #[wasm_bindgen(js_name = getDependencies)]
-    pub fn get_dependencies(&self, qualified_id: JsValue) -> Result<JsValue, JsValue> {
+    #[wasm_bindgen(js_name = getDependencies, unchecked_return_type = "string[]")]
+    pub fn get_dependencies(
+        &self,
+        #[wasm_bindgen(js_name = "qualifiedId", unchecked_param_type = "string")]
+        qualified_id: JsValue,
+    ) -> Result<JsValue, JsValue> {
         to_js_value(
             &self
                 .inner

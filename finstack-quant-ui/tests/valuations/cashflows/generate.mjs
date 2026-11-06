@@ -4,6 +4,7 @@ import {
   readRepoJson,
   sourceRecord,
 } from "../../../scripts/fixture-inputs.mjs";
+import { priceExtras } from "../../shared/price-extras.mjs";
 const manifestPath =
   "finstack-quant-ui/tests/valuations/instruments/pricing-cases.json";
 const bondPath = "finstack-quant-ui/src/fixtures/results/bond.json";
@@ -71,8 +72,7 @@ const cases = inputs.map(({ type, request }) => {
     request.asOf,
     request.model,
     request.metrics,
-    request.metricPricingOverrides,
-    request.marketHistory,
+    priceExtras(request),
   );
   let cashflows = null,
     error = null;

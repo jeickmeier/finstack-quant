@@ -32,6 +32,16 @@ use wasm_bindgen::prelude::*;
 /// Wraps the Rust `MertonMcConfig`: the constructor takes the asset-value
 /// model and a recovery rate, and each fluent method returns a new
 /// configuration with one field replaced. Pass it to `Bond.priceMertonMc`.
+///
+/// @example
+/// ```typescript
+/// import init, { models, valuations } from "finstack-quant-wasm";
+/// await init();
+/// const merton = new models.credit.MertonModel(100, 0.2, 80, 0.03);
+/// const config = new valuations.instruments.MertonMcConfig(merton.toJson(), 0.4).stepsPerYear(24);
+/// console.log(JSON.parse(config.toJson()).steps_per_year); // 24
+/// config.free();
+/// ```
 #[wasm_bindgen(js_name = MertonMcConfig)]
 #[derive(Clone)]
 pub struct JsMertonMcConfig {
@@ -42,11 +52,15 @@ pub struct JsMertonMcConfig {
 impl JsMertonMcConfig {
     /// Create a configuration with the Rust defaults (cash coupons, discrete barrier monitoring).
     /// @param merton - `MertonModel` plain object or JSON string: asset value, asset volatility, debt barrier and risk-free rate.
-    /// @param recovery_rate - Recovery on default as a decimal fraction of the accreted notional, in `[0, 1]`.
+    /// @param recoveryRate - Recovery on default as a decimal fraction of the accreted notional, in `[0, 1]`.
     /// @returns The configuration with Rust defaults for every other field.
     /// @throws Error - Throws with kind `validation` if `merton` does not match the `MertonModel` schema or `recoveryRate` is outside `[0, 1]`, and kind `invalid_type` for a wrong argument type.
     #[wasm_bindgen(constructor)]
-    pub fn new(merton: JsValue, recovery_rate: JsValue) -> Result<JsMertonMcConfig, JsValue> {
+    pub fn new(
+        #[wasm_bindgen(unchecked_param_type = "generated.valuations.MertonModel | string")] merton: JsValue,
+        #[wasm_bindgen(js_name = "recoveryRate", unchecked_param_type = "number")]
+        recovery_rate: JsValue,
+    ) -> Result<JsMertonMcConfig, JsValue> {
         MertonMcConfig::new(
             from_js_json(&merton, "merton")?,
             js_f64(&recovery_rate, "recoveryRate")?,
@@ -60,7 +74,11 @@ impl JsMertonMcConfig {
     /// @returns A new configuration; the receiver is not modified.
     /// @throws Error - Throws with kind `validation` if `s` does not match the `PikSchedule` schema.
     #[wasm_bindgen(js_name = pikSchedule)]
-    pub fn pik_schedule(&self, s: JsValue) -> Result<JsMertonMcConfig, JsValue> {
+    pub fn pik_schedule(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "generated.valuations.PikSchedule | string")]
+        s: JsValue,
+    ) -> Result<JsMertonMcConfig, JsValue> {
         let schedule = from_js_json(&s, "s")?;
         Ok(Self {
             inner: self.inner.clone().pik_schedule(schedule),
@@ -72,7 +90,10 @@ impl JsMertonMcConfig {
     /// @returns A new configuration; the receiver is not modified.
     /// @throws Error - Throws with kind `invalid_type` if `n` is not a non-negative whole number.
     #[wasm_bindgen(js_name = stepsPerYear)]
-    pub fn steps_per_year(&self, n: JsValue) -> Result<JsMertonMcConfig, JsValue> {
+    pub fn steps_per_year(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] n: JsValue,
+    ) -> Result<JsMertonMcConfig, JsValue> {
         let steps = js_uint(&n, "n")?;
         Ok(Self {
             inner: self.inner.clone().steps_per_year(steps),
@@ -84,7 +105,10 @@ impl JsMertonMcConfig {
     /// @returns A new configuration; the receiver is not modified.
     /// @throws Error - Throws with kind `validation` if `p` is not a known barrier-crossing name.
     #[wasm_bindgen(js_name = barrierCrossing)]
-    pub fn barrier_crossing(&self, p: JsValue) -> Result<JsMertonMcConfig, JsValue> {
+    pub fn barrier_crossing(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "generated.valuations.BarrierCrossing")] p: JsValue,
+    ) -> Result<JsMertonMcConfig, JsValue> {
         let crossing = js_wire(&p, "p")?;
         Ok(Self {
             inner: self.inner.clone().barrier_crossing(crossing),
@@ -96,7 +120,10 @@ impl JsMertonMcConfig {
     /// @returns A new configuration; the receiver is not modified.
     /// @throws Error - Throws with kind `validation` if `r` is outside `[0, 1]`, and kind `invalid_type` if it is not a number.
     #[wasm_bindgen(js_name = recoveryRate)]
-    pub fn recovery_rate(&self, r: JsValue) -> Result<JsMertonMcConfig, JsValue> {
+    pub fn recovery_rate(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] r: JsValue,
+    ) -> Result<JsMertonMcConfig, JsValue> {
         self.inner
             .clone()
             .recovery_rate(js_f64(&r, "r")?)
@@ -109,7 +136,13 @@ impl JsMertonMcConfig {
     /// @returns A new configuration; the receiver is not modified.
     /// @throws Error - Throws with kind `validation` if `h` does not match the `EndogenousHazardSpec` schema.
     #[wasm_bindgen(js_name = endogenousHazard)]
-    pub fn endogenous_hazard(&self, h: JsValue) -> Result<JsMertonMcConfig, JsValue> {
+    pub fn endogenous_hazard(
+        &self,
+        #[wasm_bindgen(
+            unchecked_param_type = "generated.valuations.EndogenousHazardSpec | string"
+        )]
+        h: JsValue,
+    ) -> Result<JsMertonMcConfig, JsValue> {
         let hazard = from_js_json(&h, "h")?;
         Ok(Self {
             inner: self.inner.clone().endogenous_hazard(hazard),
@@ -121,7 +154,11 @@ impl JsMertonMcConfig {
     /// @returns A new configuration; the receiver is not modified.
     /// @throws Error - Throws with kind `validation` if `r` does not match the `DynamicRecoverySpec` schema.
     #[wasm_bindgen(js_name = dynamicRecovery)]
-    pub fn dynamic_recovery(&self, r: JsValue) -> Result<JsMertonMcConfig, JsValue> {
+    pub fn dynamic_recovery(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "generated.valuations.DynamicRecoverySpec | string")]
+        r: JsValue,
+    ) -> Result<JsMertonMcConfig, JsValue> {
         let recovery = from_js_json(&r, "r")?;
         Ok(Self {
             inner: self.inner.clone().dynamic_recovery(recovery),
@@ -133,7 +170,11 @@ impl JsMertonMcConfig {
     /// @returns A new configuration; the receiver is not modified.
     /// @throws Error - Throws with kind `validation` if `t` does not match the `ToggleExerciseModel` schema.
     #[wasm_bindgen(js_name = toggleModel)]
-    pub fn toggle_model(&self, t: JsValue) -> Result<JsMertonMcConfig, JsValue> {
+    pub fn toggle_model(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "generated.valuations.ToggleExerciseModel | string")]
+        t: JsValue,
+    ) -> Result<JsMertonMcConfig, JsValue> {
         let toggle = from_js_json(&t, "t")?;
         Ok(Self {
             inner: self.inner.clone().toggle_model(toggle),
@@ -151,7 +192,13 @@ impl JsMertonMcConfig {
     /// @param spec - `MertonMcCalibrationSpec` plain object or JSON string: `target` (a `BondQuoteInput` such as `{ z_spread: 0.03 }`; spreads and yields are decimals), `parameter` (`"debt_barrier"` or `"asset_vol"`), `low_paths`, `max_iterations`, `tolerance_pv` (PV residual in currency units), optional `bracket` and `seed`.
     /// @returns A new configuration; the receiver is not modified.
     /// @throws Error - Throws with kind `validation` if `spec` does not match the `MertonMcCalibrationSpec` schema.
-    pub fn calibration(&self, spec: JsValue) -> Result<JsMertonMcConfig, JsValue> {
+    pub fn calibration(
+        &self,
+        #[wasm_bindgen(
+            unchecked_param_type = "generated.valuations.MertonMcCalibrationSpec | string"
+        )]
+        spec: JsValue,
+    ) -> Result<JsMertonMcConfig, JsValue> {
         let spec = from_js_json(&spec, "spec")?;
         Ok(Self {
             inner: self.inner.clone().calibration(spec),
@@ -167,7 +214,10 @@ impl JsMertonMcConfig {
     /// @returns A new configuration; the receiver is not modified.
     /// @throws Error - Throws with kind `validation` if `dfs` is not an array of number pairs.
     #[wasm_bindgen(js_name = cashflowDfs)]
-    pub fn cashflow_dfs(&self, dfs: JsValue) -> Result<JsMertonMcConfig, JsValue> {
+    pub fn cashflow_dfs(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "Array<[number, number]> | string")] dfs: JsValue,
+    ) -> Result<JsMertonMcConfig, JsValue> {
         let dfs = from_js_json(&dfs, "dfs")?;
         Ok(Self {
             inner: self.inner.clone().cashflow_dfs(dfs),
@@ -177,7 +227,7 @@ impl JsMertonMcConfig {
     /// Every configuration field as a plain object.
     /// @returns The `MertonMcConfig` serde form (`merton`, `pik_schedule`, `steps_per_year`, `barrier_crossing`, `recovery_rate`, `calibration`, `cashflow_dfs`, ...).
     /// @throws Error - Throws if the configuration cannot be serialized.
-    #[wasm_bindgen(js_name = toDict)]
+    #[wasm_bindgen(js_name = toDict, unchecked_return_type = "generated.valuations.MertonMcConfig")]
     pub fn to_dict(&self) -> Result<JsValue, JsValue> {
         to_js_value(&self.inner)
     }
@@ -187,7 +237,9 @@ impl JsMertonMcConfig {
     /// @returns The configuration.
     /// @throws Error - Throws with kind `validation` if `json` does not match the `MertonMcConfig` schema.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsMertonMcConfig, JsValue> {
+    pub fn from_json(
+        #[wasm_bindgen(unchecked_param_type = "generated.valuations.MertonMcConfig | string")] json: JsValue,
+    ) -> Result<JsMertonMcConfig, JsValue> {
         Ok(Self {
             inner: from_js_json(&json, "json")?,
         })
@@ -207,8 +259,12 @@ impl JsMertonMcConfig {
 /// @param t - Time from issue in years.
 /// @returns The `PikMode` applying at `t`.
 /// @throws Error - Throws with kind `validation` if `schedule` does not match the `PikSchedule` schema, and kind `invalid_type` if `t` is not a number.
-#[wasm_bindgen(js_name = pikScheduleModeAt)]
-pub fn pik_schedule_mode_at(schedule: JsValue, t: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = pikScheduleModeAt, unchecked_return_type = "generated.valuations.PikMode")]
+pub fn pik_schedule_mode_at(
+    #[wasm_bindgen(unchecked_param_type = "generated.valuations.PikSchedule | string")]
+    schedule: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] t: JsValue,
+) -> Result<JsValue, JsValue> {
     let schedule: PikSchedule = from_js_json(&schedule, "schedule")?;
     to_js_value(&schedule.mode_at(js_f64(&t, "t")?))
 }
@@ -231,8 +287,11 @@ pub fn tranche_builder() -> JsTrancheBuilder {
 /// @param tranches - `Tranche` plain objects (or a JSON array string).
 /// @returns The validated `TrancheStructure` plain object.
 /// @throws Error - Throws with kind `validation` if a tranche does not match the `Tranche` schema or the structure is invalid (empty, mixed currencies, duplicate ids).
-#[wasm_bindgen(js_name = trancheStructureFromBalances)]
-pub fn tranche_structure_from_balances(tranches: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = trancheStructureFromBalances, unchecked_return_type = "generated.valuations.TrancheStructure")]
+pub fn tranche_structure_from_balances(
+    #[wasm_bindgen(unchecked_param_type = "generated.valuations.Tranche[] | string")]
+    tranches: JsValue,
+) -> Result<JsValue, JsValue> {
     let tranches: Vec<Tranche> = from_js_json(&tranches, "tranches")?;
     to_js_value(&TrancheStructure::from_balances(tranches).map_err(to_js_err)?)
 }
@@ -242,15 +301,19 @@ pub fn tranche_structure_from_balances(tranches: JsValue) -> Result<JsValue, JsV
 /// @param balance - Current balance as a `Money` plain object.
 /// @param rate - Annual coupon as a decimal (`0.07` = 7%).
 /// @param maturity - Maturity date as an ISO-8601 string.
-/// @param day_count - Day-count serde name, e.g. `"30_360"`.
+/// @param dayCount - Day-count serde name, e.g. `"30_360"`.
 /// @returns The `PoolAsset` plain object.
 /// @throws Error - Throws with kind `validation` if `balance`, `maturity` or `dayCount` is malformed, and kind `invalid_type` for a wrong argument type.
-#[wasm_bindgen(js_name = poolAssetFixedRateBond)]
+#[wasm_bindgen(js_name = poolAssetFixedRateBond, unchecked_return_type = "generated.valuations.PoolAsset")]
 pub fn pool_asset_fixed_rate_bond(
-    id: JsValue,
-    balance: JsValue,
-    rate: JsValue,
-    maturity: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "MoneyValue")] balance: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] maturity: JsValue,
+    #[wasm_bindgen(
+        js_name = "dayCount",
+        unchecked_param_type = "generated.valuations.PoolAsset['day_count']"
+    )]
     day_count: JsValue,
 ) -> Result<JsValue, JsValue> {
     to_js_value(&PoolAsset::fixed_rate_bond(
@@ -265,19 +328,24 @@ pub fn pool_asset_fixed_rate_bond(
 /// Create a floating-rate loan pool asset (mirrors Rust `PoolAsset::floating_rate_loan`).
 /// @param id - Asset identifier, unique within the pool.
 /// @param balance - Current balance as a `Money` plain object.
-/// @param forward_curve_id - Forward curve projecting the loan's index, e.g. `"USD-SOFR-3M"`.
-/// @param spread_bp - Margin over the index in basis points.
+/// @param forwardCurveId - Forward curve projecting the loan's index, e.g. `"USD-SOFR-3M"`.
+/// @param spreadBp - Margin over the index in basis points.
 /// @param maturity - Maturity date as an ISO-8601 string.
-/// @param day_count - Day-count serde name, e.g. `"act_360"`.
+/// @param dayCount - Day-count serde name, e.g. `"act_360"`.
 /// @returns The `PoolAsset` plain object.
 /// @throws Error - Throws with kind `validation` if `balance`, `maturity` or `dayCount` is malformed, and kind `invalid_type` for a wrong argument type.
-#[wasm_bindgen(js_name = poolAssetFloatingRateLoan)]
+#[wasm_bindgen(js_name = poolAssetFloatingRateLoan, unchecked_return_type = "generated.valuations.PoolAsset")]
 pub fn pool_asset_floating_rate_loan(
-    id: JsValue,
-    balance: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "MoneyValue")] balance: JsValue,
+    #[wasm_bindgen(js_name = "forwardCurveId", unchecked_param_type = "string")]
     forward_curve_id: JsValue,
-    spread_bp: JsValue,
-    maturity: JsValue,
+    #[wasm_bindgen(js_name = "spreadBp", unchecked_param_type = "number")] spread_bp: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] maturity: JsValue,
+    #[wasm_bindgen(
+        js_name = "dayCount",
+        unchecked_param_type = "generated.valuations.PoolAsset['day_count']"
+    )]
     day_count: JsValue,
 ) -> Result<JsValue, JsValue> {
     to_js_value(&PoolAsset::floating_rate_loan(
@@ -292,18 +360,28 @@ pub fn pool_asset_floating_rate_loan(
 
 /// Return a copy of a pool with its reserve account configured.
 /// @param pool - `AssetPool` plain object or JSON string.
-/// @param reserve_account - Opening reserve balance as a `Money` plain object.
-/// @param reserve_account_rate - Annual interest rate earned on the reserve, as a decimal.
-/// @param reserve_target - Optional reserve target as a `Money` plain object; omit for no target.
-/// @param reserve_interest_destination - Optional `ReserveInterestDestination` plain object; omit for the Rust default (interest stays in the reserve).
+/// @param reserveAccount - Opening reserve balance as a `Money` plain object.
+/// @param reserveAccountRate - Annual interest rate earned on the reserve, as a decimal.
+/// @param reserveTarget - Optional reserve target as a `Money` plain object; omit for no target.
+/// @param reserveInterestDestination - Optional `ReserveInterestDestination` plain object; omit for the Rust default (interest stays in the reserve).
 /// @returns A new `AssetPool` plain object with the reserve fields set.
 /// @throws Error - Throws with kind `validation` if an argument does not match its schema, and kind `invalid_type` if `reserveAccountRate` is not a number.
-#[wasm_bindgen(js_name = assetPoolWithReserve)]
+#[wasm_bindgen(js_name = assetPoolWithReserve, unchecked_return_type = "generated.valuations.AssetPool")]
 pub fn asset_pool_with_reserve(
-    pool: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.valuations.AssetPool | string")] pool: JsValue,
+    #[wasm_bindgen(js_name = "reserveAccount", unchecked_param_type = "MoneyValue")]
     reserve_account: JsValue,
+    #[wasm_bindgen(js_name = "reserveAccountRate", unchecked_param_type = "number")]
     reserve_account_rate: JsValue,
+    #[wasm_bindgen(
+        js_name = "reserveTarget",
+        unchecked_optional_param_type = "MoneyValue | null"
+    )]
     reserve_target: Option<JsValue>,
+    #[wasm_bindgen(
+        js_name = "reserveInterestDestination",
+        unchecked_optional_param_type = "generated.valuations.AssetPool['reserve_interest_destination'] | null"
+    )]
     reserve_interest_destination: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let pool: AssetPool = from_js_json(&pool, "pool")?;
@@ -328,8 +406,10 @@ pub fn asset_pool_with_reserve(
 /// @param pool - `AssetPool` plain object or JSON string.
 /// @returns Pool balance as a `Money` plain object (`{ amount, currency }`) in the pool currency.
 /// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, carries both asset rows and representative lines, or mixes currencies.
-#[wasm_bindgen(js_name = assetPoolTotalBalance)]
-pub fn asset_pool_total_balance(pool: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = assetPoolTotalBalance, unchecked_return_type = "MoneyValue")]
+pub fn asset_pool_total_balance(
+    #[wasm_bindgen(unchecked_param_type = "generated.valuations.AssetPool | string")] pool: JsValue,
+) -> Result<JsValue, JsValue> {
     let pool: AssetPool = from_js_json(&pool, "pool")?;
     to_js_value(&pool.total_balance().map_err(to_js_err)?)
 }
@@ -338,8 +418,10 @@ pub fn asset_pool_total_balance(pool: JsValue) -> Result<JsValue, JsValue> {
 /// @param pool - `AssetPool` plain object or JSON string.
 /// @returns Performing balance as a `Money` plain object in the pool currency; equals the total balance when the pool has no loan-level assets.
 /// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema or its representation or currencies are inconsistent.
-#[wasm_bindgen(js_name = assetPoolPerformingBalance)]
-pub fn asset_pool_performing_balance(pool: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = assetPoolPerformingBalance, unchecked_return_type = "MoneyValue")]
+pub fn asset_pool_performing_balance(
+    #[wasm_bindgen(unchecked_param_type = "generated.valuations.AssetPool | string")] pool: JsValue,
+) -> Result<JsValue, JsValue> {
     let pool: AssetPool = from_js_json(&pool, "pool")?;
     to_js_value(&pool.performing_balance().map_err(to_js_err)?)
 }
@@ -349,7 +431,9 @@ pub fn asset_pool_performing_balance(pool: JsValue) -> Result<JsValue, JsValue> 
 /// @returns Balance-weighted coupon as an annual decimal (`0.07` = 7%); `undefined` when no performing fixed-rate collateral exists.
 /// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema.
 #[wasm_bindgen(js_name = assetPoolWac)]
-pub fn asset_pool_wac(pool: JsValue) -> Result<Option<f64>, JsValue> {
+pub fn asset_pool_wac(
+    #[wasm_bindgen(unchecked_param_type = "generated.valuations.AssetPool | string")] pool: JsValue,
+) -> Result<Option<f64>, JsValue> {
     let pool: AssetPool = from_js_json(&pool, "pool")?;
     Ok(pool.wac())
 }
@@ -359,20 +443,22 @@ pub fn asset_pool_wac(pool: JsValue) -> Result<Option<f64>, JsValue> {
 /// @returns Balance-weighted spread in basis points; `undefined` when no performing asset carries a spread.
 /// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema.
 #[wasm_bindgen(js_name = assetPoolWeightedAvgSpreadBp)]
-pub fn asset_pool_weighted_avg_spread_bp(pool: JsValue) -> Result<Option<f64>, JsValue> {
+pub fn asset_pool_weighted_avg_spread_bp(
+    #[wasm_bindgen(unchecked_param_type = "generated.valuations.AssetPool | string")] pool: JsValue,
+) -> Result<Option<f64>, JsValue> {
     let pool: AssetPool = from_js_json(&pool, "pool")?;
     Ok(pool.weighted_avg_spread_bp())
 }
 
 /// Balance-weighted average remaining maturity (mirrors Rust `AssetPool::weighted_avg_maturity`).
 /// @param pool - `AssetPool` plain object or JSON string.
-/// @param as_of - ISO-8601 date the remaining maturities are measured from.
+/// @param asOf - ISO-8601 date the remaining maturities are measured from.
 /// @returns Weighted average maturity in years (ACT/365F from `asOf`); `undefined` when the pool balance is zero.
 /// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, `asOf` is malformed, or the pool balances are inconsistent.
 #[wasm_bindgen(js_name = assetPoolWeightedAvgMaturity)]
 pub fn asset_pool_weighted_avg_maturity(
-    pool: JsValue,
-    as_of: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.valuations.AssetPool | string")] pool: JsValue,
+    #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
 ) -> Result<Option<f64>, JsValue> {
     let pool: AssetPool = from_js_json(&pool, "pool")?;
     pool.weighted_avg_maturity(js_date(&as_of, "asOf")?)
@@ -384,20 +470,22 @@ pub fn asset_pool_weighted_avg_maturity(
 /// @returns Diversity score over the assets that name an obligor; `undefined` when the pool balance is zero or no asset names an obligor.
 /// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema or the pool balances are inconsistent.
 #[wasm_bindgen(js_name = assetPoolDiversityScore)]
-pub fn asset_pool_diversity_score(pool: JsValue) -> Result<Option<f64>, JsValue> {
+pub fn asset_pool_diversity_score(
+    #[wasm_bindgen(unchecked_param_type = "generated.valuations.AssetPool | string")] pool: JsValue,
+) -> Result<Option<f64>, JsValue> {
     let pool: AssetPool = from_js_json(&pool, "pool")?;
     pool.diversity_score().map_err(to_js_err)
 }
 
 /// Loan-level assets of one obligor (mirrors Rust `AssetPool::assets_by_obligor`).
 /// @param pool - `AssetPool` plain object or JSON string.
-/// @param obligor_id - Obligor identifier matched exactly against each asset's `obligor_id`.
+/// @param obligorId - Obligor identifier matched exactly against each asset's `obligor_id`.
 /// @returns `PoolAsset` plain objects in pool order; empty when none match.
 /// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, and kind `invalid_type` if `obligorId` is not a string.
-#[wasm_bindgen(js_name = assetPoolAssetsByObligor)]
+#[wasm_bindgen(js_name = assetPoolAssetsByObligor, unchecked_return_type = "generated.valuations.PoolAsset[]")]
 pub fn asset_pool_assets_by_obligor(
-    pool: JsValue,
-    obligor_id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.valuations.AssetPool | string")] pool: JsValue,
+    #[wasm_bindgen(js_name = "obligorId", unchecked_param_type = "string")] obligor_id: JsValue,
 ) -> Result<JsValue, JsValue> {
     let pool: AssetPool = from_js_json(&pool, "pool")?;
     to_js_value(&pool.assets_by_obligor(&js_string(&obligor_id, "obligorId")?))
@@ -408,8 +496,11 @@ pub fn asset_pool_assets_by_obligor(
 /// @param industry - Industry label matched exactly against each asset's `industry`.
 /// @returns `PoolAsset` plain objects in pool order; empty when none match.
 /// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, and kind `invalid_type` if `industry` is not a string.
-#[wasm_bindgen(js_name = assetPoolAssetsByIndustry)]
-pub fn asset_pool_assets_by_industry(pool: JsValue, industry: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = assetPoolAssetsByIndustry, unchecked_return_type = "generated.valuations.PoolAsset[]")]
+pub fn asset_pool_assets_by_industry(
+    #[wasm_bindgen(unchecked_param_type = "generated.valuations.AssetPool | string")] pool: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] industry: JsValue,
+) -> Result<JsValue, JsValue> {
     let pool: AssetPool = from_js_json(&pool, "pool")?;
     to_js_value(&pool.assets_by_industry(&js_string(&industry, "industry")?))
 }
@@ -420,8 +511,11 @@ pub fn asset_pool_assets_by_industry(pool: JsValue, industry: JsValue) -> Result
 /// @param cashflows - `TrancheCashflows` plain object or JSON string, as `StructuredCredit.trancheCashflows` returns it.
 /// @returns `TableEnvelope` with a `date` column in ascending order and float `cashflow`, `interest`, `principal`, `pik`, `deferred` and `writedown` columns in the flows' one currency, which the table does not state (read `total_interest.currency`). Flows on one date are summed per kind; a kind with no flow on a date is zero; the columns remain when there are no rows.
 /// @throws Error - Throws with kind `validation` if `cashflows` does not match the `TrancheCashflows` schema or mixes currencies.
-#[wasm_bindgen(js_name = trancheCashflowsTable)]
-pub fn tranche_cashflows_table(cashflows: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = trancheCashflowsTable, unchecked_return_type = "TableEnvelope")]
+pub fn tranche_cashflows_table(
+    #[wasm_bindgen(unchecked_param_type = "generated.valuations.TrancheCashflows | string")]
+    cashflows: JsValue,
+) -> Result<JsValue, JsValue> {
     let cashflows: TrancheCashflows = from_js_json(&cashflows, "cashflows")?;
     to_js_value(&cashflows.to_table().map_err(to_js_err)?)
 }
@@ -430,11 +524,14 @@ pub fn tranche_cashflows_table(cashflows: JsValue) -> Result<JsValue, JsValue> {
 ///
 /// Each concentration table covers every asset row, defaulted assets included in balances and denominator, so its shares sum to 100%. Assets with no value on a dimension form one row with a null key. Rows are ordered by balance descending, then key ascending with the null key first. Representative lines and instrument collateral are normalized to asset rows first and land in the null-key rows.
 /// @param pool - `AssetPool` plain object or JSON string, in any of its three representations.
-/// @param as_of - ISO-8601 date the remaining maturities are measured from. It also stands in for the closing date when a pool is normalized: it ages representative lines and counts the delayed draws already funded on instrument collateral.
+/// @param asOf - ISO-8601 date the remaining maturities are measured from. It also stands in for the closing date when a pool is normalized: it ages representative lines and counts the delayed draws already funded on instrument collateral.
 /// @returns `PoolReport` plain object: `total_balance` (the denominator of every share), `stats` (`PoolStats` of the same rows), `warf` (Moody's rating factor weighted by balance over the performing rows, unrated assets at the `NR` factor) and `by_obligor`, `by_industry`, `by_rating`, each a list of `PoolConcentrationEntry` with `balance_pct` in percent points. An empty pool reports zero balances and empty tables. `poolReportFieldUnits` states every unit.
 /// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, `asOf` is malformed, the pool cannot be normalized, an asset is not in the pool's base currency, or a rating has no Moody's factor.
-#[wasm_bindgen(js_name = poolReport)]
-pub fn pool_report(pool: JsValue, as_of: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = poolReport, unchecked_return_type = "generated.valuations.PoolReport")]
+pub fn pool_report(
+    #[wasm_bindgen(unchecked_param_type = "generated.valuations.AssetPool | string")] pool: JsValue,
+    #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
+) -> Result<JsValue, JsValue> {
     let pool: AssetPool = from_js_json(&pool, "pool")?;
     to_js_value(
         &finstack_quant_valuations::instruments::fixed_income::structured_credit::pool_report(
@@ -451,8 +548,11 @@ pub fn pool_report(pool: JsValue, as_of: JsValue) -> Result<JsValue, JsValue> {
 /// @param report - `PoolReport` plain object or JSON string, as `poolReport` returns it.
 /// @returns `TableEnvelope` with the obligor rows, then industry, then rating, each in report order, and columns `dimension` (`obligor`, `industry` or `rating`), `key` (nullable string, null for the assets with no value on the dimension), `balance` (float), `currency` (ISO code of the balance), `balance_pct` (percent points) and `asset_count` (integer). The columns remain when every table is empty.
 /// @throws Error - Throws with kind `validation` if `report` does not match the `PoolReport` schema.
-#[wasm_bindgen(js_name = poolReportTable)]
-pub fn pool_report_table(report: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = poolReportTable, unchecked_return_type = "TableEnvelope")]
+pub fn pool_report_table(
+    #[wasm_bindgen(unchecked_param_type = "generated.valuations.PoolReport | string")]
+    report: JsValue,
+) -> Result<JsValue, JsValue> {
     let report: finstack_quant_valuations::instruments::fixed_income::structured_credit::PoolReport =
         from_js_json(&report, "report")?;
     to_js_value(&report.to_table())
@@ -460,11 +560,14 @@ pub fn pool_report_table(report: JsValue) -> Result<JsValue, JsValue> {
 
 /// Collateral-pool statistics at a date (mirrors Rust `calculate_pool_stats`).
 /// @param pool - `AssetPool` plain object or JSON string.
-/// @param as_of - ISO-8601 date the remaining maturities are measured from.
+/// @param asOf - ISO-8601 date the remaining maturities are measured from.
 /// @returns `PoolStats` plain object: weighted-average coupon, spread (bp) and maturity (years), diversity score, obligor and industry counts, defaulted balance in percent points and undrawn commitment.
 /// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, `asOf` is malformed, or the pool balances are inconsistent.
-#[wasm_bindgen(js_name = calculatePoolStats)]
-pub fn calculate_pool_stats(pool: JsValue, as_of: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = calculatePoolStats, unchecked_return_type = "generated.valuations.PoolStats")]
+pub fn calculate_pool_stats(
+    #[wasm_bindgen(unchecked_param_type = "generated.valuations.AssetPool | string")] pool: JsValue,
+    #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
+) -> Result<JsValue, JsValue> {
     let pool: AssetPool = from_js_json(&pool, "pool")?;
     to_js_value(
         &finstack_quant_valuations::instruments::fixed_income::structured_credit::calculate_pool_stats(
@@ -490,8 +593,10 @@ fn penalty(value: PrepaymentPenalty) -> Result<JsValue, JsValue> {
 /// @param through - Optional last date of the lockout as an ISO-8601 string; omit for a lockout to maturity.
 /// @returns The `PrepaymentPenalty` plain object.
 /// @throws Error - Throws with kind `validation` if `through` is malformed, and kind `invalid_type` if it is not a string.
-#[wasm_bindgen(js_name = prepaymentPenaltyLockout)]
-pub fn prepayment_penalty_lockout(through: Option<JsValue>) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = prepaymentPenaltyLockout, unchecked_return_type = "generated.valuations.PrepaymentPenalty")]
+pub fn prepayment_penalty_lockout(
+    #[wasm_bindgen(unchecked_optional_param_type = "string | null")] through: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
     penalty(PrepaymentPenalty::Lockout {
         through: js_opt_date(through.as_ref(), "through")?,
     })
@@ -502,10 +607,10 @@ pub fn prepayment_penalty_lockout(through: Option<JsValue>) -> Result<JsValue, J
 /// @param through - Optional last date the penalty applies, as an ISO-8601 string; omit for the life of the loan.
 /// @returns The `PrepaymentPenalty` plain object.
 /// @throws Error - Throws with kind `validation` if `pct` is negative or not finite or `through` is malformed, and kind `invalid_type` for a wrong argument type.
-#[wasm_bindgen(js_name = prepaymentPenaltyFixed)]
+#[wasm_bindgen(js_name = prepaymentPenaltyFixed, unchecked_return_type = "generated.valuations.PrepaymentPenalty")]
 pub fn prepayment_penalty_fixed(
-    pct: JsValue,
-    through: Option<JsValue>,
+    #[wasm_bindgen(unchecked_param_type = "number")] pct: JsValue,
+    #[wasm_bindgen(unchecked_optional_param_type = "string | null")] through: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     penalty(PrepaymentPenalty::Fixed {
         pct: js_f64(&pct, "pct")?,
@@ -517,8 +622,10 @@ pub fn prepayment_penalty_fixed(
 /// @param schedule - `[throughDate, pct]` pairs in increasing date order: `pct` percent of the prepaid balance applies through each ISO-8601 date.
 /// @returns The `PrepaymentPenalty` plain object.
 /// @throws Error - Throws with kind `validation` if `schedule` is not an array of `[string, number]` pairs, a date is malformed, or the schedule is empty, unordered or has a negative percentage.
-#[wasm_bindgen(js_name = prepaymentPenaltyStepDown)]
-pub fn prepayment_penalty_step_down(schedule: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = prepaymentPenaltyStepDown, unchecked_return_type = "generated.valuations.PrepaymentPenalty")]
+pub fn prepayment_penalty_step_down(
+    #[wasm_bindgen(unchecked_param_type = "[string, number][] | string")] schedule: JsValue,
+) -> Result<JsValue, JsValue> {
     let rows: Vec<(String, f64)> = from_js_json(&schedule, "schedule")?;
     let schedule = rows
         .into_iter()
@@ -533,18 +640,27 @@ pub fn prepayment_penalty_step_down(schedule: JsValue) -> Result<JsValue, JsValu
 }
 
 /// `PrepaymentPenalty::YieldMaintenance`: the lender is made whole on lost interest.
-/// @param reinvestment_rate - Optional flat reinvestment rate as a decimal; omit to discount on `discountCurveId`.
-/// @param discount_curve_id - Optional discount curve used for the reinvestment yield; omit to use `reinvestmentRate`.
-/// @param floor_pct - Optional minimum penalty in percent of the prepaid balance.
+/// @param reinvestmentRate - Optional flat reinvestment rate as a decimal; omit to discount on `discountCurveId`.
+/// @param discountCurveId - Optional discount curve used for the reinvestment yield; omit to use `reinvestmentRate`.
+/// @param floorPct - Optional minimum penalty in percent of the prepaid balance.
 /// @param through - Optional last date the penalty applies, as an ISO-8601 string; omit for the life of the loan.
 /// @returns The `PrepaymentPenalty` plain object.
 /// @throws Error - Throws with kind `validation` if neither or both of `reinvestmentRate` and `discountCurveId` are usable, a value is negative or not finite, or `through` is malformed; and kind `invalid_type` for a wrong argument type.
-#[wasm_bindgen(js_name = prepaymentPenaltyYieldMaintenance)]
+#[wasm_bindgen(js_name = prepaymentPenaltyYieldMaintenance, unchecked_return_type = "generated.valuations.PrepaymentPenalty")]
 pub fn prepayment_penalty_yield_maintenance(
+    #[wasm_bindgen(
+        js_name = "reinvestmentRate",
+        unchecked_optional_param_type = "number | null"
+    )]
     reinvestment_rate: Option<JsValue>,
+    #[wasm_bindgen(
+        js_name = "discountCurveId",
+        unchecked_optional_param_type = "string | null"
+    )]
     discount_curve_id: Option<JsValue>,
+    #[wasm_bindgen(js_name = "floorPct", unchecked_optional_param_type = "number | null")]
     floor_pct: Option<JsValue>,
-    through: Option<JsValue>,
+    #[wasm_bindgen(unchecked_optional_param_type = "string | null")] through: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     penalty(PrepaymentPenalty::YieldMaintenance {
         discount_curve_id: js_opt_string(discount_curve_id.as_ref(), "discountCurveId")?
@@ -561,7 +677,7 @@ pub fn prepayment_penalty_yield_maintenance(
 /// CCC bucket carried at market value and an 80% discount-obligation threshold.
 /// @returns The `CoverageRules` plain object.
 /// @throws Error - Throws if the value cannot be converted to JavaScript.
-#[wasm_bindgen(js_name = coverageRulesCloStandard)]
+#[wasm_bindgen(js_name = coverageRulesCloStandard, unchecked_return_type = "generated.valuations.CoverageRules")]
 pub fn coverage_rules_clo_standard() -> Result<JsValue, JsValue> {
     to_js_value(&CoverageRules::clo_standard())
 }
@@ -570,7 +686,10 @@ pub fn coverage_rules_clo_standard() -> Result<JsValue, JsValue> {
 /// @param rules - `CoverageRules` plain object or JSON string.
 /// @throws Error - Throws with kind `validation` if `rules` does not match the `CoverageRules` schema or a haircut, threshold or carry value is out of range.
 #[wasm_bindgen(js_name = coverageRulesValidate)]
-pub fn coverage_rules_validate(rules: JsValue) -> Result<(), JsValue> {
+pub fn coverage_rules_validate(
+    #[wasm_bindgen(unchecked_param_type = "generated.valuations.CoverageRules | string")]
+    rules: JsValue,
+) -> Result<(), JsValue> {
     let rules: CoverageRules = from_js_json(&rules, "rules")?;
     rules.validate().map_err(to_js_err)
 }
@@ -579,8 +698,11 @@ pub fn coverage_rules_validate(rules: JsValue) -> Result<(), JsValue> {
 /// @param waterfall - `Waterfall` plain object or JSON string.
 /// @returns `CoverageTestSpec` plain objects in the order the waterfall runs them.
 /// @throws Error - Throws with kind `validation` if `waterfall` does not match the `Waterfall` schema.
-#[wasm_bindgen(js_name = waterfallCoverageTests)]
-pub fn waterfall_coverage_tests(waterfall: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = waterfallCoverageTests, unchecked_return_type = "generated.valuations.CoverageTestSpec[]")]
+pub fn waterfall_coverage_tests(
+    #[wasm_bindgen(unchecked_param_type = "generated.valuations.Waterfall | string")]
+    waterfall: JsValue,
+) -> Result<JsValue, JsValue> {
     let waterfall: Waterfall = from_js_json(&waterfall, "waterfall")?;
     let tests: Vec<&CoverageTestSpec> = waterfall.coverage_tests().collect();
     to_js_value(&tests)
@@ -600,19 +722,22 @@ fn amortization_event(event: AmortizationEvent) -> Result<JsValue, JsValue> {
 /// @param date - Date revolving stops, as an ISO-8601 string.
 /// @returns The `AmortizationEvent` plain object.
 /// @throws Error - Throws with kind `validation` if `date` is malformed, and kind `invalid_type` if it is not a string.
-#[wasm_bindgen(js_name = amortizationEventDate)]
-pub fn amortization_event_date(date: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = amortizationEventDate, unchecked_return_type = "generated.valuations.AmortizationEvent")]
+pub fn amortization_event_date(
+    #[wasm_bindgen(unchecked_param_type = "string")] date: JsValue,
+) -> Result<JsValue, JsValue> {
     amortization_event(AmortizationEvent::Date {
         date: js_date(&date, "date")?,
     })
 }
 
 /// `AmortizationEvent::CumulativeLoss`: revolving stops when losses pass a limit.
-/// @param max_cumulative_loss - Cumulative net loss limit as a decimal fraction of the original pool balance (`0.05` = 5%).
+/// @param maxCumulativeLoss - Cumulative net loss limit as a decimal fraction of the original pool balance (`0.05` = 5%).
 /// @returns The `AmortizationEvent` plain object.
 /// @throws Error - Throws with kind `validation` if the limit is outside `(0, 1]`, and kind `invalid_type` if it is not a number.
-#[wasm_bindgen(js_name = amortizationEventCumulativeLoss)]
+#[wasm_bindgen(js_name = amortizationEventCumulativeLoss, unchecked_return_type = "generated.valuations.AmortizationEvent")]
 pub fn amortization_event_cumulative_loss(
+    #[wasm_bindgen(js_name = "maxCumulativeLoss", unchecked_param_type = "number")]
     max_cumulative_loss: JsValue,
 ) -> Result<JsValue, JsValue> {
     amortization_event(AmortizationEvent::CumulativeLoss {
@@ -621,11 +746,14 @@ pub fn amortization_event_cumulative_loss(
 }
 
 /// `AmortizationEvent::ExcessSpread`: revolving stops when excess spread falls below a floor.
-/// @param min_excess_spread_3m - Minimum three-month average annualized excess spread as a decimal (`0.01` = 1%).
+/// @param minExcessSpread3m - Minimum three-month average annualized excess spread as a decimal (`0.01` = 1%).
 /// @returns The `AmortizationEvent` plain object.
 /// @throws Error - Throws with kind `validation` if the floor is not finite, and kind `invalid_type` if it is not a number.
-#[wasm_bindgen(js_name = amortizationEventExcessSpread)]
-pub fn amortization_event_excess_spread(min_excess_spread_3m: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = amortizationEventExcessSpread, unchecked_return_type = "generated.valuations.AmortizationEvent")]
+pub fn amortization_event_excess_spread(
+    #[wasm_bindgen(js_name = "minExcessSpread3m", unchecked_param_type = "number")]
+    min_excess_spread_3m: JsValue,
+) -> Result<JsValue, JsValue> {
     amortization_event(AmortizationEvent::ExcessSpread {
         min_excess_spread_3m: js_f64(&min_excess_spread_3m, "minExcessSpread3m")?,
     })
@@ -638,14 +766,19 @@ pub fn amortization_event_excess_spread(min_excess_spread_3m: JsValue) -> Result
 /// One `CdsIndexParams` preset factory `(series, version, couponBp)`.
 macro_rules! index_preset {
     ($(#[$doc:meta])* $name:ident as $js_name:ident => $preset:ident) => {
+        #[finstack_quant_wasm_macros::plain_docs]
         $(#[$doc])*
         /// @param series - Published series number of the index.
         /// @param version - Index version within the series after credit events (1 at launch).
-        /// @param coupon_bp - Running fixed coupon in basis points.
+        /// @param couponBp - Running fixed coupon in basis points.
         /// @returns The `CdsIndexParams` plain object for `CdsIndex.fromPreset`.
         /// @throws Error - Throws with kind `invalid_type` if `series` or `version` is not a whole number in `0..=65535` or `couponBp` is not a number.
-        #[wasm_bindgen(js_name = $js_name)]
-        pub fn $name(series: JsValue, version: JsValue, coupon_bp: JsValue) -> Result<JsValue, JsValue> {
+        #[wasm_bindgen(js_name = $js_name, unchecked_return_type = "generated.valuations.CdsIndexParams")]
+        pub fn $name(
+            #[wasm_bindgen(unchecked_param_type = "number")] series: JsValue,
+            #[wasm_bindgen(unchecked_param_type = "number")] version: JsValue,
+            #[wasm_bindgen(js_name = "couponBp", unchecked_param_type = "number")] coupon_bp: JsValue,
+        ) -> Result<JsValue, JsValue> {
             to_js_value(&CdsIndexParams::$preset(
                 js_uint(&series, "series")?,
                 js_uint(&version, "version")?,
@@ -671,21 +804,22 @@ index_preset!(
 /// One `CdsTrancheParams` factory `(indexName, series, notional, maturity, couponBp)`.
 macro_rules! tranche_preset {
     ($(#[$doc:meta])* $name:ident as $js_name:ident => $preset:ident) => {
+        #[finstack_quant_wasm_macros::plain_docs]
         $(#[$doc])*
-        /// @param index_name - Index family name, e.g. `"CDX.NA.IG"`.
+        /// @param indexName - Index family name, e.g. `"CDX.NA.IG"`.
         /// @param series - Published series number of the index.
         /// @param notional - Tranche notional as a `Money` plain object.
         /// @param maturity - Maturity date as an ISO-8601 string.
-        /// @param coupon_bp - Running coupon in basis points.
+        /// @param couponBp - Running coupon in basis points.
         /// @returns The `CdsTrancheParams` plain object for `CdsTranche.standard`.
         /// @throws Error - Throws with kind `validation` if `notional` or `maturity` is malformed, and kind `invalid_type` for a wrong argument type.
-        #[wasm_bindgen(js_name = $js_name)]
+        #[wasm_bindgen(js_name = $js_name, unchecked_return_type = "generated.valuations.CdsTrancheParams")]
         pub fn $name(
-            index_name: JsValue,
-            series: JsValue,
-            notional: JsValue,
-            maturity: JsValue,
-            coupon_bp: JsValue,
+            #[wasm_bindgen(js_name = "indexName", unchecked_param_type = "string")] index_name: JsValue,
+            #[wasm_bindgen(unchecked_param_type = "number")] series: JsValue,
+            #[wasm_bindgen(unchecked_param_type = "MoneyValue")] notional: JsValue,
+            #[wasm_bindgen(unchecked_param_type = "string")] maturity: JsValue,
+            #[wasm_bindgen(js_name = "couponBp", unchecked_param_type = "number")] coupon_bp: JsValue,
         ) -> Result<JsValue, JsValue> {
             to_js_value(&CdsTrancheParams::$preset(
                 js_string(&index_name, "indexName")?,
@@ -714,12 +848,15 @@ tranche_preset!(
 /// Validate a canonical envelope for one exact instrument type.
 ///
 /// Mirrors Rust `pricer::validate_typed_instrument_json`.
-/// @param type_tag - Canonical instrument discriminator expected by the caller, e.g. `"bond"`.
+/// @param typeTag - Canonical instrument discriminator expected by the caller, e.g. `"bond"`.
 /// @param json - Canonical v1 instrument envelope (JSON string or plain object).
 /// @returns The canonical envelope JSON.
 /// @throws Error - Throws with kind `validation` if `json` is malformed, fails instrument validation, or carries another instrument type.
 #[wasm_bindgen(js_name = validateTypedInstrumentJson)]
-pub fn validate_typed_instrument_json(type_tag: JsValue, json: JsValue) -> Result<String, JsValue> {
+pub fn validate_typed_instrument_json(
+    #[wasm_bindgen(js_name = "typeTag", unchecked_param_type = "string")] type_tag: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+) -> Result<String, JsValue> {
     finstack_quant_valuations::pricer::validate_typed_instrument_json(
         &js_string(&type_tag, "typeTag")?,
         &crate::utils::input::json_text(&json, "json")?,
@@ -734,12 +871,15 @@ pub fn validate_typed_instrument_json(type_tag: JsValue, json: JsValue) -> Resul
 /// deposit, inflation swaps, exotics, ...): build the type's `spec` object and
 /// pass the returned envelope object straight to `priceInstrument` or
 /// `instrumentCashflows`.
-/// @param type_tag - Canonical instrument discriminator, one of `valuations.schema.instrumentTypes()`, e.g. `"forward_rate_agreement"` or `"fx_spot"`.
+/// @param typeTag - Canonical instrument discriminator, one of `valuations.schema.instrumentTypes()`, e.g. `"forward_rate_agreement"` or `"fx_spot"`.
 /// @param spec - The bare `spec` object for that type (plain object or JSON string); tagged `{type, spec}` payloads and envelopes are rejected.
 /// @returns The canonical `finstack_quant.instrument/1` envelope as a plain object (`{ schema, instrument: { type, spec } }`); use `JSON.stringify` when the wire text is needed.
 /// @throws Error - Throws with kind `validation` if `spec` is not a bare object, does not deserialize as a `typeTag` instrument, or fails instrument validation; kind `invalid_type` for a wrong argument type.
-#[wasm_bindgen(js_name = instrumentEnvelopeFromSpec)]
-pub fn instrument_envelope_from_spec(type_tag: JsValue, spec: JsValue) -> Result<JsValue, JsValue> {
+#[wasm_bindgen(js_name = instrumentEnvelopeFromSpec, unchecked_return_type = "generated.valuations.InstrumentEnvelope")]
+pub fn instrument_envelope_from_spec(
+    #[wasm_bindgen(js_name = "typeTag", unchecked_param_type = "string")] type_tag: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] spec: JsValue,
+) -> Result<JsValue, JsValue> {
     let envelope = finstack_quant_valuations::pricer::instrument_envelope_from_spec(
         &js_string(&type_tag, "typeTag")?,
         crate::utils::input::from_js_json(&spec, "spec")?,
@@ -756,7 +896,9 @@ pub fn instrument_envelope_from_spec(type_tag: JsValue, spec: JsValue) -> Result
 /// @returns Indented canonical envelope JSON.
 /// @throws Error - Throws with kind `validation` if `json` is malformed or fails instrument validation.
 #[wasm_bindgen(js_name = prettyInstrumentJson)]
-pub fn pretty_instrument_json(json: JsValue) -> Result<String, JsValue> {
+pub fn pretty_instrument_json(
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+) -> Result<String, JsValue> {
     finstack_quant_valuations::pricer::pretty_instrument_json(&crate::utils::input::json_text(
         &json, "json",
     )?)

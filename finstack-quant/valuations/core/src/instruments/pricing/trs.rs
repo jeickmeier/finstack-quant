@@ -99,6 +99,29 @@ impl FinancingPeriodProjection {
     }
 }
 
+/// Period-invariant inputs of [`financing_period_projection`] for one
+/// financing leg.
+struct FinancingLegContext<'a> {
+    /// Financing leg terms: forward curve id, day count and compounding.
+    financing: &'a FinancingLegSpec,
+    /// Forward curve projecting the leg's rate.
+    fwd: &'a ForwardCurve,
+    /// Published `FIXING:{forward_curve_id}` series, when the market has one.
+    fixings: Option<&'a ScalarTimeSeries>,
+    /// Coupon frequency of the financing schedule.
+    coupon_frequency: Tenor,
+    /// Valuation date splitting realized from projected fixings.
+    as_of: Date,
+    /// Overnight fixing calendar id; empty resolves the currency default.
+    calendar_id: &'a str,
+    /// Business-day convention for overnight accrual boundaries.
+    accrual_bdc: BusinessDayConvention,
+    /// Leg currency, used to resolve the default fixing calendar.
+    currency: Currency,
+    /// Whether to report projected fixings as exposures.
+    collect_fixings: bool,
+}
+
 /// Project one financing-leg accrual period's floating rate, excluding spread.
 ///
 /// `simple` legs use the discount-factor-implied simple forward over the period;
@@ -117,21 +140,26 @@ impl FinancingPeriodProjection {
 /// overnight coupon projector. Fully-future periods (`period_start > as_of`)
 /// use the same projector with entirely projected observations. Missing realized
 /// fixings for an in-progress period are errors.
-#[allow(clippy::too_many_arguments)]
+///
+/// `period_year_fraction` is the period's accrual on the financing leg's day
+/// count; every other input is the period-invariant `leg` context.
 fn financing_period_projection(
-    financing: &FinancingLegSpec,
-    fwd: &ForwardCurve,
-    fixings: Option<&ScalarTimeSeries>,
+    leg: &FinancingLegContext<'_>,
     period_start: Date,
     period_end: Date,
     period_year_fraction: f64,
-    coupon_frequency: Tenor,
-    as_of: Date,
-    calendar_id: &str,
-    accrual_bdc: BusinessDayConvention,
-    currency: Currency,
-    collect_fixings: bool,
 ) -> finstack_quant_core::Result<FinancingPeriodProjection> {
+    let &FinancingLegContext {
+        financing,
+        fwd,
+        fixings,
+        coupon_frequency,
+        as_of,
+        calendar_id,
+        accrual_bdc,
+        currency,
+        collect_fixings,
+    } = leg;
     match financing.compounding {
         FloatingLegCompounding::SimpleAverage => Err(finstack_quant_core::Error::Validation(
             "financing_leg.compounding = simple_average is not supported; use simple or a \
@@ -272,6 +300,17 @@ fn for_each_financing_period(
     } else {
         BusinessDayConvention::ModifiedFollowing
     };
+    let leg = FinancingLegContext {
+        financing,
+        fwd: fwd.as_ref(),
+        fixings,
+        coupon_frequency: schedule.params.frequency,
+        as_of,
+        calendar_id: schedule.params.calendar_id.as_str(),
+        accrual_bdc,
+        currency,
+        collect_fixings,
+    };
 
     for i in 1..period_schedule.dates.len() {
         let period_start = period_schedule.dates[i - 1];
@@ -291,20 +330,7 @@ fn for_each_financing_period(
         let yf = financing
             .day_count
             .year_fraction(period_start, period_end, ctx)?;
-        let projected = financing_period_projection(
-            financing,
-            fwd.as_ref(),
-            fixings,
-            period_start,
-            period_end,
-            yf,
-            schedule.params.frequency,
-            as_of,
-            schedule.params.calendar_id.as_str(),
-            accrual_bdc,
-            currency,
-            collect_fixings,
-        )?;
+        let projected = financing_period_projection(&leg, period_start, period_end, yf)?;
         visit(payment_date, projected)?;
     }
     Ok(())
@@ -324,21 +350,18 @@ fn financing_period_rate(
     calendar_id: &str,
     currency: Currency,
 ) -> finstack_quant_core::Result<f64> {
-    Ok(financing_period_projection(
+    let leg = FinancingLegContext {
         financing,
         fwd,
         fixings,
-        period_start,
-        period_end,
-        period_year_fraction,
         coupon_frequency,
         as_of,
         calendar_id,
-        BusinessDayConvention::ModifiedFollowing,
+        accrual_bdc: BusinessDayConvention::ModifiedFollowing,
         currency,
-        false,
-    )?
-    .rate)
+        collect_fixings: false,
+    };
+    Ok(financing_period_projection(&leg, period_start, period_end, period_year_fraction)?.rate)
 }
 
 /// Parameters for total return leg calculation.
@@ -843,8 +866,8 @@ impl TrsEngine {
 #[cfg(test)]
 mod tests {
     use super::{
-        TotalReturnLegParams, TrsEngine, TrsReturnModel, financing_period_projection,
-        financing_period_rate,
+        FinancingLegContext, TotalReturnLegParams, TrsEngine, TrsReturnModel,
+        financing_period_projection, financing_period_rate,
     };
     use crate::instruments::FinancingLegSpec;
     use crate::instruments::TrsScheduleSpec;
@@ -1527,21 +1550,18 @@ mod tests {
             .year_fraction(as_of, period_end, DayCountContext::default())
             .expect("year fraction");
         let project = |fixings: Option<&ScalarTimeSeries>| {
-            financing_period_projection(
-                &financing,
-                &fwd,
+            let leg = FinancingLegContext {
+                financing: &financing,
+                fwd: &fwd,
                 fixings,
+                coupon_frequency: Tenor::quarterly(),
                 as_of,
-                period_end,
-                year_fraction,
-                Tenor::quarterly(),
-                as_of,
-                finstack_quant_core::dates::WEEKENDS_ONLY_ID,
-                BusinessDayConvention::ModifiedFollowing,
-                Currency::USD,
-                true,
-            )
-            .expect("projection")
+                calendar_id: finstack_quant_core::dates::WEEKENDS_ONLY_ID,
+                accrual_bdc: BusinessDayConvention::ModifiedFollowing,
+                currency: Currency::USD,
+                collect_fixings: true,
+            };
+            financing_period_projection(&leg, as_of, period_end, year_fraction).expect("projection")
         };
 
         let published = ScalarTimeSeries::new("FIXING:USD-TERM-3M", vec![(as_of, 0.041)], None)
@@ -1694,21 +1714,19 @@ mod tests {
             "TRS overnight {actual} != shared engine {}",
             expected.rate
         );
-        let projected = financing_period_projection(
-            &financing,
-            &fwd,
-            None,
-            start,
-            end,
-            0.50,
-            Tenor::quarterly(),
-            start,
-            "usny",
-            BusinessDayConvention::ModifiedFollowing,
-            Currency::USD,
-            false,
-        )
-        .expect("trs overnight projection");
+        let leg = FinancingLegContext {
+            financing: &financing,
+            fwd: &fwd,
+            fixings: None,
+            coupon_frequency: Tenor::quarterly(),
+            as_of: start,
+            calendar_id: "usny",
+            accrual_bdc: BusinessDayConvention::ModifiedFollowing,
+            currency: Currency::USD,
+            collect_fixings: false,
+        };
+        let projected =
+            financing_period_projection(&leg, start, end, 0.50).expect("trs overnight projection");
         let amount = projected.unsigned_coupon(1_000_000.0, 0.0);
         let expected_amount = 1_000_000.0 * (expected.compound_factor - 1.0);
         assert!(

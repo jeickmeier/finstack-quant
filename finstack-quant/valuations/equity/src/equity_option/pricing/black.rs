@@ -242,13 +242,15 @@ pub(crate) fn compute_greeks(
     match inst.exercise_style {
         ExerciseStyle::European => {
             let greeks_unit = bs_greeks_unchecked(
-                spot,
-                inst.strike,
-                r,
-                q,
-                sigma,
-                t,
-                inst.option_type,
+                &OptionMarketParams {
+                    spot,
+                    strike: inst.strike,
+                    rate: r,
+                    volatility: sigma,
+                    time_to_expiry: t,
+                    dividend_yield: q,
+                    option_type: inst.option_type,
+                },
                 inst.metric_pricing_overrides.theta_days_per_year(),
             );
 

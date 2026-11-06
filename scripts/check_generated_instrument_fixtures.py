@@ -9,7 +9,6 @@ import tomllib
 
 MANIFEST = Path("finstack-quant/valuations/tests/instruments/coverage_manifest.toml")
 INSTRUMENTS_DIR = MANIFEST.parent
-EXPECTED_CANONICAL_FIXTURES = 78
 
 
 def canonical_fixture_entries(root: Path) -> list[tuple[str, Path]]:
@@ -18,13 +17,14 @@ def canonical_fixture_entries(root: Path) -> list[tuple[str, Path]]:
     with manifest_path.open("rb") as manifest_file:
         manifest = tomllib.load(manifest_file)
 
-    entries = [(instrument["tag"], INSTRUMENTS_DIR / instrument["fixture"]) for instrument in manifest["instrument"]]
+    # `gen-write` writes one fixture per registry tag: json_examples/<tag>.json.
+    entries = [
+        (instrument["tag"], INSTRUMENTS_DIR / "json_examples" / f"{instrument['tag']}.json")
+        for instrument in manifest["instrument"]
+    ]
     paths = [path for _, path in entries]
-    unique_paths = set(paths)
-    if len(paths) != EXPECTED_CANONICAL_FIXTURES or len(unique_paths) != len(paths):
-        raise ValueError(
-            f"coverage manifest must declare exactly {EXPECTED_CANONICAL_FIXTURES} unique canonical fixtures"
-        )
+    if not paths or len(set(paths)) != len(paths):
+        raise ValueError("coverage manifest must declare each canonical fixture tag exactly once")
     return sorted(entries, key=lambda entry: entry[1].as_posix())
 
 

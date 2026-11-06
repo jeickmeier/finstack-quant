@@ -1,5 +1,6 @@
 import { checking, emit } from "../../../scripts/fixture-output.mjs";
 import { native, readRepoSource } from "../../../scripts/fixture-inputs.mjs";
+import { priceExtras } from "../../shared/price-extras.mjs";
 // The priced bond of the results fixture (its request, metrics included) is the base.
 const bondPath = "finstack-quant-ui/src/fixtures/results/bond.json";
 const bondInput = await readRepoSource(bondPath);
@@ -77,8 +78,7 @@ const cases = specs.map(({ name, spec }) => {
     asOf,
     base.model,
     base.metrics,
-    base.metricPricingOverrides,
-    base.marketHistory,
+    priceExtras(base),
   );
   return {
     name,

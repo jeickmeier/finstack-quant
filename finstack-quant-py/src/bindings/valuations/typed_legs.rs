@@ -2,10 +2,9 @@
 //! `ProtectionLegSpec`) shared by the typed `InterestRateSwap`, `Swaption`,
 //! `CreditDefaultSwap` and `CdsIndex` builders.
 //!
-//! Thin frozen wrappers: construction and validation stay in Rust, the
-//! bindings only coerce Python inputs (`float | Rate`, `float | Bps`,
-//! date-likes, serde strings) and expose the serde surface (`to_json`,
-//! `from_json`, pickle) plus one getter per field.
+//! Thin frozen wrappers: the keyword-only constructors read the Rust serde
+//! struct (its defaults and validation), and the wrappers expose the serde
+//! surface (`to_json`, `from_json`, pickle) plus one getter per field.
 
 use pyo3::prelude::*;
 use rust_decimal::prelude::ToPrimitive;
@@ -14,29 +13,11 @@ use crate::bindings::cashflows::builder::specs::PyRollRule;
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::dates::schedule::PyStubKind;
 use crate::bindings::core::dates::tenor::PyTenor;
-use crate::bindings::date_utils::{date_to_py, py_to_date};
+use crate::bindings::date_utils::date_to_py;
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::errors::{core_to_py, display_to_py};
 
-use super::convert::{decimal_from_f64, enum_from_str, stub_kind_from_py};
 use super::convert::{enum_to_py_string, opt_repr};
-use crate::bindings::extract::{extract_basis_points, extract_rate_decimal};
-
-use finstack_quant_cashflows::builder::FloatingLegCompounding;
-
-/// Coerce `str | dict` to a `FloatingLegCompounding`.
-///
-/// A bare string names a unit variant (`"simple"`); a dict carries a struct
-/// variant such as `{"compounded_in_arrears": {"lookback_days": 0}}`.
-pub(crate) fn compounding_from_py(
-    py: Python<'_>,
-    obj: &Bound<'_, PyAny>,
-) -> PyResult<FloatingLegCompounding> {
-    if let Ok(name) = obj.extract::<&str>() {
-        return enum_from_str(name, "compounding");
-    }
-    crate::bindings::module_utils::py_to_serde(py, obj, "compounding")
-}
 
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FixedLegSpec")]
 #[pyclass(
@@ -62,48 +43,13 @@ impl PyFixedLegSpec {
 impl PyFixedLegSpec {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FixedLegSpec.__init__")]
     #[new]
-    #[pyo3(signature = (discount_curve_id, rate, frequency, day_count, start, end, *,
-                        business_day_convention = "modified_following", calendar_id = None,
-                        stub = None, payment_lag_days = 0, end_of_month = false))]
     #[pyo3(
-        text_signature = "(discount_curve_id, rate, frequency, day_count, start, end, *, \
-business_day_convention='modified_following', calendar_id=None, stub='short_front', \
-payment_lag_days=0, end_of_month=False)"
+        signature = (**fields),
+        text_signature = "(*, discount_curve_id, rate, frequency, day_count, start, end, business_day_convention='modified_following', calendar_id=None, stub='short_front', payment_lag_days=0, end_of_month=False)"
     )]
-    // PyO3 binding: the argument list mirrors the Python keyword-argument API.
-    #[allow(clippy::too_many_arguments)]
-    fn new(
-        discount_curve_id: &str,
-        rate: &Bound<'_, PyAny>,
-        frequency: PyRef<'_, PyTenor>,
-        day_count: PyRef<'_, PyDayCount>,
-        start: &Bound<'_, PyAny>,
-        end: &Bound<'_, PyAny>,
-        business_day_convention: &str,
-        calendar_id: Option<String>,
-        stub: Option<&Bound<'_, PyAny>>,
-        payment_lag_days: i32,
-        end_of_month: bool,
-    ) -> PyResult<Self> {
-        let rate = extract_rate_decimal(rate, "rate")?;
-        let inner = finstack_quant_valuations::instruments::FixedLegSpec {
-            discount_curve_id: finstack_quant_core::types::CurveId::new(
-                discount_curve_id.to_string(),
-            ),
-            rate: decimal_from_f64(rate, "rate")?,
-            frequency: frequency.inner,
-            day_count: day_count.inner,
-            business_day_convention: super::convert::bdc_from_str(
-                business_day_convention,
-                "business_day_convention",
-            )?,
-            calendar_id: calendar_id.map(Into::into),
-            stub: stub_kind_from_py(stub, "stub")?,
-            start: py_to_date(start)?,
-            end: py_to_date(end)?,
-            payment_lag_days,
-            end_of_month,
-        };
+    fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
+        let inner: finstack_quant_valuations::instruments::FixedLegSpec =
+            crate::bindings::module_utils::fields_from_py(py, fields, "FixedLegSpec")?;
         inner.validate().map_err(core_to_py)?;
         Ok(Self { inner })
     }
@@ -223,64 +169,13 @@ impl PyFloatLegSpec {
 impl PyFloatLegSpec {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FloatLegSpec.__init__")]
     #[new]
-    #[pyo3(signature = (discount_curve_id, forward_curve_id, spread_bp, frequency, day_count,
-                        start, end, *, business_day_convention = "modified_following", calendar_id = None,
-                        stub = None, reset_lag_days = 0, fixing_calendar_id = None, compounding = None,
-                        payment_lag_days = 0, end_of_month = false))]
     #[pyo3(
-        text_signature = "(discount_curve_id, forward_curve_id, spread_bp, frequency, \
-day_count, start, end, *, business_day_convention='modified_following', calendar_id=None, stub='short_front', \
-reset_lag_days=0, fixing_calendar_id=None, compounding='simple', payment_lag_days=0, end_of_month=False)"
+        signature = (**fields),
+        text_signature = "(*, discount_curve_id, forward_curve_id, spread_bp, frequency, day_count, start, end, business_day_convention='modified_following', calendar_id=None, stub='short_front', reset_lag_days=0, fixing_calendar_id=None, compounding='simple', payment_lag_days=0, end_of_month=False)"
     )]
-    // PyO3 binding: the argument list mirrors the Python keyword-argument API.
-    #[allow(clippy::too_many_arguments)]
-    fn new(
-        py: Python<'_>,
-        discount_curve_id: &str,
-        forward_curve_id: &str,
-        spread_bp: &Bound<'_, PyAny>,
-        frequency: PyRef<'_, PyTenor>,
-        day_count: PyRef<'_, PyDayCount>,
-        start: &Bound<'_, PyAny>,
-        end: &Bound<'_, PyAny>,
-        business_day_convention: &str,
-        calendar_id: Option<String>,
-        stub: Option<&Bound<'_, PyAny>>,
-        reset_lag_days: i32,
-        fixing_calendar_id: Option<String>,
-        compounding: Option<&Bound<'_, PyAny>>,
-        payment_lag_days: i32,
-        end_of_month: bool,
-    ) -> PyResult<Self> {
-        let spread_bp = extract_basis_points(spread_bp, "spread_bp")?;
-        let compounding = match compounding {
-            Some(obj) if !obj.is_none() => compounding_from_py(py, obj)?,
-            _ => FloatingLegCompounding::default(),
-        };
-        let inner = finstack_quant_valuations::instruments::FloatLegSpec {
-            discount_curve_id: finstack_quant_core::types::CurveId::new(
-                discount_curve_id.to_string(),
-            ),
-            forward_curve_id: finstack_quant_core::types::CurveId::new(
-                forward_curve_id.to_string(),
-            ),
-            spread_bp: decimal_from_f64(spread_bp, "spread_bp")?,
-            frequency: frequency.inner,
-            day_count: day_count.inner,
-            business_day_convention: super::convert::bdc_from_str(
-                business_day_convention,
-                "business_day_convention",
-            )?,
-            calendar_id: calendar_id.map(Into::into),
-            stub: stub_kind_from_py(stub, "stub")?,
-            reset_lag_days,
-            fixing_calendar_id: fixing_calendar_id.map(Into::into),
-            start: py_to_date(start)?,
-            end: py_to_date(end)?,
-            compounding,
-            payment_lag_days,
-            end_of_month,
-        };
+    fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
+        let inner: finstack_quant_valuations::instruments::FloatLegSpec =
+            crate::bindings::module_utils::fields_from_py(py, fields, "FloatLegSpec")?;
         inner.validate().map_err(core_to_py)?;
         Ok(Self { inner })
     }
@@ -424,44 +319,13 @@ pub struct PyPremiumLegSpec {
 impl PyPremiumLegSpec {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "PremiumLegSpec.__init__")]
     #[new]
-    #[pyo3(signature = (start, end, frequency, day_count, coupon_bp, discount_curve_id, *, roll_rule,
-                        stub = None, business_day_convention = "modified_following", calendar_id = None))]
     #[pyo3(
-        text_signature = "(start, end, frequency, day_count, coupon_bp, discount_curve_id, *, roll_rule, \
-stub='short_front', business_day_convention='modified_following', calendar_id=None)"
+        signature = (**fields),
+        text_signature = "(*, start, end, frequency, day_count, coupon_bp, discount_curve_id, roll_rule, stub='short_front', business_day_convention='modified_following', calendar_id=None)"
     )]
-    // PyO3 binding: the argument list mirrors the Python keyword-argument API.
-    #[allow(clippy::too_many_arguments)]
-    fn new(
-        start: &Bound<'_, PyAny>,
-        end: &Bound<'_, PyAny>,
-        frequency: PyRef<'_, PyTenor>,
-        day_count: PyRef<'_, PyDayCount>,
-        coupon_bp: &Bound<'_, PyAny>,
-        discount_curve_id: &str,
-        roll_rule: PyRef<'_, PyRollRule>,
-        stub: Option<&Bound<'_, PyAny>>,
-        business_day_convention: &str,
-        calendar_id: Option<String>,
-    ) -> PyResult<Self> {
-        let coupon_bp = extract_basis_points(coupon_bp, "coupon_bp")?;
-        let inner = finstack_quant_valuations::instruments::PremiumLegSpec {
-            roll_rule: roll_rule.inner,
-            start: py_to_date(start)?,
-            end: py_to_date(end)?,
-            frequency: frequency.inner,
-            stub: stub_kind_from_py(stub, "stub")?,
-            business_day_convention: super::convert::bdc_from_str(
-                business_day_convention,
-                "business_day_convention",
-            )?,
-            calendar_id: calendar_id.map(Into::into),
-            day_count: day_count.inner,
-            coupon_bp: decimal_from_f64(coupon_bp, "coupon_bp")?,
-            discount_curve_id: finstack_quant_core::types::CurveId::new(
-                discount_curve_id.to_string(),
-            ),
-        };
+    fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
+        let inner: finstack_quant_valuations::instruments::PremiumLegSpec =
+            crate::bindings::module_utils::fields_from_py(py, fields, "PremiumLegSpec")?;
         Ok(Self { inner })
     }
 

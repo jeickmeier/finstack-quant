@@ -33,6 +33,19 @@ function quarter(q, year = 2025) {
 }
 
 /** One-quarter model: profit = revenue * 0.5, revenue = 100. */
+/** A GoalSeekSpec solving `profit` = 60 in 2025Q1 by varying `revenue`. */
+function goalSeekSpec(overrides = {}) {
+  return {
+    target_node: 'profit',
+    target_period: '2025Q1',
+    target_value: 60,
+    driver_node: 'revenue',
+    driver_period: '2025Q1',
+    update_model: true,
+    ...overrides,
+  };
+}
+
 function goalSeekModel() {
   return {
     id: 'goal-seek',
@@ -111,7 +124,7 @@ function dcfModel() {
 const EXIT_MULTIPLE = { type: 'exit_multiple', terminal_metric: 999.0, multiple: 8.0 };
 
 test('goalSeek returns the Rust GoalSeekResult with the model as an object', () => {
-  const updated = sa.goalSeek(goalSeekModel(), 'profit', '2025Q1', 60, 'revenue', '2025Q1', true);
+  const updated = sa.goalSeek(goalSeekModel(), goalSeekSpec());
   assert.deepEqual(Object.keys(updated).sort(), [
     'converged',
     'evaluations',
@@ -133,26 +146,26 @@ test('goalSeek returns the Rust GoalSeekResult with the model as an object', () 
 
   const bare = sa.goalSeek(
     goalSeekModel(),
-    'profit',
-    '2025Q1',
-    60,
-    'revenue',
-    '2025Q1',
-    false,
-    [1, 200]
+    goalSeekSpec({ update_model: false, bounds: [1, 200] })
   );
   assert.equal(bare.model, null);
   assert.ok(Math.abs(bare.solved_value - 120) < 1e-6);
 });
 
-test('goalSeek requires updateModel and a two-number bounds array', () => {
+test('goalSeek requires update_model and a two-number bounds array', () => {
+  const withoutUpdateModel = goalSeekSpec();
+  delete withoutUpdateModel.update_model;
   assert.throws(
-    () => sa.goalSeek(goalSeekModel(), 'profit', '2025Q1', 60, 'revenue', '2025Q1'),
-    (e) => e instanceof TypeError && e.kind === 'invalid_type'
+    () => sa.goalSeek(goalSeekModel(), withoutUpdateModel),
+    (e) => e instanceof Error && e.kind === 'validation' && /update_model/.test(e.message)
   );
   assert.throws(
-    () => sa.goalSeek(goalSeekModel(), 'profit', '2025Q1', 60, 'revenue', '2025Q1', true, [1]),
+    () => sa.goalSeek(goalSeekModel(), goalSeekSpec({ bounds: [1] })),
     (e) => e instanceof Error && e.kind === 'validation'
+  );
+  assert.throws(
+    () => sa.goalSeek(goalSeekModel(), goalSeekSpec({ tolerance: 1e-6 })),
+    (e) => e instanceof Error && e.kind === 'validation' && /tolerance/.test(e.message)
   );
 });
 

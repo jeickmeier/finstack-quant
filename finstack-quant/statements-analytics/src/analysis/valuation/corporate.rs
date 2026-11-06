@@ -151,6 +151,38 @@ pub struct DcfPeriodRow {
 /// of `dcf_sensitivity` / `evaluate_dcf`.
 pub const DEFAULT_UFCF_NODE: &str = "ufcf";
 
+/// Serde default of [`DcfInputs::ufcf_node`]: [`DEFAULT_UFCF_NODE`].
+fn default_ufcf_node() -> String {
+    DEFAULT_UFCF_NODE.to_string()
+}
+
+/// Headline DCF assumptions of [`evaluate_dcf`]: discount rate, terminal value,
+/// cash-flow node and optional net-debt override.
+///
+/// The serde form is the host input of `evaluate_dcf`: `wacc` and
+/// `terminal_value` are required, `ufcf_node` defaults to
+/// [`DEFAULT_UFCF_NODE`] and `net_debt_override` to `None`; an unknown field
+/// is rejected. For example
+/// `{"wacc": 0.10, "terminal_value": {"type": "gordon_growth", "stable_growth_rate": 0.02}}`.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct DcfInputs {
+    /// Weighted average cost of capital as a decimal (`0.10` means `10%`).
+    pub wacc: f64,
+    /// Terminal-value convention applied after the explicit forecast period.
+    pub terminal_value: TerminalValueSpec,
+    /// Node id containing monetary unlevered free cash flow for forecast
+    /// periods (default [`DEFAULT_UFCF_NODE`], `"ufcf"`).
+    #[serde(default = "default_ufcf_node")]
+    pub ufcf_node: String,
+    /// Flat net-debt amount in model currency used instead of the
+    /// model-derived equity bridge; `None` (the default) derives net debt
+    /// from the model's debt and cash.
+    #[serde(default)]
+    pub net_debt_override: Option<f64>,
+}
+
 /// Optional configuration for DCF valuation beyond the core WACC/terminal parameters.
 ///
 /// Percentage-style inputs use decimal form, so `0.10` means `10%`.
@@ -283,12 +315,10 @@ pub(crate) struct DcfEvalContext<'a> {
 ///
 /// * `model` - Statement model containing forecast periods plus a currency in
 ///   metadata
-/// * `wacc` - Discount rate in decimal form (`0.10` means `10%`)
-/// * `terminal_value` - Terminal-value convention applied after the explicit
-///   forecast period
-/// * `ufcf_node` - Node id containing unlevered free cash flow for forecast
-///   periods
-/// * `net_debt_override` - Optional flat net-debt amount used instead of the
+/// * `inputs` - Headline assumptions: `wacc` (decimal, `0.10` means `10%`),
+///   the `terminal_value` convention applied after the explicit forecast
+///   period, the `ufcf_node` holding unlevered free cash flow for forecast
+///   periods, and an optional flat `net_debt_override` used instead of the
 ///   model-derived bridge
 /// * `options` - Mid-year, bridge, share-count, exit-multiple node, and
 ///   discount configuration
@@ -312,8 +342,8 @@ pub(crate) struct DcfEvalContext<'a> {
 ///
 /// Returns an error if `market` is provided without `as_of`, if the model
 /// cannot be evaluated (including a value node whose actual `as_of` hides),
-/// if `ufcf_node` has no forecast cash flows ending after `as_of`, if the
-/// model currency cannot be inferred, if monetary nodes use another currency
+/// if `inputs.ufcf_node` has no forecast cash flows ending after `as_of`, if
+/// the model currency cannot be inferred, if monetary nodes use another currency
 /// or no opening balance is available without a net-debt override, if an
 /// exit-multiple metric node is missing or non-finite, or if the
 /// terminal-value assumptions are internally inconsistent. Growth terminals
@@ -322,7 +352,7 @@ pub(crate) struct DcfEvalContext<'a> {
 /// # Examples
 ///
 /// ```
-/// use finstack_quant_statements_analytics::analysis::{evaluate_dcf, DcfOptions};
+/// use finstack_quant_statements_analytics::analysis::{evaluate_dcf, DcfInputs, DcfOptions};
 /// use finstack_quant_statements::builder::ModelBuilder;
 /// use finstack_quant_core::{currency::Currency, dates::PeriodId, money::Money};
 /// use finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec;
@@ -344,16 +374,13 @@ pub(crate) struct DcfEvalContext<'a> {
 ///     model_builder.build()?
 /// };
 ///
-/// let result = evaluate_dcf(
-///     &model,
-///     0.10,
-///     TerminalValueSpec::GordonGrowth { stable_growth_rate: 0.02 },
-///     "ufcf",
-///     Some(4_000_000.0),
-///     &DcfOptions::default(),
-///     None,
-///     None,
-/// )?;
+/// let inputs = DcfInputs {
+///     wacc: 0.10,
+///     terminal_value: TerminalValueSpec::GordonGrowth { stable_growth_rate: 0.02 },
+///     ufcf_node: "ufcf".to_string(),
+///     net_debt_override: Some(4_000_000.0),
+/// };
+/// let result = evaluate_dcf(&model, &inputs, &DcfOptions::default(), None, None)?;
 ///
 /// assert_eq!(result.enterprise_value.currency().to_string(), "USD");
 /// # Ok(())
@@ -363,13 +390,9 @@ pub(crate) struct DcfEvalContext<'a> {
 /// # References
 ///
 /// - Discounting and terminal-value context: `docs/REFERENCES.md#hull-options-futures`
-#[allow(clippy::too_many_arguments)]
 pub fn evaluate_dcf(
     model: &FinancialModelSpec,
-    wacc: f64,
-    terminal_value: TerminalValueSpec,
-    ufcf_node: &str,
-    net_debt_override: Option<f64>,
+    inputs: &DcfInputs,
     options: &DcfOptions,
     market: Option<&MarketContext>,
     as_of: Option<Date>,
@@ -378,7 +401,7 @@ pub fn evaluate_dcf(
     // DCF discounting. Require as_of whenever a market is supplied so
     // curves cannot be silently dropped.
     let context = DcfEvalContext {
-        net_debt_override,
+        net_debt_override: inputs.net_debt_override,
         options,
     };
     let mut evaluator = Evaluator::new();
@@ -397,9 +420,9 @@ pub fn evaluate_dcf(
     evaluate_dcf_from_results_impl(
         model,
         &results,
-        wacc,
-        terminal_value,
-        ufcf_node,
+        inputs.wacc,
+        inputs.terminal_value.clone(),
+        &inputs.ufcf_node,
         context,
         as_of,
     )
@@ -533,7 +556,6 @@ pub struct DcfSensitivityResult {
 ///   value) on the sensitivity of `1/(WACC − g)` to the assumed spread. `docs/REFERENCES.md#koller-valuation`
 /// - Damodaran, A. (2012). *Investment Valuation* (3rd ed.). Wiley. Ch. 12 on
 ///   stable-growth constraints (`g < WACC`).
-#[allow(clippy::too_many_arguments)]
 pub fn dcf_sensitivity(
     model: &FinancialModelSpec,
     wacc: f64,
@@ -1337,12 +1359,14 @@ mod tests {
 
         let result = evaluate_dcf(
             &model,
-            0.10,
-            TerminalValueSpec::GordonGrowth {
-                stable_growth_rate: 0.02,
+            &DcfInputs {
+                wacc: 0.10,
+                terminal_value: TerminalValueSpec::GordonGrowth {
+                    stable_growth_rate: 0.02,
+                },
+                ufcf_node: "ufcf".to_string(),
+                net_debt_override: None,
             },
-            "ufcf",
-            None,
             &DcfOptions::default(),
             None,
             None,
@@ -1376,12 +1400,14 @@ mod tests {
 
         let result = evaluate_dcf(
             &model,
-            0.10,
-            TerminalValueSpec::GordonGrowth {
-                stable_growth_rate: 0.02,
+            &DcfInputs {
+                wacc: 0.10,
+                terminal_value: TerminalValueSpec::GordonGrowth {
+                    stable_growth_rate: 0.02,
+                },
+                ufcf_node: "ufcf".to_string(),
+                net_debt_override: None,
             },
-            "ufcf",
-            None,
             &DcfOptions::default(),
             None,
             None,
@@ -1400,10 +1426,12 @@ mod tests {
         };
         let plain = evaluate_dcf(
             &model,
-            0.10,
-            gordon(),
-            "ufcf",
-            Some(200.0),
+            &DcfInputs {
+                wacc: 0.10,
+                terminal_value: gordon(),
+                ufcf_node: "ufcf".to_string(),
+                net_debt_override: Some(200.0),
+            },
             &DcfOptions::default(),
             None,
             None,
@@ -1413,10 +1441,12 @@ mod tests {
 
         let discounted = evaluate_dcf(
             &model,
-            0.10,
-            gordon(),
-            "ufcf",
-            Some(200.0),
+            &DcfInputs {
+                wacc: 0.10,
+                terminal_value: gordon(),
+                ufcf_node: "ufcf".to_string(),
+                net_debt_override: Some(200.0),
+            },
             &DcfOptions {
                 valuation_discounts: Some(ValuationDiscounts {
                     dlom: Some(0.25),
@@ -1446,12 +1476,14 @@ mod tests {
         for mid_year_convention in [false, true] {
             let result = evaluate_dcf(
                 &model,
-                0.10,
-                TerminalValueSpec::GordonGrowth {
-                    stable_growth_rate: 0.02,
+                &DcfInputs {
+                    wacc: 0.10,
+                    terminal_value: TerminalValueSpec::GordonGrowth {
+                        stable_growth_rate: 0.02,
+                    },
+                    ufcf_node: "ufcf".to_string(),
+                    net_debt_override: Some(200.0),
                 },
-                "ufcf",
-                Some(200.0),
                 &DcfOptions {
                     mid_year_convention,
                     ..DcfOptions::default()
@@ -1784,14 +1816,16 @@ mod tests {
         };
         let result = evaluate_dcf(
             &model,
-            0.10,
-            TerminalValueSpec::ExitMultiple {
-                // Explicit metric is ignored when the node is set.
-                terminal_metric: 999.0,
-                multiple: 8.0,
+            &DcfInputs {
+                wacc: 0.10,
+                terminal_value: TerminalValueSpec::ExitMultiple {
+                    // Explicit metric is ignored when the node is set.
+                    terminal_metric: 999.0,
+                    multiple: 8.0,
+                },
+                ufcf_node: "ufcf".to_string(),
+                net_debt_override: Some(0.0),
             },
-            "ufcf",
-            Some(0.0),
             &options,
             None,
             None,
@@ -1889,13 +1923,15 @@ mod tests {
         };
         let result = evaluate_dcf(
             &model,
-            0.10,
-            TerminalValueSpec::ExitMultiple {
-                terminal_metric: 150.0,
-                multiple: 8.0,
+            &DcfInputs {
+                wacc: 0.10,
+                terminal_value: TerminalValueSpec::ExitMultiple {
+                    terminal_metric: 150.0,
+                    multiple: 8.0,
+                },
+                ufcf_node: "ufcf".to_string(),
+                net_debt_override: Some(0.0),
             },
-            "ufcf",
-            Some(0.0),
             &options,
             None,
             None,
@@ -1911,13 +1947,15 @@ mod tests {
         let model = exit_multiple_model();
         let result = evaluate_dcf(
             &model,
-            0.10,
-            TerminalValueSpec::ExitMultiple {
-                terminal_metric: 150.0,
-                multiple: 8.0,
+            &DcfInputs {
+                wacc: 0.10,
+                terminal_value: TerminalValueSpec::ExitMultiple {
+                    terminal_metric: 150.0,
+                    multiple: 8.0,
+                },
+                ufcf_node: "ufcf".to_string(),
+                net_debt_override: Some(0.0),
             },
-            "ufcf",
-            Some(0.0),
             &DcfOptions::default(),
             None,
             None,

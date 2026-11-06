@@ -95,44 +95,6 @@ struct CallableRangeAccrualPayoff {
 }
 
 impl CallableRangeAccrualPayoff {
-    #[allow(clippy::too_many_arguments)]
-    fn new(
-        lower_bound: f64,
-        upper_bound: f64,
-        coupon_rate: f64,
-        notional: f64,
-        events: Vec<CallableRangeAccrualEvent>,
-        call_prices: Vec<f64>,
-        final_payment_event_idx: Option<usize>,
-        final_payment_discount_factor: f64,
-        past_in_range: usize,
-        total_past_observations: usize,
-        future_observations: usize,
-        basis_degree: usize,
-    ) -> Self {
-        let call_prices_len = call_prices.len();
-        Self {
-            lower_bound,
-            upper_bound,
-            coupon_rate,
-            notional,
-            events,
-            call_prices,
-            final_payment_event_idx,
-            final_payment_discount_factor,
-            past_in_range,
-            total_past_observations,
-            future_observations,
-            days_in_range: 0,
-            observations_seen: 0,
-            next_event: 0,
-            in_range_at_exercise: vec![0; call_prices_len],
-            bond_to_final_at_exercise: vec![1.0; call_prices_len],
-            bank_at_final_payment: 0.0,
-            basis_degree,
-        }
-    }
-
     /// Range coupon earned on `simulated_in_range` path observations plus the
     /// historical ones: the full-life coupon times the share of all
     /// observations that fell in range.
@@ -341,20 +303,28 @@ impl Hw1fNote for CallableRangeAccrual {
         // curve and break the M6 repricing property.
         let r0 = initial_short_rate_from_curve(discount_curve.as_ref(), as_of)?;
         let config = pricer.effective_config(inst);
-        let payoff = CallableRangeAccrualPayoff::new(
+        let call_count = schedule.call_prices.len();
+        let payoff = CallableRangeAccrualPayoff {
             lower_bound,
             upper_bound,
-            inst.range_accrual.coupon_rate * inst.range_accrual.accrual_year_fraction()?,
-            inst.range_accrual.notional.amount(),
-            schedule.events.clone(),
-            schedule.call_prices.clone(),
-            schedule.final_payment_event_idx,
-            schedule.final_payment_discount_factor,
-            inst.range_accrual.past_observations_in_range.unwrap_or(0),
-            inst.range_accrual.total_past_observations.unwrap_or(0),
-            schedule.future_observations,
-            config.basis_degree,
-        );
+            coupon_rate: inst.range_accrual.coupon_rate
+                * inst.range_accrual.accrual_year_fraction()?,
+            notional: inst.range_accrual.notional.amount(),
+            events: schedule.events.clone(),
+            call_prices: schedule.call_prices.clone(),
+            final_payment_event_idx: schedule.final_payment_event_idx,
+            final_payment_discount_factor: schedule.final_payment_discount_factor,
+            past_in_range: inst.range_accrual.past_observations_in_range.unwrap_or(0),
+            total_past_observations: inst.range_accrual.total_past_observations.unwrap_or(0),
+            future_observations: schedule.future_observations,
+            days_in_range: 0,
+            observations_seen: 0,
+            next_event: 0,
+            in_range_at_exercise: vec![0; call_count],
+            bond_to_final_at_exercise: vec![1.0; call_count],
+            bank_at_final_payment: 0.0,
+            basis_degree: config.basis_degree,
+        };
         // Bootstrap a time-dependent θ(t) from the discount curve so the
         // simulated short rate reprices the initial curve (HW1F, not Vasicek).
         let horizon = schedule.event_times.last().copied().unwrap_or(0.0);
@@ -903,21 +873,28 @@ mod tests {
                 build_schedule(&inst, &curves, as_of, &term_forward).expect("callable schedule");
             assert_eq!(schedule.exercise_times.len(), 1);
             let call_time = schedule.exercise_times[0];
-            let payoff = CallableRangeAccrualPayoff::new(
-                0.02,
-                0.04,
-                inst.range_accrual.coupon_rate
+            let call_count = schedule.call_prices.len();
+            let payoff = CallableRangeAccrualPayoff {
+                lower_bound: 0.02,
+                upper_bound: 0.04,
+                coupon_rate: inst.range_accrual.coupon_rate
                     * inst.range_accrual.accrual_year_fraction().expect("accrual"),
                 notional,
-                schedule.events,
-                schedule.call_prices,
-                schedule.final_payment_event_idx,
-                schedule.final_payment_discount_factor,
-                0,
-                0,
-                schedule.future_observations,
-                2,
-            );
+                events: schedule.events,
+                call_prices: schedule.call_prices,
+                final_payment_event_idx: schedule.final_payment_event_idx,
+                final_payment_discount_factor: schedule.final_payment_discount_factor,
+                past_in_range: 0,
+                total_past_observations: 0,
+                future_observations: schedule.future_observations,
+                days_in_range: 0,
+                observations_seen: 0,
+                next_event: 0,
+                in_range_at_exercise: vec![0; call_count],
+                bond_to_final_at_exercise: vec![1.0; call_count],
+                bank_at_final_payment: 0.0,
+                basis_degree: 2,
+            };
             let redemption = payoff
                 .intrinsic_at(0, discount_rate, Currency::USD)
                 .expect("redemption")

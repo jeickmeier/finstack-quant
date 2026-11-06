@@ -1,6 +1,15 @@
 import * as wasm from '../pkg/finstack_quant_wasm.js';
 import { schema } from './scenarios/schema.js';
 
+/**
+ * Namespaced TypeScript entry points for scenarios calculations and types.
+ * @example
+ * ```typescript
+ * import init, { scenarios } from "finstack-quant-wasm";
+ * await init();
+ * console.log(scenarios.listBuiltinTemplates());
+ * ```
+ */
 export const scenarios = {
   parseScenarioSpec: wasm.parseScenarioSpec,
   composeScenarios: wasm.composeScenarios,

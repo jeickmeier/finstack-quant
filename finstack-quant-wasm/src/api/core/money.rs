@@ -54,7 +54,10 @@ impl JsMoney {
     /// m.currency.toString();   // "USD"
     /// ```
     #[wasm_bindgen(constructor)]
-    pub fn new(amount: JsValue, currency: &JsCurrency) -> Result<JsMoney, JsValue> {
+    pub fn new(
+        #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
+        currency: &JsCurrency,
+    ) -> Result<JsMoney, JsValue> {
         let amount = js_f64(&amount, "amount")?;
         RustMoney::new(amount, currency.inner)
             .map(|inner| JsMoney { inner })
@@ -102,8 +105,13 @@ impl JsMoney {
     /// For a different target currency, throws a JavaScript exception if `rate`
     /// is non-finite or not strictly positive, or if the converted amount cannot
     /// be represented as a decimal.
+    /// @returns Converted `Money` amount in the target currency.
     #[wasm_bindgen(js_name = convertAtRate)]
-    pub fn convert_at_rate(&self, target: &JsCurrency, rate: JsValue) -> Result<JsMoney, JsValue> {
+    pub fn convert_at_rate(
+        &self,
+        target: &JsCurrency,
+        #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
+    ) -> Result<JsMoney, JsValue> {
         let rate = js_f64(&rate, "rate")?;
         self.inner
             .convert_at_rate(target.inner, rate)
@@ -153,7 +161,10 @@ impl JsMoney {
     /// @returns Scaled amount, in the same currency.
     /// @throws If `factor` is non-finite or the result is not representable.
     #[wasm_bindgen(js_name = checkedMulF64)]
-    pub fn checked_mul_f64(&self, factor: JsValue) -> Result<JsMoney, JsValue> {
+    pub fn checked_mul_f64(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] factor: JsValue,
+    ) -> Result<JsMoney, JsValue> {
         let factor = js_f64(&factor, "factor")?;
         self.inner
             .checked_mul_f64(factor)
@@ -167,7 +178,10 @@ impl JsMoney {
     /// @returns Scaled amount, in the same currency.
     /// @throws If `divisor` is zero, non-finite, or the result is not representable.
     #[wasm_bindgen(js_name = checkedDivF64)]
-    pub fn checked_div_f64(&self, divisor: JsValue) -> Result<JsMoney, JsValue> {
+    pub fn checked_div_f64(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] divisor: JsValue,
+    ) -> Result<JsMoney, JsValue> {
         let divisor = js_f64(&divisor, "divisor")?;
         self.inner
             .checked_div_f64(divisor)
@@ -210,6 +224,10 @@ impl JsMoney {
     ///
     /// @returns Formatted amount such as `"USD 1,234.57"`.
     /// @throws If `decimals` is not a non-negative integer or exceeds 1,000,000, if `group` is not a single character, or if `rounding` is not a recognised mode name.
+    /// @param decimals - JavaScript number of fractional digits, an integer in `0..=1_000_000`; null or undefined selects ISO minor units.
+    /// @param showCurrency - Whether to prepend the ISO code; omitted means true.
+    /// @param group - Optional single-character thousands separator; omitted means no grouping.
+    /// @param rounding - Canonical lowercase rounding mode; omitted selects the Rust default (bankers).
     ///
     /// @example
     /// ```javascript
@@ -225,10 +243,14 @@ impl JsMoney {
     #[wasm_bindgen(js_name = formatWith)]
     pub fn format_with(
         &self,
-        decimals: JsValue,
+        #[wasm_bindgen(unchecked_optional_param_type = "number | null")] decimals: JsValue,
+        #[wasm_bindgen(
+            js_name = "showCurrency",
+            unchecked_optional_param_type = "boolean | null"
+        )]
         show_currency: Option<JsValue>,
-        group: Option<JsValue>,
-        rounding: Option<JsValue>,
+        #[wasm_bindgen(unchecked_optional_param_type = "string | null")] group: Option<JsValue>,
+        #[wasm_bindgen(unchecked_optional_param_type = "string | null")] rounding: Option<JsValue>,
     ) -> Result<String, JsValue> {
         let show_currency = js_opt_bool(show_currency.as_ref(), "showCurrency")?;
         let group = js_opt_string(group.as_ref(), "group")?;
@@ -268,7 +290,9 @@ impl JsMoney {
     /// @returns The parsed `Money`.
     /// @throws If `json` is malformed or fails strict schema validation.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsMoney, JsValue> {
+    pub fn from_json(
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+    ) -> Result<JsMoney, JsValue> {
         from_js_json(&json, "json").map(|inner| JsMoney { inner })
     }
 
@@ -289,6 +313,8 @@ impl JsMoney {
     ///
     /// @returns The constructed `Money`.
     /// @throws If `amount` is malformed, non-finite, needs more precision than `Decimal` can hold, or underflows its supported scale; or if `currency` is not a `Currency` object.
+    /// @param amount - Exact fixed-point or scientific decimal text in major currency units.
+    /// @param currency - ISO-4217 `Currency` object that tags the amount, as for the `Money` constructor (build one with `new Currency(code)`).
     ///
     /// @example
     /// ```javascript
@@ -302,7 +328,10 @@ impl JsMoney {
     /// }
     /// ```
     #[wasm_bindgen(js_name = fromDecimalStr)]
-    pub fn from_decimal_str(amount: JsValue, currency: &JsCurrency) -> Result<JsMoney, JsValue> {
+    pub fn from_decimal_str(
+        #[wasm_bindgen(unchecked_param_type = "string")] amount: JsValue,
+        currency: &JsCurrency,
+    ) -> Result<JsMoney, JsValue> {
         let amount: &str = &js_string(&amount, "amount")?;
         RustMoney::from_decimal_str(amount, currency.inner)
             .map(|inner| JsMoney { inner })
@@ -316,6 +345,7 @@ impl JsMoney {
     /// * `currency` - ISO-4217 `Currency` object that tags the amount.
     ///
     /// @returns `Money` with amount `0` in `currency`.
+    /// @param currency - ISO-4217 `Currency` object that tags the amount.
     #[wasm_bindgen(js_name = zero)]
     pub fn zero(currency: &JsCurrency) -> JsMoney {
         JsMoney {

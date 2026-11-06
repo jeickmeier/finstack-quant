@@ -16,9 +16,8 @@ use crate::utils::{materialization_to_js_error, to_js_value};
 ///
 /// @example
 /// ```typescript
-/// const cache = new portfolio.InstrumentArtifactCache(5000);
-/// const first = portfolio.Portfolio.fromMaterialization(bundle, cache);
-/// const second = portfolio.Portfolio.fromMaterialization(bundle, cache);
+/// const cache = new portfolio.InstrumentArtifactCache(5_000);
+/// console.log(cache.size);
 /// cache.free();
 /// ```
 #[wasm_bindgen(js_name = InstrumentArtifactCache)]
@@ -34,7 +33,9 @@ impl JsInstrumentArtifactCache {
     /// `undefined` to use the native default of 4,096.
     /// @returns A reusable cache with a 64 MiB encoded-source byte bound.
     #[wasm_bindgen(constructor)]
-    pub fn new(capacity: Option<JsValue>) -> Result<JsInstrumentArtifactCache, JsValue> {
+    pub fn new(
+        #[wasm_bindgen(unchecked_optional_param_type = "number")] capacity: Option<JsValue>,
+    ) -> Result<JsInstrumentArtifactCache, JsValue> {
         let capacity: Option<usize> = js_opt_uint(capacity.as_ref(), "capacity")?;
         Ok(Self {
             inner: capacity
@@ -78,9 +79,10 @@ impl JsPortfolio {
     /// `code` of `report` plus a structured `report` property if the persisted
     /// contract is malformed, invalid, or unsupported, or a `code` of
     /// `limit_exceeded` if it exceeds a resource limit.
-    #[wasm_bindgen(js_name = fromMaterialization)]
+    #[wasm_bindgen(js_name = fromMaterialization, unchecked_return_type = "PortfolioMaterializationResult")]
     pub fn from_materialization(
-        bundle: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "MaterializationBundleInput")] bundle: JsValue,
+        #[wasm_bindgen(unchecked_optional_param_type = "InstrumentArtifactCache | null")]
         cache: &JsInstrumentArtifactCache,
     ) -> Result<JsValue, JsValue> {
         let bytes = extract_bundle_bytes(bundle)?;
@@ -113,9 +115,10 @@ impl JsPortfolio {
     /// or a `ValidationReport` when the contract is invalid but still reportable.
     /// @throws Error - Throws `TypeError` for unsupported input types or a
     /// structured `ContractValidationError` when validation cannot produce a report.
-    #[wasm_bindgen(js_name = validateMaterialization)]
+    #[wasm_bindgen(js_name = validateMaterialization, unchecked_return_type = "MaterializationReport | ValidationReport")]
     pub fn validate_materialization(
-        bundle: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "MaterializationBundleInput")] bundle: JsValue,
+        #[wasm_bindgen(unchecked_optional_param_type = "InstrumentArtifactCache | null")]
         cache: &JsInstrumentArtifactCache,
     ) -> Result<JsValue, JsValue> {
         let bytes = extract_bundle_bytes(bundle)?;

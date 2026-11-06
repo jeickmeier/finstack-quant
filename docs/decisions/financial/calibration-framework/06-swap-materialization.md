@@ -31,7 +31,7 @@ An analytic par-swap sum would be simpler to differentiate, while shared valuati
 - Implementation: [build/context.rs](../../../../finstack-quant/calibration/src/build/context.rs) — OIS override carriage.
 - Implementation: [build/prepared.rs](../../../../finstack-quant/calibration/src/build/prepared.rs) — preparation flag and curve-clock caching.
 - Test evidence: [src/build/rates.rs](../../../../finstack-quant/calibration/src/build/rates.rs) — swap conventions/override and pillar tests located; inspected or located, not executed.
-- Test evidence: [src/build/tests_rates.rs](../../../../finstack-quant/calibration/src/build/tests_rates.rs) — IRS field assertions; inspected or located, not executed.
+- Test evidence: [src/build/tests/rates.rs](../../../../finstack-quant/calibration/src/build/tests/rates.rs) — IRS field assertions; inspected or located, not executed.
 - Test evidence: [src/recalibration/rates.rs](../../../../finstack-quant/calibration/src/recalibration/rates.rs) — SOFR cutoff replay and observed-fixing preservation regressions; inspected or located, not executed.
 - Reference context: [ISDA 2021 definitions](../../../REFERENCES.md#isda-2021-definitions) — external convention context only; a catalogue entry is not proof of implementation equivalence.
 

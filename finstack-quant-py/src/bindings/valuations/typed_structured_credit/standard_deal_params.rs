@@ -1,6 +1,6 @@
 //! Inputs for the canonical standard-deal constructor.
 use super::{PyAssetPool, PyTrancheStructure};
-use crate::bindings::date_utils::{date_to_py, py_to_date};
+use crate::bindings::date_utils::date_to_py;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams;
 use pyo3::prelude::*;
 
@@ -31,28 +31,14 @@ impl PyStandardDealParams {
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.standard_deal_params", "StandardDealParams.__init__")]
     #[new]
-    #[pyo3(signature = (id, pool, tranches, closing_date, maturity, discount_curve_id, calendar_id=None))]
-    #[allow(clippy::too_many_arguments)]
-    fn new(
-        id: &str,
-        pool: PyRef<'_, PyAssetPool>,
-        tranches: PyRef<'_, PyTrancheStructure>,
-        closing_date: &Bound<'_, PyAny>,
-        maturity: &Bound<'_, PyAny>,
-        discount_curve_id: &str,
-        calendar_id: Option<&str>,
-    ) -> PyResult<Self> {
-        Ok(Self {
-            inner: StandardDealParams {
-                id: id.into(),
-                pool: pool.inner.clone(),
-                tranches: tranches.inner.clone(),
-                closing_date: py_to_date(closing_date)?,
-                maturity: py_to_date(maturity)?,
-                discount_curve_id: discount_curve_id.into(),
-                calendar_id: calendar_id.map(Into::into),
-            },
-        })
+    #[pyo3(
+        signature = (**fields),
+        text_signature = "(*, id, pool, tranches, closing_date, maturity, discount_curve_id, calendar_id=None)"
+    )]
+    fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
+        let inner: StandardDealParams =
+            crate::bindings::module_utils::fields_from_py(py, fields, "StandardDealParams")?;
+        Ok(Self { inner })
     }
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.standard_deal_params", "StandardDealParams.id")]
     #[getter]

@@ -1,21 +1,16 @@
-//! Return-shape checks for public WASM entry points.
+//! Source checks of how WASM entry points build their results.
 //!
-//! The mirror of `finstack-quant-py/tests/parity/test_return_shapes.py`. The
-//! two files are deliberately kept in the same order with the same entry
-//! names, so a cross-language divergence reads as a one-screen diff.
-//!
-//! These assertions are made against the hand-written `index.d.ts`, which is
-//! the published contract JS consumers compile against.
+//! The declared return shapes (Json/Text suffixes, structured results,
+//! `Float64Array` vectors) are checked on the published declarations by
+//! `tests/facade/return_shapes.test.mjs`, the mirror of
+//! `finstack-quant-py/tests/parity/test_return_shapes.py`. These two checks
+//! read the Rust and facade sources and need no build.
 
 use std::fs;
 use std::path::PathBuf;
 
 fn manifest_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-}
-
-fn index_dts() -> String {
-    fs::read_to_string(manifest_dir().join("index.d.ts")).expect("read index.d.ts")
 }
 
 /// All Rust sources under `src/`, concatenated with their paths, so a check
@@ -35,94 +30,6 @@ fn api_sources() -> Vec<(PathBuf, String)> {
     let mut out = Vec::new();
     walk(&manifest_dir().join("src"), &mut out);
     out
-}
-
-/// One method declared inside an `interface` or `class` body of `index.d.ts`.
-struct Member {
-    owner: String,
-    name: String,
-    ret: String,
-}
-
-/// Every method declared in `index.d.ts`, with its owning interface or class.
-///
-/// Members sit at a two-space indent (the file is prettier-formatted);
-/// multi-line signatures end with a `  ): Ret;` line. Doc-comment prose is
-/// never at that indent with a `name(` shape, so it is not mistaken for a
-/// declaration.
-fn members(dts: &str) -> Vec<Member> {
-    let lines: Vec<&str> = dts.lines().collect();
-    let mut out = Vec::new();
-    let mut owner: Option<String> = None;
-    for (idx, line) in lines.iter().enumerate() {
-        let head = line
-            .trim_start_matches("export ")
-            .trim_start_matches("declare ");
-        if let Some(rest) = head
-            .strip_prefix("interface ")
-            .or_else(|| head.strip_prefix("class "))
-        {
-            let name: String = rest
-                .chars()
-                .take_while(|c| c.is_alphanumeric() || *c == '_')
-                .collect();
-            owner = Some(name);
-            continue;
-        }
-        if line.starts_with('}') {
-            owner = None;
-            continue;
-        }
-        let Some(owner_name) = owner.as_ref() else {
-            continue;
-        };
-        let Some(body) = line.strip_prefix("  ") else {
-            continue;
-        };
-        if body.starts_with(' ') {
-            continue;
-        }
-        let body = body
-            .trim_start_matches("static ")
-            .trim_start_matches("readonly ");
-        let name: String = body
-            .chars()
-            .take_while(|c| c.is_alphanumeric() || *c == '_')
-            .collect();
-        let after = &body[name.len()..];
-        if name.is_empty() || !(after.starts_with('(') || after.starts_with('<')) {
-            continue;
-        }
-        let ret = if let Some(colon) = line.rfind("):") {
-            Some(line[colon + 2..].to_string())
-        } else {
-            lines
-                .iter()
-                .skip(idx + 1)
-                .take(80)
-                .find_map(|l| l.strip_prefix("  ):").map(str::to_string))
-        };
-        if let Some(ret) = ret {
-            out.push(Member {
-                owner: owner_name.clone(),
-                name,
-                ret: ret.trim().trim_end_matches(';').trim().to_string(),
-            });
-        }
-    }
-    out
-}
-
-/// The declared return type of `owner.name` in `index.d.ts`.
-///
-/// Panics when the member is not declared: a pinned export that disappears
-/// must fail the gate, not silently skip it.
-fn declared(dts: &str, owner: &str, name: &str) -> String {
-    members(dts)
-        .into_iter()
-        .find(|m| m.owner == owner && m.name == name)
-        .map(|m| m.ret)
-        .unwrap_or_else(|| panic!("{owner}.{name} is not declared in index.d.ts"))
 }
 
 /// Raw `serde_wasm_bindgen::to_value` emits ES2015 `Map`s for Rust maps, and
@@ -149,217 +56,18 @@ fn no_binding_bypasses_the_json_compatible_serializer() {
     );
 }
 
-/// A `Json`-suffixed export returns a JSON string; an unsuffixed one returns a
-/// structured value. The suffix is the only signal a JS caller has, so it must
-/// not lie — `accruedInterestJson` used to return a number.
-#[test]
-fn json_suffixed_exports_return_strings() {
-    let dts = index_dts();
-    // Exports whose names promise a JSON document.
-    for (owner, export) in [
-        ("CovenantsNamespace", "validateCovenantSpecJson"),
-        ("CovenantsNamespace", "validateCovenantReportJson"),
-        ("CovenantsNamespace", "validateCovenantEngineJson"),
-        ("ValuationsNamespace", "valuationResultToJson"),
-        ("AttributionNamespace", "attributePnlEnvelopeJson"),
-    ] {
-        let ret = declared(&dts, owner, export);
-        assert_eq!(
-            ret, "string",
-            "{owner}.{export} is Json-suffixed but index.d.ts declares it returning {ret:?}; \
-             the suffix must mean 'returns a JSON string'"
-        );
+/// `text` with every `/* ... */` comment (including JSDoc) removed.
+fn without_block_comments(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(start) = rest.find("/*") {
+        out.push_str(&rest[..start]);
+        rest = rest[start + 2..]
+            .split_once("*/")
+            .map_or("", |(_, after)| after);
     }
-    // And the rule holds for every Json-suffixed method, pinned or not
-    // (`fromJson` is a constructor, not a wire surface). A lookup that can
-    // miss returns the JSON string or `undefined` (Rust `Option<String>`).
-    for member in members(&dts) {
-        if member.name.ends_with("Json") && !member.name.starts_with("from") {
-            assert!(
-                matches!(member.ret.as_str(), "string" | "string | undefined"),
-                "{}.{} is Json-suffixed but returns {:?}",
-                member.owner,
-                member.name,
-                member.ret
-            );
-        }
-    }
-}
-
-/// Computation results must not be declared as bare strings.
-#[test]
-fn computation_results_are_structured_not_strings() {
-    let dts = index_dts();
-    for (owner, export) in [
-        ("ValuationInstrumentsNamespace", "priceInstrument"),
-        ("ValuationInstrumentsNamespace", "priceInstrumentWithMarket"),
-        ("CalibrationNamespace", "calibrate"),
-        ("CalibrationNamespace", "dryRun"),
-        ("AttributionNamespace", "attributePnl"),
-        ("AttributionNamespace", "attributePnlEnvelope"),
-        ("ValuationInstrumentsNamespace", "trancheOas"),
-        ("ValuationInstrumentsNamespace", "trancheMetrics"),
-        ("ValuationInstrumentsNamespace", "trancheScenarioTable"),
-        ("StatementsAnalyticsNamespace", "runChecks"),
-        ("StatementsAnalyticsNamespace", "runThreeStatementChecks"),
-        (
-            "StatementsAnalyticsNamespace",
-            "runCreditUnderwritingChecks",
-        ),
-        ("StatementsAnalyticsNamespace", "generateTornadoEntries"),
-        ("FactorCovarianceForecast", "covarianceAt"),
-        ("FactorCovarianceForecast", "factorModelAt"),
-        ("FxHandle", "price"),
-        ("ValuationInstrumentsNamespace", "instrumentCashflows"),
-        (
-            "ValuationInstrumentsNamespace",
-            "instrumentCashflowsWithMarket",
-        ),
-        ("AttributionNamespace", "attributePnlMany"),
-        ("AttributionNamespace", "attributeReturnContribution"),
-        ("PortfolioNamespace", "collapseToBaseByDateKind"),
-        ("PortfolioNamespace", "portfolioMetricsSeries"),
-        ("StatementsNamespace", "nodeToDatedSchedule"),
-        ("StatementsNamespace", "statementResultToTableLong"),
-        ("StatementsNamespace", "statementResultToTableWide"),
-        ("StatementsAnalyticsNamespace", "scenarioComparisonTable"),
-        ("StatementsAnalyticsNamespace", "plSummaryReport"),
-        ("StatementsNamespace", "normalize"),
-        ("Evaluator", "evaluate"),
-        ("Evaluator", "evaluateMonteCarlo"),
-        ("DependencyTracer", "dependencyTree"),
-        ("AssetBackedFacility", "project"),
-        ("RevolvingCredit", "expectedCashflows"),
-    ] {
-        let ret = declared(&dts, owner, export);
-        assert_ne!(
-            ret, "string",
-            "{owner}.{export} is a computation result but index.d.ts declares it \
-             returning a bare string; it should be a structured object (or be \
-             renamed with a Json suffix if it is really a wire surface)"
-        );
-    }
-}
-
-/// A method that returns a bare `string` must say what the string is: a
-/// `Json` document, `Text` prose, or `Html`. The allowlist names the few
-/// strings that are the value itself.
-#[test]
-fn bare_string_returns_are_named_or_allowlisted() {
-    const VALUE_STRINGS: &[(&str, &str)] = &[
-        ("Currency", "toString"),
-        ("Money", "toString"),
-        ("DayCount", "toString"),
-        ("Tenor", "toString"),
-        ("FxConversionPolicy", "toString"),
-        ("FxQuoteConvention", "toString"),
-        // Canonical labels of the core enum, identifier and calendar handles.
-        ("HolidayCalendar", "toString"),
-        ("PeriodKind", "toString"),
-        ("PeriodId", "toString"),
-        ("SifmaSettlementClass", "toString"),
-        ("TenorUnit", "toString"),
-        ("RoundingMode", "toString"),
-        ("UnknownScalePolicy", "toString"),
-        ("CreditRating", "toString"),
-        ("CurveId", "toString"),
-        ("InstrumentId", "toString"),
-        // Identifier text and rating spellings: the value itself.
-        ("CurveId", "asStr"),
-        ("InstrumentId", "asStr"),
-        ("CreditRating", "toMoodysString"),
-        ("RatingScaleRegistry", "defaultScaleId"),
-        ("CoreNamespace", "ratingScalesExtensionKey"),
-        // Exact decimal text of the amount.
-        ("Money", "amountDecimal"),
-        // Display formatting of the amount.
-        ("Money", "formatWith"),
-        // Canonical return-frequency label.
-        ("Performance", "getFrequency"),
-        // Canonical liquidity-tier label.
-        ("LiquidityNamespace", "liquidityTier"),
-        // Canonical formula text (re-parseable), the Python `parse_formula` twin.
-        ("StatementsNamespace", "parseFormula"),
-        // Canonical "sha256:<hex>" content hashes.
-        ("CalibrationNamespace", "calibrationEnvelopeContentHash"),
-        ("CalibrationNamespace", "calibrationResultContentHash"),
-        ("StatementsNamespace", "financialModelContentHash"),
-        // Canonical horizon descriptor ("one_step", "unconditional", "years:<n>").
-        ("VolHorizon", "toString"),
-        // Rating label of a simulated path at a time / of a WARF factor.
-        ("RatingPath", "labelAt"),
-        ("RatingScale", "ratingFromWarf"),
-        // ISO-8601 dates of the underlying swap.
-        ("Swaption", "getUnderlyingStartDate"),
-        ("Swaption", "getUnderlyingMaturity"),
-        // ISO-8601 valuation date after a scenario's time roll.
-        ("ScenariosNamespace", "applicationReportEffectiveAsOf"),
-    ];
-    let dts = index_dts();
-    let offenders: Vec<String> = members(&dts)
-        .into_iter()
-        .filter(|m| m.ret == "string")
-        .filter(|m| !["Json", "Text", "Html"].iter().any(|s| m.name.ends_with(s)))
-        .filter(|m| {
-            let key = (m.owner.as_str(), m.name.as_str());
-            !VALUE_STRINGS.contains(&key)
-        })
-        .map(|m| format!("{}.{}", m.owner, m.name))
-        .collect();
-    assert!(
-        offenders.is_empty(),
-        "these methods return a bare string without a Json/Text/Html suffix; \
-         return a structured object or name the string: {offenders:?}"
-    );
-}
-
-/// Text-returning exports say so in their names. They share the
-/// `Result<String, JsValue>` signature with ~130 genuine JSON exports, so the
-/// name is the only way a caller can tell prose from a parseable document.
-#[test]
-fn prose_returning_exports_are_named_text() {
-    let dts = index_dts();
-    for export in [
-        "plSummaryReportText",
-        "creditAssessmentReportText",
-        "explainFormulaText",
-    ] {
-        assert!(
-            dts.contains(&format!("{export}(")),
-            "{export} is missing from index.d.ts; prose-returning exports must \
-             carry the Text suffix so they are not mistaken for JSON"
-        );
-    }
-    // The pre-refactor names must be gone, not aliased. (`plSummaryReport` is
-    // now the structured table twin of Python `pl_summary_report`, pinned as a
-    // non-string return above.)
-    for stale in ["parseFormulaText(", "creditAssessmentReport("] {
-        assert!(
-            !dts.contains(stale),
-            "the pre-refactor export {stale:?} is still declared; renames \
-             replace, they do not alias"
-        );
-    }
-}
-
-/// Numeric vectors cross the boundary as `Float64Array`, not as boxed-`Number`
-/// JS arrays. Rust-side that means returning `Box<[f64]>`.
-#[test]
-fn numeric_vector_exports_declare_float64array() {
-    let dts = index_dts();
-    for (owner, export) in [
-        ("CorrelationNamespace", "correlationBounds"),
-        ("CorrelatedBernoulli", "jointProbabilities"),
-        ("CorrelationNamespace", "nearestCorrelation"),
-        ("SabrSmile", "generateSmile"),
-    ] {
-        let ret = declared(&dts, owner, export);
-        assert!(
-            ret.contains("Float64Array"),
-            "{owner}.{export} returns a numeric vector but index.d.ts declares {ret:?}; \
-             flat numeric vectors cross as Float64Array"
-        );
-    }
+    out.push_str(rest);
+    out
 }
 
 /// The JS facade is a pure namespace re-export. A `JSON.parse` in it means the
@@ -378,7 +86,8 @@ fn facade_does_no_json_parsing() {
             }
             if path.extension().is_some_and(|ext| ext == "js") {
                 let body = fs::read_to_string(&path).expect("read facade file");
-                if body.contains("JSON.parse") {
+                // JSDoc examples may parse a `*Json` result; only code counts.
+                if without_block_comments(&body).contains("JSON.parse") {
                     offenders.push(path.display().to_string());
                 }
             }

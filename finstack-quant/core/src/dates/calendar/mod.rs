@@ -13,8 +13,10 @@ pub(crate) mod types;
 mod year_cache;
 
 #[cfg(test)]
+#[path = "tests/rule_coverage.rs"]
 mod rule_coverage_tests;
 #[cfg(test)]
+#[path = "tests/rule.rs"]
 mod rule_tests;
 
 // Isolate generated `use` imports from this module's public re-exports.
