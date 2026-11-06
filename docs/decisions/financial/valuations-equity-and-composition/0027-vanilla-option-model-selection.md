@@ -10,6 +10,8 @@ entry points and registered alternatives; not a completeness assessment.
 
 **Audit date:** 2026-11-05
 
+**Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`
+
 ## Decision awaiting adoption
 
 The proposed decision covers the default model/exercise mapping for vanilla

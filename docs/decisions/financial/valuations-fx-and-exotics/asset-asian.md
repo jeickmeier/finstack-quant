@@ -1,4 +1,4 @@
-# Asset Asian seasoning, exact geometric control and GBM/Heston alternatives
+# VALUATIONS-FX-AND-EXOTICS-ASSET-ASIAN: Asset Asian seasoning, exact geometric control and GBM/Heston alternatives
 
 - Record: `VALUATIONS-FX-AND-EXOTICS-ASSET-ASIAN`
 - Decision status: **Draft — observed implementation, adoption pending**.

@@ -1,4 +1,4 @@
-# Equity rough Heston and rough Bergomi adapters
+# VALUATIONS-EQUITY-AND-COMPOSITION-11: Equity rough Heston and rough Bergomi adapters
 
 - **Record:** `VALUATIONS-EQUITY-AND-COMPOSITION-11`.
 - **Decision status:** Draft — observed implementation; adoption pending.

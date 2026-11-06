@@ -12,6 +12,8 @@ reference provenance and coverage are not fully assessed.
 
 **Audit date:** 2026-11-05
 
+**Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`
+
 ## Observed choice and rationale
 
 Rate calibration fits instruments using the requested final interpolation.

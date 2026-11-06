@@ -1,4 +1,4 @@
-# Carino linking and supplied-attribution validation
+# PORTFOLIO-ATTRIBUTION-017: Carino linking and supplied-attribution validation
 
 - ID: PORTFOLIO-ATTRIBUTION-017
 - Decision status: Draft (observed implementation; adoption pending).

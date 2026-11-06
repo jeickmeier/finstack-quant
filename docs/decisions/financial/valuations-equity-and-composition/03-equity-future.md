@@ -1,4 +1,4 @@
-# Equity futures carry, quanto adjustment and risk
+# VALUATIONS-EQUITY-AND-COMPOSITION-03: Equity futures carry, quanto adjustment and risk
 
 - **Record:** `VALUATIONS-EQUITY-AND-COMPOSITION-03`.
 - **Decision status:** Draft — observed implementation; adoption pending.

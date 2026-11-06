@@ -1,4 +1,4 @@
-# NDF quote direction, fixing transition and settlement value
+# VALUATIONS-FX-AND-EXOTICS-NDF-FIXING-SETTLEMENT: NDF quote direction, fixing transition and settlement value
 
 - Record: `VALUATIONS-FX-AND-EXOTICS-NDF-FIXING-SETTLEMENT`
 - Decision status: **Draft — observed implementation, adoption pending**.

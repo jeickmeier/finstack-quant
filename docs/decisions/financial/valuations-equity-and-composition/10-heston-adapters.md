@@ -1,4 +1,4 @@
-# Equity Heston Fourier and Monte Carlo adapters
+# VALUATIONS-EQUITY-AND-COMPOSITION-10: Equity Heston Fourier and Monte Carlo adapters
 
 - **Record:** `VALUATIONS-EQUITY-AND-COMPOSITION-10`.
 - **Decision status:** Draft — observed implementation; adoption pending.

@@ -1,4 +1,4 @@
-# Commodity business-day averaging and fixed-for-floating swaps
+# VALUATIONS-FX-AND-EXOTICS-COMMODITY-AVERAGE-SWAP: Commodity business-day averaging and fixed-for-floating swaps
 
 - Record: `VALUATIONS-FX-AND-EXOTICS-COMMODITY-AVERAGE-SWAP`
 - Decision status: **Draft — observed implementation, adoption pending**.

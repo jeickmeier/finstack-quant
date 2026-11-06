@@ -1,4 +1,4 @@
-# Autocallable seasoning, coupon memory and redemption
+# VALUATIONS-EQUITY-AND-COMPOSITION-13: Autocallable seasoning, coupon memory and redemption
 
 - **Record:** `VALUATIONS-EQUITY-AND-COMPOSITION-13`.
 - **Decision status:** Draft — observed implementation; adoption pending.

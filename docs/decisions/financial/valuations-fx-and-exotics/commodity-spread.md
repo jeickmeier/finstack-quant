@@ -1,4 +1,4 @@
-# Commodity spread option Kirk approximation and leg risk
+# VALUATIONS-FX-AND-EXOTICS-COMMODITY-SPREAD: Commodity spread option Kirk approximation and leg risk
 
 - Record: `VALUATIONS-FX-AND-EXOTICS-COMMODITY-SPREAD`
 - Decision status: **Draft — observed implementation, adoption pending**.

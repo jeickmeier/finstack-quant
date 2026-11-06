@@ -82,7 +82,19 @@ resolve the stated scope question explicitly.
    [error guide](../../.agents/rules/rust/error-handling.md) now specifies the
    centralized, kind-aware binding adapters required by
    [ADR 0006](standards/0006-structured-errors.md) and
-   [ADR 0049](standards/0049-explicit-public-error-matching.md). Continue
+   [ADR 0049](standards/0049-explicit-public-error-matching.md). The
+   Rust standards guidance has also been reconciled with
+   [ADR 0004](project/0004-development-compatibility.md) (compatibility),
+   [ADR 0020](financial/conventions/0020-numerical-representation-and-rounding.md),
+   [ADR 0021](standards/0021-reproducibility-guarantees.md) and
+   [ADR 0042](standards/0042-numerical-accumulation-and-comparisons.md)
+   (determinism and summation), and ADR 0034 (lint definitions live in the
+   workspace manifest). The error guide's crate inventory is now a snapshot
+   to re-check, and the
+   [testing guidance](../../.agents/rules/rust/testing-standards.md) now
+   follows [ADR 0048](project/0048-reference-provenance-and-version-pinning.md)
+   for fixture location and provenance and names the actual `ResultsMeta`
+   fields. Continue
    auditing remaining contributor guidance and crate-level lint configuration for
    any further drift; ADR 0034 does not independently approve every legacy
    instruction or current configuration setting.

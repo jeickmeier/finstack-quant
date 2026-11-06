@@ -11,6 +11,8 @@ reference coverage and tolerance justification remain incomplete.
 
 **Audit date:** 2026-11-05
 
+**Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`
+
 ## Observed choice and rationale
 
 `Performance::value_at_risk`, `expected_shortfall` and the standard summary

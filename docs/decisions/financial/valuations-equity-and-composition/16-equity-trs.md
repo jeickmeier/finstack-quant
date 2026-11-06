@@ -1,4 +1,4 @@
-# Equity total-return swap projection, dividends and margin exposure
+# VALUATIONS-EQUITY-AND-COMPOSITION-16: Equity total-return swap projection, dividends and margin exposure
 
 - **Record:** `VALUATIONS-EQUITY-AND-COMPOSITION-16`.
 - **Decision status:** Draft — observed implementation; adoption pending.

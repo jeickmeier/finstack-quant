@@ -1,4 +1,4 @@
-# FX European option valuation, implied volatility and delta conventions
+# VALUATIONS-FX-AND-EXOTICS-FX-VANILLA-DELTA: FX European option valuation, implied volatility and delta conventions
 
 - Record: `VALUATIONS-FX-AND-EXOTICS-FX-VANILLA-DELTA`
 - Decision status: **Draft — observed implementation, adoption pending**.

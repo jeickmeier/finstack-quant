@@ -1,4 +1,4 @@
-# Long-only covariance risk-budget iteration
+# PORTFOLIO-ATTRIBUTION-002: Long-only covariance risk-budget iteration
 
 - ID: PORTFOLIO-ATTRIBUTION-002
 - Decision status: Draft (observed implementation; adoption pending).

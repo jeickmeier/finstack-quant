@@ -1,4 +1,4 @@
-# ATM term-GBM, observation grids and pinned spot risk
+# VALUATIONS-EQUITY-AND-COMPOSITION-12: ATM term-GBM, observation grids and pinned spot risk
 
 - **Record:** `VALUATIONS-EQUITY-AND-COMPOSITION-12`.
 - **Decision status:** Draft — observed implementation; adoption pending.

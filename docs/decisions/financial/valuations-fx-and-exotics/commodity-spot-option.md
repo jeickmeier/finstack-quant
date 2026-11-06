@@ -1,4 +1,4 @@
-# Commodity spot-option Black pricing, exercise trees and Schwartz–Smith simulation
+# VALUATIONS-FX-AND-EXOTICS-COMMODITY-SPOT-OPTION: Commodity spot-option Black pricing, exercise trees and Schwartz–Smith simulation
 
 - Record: `VALUATIONS-FX-AND-EXOTICS-COMMODITY-SPOT-OPTION`
 - Decision status: **Draft — observed implementation, adoption pending**.

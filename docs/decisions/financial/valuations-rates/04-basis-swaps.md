@@ -1,4 +1,4 @@
-# Basis swap floating legs and absolute par spread
+# VALUATIONS-RATES-04-BASIS-SWAPS: Basis swap floating legs and absolute par spread
 
 - ID: VALUATIONS-RATES-04-BASIS-SWAPS
 - Decision status: Draft (observed implementation; adoption pending).

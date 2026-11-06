@@ -1,4 +1,4 @@
-# TARN target truncation, early redemption and HW1F term rates
+# VALUATIONS-FX-AND-EXOTICS-TARN-TARGET: TARN target truncation, early redemption and HW1F term rates
 
 - Record: `VALUATIONS-FX-AND-EXOTICS-TARN-TARGET`
 - Decision status: **Draft — observed implementation, adoption pending**.

@@ -1,4 +1,4 @@
-# Cliquet locked returns, reset anchoring and settlement
+# VALUATIONS-EQUITY-AND-COMPOSITION-14: Cliquet locked returns, reset anchoring and settlement
 
 - **Record:** `VALUATIONS-EQUITY-AND-COMPOSITION-14`.
 - **Decision status:** Draft — observed implementation; adoption pending.

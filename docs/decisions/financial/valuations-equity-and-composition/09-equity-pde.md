@@ -1,4 +1,4 @@
-# Equity Black–Scholes and Heston PDE adapters
+# VALUATIONS-EQUITY-AND-COMPOSITION-09: Equity Black–Scholes and Heston PDE adapters
 
 - **Record:** `VALUATIONS-EQUITY-AND-COMPOSITION-09`.
 - **Decision status:** Draft — observed implementation; adoption pending.

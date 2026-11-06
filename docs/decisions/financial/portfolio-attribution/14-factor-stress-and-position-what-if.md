@@ -1,4 +1,4 @@
-# Factor stress repricing and proportional position what-if
+# PORTFOLIO-ATTRIBUTION-014: Factor stress repricing and proportional position what-if
 
 - ID: PORTFOLIO-ATTRIBUTION-014
 - Decision status: Draft (observed implementation; adoption pending).
