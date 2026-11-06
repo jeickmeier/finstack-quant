@@ -434,3 +434,46 @@ work-count log. It also establishes H3's new batch baseline, with fresh provider
 construction and fingerprinting included: one bump 7.235 ms, five ascending
 36.218 ms, five reversed 36.178 ms, five concurrent 15.117 ms. Thread creation
 is included in the concurrent timing.
+
+## H3 — Share validated hazard source replay
+
+Accepted. The batch-local cache now retains the parsed recipe and validated
+identity replay separately from each bumped result. Identity keys include the
+complete source content, discount content and hazard seed used by global
+calibration, plus requested conventions. Target keys additionally include the
+shocked market dependencies, recovery, bump and spread-risk-center mode.
+Failures are not retained. Source and target markets remain distinct.
+
+| Workload | H2 mean ms | H3 mean ms | Change |
+|---|---:|---:|---:|
+| hazard_bucket_batch/one_bump | 7.212 | 7.080 | -1.8% |
+| hazard_bucket_batch/five_ascending | 36.078 | 21.354 | -40.8% |
+| hazard_bucket_batch/five_reverse | 36.118 | 21.347 | -40.9% |
+| hazard_bucket_batch/five_concurrent | 15.137 | 11.331 | -25.1% |
+| calibration_hazard_isolated_5_pillars | 3.615 | 3.518 | -2.7% |
+| calibration_base_correlation_isolated_5_knots | 268.206 | 266.409 | -0.7% |
+| calibration_base_correlation_full_plan_5_knots | 278.390 | 276.280 | -0.8% |
+
+Each timing constructs a fresh provider, including fingerprints/cache setup;
+concurrent timings include thread creation. Tests count actual replay solves:
+five distinct bumps require six solves, including concurrent repeated requests,
+instead of ten. One bump still requires two. All five stored calibration reports
+match H2 exactly. Cached and uncached bumped curves match canonical content.
+
+Validation: 571 calibration tests, 453 CDS-related umbrella tests and scoped
+calibration lint passed. Coverage includes reordered/zero/invalid bumps,
+concurrent deduplication, source/target discount and seed mutations, recovery,
+risk-center mode, failed identity retries, and existing recipe/FX checks.
+The source cache retains one parsed recipe, quote vectors, settings and base
+curve per distinct identity key, for the existing batch cache's lifetime.
+It does not retain per-solver-trial objects. Raw samples and confidence intervals
+are in `h3`; the ordinary CDS/risk target is retained as a consumer control.
+
+Execution status: S0, BC1–BC5 and H1–H3 complete; BC6 rejected for lack of a
+representative incremental workload. V1 is in progress; V2/V3 and final gate
+remain pending. The fixed implementation brief is unchanged.
+
+H3 evidence note: `calibration_discount_step` and
+`calibration_discount_then_forward_steps` directories were copied from earlier
+controls by the broad prefix collector; they are not fresh H3 measurements and
+are excluded from H3 conclusions. All H3 table rows and CDS controls are fresh.
