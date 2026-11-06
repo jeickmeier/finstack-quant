@@ -16,7 +16,7 @@ use finstack_quant_calibration::api::{
 use finstack_quant_calibration::quotes::MarketQuote;
 use finstack_quant_calibration::quotes::RateQuote;
 use finstack_quant_calibration::quotes::{Pillar, QuoteId};
-use finstack_quant_calibration::recalibration::{CachedRecalibrationProvider, bump_hazard_spreads};
+use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
 use finstack_quant_core::FxHashMap;
 use finstack_quant_core::contract::LoadLimits;
 use finstack_quant_core::currency::Currency;
@@ -28,9 +28,7 @@ use finstack_quant_core::types::IndexId;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions};
-use finstack_quant_valuations_core::market::conventions::ids::CdsDocClause;
 use finstack_quant_valuations_core::metrics::MetricId;
-use finstack_quant_valuations_core::recalibration::QuoteBump;
 use finstack_quant_valuations_rates::fra::ForwardRateAgreement;
 use rust_decimal::Decimal;
 use std::hint::black_box;
@@ -326,53 +324,6 @@ fn load_example(json: &str) -> CalibrationEnvelope {
         .expect("benchmark envelope should pass strict loading")
 }
 
-fn bench_hazard_bootstrap(c: &mut Criterion) {
-    let envelope = load_example(include_str!(
-        "../examples/market_bootstrap/03_single_name_hazard.json"
-    ));
-
-    c.bench_function("calibration_hazard_full_plan_5_pillars", |b| {
-        b.iter(|| {
-            engine::calibrate(black_box(&envelope)).expect("hazard calibration should succeed")
-        })
-    });
-
-    let result = engine::calibrate(&envelope).expect("hazard calibration setup should succeed");
-    let market =
-        MarketContext::try_from(result.result.final_market).expect("market state should rebuild");
-    let hazard = market
-        .get_hazard("ISSUER-A-CDS")
-        .expect("calibrated hazard curve should exist");
-    let discount_id = CurveId::new("USD-OIS");
-
-    c.bench_function("calibration_hazard_rebootstrap_parallel_5_pillars", |b| {
-        b.iter(|| {
-            bump_hazard_spreads(
-                black_box(hazard.as_ref()),
-                black_box(&market),
-                black_box(&QuoteBump::ParallelBp(1.0)),
-                black_box(&discount_id),
-                Some(CdsDocClause::IsdaNa),
-                None,
-            )
-            .expect("hazard rebootstrap should succeed")
-        })
-    });
-}
-
-fn bench_base_correlation_bootstrap(c: &mut Criterion) {
-    let envelope = load_example(include_str!(
-        "../examples/market_bootstrap/05_cdx_base_correlation.json"
-    ));
-
-    c.bench_function("calibration_base_correlation_full_plan_5_knots", |b| {
-        b.iter(|| {
-            engine::calibrate(black_box(&envelope))
-                .expect("base-correlation calibration should succeed")
-        })
-    });
-}
-
 fn bench_rate_quote_risk_cache(c: &mut Criterion) {
     let envelope = load_example(include_str!(
         "../examples/market_bootstrap/02_usd_3m_forward_curve.json"
@@ -453,8 +404,6 @@ criterion_group!(
     benches,
     bench_discount_and_forward_steps,
     bench_residual_normalization,
-    bench_hazard_bootstrap,
-    bench_base_correlation_bootstrap,
     bench_rate_quote_risk_cache
 );
 criterion_main!(benches);

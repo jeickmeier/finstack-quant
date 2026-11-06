@@ -226,14 +226,36 @@ fn bench_cds_tranche_npv(c: &mut Criterion) {
         ("junior_mezz_3_7", 3.0, 7.0),
         ("senior_mezz_7_10", 7.0, 10.0),
         ("senior_10_15", 10.0, 15.0),
+        ("thin_6_6_1", 6.0, 6.1),
+        ("high_60_100", 60.0, 100.0),
     ];
 
     for (name, attach, detach) in tranches {
         let tranche = create_tranche(attach, detach, 5);
         group.bench_with_input(BenchmarkId::from_parameter(name), name, |b, _| {
-            b.iter(|| tranche.value(black_box(&market), black_box(as_of)));
+            b.iter(|| {
+                tranche
+                    .value(black_box(&market), black_box(as_of))
+                    .expect("tranche must price")
+            });
         });
     }
+    let long = create_tranche(3.0, 7.0, 10);
+    group.bench_function("ten_year", |b| {
+        b.iter(|| {
+            long.value(black_box(&market), black_box(as_of))
+                .expect("ten-year tranche must price")
+        });
+    });
+    let mut seasoned = create_tranche(7.0, 15.0, 5);
+    seasoned.realized_loss = 0.02;
+    group.bench_function("seasoned", |b| {
+        b.iter(|| {
+            seasoned
+                .value(black_box(&market), black_box(as_of))
+                .expect("seasoned tranche must price")
+        });
+    });
     group.finish();
 }
 
@@ -270,7 +292,9 @@ fn bench_cds_tranche_correlation_delta(c: &mut Criterion) {
 
     group.bench_function("correlation_delta", |b| {
         b.iter(|| {
-            pricer.calculate_correlation_delta(&tranche, black_box(&market), black_box(as_of))
+            pricer
+                .calculate_correlation_delta(&tranche, black_box(&market), black_box(as_of))
+                .expect("tranche measure must succeed")
         });
     });
 
@@ -286,7 +310,11 @@ fn bench_cds_tranche_jump_to_default(c: &mut Criterion) {
     let pricer = CdsTranchePricer::new();
 
     group.bench_function("jump_to_default", |b| {
-        b.iter(|| pricer.calculate_jump_to_default(&tranche, black_box(&market), black_box(as_of)));
+        b.iter(|| {
+            pricer
+                .calculate_jump_to_default(&tranche, black_box(&market), black_box(as_of))
+                .expect("tranche measure must succeed")
+        });
     });
 
     group.finish();
@@ -301,7 +329,11 @@ fn bench_cds_tranche_par_spread(c: &mut Criterion) {
     let pricer = CdsTranchePricer::new();
 
     group.bench_function("par_spread", |b| {
-        b.iter(|| pricer.calculate_par_spread(&tranche, black_box(&market), black_box(as_of)));
+        b.iter(|| {
+            pricer
+                .calculate_par_spread(&tranche, black_box(&market), black_box(as_of))
+                .expect("tranche measure must succeed")
+        });
     });
 
     group.finish();
@@ -326,11 +358,15 @@ fn bench_cds_tranche_all_metrics(c: &mut Criterion) {
                 )
                 .unwrap();
 
-            let _corr_delta =
-                pricer.calculate_correlation_delta(&tranche, black_box(&market), black_box(as_of));
-            let _jtd =
-                pricer.calculate_jump_to_default(&tranche, black_box(&market), black_box(as_of));
-            let _par = pricer.calculate_par_spread(&tranche, black_box(&market), black_box(as_of));
+            let _corr_delta = pricer
+                .calculate_correlation_delta(&tranche, black_box(&market), black_box(as_of))
+                .expect("tranche measure must succeed");
+            let _jtd = pricer
+                .calculate_jump_to_default(&tranche, black_box(&market), black_box(as_of))
+                .expect("tranche measure must succeed");
+            let _par = pricer
+                .calculate_par_spread(&tranche, black_box(&market), black_box(as_of))
+                .expect("tranche measure must succeed");
         });
     });
 
@@ -368,7 +404,11 @@ fn bench_cds_tranche_heterogeneous(c: &mut Criterion) {
             BenchmarkId::new("npv_hetero", pool_size),
             &pool_size,
             |b, _| {
-                b.iter(|| tranche.value(black_box(&market), black_box(as_of)));
+                b.iter(|| {
+                    tranche
+                        .value(black_box(&market), black_box(as_of))
+                        .expect("tranche must price")
+                });
             },
         );
     }

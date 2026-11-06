@@ -13,6 +13,16 @@ use finstack_quant_core::math::distributions::binomial_pmf_all_into;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::{Error, Result};
 
+#[cfg(test)]
+thread_local! {
+    static PMF_EVALUATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(super) fn take_pmf_evaluations() -> usize {
+    PMF_EVALUATIONS.with(|count| count.replace(0))
+}
+
 impl CdsTranchePricer {
     /// Apply smooth correlation boundary handling to avoid numerical discontinuities.
     ///
@@ -590,6 +600,8 @@ fn with_conditional_pmf<T>(
     conditional_default_prob: f64,
     f: impl FnOnce(&[f64]) -> T,
 ) -> Result<T> {
+    #[cfg(test)]
+    PMF_EVALUATIONS.with(|count| count.set(count.get() + 1));
     if !conditional_default_prob.is_finite() {
         return Err(Error::Validation(
             "conditional default probability must be finite".to_owned(),

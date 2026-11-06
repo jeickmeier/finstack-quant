@@ -2675,3 +2675,140 @@ fn heterogeneous_tail_loss_matches_independent_state_enumeration_and_factor_grid
         }
     }
 }
+
+/// Original-engine snapshots supplement the independent SciPy reference.
+/// The pool budget is 1e-10 per cap. A difference of two engines and two
+/// caps is bounded by 4e-10 / tranche width. Monotonicity repair is nonexpansive.
+/// For PV, add protection variation over all periods and coupon exposure;
+/// all fixture discount factors are <= 1 and coupons are 5% per year.
+#[test]
+fn credit_performance_numerical_baseline() {
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+    let mut records = Vec::new();
+    for (name, attach, detach, years, rho, hazard, realized) in [
+        ("equity", 0.0, 3.0, 5, 0.25, 0.02, 0.0),
+        ("thin", 6.0, 6.1, 5, 0.25, 0.02, 0.0),
+        ("high", 60.0, 100.0, 10, 0.75, 0.10, 0.0),
+        ("distressed", 15.0, 30.0, 5, 0.25, 0.25, 0.0),
+        ("boundary", 3.0, 7.0, 5, 0.999, 0.02, 0.0),
+        ("seasoned", 7.0, 15.0, 5, 0.25, 0.02, 0.02),
+        ("noncontiguous", 4.0, 9.0, 5, 0.25, 0.02, 0.0),
+    ] {
+        let index_curve = HazardCurve::builder("CDX.NA.IG.42")
+            .base_date(as_of)
+            .recovery_rate(0.4)
+            .knots([(1.0, hazard), (10.0, hazard)])
+            .build()
+            .expect("hazard");
+        let correlation = BaseCorrelationCurve::builder("CDX.NA.IG.42_5Y")
+            .knots([(3.0, rho), (100.0, rho)])
+            .build()
+            .expect("correlation");
+        let index = CreditIndexData::builder()
+            .num_constituents(125)
+            .recovery_rate(0.4)
+            .index_credit_curve(Arc::new(index_curve.clone()))
+            .base_correlation_curve(Arc::new(correlation.clone()))
+            .build()
+            .expect("index");
+        let market = sample_market_context()
+            .insert(index_curve)
+            .insert(correlation)
+            .insert_credit_index("CDX.NA.IG.42", index.clone())
+            .expect("market");
+        let mut tranche = sample_tranche();
+        tranche.attach_pct = attach;
+        tranche.detach_pct = detach;
+        tranche.maturity =
+            Date::from_calendar_date(2025 + years, Month::January, 1).expect("maturity");
+        tranche.realized_loss = realized;
+        let pricer = CdsTranchePricer::new();
+        let (_, _, periods, curve) = pricer
+            .prepare_projection_inputs(&tranche, &market, as_of)
+            .expect("projection");
+        let raw: Vec<_> = [attach, detach]
+            .into_iter()
+            .map(|cap| {
+                [PoolExposure::Loss, PoolExposure::Recovery]
+                    .into_iter()
+                    .map(|exposure| {
+                        let strike = match exposure {
+                            PoolExposure::Loss => cap,
+                            PoolExposure::Recovery => 100.0 - cap,
+                        };
+                        pricer
+                            .calculate_equity_tranche_capped(
+                                strike,
+                                rho,
+                                &index,
+                                tranche.maturity,
+                                exposure,
+                            )
+                            .expect("capped expectation")
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        super::sensitivities::take_pmf_evaluations();
+        let pv = pricer
+            .price_tranche(&tranche, &market, as_of)
+            .expect("PV")
+            .amount();
+        let pmf_evaluations = super::sensitivities::take_pmf_evaluations();
+        eprintln!("{name}: {pmf_evaluations} PMF evaluations per PV");
+        let delta = pricer
+            .calculate_correlation_delta(&tranche, &market, as_of)
+            .expect("correlation sensitivity");
+        let width = (detach - attach) / 100.0;
+        records.push(serde_json::json!({"name": name, "raw": raw, "curve": curve.iter().map(|p| [p.el_fraction, p.wd_fraction]).collect::<Vec<_>>(), "pv": pv, "delta": delta, "fraction_bound": 4e-10 / width, "pv_bound": tranche.notional.amount() * 4e-10 / width * (2.0 * periods.len() as f64 + 0.05 * (years as f64 + 1.0))}));
+    }
+    let baseline: Vec<serde_json::Value> = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/credit_performance_baseline.json"
+    ))
+    .expect("original engine baseline");
+    assert_eq!(records.len(), baseline.len());
+    for (actual, expected) in records.iter().zip(&baseline) {
+        assert_eq!(actual["name"], expected["name"]);
+        let fraction_bound = expected["fraction_bound"].as_f64().expect("bound");
+        for field in ["raw", "curve"] {
+            let bound = if field == "raw" {
+                2e-10
+            } else {
+                fraction_bound
+            };
+            let actual_rows = actual[field].as_array().expect("rows");
+            let expected_rows = expected[field].as_array().expect("rows");
+            assert_eq!(actual_rows.len(), expected_rows.len());
+            for (a, e) in actual_rows.iter().zip(expected_rows) {
+                for (a, e) in a
+                    .as_array()
+                    .expect("row")
+                    .iter()
+                    .zip(e.as_array().expect("row"))
+                {
+                    assert!(
+                        (a.as_f64().expect("value") - e.as_f64().expect("value")).abs() <= bound,
+                        "{} {field}: {a} vs {e}, bound={bound}",
+                        actual["name"]
+                    );
+                }
+            }
+        }
+        let pv_bound = expected["pv_bound"].as_f64().expect("PV bound");
+        assert!(
+            (actual["pv"].as_f64().expect("PV") - expected["pv"].as_f64().expect("PV")).abs()
+                <= pv_bound,
+            "{} PV exceeds {pv_bound}",
+            actual["name"]
+        );
+        // Correlation delta is a central difference per one percentage point;
+        // each of its two PVs carries the same bound.
+        assert!(
+            (actual["delta"].as_f64().expect("delta") - expected["delta"].as_f64().expect("delta"))
+                .abs()
+                <= 2.0 * pv_bound,
+            "{} correlation delta",
+            actual["name"]
+        );
+    }
+}
