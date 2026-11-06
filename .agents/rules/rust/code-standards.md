@@ -9,8 +9,13 @@ globs:
 
 1. **Zero-cost abstractions** - Performance should not be sacrificed for ergonomics
 2. **Type safety first** - Use the type system to prevent errors at compile time
-3. **Determinism** - Decimal mode results must be identical serial vs parallel,
-   and across targets; no wall-clock, no unseeded randomness, stable ordering
+3. **Determinism** - Every public stochastic API declares its reproducibility
+   tier and keeps it across serial and parallel execution
+   ([ADR 0021](../../../docs/decisions/standards/0021-reproducibility-guarantees.md),
+   [ADR 0043](../../../docs/decisions/standards/0043-deterministic-ordering-and-monte-carlo-execution.md));
+   `Decimal`/`Money` paths are exact ([ADR 0020](../../../docs/decisions/financial/conventions/0020-numerical-representation-and-rounding.md)),
+   while `f64` results agree across native and WASM only within justified
+   tolerances; no wall-clock, no unseeded randomness, stable ordering
 4. **Clear error handling** - All fallible operations return `Result` with meaningful errors
 
 ## Module Organization
@@ -70,7 +75,7 @@ pub struct MyType;
 - `random` - RNG traits and implementations (SimpleRng, Philox, Sobol)
 - `integration` - Numerical integration (Gauss-Hermite, adaptive Simpson, etc.)
 - `solver` - Root finding and optimization
-- `summation` - Numerically stable summation (Kahan, pairwise)
+- `summation` - Compensated summation (`neumaier_sum`, `NeumaierAccumulator`; also `kahan_sum`). Use the Neumaier primitives for floating-point totals per [ADR 0042](../../../docs/decisions/standards/0042-numerical-accumulation-and-comparisons.md)
 - `interp` - Interpolation methods
 - `distributions` - Probability distributions and sampling
 
@@ -196,7 +201,7 @@ The complete set of features across all crates (read from each `Cargo.toml`) is:
 | Crate | Features |
 | --- | --- |
 | `core`, `cashflows`, `valuations` | `json-schema` (default), `jsonschema-validate` (default; implies `json-schema`) |
-| `models`, `calibration`, `portfolio`, `valuations/core` (package `finstack-quant-valuations-core`), `valuations/{rates,fixed-income,structured-credit,credit,equity,fx,exotics}` (packages `finstack-quant-valuations-<family>`) | `json-schema` (default) |
+| `models`, `factor`, `calibration`, `portfolio`, `valuations/core` (package `finstack-quant-valuations-core`), `valuations/{rates,fixed-income,structured-credit,credit,equity,fx,exotics}` (packages `finstack-quant-valuations-<family>`) | `json-schema` (default) |
 | `analytics`, `covenants`, `features`, `margin`, `attribution`, `statements`, `statements-analytics`, `scenarios` | `json-schema` (default) |
 | `finstack-quant` (umbrella) | `json-schema` (default), `jsonschema-validate` (default) |
 | `finstack-quant-py` | `extension-module` (PyO3 requirement) |
@@ -232,9 +237,8 @@ fn parallel_path(&self) -> Money { /* rayon implementation */ }
 fn parallel_path(&self) -> Money { /* sequential fallback */ }
 ```
 
-Both arms must produce identical results in Decimal mode — see the determinism
-invariant.
-```
+Both arms must satisfy the declared reproducibility tier and agree on
+`Decimal`/`Money` results — see the determinism principle above.
 
 ## Testing
 
@@ -409,22 +413,25 @@ fn bench_interpolation(c: &mut Criterion) {
 - Reference issue numbers where applicable
 - Keep changes focused and atomic
 
-### Backwards Compatibility
+### Compatibility
 
-- Mark new APIs with version tags in docs
+- During development, remove superseded APIs and formats in the same change
+  instead of keeping aliases or compatibility layers
+  ([ADR 0004](../../../docs/decisions/project/0004-development-compatibility.md)).
+  The compatibility strategy for final releases is decided separately.
 - Use `#[non_exhaustive]` for enums/structs that may grow
-- Follow semver strictly
 
 ## Clippy and Formatting
 
 ### Required Lints
 
-```rust
-#![warn(missing_docs)]
-#![warn(clippy::all)]
-#![warn(clippy::pedantic)]
-#![allow(clippy::module_name_repetitions)]  // Common in finance code
-```
+Lint levels are defined once in `[workspace.lints]` in the root `Cargo.toml`;
+every crate inherits them with `[lints] workspace = true`
+([ADR 0034](../../../docs/decisions/standards/0034-code-standards-authority.md)).
+Library crates additionally set `#![forbid(unsafe_code)]` and the production
+panic-family lints (`unwrap_used`, `expect_used`, `panic`) in `lib.rs`, with
+test-only allowances. Do not copy a separate lint list into a crate; fix the
+underlying issue before adding a narrowly scoped `#[allow(...)]`.
 
 ### Formatting
 

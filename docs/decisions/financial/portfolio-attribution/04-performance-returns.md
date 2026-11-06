@@ -1,4 +1,4 @@
-# Modified Dietz, geometric linking and money-weighted return
+# PORTFOLIO-ATTRIBUTION-004: Modified Dietz, geometric linking and money-weighted return
 
 - ID: PORTFOLIO-ATTRIBUTION-004
 - Decision status: Draft (observed implementation; adoption pending).

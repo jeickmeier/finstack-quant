@@ -1,4 +1,4 @@
-# Factor assignment and assignment-driven credit exposures
+# PORTFOLIO-ATTRIBUTION-012: Factor assignment and assignment-driven credit exposures
 
 - ID: PORTFOLIO-ATTRIBUTION-012
 - Decision status: Draft (observed implementation; adoption pending).

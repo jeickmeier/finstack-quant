@@ -1,4 +1,4 @@
-# Private-fund dated hurdles, catch-up, promote and clawback
+# VALUATIONS-EQUITY-AND-COMPOSITION-18: Private-fund dated hurdles, catch-up, promote and clawback
 
 - **Record:** `VALUATIONS-EQUITY-AND-COMPOSITION-18`.
 - **Decision status:** Draft — observed implementation; adoption pending.

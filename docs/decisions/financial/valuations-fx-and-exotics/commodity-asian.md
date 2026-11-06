@@ -1,4 +1,4 @@
-# Commodity Asian exact geometric and arithmetic moment matching
+# VALUATIONS-FX-AND-EXOTICS-COMMODITY-ASIAN: Commodity Asian exact geometric and arithmetic moment matching
 
 - Record: `VALUATIONS-FX-AND-EXOTICS-COMMODITY-ASIAN`
 - Decision status: **Draft — observed implementation, adoption pending**.

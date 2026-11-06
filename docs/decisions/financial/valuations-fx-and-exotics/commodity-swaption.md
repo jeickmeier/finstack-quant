@@ -1,4 +1,4 @@
-# Commodity swaption discounted-forward averaging and annuity Black-76
+# VALUATIONS-FX-AND-EXOTICS-COMMODITY-SWAPTION: Commodity swaption discounted-forward averaging and annuity Black-76
 
 - Record: `VALUATIONS-FX-AND-EXOTICS-COMMODITY-SWAPTION`
 - Decision status: **Draft — observed implementation, adoption pending**.

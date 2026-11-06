@@ -1,4 +1,4 @@
-# Duration-cell and sector hierarchical return attribution
+# PORTFOLIO-ATTRIBUTION-015: Duration-cell and sector hierarchical return attribution
 
 - ID: PORTFOLIO-ATTRIBUTION-015
 - Decision status: Draft (observed implementation; adoption pending).

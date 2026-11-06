@@ -1,4 +1,4 @@
-# CMS reference swaps, convexity approximation and local risk
+# VALUATIONS-RATES-11-CMS-CONVEXITY: CMS reference swaps, convexity approximation and local risk
 
 - ID: VALUATIONS-RATES-11-CMS-CONVEXITY
 - Decision status: Draft (observed implementation; adoption pending).

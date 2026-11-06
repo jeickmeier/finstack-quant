@@ -1,6 +1,7 @@
 """Check the source ledger for the audited financial and numerical crates.
 
-This checks source enumeration and record ownership, not mathematical correctness
+This checks source enumeration, record ownership and that every document in a
+scope is a record, an ADR or linked from the scope, not mathematical correctness
 or methodology approval. Use --verify-source to check the dated source snapshot,
 and --write to regenerate the readable source map from the reviewed ledgers.
 """
@@ -13,10 +14,13 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 
 ROOT = Path(__file__).resolve().parents[1]
 AUDIT = ROOT / "docs/decisions/financial"
 CLASSIFICATIONS = {"algorithm", "support", "test", "generated"}
+ADR_NAME = re.compile(r"^\d{4}-.+\.md$")
+MARKDOWN_LINK = re.compile(r"\]\(([^)#\s]+\.md)")
 AUDITED_CRATES = (
     "core",
     "cashflows",
@@ -55,6 +59,23 @@ def _source_files() -> set[str]:
     return files
 
 
+def _orphan_documents(scope: Path, record_paths: set[str]) -> list[str]:
+    """List scope documents that are not a record, an ADR, or linked from the scope."""
+    linked: set[str] = set()
+    for name in {"README.md", *record_paths}:
+        document = scope / name
+        if document.is_file():
+            linked.update(Path(link).name for link in MARKDOWN_LINK.findall(document.read_text()) if "/" not in link)
+    return [
+        document.name
+        for document in sorted(scope.glob("*.md"))
+        if document.name != "README.md"
+        and not ADR_NAME.match(document.name)
+        and document.name not in record_paths
+        and document.name not in linked
+    ]
+
+
 def _check(verify_source: bool) -> tuple[list[str], list[tuple[Path, dict]]]:
     """Validate each source classification and its links to distinct records."""
     errors: list[str] = []
@@ -77,6 +98,10 @@ def _check(verify_source: bool) -> tuple[list[str], list[tuple[Path, dict]]]:
             if not target.is_relative_to(path.parent.resolve()) or not target.is_file():
                 errors.append(f"{record_id}: record file missing or outside its scope")
             records[record_id] = record
+        errors.extend(
+            f"{path.parent.name}/{name}: document is neither a record, an ADR, nor linked from the scope"
+            for name in _orphan_documents(path.parent, {record["path"] for record in data["records"]})
+        )
         used: set[str] = set()
         for entry in data["files"]:
             source = entry["path"]

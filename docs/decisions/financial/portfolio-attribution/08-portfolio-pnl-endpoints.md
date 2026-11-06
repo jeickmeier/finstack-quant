@@ -1,4 +1,4 @@
-# Portfolio P&L endpoint preparation, primitive reduction and aggregation
+# PORTFOLIO-ATTRIBUTION-008: Portfolio P&L endpoint preparation, primitive reduction and aggregation
 
 - ID: PORTFOLIO-ATTRIBUTION-008
 - Decision status: Draft (observed implementation; adoption pending).

@@ -1,4 +1,4 @@
-# Cap/floor projection, volatility conventions and Hull–White approximation
+# VALUATIONS-RATES-05-CAP-FLOOR-PRICING: Cap/floor projection, volatility conventions and Hull–White approximation
 
 - ID: VALUATIONS-RATES-05-CAP-FLOOR-PRICING
 - Decision status: Draft (observed implementation; adoption pending).

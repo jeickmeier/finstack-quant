@@ -1,4 +1,4 @@
-# European swaption forwards, settlement annuities and quote Greeks
+# VALUATIONS-RATES-07-EUROPEAN-SWAPTIONS: European swaption forwards, settlement annuities and quote Greeks
 
 - ID: VALUATIONS-RATES-07-EUROPEAN-SWAPTIONS
 - Decision status: Draft (observed implementation; adoption pending).

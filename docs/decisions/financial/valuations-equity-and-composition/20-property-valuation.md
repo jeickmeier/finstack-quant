@@ -1,4 +1,4 @@
-# Property appraisal, DCF, capitalization and unlevered returns
+# VALUATIONS-EQUITY-AND-COMPOSITION-20: Property appraisal, DCF, capitalization and unlevered returns
 
 - **Record:** `VALUATIONS-EQUITY-AND-COMPOSITION-20`.
 - **Decision status:** Draft — observed implementation; adoption pending.

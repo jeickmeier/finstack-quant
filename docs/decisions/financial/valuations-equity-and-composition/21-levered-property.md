@@ -1,4 +1,4 @@
-# Levered property equity, debt payoff, coverage and financing risk
+# VALUATIONS-EQUITY-AND-COMPOSITION-21: Levered property equity, debt payoff, coverage and financing risk
 
 - **Record:** `VALUATIONS-EQUITY-AND-COMPOSITION-21`.
 - **Decision status:** Draft — observed implementation; adoption pending.

@@ -1,4 +1,4 @@
-# FRA historical fixings, early settlement and quote risk
+# VALUATIONS-RATES-02-FRA: FRA historical fixings, early settlement and quote risk
 
 - ID: VALUATIONS-RATES-02-FRA
 - Decision status: Draft (observed implementation; adoption pending).

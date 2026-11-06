@@ -1,4 +1,4 @@
-# Snowball and inverse-floater coupon recursion and HW1F discounting
+# VALUATIONS-FX-AND-EXOTICS-SNOWBALL-HW: Snowball and inverse-floater coupon recursion and HW1F discounting
 
 - Record: `VALUATIONS-FX-AND-EXOTICS-SNOWBALL-HW`
 - Decision status: **Draft — observed implementation, adoption pending**.

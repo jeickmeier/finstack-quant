@@ -1,4 +1,4 @@
-# Asset barrier analytic, Monte Carlo and log-space PDE algorithms
+# VALUATIONS-FX-AND-EXOTICS-ASSET-BARRIER: Asset barrier analytic, Monte Carlo and log-space PDE algorithms
 
 - Record: `VALUATIONS-FX-AND-EXOTICS-ASSET-BARRIER`
 - Decision status: **Draft — observed implementation, adoption pending**.

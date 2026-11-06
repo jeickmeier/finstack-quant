@@ -1,4 +1,4 @@
-# FX listed futures and futures-option delegation
+# VALUATIONS-FX-AND-EXOTICS-FX-LISTED-CONTRACTS: FX listed futures and futures-option delegation
 
 - Record: `VALUATIONS-FX-AND-EXOTICS-FX-LISTED-CONTRACTS`
 - Decision status: **Draft — observed implementation, adoption pending**.

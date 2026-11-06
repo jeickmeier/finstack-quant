@@ -1,4 +1,4 @@
-# Repo lending cashflows, collateral and margin proxies
+# VALUATIONS-RATES-15-REPO: Repo lending cashflows, collateral and margin proxies
 
 - ID: VALUATIONS-RATES-15-REPO
 - Decision status: Draft (observed implementation; adoption pending).

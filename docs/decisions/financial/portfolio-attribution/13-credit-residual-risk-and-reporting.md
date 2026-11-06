@@ -1,4 +1,4 @@
-# Issuer-netted credit residual risk and hierarchy reporting
+# PORTFOLIO-ATTRIBUTION-013: Issuer-netted credit residual risk and hierarchy reporting
 
 - ID: PORTFOLIO-ATTRIBUTION-013
 - Decision status: Draft (observed implementation; adoption pending).
