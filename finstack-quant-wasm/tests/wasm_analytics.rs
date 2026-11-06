@@ -26,10 +26,6 @@ fn fixture() -> AnalyticsFixture {
     serde_json::from_str(API_INVARIANTS_FIXTURE).unwrap()
 }
 
-fn to_js<T: serde::Serialize>(value: &T) -> JsValue {
-    serde_wasm_bindgen::to_value(value).unwrap()
-}
-
 /// A return `PerformancePanel` as JSON text; a non-finite value is a `null` gap.
 fn return_panel(
     dates: &[String],
