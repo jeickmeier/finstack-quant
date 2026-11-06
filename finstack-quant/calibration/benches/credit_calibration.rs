@@ -148,9 +148,49 @@ fn bench_base_correlation_bootstrap(c: &mut Criterion) {
     });
 }
 
+fn bench_hazard_variants(c: &mut Criterion) {
+    let source = include_str!("../examples/market_bootstrap/03_single_name_hazard.json");
+    for variant in ["distressed", "upfront", "long_tenor"] {
+        let mut json: serde_json::Value = serde_json::from_str(source).expect("source");
+        json["plan"]["id"] = format!("hazard_{variant}").into();
+        let mut i = 0;
+        for datum in json["market_data"].as_array_mut().expect("market data") {
+            if datum["type"] != "cds_par_spread" {
+                continue;
+            }
+            match variant {
+                "distressed" => {
+                    datum["spread_bp"] = (datum["spread_bp"].as_f64().expect("spread") * 8.0).into()
+                }
+                "upfront" => {
+                    let object = datum.as_object_mut().expect("quote");
+                    object.remove("spread_bp");
+                    object.insert("type".into(), "cds_upfront".into());
+                    object.insert("coupon_bp".into(), 100.0.into());
+                    object.insert("upfront_pct".into(), (0.005 + 0.003 * i as f64).into());
+                }
+                "long_tenor" => {
+                    datum["pillar"] = serde_json::json!({"tenor": {"count": ([5,10,15,20,30][i]), "unit": "years"}})
+                }
+                _ => unreachable!(),
+            }
+            i += 1;
+        }
+        assert_eq!(i, 5, "must vary five hazard quotes");
+        let envelope = load_example(&serde_json::to_string(&json).expect("envelope"));
+        let isolated = isolate_last(&envelope).expect("isolate hazard prerequisites");
+        record_evidence(&isolated);
+        c.bench_function(
+            &format!("calibration_hazard_{variant}_isolated_5_pillars"),
+            |b| b.iter(|| checked_calibrate(black_box(&isolated))),
+        );
+    }
+}
+
 criterion_group!(
     benches,
     bench_hazard_bootstrap,
+    bench_hazard_variants,
     bench_base_correlation_bootstrap
 );
 criterion_main!(benches);

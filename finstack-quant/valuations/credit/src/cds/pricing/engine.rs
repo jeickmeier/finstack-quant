@@ -1,5 +1,5 @@
 //! `CdsPricer`: premium and protection legs, protection-leg integration over the
-//! ISDA Standard Model knot grid, NPV and the hazard-reprice cache.
+//! ISDA Standard Model knot grid, NPV and the prepared CDS workspace.
 
 use super::helpers::{
     date_from_hazard_time, haz_t, isda_standard_model_boundaries, settlement_date, sp_cond_to,
@@ -399,12 +399,12 @@ impl CdsPricer {
     }
 }
 
-/// Discount-side state reused across hazard bumps for bucketed CDS CS01.
+/// Immutable CDS contract and discount snapshot for repeated hazard-curve pricing.
 ///
 /// Coupon dates, accruals, and payment discount factors do not change when
 /// only the hazard curve is shocked. Protection and accrual-on-default still
 /// re-integrate against the bumped survival curve.
-pub(crate) struct CdsHazardRepriceCache {
+pub struct PreparedCds {
     pricer: CdsPricer,
     cds: CreditDefaultSwap,
     disc: std::sync::Arc<DiscountCurve>,
@@ -415,21 +415,32 @@ pub(crate) struct CdsHazardRepriceCache {
     clean_accrued: f64,
 }
 
-impl CdsHazardRepriceCache {
+impl PreparedCds {
     /// Build the cache from the live discount curve and CDS schedule.
     ///
     /// # Arguments
     ///
-    /// * `cds` - Live CDS whose premium schedule and valuation convention are cached.
-    /// * `market` - Market supplying the premium-leg discount curve.
-    /// * `as_of` - Valuation date used to drop expired coupons and compute DFs.
-    pub(crate) fn try_new(
+    /// * `cds` - Valid CDS contract cloned into the workspace, including notional
+    ///   currency, premium coupon in basis points, upfront cash, recovery,
+    ///   settlement/calendar rules and clean/dirty valuation convention.
+    /// * `market` - Supplies the discount curve named by the premium leg. Its
+    ///   immutable Arc snapshot is retained; subsequent market changes do not
+    ///   affect this workspace. No hazard curve is required at preparation.
+    /// * `as_of` - Valuation date used to drop expired coupons and upfronts,
+    ///   condition survival, calculate accrued premium and rebase discounting.
+    ///
+    /// # Errors
+    /// Returns validation, missing-market-data or date/schedule errors for an
+    /// invalid contract, unavailable discount curve or invalid discount/accrual
+    /// inputs. Hazard/recovery compatibility is checked by [`Self::price`].
+    pub fn new(
         cds: &CreditDefaultSwap,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: Date,
     ) -> Result<Self> {
         use rust_decimal::prelude::ToPrimitive;
 
+        cds.validate()?;
         let pricer = CdsPricer::new();
         let disc = market.get_discount(&cds.premium_leg.discount_curve_id)?;
         let periods_raw = pricer.coupon_periods(cds, as_of)?;
@@ -477,9 +488,20 @@ impl CdsHazardRepriceCache {
     ///
     /// # Arguments
     ///
-    /// * `surv` - Bumped or original survival/hazard curve used for protection
-    ///   and accrual-on-default. Discount factors stay at the cached values.
-    pub(crate) fn npv(&self, surv: &HazardCurve) -> Result<f64> {
+    /// * `surv` - Trial hazard curve, with decimal annual hazard rates and its
+    ///   own base date/day-count clock. Its recovery must match the CDS; its ID
+    ///   need not match the contract's original credit curve ID. Protection,
+    ///   premium survival and accrual-on-default use this curve. Discounting
+    ///   remains fixed at the snapshot captured by [`Self::new`].
+    ///
+    /// # Returns
+    /// Unrounded signed present value in the CDS notional currency, including
+    /// dated upfront and the contract's clean/dirty accrued treatment.
+    ///
+    /// # Errors
+    /// Returns recovery-validation, survival, discounting or integration/date
+    /// errors from the shared CDS pricing kernel.
+    pub fn price(&self, surv: &HazardCurve) -> Result<f64> {
         let protection_pv =
             self.pricer
                 .pv_protection_leg_raw(&self.cds, self.disc.as_ref(), surv, self.as_of)?;
@@ -677,8 +699,8 @@ fn protection_leg_isda_standard_model_cond(grid: &IsdaGrid<'_>, recovery: f64) -
 }
 
 #[cfg(test)]
-mod cds_hazard_reprice_cache_tests {
-    use super::{CdsHazardRepriceCache, CdsPricer};
+mod prepared_cds_tests {
+    use super::{CdsPricer, PreparedCds};
     use crate::cds::CreditDefaultSwap;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
@@ -743,17 +765,17 @@ mod cds_hazard_reprice_cache_tests {
         market: &MarketContext,
         hazard: &HazardCurve,
         as_of: Date,
-    ) -> finstack_quant_core::Result<CdsHazardRepriceCache> {
-        let cache = CdsHazardRepriceCache::try_new(cds, market, as_of)?;
+    ) -> finstack_quant_core::Result<PreparedCds> {
+        let cache = PreparedCds::new(cds, market, as_of)?;
 
-        let base_cached = cache.npv(hazard)?;
+        let base_cached = cache.price(hazard)?;
         let base_full = cds.value(market, as_of)?.amount();
         assert_npv_matches(base_cached, base_full, "base hazard");
 
         let bumped_hazard = hazard.with_parallel_hazard_rate_bump_bp(1.0)?;
         let mut bumped_market = market.clone();
         bumped_market.insert_mut(bumped_hazard.clone());
-        let bumped_cached = cache.npv(&bumped_hazard)?;
+        let bumped_cached = cache.price(&bumped_hazard)?;
         let bumped_full = cds.value(&bumped_market, as_of)?.amount();
         assert_npv_matches(bumped_cached, bumped_full, "bumped hazard");
         assert!(
@@ -765,7 +787,7 @@ mod cds_hazard_reprice_cache_tests {
     }
 
     #[test]
-    fn cds_hazard_reprice_cache_matches_value_for_current_coupon_with_accrual_on_default()
+    fn prepared_cds_matches_value_for_current_coupon_with_accrual_on_default()
     -> finstack_quant_core::Result<()> {
         let as_of = date!(2025 - 02 - 15);
         let cds = create_test_cds(CdsValuationConvention::IsdaDirty)?;
@@ -792,8 +814,7 @@ mod cds_hazard_reprice_cache_tests {
     }
 
     #[test]
-    fn cds_hazard_reprice_cache_matches_value_for_bloomberg_clean_accrued()
-    -> finstack_quant_core::Result<()> {
+    fn prepared_cds_matches_value_for_bloomberg_clean_accrued() -> finstack_quant_core::Result<()> {
         let as_of = date!(2025 - 02 - 15);
         let cds = create_test_cds(CdsValuationConvention::BloombergCdswClean)?;
         let (market, hazard) = create_test_market()?;
@@ -805,11 +826,78 @@ mod cds_hazard_reprice_cache_tests {
         );
         Ok(())
     }
+    #[test]
+    fn prepared_cds_matches_raw_pricing_bitwise_and_snapshots_discount()
+    -> finstack_quant_core::Result<()> {
+        let (market, hazard) = create_test_market()?;
+        let discount = market.get_discount("USD-OIS")?;
+        let pricer = CdsPricer::new();
+        for convention in [
+            CdsValuationConvention::IsdaDirty,
+            CdsValuationConvention::BloombergCdswClean,
+            CdsValuationConvention::BloombergCdswCleanFullPremium,
+            CdsValuationConvention::QuantLibIsdaParity,
+        ] {
+            for as_of in [
+                date!(2025 - 01 - 01),
+                date!(2025 - 02 - 15),
+                date!(2025 - 03 - 20),
+            ] {
+                let mut cds = create_test_cds(convention)?;
+                cds.upfront = Some((
+                    as_of + time::Duration::days(3),
+                    Money::new(12345.67, Currency::USD)?,
+                ));
+                let prepared = PreparedCds::new(&cds, &market, as_of)?;
+                for curve in [&hazard, &hazard.with_parallel_hazard_rate_bump_bp(1.0)?] {
+                    let expected = pricer.npv_full(&cds, discount.as_ref(), curve, as_of)?;
+                    assert_eq!(
+                        prepared.price(curve)?.to_bits(),
+                        expected.to_bits(),
+                        "{convention:?} {as_of}"
+                    );
+                }
+                let original = prepared.price(&hazard)?;
+                let replacement = DiscountCurve::builder("USD-OIS")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (10.0, 0.5)])
+                    .build()?;
+                let changed = market.clone().insert(replacement);
+                assert_eq!(prepared.price(&hazard)?.to_bits(), original.to_bits());
+                assert!(
+                    (PreparedCds::new(&cds, &changed, as_of)?.price(&hazard)? - original).abs()
+                        > 1.0
+                );
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn prepared_cds_requires_valid_contract_and_discount_but_no_hazard()
+    -> finstack_quant_core::Result<()> {
+        let (market, hazard) = create_test_market()?;
+        let cds = create_test_cds(CdsValuationConvention::IsdaDirty)?;
+        let discount = market.get_discount("USD-OIS")?;
+        let discount_only = MarketContext::new().insert(discount.as_ref().clone());
+        let prepared = PreparedCds::new(&cds, &discount_only, date!(2025 - 02 - 15))?;
+        assert!(prepared.price(&hazard)?.is_finite());
+        assert!(PreparedCds::new(&cds, &MarketContext::new(), date!(2025 - 02 - 15)).is_err());
+        let mismatched = hazard
+            .to_builder_with_id("other")
+            .recovery_rate(0.2)
+            .build()?;
+        assert!(prepared.price(&mismatched).is_err());
+        let mut invalid = cds;
+        invalid.protection_leg.recovery_rate = f64::NAN;
+        assert!(PreparedCds::new(&invalid, &discount_only, date!(2025 - 02 - 15)).is_err());
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod cds_review_regression_tests {
-    use super::{CdsHazardRepriceCache, CdsPricer};
+    use super::{CdsPricer, PreparedCds};
     use crate::cds::CreditDefaultSwap;
     use crate::cds::pricing::AccrualDayCountPolicy;
     use finstack_quant_core::currency::Currency;
@@ -943,8 +1031,7 @@ mod cds_review_regression_tests {
                     let market = MarketContext::new()
                         .insert(disc.clone())
                         .insert(surv.clone());
-                    let cached =
-                        CdsHazardRepriceCache::try_new(&cds, &market, as_of)?.npv(&surv)?;
+                    let cached = PreparedCds::new(&cds, &market, as_of)?.price(&surv)?;
                     close(cached, -expected);
                     close(cached, pricer.npv_full(&cds, &disc, &surv, as_of)?);
                 }
@@ -1008,7 +1095,7 @@ mod cds_review_regression_tests {
                 );
                 let market = MarketContext::new().insert(disc).insert(surv.clone());
                 close(
-                    CdsHazardRepriceCache::try_new(&cds, &market, as_of)?.npv(&surv)?,
+                    PreparedCds::new(&cds, &market, as_of)?.price(&surv)?,
                     -expected_premium,
                 );
             }
@@ -1062,10 +1149,7 @@ mod cds_review_regression_tests {
                 let market = MarketContext::new()
                     .insert(disc.clone())
                     .insert(surv.clone());
-                close(
-                    CdsHazardRepriceCache::try_new(&cds, &market, as_of)?.npv(&surv)?,
-                    npv,
-                );
+                close(PreparedCds::new(&cds, &market, as_of)?.price(&surv)?, npv);
                 values.push(npv);
                 denominators.push(pricer.par_spread_denominator(&cds, &disc, &surv, as_of)?);
             }

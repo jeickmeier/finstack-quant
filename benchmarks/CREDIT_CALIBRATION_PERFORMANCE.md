@@ -142,7 +142,7 @@ reference, 15 base-correlation tests, 91 umbrella tranche tests, and the scoped
 public-input documentation check passed. One nextest process-leak report cleared
 on a focused rerun. No independent references or tolerances changed.
 
-Execution status: S0 and BC1–BC5 complete; BC6 rejected after workload review; H1 in progress. Remaining slices are
+Execution status: S0 and BC1–BC5 complete; BC6 rejected after workload review; H1 complete; H2 in progress. Remaining slices are
 pending. The fixed implementation plan is unchanged.
 
 ## BC3: bounded raw attachment reuse
@@ -320,3 +320,57 @@ Heterogeneous issuer pools retain their separate integration rules and
 non-Gaussian redesign is outside this slice. Adding a second adaptive Simpson
 implementation therefore fails the plan's incremental-benefit requirement.
 No paired-quadrature production code was added; all existing budgets remain.
+
+## H1: shared prepared CDS workspace
+
+`cds::pricing::PreparedCds` replaces the private risk-only cache. Risk and
+hazard calibration now use that single valuations-owned workspace; the
+ordinary and prepared paths share protection, premium-period and signed-NPV
+calculations. Preparation validates and clones the contract, retains the
+immutable discount Arc and caches coupon periods/accruals/DFs, upfront and
+clean accrued. Pricing accepts only a trial hazard curve. The old scratch
+market insertion path in the hazard target is removed.
+
+The new hazard-phase baseline H0 adds distressed (8× quoted spreads), fixed
+100 bp coupon with 0.5–1.7% upfronts, and 5/10/15/20/30-year cases. All fit
+successfully. CDS pricing/par-spread benchmarks now reject errors. H0 and H1
+include setup in whole-calibration timings; prepared pricing is labeled
+separately. H0's base-correlation control was already faster than BC5 with no
+production change, so that drift is not attributed to H1.
+
+| Workload (mean ms) | H0 | H1 |
+| --- | ---: | ---: |
+| Hazard isolated | 35.132 | 35.070 |
+| Hazard full plan | 42.760 | 42.495 |
+| Distressed | 27.702 | 27.618 |
+| Upfront quoted | 35.578 | 35.322 |
+| Long tenor | 102.084 | 100.691 |
+| Parallel replay | 70.379 | 69.710 |
+| Base correlation isolated control | 249.039 | 249.764 |
+| Base correlation full control | 294.732 | 292.795 |
+
+H1 is accepted as a neutral preparation foundation for H2, not as a
+standalone calibration speedup. All five complete calibration reports match
+H0 exactly (standard, distressed, upfront, long-tenor hazard and base
+correlation), including work counts, knots and residuals.
+
+- Five-year ordinary price: 87.162 microseconds.
+- Five-year setup only: 1.274 microseconds.
+- Five-year prepared reuse: 85.711 microseconds.
+- Five-year setup plus price: 86.749 microseconds.
+
+Global-hazard six-quote controls: 51.740 ms global and 64.535 ms bootstrap, compared with BC4 controls of 54.001/67.219 ms.
+
+Memory retained is one cloned CDS contract, one discount Arc and P entries of
+`CouponPeriod` plus two f64 values (accrual and payment DF). No trial results
+or integration windows are cached in H1; storage is O(P). Calibration keeps
+one Arc to each prepared quote through bootstrap/global/final validation.
+
+Validation: all 230 credit tests, all 568 enabled calibration tests, 453 CDS-
+related umbrella tests, scoped credit/calibration lint and public-input docs
+passed. New tests compare raw and prepared values bitwise across four
+conventions, three dates, upfronts and hazard bumps; they verify discount
+snapshot independence and invalid/missing-input errors. Existing rolled-
+coupon, survival-floor and independent AoD integral checks remain intact.
+Raw reports/samples are in `h0` and `h1`. No financial outputs or generated
+fixtures changed; no new host binding surface is required for this workspace.
