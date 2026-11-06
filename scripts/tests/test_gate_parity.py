@@ -20,6 +20,9 @@ TASKS = tomllib.loads((ROOT / "mise.toml").read_text(encoding="utf-8"))["tasks"]
 # CI steps that prepare a runner (dependencies, the WASM packages ui-check
 # imports) rather than check anything; locally `wasm-test` builds the packages.
 RUNNER_SETUP = {"ui-sync", "wasm-build", "wasm-build-node"}
+# Local build-order stages of `all`: they compile what later stages run, so
+# compiling never overlaps ui-check; each CI job builds what it runs itself.
+LOCAL_BUILD = {"rust-build-tests"}
 MISE_RUN = re.compile(r"mise run ([a-z0-9-]+(?: --[a-z-]+)*)")
 
 
@@ -49,7 +52,7 @@ def _workflow_runs(name: str) -> list[str]:
 
 def test_all_runs_exactly_the_checks_workflow() -> None:
     """Each `checks.yml` job is one stage of `mise run all`, and vice versa."""
-    local = set(_stage_tasks(TASKS["all"]["run"]))
+    local = set(_stage_tasks(TASKS["all"]["run"])) - LOCAL_BUILD
     ci = {run.split()[0] for run in _workflow_runs("checks.yml")} - RUNNER_SETUP
     assert local == ci, f"only in `all`: {sorted(local - ci)}; only in checks.yml: {sorted(ci - local)}"
 
