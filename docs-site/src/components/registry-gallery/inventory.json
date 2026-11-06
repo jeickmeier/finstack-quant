@@ -1776,11 +1776,11 @@
     },
     {
       "path": "finstack-quant-ui/tests/analytics/explicit.json",
-      "sha256": "9b1db83e086727e9f5b311353291b24df7e0cb3570892c95615ec836ddce227a"
+      "sha256": "b1ce0b385893a290b0537ad8106a11d7d81cb157caa428f024c38815c25f9e04"
     },
     {
       "path": "finstack-quant-ui/tests/analytics/benchmark.json",
-      "sha256": "62e6502b190c0b291a85466eee50fe0bdb58dd34c526e49e95bec7ea45ae5922"
+      "sha256": "7ce2ee5e91bc8247025f018ded85e84af54aad2a106e5c8b84ca60851a3d4ed0"
     },
     {
       "path": "finstack-quant-ui/tests/analytics/correlation/cases.json",

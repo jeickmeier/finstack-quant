@@ -753,8 +753,9 @@ def forecast_breaches(
     >>> from finstack_quant.covenants import (
     ...     CovenantEngine,
     ...     CovenantForecastConfig,
+    ...     CovenantTemplate,
     ...     breaches_to_dataframe,
-    ...     cov_lite,
+    ...     covenant_template,
     ...     forecast_breaches,
     ... )
     >>> engine = CovenantEngine.from_specs(covenant_template(CovenantTemplate.cov_lite(7.0, 4.5)))
