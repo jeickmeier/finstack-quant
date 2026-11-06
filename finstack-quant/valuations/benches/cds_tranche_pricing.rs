@@ -438,6 +438,49 @@ fn bench_cds_tranche_prepared(c: &mut Criterion) {
     group.bench_function("reuse_3_7", |b| {
         b.iter(|| prepared.price(black_box(correlation)).unwrap())
     });
+    let noncontiguous = create_tranche(4.0, 7.0, 5);
+    let prepared_noncontiguous = pricer.prepare(&noncontiguous, &market, as_of).unwrap();
+    let trials: Vec<_> = [0.26, 0.27]
+        .into_iter()
+        .map(|rho| {
+            BaseCorrelationCurve::builder("interpolated_trial")
+                .knots([(3.0, 0.25), (7.0, rho), (100.0, rho)])
+                .build()
+                .unwrap()
+        })
+        .collect();
+    for trial in &trials {
+        assert_eq!(
+            prepared_noncontiguous.price(trial).unwrap(),
+            pricer
+                .prepare(&noncontiguous, &market, as_of)
+                .unwrap()
+                .price(trial)
+                .unwrap()
+        );
+    }
+    // Alternate the detachment knot so the actual interpolated attachment
+    // correlation changes on every trial: this is a cache-invalidation control.
+    group.bench_function("reuse_interpolated_4_7", |b| {
+        let mut trial = 0usize;
+        b.iter(|| {
+            trial ^= 1;
+            prepared_noncontiguous
+                .price(black_box(&trials[trial]))
+                .unwrap()
+        })
+    });
+    group.bench_function("prepare_and_price_interpolated_4_7", |b| {
+        let mut trial = 0usize;
+        b.iter(|| {
+            trial ^= 1;
+            pricer
+                .prepare(black_box(&noncontiguous), black_box(&market), as_of)
+                .unwrap()
+                .price(black_box(&trials[trial]))
+                .unwrap()
+        })
+    });
     group.finish();
 }
 

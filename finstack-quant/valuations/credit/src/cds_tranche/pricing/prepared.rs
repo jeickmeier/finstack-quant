@@ -16,10 +16,11 @@ use std::sync::Arc;
 /// Immutable contract, schedule and market inputs for repeated correlation trials.
 ///
 /// Preparation retains default probabilities/thresholds, default timing and
-/// discount factors. Each evaluation recomputes the loss/recovery expectations
-/// at the supplied base-correlation curve using the ordinary pricing kernel.
-/// Storage is bounded by coupon count times constituent count; no trial curves
-/// or prior trial results are accumulated. Reprepare after changing any market
+/// discount factors. Evaluations use the ordinary pricing kernel and retain
+/// one raw attachment loss/recovery vector keyed by its actual smoothed
+/// correlation. Interpolated attachment changes invalidate that last-value cache;
+/// no trial curves or unbounded history are retained. Storage is bounded by
+/// coupon count times constituent count. Reprepare after changing any market
 /// or contract input other than base correlation. This is a Rust pricing
 /// workspace, not a serializable market object.
 pub struct PreparedTranche {
@@ -180,7 +181,13 @@ impl CdsTranchePricer {
         as_of: Date,
     ) -> Result<PreparedTranche> {
         tranche.validate()?;
-        self.prepare_validated_tranche(tranche, market, as_of)
+        let mut prepared = self.prepare_validated_tranche(tranche, market, as_of)?;
+        // Only explicitly reusable workspaces retain trial results. Ordinary
+        // one-shot pricing still uses this same kernel without cache allocation.
+        if let PreparedState::Live { projection, .. } = &mut prepared.state {
+            projection.losses.enable_attachment_cache();
+        }
+        Ok(prepared)
     }
     pub(super) fn prepare_validated_tranche(
         &self,

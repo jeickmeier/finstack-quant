@@ -1,0 +1,4 @@
+BC2 source 6c55a7f4c7 plus new alternating interpolated-attachment benchmarks.
+10 samples, 1 s warmup, 10 s measurement, 10000 resamples, unchanged release profile.
+Both benchmarks alternate trial 7% knots (0.26, 0.27) with fixed 3% knot 0.25.
+The 4% attachment therefore changes correlation every trial.

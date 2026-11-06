@@ -142,5 +142,51 @@ reference, 15 base-correlation tests, 91 umbrella tranche tests, and the scoped
 public-input documentation check passed. One nextest process-leak report cleared
 on a focused rerun. No independent references or tolerances changed.
 
-Execution status: S0, BC1 and BC2 complete; BC3 in progress. Later slices remain
+Execution status: S0 and BC1–BC3 complete; BC4 in progress. Later slices remain
 pending. The fixed implementation plan is unchanged.
+
+## BC3: bounded raw attachment reuse
+
+BC3 retains one raw attachment vector per explicitly reusable prepared quote,
+keyed by the actual twice-smoothed correlation. Immutable caps and pool inputs
+belong to that quote. A changed interpolated attachment recomputes the vector;
+failed trials retain no new entry. Tranchelet subtraction, floors, joint caps
+and time-monotonicity repair still run on each evaluation. Ordinary one-shot
+pricing uses the same kernel with cache storage disabled.
+
+| Workload (mean ms) | S0 quiet | BC2 | BC3 |
+| --- | ---: | ---: | ---: |
+| Base correlation: isolated | 8239.613 | 4047.698 | 2304.735 |
+| Base correlation: full plan | 8315.811 | 4118.397 | 2373.561 |
+| Prepared reuse, 3–7% | — | 23.826 | 12.742 |
+| Alternating interpolated 4–7% reuse | — | 24.265 | 24.276 |
+| Alternating 4–7%, preparation + price | — | 24.322 | 24.370 |
+
+The full-plan improvement is 42.4% over BC2 and 71.5% over S0; gains are not
+added across slices. Solver calls, fitted knots and residuals are unchanged:
+both complete calibration reports match BC2 exactly. All fixed-correlation
+snapshot outputs remain bitwise equal to BC1.
+
+The first pricing run showed common 2–4% drift in Student-t and interpolation
+controls. Retained executable comparisons and longer repeats resolved this:
+Student-t differed by about 0.4% between adjacent BC2/BC3 runs, and the two
+interpolation controls above differed by less than 0.3%. These repeated
+controls use 20 samples / 3 s warmup / 20 s measurement / 10,000 resamples;
+main runs retain the original 10 / 1 s / 10 s / 10,000 settings. The cheap
+high-detachment ordinary price moved from 7.583 to 7.772 microseconds, a small
+absolute bookkeeping cost, while the end-to-end calibration includes all
+preparation and cache construction costs.
+
+Test-local PMF work fell from 33,400 to 17,408 calls on repeated 3–7% pricing
+and from 34,004 to 17,408 on repeated flat-correlation 4–7% pricing. Tests also
+exercise changing interpolated attachments, reordered curves and recovery
+after arbitrage errors. Permanent cache storage is 16 × P bytes of raw values
+plus one Arc/mutex/key entry; a replacement vector is temporary. No historical
+trial curves or final loss vectors are accumulated.
+
+Acceptance: 90 tranche tests with bitwise snapshots, 15 calibration tests,
+91 umbrella tranche tests, and scoped credit/calibration lint passed. Raw
+samples and identical reports are in `credit-calibration-evidence/bc3`;
+`bc2-noncontiguous`, `bc2-student-control` and `bc3-control-repeat` retain the
+matched control evidence. Financial tolerances and generated outputs did not
+change.

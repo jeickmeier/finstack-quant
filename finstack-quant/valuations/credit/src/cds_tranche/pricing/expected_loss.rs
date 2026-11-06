@@ -12,6 +12,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::term_structures::{BaseCorrelationCurve, CreditIndexData};
 use finstack_quant_core::{Error, Result};
 use finstack_quant_models::correlation::CopulaSpec;
+use std::sync::{Arc, Mutex};
 
 /// Pre-computed invariants for EL fraction evaluation (hoisted out of the date loop).
 #[derive(Clone, Copy)]
@@ -315,6 +316,7 @@ impl CdsTranchePricer {
             inv,
             dates: dates.to_vec(),
             pools,
+            attachment: None,
         })
     }
 
@@ -426,8 +428,19 @@ pub(super) struct PreparedExpectedLoss {
     inv: ElInvariants,
     dates: Vec<Date>,
     pools: Vec<PreparedPool>,
+    // One raw attachment state only. Caps, pool data and copula are immutable;
+    // the actual twice-smoothed interpolation result is the remaining key.
+    attachment: Option<Mutex<Option<AttachmentExpectations>>>,
+}
+struct AttachmentExpectations {
+    correlation_bits: u64,
+    caps: Arc<Vec<(f64, f64)>>,
 }
 impl PreparedExpectedLoss {
+    pub(super) fn enable_attachment_cache(&mut self) {
+        self.attachment = Some(Mutex::new(None));
+    }
+
     pub(super) fn evaluate(
         &self,
         pricer: &CdsTranchePricer,
@@ -451,16 +464,40 @@ impl PreparedExpectedLoss {
         let corr_detach = pricer.smooth_correlation_boundary(
             pricer.smooth_correlation_boundary(correlation.correlation(inv.detach_pct)),
         );
+        let correlation_bits = corr_attach.to_bits();
+        let cached_attachment = self.attachment.as_ref().and_then(|cache| {
+            cache
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .as_ref()
+                .filter(|entry| entry.correlation_bits == correlation_bits)
+                .map(|entry| Arc::clone(&entry.caps))
+        });
+        let mut new_attachment = Vec::with_capacity(
+            if self.attachment.is_some() && cached_attachment.is_none() {
+                self.dates.len()
+            } else {
+                0
+            },
+        );
         let mut curve = Vec::with_capacity(self.dates.len());
         let mut prev_el = 0.0;
         let mut prev_wd = 0.0;
-        for (&date, pool) in self.dates.iter().zip(&self.pools) {
-            let attachment = pool.pair(
-                pricer,
-                (inv.eff_attach * 100.0) / 100.0,
-                ((1.0 - inv.eff_attach) * 100.0) / 100.0,
-                corr_attach,
-            )?;
+        for (i, (&date, pool)) in self.dates.iter().zip(&self.pools).enumerate() {
+            let attachment = if let Some(cached) = &cached_attachment {
+                cached[i]
+            } else {
+                let caps = pool.pair(
+                    pricer,
+                    (inv.eff_attach * 100.0) / 100.0,
+                    ((1.0 - inv.eff_attach) * 100.0) / 100.0,
+                    corr_attach,
+                )?;
+                if self.attachment.is_some() {
+                    new_attachment.push(caps);
+                }
+                caps
+            };
             let detachment = pool.pair(
                 pricer,
                 (inv.eff_detach * 100.0) / 100.0,
@@ -487,6 +524,17 @@ impl PreparedExpectedLoss {
             });
             prev_el = el_fraction;
             prev_wd = wd_fraction;
+        }
+        if cached_attachment.is_none()
+            && let Some(cache) = &self.attachment
+        {
+            *cache
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) =
+                Some(AttachmentExpectations {
+                    correlation_bits,
+                    caps: Arc::new(new_attachment),
+                });
         }
         Ok(curve)
     }

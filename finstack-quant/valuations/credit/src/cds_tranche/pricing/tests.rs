@@ -2979,3 +2979,90 @@ fn prepared_wiped_tranche_preserves_upfront_without_requiring_credit_index() {
         .expect("no credit index needed");
     assert_eq!(prepared.price(&curve).expect("upfront").amount(), 1000.0);
 }
+
+#[test]
+fn prepared_attachment_cache_tracks_effective_interpolated_correlation() {
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+    let market = sample_market_context();
+    let pricer = CdsTranchePricer::new();
+    for attachment in [3.0, 4.0] {
+        let mut tranche = sample_tranche();
+        tranche.attach_pct = attachment;
+        tranche.detach_pct = 7.0;
+        let prepared = pricer.prepare(&tranche, &market, as_of).expect("prepare");
+        // At 3% the attachment is fixed. At 4% it interpolates against the
+        // trial 7% knot, so detachment trials must invalidate the raw cache.
+        for rho in [0.25, 0.26, 0.25, 0.24, 0.24] {
+            let curve = BaseCorrelationCurve::builder("trial")
+                .knots([(3.0, 0.25), (7.0, rho), (100.0, rho)])
+                .build()
+                .expect("curve");
+            let fresh = pricer.prepare(&tranche, &market, as_of).expect("uncached");
+            let expected = fresh.price(&curve).expect("fresh");
+            super::sensitivities::take_pmf_evaluations();
+            let actual = prepared.price(&curve).expect("cached");
+            let first_work = super::sensitivities::take_pmf_evaluations();
+            assert_eq!(actual.amount().to_bits(), expected.amount().to_bits());
+            let repeated = prepared.price(&curve).expect("repeat");
+            let second_work = super::sensitivities::take_pmf_evaluations();
+            assert_eq!(repeated.amount().to_bits(), expected.amount().to_bits());
+            assert!(second_work <= first_work);
+        }
+        let curve = BaseCorrelationCurve::builder("fixed")
+            .knots([(3.0, 0.25), (100.0, 0.25)])
+            .build()
+            .expect("curve");
+        let fresh = pricer.prepare(&tranche, &market, as_of).expect("fresh");
+        super::sensitivities::take_pmf_evaluations();
+        fresh.price(&curve).expect("first");
+        let first_work = super::sensitivities::take_pmf_evaluations();
+        fresh.price(&curve).expect("second");
+        let second_work = super::sensitivities::take_pmf_evaluations();
+        assert!(
+            second_work < first_work,
+            "a fixed nonzero attachment must avoid PMFs: {second_work} vs {first_work}"
+        );
+        eprintln!("attachment {attachment}: first {first_work}, repeated {second_work} PMF calls");
+    }
+}
+
+#[test]
+fn prepared_attachment_cache_does_not_retain_failed_trials() {
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+    let market = arbitrage_market_context();
+    let pricer = CdsTranchePricer::new();
+    let tranche = sample_tranche();
+    let prepared = pricer.prepare(&tranche, &market, as_of).expect("prepare");
+    let index = market.get_credit_index("CDX.NA.IG.42").expect("index");
+    let bad = index.base_correlation_curve();
+    super::sensitivities::take_pmf_evaluations();
+    let first_error = prepared.price(bad).expect_err("arbitrage");
+    let first_work = super::sensitivities::take_pmf_evaluations();
+    let second_error = prepared.price(bad).expect_err("repeated arbitrage");
+    let second_work = super::sensitivities::take_pmf_evaluations();
+    assert_eq!(first_error.to_string(), second_error.to_string());
+    assert_eq!(
+        first_work, second_work,
+        "a failed trial must not populate the cache"
+    );
+    let good = BaseCorrelationCurve::builder("flat")
+        .knots([(3.0, 0.25), (100.0, 0.25)])
+        .build()
+        .expect("valid curve");
+    let fresh = pricer.prepare(&tranche, &market, as_of).expect("fresh");
+    assert_eq!(
+        prepared.price(&good).expect("recovered").amount().to_bits(),
+        fresh
+            .price(&good)
+            .expect("fresh valid price")
+            .amount()
+            .to_bits()
+    );
+    assert_eq!(
+        prepared
+            .price(bad)
+            .expect_err("arbitrage remains an error")
+            .to_string(),
+        first_error.to_string()
+    );
+}
