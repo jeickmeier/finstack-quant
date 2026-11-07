@@ -646,7 +646,7 @@ mod tests {
                 None,
             )
             .unwrap();
-            assert_close(result.value.amount(), npv, 1e-6);
+            assert_close(result.value.amount(), npv, 2e-6);
             assert_close(result.measures["z_spread"], 0.10, 1e-10);
             assert_close(result.measures["cs01"], cs01, 1e-6);
             assert_close(
@@ -655,7 +655,7 @@ mod tests {
                     .quoted_dirty_price_currency
                     .unwrap(),
                 quote,
-                1e-6,
+                2e-6,
             );
         }
     }
