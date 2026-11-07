@@ -24,6 +24,12 @@ use finstack_quant_valuations::instruments::credit_derivatives::cds_option::{
 use rust_decimal::Decimal;
 use std::hint::black_box;
 use time::Month;
+mod support;
+
+fn validate_price(value: &Money) {
+    assert_eq!(value.currency(), Currency::USD);
+    assert!(value.amount().is_finite() && value.amount() >= 0.0);
+}
 
 fn create_cds_option(
     option_type: OptionType,
@@ -115,9 +121,10 @@ fn create_market() -> MarketContext {
     // Volatility surface (flat 30% vol for simplicity)
     let vol_surface = VolSurface::from_grid(
         "CDS-VOL",
-        &[0.25, 0.5, 1.0, 2.0, 3.0],         // Expiries in years
+        // Include the actual 30-day/90-day Act/365F option expiries.
+        &[30.0 / 365.0, 90.0 / 365.0, 0.5, 1.0, 2.0, 3.0],
         &[0.005, 0.0075, 0.01, 0.015, 0.02], // Strikes as decimal rates
-        &[0.30; 25],                         // Flat 30% vol
+        &[0.30; 30],                         // Flat 30% vol
         Default::default(),
         None,
     )
@@ -131,7 +138,6 @@ fn create_market() -> MarketContext {
 
 fn bench_cds_option_npv(c: &mut Criterion) {
     let mut group = c.benchmark_group("cds_option_npv");
-    let market = create_market();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
     // Benchmark across different tenors
@@ -143,21 +149,41 @@ fn bench_cds_option_npv(c: &mut Criterion) {
     ];
 
     for &(expiry_months, cds_tenor) in &test_cases {
-        let call = create_cds_option(OptionType::Call, expiry_months, cds_tenor);
         group.bench_with_input(
             BenchmarkId::new("call", format!("{}M_{}Y", expiry_months, cds_tenor)),
             &(expiry_months, cds_tenor),
             |b, _| {
-                b.iter(|| call.value(black_box(&market), black_box(as_of)));
+                let market = create_market();
+                let call = create_cds_option(OptionType::Call, expiry_months, cds_tenor);
+                assert_eq!(call.option_type, OptionType::Call);
+                assert!(!call.underlying_is_index);
+                support::bench(
+                    b,
+                    || {
+                        call.value(black_box(&market), black_box(as_of))
+                            .expect("CDS call PV")
+                    },
+                    validate_price,
+                );
             },
         );
 
-        let put = create_cds_option(OptionType::Put, expiry_months, cds_tenor);
         group.bench_with_input(
             BenchmarkId::new("put", format!("{}M_{}Y", expiry_months, cds_tenor)),
             &(expiry_months, cds_tenor),
             |b, _| {
-                b.iter(|| put.value(black_box(&market), black_box(as_of)));
+                let market = create_market();
+                let put = create_cds_option(OptionType::Put, expiry_months, cds_tenor);
+                assert_eq!(put.option_type, OptionType::Put);
+                assert!(!put.underlying_is_index);
+                support::bench(
+                    b,
+                    || {
+                        put.value(black_box(&market), black_box(as_of))
+                            .expect("CDS put PV")
+                    },
+                    validate_price,
+                );
             },
         );
     }
@@ -166,25 +192,62 @@ fn bench_cds_option_npv(c: &mut Criterion) {
 
 fn bench_cds_option_greeks(c: &mut Criterion) {
     let mut group = c.benchmark_group("cds_option_greeks");
-    let market = create_market();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
-    let option = create_cds_option(OptionType::Call, 6, 5);
-
     group.bench_function("delta", |b| {
-        b.iter(|| option.delta(black_box(&market), black_box(as_of)));
+        let market = create_market();
+        let option = create_cds_option(OptionType::Call, 6, 5);
+        support::bench(
+            b,
+            || {
+                option
+                    .delta(black_box(&market), black_box(as_of))
+                    .expect("CDS option delta")
+            },
+            |value| assert!(value.is_finite()),
+        );
     });
 
     group.bench_function("gamma", |b| {
-        b.iter(|| option.gamma(black_box(&market), black_box(as_of)));
+        let market = create_market();
+        let option = create_cds_option(OptionType::Call, 6, 5);
+        support::bench(
+            b,
+            || {
+                option
+                    .gamma(black_box(&market), black_box(as_of))
+                    .expect("CDS option gamma")
+            },
+            |value| assert!(value.is_finite()),
+        );
     });
 
     group.bench_function("vega", |b| {
-        b.iter(|| option.vega(black_box(&market), black_box(as_of)));
+        let market = create_market();
+        let option = create_cds_option(OptionType::Call, 6, 5);
+        support::bench(
+            b,
+            || {
+                option
+                    .vega(black_box(&market), black_box(as_of))
+                    .expect("CDS option vega")
+            },
+            |value| assert!(value.is_finite()),
+        );
     });
 
     group.bench_function("theta", |b| {
-        b.iter(|| option.theta(black_box(&market), black_box(as_of)));
+        let market = create_market();
+        let option = create_cds_option(OptionType::Call, 6, 5);
+        support::bench(
+            b,
+            || {
+                option
+                    .theta(black_box(&market), black_box(as_of))
+                    .expect("CDS option theta")
+            },
+            |value| assert!(value.is_finite()),
+        );
     });
 
     group.finish();
@@ -192,18 +255,31 @@ fn bench_cds_option_greeks(c: &mut Criterion) {
 
 fn bench_cds_option_all_greeks(c: &mut Criterion) {
     let mut group = c.benchmark_group("cds_option_all_greeks");
-    let market = create_market();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
-    let option = create_cds_option(OptionType::Call, 6, 5);
-
     group.bench_function("all_greeks_sequential", |b| {
-        b.iter(|| {
-            let _delta = option.delta(black_box(&market), black_box(as_of));
-            let _gamma = option.gamma(black_box(&market), black_box(as_of));
-            let _vega = option.vega(black_box(&market), black_box(as_of));
-            let _theta = option.theta(black_box(&market), black_box(as_of));
-        });
+        let market = create_market();
+        let option = create_cds_option(OptionType::Call, 6, 5);
+        support::bench(
+            b,
+            || {
+                [
+                    option
+                        .delta(black_box(&market), black_box(as_of))
+                        .expect("CDS option delta"),
+                    option
+                        .gamma(black_box(&market), black_box(as_of))
+                        .expect("CDS option gamma"),
+                    option
+                        .vega(black_box(&market), black_box(as_of))
+                        .expect("CDS option vega"),
+                    option
+                        .theta(black_box(&market), black_box(as_of))
+                        .expect("CDS option theta"),
+                ]
+            },
+            |values| assert!(values.iter().all(|value| value.is_finite())),
+        );
     });
 
     group.finish();
@@ -211,23 +287,30 @@ fn bench_cds_option_all_greeks(c: &mut Criterion) {
 
 fn bench_cds_option_implied_vol(c: &mut Criterion) {
     let mut group = c.benchmark_group("cds_option_implied_vol");
-    let market = create_market();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
-    let option = create_cds_option(OptionType::Call, 6, 5);
-
-    // Get a target price from NPV
-    let target_price = option.value(&market, as_of).unwrap().amount();
-
     group.bench_function("implied_vol_solver", |b| {
-        b.iter(|| {
-            option.implied_vol(
-                black_box(&market),
-                black_box(as_of),
-                black_box(target_price),
-                black_box(Some(0.25)),
-            )
-        });
+        let market = create_market();
+        let option = create_cds_option(OptionType::Call, 6, 5);
+        let target = option
+            .value(&market, as_of)
+            .expect("CDS option target price");
+        validate_price(&target);
+        let target_price = target.amount();
+        support::bench(
+            b,
+            || {
+                option
+                    .implied_vol(
+                        black_box(&market),
+                        black_box(as_of),
+                        black_box(target_price),
+                        black_box(Some(0.25)),
+                    )
+                    .expect("CDS option implied volatility")
+            },
+            |value| assert!(value.is_finite() && (value - 0.30).abs() < 1e-6),
+        );
     });
 
     group.finish();
@@ -235,12 +318,24 @@ fn bench_cds_option_implied_vol(c: &mut Criterion) {
 
 fn bench_cds_index_option_npv(c: &mut Criterion) {
     let mut group = c.benchmark_group("cds_index_option_npv");
-    let market = create_market();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-    let option = create_index_cds_option();
-
     group.bench_function("index_payer_1M_5Y", |b| {
-        b.iter(|| option.value(black_box(&market), black_box(as_of)));
+        let market = create_market();
+        let option = create_index_cds_option();
+        assert!(option.underlying_is_index && !option.knockout);
+        assert_eq!(
+            option.protection_start_convention,
+            ProtectionStartConvention::Spot
+        );
+        support::bench(
+            b,
+            || {
+                option
+                    .value(black_box(&market), black_box(as_of))
+                    .expect("CDS index option PV")
+            },
+            validate_price,
+        );
     });
 
     group.finish();

@@ -1,4 +1,4 @@
-//! Heterogeneous capped loss by exact states for small pools and grid convolution.
+//! Constituent capped expectations by exact default counts, subsets or grid convolution.
 use super::pricer::{
     CdsTranchePricer, GRID_STEP, HOMOGENEITY_TOLERANCE, MAX_CONVOLUTION_WORK, MAX_GRID_POINTS,
     PoolExposure,
@@ -10,7 +10,7 @@ use std::cell::RefCell;
 
 impl CdsTranchePricer {
     /// Integrate a complete constituent pool with per-issuer recovery rates
-    /// by exact conditional convolution at every factor node.
+    /// using a bounded count, subset or grid distribution at every factor node.
     pub(super) fn calculate_equity_tranche_capped_hetero(
         &self,
         cap_pct: f64,
@@ -91,14 +91,45 @@ impl CdsTranchePricer {
                 PoolExposure::Recovery => recovery,
             })
             .collect();
+        let exact_states = u32::try_from(count)
+            .ok()
+            .and_then(|bits| 1_usize.checked_shl(bits))
+            .filter(|&states| states <= MAX_GRID_POINTS);
+        // Distinct-PD pools with identical contractual exposures need only the
+        // default count. Exact equality is essential: even tiny exposure
+        // differences belong to the original subset/grid algorithms. A zero
+        // exposure retains its existing cheap path and resource behavior.
+        if equal_positive_exposures(&weights, &recoveries) && exposures[0] != 0.0 {
+            if exact_states.is_none() {
+                // Preserve the existing heterogeneous resource failure before
+                // replacing its grid with a smaller exact count distribution.
+                let max_grid_index: f64 = (0..count)
+                    .map(|i| (weights[i] * exposures[i] / GRID_STEP).ceil())
+                    .sum();
+                if !max_grid_index.is_finite() {
+                    return Err(Error::Validation(
+                        "non-finite heterogeneous pool exposure".to_owned(),
+                    ));
+                }
+                checked_convolution_grid(count, max_grid_index)?;
+            }
+            let points = checked_count_points(count)?;
+            let pmf = RefCell::new(vec![0.0; points]);
+            return self.integrate_factors(&|factors| {
+                let mut pmf = pmf.borrow_mut();
+                default_count_pmf(&mut pmf, (0..count).map(|i| conditional_p(i, factors)));
+                Ok(count_capped_expectation(
+                    &pmf,
+                    weights[0],
+                    exposures[0],
+                    cap,
+                ))
+            });
+        }
         // Small bespoke pools can retain every contractual loss state within
         // the same storage limit as the convolution grid. This avoids rounding
         // a concentrated issuer across the tranche attachment/detachment kink.
-        if let Some(states) = u32::try_from(count)
-            .ok()
-            .and_then(|bits| 1_usize.checked_shl(bits))
-            .filter(|&states| states <= MAX_GRID_POINTS)
-        {
+        if let Some(states) = exact_states {
             let mut capped_losses = vec![0.0; states];
             for i in 0..count {
                 let offset = 1_usize << i;
@@ -183,6 +214,68 @@ impl CdsTranchePricer {
             ))
         })
     }
+}
+
+/// Exact contractual equality after the caller has excluded zero weights.
+#[expect(
+    clippy::float_cmp,
+    reason = "Contractual exposure equality must be exact; a tolerance would change the finite-pool model"
+)]
+fn equal_positive_exposures(weights: &[f64], recoveries: &[f64]) -> bool {
+    let (Some(&weight), Some(&recovery)) = (weights.first(), recoveries.first()) else {
+        return false;
+    };
+    weight > 0.0
+        && weights.len() == recoveries.len()
+        && weights.iter().all(|&value| value == weight)
+        && recoveries.iter().all(|&value| value == recovery)
+}
+
+/// Bound the new count distribution independently of the old grid preflight.
+fn checked_count_points(count: usize) -> Result<usize> {
+    let points = count
+        .checked_add(1)
+        .ok_or_else(|| Error::Validation("heterogeneous default-count size overflow".to_owned()))?;
+    if points > MAX_GRID_POINTS {
+        return Err(Error::Validation(format!(
+            "heterogeneous default-count PMF exceeds the limit of {MAX_GRID_POINTS} points"
+        )));
+    }
+    let work = count.checked_mul(points).ok_or_else(|| {
+        Error::Validation("heterogeneous default-count work estimate overflow".to_owned())
+    })?;
+    if work > MAX_CONVOLUTION_WORK {
+        return Err(Error::Validation(format!(
+            "heterogeneous default-count recurrence requires up to {work} count-state visits per factor evaluation, exceeding the limit of {MAX_CONVOLUTION_WORK}; reduce the positive-weight constituent count"
+        )));
+    }
+    Ok(points)
+}
+
+/// Overwrite an N+1 scratch buffer with the exact Poisson-binomial PMF.
+///
+/// The caller supplies N valid conditional probabilities in issuer order.
+/// Descending updates retain the previous issuer's coefficients in place;
+/// each new endpoint is assigned before use, so scratch reuse needs no clear.
+fn default_count_pmf(pmf: &mut [f64], probabilities: impl Iterator<Item = f64>) {
+    pmf[0] = 1.0;
+    for (i, p) in probabilities.enumerate() {
+        let survival = 1.0 - p;
+        pmf[i + 1] = pmf[i] * p;
+        for k in (1..=i).rev() {
+            pmf[k] = pmf[k] * survival + pmf[k - 1] * p;
+        }
+        pmf[0] *= survival;
+    }
+}
+
+/// Apply the cap to the actual common contractual weight, without normalizing.
+fn count_capped_expectation(pmf: &[f64], weight: f64, exposure: f64, cap: f64) -> f64 {
+    finstack_quant_core::math::summation::neumaier_sum(
+        pmf.iter()
+            .enumerate()
+            .map(|(k, &mass)| mass * (k as f64 * weight * exposure).min(cap)),
+    )
 }
 
 /// Check conservative PMF storage and work before allocation or convolution.
@@ -312,3 +405,7 @@ mod work_limit_tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "../../../tests/performance/count.rs"]
+mod count_tests;

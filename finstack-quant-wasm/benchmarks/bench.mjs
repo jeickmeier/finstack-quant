@@ -6,6 +6,7 @@
  * Requires: npm run build:node
  */
 
+import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -42,6 +43,10 @@ function materializationSampleCount() {
 
 const MATERIALIZATION_SAMPLES = materializationSampleCount();
 const MATERIALIZATION_ONLY = process.argv.includes('--materialization-only');
+const VALUATION_ONLY = process.argv.includes('--valuation-only');
+if (MATERIALIZATION_ONLY && VALUATION_ONLY) {
+  throw new Error('--materialization-only and --valuation-only are mutually exclusive');
+}
 
 function resolveCargo() {
   const executable = process.platform === 'win32' ? 'cargo.exe' : 'cargo';
@@ -89,11 +94,14 @@ Options:
   --help, -h    Show this message
   --materialization-only
                 Run only validation and materialization benchmarks
+  --valuation-only
+                Run required deposit valuation and nonempty portfolio controls
 
 Prerequisites:
   The wasm-pack Node build must exist under pkg-node/. If missing, run:
     npm run build:node
 
+Raw wasm-bindgen calls, including Rust pricing and JS result conversion.
 Timing uses performance.now(); each row is one measured call per iteration
 (unless noted). Monte Carlo uses 50,000 paths per call.
 `);
@@ -150,14 +158,6 @@ const SENSITIVITY_CONFIG_JSON = JSON.stringify({
   target_metrics: ['revenue'],
 });
 
-const PORTFOLIO_SPEC_JSON = JSON.stringify({
-  id: 'bench-portfolio',
-  base_currency: 'USD',
-  as_of: '2024-01-01',
-  entities: {},
-  positions: [],
-});
-
 const INSTRUMENT_JSON = JSON.stringify({
   schema: 'finstack_quant.instrument/1',
   instrument: {
@@ -176,14 +176,36 @@ const INSTRUMENT_JSON = JSON.stringify({
   },
 });
 
+const PORTFOLIO_SPEC = {
+  id: 'bench-two-deposits',
+  base_currency: 'USD',
+  as_of: '2024-01-02',
+  entities: { 'BENCH-ENTITY': { id: 'BENCH-ENTITY' } },
+  positions: [0, 1].map((index) => {
+    const instrument = JSON.parse(INSTRUMENT_JSON).instrument;
+    instrument.spec.id = `DEP-BENCH-${index}`;
+    instrument.spec.notional.amount = String(100000 * (index + 1));
+    instrument.spec.maturity = index === 0 ? '2024-07-01' : '2024-10-01';
+    return {
+      position_id: `POS-${index}`,
+      entity_id: 'BENCH-ENTITY',
+      instrument_id: instrument.spec.id,
+      instrument_spec: instrument,
+      quantity: 1,
+      unit: 'units',
+    };
+  }),
+};
+const PORTFOLIO_SPEC_JSON = JSON.stringify(PORTFOLIO_SPEC);
+
 const SCENARIO_SPEC_JSON = JSON.stringify({
   id: 'bench-scenario',
   operations: [],
 });
 
-/** Minimal `MarketContext` JSON for discounting (schema v2). */
+/** Canonical `MarketContext` state for discounting (schema version 1). */
 const MARKET_CONTEXT_JSON = JSON.stringify({
-  version: 2,
+  schema_version: 1,
   curves: [
     {
       type: 'discount',
@@ -197,6 +219,11 @@ const MARKET_CONTEXT_JSON = JSON.stringify({
       ],
       interp_style: 'monotone_convex',
       extrapolation: 'flat_forward',
+      min_forward_rate: null,
+      allow_non_monotonic: false,
+      min_forward_tenor: 1e-6,
+      rate_calibration: null,
+      fx_policy: null,
     },
   ],
   fx: null,
@@ -207,7 +234,8 @@ const MARKET_CONTEXT_JSON = JSON.stringify({
   dividends: [],
   credit_indices: [],
   fx_delta_vol_surfaces: [],
-  collateral: {},
+  vol_cubes: [],
+  hierarchy: null,
 });
 
 const STATEMENT_RESULT_BASE_JSON = JSON.stringify({
@@ -410,6 +438,169 @@ async function main() {
     bench(domain, name, iterations, fn);
   }
 
+  function benchRequired(domain, name, iterations, operation, validate, cleanup = () => {}) {
+    const sample = operation();
+    try {
+      validate(sample);
+    } finally {
+      cleanup(sample);
+    }
+    bench(
+      domain,
+      name,
+      iterations,
+      operation,
+      () => undefined,
+      (_unused, result) => cleanup(result)
+    );
+  }
+
+  function assertMoney(value, currency = 'USD') {
+    assert.equal(value.currency, currency);
+    assert.ok(typeof value.amount === 'number' || typeof value.amount === 'string');
+    assert.ok(Number.isFinite(Number(value.amount)), 'finite monetary amount');
+  }
+
+  function assertValuation(result, instrumentId, requestedMetrics = []) {
+    assert.equal(result.instrument_id, instrumentId);
+    assert.equal(result.as_of, '2024-01-02');
+    assertMoney(result.value);
+    for (const metric of requestedMetrics) {
+      assert.ok(Number.isFinite(result.measures[metric]), `finite requested ${metric}`);
+    }
+    assert.ok(Object.values(result.measures).every(Number.isFinite));
+  }
+
+  function assertPortfolioValuation(result) {
+    assert.equal(result.as_of, PORTFOLIO_SPEC.as_of);
+    assertMoney(result.total_base_currency);
+    assert.deepEqual(result.degraded_positions ?? [], []);
+    assert.deepEqual(Object.keys(result.position_values), ['POS-0', 'POS-1']);
+    assert.deepEqual(Object.keys(result.by_entity), ['BENCH-ENTITY']);
+    assertMoney(result.by_entity['BENCH-ENTITY']);
+    for (const position of PORTFOLIO_SPEC.positions) {
+      const value = result.position_values[position.position_id];
+      assert.equal(value.risk_metrics_complete, true);
+      assert.equal(value.risk_error ?? null, null);
+      assert.deepEqual(value.inapplicable_metrics ?? [], []);
+      assertMoney(value.value_native);
+      assertMoney(value.value_base);
+      assertValuation(value.valuation_result, position.instrument_id, ['dv01']);
+    }
+  }
+
+  function assertPortfolioCashflows(result) {
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(Object.keys(result.by_position), ['POS-0', 'POS-1']);
+    assert.deepEqual(Object.keys(result.position_summaries), ['POS-0', 'POS-1']);
+    assert.ok(result.events.length > 0);
+    for (const position of PORTFOLIO_SPEC.positions) {
+      const events = result.by_position[position.position_id];
+      assert.ok(events.length > 0);
+      for (const event of events) assertMoney(event.amount);
+    }
+    for (const event of result.events) assertMoney(event.amount);
+  }
+
+  function runValuationBenchmarks() {
+    benchRequired(
+      'portfolio',
+      'parsePortfolioSpecJson (2 deposits)',
+      4000,
+      () => w.parsePortfolioSpecJson(PORTFOLIO_SPEC_JSON),
+      (result) => assert.equal(JSON.parse(result).positions.length, 2)
+    );
+    benchRequired(
+      'valuations',
+      'validateInstrumentJson (deposit)',
+      2000,
+      () => w.validateInstrumentJson(INSTRUMENT_JSON),
+      (result) => assert.equal(JSON.parse(result).instrument.type, 'deposit')
+    );
+    benchRequired(
+      'valuations',
+      'listStandardMetrics',
+      3000,
+      () => w.listStandardMetrics(),
+      (result) => assert.ok(result.includes('dv01'))
+    );
+    benchRequired(
+      'portfolio',
+      'Portfolio.fromSpec + toJson (2 deposits)',
+      3000,
+      () => {
+        const book = w.Portfolio.fromSpec(PORTFOLIO_SPEC_JSON);
+        try {
+          return { book, json: book.toJson() };
+        } catch (error) {
+          book.free();
+          throw error;
+        }
+      },
+      ({ book, json }) => {
+        assert.equal(book.numPositions(), 2);
+        assert.equal(JSON.parse(json).positions.length, 2);
+      },
+      ({ book }) => book.free()
+    );
+
+    const portfolioBook = w.Portfolio.fromSpec(PORTFOLIO_SPEC_JSON);
+    try {
+      assert.equal(portfolioBook.numPositions(), 2);
+      const portfolioMarket = w.MarketContext.fromJson(MARKET_CONTEXT_JSON);
+      try {
+        benchRequired(
+          'portfolio',
+          'valuePortfolio (2 deposits, strict dv01)',
+          200,
+          () => w.valuePortfolio(portfolioBook, portfolioMarket, true),
+          assertPortfolioValuation
+        );
+        benchRequired(
+          'portfolio',
+          'aggregateFullCashflows (2 deposits)',
+          200,
+          () => w.aggregateFullCashflows(portfolioBook, portfolioMarket, false),
+          assertPortfolioCashflows
+        );
+      } finally {
+        portfolioMarket.free();
+      }
+    } finally {
+      portfolioBook.free();
+    }
+
+    const priceDeposit = () =>
+      w.priceInstrument(INSTRUMENT_JSON, MARKET_CONTEXT_JSON, '2024-01-02', 'discounting');
+    const sampleValuation = priceDeposit();
+    assertValuation(sampleValuation, 'DEP-BENCH');
+    const sampleValuationJson = w.valuationResultToJson(sampleValuation);
+    benchRequired(
+      'valuations',
+      'priceInstrument (deposit discounting PV)',
+      150,
+      priceDeposit,
+      (result) => assertValuation(result, 'DEP-BENCH')
+    );
+    benchRequired(
+      'valuations',
+      'priceInstrument (deposit discounting dv01)',
+      120,
+      () =>
+        w.priceInstrument(INSTRUMENT_JSON, MARKET_CONTEXT_JSON, '2024-01-02', 'discounting', [
+          'dv01',
+        ]),
+      (result) => assertValuation(result, 'DEP-BENCH', ['dv01'])
+    );
+    benchRequired(
+      'valuations',
+      'valuationResultToJson (deposit result JSON)',
+      2000,
+      () => w.valuationResultToJson(sampleValuationJson),
+      (result) => assert.deepEqual(JSON.parse(result), JSON.parse(sampleValuationJson))
+    );
+  }
+
   function runMaterializationBenchmarks() {
     const materializationFixtures = loadMaterializationFixtures();
     const warmMaterializationCache = new w.InstrumentArtifactCache(50);
@@ -515,7 +706,7 @@ async function main() {
     const dW = Math.max(12, ...rows.map((r) => r.domain.length));
     const nW = Math.max(36, ...rows.map((r) => r.name.length));
 
-    console.log('\nfinstack-quant-wasm benchmarks (pkg-node)\n');
+    console.log('\nfinstack-quant-wasm benchmarks (raw wasm-bindgen pkg-node)\n');
     console.log(
       `${'Domain'.padEnd(dW)}  ${'Benchmark'.padEnd(nW)}  ${'Iter'.padStart(5)}  ${'Best (ms)'.padStart(10)}  ${'Avg (ms)'.padStart(10)}  ${'p95 (ms)'.padStart(10)}  ${'Ops/sec'.padStart(12)}`
     );
@@ -538,6 +729,12 @@ async function main() {
 
   if (MATERIALIZATION_ONLY) {
     runMaterializationBenchmarks();
+    printRows();
+    return;
+  }
+
+  runValuationBenchmarks();
+  if (VALUATION_ONLY) {
     printRows();
     return;
   }
@@ -662,19 +859,7 @@ async function main() {
     w.backtestForecast(actualSeries, forecastSeries);
   });
 
-  bench('portfolio', 'parsePortfolioSpecJson', 4000, () => {
-    w.parsePortfolioSpecJson(PORTFOLIO_SPEC_JSON);
-  });
-
   runMaterializationBenchmarks();
-
-  bench('valuations', 'validateInstrumentJson', 2000, () => {
-    w.validateInstrumentJson(INSTRUMENT_JSON);
-  });
-
-  bench('valuations', 'listStandardMetrics', 3000, () => {
-    w.listStandardMetrics();
-  });
 
   const templateIds = w.listBuiltinTemplates();
 
@@ -928,70 +1113,6 @@ async function main() {
   benchTry('statements_analytics', 'explainFormula', 1500, () => {
     w.explainFormula(FINANCIAL_MODEL_JSON, STATEMENT_RESULT_BASE_JSON, 'revenue', '2025Q1');
   });
-
-  benchTry('portfolio', 'Portfolio.fromSpec', 3000, () => {
-    const book = w.Portfolio.fromSpec(PORTFOLIO_SPEC_JSON);
-    try {
-      book.toJson();
-    } finally {
-      book.free();
-    }
-  });
-
-  const portfolioBook = w.Portfolio.fromSpec(PORTFOLIO_SPEC_JSON);
-  const portfolioMarket = w.MarketContext.fromJson(MARKET_CONTEXT_JSON);
-  try {
-    benchTry('portfolio', 'valuePortfolio', 200, () => {
-      w.valuePortfolio(portfolioBook, portfolioMarket, false);
-    });
-    benchTry('portfolio', 'aggregateFullCashflows', 200, () => {
-      w.aggregateFullCashflows(portfolioBook, portfolioMarket);
-    });
-  } finally {
-    portfolioBook.free();
-    portfolioMarket.free();
-  }
-
-  let sampleValuationJson = '';
-  let firstStandardMetric = 'accrued';
-  try {
-    const metricList = w.listStandardMetrics();
-    if (Array.isArray(metricList) && metricList.length > 0) {
-      firstStandardMetric = String(metricList[0]);
-    }
-  } catch {
-    /* keep default */
-  }
-
-  try {
-    // `priceInstrument` returns a structured object; the validator below takes
-    // the wire string, so stringify once outside the timed loop.
-    sampleValuationJson = JSON.stringify(
-      w.priceInstrument(INSTRUMENT_JSON, MARKET_CONTEXT_JSON, '2024-01-02', 'discounting')
-    );
-  } catch (e) {
-    console.warn(`[bench skip] valuations / price paths: ${e instanceof Error ? e.message : e}`);
-  }
-
-  if (sampleValuationJson) {
-    bench('valuations', 'priceInstrument (discounting)', 150, () => {
-      w.priceInstrument(INSTRUMENT_JSON, MARKET_CONTEXT_JSON, '2024-01-02', 'discounting');
-    });
-
-    benchTry('valuations', 'priceInstrument', 120, () => {
-      w.priceInstrument(INSTRUMENT_JSON, MARKET_CONTEXT_JSON, '2024-01-02', 'discounting', [
-        firstStandardMetric,
-      ]);
-    });
-
-    bench('valuations', 'valuationResultToJson', 2000, () => {
-      w.valuationResultToJson(sampleValuationJson);
-    });
-  } else {
-    skipBench('valuations', 'priceInstrument (discounting)', 'pricing fixture failed');
-    skipBench('valuations', 'priceInstrument', 'pricing fixture failed');
-    skipBench('valuations', 'valuationResultToJson', 'pricing fixture failed');
-  }
 
   bench('scenarios', 'parseScenarioSpec', 5000, () => {
     w.parseScenarioSpec(SCENARIO_SPEC_JSON);

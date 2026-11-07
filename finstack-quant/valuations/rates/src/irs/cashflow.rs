@@ -7,12 +7,11 @@
 //! Pricing logic (discounting, forwards, PV) lives in `pricer.rs` and consumes
 //! these schedules where appropriate.
 //!
-//! # Important: Accrual-End Dates vs Payment Dates
+//! # Payment Dates
 //!
-//! Fixed leg schedules delegate to the cashflow builder, whose emitted
-//! `CashFlow::date` already includes business-day adjustment and payment lag.
-//! Compounded floating-leg schedules in this module emit accrual-end dates;
-//! the pricer applies floating-leg payment lag when discounting those flows.
+//! Fixed and floating schedules emit payment dates in `CashFlow::date`,
+//! including business-day adjustment and payment lag. The pricer discounts
+//! those dates directly without applying another payment delay.
 
 use finstack_quant_core::Result;
 #[cfg(test)]
@@ -164,12 +163,34 @@ fn resolve_compounded_fixing_calendar(
     )
 }
 
+/// Project compounded overnight coupons with optional fixing metadata.
+///
+/// # Arguments
+///
+/// * `irs` - Swap supplying the floating-leg dates, calendar, notional and
+///   arithmetic spread conventions.
+/// * `disc` - Discount curve used as the overnight projection source when
+///   `proj` is absent.
+/// * `proj` - Explicit overnight forward curve, when the resolved market
+///   supplies one; its source role is preserved even if derived from `disc`.
+/// * `as_of` - Valuation date; earlier observations require exact historical
+///   fixings and coupons paid on or before this date are excluded.
+/// * `fixings` - Exact historical index observations in decimal rate units.
+/// * `include_projected_fixings` - When true, retain every raw overnight
+///   observation for export and fixing materialization. When false, omit that
+///   metadata while preserving the same canonical daily coupon calculation.
+///
+/// # Errors
+///
+/// Propagates invalid schedules, calendars, projection inputs, missing exact
+/// fixings and invalid monetary cashflows.
 pub(crate) fn projected_compounded_float_leg_schedule(
     irs: &InterestRateSwap,
     disc: &DiscountCurve,
     proj: Option<&ForwardCurve>,
     as_of: Date,
     fixings: Option<&ScalarTimeSeries>,
+    include_projected_fixings: bool,
 ) -> Result<CashFlowSchedule> {
     use finstack_quant_core::cashflow::{CFKind, CashFlow};
 
@@ -242,16 +263,20 @@ pub(crate) fn projected_compounded_float_leg_schedule(
                     compounding: &float.compounding,
                     fixing_calendar: cal,
                     compounded_spread: 0.0,
+                    // Preserve the daily-product rounding used by exported cashflows.
+                    // Valuation omits only the separate projected-fixing metadata below.
                     need_observation_exposures: true,
                 },
             )?;
-        projected_fixings.extend(projection.observation_exposures.iter().map(|observation| {
-            finstack_quant_cashflows::fixings::ProjectedFixing {
-                series_id: fixing_series_id(float.forward_curve_id.as_str()),
-                date: observation.observation_start,
-                value: Some(observation.projected_rate),
-            }
-        }));
+        if include_projected_fixings {
+            projected_fixings.extend(projection.observation_exposures.iter().map(|observation| {
+                finstack_quant_cashflows::fixings::ProjectedFixing {
+                    series_id: fixing_series_id(float.forward_curve_id.as_str()),
+                    date: observation.observation_start,
+                    value: Some(observation.projected_rate),
+                }
+            }));
+        }
         let compound_factor = projection.compound_factor;
         let accrual_year_fraction = projection.accrual_year_fraction;
 
@@ -359,15 +384,24 @@ pub(crate) fn fixed_leg_schedule(irs: &InterestRateSwap) -> Result<CashFlowSched
 /// * `curves` - Optional market context containing forward curves
 /// * `as_of` - Optional valuation date for compounded-in-arrears legs; `None`
 ///   falls back to the projection (else discount) curve base date
+/// * `include_projected_fixings` - Retain raw overnight observation metadata
+///   for compounded coupons when true; false omits the metadata without changing
+///   coupon economics. Term-rate and structure-only schedules are unchanged.
 ///
 /// # Returns
 ///
 /// A `CashFlowSchedule` containing all floating leg cashflows with `CFKind::FloatReset`
 /// classifications.
+///
+/// # Errors
+///
+/// Propagates invalid schedules, missing market curves or historical fixings,
+/// invalid projection inputs and invalid monetary cashflows.
 pub(crate) fn float_leg_schedule_with_curves_as_of(
     irs: &InterestRateSwap,
     curves: Option<&MarketContext>,
     as_of: Option<Date>,
+    include_projected_fixings: bool,
 ) -> Result<CashFlowSchedule> {
     let float = irs.resolved_float_leg()?;
     if matches!(
@@ -399,6 +433,7 @@ pub(crate) fn float_leg_schedule_with_curves_as_of(
             proj.as_deref(),
             valuation_date,
             fixings,
+            include_projected_fixings,
         );
     }
 
@@ -445,7 +480,7 @@ pub(crate) fn full_signed_schedule_with_curves_as_of(
     as_of: Option<Date>,
 ) -> Result<CashFlowSchedule> {
     let fixed_sched = fixed_leg_schedule(irs)?;
-    let float_sched = float_leg_schedule_with_curves_as_of(irs, curves, as_of)?;
+    let float_sched = float_leg_schedule_with_curves_as_of(irs, curves, as_of, true)?;
 
     let (fixed_sign, floating_sign) = match irs.side {
         PayReceive::Receive => (1.0, -1.0),
@@ -525,7 +560,9 @@ mod tests {
             .expect("curve");
         let market = MarketContext::new().insert(curve);
         let as_of = date!(2025 - 02 - 01);
-        assert!(float_leg_schedule_with_curves_as_of(&irs, Some(&market), Some(as_of)).is_err());
+        assert!(
+            float_leg_schedule_with_curves_as_of(&irs, Some(&market), Some(as_of), true).is_err()
+        );
         let market = market.insert_series(
             ScalarTimeSeries::new(
                 "FIXING:TEST-TERM",
@@ -534,7 +571,7 @@ mod tests {
             )
             .expect("fixing"),
         );
-        let schedule = float_leg_schedule_with_curves_as_of(&irs, Some(&market), Some(as_of))
+        let schedule = float_leg_schedule_with_curves_as_of(&irs, Some(&market), Some(as_of), true)
             .expect("schedule");
         let coupon = schedule
             .get_flows()
@@ -549,6 +586,162 @@ mod tests {
     }
 
     #[test]
+    fn ois_economics_mode_omits_only_projected_fixings() {
+        use finstack_quant_cashflows::CashflowProvider;
+        use finstack_quant_core::currency::Currency;
+        use finstack_quant_core::math::interp::InterpStyle;
+        use finstack_quant_valuations_core::instruments::Instrument;
+        use serde_json::json;
+
+        let as_of = date!(2025 - 01 - 02);
+        let mut irs = InterestRateSwap::example().expect("example IRS");
+        irs.id = "OIS-PROJECTION-DETAILS".into();
+        irs.notional = Money::from((10_000_000_i64, Currency::USD));
+        irs.fixed_leg.start = as_of;
+        irs.fixed_leg.end = date!(2025 - 01 - 10);
+        irs.fixed_leg.frequency = Tenor::annual();
+        irs.fixed_leg.day_count = DayCount::Act360;
+        irs.fixed_leg.business_day_convention = BusinessDayConvention::Following;
+        irs.fixed_leg.calendar_id = Some("weekends_only".into());
+        irs.fixed_leg.stub = StubKind::ShortFront;
+        irs.fixed_leg.payment_lag_days = 2;
+        irs.float_leg.start = irs.fixed_leg.start;
+        irs.float_leg.end = irs.fixed_leg.end;
+        irs.float_leg.frequency = Tenor::annual();
+        irs.float_leg.day_count = DayCount::Act360;
+        irs.float_leg.business_day_convention = BusinessDayConvention::Following;
+        irs.float_leg.calendar_id = Some("weekends_only".into());
+        irs.float_leg.fixing_calendar_id = Some("weekends_only".into());
+        irs.float_leg.forward_curve_id = "USD-OIS".into();
+        irs.float_leg.stub = StubKind::ShortFront;
+        irs.float_leg.reset_lag_days = 0;
+        irs.float_leg.payment_lag_days = 2;
+        let market = MarketContext::new().insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(as_of)
+                .day_count(DayCount::Act365F)
+                .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80)])
+                .interp(InterpStyle::Linear)
+                .build()
+                .expect("discount curve"),
+        );
+
+        for (label, compounding, raw_dates, exported_dates) in [
+            (
+                "eligible",
+                FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
+                vec![
+                    date!(2025 - 01 - 02),
+                    date!(2025 - 01 - 03),
+                    date!(2025 - 01 - 06),
+                    date!(2025 - 01 - 07),
+                    date!(2025 - 01 - 08),
+                    date!(2025 - 01 - 09),
+                ],
+                vec![
+                    date!(2025 - 01 - 02),
+                    date!(2025 - 01 - 03),
+                    date!(2025 - 01 - 06),
+                    date!(2025 - 01 - 07),
+                    date!(2025 - 01 - 08),
+                    date!(2025 - 01 - 09),
+                ],
+            ),
+            (
+                "cutoff",
+                FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 2 },
+                vec![
+                    date!(2025 - 01 - 02),
+                    date!(2025 - 01 - 03),
+                    date!(2025 - 01 - 06),
+                    date!(2025 - 01 - 07),
+                    date!(2025 - 01 - 07),
+                    date!(2025 - 01 - 07),
+                ],
+                vec![
+                    date!(2025 - 01 - 02),
+                    date!(2025 - 01 - 03),
+                    date!(2025 - 01 - 06),
+                    date!(2025 - 01 - 07),
+                ],
+            ),
+        ] {
+            irs.float_leg.compounding = compounding;
+            irs.validate().expect("valid compact OIS");
+            let before = irs.cashflow_schedule(&market, as_of).expect("full export");
+            let economics =
+                float_leg_schedule_with_curves_as_of(&irs, Some(&market), Some(as_of), false)
+                    .expect("economics schedule");
+            let full = float_leg_schedule_with_curves_as_of(&irs, Some(&market), Some(as_of), true)
+                .expect("full floating schedule");
+            assert!(economics.get_meta().projected_fixings.is_empty());
+            assert_eq!(economics.get_flows().len(), 1);
+            assert_eq!(full.get_flows().len(), 1);
+            let actual = &economics.get_flows()[0];
+            let expected = &full.get_flows()[0];
+            assert_eq!(actual.date, date!(2025 - 01 - 14));
+            assert_eq!(actual.date, expected.date);
+            assert_eq!(actual.kind, CFKind::FloatReset);
+            assert_eq!(actual.kind, expected.kind);
+            assert_eq!(actual.amount.currency(), Currency::USD);
+            assert_eq!(actual.amount.currency(), expected.amount.currency());
+            assert_eq!(actual.accrual_factor, expected.accrual_factor);
+            let actual_rate = actual.rate.expect("coupon rate");
+            let expected_rate = expected.rate.expect("coupon rate");
+            assert!((actual_rate - expected_rate).abs() <= 1e-12);
+            assert!(
+                ((1.0 + actual_rate * actual.accrual_factor)
+                    - (1.0 + expected_rate * expected.accrual_factor))
+                    .abs()
+                    <= 1e-12
+            );
+            let amount_error = (actual.amount.amount() - expected.amount.amount()).abs();
+            assert!(amount_error <= irs.notional.amount() * 1e-12);
+            assert_eq!(
+                full.get_meta()
+                    .projected_fixings
+                    .iter()
+                    .map(|fixing| fixing.date)
+                    .collect::<Vec<_>>(),
+                raw_dates
+            );
+            assert!(full.get_meta().projected_fixings.iter().all(|fixing| {
+                fixing.series_id == "FIXING:USD-OIS" && fixing.value.is_some_and(f64::is_finite)
+            }));
+            let _ = irs.value(&market, as_of).expect("economics-only value");
+            let after = irs.cashflow_schedule(&market, as_of).expect("full export");
+            assert_eq!(
+                serde_json::to_value(&before).expect("serialize before export"),
+                serde_json::to_value(&after).expect("serialize after export")
+            );
+            assert_eq!(
+                after
+                    .get_meta()
+                    .projected_fixings
+                    .iter()
+                    .map(|fixing| fixing.date)
+                    .collect::<Vec<_>>(),
+                exported_dates
+            );
+            eprintln!(
+                "FQ_OIS_DIAGNOSTIC {}",
+                json!({
+                    "case": format!("ois_p3/mode/{label}"),
+                    "data": {
+                        "fixture": {"instrument": irs, "market": market, "as_of": as_of.to_string()},
+                        "economics_schedule": economics,
+                        "full_floating_schedule": full,
+                        "public_export": after,
+                        "coupon_amount_error_usd": amount_error,
+                        "factor_and_rate_bound": 1e-12,
+                        "coupon_amount_bound_usd": irs.notional.amount() * 1e-12,
+                    },
+                })
+            );
+        }
+    }
+
+    #[test]
     fn irs_leg_schedules_do_not_emit_notional_flows() {
         let irs = InterestRateSwap::example().expect("example IRS");
         let fixed = fixed_leg_schedule(&irs).expect("fixed schedule");
@@ -560,7 +753,8 @@ mod tests {
             "fixed_leg_schedule should be coupon-only"
         );
 
-        let float = float_leg_schedule_with_curves_as_of(&irs, None, None).expect("float schedule");
+        let float =
+            float_leg_schedule_with_curves_as_of(&irs, None, None, true).expect("float schedule");
         assert!(
             float
                 .get_flows()
@@ -708,7 +902,7 @@ mod tests {
                     .expect("forward"),
             );
 
-        let schedule = float_leg_schedule_with_curves_as_of(&irs, Some(&market), Some(as_of))
+        let schedule = float_leg_schedule_with_curves_as_of(&irs, Some(&market), Some(as_of), true)
             .expect("compounded schedule");
         let total_accrual: f64 = schedule
             .get_flows()
@@ -842,10 +1036,10 @@ mod tests {
         let ctx = MarketContext::new().insert(disc);
 
         let sched_no_cutoff =
-            float_leg_schedule_with_curves_as_of(&swap_no_cutoff, Some(&ctx), Some(as_of))
+            float_leg_schedule_with_curves_as_of(&swap_no_cutoff, Some(&ctx), Some(as_of), true)
                 .expect("no-cutoff schedule");
         let sched_cutoff =
-            float_leg_schedule_with_curves_as_of(&swap_cutoff, Some(&ctx), Some(as_of))
+            float_leg_schedule_with_curves_as_of(&swap_cutoff, Some(&ctx), Some(as_of), true)
                 .expect("cutoff schedule");
 
         let pv_no_cutoff: f64 = sched_no_cutoff

@@ -2,6 +2,11 @@
 //!
 //! This benchmark suite focuses on the plan-driven calibration step engine.
 
+#[path = "../../valuations/benches/support/mod.rs"]
+mod bench_support;
+#[path = "../../valuations/benches/support/record.rs"]
+mod record;
+
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use finstack_quant_calibration::CalibrationConfig;
 use finstack_quant_calibration::CalibrationMethod;
@@ -327,25 +332,26 @@ fn load_example(json: &str) -> CalibrationEnvelope {
 }
 
 fn bench_hazard_bootstrap(c: &mut Criterion) {
-    let envelope = load_example(include_str!(
-        "../examples/market_bootstrap/03_single_name_hazard.json"
-    ));
-
     c.bench_function("calibration_hazard_full_plan_5_pillars", |b| {
+        let envelope = load_example(include_str!(
+            "../examples/market_bootstrap/03_single_name_hazard.json"
+        ));
         b.iter(|| {
             engine::calibrate(black_box(&envelope)).expect("hazard calibration should succeed")
         })
     });
 
-    let result = engine::calibrate(&envelope).expect("hazard calibration setup should succeed");
-    let market =
-        MarketContext::try_from(result.result.final_market).expect("market state should rebuild");
-    let hazard = market
-        .get_hazard("ISSUER-A-CDS")
-        .expect("calibrated hazard curve should exist");
-    let discount_id = CurveId::new("USD-OIS");
-
     c.bench_function("calibration_hazard_rebootstrap_parallel_5_pillars", |b| {
+        let envelope = load_example(include_str!(
+            "../examples/market_bootstrap/03_single_name_hazard.json"
+        ));
+        let result = engine::calibrate(&envelope).expect("hazard calibration setup should succeed");
+        let market = MarketContext::try_from(result.result.final_market)
+            .expect("market state should rebuild");
+        let hazard = market
+            .get_hazard("ISSUER-A-CDS")
+            .expect("calibrated hazard curve should exist");
+        let discount_id = CurveId::new("USD-OIS");
         b.iter(|| {
             bump_hazard_spreads(
                 black_box(hazard.as_ref()),
@@ -360,20 +366,122 @@ fn bench_hazard_bootstrap(c: &mut Criterion) {
     });
 }
 
-fn bench_base_correlation_bootstrap(c: &mut Criterion) {
-    let envelope = load_example(include_str!(
-        "../examples/market_bootstrap/05_cdx_base_correlation.json"
-    ));
+fn check_calibration_report(report: &finstack_quant_calibration::CalibrationReport) {
+    assert!(report.success, "{}", report.convergence_reason);
+    assert!(report.validation_passed);
+    assert!(report.validation_error.is_none());
+    assert!(!report.residuals.is_empty());
+    assert!(report.residuals.values().all(|value| value.is_finite()));
+    assert!(report.objective_value.is_finite());
+    assert!(report.max_residual.is_finite());
+    assert!(report.rmse.is_finite());
+    assert!(report.max_residual_ratio.is_none_or(f64::is_finite));
+    assert!(report.rmse_ratio.is_none_or(f64::is_finite));
+    if let Some(tolerance) = report.success_tolerance {
+        assert!(tolerance.is_finite() && tolerance > 0.0);
+        assert!(report.max_residual <= tolerance);
+    }
+}
 
+fn bench_base_correlation_bootstrap(c: &mut Criterion) {
     c.bench_function("calibration_base_correlation_full_plan_5_knots", |b| {
-        b.iter(|| {
-            engine::calibrate(black_box(&envelope))
-                .expect("base-correlation calibration should succeed")
-        })
+        let envelope = load_example(include_str!(
+            "../examples/market_bootstrap/05_cdx_base_correlation.json"
+        ));
+        assert_eq!(envelope.plan.steps.len(), 3);
+        bench_support::bench(
+            b,
+            || {
+                let output = engine::calibrate(black_box(&envelope))
+                    .expect("base-correlation calibration should succeed");
+                assert!(
+                    output.result.report.success,
+                    "base-correlation calibration returned an unsuccessful report"
+                );
+                output
+            },
+            |output| {
+                let result = &output.result;
+                check_calibration_report(&result.report);
+                assert_eq!(result.step_reports.len(), envelope.plan.steps.len());
+                let mut quote_count = 0;
+                for step in &envelope.plan.steps {
+                    let report = result.step_reports.get(&step.id).expect("step report");
+                    check_calibration_report(report);
+                    let quotes = envelope
+                        .plan
+                        .quote_sets
+                        .get(&step.quote_set)
+                        .expect("step quote set");
+                    assert_eq!(report.residuals.len(), quotes.len());
+                    assert!(
+                        quotes
+                            .iter()
+                            .all(|id| report.residuals.contains_key(id.as_str()))
+                    );
+                    quote_count += quotes.len();
+                }
+                assert_eq!(quote_count, 16);
+                assert_eq!(result.report.residuals.len(), quote_count);
+                let params = envelope
+                    .plan
+                    .steps
+                    .iter()
+                    .find_map(|step| match &step.params {
+                        StepParams::BaseCorrelation(params) => Some(params),
+                        _ => None,
+                    })
+                    .expect("base-correlation step");
+                assert_eq!(params.detachment_points.len(), 5);
+                let market = MarketContext::try_from(result.final_market.clone())
+                    .expect("calibrated market should rebuild");
+                let index = market
+                    .get_credit_index(&params.index_id)
+                    .expect("calibrated credit index");
+                let curve = market
+                    .get_base_correlation(index.base_correlation_curve().id().as_str())
+                    .expect("calibrated correlation curve");
+                assert_eq!(curve.len(), params.detachment_points.len());
+                assert!(curve.validate_shape().is_monotonic);
+                for (&actual, &expected) in curve
+                    .detachment_points()
+                    .iter()
+                    .zip(&params.detachment_points)
+                {
+                    assert!((actual - expected * 100.0).abs() < 1e-12);
+                }
+                assert!(
+                    curve
+                        .correlations()
+                        .iter()
+                        .all(|rho| rho.is_finite() && (0.0..=1.0).contains(rho))
+                );
+                assert_eq!(
+                    index.base_correlation_curve().correlations(),
+                    curve.correlations()
+                );
+                assert_eq!(
+                    index.base_correlation_curve().detachment_points(),
+                    curve.detachment_points()
+                );
+                record::capture("calibration_base_correlation_full_plan_5_knots", || {
+                    serde_json::json!({
+                        "fixture": {
+                            "envelope": envelope,
+                            "timing_boundary": "complete canonical calibration engine, including rate/hazard prerequisite calibration and all final repricing",
+                            "expected_steps": 3,
+                            "expected_quotes": 16,
+                            "expected_correlation_knots": 5,
+                        },
+                        "output": output,
+                    })
+                });
+            },
+        );
     });
 }
 
-fn bench_rate_quote_risk_cache(c: &mut Criterion) {
+fn rate_quote_risk_fixture() -> (MarketContext, Date, Vec<ForwardRateAgreement>) {
     let envelope = load_example(include_str!(
         "../examples/market_bootstrap/02_usd_3m_forward_curve.json"
     ));
@@ -402,12 +510,16 @@ fn bench_rate_quote_risk_cache(c: &mut Criterion) {
                 .expect("benchmark FRA")
         })
         .collect::<Vec<_>>();
+    (market, as_of, fras)
+}
 
+fn bench_rate_quote_risk_cache(c: &mut Criterion) {
     let mut group = c.benchmark_group("rate_quote_risk_portfolio");
     group.sample_size(10);
     // Uncached: every FRA gets its own provider, so no recalibration is shared
     // across the portfolio (DV01 is quote-space and needs a provider).
     group.bench_function("4_fras_uncached", |b| {
+        let (market, as_of, fras) = rate_quote_risk_fixture();
         b.iter(|| {
             fras.iter()
                 .map(|fra| {
@@ -425,6 +537,7 @@ fn bench_rate_quote_risk_cache(c: &mut Criterion) {
         })
     });
     group.bench_function("4_fras_batch_cached", |b| {
+        let (market, as_of, fras) = rate_quote_risk_fixture();
         b.iter_batched(
             || {
                 PricingOptions::default()

@@ -27,6 +27,7 @@ expand benchmark runtime unless a matching `[[bench]]` entry is added.
 | `bench_common.rs` | no | Shared fixture builders, pulled in with `#[path = "bench_common.rs"] mod bench_common;` |
 | `materialization_fixtures.rs`, `materialization_gate.rs` | no | Fixture builders and percentile/gate logic used only by `materialization.rs` |
 | `support/rates.rs` | no | IRS fixture helper |
+| `support/validity.rs` | no | Untimed output assertions for valuation and metrics benchmarks |
 
 ## Run
 
@@ -81,6 +82,17 @@ options, variance swaps, FX spot and options, CDS, CDS options, CDS tranches,
 and structured credit (CLO). Read
 `bench_common.rs` for the exact composition before quoting a number from these
 benchmarks.
+
+`portfolio_valuation` and `portfolio_metrics` require successful canonical
+pricing, including their PV-only controls. The standard-risk cases request the
+standard menu (`dv01` where supported) with `strict_risk = true`. Each selected
+case has an untimed preflight checking position counts, finite PVs and requested
+metrics, currencies, `risk_metrics_complete`, and the absence of `risk_error`
+and `degraded_positions`. Metric aggregation additionally rejects skipped
+non-finite values; table exports check their expected row counts. Errors remain
+fatal during measured calls, so PV-only fallback cannot produce a successful
+risk timing. Fixture construction and preflight occur only inside selected
+Criterion cases and remain outside the measured operation.
 
 ## Materialization bench
 

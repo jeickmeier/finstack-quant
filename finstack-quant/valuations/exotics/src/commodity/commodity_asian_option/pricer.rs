@@ -23,6 +23,7 @@ use crate::exotics::asian_option::types::{average_intrinsic, realized_average};
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
+use finstack_quant_core::math::summation::{NeumaierAccumulator, neumaier_sum};
 use finstack_quant_core::money::Money;
 use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
 use finstack_quant_models::types::OptionType;
@@ -162,6 +163,69 @@ pub(crate) fn compute_pv(
     Money::new(price * inst.quantity, inst.underlying.currency)
 }
 
+/// Return `(mean, variance)` for a nonempty projection in nondecreasing time.
+/// Forwards are validated positive prices; variance has squared price units.
+fn arithmetic_moments(future_forwards: &[(f64, f64)], sigma: f64) -> (f64, f64) {
+    let mut suffix = NeumaierAccumulator::new();
+    let mut covariance = NeumaierAccumulator::new();
+    let sigma_sq = sigma * sigma;
+    for &(time, forward) in future_forwards.iter().rev() {
+        // The suffix excludes the current fixing: its diagonal is counted once.
+        // Accumulate covariance directly; subtracting M1^2 from M2 would lose
+        // genuine small variance or turn moment rounding into spurious variance.
+        covariance.add((sigma_sq * time).exp_m1() * forward * (forward + 2.0 * suffix.total()));
+        suffix.add(forward);
+    }
+    let count = future_forwards.len() as f64;
+    (suffix.total() / count, covariance.total() / (count * count))
+}
+
+struct GeometricMoments {
+    log_sum: f64,
+    forward: f64,
+    log_variance: f64,
+}
+
+/// Moments of the full seasoned average from a nonempty ordered projection.
+/// Equal model times are valid; contractual dates are validated by the caller.
+fn geometric_moments(
+    future_forwards: &[(f64, f64)],
+    sigma: f64,
+    hist_prod_log: f64,
+    total_fixings: usize,
+) -> GeometricMoments {
+    let count = future_forwards.len();
+    let m = count as f64;
+    let n = total_fixings as f64;
+    let log_sum: f64 = future_forwards
+        .iter()
+        .map(|(_, forward)| forward.ln())
+        .sum();
+    let geo_mean_fwd = (log_sum / m).exp();
+    // For ordered times, each t_i supplies its diagonal and both triangles
+    // against the m-i-1 later observations, including equal model times.
+    let weighted_times = neumaier_sum(
+        future_forwards
+            .iter()
+            .enumerate()
+            .map(|(index, (time, _))| (2.0 * (count - index) as f64 - 1.0) * time),
+    );
+    let vol_adj_sq = sigma * sigma * weighted_times / (m * m);
+    let sum_t: f64 = future_forwards.iter().map(|(time, _)| *time).sum();
+    let mean_log_drift = -0.5 * sigma * sigma * sum_t / m;
+    let realized_factor = (hist_prod_log / n).exp();
+    let ratio = m / n;
+    let log_variance = ratio * ratio * vol_adj_sq;
+    let forward = realized_factor
+        * geo_mean_fwd.powf(ratio)
+        * (ratio * mean_log_drift + 0.5 * log_variance).exp();
+    GeometricMoments {
+        log_sum,
+        forward,
+        log_variance,
+    }
+}
+
 /// Seasoned geometric Asian pricing on commodity forwards.
 ///
 /// Once `n − m` of the `n` fixings are realized, the geometric average factors
@@ -201,34 +265,11 @@ fn price_geometric_commodity(
         return 0.0;
     }
 
-    // Geometric mean and exact log-variance of the m remaining forwards
-    // (same basis as the unseasoned Kemna-Vorst pricer).
-    let log_sum: f64 = future_forwards.iter().map(|(_, f)| f.ln()).sum();
-    let geo_mean_fwd = (log_sum / m).exp();
-    let mut var_sum = 0.0;
-    for (t_i, _) in future_forwards.iter() {
-        for (t_j, _) in future_forwards.iter() {
-            var_sum += sigma * sigma * t_i.min(*t_j);
-        }
-    }
-    let vol_adj_sq = var_sum / (m * m); // Var[ln G_fut]
-
-    // Kemna-Vorst mean-log drift : each forward is a
-    // martingale under its own measure, so
-    // E[ln G_fut] = ln(geo_mean_fwd) − (σ²/2m) Σ t_j.
-    let sum_t: f64 = future_forwards.iter().map(|(t, _)| *t).sum();
-    let mean_log_drift = -0.5 * sigma * sigma * sum_t / m;
-
-    // X = A · G_fut^(m/n), with the Kemna-Vorst lognormal law for G_fut:
-    // ln G_fut ~ N(ln geo_mean_fwd + mean_log_drift, vol_adj_sq).
-    // Then, with r = m/n:
-    // Var[ln X] = r² · vol_adj_sq
-    // E[X] = A · geo_mean_fwd^r · exp(r · mean_log_drift + ½ · r² · vol_adj_sq)
-    let realized_factor = (hist_prod_log / n).exp();
-    let ratio = m / n;
-    let var_x = ratio * ratio * vol_adj_sq;
-    let fwd_x =
-        realized_factor * geo_mean_fwd.powf(ratio) * (ratio * mean_log_drift + 0.5 * var_x).exp();
+    let GeometricMoments {
+        log_sum,
+        forward: fwd_x,
+        log_variance: var_x,
+    } = geometric_moments(future_forwards, sigma, hist_prod_log, total_fixings);
 
     let t_last = future_forwards
         .iter()
@@ -306,32 +347,10 @@ fn price_arithmetic_tw_commodity(
         return payoff * df;
     }
 
-    // First moment: E[A_future] = (1/m) Σ F(t_i)
-    let m1 = future_forwards.iter().map(|(_, f)| f).sum::<f64>() / m;
-
-    // Second moment: E[A_future²]
-    // E[F(t_i) × F(t_j)] = F(t_i) × F(t_j) × exp(σ² × min(t_i, t_j))
-    // This is the Turnbull-Wakeman moment for correlated commodity forwards
-    let mut sum_m2 = 0.0;
-    for (t_i, f_i) in future_forwards.iter() {
-        for (t_j, f_j) in future_forwards.iter() {
-            let t_min = t_i.min(*t_j);
-            sum_m2 += f_i * f_j * (sigma * sigma * t_min).exp();
-        }
-    }
-    let m2 = sum_m2 / (m * m);
-
-    // Match to lognormal
-    if m2 <= m1 * m1 {
-        return df
-            * scale
-            * match option_type {
-                OptionType::Call => (m1 - k_eff).max(0.0),
-                OptionType::Put => (k_eff - m1).max(0.0),
-            };
-    }
-
-    let var = (m2 / (m1 * m1)).ln();
+    let (m1, variance) = arithmetic_moments(future_forwards, sigma);
+    // Match the lognormal variance without subtracting nearly equal moments.
+    // expm1 above and log1p here also make exact zero volatility deterministic.
+    let var = (variance / m1 / m1).ln_1p();
     if var <= 0.0 {
         return df
             * scale
@@ -386,6 +405,10 @@ impl Pricer for CommodityAsianOptionAnalyticalPricer {
         Ok(ValuationResult::stamped(asian.id(), as_of, pv))
     }
 }
+
+#[cfg(test)]
+#[path = "../../../tests/performance/commodity_asian_option.rs"]
+mod performance_accuracy;
 
 #[cfg(test)]
 mod tests {

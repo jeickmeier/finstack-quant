@@ -560,6 +560,176 @@ where
     }
 }
 
+/// Integrate two functions with shared adaptive Simpson nodes.
+///
+/// The callback evaluates both components at each node. Refinement follows
+/// whichever component needs more accuracy, while each component retains its
+/// own summed absolute error estimate. A large component cannot consume the
+/// other component's error budget.
+///
+/// # Arguments
+///
+/// * `f` - Callback returning both integrands in tuple order at one domain
+///   coordinate. It must be copyable for recursive evaluation; shared immutable
+///   data or interior-mutable diagnostic state may be captured by reference.
+/// * `a` - Lower endpoint in the domain units accepted by `f`; it must be finite.
+/// * `b` - Upper endpoint in the same domain units; it must be finite. A value
+///   below `a` produces signed integrals with reversed orientation.
+/// * `tol` - Finite, nonnegative absolute error budget applied independently to
+///   each integral, in that component's integral units. Each recursive half
+///   receives half the local budget; final acceptance uses each component's
+///   sum of terminal-panel error estimates, without relative scaling.
+/// * `max_depth` - Maximum bisection depth, with the initial panel at depth zero.
+///   A depth-limited panel may exceed its local share if that component's total
+///   estimated error still fits `tol`.
+///
+/// # Returns
+///
+/// The two finite integral estimates, in callback tuple order, with each summed
+/// quadrature error estimate at most `tol`. Estimates use the same uncorrected
+/// composite Simpson totals as [`adaptive_simpson`].
+///
+/// # Errors
+///
+/// Returns [`Error::Validation`] for a non-finite endpoint or a negative or
+/// non-finite tolerance. Returns [`InputError::SolverConvergenceFailed`] if
+/// either value or error estimate is non-finite, or either summed estimate
+/// exceeds `tol` at the permitted depth. When both components fail, the error
+/// identifies the first component in tuple order and reports its own estimate.
+///
+/// # Example
+///
+/// ```rust
+/// use finstack_quant_core::math::integration::adaptive_simpson_pair;
+///
+/// let (square, cube) =
+///     adaptive_simpson_pair(|x| (x * x, x * x * x), 0.0, 1.0, 1e-10, 20)?;
+/// assert!((square - 1.0 / 3.0).abs() < 1e-10);
+/// assert!((cube - 0.25).abs() < 1e-10);
+/// # Ok::<(), finstack_quant_core::Error>(())
+/// ```
+pub fn adaptive_simpson_pair<F>(
+    f: F,
+    a: f64,
+    b: f64,
+    tol: f64,
+    max_depth: usize,
+) -> Result<(f64, f64), Error>
+where
+    F: Fn(f64) -> (f64, f64) + Copy,
+{
+    if !a.is_finite() || !b.is_finite() || !tol.is_finite() || tol < 0.0 {
+        return Err(Error::Validation(
+            "adaptive Simpson endpoints and tolerance must be finite with tol >= 0".to_string(),
+        ));
+    }
+
+    #[derive(Clone, Copy)]
+    struct PairPanel {
+        a: f64,
+        b: f64,
+        fa: [f64; 2],
+        fb: [f64; 2],
+        fc: [f64; 2],
+        whole: [f64; 2],
+    }
+
+    fn recurse<F>(
+        f: F,
+        panel: PairPanel,
+        tol: f64,
+        depth: usize,
+        max_depth: usize,
+    ) -> ([f64; 2], [f64; 2])
+    where
+        F: Fn(f64) -> [f64; 2] + Copy,
+    {
+        let PairPanel {
+            a,
+            b,
+            fa,
+            fb,
+            fc,
+            whole,
+        } = panel;
+        let c = (a + b) / 2.0;
+        let fd = f((a + c) / 2.0);
+        let fe = f((c + b) / 2.0);
+        let h_left = (c - a) / 6.0;
+        let h_right = (b - c) / 6.0;
+        let left: [f64; 2] = std::array::from_fn(|i| h_left * (fa[i] + 4.0 * fd[i] + fc[i]));
+        let right: [f64; 2] = std::array::from_fn(|i| h_right * (fc[i] + 4.0 * fe[i] + fb[i]));
+        let total: [f64; 2] = std::array::from_fn(|i| left[i] + right[i]);
+        let error: [f64; 2] = std::array::from_fn(|i| (total[i] - whole[i]).abs() / 15.0);
+
+        if error.iter().all(|&estimate| estimate <= tol)
+            || error.iter().any(|estimate| !estimate.is_finite())
+            || depth >= max_depth
+        {
+            return (total, error);
+        }
+
+        let left_panel = PairPanel {
+            a,
+            b: c,
+            fa,
+            fb: fc,
+            fc: fd,
+            whole: left,
+        };
+        let right_panel = PairPanel {
+            a: c,
+            b,
+            fa: fc,
+            fb,
+            fc: fe,
+            whole: right,
+        };
+        let (left_value, left_error) = recurse(f, left_panel, tol / 2.0, depth + 1, max_depth);
+        let (right_value, right_error) = recurse(f, right_panel, tol / 2.0, depth + 1, max_depth);
+        (
+            std::array::from_fn(|i| left_value[i] + right_value[i]),
+            std::array::from_fn(|i| left_error[i] + right_error[i]),
+        )
+    }
+
+    let paired = |x| {
+        let (first, second) = f(x);
+        [first, second]
+    };
+    let c = (a + b) / 2.0;
+    let h = (b - a) / 6.0;
+    let fa = paired(a);
+    let fb = paired(b);
+    let fc = paired(c);
+    let panel = PairPanel {
+        a,
+        b,
+        fa,
+        fb,
+        fc,
+        whole: std::array::from_fn(|i| h * (fa[i] + 4.0 * fc[i] + fb[i])),
+    };
+    let (value, error) = recurse(paired, panel, tol, 0, max_depth);
+    for (component, (&value, &error_estimate)) in value.iter().zip(&error).enumerate() {
+        if !value.is_finite() || !error_estimate.is_finite() || error_estimate > tol {
+            return Err(InputError::SolverConvergenceFailed {
+                iterations: max_depth,
+                residual: error_estimate,
+                last_x: c,
+                reason: format!(
+                    "adaptive_simpson_pair component {} did not meet total tolerance {tol:.2e} \
+                     at max_depth {max_depth} (interval [{a:.6e}, {b:.6e}], \
+                     summed error estimate {error_estimate:.2e})",
+                    component + 1
+                ),
+            }
+            .into());
+        }
+    }
+    Ok((value[0], value[1]))
+}
+
 // Gauss–Legendre Quadrature (finite intervals)
 
 /// Return Gauss–Legendre nodes and weights for supported orders.

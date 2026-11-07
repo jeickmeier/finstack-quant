@@ -70,10 +70,9 @@ const EXPECTED_FAILURES: &[(&str, &[&str], &str)] = &[
     // or leaves its market grid.
     (
         "golden/regression_goldens/bond_future/ust_ty_10y_front_month",
-        &["1D", "1M", "6M"],
-        NO_SCHEDULE,
+        &["6M"],
+        "the 6M theta horizon reaches physical delivery, which requires the typed delivery result",
     ),
-    ("registry/bond_future", &["1D", "1M", "6M"], NO_SCHEDULE),
     ("registry/agency_tba", &["1D", "1M", "6M"], NO_SCHEDULE),
     (
         "golden/regression_goldens/equity_future/spx_es_3m",

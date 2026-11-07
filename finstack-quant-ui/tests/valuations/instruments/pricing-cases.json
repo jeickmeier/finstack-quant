@@ -582,8 +582,8 @@
         "description": "Change notional.amount from 30000 to 33000; native present value must change."
       },
       "reference": {
-        "baseline": { "amount": "4849.05383245252", "currency": "USD" },
-        "edited": { "amount": "5333.95921569777", "currency": "USD" }
+        "baseline": { "amount": "4849.05383068509", "currency": "USD" },
+        "edited": { "amount": "5333.9592137536", "currency": "USD" }
       }
     },
     {

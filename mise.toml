@@ -350,14 +350,41 @@ description = "Run one Criterion bench in one crate"
 usage = '''
 arg "<package>" help="Cargo package (e.g. finstack-quant-portfolio)"
 arg "<bench>" help="Bench target (e.g. materialization)"
+flag "--filter <regex>" help="Run only Criterion case names matching this regular expression"
+flag "--test" help="Run Criterion correctness/smoke mode without recording timings"
+flag "--save-baseline <name>" help="Save timings under this Criterion baseline name"
+flag "--baseline <name>" help="Compare timings with an existing Criterion baseline"
 '''
 run = '''
-cargo bench -p "${usage_package?}" --bench "${usage_bench?}" -- \
-  --sample-size ${FQ_BENCH_SAMPLE_SIZE:-10} \
-  --warm-up-time ${FQ_BENCH_WARM_UP_TIME:-1} \
-  --measurement-time ${FQ_BENCH_MEASUREMENT_TIME:-1} \
-  --nresamples ${FQ_BENCH_NRESAMPLES:-1000} \
+if [ -n "${usage_save_baseline:-}" ] && [ -n "${usage_baseline:-}" ]; then
+  echo "--save-baseline and --baseline are mutually exclusive" >&2
+  exit 2
+fi
+if [ "${usage_test:-false}" = "true" ] && { [ -n "${usage_save_baseline:-}" ] || [ -n "${usage_baseline:-}" ]; }; then
+  echo "--test cannot be combined with --save-baseline or --baseline" >&2
+  exit 2
+fi
+set -- --sample-size "${FQ_BENCH_SAMPLE_SIZE:-10}" \
+  --warm-up-time "${FQ_BENCH_WARM_UP_TIME:-1}" \
+  --measurement-time "${FQ_BENCH_MEASUREMENT_TIME:-1}" \
+  --nresamples "${FQ_BENCH_NRESAMPLES:-1000}" \
   --noplot
+if [ "${usage_test:-false}" = "true" ]; then
+  set -- "$@" --test
+elif [ -n "${usage_save_baseline:-}" ]; then
+  set -- "$@" "--save-baseline=$usage_save_baseline"
+elif [ -n "${usage_baseline:-}" ]; then
+  set -- "$@" "--baseline=$usage_baseline"
+fi
+if [ -n "${usage_filter:-}" ]; then
+  # Cargo appends --bench, so a -- terminator would turn it into a positional.
+  # An empty regex group protects a leading dash without changing its matches.
+  case "$usage_filter" in
+    -*) set -- "$@" "(?:)$usage_filter" ;;
+    *) set -- "$@" "$usage_filter" ;;
+  esac
+fi
+cargo bench -p "${usage_package?}" --bench "${usage_bench?}" -- "$@"
 '''
 
 [tasks.rust-check-schemas]

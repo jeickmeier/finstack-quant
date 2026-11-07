@@ -33,7 +33,8 @@ repos:
       - id: check-merge-conflict
       - id: check-added-large-files
         args: [--maxkb=500]
-        exclude: ^(scripts|docs)/
+        # Preserve the sealed independent B0 tranche reference as historical evidence.
+        exclude: ^(scripts|docs)/|^finstack-quant/valuations/credit/tests/fixtures/valuation_b4_tranche_reference\.json$
       - id: mixed-line-ending
         args: [--fix=lf]
       - id: detect-private-key

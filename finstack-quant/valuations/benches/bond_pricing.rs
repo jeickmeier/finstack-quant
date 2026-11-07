@@ -9,6 +9,8 @@
 //!
 //! Market Standards Review (Week 5)
 
+mod support;
+
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_cashflows::builder::CouponType;
 use finstack_quant_core::currency::Currency;
@@ -27,6 +29,31 @@ use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricing
 use finstack_quant_valuations::metrics::MetricId;
 use std::hint::black_box;
 use time::Month;
+
+fn check_money(value: &Money, currency: Currency) {
+    assert_eq!(value.currency(), currency);
+    assert!(value.amount().is_finite());
+}
+
+fn check_valuation(
+    result: &finstack_quant_valuations::results::ValuationResult,
+    currency: Currency,
+    metrics: &[MetricId],
+) {
+    check_money(&result.value, currency);
+    assert!(result.measures.values().all(|value| value.is_finite()));
+    for metric in metrics {
+        let prefix = format!("{}::", metric.as_str());
+        assert!(
+            result.measures.contains_key(metric)
+                || result
+                    .measures
+                    .keys()
+                    .any(|key| key.as_str().starts_with(&prefix)),
+            "missing requested metric {metric}"
+        );
+    }
+}
 
 fn create_test_bond(maturity_years: i32) -> Bond {
     let issue = Date::from_calendar_date(2025, Month::January, 1).unwrap();
@@ -95,16 +122,22 @@ fn create_hazard_market() -> MarketContext {
 
 fn bench_bond_pv(c: &mut Criterion) {
     let mut group = c.benchmark_group("bond_pv");
-    let market = create_market();
-    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-
-    for tenor in [2, 5, 10, 30].iter() {
-        let bond = create_test_bond(*tenor);
+    for tenor in [2, 5, 10, 30] {
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}Y", tenor)),
-            tenor,
-            |b, _| {
-                b.iter(|| bond.value(black_box(&market), black_box(as_of)));
+            &tenor,
+            |b, tenor| {
+                let market = create_market();
+                let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+                let bond = create_test_bond(*tenor);
+                support::bench(
+                    b,
+                    || {
+                        bond.value(black_box(&market), black_box(as_of))
+                            .expect("bond PV")
+                    },
+                    |value| check_money(value, Currency::USD),
+                );
             },
         );
     }
@@ -113,27 +146,30 @@ fn bench_bond_pv(c: &mut Criterion) {
 
 fn bench_bond_ytm(c: &mut Criterion) {
     let mut group = c.benchmark_group("bond_ytm_solve");
-    let market = create_market();
-    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-
-    for tenor in [2, 5, 10, 30].iter() {
-        let mut bond = create_test_bond(*tenor);
-        // Set quoted price to require YTM solving
-        bond.instrument_pricing_overrides =
-            InstrumentPricingOverrides::default().with_quoted_clean_price_pct(95.0);
-
+    for tenor in [2, 5, 10, 30] {
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}Y", tenor)),
-            tenor,
-            |b, _| {
-                b.iter(|| {
-                    bond.price_with_metrics(
-                        black_box(&market),
-                        black_box(as_of),
-                        black_box(&[MetricId::Ytm]),
-                        finstack_quant_valuations::instruments::PricingOptions::default(),
-                    )
-                });
+            &tenor,
+            |b, tenor| {
+                let market = create_market();
+                let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+                let mut bond = create_test_bond(*tenor);
+                bond.instrument_pricing_overrides =
+                    InstrumentPricingOverrides::default().with_quoted_clean_price_pct(95.0);
+                let metrics = [MetricId::Ytm];
+                support::bench(
+                    b,
+                    || {
+                        bond.price_with_metrics(
+                            black_box(&market),
+                            black_box(as_of),
+                            black_box(&metrics),
+                            finstack_quant_valuations::instruments::PricingOptions::default(),
+                        )
+                        .expect("bond metrics")
+                    },
+                    |result| check_valuation(result, Currency::USD, &metrics),
+                );
             },
         );
     }
@@ -142,23 +178,28 @@ fn bench_bond_ytm(c: &mut Criterion) {
 
 fn bench_bond_duration(c: &mut Criterion) {
     let mut group = c.benchmark_group("bond_duration");
-    let market = create_market();
-    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-
-    for tenor in [2, 5, 10, 30].iter() {
-        let bond = create_test_bond(*tenor);
+    for tenor in [2, 5, 10, 30] {
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}Y", tenor)),
-            tenor,
-            |b, _| {
-                b.iter(|| {
-                    bond.price_with_metrics(
-                        black_box(&market),
-                        black_box(as_of),
-                        black_box(&[MetricId::DurationMod, MetricId::Convexity]),
-                        finstack_quant_valuations::instruments::PricingOptions::default(),
-                    )
-                });
+            &tenor,
+            |b, tenor| {
+                let market = create_market();
+                let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+                let bond = create_test_bond(*tenor);
+                let metrics = [MetricId::DurationMod, MetricId::Convexity];
+                support::bench(
+                    b,
+                    || {
+                        bond.price_with_metrics(
+                            black_box(&market),
+                            black_box(as_of),
+                            black_box(&metrics),
+                            finstack_quant_valuations::instruments::PricingOptions::default(),
+                        )
+                        .expect("bond metrics")
+                    },
+                    |result| check_valuation(result, Currency::USD, &metrics),
+                );
             },
         );
     }
@@ -167,23 +208,28 @@ fn bench_bond_duration(c: &mut Criterion) {
 
 fn bench_bond_dv01(c: &mut Criterion) {
     let mut group = c.benchmark_group("bond_dv01");
-    let market = create_market();
-    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-
-    for tenor in [2, 5, 10, 30].iter() {
-        let bond = create_test_bond(*tenor);
+    for tenor in [2, 5, 10, 30] {
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}Y", tenor)),
-            tenor,
-            |b, _| {
-                b.iter(|| {
-                    bond.price_with_metrics(
-                        black_box(&market),
-                        black_box(as_of),
-                        black_box(&[MetricId::Dv01]),
-                        finstack_quant_valuations::instruments::PricingOptions::default(),
-                    )
-                });
+            &tenor,
+            |b, tenor| {
+                let market = create_market();
+                let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+                let bond = create_test_bond(*tenor);
+                let metrics = [MetricId::Dv01];
+                support::bench(
+                    b,
+                    || {
+                        bond.price_with_metrics(
+                            black_box(&market),
+                            black_box(as_of),
+                            black_box(&metrics),
+                            finstack_quant_valuations::instruments::PricingOptions::default(),
+                        )
+                        .expect("bond metrics")
+                    },
+                    |result| check_valuation(result, Currency::USD, &metrics),
+                );
             },
         );
     }
@@ -192,25 +238,30 @@ fn bench_bond_dv01(c: &mut Criterion) {
 
 fn bench_bond_yield_dv01(c: &mut Criterion) {
     let mut group = c.benchmark_group("bond_yield_dv01");
-    let market = create_market();
-    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-
-    for tenor in [2, 5, 10, 30].iter() {
-        let mut bond = create_test_bond(*tenor);
-        bond.instrument_pricing_overrides =
-            InstrumentPricingOverrides::default().with_quoted_clean_price_pct(99.25);
+    for tenor in [2, 5, 10, 30] {
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}Y", tenor)),
-            tenor,
-            |b, _| {
-                b.iter(|| {
-                    bond.price_with_metrics(
-                        black_box(&market),
-                        black_box(as_of),
-                        black_box(&[MetricId::YieldDv01]),
-                        finstack_quant_valuations::instruments::PricingOptions::default(),
-                    )
-                });
+            &tenor,
+            |b, tenor| {
+                let market = create_market();
+                let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+                let mut bond = create_test_bond(*tenor);
+                bond.instrument_pricing_overrides =
+                    InstrumentPricingOverrides::default().with_quoted_clean_price_pct(99.25);
+                let metrics = [MetricId::YieldDv01];
+                support::bench(
+                    b,
+                    || {
+                        bond.price_with_metrics(
+                            black_box(&market),
+                            black_box(as_of),
+                            black_box(&metrics),
+                            finstack_quant_valuations::instruments::PricingOptions::default(),
+                        )
+                        .expect("bond metrics")
+                    },
+                    |result| check_valuation(result, Currency::USD, &metrics),
+                );
             },
         );
     }
@@ -285,30 +336,36 @@ fn create_floating_note(maturity_years: i32) -> Bond {
 
 fn bench_callable_bond_tree_pv(c: &mut Criterion) {
     let mut group = c.benchmark_group("bond_tree_pricing");
-    let market = create_market();
-    let market_ref = &market;
-    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-
     for tenor in [5, 10, 30] {
-        let mut bond = create_callable_bond(tenor);
-        // This benchmark measures the model rollback itself. The shared
-        // callable fixture carries a clean quote for OAS-solver benchmarks;
-        // remove it here so `Bond::value` cannot return the pinned quote.
-        bond.instrument_pricing_overrides
-            .market_quotes
-            .quoted_clean_price_pct = None;
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}Y", tenor)),
             &tenor,
-            {
-                move |b, _| {
-                    b.iter(|| {
-                        let pv = bond
-                            .value(black_box(market_ref), black_box(as_of))
-                            .unwrap_or_else(|e| panic!("tree pv failed: {e:?}"));
-                        black_box(pv)
-                    });
-                }
+            |b, tenor| {
+                let market = create_market();
+                let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+                let mut bond = create_callable_bond(*tenor);
+                // Remove the solver's quote so value executes the model rollback.
+                bond.instrument_pricing_overrides
+                    .market_quotes
+                    .quoted_clean_price_pct = None;
+                assert!(
+                    bond.call_put
+                        .as_ref()
+                        .is_some_and(CallPutSchedule::has_options)
+                );
+                assert!(bond.credit_curve_id.is_none());
+                assert_eq!(
+                    bond.instrument_pricing_overrides.model_config.hw1f_sigma,
+                    Some(0.01)
+                );
+                support::bench(
+                    b,
+                    || {
+                        bond.value(black_box(&market), black_box(as_of))
+                            .expect("callable tree PV")
+                    },
+                    |value| check_money(value, Currency::USD),
+                );
             },
         );
     }
@@ -317,32 +374,34 @@ fn bench_callable_bond_tree_pv(c: &mut Criterion) {
 
 /// OAS through the production metric (prepared tree, Brent on OAS).
 fn bench_tree_oas_solver(c: &mut Criterion) {
-    use finstack_quant_valuations::instruments::PricingOptions;
-
     let mut group = c.benchmark_group("bond_tree_oas");
-    let market = create_market();
-    let market_ref = &market;
-    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-
     for tenor in [5, 10, 30] {
-        let bond = create_callable_bond(tenor);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}Y", tenor)),
             &tenor,
-            {
-                move |b, _| {
-                    b.iter(|| {
-                        let result = bond
-                            .price_with_metrics(
-                                black_box(market_ref),
-                                black_box(as_of),
-                                &[MetricId::Oas],
-                                PricingOptions::default(),
-                            )
-                            .unwrap_or_else(|e| panic!("tree oas failed: {e:?}"));
-                        black_box(result)
-                    });
-                }
+            |b, tenor| {
+                let market = create_market();
+                let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+                let bond = create_callable_bond(*tenor);
+                assert!(
+                    bond.call_put
+                        .as_ref()
+                        .is_some_and(CallPutSchedule::has_options)
+                );
+                let metrics = [MetricId::Oas];
+                support::bench(
+                    b,
+                    || {
+                        bond.price_with_metrics(
+                            black_box(&market),
+                            black_box(as_of),
+                            &metrics,
+                            finstack_quant_valuations::instruments::PricingOptions::default(),
+                        )
+                        .expect("tree OAS")
+                    },
+                    |result| check_valuation(result, Currency::USD, &metrics),
+                );
             },
         );
     }
@@ -351,36 +410,34 @@ fn bench_tree_oas_solver(c: &mut Criterion) {
 
 /// OAS metric on a 10Y callable at an explicit 100-step Hull-White tree.
 fn bench_tree_step_scaling(c: &mut Criterion) {
-    use finstack_quant_valuations::instruments::PricingOptions;
-
     let mut group = c.benchmark_group("tree_step_scaling");
-    let market = create_market();
-    let market_ref = &market;
-    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-
-    let mut bond = create_callable_bond(10);
-    bond.instrument_pricing_overrides.model_config.tree_steps = Some(100);
-    bond.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.01);
-    bond.instrument_pricing_overrides
-        .model_config
-        .hw1f_mean_reversion = Some(0.03);
-
     let steps = 100;
     group.bench_with_input(
         BenchmarkId::from_parameter(format!("{}steps", steps)),
         &steps,
-        |b, _| {
-            b.iter(|| {
-                let result = bond
-                    .price_with_metrics(
-                        black_box(market_ref),
+        |b, steps| {
+            let market = create_market();
+            let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+            let mut bond = create_callable_bond(10);
+            bond.instrument_pricing_overrides.model_config.tree_steps = Some(*steps);
+            assert_eq!(
+                bond.instrument_pricing_overrides.model_config.tree_steps,
+                Some(100)
+            );
+            let metrics = [MetricId::Oas];
+            support::bench(
+                b,
+                || {
+                    bond.price_with_metrics(
+                        black_box(&market),
                         black_box(as_of),
-                        &[MetricId::Oas],
-                        PricingOptions::default(),
+                        &metrics,
+                        finstack_quant_valuations::instruments::PricingOptions::default(),
                     )
-                    .unwrap_or_else(|e| panic!("tree oas failed: {e:?}"));
-                black_box(result)
-            });
+                    .expect("100-step tree OAS")
+                },
+                |result| check_valuation(result, Currency::USD, &metrics),
+            );
         },
     );
     group.finish();
@@ -388,61 +445,53 @@ fn bench_tree_step_scaling(c: &mut Criterion) {
 
 fn bench_spread_metrics(c: &mut Criterion) {
     let mut group = c.benchmark_group("bond_spread_metrics");
-    let market = create_market();
-    let market_ref = &market;
-    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-
-    let base_fixed = {
-        let mut bond = create_test_bond(10);
-        bond.instrument_pricing_overrides =
-            InstrumentPricingOverrides::default().with_quoted_clean_price_pct(99.25);
-        bond
-    };
-
-    let spread_cases = [
-        ("z_spread_10Y", [MetricId::ZSpread]),
-        ("i_spread_10Y", [MetricId::ISpread]),
-        ("asw_par_10Y", [MetricId::ASWPar]),
-        ("asw_market_10Y", [MetricId::ASWMarket]),
-    ];
-
-    for (label, metrics) in spread_cases {
-        let bond = base_fixed.clone();
-        group.bench_function(label, {
-            move |b| {
-                let metrics_slice: &[MetricId] = &metrics;
-                b.iter(|| {
-                    black_box(
-                        bond.price_with_metrics(
-                            black_box(market_ref),
-                            black_box(as_of),
-                            black_box(metrics_slice),
-                            finstack_quant_valuations::instruments::PricingOptions::default(),
-                        )
-                        .expect(label),
+    for (label, metric) in [
+        ("z_spread_10Y", MetricId::ZSpread),
+        ("i_spread_10Y", MetricId::ISpread),
+        ("asw_par_10Y", MetricId::ASWPar),
+        ("asw_market_10Y", MetricId::ASWMarket),
+    ] {
+        group.bench_function(label, |b| {
+            let market = create_market();
+            let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+            let mut bond = create_test_bond(10);
+            bond.instrument_pricing_overrides =
+                InstrumentPricingOverrides::default().with_quoted_clean_price_pct(99.25);
+            let metrics = [metric.clone()];
+            support::bench(
+                b,
+                || {
+                    bond.price_with_metrics(
+                        black_box(&market),
+                        black_box(as_of),
+                        black_box(&metrics),
+                        finstack_quant_valuations::instruments::PricingOptions::default(),
                     )
-                });
-            }
+                    .expect(label)
+                },
+                |result| check_valuation(result, Currency::USD, &metrics),
+            );
         });
     }
-
-    let frn = create_floating_note(5);
-    let dm_metrics = [MetricId::DiscountMargin];
-    group.bench_function("discount_margin_5Y", move |b| {
-        let metrics_slice: &[MetricId] = &dm_metrics;
-        b.iter(|| {
-            black_box(
+    group.bench_function("discount_margin_5Y", |b| {
+        let market = create_market();
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+        let frn = create_floating_note(5);
+        let metrics = [MetricId::DiscountMargin];
+        support::bench(
+            b,
+            || {
                 frn.price_with_metrics(
-                    black_box(market_ref),
+                    black_box(&market),
                     black_box(as_of),
-                    black_box(metrics_slice),
+                    black_box(&metrics),
                     finstack_quant_valuations::instruments::PricingOptions::default(),
                 )
-                .expect("discount margin"),
-            )
-        });
+                .expect("discount margin")
+            },
+            |result| check_valuation(result, Currency::USD, &metrics),
+        );
     });
-
     group.finish();
 }
 
@@ -503,24 +552,39 @@ fn create_stochastic_hazard_callable(
 /// bounded; the path count is included in every benchmark name.
 fn bench_stochastic_hazard_callable_lsmc(c: &mut Criterion) {
     let mut group = c.benchmark_group("bond_stochastic_hazard_lsmc");
-    let market = create_hazard_market();
-    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let paths = BOND_LSMC_BENCH_PATHS;
-
     for tenor in [5, 10] {
         for (case, floating_pik) in [
             ("fixed_daily_call", false),
             ("floating_pik_daily_call", true),
         ] {
-            let bond = create_stochastic_hazard_callable(tenor, floating_pik, paths);
             let id = format!("{case}_{tenor}Y_{paths}paths");
             group.bench_function(id, |b| {
-                b.iter(|| {
-                    let value = bond
-                        .value(black_box(&market), black_box(as_of))
-                        .unwrap_or_else(|error| panic!("stochastic hazard bond failed: {error:?}"));
-                    black_box(value)
-                });
+                let market = create_hazard_market();
+                let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+                let bond = create_stochastic_hazard_callable(tenor, floating_pik, paths);
+                assert!(bond.credit_curve_id.is_some());
+                assert!(
+                    bond.call_put
+                        .as_ref()
+                        .is_some_and(CallPutSchedule::has_options)
+                );
+                assert_eq!(
+                    bond.instrument_pricing_overrides.model_config.mc_paths,
+                    Some(paths)
+                );
+                assert_eq!(
+                    bond.instrument_pricing_overrides.model_config.hazard_sigma,
+                    Some(0.02)
+                );
+                support::bench(
+                    b,
+                    || {
+                        bond.value(black_box(&market), black_box(as_of))
+                            .expect("stochastic hazard bond")
+                    },
+                    |value| check_money(value, Currency::USD),
+                );
             });
         }
     }
@@ -548,61 +612,61 @@ fn create_call_window_bond() -> Bond {
 }
 
 fn bench_call_window(c: &mut Criterion) {
-    use finstack_quant_valuations::instruments::PricingOptions;
-
     let mut group = c.benchmark_group("bond_call_window");
-    let market = create_market();
-    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-    let quoted = create_call_window_bond();
-    let mut unquoted = quoted.clone();
-    unquoted
-        .instrument_pricing_overrides
-        .market_quotes
-        .quoted_clean_price_pct = None;
-
     group.bench_function("tree_pv_5y_window", |b| {
-        b.iter(|| {
-            let pv = unquoted
-                .value(black_box(&market), black_box(as_of))
-                .unwrap_or_else(|e| panic!("call-window tree pv failed: {e:?}"));
-            black_box(pv)
-        });
+        let market = create_market();
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+        let mut unquoted = create_call_window_bond();
+        unquoted
+            .instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price_pct = None;
+        support::bench(
+            b,
+            || {
+                unquoted
+                    .value(black_box(&market), black_box(as_of))
+                    .expect("call-window tree PV")
+            },
+            |value| check_money(value, Currency::USD),
+        );
     });
-    group.bench_function("workout_metrics_5y_window", |b| {
-        b.iter(|| {
-            let result = quoted
-                .price_with_metrics(
-                    black_box(&market),
-                    black_box(as_of),
-                    &[
-                        MetricId::Ytw,
-                        MetricId::ISpread,
-                        MetricId::ZSpread,
-                        MetricId::DurationMac,
-                        MetricId::DurationMod,
-                        MetricId::Convexity,
-                        MetricId::YieldDv01,
-                        MetricId::ASWMarket,
-                    ],
-                    PricingOptions::default(),
-                )
-                .unwrap_or_else(|e| panic!("call-window workout metrics failed: {e:?}"));
-            black_box(result)
+    for (label, metrics) in [
+        (
+            "workout_metrics_5y_window",
+            vec![
+                MetricId::Ytw,
+                MetricId::ISpread,
+                MetricId::ZSpread,
+                MetricId::DurationMac,
+                MetricId::DurationMod,
+                MetricId::Convexity,
+                MetricId::YieldDv01,
+                MetricId::ASWMarket,
+            ],
+        ),
+        ("oas_metric_5y_window", vec![MetricId::Oas]),
+    ] {
+        group.bench_function(label, |b| {
+            let market = create_market();
+            let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+            let quoted = create_call_window_bond();
+            support::bench(
+                b,
+                || {
+                    quoted
+                        .price_with_metrics(
+                            black_box(&market),
+                            black_box(as_of),
+                            &metrics,
+                            finstack_quant_valuations::instruments::PricingOptions::default(),
+                        )
+                        .expect(label)
+                },
+                |result| check_valuation(result, Currency::USD, &metrics),
+            );
         });
-    });
-    group.bench_function("oas_metric_5y_window", |b| {
-        b.iter(|| {
-            let result = quoted
-                .price_with_metrics(
-                    black_box(&market),
-                    black_box(as_of),
-                    &[MetricId::Oas],
-                    PricingOptions::default(),
-                )
-                .unwrap_or_else(|e| panic!("call-window OAS metric failed: {e:?}"));
-            black_box(result)
-        });
-    });
+    }
     group.finish();
 }
 

@@ -1,7 +1,7 @@
 //! Portfolio valuation benchmarks.
 //!
 //! Measures performance of portfolio operations for large institutional portfolios:
-//! - Full portfolio valuation (all instrument types)
+//! - Mixed-instrument portfolio valuation
 //! - Scaling with portfolio size
 //! - Multi-currency aggregation
 //! - Entity-level aggregation
@@ -9,12 +9,15 @@
 //!
 //! Simulates realistic institutional portfolios with:
 //! - Multiple entities (funds, accounts)
-//! - All major instrument types
+//! - The instrument mix documented in `bench_common.rs`
 //! - Cross-currency positions
 //! - Various position sizes
 
 #[path = "bench_common.rs"]
 mod bench_common;
+
+#[path = "support/validity.rs"]
+mod validity;
 
 use bench_common::{base_date, create_institutional_portfolio, create_market_context, maturity_2y};
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
@@ -33,19 +36,13 @@ use finstack_quant_portfolio::valuation::{
 use finstack_quant_portfolio::{Portfolio, dependencies::MarketFactorKey};
 use finstack_quant_valuations::instruments::RatesCurveKind;
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
+use finstack_quant_valuations::metrics::MetricId;
 use rust_decimal_macros::dec;
 use std::hint::black_box;
 use std::sync::Arc;
 
 fn xl_benchmarks_enabled() -> bool {
     std::env::var("FINSTACK_PORTFOLIO_BENCH_XL").is_ok_and(|value| value == "1")
-}
-
-fn best_effort_standard_metrics() -> PortfolioValuationOptions {
-    PortfolioValuationOptions {
-        strict_risk: false,
-        metrics: RequestedMetrics::Standard,
-    }
 }
 
 /// Uniform-cost fixture used to isolate selective invalidation and scheduling.
@@ -124,29 +121,29 @@ fn create_selective_benchmark_market() -> MarketContext {
 
 fn bench_portfolio_valuation(c: &mut Criterion) {
     let mut group = c.benchmark_group("portfolio_valuation");
-    let market = create_market_context();
-    let config = FinstackConfig::default();
-    let options = best_effort_standard_metrics();
-
-    {
-        let num_positions = &250;
-        let portfolio = create_institutional_portfolio(*num_positions);
-        group.bench_with_input(
-            BenchmarkId::from_parameter(format!("{}pos", num_positions)),
-            num_positions,
-            |b, _| {
-                b.iter(|| {
+    group.bench_with_input(
+        BenchmarkId::from_parameter("250pos"),
+        &250usize,
+        |b, &count| {
+            let market = create_market_context();
+            let config = FinstackConfig::default();
+            let options = PortfolioValuationOptions::default();
+            let portfolio = create_institutional_portfolio(count);
+            validity::bench(
+                b,
+                || {
                     value_portfolio(
                         black_box(&portfolio),
                         black_box(&market),
                         black_box(&config),
-                        black_box(&options),
+                        &options,
                     )
-                    .expect("portfolio valuation benchmark")
-                });
-            },
-        );
-    }
+                    .expect("complete standard-risk portfolio valuation")
+                },
+                |result| validity::valuation(&portfolio, result, &[MetricId::Dv01]),
+            );
+        },
+    );
     group.finish();
 }
 
@@ -154,33 +151,40 @@ fn bench_portfolio_valuation(c: &mut Criterion) {
 
 fn bench_entity_aggregation(c: &mut Criterion) {
     let mut group = c.benchmark_group("portfolio_entity_aggregation");
-    let market = create_market_context();
-    let config = FinstackConfig::default();
-    let options = best_effort_standard_metrics();
-
-    {
-        let num_positions = &250;
-        let portfolio = create_institutional_portfolio(*num_positions);
-        group.bench_with_input(
-            BenchmarkId::from_parameter(format!("{}pos", num_positions)),
-            num_positions,
-            |b, _| {
-                b.iter(|| {
+    group.bench_with_input(
+        BenchmarkId::from_parameter("250pos"),
+        &250usize,
+        |b, &count| {
+            let market = create_market_context();
+            let config = FinstackConfig::default();
+            let options = PortfolioValuationOptions::default();
+            let portfolio = create_institutional_portfolio(count);
+            validity::bench(
+                b,
+                || {
                     let valuation = value_portfolio(
                         black_box(&portfolio),
                         black_box(&market),
                         black_box(&config),
-                        black_box(&options),
+                        &options,
                     )
-                    .unwrap();
-                    // Access entity aggregates
+                    .expect("complete standard-risk entity valuation");
                     for i in 1..=5 {
-                        let _ = valuation.get_entity_value(&format!("FUND_{}", i));
+                        black_box(
+                            valuation
+                                .get_entity_value(&format!("FUND_{i}"))
+                                .expect("benchmark entity aggregate"),
+                        );
                     }
-                });
-            },
-        );
-    }
+                    valuation
+                },
+                |result| {
+                    validity::valuation(&portfolio, result, &[MetricId::Dv01]);
+                    assert_eq!(result.by_entity.len(), 5);
+                },
+            );
+        },
+    );
     group.finish();
 }
 
@@ -188,21 +192,32 @@ fn bench_entity_aggregation(c: &mut Criterion) {
 
 fn bench_multicurrency_aggregation(c: &mut Criterion) {
     let mut group = c.benchmark_group("portfolio_multicurrency");
-    let market = create_market_context();
-    let config = FinstackConfig::default();
-    let portfolio = create_institutional_portfolio(100);
-    let options = best_effort_standard_metrics();
-
     group.bench_function("100pos_multicurrency", |b| {
-        b.iter(|| {
-            value_portfolio(
-                black_box(&portfolio),
-                black_box(&market),
-                black_box(&config),
-                black_box(&options),
-            )
-            .expect("multicurrency portfolio benchmark")
-        });
+        let market = create_market_context();
+        let config = FinstackConfig::default();
+        let options = PortfolioValuationOptions::default();
+        let portfolio = create_institutional_portfolio(100);
+        validity::bench(
+            b,
+            || {
+                value_portfolio(
+                    black_box(&portfolio),
+                    black_box(&market),
+                    black_box(&config),
+                    &options,
+                )
+                .expect("complete multicurrency standard-risk valuation")
+            },
+            |result| {
+                validity::valuation(&portfolio, result, &[MetricId::Dv01]);
+                assert!(
+                    result
+                        .position_values
+                        .values()
+                        .any(|value| value.fx_rate.is_some())
+                );
+            },
+        );
     });
     group.finish();
 }
@@ -211,27 +226,34 @@ fn bench_multicurrency_aggregation(c: &mut Criterion) {
 
 fn bench_position_filtering(c: &mut Criterion) {
     let mut group = c.benchmark_group("portfolio_filtering");
-    let portfolio = create_institutional_portfolio(250);
-
     group.bench_function("filter_by_entity", |b| {
-        b.iter(|| {
-            let target = black_box("FUND_1");
-            let matched: Vec<_> = portfolio
-                .positions()
-                .iter()
-                .filter(|position| position.entity_id.as_str() == target)
-                .collect();
-            black_box(matched);
-        });
+        let portfolio = create_institutional_portfolio(250);
+        let expected = portfolio
+            .positions()
+            .iter()
+            .filter(|position| position.entity_id.as_str() == "FUND_1")
+            .count();
+        assert!(expected > 0);
+        validity::bench(
+            b,
+            || {
+                portfolio
+                    .positions()
+                    .iter()
+                    .filter(|position| position.entity_id.as_str() == black_box("FUND_1"))
+                    .collect::<Vec<_>>()
+            },
+            |matched| assert_eq!(matched.len(), expected),
+        );
     });
-
-    group.bench_function("iterate_all_positions", |b| {
-        b.iter(|| {
-            let count = portfolio.positions().len();
-            black_box(count);
-        });
+    group.bench_function("position_count", |b| {
+        let portfolio = create_institutional_portfolio(250);
+        validity::bench(
+            b,
+            || black_box(&portfolio).positions().len(),
+            |count| assert_eq!(*count, 250),
+        );
     });
-
     group.finish();
 }
 
@@ -239,33 +261,35 @@ fn bench_position_filtering(c: &mut Criterion) {
 
 fn bench_portfolio_scaling(c: &mut Criterion) {
     let mut group = c.benchmark_group("portfolio_pv_scaling");
-    group.sample_size(10);
-    let market = create_market_context();
-    let config = FinstackConfig::default();
-    let options = PortfolioValuationOptions {
-        strict_risk: false,
-        metrics: RequestedMetrics::Only(Vec::new()),
-    };
-
     let mut position_counts = vec![63usize, 64, 250, 3_000];
     if xl_benchmarks_enabled() {
         position_counts.push(25_000);
     }
     for num_positions in position_counts {
-        let portfolio = create_institutional_portfolio(num_positions);
         group.bench_with_input(
-            BenchmarkId::from_parameter(format!("{}pos", num_positions)),
+            BenchmarkId::from_parameter(format!("{num_positions}pos")),
             &num_positions,
-            |b, _| {
-                b.iter(|| {
-                    value_portfolio(
-                        black_box(&portfolio),
-                        black_box(&market),
-                        black_box(&config),
-                        black_box(&options),
-                    )
-                    .expect("portfolio scaling benchmark")
-                });
+            |b, &count| {
+                let market = create_market_context();
+                let config = FinstackConfig::default();
+                let options = PortfolioValuationOptions {
+                    strict_risk: true,
+                    metrics: RequestedMetrics::Only(Vec::new()),
+                };
+                let portfolio = create_institutional_portfolio(count);
+                validity::bench(
+                    b,
+                    || {
+                        value_portfolio(
+                            black_box(&portfolio),
+                            black_box(&market),
+                            black_box(&config),
+                            &options,
+                        )
+                        .expect("successful canonical portfolio PV")
+                    },
+                    |result| validity::valuation(&portfolio, result, &[]),
+                );
             },
         );
     }
@@ -274,16 +298,6 @@ fn bench_portfolio_scaling(c: &mut Criterion) {
 
 fn bench_selective_repricing_shapes(c: &mut Criterion) {
     let mut group = c.benchmark_group("portfolio_selective_repricing_3000");
-    group.sample_size(30);
-    let market = create_selective_benchmark_market();
-    let portfolio = create_selective_benchmark_portfolio(3_000);
-    let config = FinstackConfig::default();
-    let options = PortfolioValuationOptions {
-        strict_risk: true,
-        metrics: RequestedMetrics::Only(Vec::new()),
-    };
-    let prior =
-        value_portfolio(&portfolio, &market, &config, &options).expect("selective benchmark prior");
     let cases = [
         (
             "dirty_03pct",
@@ -321,34 +335,58 @@ fn bench_selective_repricing_shapes(c: &mut Criterion) {
             vec![MarketFactorKey::fx(Currency::EUR, Currency::USD)],
         ),
     ];
-
-    group.bench_function("full_control", |bencher| {
-        bencher.iter(|| {
-            value_portfolio(
-                black_box(&portfolio),
-                black_box(&market),
-                black_box(&config),
-                black_box(&options),
-            )
-            .expect("full selective control")
-        });
+    group.bench_function("full_control", |b| {
+        let market = create_selective_benchmark_market();
+        let portfolio = create_selective_benchmark_portfolio(3_000);
+        let config = FinstackConfig::default();
+        let options = PortfolioValuationOptions {
+            strict_risk: true,
+            metrics: RequestedMetrics::Only(Vec::new()),
+        };
+        validity::bench(
+            b,
+            || {
+                value_portfolio(
+                    black_box(&portfolio),
+                    black_box(&market),
+                    black_box(&config),
+                    &options,
+                )
+                .expect("full selective control")
+            },
+            |result| validity::valuation(&portfolio, result, &[]),
+        );
     });
     for (label, changed) in &cases {
         group.bench_with_input(
             BenchmarkId::from_parameter(*label),
             changed,
-            |bencher, changed| {
-                bencher.iter(|| {
-                    revalue_affected(
-                        black_box(&portfolio),
-                        black_box(&market),
-                        black_box(&config),
-                        black_box(&options),
-                        black_box(&prior),
-                        black_box(changed),
-                    )
-                    .expect("selective shape benchmark")
-                });
+            |b, changed| {
+                let market = create_selective_benchmark_market();
+                let portfolio = create_selective_benchmark_portfolio(3_000);
+                let config = FinstackConfig::default();
+                let options = PortfolioValuationOptions {
+                    strict_risk: true,
+                    metrics: RequestedMetrics::Only(Vec::new()),
+                };
+                let prior = value_portfolio(&portfolio, &market, &config, &options)
+                    .expect("selective prior");
+                validity::valuation(&portfolio, &prior, &[]);
+                validity::bench(
+                    b,
+                    || {
+                        revalue_affected(
+                            black_box(&portfolio),
+                            black_box(&market),
+                            black_box(&config),
+                            &options,
+                            black_box(&prior),
+                            black_box(changed),
+                        )
+                        .expect("selective shape valuation")
+                    },
+                    |result| validity::valuation(&portfolio, result, &[]),
+                );
             },
         );
     }
@@ -357,57 +395,51 @@ fn bench_selective_repricing_shapes(c: &mut Criterion) {
 
 // Selective Repricing Benchmarks
 
-/// Bench `revalue_affected` under three "changed factor" scenarios that exercise
-/// different affected-position fractions:
-///
-/// - `broad_curve`  — USD-OIS discount curve changed → reprices nearly all instruments
-/// - `equity_spot`  — AAPL spot changed → reprices only equity / equity-option positions
-/// - `hazard_curve` — CORP-HAZARD changed → reprices CDS / CDS-option positions
+/// Measure broad rate, equity-spot and hazard-curve invalidation on the mixed book.
 fn bench_revalue_affected(c: &mut Criterion) {
     let mut group = c.benchmark_group("portfolio_revalue_affected");
-    let market = create_market_context();
-    let config = FinstackConfig::default();
-    let options = best_effort_standard_metrics();
-
-    let broad_curve = vec![MarketFactorKey::curve(
-        "USD-OIS".into(),
-        RatesCurveKind::Discount,
-    )];
-    let equity_spot = vec![MarketFactorKey::spot("AAPL")];
-    let hazard_curve = vec![MarketFactorKey::curve(
-        "CORP-HAZARD".into(),
-        RatesCurveKind::Credit,
-    )];
-
-    let scenarios: &[(&str, &[MarketFactorKey])] = &[
-        ("broad_curve", &broad_curve),
-        ("equity_spot", &equity_spot),
-        ("hazard_curve", &hazard_curve),
+    let scenarios = [
+        (
+            "broad_curve",
+            vec![MarketFactorKey::curve(
+                "USD-OIS".into(),
+                RatesCurveKind::Discount,
+            )],
+        ),
+        ("equity_spot", vec![MarketFactorKey::spot("AAPL")]),
+        (
+            "hazard_curve",
+            vec![MarketFactorKey::curve(
+                "CORP-HAZARD".into(),
+                RatesCurveKind::Credit,
+            )],
+        ),
     ];
-
-    for num_positions in [250usize] {
-        let portfolio = create_institutional_portfolio(num_positions);
-        let prior = value_portfolio(&portfolio, &market, &config, &options).unwrap();
-
-        for (label, changed) in scenarios {
-            group.bench_with_input(
-                BenchmarkId::new(format!("{}pos", num_positions), label),
-                changed,
-                |b, changed| {
-                    b.iter(|| {
-                        revalue_affected(
-                            black_box(&portfolio),
-                            black_box(&market),
-                            black_box(&config),
-                            black_box(&options),
-                            black_box(&prior),
-                            black_box(changed),
-                        )
-                        .unwrap()
-                    });
+    for (label, changed) in &scenarios {
+        group.bench_with_input(BenchmarkId::new("250pos", label), changed, |b, changed| {
+            let market = create_market_context();
+            let config = FinstackConfig::default();
+            let options = PortfolioValuationOptions::default();
+            let portfolio = create_institutional_portfolio(250);
+            let prior = value_portfolio(&portfolio, &market, &config, &options)
+                .expect("complete standard-risk prior");
+            validity::valuation(&portfolio, &prior, &[MetricId::Dv01]);
+            validity::bench(
+                b,
+                || {
+                    revalue_affected(
+                        black_box(&portfolio),
+                        black_box(&market),
+                        black_box(&config),
+                        &options,
+                        black_box(&prior),
+                        black_box(changed),
+                    )
+                    .expect("complete standard-risk selective valuation")
                 },
+                |result| validity::valuation(&portfolio, result, &[MetricId::Dv01]),
             );
-        }
+        });
     }
     group.finish();
 }

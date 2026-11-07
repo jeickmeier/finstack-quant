@@ -11,7 +11,7 @@ use super::super::traits::Payoff;
 use crate::monte_carlo::discretization::exact::ExactGbm;
 use crate::monte_carlo::estimate::Estimate;
 use crate::monte_carlo::greeks::lrm::{LrmGreeks, lrm_delta, lrm_vega_from_scores};
-use crate::monte_carlo::payoff::asian::{Asian, AveragingMethod, default_fixing_steps};
+use crate::monte_carlo::payoff::asian::{Asian, AsianPair, AveragingMethod, default_fixing_steps};
 use crate::monte_carlo::process::gbm::GbmProcess;
 use crate::monte_carlo::rng::philox::PhiloxRng;
 use crate::monte_carlo::traits::ProcessMetadata;
@@ -21,7 +21,7 @@ use finstack_quant_core::cashflow::flat_discount_factor;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::random::BrownianBridge;
 use finstack_quant_core::math::random::{MAX_SOBOL_DIMENSION, SobolRng};
-use finstack_quant_core::math::stats::OnlineStats;
+use finstack_quant_core::math::stats::{OnlineCovariance, OnlineStats};
 use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::{Error, Result};
 
@@ -404,13 +404,6 @@ impl PathDependentPricer {
         McEngine::validate_scheme_pairing(process, &disc)?;
         engine.validate_payoff_schedule(payoff)?;
 
-        let num_factors = process.num_factors();
-        let num_steps = time_grid.num_steps();
-        let bridge = self
-            .config
-            .use_brownian_bridge
-            .then(|| BrownianBridge::new(num_steps));
-
         let (disc, correlation) = engine.prepare_run(process, &disc)?;
         let inputs = PathInputs {
             process,
@@ -421,9 +414,6 @@ impl PathDependentPricer {
             discount_factor,
         };
         let mut scratch = PathScratch::new(inputs, payoff, false);
-        let mut z_path = vec![0.0; sobol_dimension];
-        let mut z_increments = vec![0.0; num_steps * num_factors];
-        let mut w_path = vec![0.0; num_steps + 1];
         let mut captured_paths = if capture_enabled {
             let estimated_capacity = match self.config.path_capture.capture_mode {
                 crate::monte_carlo::engine::PathCaptureMode::All => self.config.num_paths,
@@ -435,61 +425,20 @@ impl PathDependentPricer {
         };
 
         // Randomized QMC: split the run into R independently scrambled
-        // replicates. The reported mean and standard error come from the R
-        // replicate means — the only statistically valid error estimate for
+        // replicates. The standard error comes from the R replicate means
+        // — the statistically valid error estimate for
         // QMC (points within one scrambled sequence are dependent by
         // construction, so a plain sample stderr over them is meaningless).
-        let replicates = SOBOL_QMC_REPLICATES.min(self.config.num_paths);
-        let base_paths = self.config.num_paths / replicates;
-        let remainder = self.config.num_paths % replicates;
-
         let mut replicate_means = OnlineStats::new();
         let mut overall = OnlineStats::new();
-        let mut path_id = 0usize;
-
-        for replicate in 0..replicates {
-            // Independent Owen scrambling per replicate: distinct seeds via a
-            // golden-ratio (Weyl) increment, floored at 1 because a zero
-            // scramble seed disables scrambling entirely (and the unscrambled
-            // sequence starts at the degenerate all-zeros point — every
-            // normal on the first path would map to the extreme grid-edge
-            // deviate ≈ −6.2σ).
-            let scramble_seed = (self.config.seed ^ SOBOL_SCRAMBLE_DOMAIN_SALT)
-                .wrapping_add((replicate as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15))
-                .max(1);
-            let mut sobol = SobolRng::try_new(sobol_dimension, scramble_seed)
-                .map_err(|err| Error::Validation(err.to_string()))?;
-            let replicate_paths = base_paths + usize::from(replicate < remainder);
-            let mut replicate_stats = OnlineStats::new();
-
-            for _ in 0..replicate_paths {
-                sobol.fill_std_normals(&mut z_path);
-                fill_sobol_increments(
-                    &z_path,
-                    &mut z_increments,
-                    &mut w_path,
-                    bridge.as_ref(),
-                    &time_grid,
-                    num_factors,
-                )?;
-
-                // Auxiliary uniforms are drawn from a per-path Philox so the
-                // Sobol stream only carries asset-dimension normals. Derive
-                // the per-path generator in COUNTER space (`with_stream`)
-                // under a fixed domain-separation salt: deriving in key space
-                // (`seed ^ f(path)`) would collide with the base stream of
-                // any component using the same seed and gives no
-                // counter-block disjointness guarantee.
-                let mut adapter = SobolPathStream::new(
-                    &z_increments,
-                    PhiloxRng::with_stream(
-                        self.config.seed ^ SOBOL_AUX_DOMAIN_SALT,
-                        path_id as u64,
-                    ),
-                );
-
+        let mut replicate_stats = OnlineStats::new();
+        self.for_each_sobol_path(
+            &time_grid,
+            process.num_factors(),
+            sobol_dimension,
+            |path_id, last_in_replicate, adapter| {
                 let discounted_value = engine.simulate_discounted(
-                    &mut adapter,
+                    adapter,
                     inputs,
                     &mut scratch,
                     path_id,
@@ -497,13 +446,13 @@ impl PathDependentPricer {
                 )?;
                 replicate_stats.update(discounted_value);
                 overall.update(discounted_value);
-                path_id += 1;
-            }
-
-            if replicate_stats.count() > 0 {
-                replicate_means.update(replicate_stats.mean());
-            }
-        }
+                if last_in_replicate {
+                    replicate_means.update(replicate_stats.mean());
+                    replicate_stats = OnlineStats::new();
+                }
+                Ok(())
+            },
+        )?;
 
         // Unbiased point estimate across all simulated paths (`overall.mean()`),
         // with RQMC standard error across the R independently scrambled replicate
@@ -532,6 +481,183 @@ impl PathDependentPricer {
             run.seed = Some(self.config.seed);
         }
         Ok(result)
+    }
+
+    // Own the Sobol sequence and all stream-domain decisions in one driver.
+    // Both scalar estimates and paired Asian moments consume the same paths;
+    // their different statistics do not alter point or replicate ordering.
+    fn for_each_sobol_path<F>(
+        &self,
+        time_grid: &TimeGrid,
+        num_factors: usize,
+        sobol_dimension: usize,
+        mut visit: F,
+    ) -> Result<()>
+    where
+        F: for<'a> FnMut(usize, bool, &mut SobolPathStream<'a>) -> Result<()>,
+    {
+        let num_steps = time_grid.num_steps();
+        let bridge = self
+            .config
+            .use_brownian_bridge
+            .then(|| BrownianBridge::new(num_steps));
+        let mut z_path = vec![0.0; sobol_dimension];
+        let mut z_increments = vec![0.0; num_steps * num_factors];
+        let mut w_path = vec![0.0; num_steps + 1];
+        let replicates = SOBOL_QMC_REPLICATES.min(self.config.num_paths);
+        let base_paths = self.config.num_paths / replicates;
+        let remainder = self.config.num_paths % replicates;
+        let mut path_id = 0usize;
+        for replicate in 0..replicates {
+            // A zero scramble seed disables Owen scrambling. The Weyl
+            // increment assigns a distinct, nonzero seed to each replicate.
+            let scramble_seed = (self.config.seed ^ SOBOL_SCRAMBLE_DOMAIN_SALT)
+                .wrapping_add((replicate as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15))
+                .max(1);
+            let mut sobol = SobolRng::try_new(sobol_dimension, scramble_seed)
+                .map_err(|err| Error::Validation(err.to_string()))?;
+            let replicate_paths = base_paths + usize::from(replicate < remainder);
+            for point in 0..replicate_paths {
+                sobol.fill_std_normals(&mut z_path);
+                fill_sobol_increments(
+                    &z_path,
+                    &mut z_increments,
+                    &mut w_path,
+                    bridge.as_ref(),
+                    time_grid,
+                    num_factors,
+                )?;
+                // Auxiliary uniforms use disjoint per-path Philox counter
+                // streams; Sobol carries only the asset normals.
+                let mut adapter = SobolPathStream::new(
+                    &z_increments,
+                    PhiloxRng::with_stream(
+                        self.config.seed ^ SOBOL_AUX_DOMAIN_SALT,
+                        path_id as u64,
+                    ),
+                );
+                visit(path_id, point + 1 == replicate_paths, &mut adapter)?;
+                path_id += 1;
+            }
+        }
+        Ok(())
+    }
+
+    /// Collect discounted arithmetic and geometric Asian payoff moments on
+    /// the same simulated paths, without retaining trajectories or payoffs.
+    ///
+    /// The geometric control uses the arithmetic payoff's strike, quantity,
+    /// fixing indices, fixing multipliers and historical fixing state. For
+    /// pseudo-random paths, fixed path-ID chunks are merged in the same order
+    /// in serial and parallel runs. For Sobol, moments are folded in point
+    /// order and are suitable for fitting a control coefficient and mean;
+    /// their point-level variances are **not** an IID uncertainty estimate.
+    ///
+    /// # Arguments
+    ///
+    /// * `process` - GBM dynamics, including any cumulative carry schedule.
+    /// * `initial_spot` - Finite initial asset price in payoff price units. For
+    ///   geometric averaging, callers should supply a positive price; the
+    ///   underlying GBM initial-state rules are unchanged.
+    /// * `time_grid` - Owned simulation times in years from zero, containing
+    ///   every contractual fixing index used by `payoff`.
+    /// * `payoff` - Arithmetic Asian payoff. Its existing historical state and
+    ///   fixing multipliers are preserved for both accumulators.
+    /// * `currency` - Currency in which both discounted payoffs are evaluated.
+    /// * `discount_factor` - Finite, non-negative present-value factor from payoff
+    ///   payment to valuation, applied once to each payoff after simulation.
+    ///
+    /// # Returns
+    ///
+    /// Paired moments with arithmetic payoff as X and geometric payoff as Y,
+    /// both discounted and scaled by the payoff quantity. The count is the
+    /// configured number of independent pseudo-random paths or dependent
+    /// Sobol points. No sampling uncertainty is inferred from these moments.
+    ///
+    /// # Errors
+    ///
+    /// Returns validation errors for non-arithmetic payoffs, antithetic or
+    /// capture requests, invalid configuration, incompatible Sobol settings,
+    /// invalid market inputs or fixing indices. Payoff and simulation errors
+    /// propagate, including nonfinite target or control values.
+    pub fn price_asian_pair(
+        &self,
+        process: &GbmProcess,
+        initial_spot: f64,
+        time_grid: TimeGrid,
+        payoff: &Asian,
+        currency: Currency,
+        discount_factor: f64,
+    ) -> Result<OnlineCovariance> {
+        self.config.validate()?;
+        if self.config.antithetic {
+            return Err(Error::Validation(
+                "Arithmetic Asian paired moments do not support antithetic sampling".into(),
+            ));
+        }
+        if self.config.path_capture.enabled {
+            return Err(Error::Validation(
+                "Asian paired moments do not return captured paths".into(),
+            ));
+        }
+        let pair = AsianPair::new(payoff)?;
+        let disc = ExactGbm::new();
+        let initial_state = [initial_spot];
+        let engine = McEngine::new(self.config.engine_config(time_grid.clone()));
+        if !self.config.use_sobol {
+            let rng = PhiloxRng::new(self.config.seed);
+            return engine.paired_moments(
+                McPricingInputs {
+                    rng: &rng,
+                    process,
+                    disc: &disc,
+                    initial_state: &initial_state,
+                    payoff: &pair,
+                    currency,
+                    discount_factor,
+                },
+                AsianPair::control_value,
+            );
+        }
+
+        let sobol_dimension =
+            self.validate_sobol_configuration(&time_grid, process.num_factors())?;
+        engine.validate_runtime(
+            process,
+            &initial_state,
+            discount_factor,
+            Some(&process.metadata()),
+        )?;
+        McEngine::validate_scheme_pairing(process, &disc)?;
+        engine.validate_payoff_schedule(&pair)?;
+        let (disc, correlation) = engine.prepare_run(process, &disc)?;
+        let inputs = PathInputs {
+            process,
+            disc: &disc,
+            initial_state: &initial_state,
+            correlation: correlation.as_ref(),
+            currency,
+            discount_factor,
+        };
+        let mut scratch = PathScratch::new(inputs, &pair, false);
+        let mut moments = OnlineCovariance::new();
+        self.for_each_sobol_path(
+            &time_grid,
+            process.num_factors(),
+            sobol_dimension,
+            |path_id, _, adapter| {
+                let (arithmetic, geometric) = engine.simulate_discounted_pair(
+                    adapter,
+                    inputs,
+                    &mut scratch,
+                    path_id,
+                    &AsianPair::control_value,
+                )?;
+                moments.update(arithmetic, geometric);
+                Ok(())
+            },
+        )?;
+        Ok(moments)
     }
 
     /// Price a path-dependent option on a simulation grid.
@@ -2184,5 +2310,515 @@ mod tests {
             actual.as_slice() == EXPECTED || actual.as_slice() == LINUX,
             "GBM Asian prices moved off the macOS and Linux libm pins:\n{actual:#x?}"
         );
+    }
+}
+
+#[cfg(test)]
+mod asian_pair_tests {
+    use super::{PathDependentPricer, PathDependentPricerConfig};
+    use crate::monte_carlo::control_variate::apply_control_variate;
+    use crate::monte_carlo::engine::{MAX_NUM_PATHS, PathCaptureConfig};
+    use crate::monte_carlo::payoff::asian::{Asian, AsianFixingHistory, AveragingMethod};
+    use crate::monte_carlo::process::gbm::{DriftSchedule, GbmParams, GbmProcess};
+    use crate::types::OptionType;
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::math::random::MAX_SOBOL_DIMENSION;
+    use finstack_quant_core::math::stats::OnlineCovariance;
+    use finstack_quant_core::math::time_grid::TimeGrid;
+    use std::sync::Arc;
+
+    const DISCOUNT_FACTOR: f64 = 0.94;
+
+    fn process() -> GbmProcess {
+        let drift = DriftSchedule::new(vec![0.0, 0.2, 0.6, 1.0], vec![0.0, 0.006, 0.024, 0.037])
+            .expect("nonflat carry schedule");
+        GbmProcess::new(GbmParams::new(0.04, 0.01, 0.3).expect("GBM parameters"))
+            .with_drift_schedule(Arc::new(drift))
+    }
+
+    fn grid() -> TimeGrid {
+        TimeGrid::from_times(vec![0.0, 0.07, 0.18, 0.43, 0.69, 1.0])
+            .expect("irregular observation grid")
+    }
+
+    fn payoff(option_type: OptionType, quantity: f64, averaging: AveragingMethod) -> Asian {
+        Asian::with_history(
+            option_type,
+            100.0,
+            quantity,
+            averaging,
+            vec![3, 0, 1, 3, 5],
+            AsianFixingHistory {
+                sum: 193.0,
+                log_sum: 90.0_f64.ln() + 103.0_f64.ln(),
+                count: 2,
+            },
+        )
+        .expect("seasoned Asian contract")
+        .with_fixing_multipliers(&[1.0, 0.95, 1.03, 1.08, 0.97])
+        .expect("distinct multipliers at repeated fixing steps")
+    }
+
+    fn config(num_paths: usize, sobol: bool) -> PathDependentPricerConfig {
+        PathDependentPricerConfig {
+            chunk_size: 17,
+            ..PathDependentPricerConfig::new(num_paths)
+                .with_seed(0x1234_5678)
+                .with_parallel(false)
+                .with_antithetic(false)
+                .with_sobol(sobol)
+        }
+    }
+
+    fn values(moments: &OnlineCovariance) -> [f64; 5] {
+        [
+            moments.mean_x(),
+            moments.mean_y(),
+            moments.variance_x(),
+            moments.variance_y(),
+            moments.covariance(),
+        ]
+    }
+
+    // Retain the old two-pass, global point-order fold as an independent
+    // reference. No candidate pair implementation is used here.
+    fn captured_reference(
+        config: &PathDependentPricerConfig,
+        option_type: OptionType,
+        quantity: f64,
+    ) -> OnlineCovariance {
+        let mut capture_config = config.clone();
+        capture_config.path_capture = PathCaptureConfig::all();
+        let pricer = PathDependentPricer::new(capture_config);
+        let gbm = process();
+        let capture = |averaging| {
+            pricer
+                .price_with_paths_and_grid(
+                    &gbm,
+                    100.0,
+                    grid(),
+                    &payoff(option_type, quantity, averaging),
+                    Currency::USD,
+                    DISCOUNT_FACTOR,
+                )
+                .expect("independent scalar capture")
+        };
+        let arithmetic = capture(AveragingMethod::Arithmetic);
+        let geometric = capture(AveragingMethod::Geometric);
+        for result in [&arithmetic, &geometric] {
+            assert_eq!(result.estimate.num_paths, config.num_paths);
+            assert_eq!(result.estimate.num_simulated_paths, config.num_paths);
+            let paths = result.paths.as_ref().expect("complete path capture");
+            assert_eq!(paths.num_paths_total, config.num_paths);
+            assert_eq!(paths.paths.len(), config.num_paths);
+        }
+        let mut reference = OnlineCovariance::new();
+        for (path_id, (arithmetic, geometric)) in arithmetic
+            .paths
+            .as_ref()
+            .expect("arithmetic capture")
+            .paths
+            .iter()
+            .zip(&geometric.paths.as_ref().expect("geometric capture").paths)
+            .enumerate()
+        {
+            assert_eq!(arithmetic.path_id, path_id);
+            assert_eq!(geometric.path_id, path_id);
+            assert!(arithmetic.final_value.is_finite() && geometric.final_value.is_finite());
+            reference.update(arithmetic.final_value, geometric.final_value);
+        }
+        reference
+    }
+
+    fn assert_moments_close(
+        actual: &OnlineCovariance,
+        reference: &OnlineCovariance,
+        quantity: f64,
+    ) {
+        assert_eq!(actual.count(), reference.count());
+        for (index, (actual, reference)) in values(actual)
+            .into_iter()
+            .zip(values(reference))
+            .enumerate()
+        {
+            let scale = if index < 2 {
+                quantity
+            } else {
+                quantity * quantity
+            };
+            assert!(actual.is_finite() && reference.is_finite());
+            assert!(
+                ((actual - reference) / scale).abs() <= 1e-10,
+                "moment {index}: actual={actual:.17e}, reference={reference:.17e}, scale={scale}"
+            );
+        }
+    }
+
+    #[test]
+    fn asian_pair_philox_matches_captured_moments_and_parallel_bits() {
+        let config = config(65, false);
+        let gbm = process();
+        for option_type in [OptionType::Call, OptionType::Put] {
+            for quantity in [1.0, 250.0] {
+                let reference = captured_reference(&config, option_type, quantity);
+                let arithmetic = payoff(option_type, quantity, AveragingMethod::Arithmetic);
+                let price = |parallel| {
+                    PathDependentPricer::new(config.clone().with_parallel(parallel))
+                        .price_asian_pair(
+                            &gbm,
+                            100.0,
+                            grid(),
+                            &arithmetic,
+                            Currency::USD,
+                            DISCOUNT_FACTOR,
+                        )
+                        .expect("paired Philox moments")
+                };
+                let serial = price(false);
+                let parallel = price(true);
+                assert_eq!(serial.count(), config.num_paths);
+                assert_moments_close(&serial, &reference, quantity);
+                assert_moments_close(&parallel, &reference, quantity);
+                assert_eq!(
+                    values(&serial).map(f64::to_bits),
+                    values(&parallel).map(f64::to_bits)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn asian_pair_sobol_preserves_global_point_fold_on_irregular_grid() {
+        let gbm = process();
+        // 35 points allocate three points to three scrambles and two to the
+        // other thirteen. A replicate-level fold or beta would differ.
+        for bridge in [false, true] {
+            let config = config(35, true).with_brownian_bridge(bridge);
+            for option_type in [OptionType::Call, OptionType::Put] {
+                for quantity in [1.0, 250.0] {
+                    let reference = captured_reference(&config, option_type, quantity);
+                    let actual = PathDependentPricer::new(config.clone())
+                        .price_asian_pair(
+                            &gbm,
+                            100.0,
+                            grid(),
+                            &payoff(option_type, quantity, AveragingMethod::Arithmetic),
+                            Currency::USD,
+                            DISCOUNT_FACTOR,
+                        )
+                        .expect("paired Sobol moments");
+                    assert_eq!(actual.count(), 35);
+                    assert_eq!(
+                        values(&actual).map(f64::to_bits),
+                        values(&reference).map(f64::to_bits),
+                        "bridge={bridge}, direction={option_type:?}, quantity={quantity}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn asian_pair_zero_volatility_and_fully_observed_contracts_preserve_constant_payoffs() {
+        let zero_volatility =
+            GbmProcess::new(GbmParams::new(0.0, 0.0, 0.0).expect("zero-volatility GBM"));
+        let future = Asian::new(
+            OptionType::Call,
+            90.0,
+            1.0,
+            AveragingMethod::Arithmetic,
+            vec![0, 2, 2, 5],
+        )
+        .expect("future deterministic fixings");
+        let observed = Asian::with_history(
+            OptionType::Call,
+            90.0,
+            1.0,
+            AveragingMethod::Arithmetic,
+            Vec::new(),
+            AsianFixingHistory {
+                sum: 200.0,
+                log_sum: 2.0 * 100.0_f64.ln(),
+                count: 2,
+            },
+        )
+        .expect("fully observed contract");
+        for (gbm, arithmetic) in [(zero_volatility, future), (process(), observed)] {
+            for sobol in [false, true] {
+                for chunk_size in [7, 35] {
+                    let config = PathDependentPricerConfig {
+                        chunk_size,
+                        ..config(35, sobol)
+                    };
+                    let actual = PathDependentPricer::new(config)
+                        .price_asian_pair(
+                            &gbm,
+                            100.0,
+                            grid(),
+                            &arithmetic,
+                            Currency::USD,
+                            DISCOUNT_FACTOR,
+                        )
+                        .expect("deterministic paired payoffs");
+                    assert_eq!(actual.count(), 35);
+                    assert!((actual.mean_x() - 10.0 * DISCOUNT_FACTOR).abs() < 1e-12);
+                    assert!((actual.mean_y() - 10.0 * DISCOUNT_FACTOR).abs() < 1e-12);
+                    // One Philox chunk and the global Sobol fold give exact
+                    // zero. Weighted multi-chunk means can round, but the
+                    // variance must stay below the existing CV cutoff.
+                    if sobol || chunk_size == 35 {
+                        assert_eq!(actual.variance_x(), 0.0);
+                        assert_eq!(actual.variance_y(), 0.0);
+                        assert_eq!(actual.covariance(), 0.0);
+                    } else {
+                        assert!(actual.variance_x().abs() < 1e-10);
+                        assert!(actual.variance_y().abs() < 1e-10);
+                        assert!(actual.covariance().abs() < 1e-10);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn asian_pair_preserves_control_adjustment_on_both_sides_of_variance_cutoff() {
+        let config = config(65, false);
+        let gbm = process();
+        let unit_reference = captured_reference(&config, OptionType::Call, 1.0);
+        assert!(unit_reference.variance_y().is_finite() && unit_reference.variance_y() > 0.0);
+        for target_variance in [0.5e-10, 2.0e-10] {
+            let quantity = (target_variance / unit_reference.variance_y()).sqrt();
+            let reference = captured_reference(&config, OptionType::Call, quantity);
+            let actual = PathDependentPricer::new(config.clone())
+                .price_asian_pair(
+                    &gbm,
+                    100.0,
+                    grid(),
+                    &payoff(OptionType::Call, quantity, AveragingMethod::Arithmetic),
+                    Currency::USD,
+                    DISCOUNT_FACTOR,
+                )
+                .expect("paired moments near variance cutoff");
+            assert_moments_close(&actual, &reference, quantity);
+            let applies_control = target_variance > 1e-10;
+            assert_eq!(reference.variance_y() > 1e-10, applies_control);
+            assert_eq!(actual.variance_y() > 1e-10, applies_control);
+
+            // A synthetic control anchor makes the existing coefficient
+            // cutoff observable. This tests its propagation, not an Asian
+            // analytical pricing formula.
+            let control_mean = 0.9 * reference.mean_y();
+            let adjust = |moments: &OnlineCovariance| {
+                apply_control_variate(
+                    moments.mean_x(),
+                    moments.variance_x(),
+                    moments.mean_y(),
+                    moments.variance_y(),
+                    moments.covariance(),
+                    control_mean,
+                    moments.count(),
+                )
+            };
+            let actual_adjusted = adjust(&actual);
+            let reference_adjusted = adjust(&reference);
+            assert!(((actual_adjusted.mean - reference_adjusted.mean) / quantity).abs() <= 1e-10);
+            let actual_variance = actual.count() as f64 * actual_adjusted.stderr.powi(2);
+            let reference_variance = reference.count() as f64 * reference_adjusted.stderr.powi(2);
+            assert!(((actual_variance - reference_variance) / quantity.powi(2)).abs() <= 1e-10);
+            if applies_control {
+                assert!(actual_adjusted.mean < actual.mean_x());
+            } else {
+                assert_eq!(actual_adjusted.mean.to_bits(), actual.mean_x().to_bits());
+            }
+        }
+    }
+
+    #[test]
+    fn asian_pair_rejects_incompatible_requests_and_invalid_configuration() {
+        let gbm = process();
+        let arithmetic = payoff(OptionType::Call, 1.0, AveragingMethod::Arithmetic);
+        let geometric = payoff(OptionType::Call, 1.0, AveragingMethod::Geometric);
+        for sobol in [false, true] {
+            let base = config(35, sobol);
+            let error = PathDependentPricer::new(base.clone())
+                .price_asian_pair(
+                    &gbm,
+                    100.0,
+                    grid(),
+                    &geometric,
+                    Currency::USD,
+                    DISCOUNT_FACTOR,
+                )
+                .expect_err("geometric target is not an arithmetic/control pair");
+            assert!(error.to_string().contains("arithmetic"), "{error}");
+
+            let mut full_capture = base.clone();
+            full_capture.path_capture = PathCaptureConfig::all();
+            let mut sample_capture = base.clone();
+            sample_capture.path_capture = PathCaptureConfig::sample(4, 17);
+            let mut zero_chunk = base.clone();
+            zero_chunk.chunk_size = 0;
+            let mut zero_step_density = base.clone();
+            zero_step_density.steps_per_year = 0.0;
+            let mut nonfinite_step_density = base.clone();
+            nonfinite_step_density.steps_per_year = f64::NAN;
+            for (config, expected_message) in [
+                (config(0, sobol), "num_paths"),
+                (config(1, sobol), "num_paths"),
+                (config(MAX_NUM_PATHS + 1, sobol), "maximum"),
+                (zero_chunk, "chunk_size"),
+                (zero_step_density, "steps_per_year"),
+                (nonfinite_step_density, "steps_per_year"),
+                (base.with_antithetic(true), "antithetic"),
+                (full_capture, "captured paths"),
+                (sample_capture, "captured paths"),
+            ] {
+                let error = PathDependentPricer::new(config)
+                    .price_asian_pair(
+                        &gbm,
+                        100.0,
+                        grid(),
+                        &arithmetic,
+                        Currency::USD,
+                        DISCOUNT_FACTOR,
+                    )
+                    .expect_err("invalid paired request must fail");
+                assert!(error.to_string().contains(expected_message), "{error}");
+            }
+        }
+    }
+
+    #[test]
+    fn asian_pair_preserves_runtime_and_payoff_errors() {
+        let gbm = process();
+        let arithmetic = payoff(OptionType::Call, 1.0, AveragingMethod::Arithmetic);
+        for sobol in [false, true] {
+            let pricer = PathDependentPricer::new(config(35, sobol));
+            let schedule_error = pricer
+                .price_asian_pair(
+                    &gbm,
+                    100.0,
+                    TimeGrid::uniform(1.0, 4).expect("short grid"),
+                    &arithmetic,
+                    Currency::USD,
+                    DISCOUNT_FACTOR,
+                )
+                .expect_err("fixing step 5 must not silently disappear");
+            assert!(schedule_error.to_string().contains("event at step 5"));
+            for discount_factor in [-1.0, f64::NAN, f64::INFINITY] {
+                let error = pricer
+                    .price_asian_pair(
+                        &gbm,
+                        100.0,
+                        grid(),
+                        &arithmetic,
+                        Currency::USD,
+                        discount_factor,
+                    )
+                    .expect_err("invalid discount factor");
+                assert!(error.to_string().contains("discount_factor"), "{error}");
+            }
+            for spot in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+                assert!(
+                    pricer
+                        .price_asian_pair(
+                            &gbm,
+                            spot,
+                            grid(),
+                            &arithmetic,
+                            Currency::USD,
+                            DISCOUNT_FACTOR,
+                        )
+                        .is_err(),
+                    "a fixing must reject nonfinite spot"
+                );
+            }
+            let invalid_control = Asian::with_history(
+                OptionType::Call,
+                100.0,
+                1.0,
+                AveragingMethod::Arithmetic,
+                Vec::new(),
+                AsianFixingHistory {
+                    sum: 100.0,
+                    log_sum: f64::INFINITY,
+                    count: 1,
+                },
+            )
+            .expect("history is validated when evaluated");
+            assert!(
+                pricer
+                    .price_asian_pair(
+                        &gbm,
+                        100.0,
+                        grid(),
+                        &invalid_control,
+                        Currency::USD,
+                        DISCOUNT_FACTOR,
+                    )
+                    .is_err(),
+                "a finite arithmetic payoff must not hide an invalid geometric control"
+            );
+        }
+    }
+
+    #[test]
+    fn asian_pair_rejects_unsupported_sobol_execution_and_dimensions() {
+        let gbm = process();
+        let arithmetic = payoff(OptionType::Call, 1.0, AveragingMethod::Arithmetic);
+        let parallel_error = PathDependentPricer::new(config(35, true).with_parallel(true))
+            .price_asian_pair(
+                &gbm,
+                100.0,
+                grid(),
+                &arithmetic,
+                Currency::USD,
+                DISCOUNT_FACTOR,
+            )
+            .expect_err("Sobol stream cannot be split across workers");
+        assert!(parallel_error.to_string().contains("serial execution"));
+        for bridge in [false, true] {
+            let error = PathDependentPricer::new(config(35, true).with_brownian_bridge(bridge))
+                .price_asian_pair(
+                    &gbm,
+                    100.0,
+                    TimeGrid::uniform(1.0, MAX_SOBOL_DIMENSION + 1)
+                        .expect("grid beyond Sobol dimension cap"),
+                    &arithmetic,
+                    Currency::USD,
+                    DISCOUNT_FACTOR,
+                )
+                .expect_err("unsupported Sobol dimension");
+            assert!(error.to_string().contains("Sobol dimension"), "{error}");
+        }
+    }
+
+    #[test]
+    fn geometric_asian_antithetic_pricing_remains_available() {
+        let gbm = process();
+        for option_type in [OptionType::Call, OptionType::Put] {
+            let geometric = payoff(option_type, 1.0, AveragingMethod::Geometric);
+            for parallel in [false, true] {
+                let estimate = PathDependentPricer::new(
+                    config(31, false)
+                        .with_parallel(parallel)
+                        .with_antithetic(true),
+                )
+                .price(
+                    &gbm,
+                    100.0,
+                    grid(),
+                    &geometric,
+                    Currency::USD,
+                    DISCOUNT_FACTOR,
+                )
+                .expect("ordinary geometric antithetic price");
+                assert_eq!(estimate.num_paths, 31);
+                assert_eq!(estimate.num_simulated_paths, 62);
+                assert_eq!(estimate.mean.currency(), Currency::USD);
+                assert!(estimate.mean.amount().is_finite() && estimate.mean.amount() > 0.0);
+                assert!(estimate.stderr.is_finite());
+            }
+        }
     }
 }

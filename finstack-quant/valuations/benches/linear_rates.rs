@@ -2,12 +2,16 @@
 
 #![allow(clippy::unwrap_used)]
 
+mod support;
+
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
+use finstack_quant_core::dates::{
+    BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
+};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::scalars::MarketScalar;
+use finstack_quant_core::market_data::scalars::{MarketScalar, ScalarTimeSeries};
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::math::interp::InterpStyle;
@@ -27,6 +31,7 @@ use finstack_quant_valuations::instruments::rates::repo::{CollateralSpec, Repo};
 use finstack_quant_valuations::instruments::{Instrument, PayReceive, SettlementType};
 use finstack_quant_valuations::instruments::{ListedFutureTerms, Position};
 use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations::pricer::ModelKey;
 use rust_decimal::Decimal;
 use std::hint::black_box;
 use time::Month;
@@ -89,9 +94,19 @@ fn create_rates_market() -> MarketContext {
         .unwrap();
 
     let vol = 0.30_f64;
+    // The next live caplet fixes before one quarter of an ACT/365F year
+    // because the reference index preserves its two-business-day reset lag.
+    let first_expiry = DayCount::Act365F
+        .year_fraction(
+            base,
+            base + time::Duration::days(1),
+            DayCountContext::default(),
+        )
+        .expect("cap surface expiry year fraction");
     let cap_vol = VolSurface::builder("USD-CAP-VOL")
-        .expiries(&[0.25, 1.0, 5.0, 10.0])
+        .expiries(&[first_expiry, 0.25, 1.0, 5.0, 10.0])
         .strikes(&[0.01, 0.03, 0.05, 0.07, 0.10])
+        .row(&[vol, vol, vol, vol, vol])
         .row(&[vol, vol, vol, vol, vol])
         .row(&[vol, vol, vol, vol, vol])
         .row(&[vol, vol, vol, vol, vol])
@@ -108,6 +123,25 @@ fn create_rates_market() -> MarketContext {
             "TREASURY_BOND_PRICE",
             MarketScalar::Price(Money::new(1.02, Currency::USD).expect("valid money fixture")),
         )
+}
+
+fn create_cap_market() -> MarketContext {
+    let fixings = ScalarTimeSeries::new(
+        "FIXING:USD-SOFR-3M",
+        vec![(date_support::date(2024, 12, 30), 0.04)],
+        None,
+    )
+    .expect("valid historical cap fixing");
+    create_rates_market().insert_series(fixings)
+}
+
+fn assert_cap_fixing_required(cap: &CapFloor, as_of: Date) {
+    let error = cap
+        .value(&create_rates_market(), as_of)
+        .expect_err("fixed-but-unpaid caplet must require its historical fixing")
+        .to_string();
+    assert!(error.contains("FIXING:USD-SOFR-3M"));
+    assert!(error.contains("2024-12-30"));
 }
 
 fn deposit(id: &str, maturity: Date) -> Deposit {
@@ -272,13 +306,24 @@ fn ir_future() -> InterestRateFuture {
 
 fn bench_deposit_pv(c: &mut Criterion) {
     let mut group = c.benchmark_group("deposit_pv");
-    let market = create_rates_market();
     let as_of = base_date();
     let maturities = [("3M", date_support::date(2025, 4, 1))];
     for (label, mat) in maturities {
-        let dep = deposit(&format!("DEP-{label}"), mat);
         group.bench_with_input(BenchmarkId::from_parameter(label), &label, |b, _| {
-            b.iter(|| dep.value(black_box(&market), black_box(as_of)));
+            let market = create_rates_market();
+            let dep = deposit(&format!("DEP-{label}"), mat);
+            assert_eq!(dep.default_model(), ModelKey::Discounting);
+            support::bench(
+                b,
+                || {
+                    dep.value(black_box(&market), black_box(as_of))
+                        .expect("deposit pricing must succeed")
+                },
+                |value| {
+                    assert!(value.amount().is_finite());
+                    assert_eq!(value.currency(), Currency::USD);
+                },
+            );
         });
     }
     group.finish();
@@ -286,7 +331,6 @@ fn bench_deposit_pv(c: &mut Criterion) {
 
 fn bench_fra_pv(c: &mut Criterion) {
     let mut group = c.benchmark_group("fra_pv");
-    let market = create_rates_market();
     let as_of = base_date();
     let cases = [(
         "6x9",
@@ -294,9 +338,21 @@ fn bench_fra_pv(c: &mut Criterion) {
         date_support::date(2025, 10, 1),
     )];
     for (label, start, end) in cases {
-        let f = fra(&format!("FRA-{label}"), start, end);
         group.bench_with_input(BenchmarkId::from_parameter(label), &label, |b, _| {
-            b.iter(|| f.value(black_box(&market), black_box(as_of)));
+            let market = create_rates_market();
+            let f = fra(&format!("FRA-{label}"), start, end);
+            assert_eq!(f.default_model(), ModelKey::Discounting);
+            support::bench(
+                b,
+                || {
+                    f.value(black_box(&market), black_box(as_of))
+                        .expect("FRA pricing must succeed")
+                },
+                |value| {
+                    assert!(value.amount().is_finite());
+                    assert_eq!(value.currency(), Currency::USD);
+                },
+            );
         });
     }
     group.finish();
@@ -304,13 +360,24 @@ fn bench_fra_pv(c: &mut Criterion) {
 
 fn bench_basis_swap_pv(c: &mut Criterion) {
     let mut group = c.benchmark_group("basis_swap_pv");
-    let market = create_rates_market();
     let as_of = base_date();
     let cases = [("5Y", date_support::date(2030, 1, 1))];
     for (label, end) in cases {
-        let swap = basis_swap(&format!("BASIS-{label}"), end);
         group.bench_with_input(BenchmarkId::from_parameter(label), &label, |b, _| {
-            b.iter(|| swap.value(black_box(&market), black_box(as_of)));
+            let market = create_rates_market();
+            let swap = basis_swap(&format!("BASIS-{label}"), end);
+            assert_eq!(swap.default_model(), ModelKey::Discounting);
+            support::bench(
+                b,
+                || {
+                    swap.value(black_box(&market), black_box(as_of))
+                        .expect("basis swap pricing must succeed")
+                },
+                |value| {
+                    assert!(value.amount().is_finite());
+                    assert_eq!(value.currency(), Currency::USD);
+                },
+            );
         });
     }
     group.finish();
@@ -318,13 +385,25 @@ fn bench_basis_swap_pv(c: &mut Criterion) {
 
 fn bench_cap_floor_pv(c: &mut Criterion) {
     let mut group = c.benchmark_group("cap_floor_pv");
-    let market = create_rates_market();
     let as_of = base_date();
     {
         let (label, mat) = ("5Y", date_support::date(2030, 1, 1));
-        let cap = interest_rate_cap(&format!("CAP-{label}"), mat);
         group.bench_with_input(BenchmarkId::from_parameter(label), &label, |b, _| {
-            b.iter(|| cap.value(black_box(&market), black_box(as_of)));
+            let market = create_cap_market();
+            let cap = interest_rate_cap(&format!("CAP-{label}"), mat);
+            assert_eq!(cap.default_model(), ModelKey::Black76);
+            assert_cap_fixing_required(&cap, as_of);
+            support::bench(
+                b,
+                || {
+                    cap.value(black_box(&market), black_box(as_of))
+                        .expect("cap pricing must succeed")
+                },
+                |value| {
+                    assert!(value.amount().is_finite());
+                    assert_eq!(value.currency(), Currency::USD);
+                },
+            );
         });
     }
     group.finish();
@@ -332,9 +411,7 @@ fn bench_cap_floor_pv(c: &mut Criterion) {
 
 fn bench_cap_floor_greeks(c: &mut Criterion) {
     let mut group = c.benchmark_group("cap_floor_greeks");
-    let market = create_rates_market();
     let as_of = base_date();
-    let cap = interest_rate_cap("CAP-5Y-GREEKS", date_support::date(2030, 1, 1));
     let metrics = [
         MetricId::Delta,
         MetricId::Gamma,
@@ -342,36 +419,80 @@ fn bench_cap_floor_greeks(c: &mut Criterion) {
         MetricId::Dv01,
     ];
     group.bench_function("5Y_cap", |b| {
-        b.iter(|| {
-            cap.price_with_metrics(
-                black_box(&market),
-                black_box(as_of),
-                black_box(&metrics),
-                PricingOptions::default(),
-            )
-        });
+        let market = create_cap_market();
+        let cap = interest_rate_cap("CAP-5Y-GREEKS", date_support::date(2030, 1, 1));
+        assert_eq!(cap.default_model(), ModelKey::Black76);
+        assert_cap_fixing_required(&cap, as_of);
+        support::bench(
+            b,
+            || {
+                cap.price_with_metrics(
+                    black_box(&market),
+                    black_box(as_of),
+                    black_box(&metrics),
+                    PricingOptions::default(),
+                )
+                .expect("cap Greek pricing must succeed")
+            },
+            |result| {
+                assert!(result.value.amount().is_finite());
+                assert_eq!(result.value.currency(), Currency::USD);
+                for metric in &metrics {
+                    assert!(
+                        result
+                            .measures
+                            .get(metric)
+                            .expect("requested cap Greek must be present")
+                            .is_finite()
+                    );
+                }
+            },
+        );
     });
     group.finish();
 }
 
 fn bench_repo_pv(c: &mut Criterion) {
     let mut group = c.benchmark_group("repo_pv");
-    let market = create_rates_market();
     let as_of = date_support::date(2025, 1, 10);
-    let repo = term_repo();
     group.bench_function("term_repo", |b| {
-        b.iter(|| repo.value(black_box(&market), black_box(as_of)));
+        let market = create_rates_market();
+        let repo = term_repo();
+        assert_eq!(repo.default_model(), ModelKey::Discounting);
+        support::bench(
+            b,
+            || {
+                repo.value(black_box(&market), black_box(as_of))
+                    .expect("repo pricing must succeed")
+            },
+            |value| {
+                assert!(value.amount().is_finite());
+                assert_eq!(value.currency(), Currency::USD);
+            },
+        );
     });
     group.finish();
 }
 
 fn bench_ir_future_pv(c: &mut Criterion) {
     let mut group = c.benchmark_group("ir_future_pv");
-    let market = create_rates_market();
     let as_of = base_date();
-    let fut = ir_future();
     group.bench_function("quarterly_future", |b| {
-        b.iter(|| fut.value(black_box(&market), black_box(as_of)));
+        let market = create_rates_market();
+        let fut = ir_future();
+        assert_eq!(fut.default_model(), ModelKey::Discounting);
+        assert_eq!(fut.compounding, FloatingLegCompounding::Simple);
+        support::bench(
+            b,
+            || {
+                fut.value(black_box(&market), black_box(as_of))
+                    .expect("IR future pricing must succeed")
+            },
+            |value| {
+                assert!(value.amount().is_finite());
+                assert_eq!(value.currency(), Currency::USD);
+            },
+        );
     });
     group.finish();
 }

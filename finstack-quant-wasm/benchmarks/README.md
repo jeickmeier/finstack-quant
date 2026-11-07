@@ -1,10 +1,9 @@
 # WASM benchmarks
 
-Node.js micro-benchmarks for the wasm-bindgen exports. Everything here measures
-the _boundary_ — argument marshalling, wasm call, result conversion back to
-JavaScript — layered on top of the Rust work, so a number from this directory is
-only interpretable next to the corresponding Criterion number under
-`finstack-quant/*/benches/`.
+Node.js micro-benchmarks for the raw wasm-bindgen exports. Timings include
+argument marshalling, the Rust computation inside WebAssembly, and result
+conversion back to JavaScript. They are end-to-end raw-binding timings, not an
+isolated measurement of boundary overhead or public-facade performance.
 
 One file, one entry point. There is no framework: timing is `performance.now()`
 around a single measured call per iteration.
@@ -25,9 +24,9 @@ wasm-bindgen output, not the `index.js` facade — and exits 1 with a build hint
 either `pkg-node/finstack_quant_wasm.js` or `pkg-node/finstack_quant_wasm_bg.wasm`
 is missing. Every symbol in the file is therefore a flat bindgen name
 (`w.blackScholesCall`, `w.csaSpecUsdRegulatory`), not a namespaced facade name
-(`models.monteCarlo.blackScholesCall`). That deliberately bypasses the facade layer so
-the numbers are boundary cost only; it also means the benchmark does not exercise
-the wrappers `exports/*.js` installs.
+(`models.monteCarlo.blackScholesCall`). That bypasses the facade layer; the benchmark does not exercise the wrappers
+`exports/*.js` installs. Compare with a matched Rust workload before attributing
+any timing difference to the binding boundary.
 
 `wasm-pack` builds release by default, so the profile is correct as long as the
 build was not run with `--dev`.
@@ -35,6 +34,7 @@ build was not run with `--dev`.
 ```bash
 npm --prefix finstack-quant-wasm run build:node   # wasm-pack build --target nodejs --out-dir pkg-node
 npm --prefix finstack-quant-wasm run bench        # node benchmarks/bench.mjs
+node finstack-quant-wasm/benchmarks/bench.mjs --valuation-only # required pricing controls
 node finstack-quant-wasm/benchmarks/bench.mjs --help
 ```
 
@@ -53,44 +53,53 @@ Rows are grouped by a `domain` string, printed as the first column.
 | `margin`                    | `csaSpecUsdRegulatory`, `csaSpecEurRegulatory`, `csaSpecValidate`, `VmCalculator.calculate`                                                                                                                                                                                                                               |
 | `statements`                | `validateFinancialModelJson`, `modelNodeIds`                                                                                                                                                                                                                                                                              |
 | `statements_analytics`      | `runSensitivity`, `backtestForecast`, `runVariance`, `evaluateScenarioSet`, `generateTornadoEntries`, `evaluateMonteCarlo`, `goalSeek`, `dependencyTree`, `explainFormula`                                                                                                                                                |
-| `portfolio`                 | `parsePortfolioSpecJson`, `Portfolio.fromSpec(...).toJson()`, `valuePortfolio`, `aggregateFullCashflows`                                                                                                                                                                                                                  |
+| `portfolio`                 | `parsePortfolioSpecJson`, `Portfolio.fromSpec(...).toJson()`, strict standard-risk `valuePortfolio`, `aggregateFullCashflows` on two deposits                                                                                                                                                                             |
 | `portfolio_materialization` | `Portfolio.validateMaterialization` and `Portfolio.fromMaterialization` (cold-unique, cold-dedup, warm-dedup) — the only gated block                                                                                                                                                                                      |
-| `valuations`                | `validateInstrumentJson`, `listStandardMetrics`, `priceInstrument` with and without an explicit metric list, `valuationResultToJson`                                                                                                                                                                                      |
+| `valuations`                | `validateInstrumentJson` for one deposit, `listStandardMetrics`, deposit `priceInstrument` PV / explicit `dv01`, successful `valuationResultToJson`                                                                                                                                                                       |
 | `scenarios`                 | `listBuiltinTemplates`, `buildFromTemplate`, `listTemplateComponents`, `buildTemplateComponent`, `parseScenarioSpec`, `validateScenarioSpec`, `composeScenarios`, `applyScenario`                                                                                                                                         |
 
 Uncovered domains: `attribution`, `cashflows`, `covenants`, `factor_model`,
 `features`.
 
-JSON fixtures are inline string constants at the top of the file — a minimal
-financial model, portfolio spec, portfolio result, deposit instrument, scenario
-spec, market context (schema v2), two statement results, and a goal-seek and a
-Monte Carlo model. They are hand-written, not generated; if a wire schema
-changes, the affected rows start reporting as skipped rather than failing.
+JSON fixtures are inline string constants at the top of the file. The pricing
+portfolio holds two USD deposits with different notionals and maturities. These
+are deposit-only controls, not representative mixed-asset portfolio timings.
 
-## Skips are not failures
+## Required pricing controls
 
-Three helpers govern row behaviour:
+The nine `portfolio` / `valuations` rows run through `benchRequired`, which checks
+one successful output before timing. Initialization, pricing and validation
+errors abort the run with a nonzero exit. Preflight requires the expected position
+IDs/counts, finite USD PVs, explicit finite `dv01` where requested, complete risk,
+no `risk_error` or `degraded_positions`, and nonempty cashflows without issues.
+The result JSON row canonicalizes a successfully priced valuation result.
+Exceptions during measured calls are also fatal.
 
-- `bench(domain, name, iterations, fn, setup, cleanup)` — the plain path.
-  `setup` runs untimed before each iteration, `cleanup` untimed after.
-- `benchTry(...)` — runs `fn` once as an untimed probe; if it throws, the row
-  becomes a skip and the suite continues.
-- `skipBench(domain, name, reason)` — emits a `[bench skip]` warning and pushes a
-  zero row that prints as em dashes.
+`--valuation-only` executes exactly these required rows without constructing
+unrelated fixtures or running materialization generation. It is mutually
+exclusive with `--materialization-only`. All rows retain their normal iteration
+counts in this selection mode.
 
-So a broken fixture or a renamed export degrades to a skipped row, not a non-zero
-exit. Read the `[bench skip]` warnings; a table with no failures is not evidence
-that everything ran.
+Portfolio and market handles used for pricing are constructed before timing and
+freed after their rows. The `Portfolio.fromSpec + toJson` row includes construction
+and serialization in its timer; its handle is freed after each measured call,
+including the untimed preflight. Pricing results are plain JavaScript objects.
 
-Handles created inside timed loops (`new w.Currency(...)`, `new w.ForwardCurve(...)`,
-and similar) are not freed explicitly — only the materialization rows call
-`free()` deterministically, in their `cleanup`. Keep that in mind before adding a
-row that allocates a large handle at high iteration counts.
+Other domain rows retain their existing optional-probe behavior:
+
+- `bench(domain, name, iterations, fn, setup, cleanup)` measures each call;
+  `setup` and `cleanup` run outside timing.
+- `benchTry(...)` probes once and records a skip if it throws.
+- `skipBench(...)` emits a warning and prints the row as em dashes.
+
+A skipped optional row is not evidence of successful execution. Handle cleanup
+outside the required pricing and materialization groups has not been normalized;
+some primitive-construction rows still rely on garbage collection.
 
 ## The materialization block
 
 `runMaterializationBenchmarks()` is the only part of this file tied to a
-checked-in baseline, and the only part with its own CLI flag:
+checked-in baseline, and can be selected independently:
 
 ```bash
 node benchmarks/bench.mjs --materialization-only  # skip every other row
@@ -126,7 +135,8 @@ result conversion; handle cleanup happens after the stop.
 `scripts/materialization_bench.sh record` is what actually consumes the raw
 output — it runs the Rust, Python and WASM measurements, applies both regression
 gates, and writes `benchmarks/materialization/materialization-benchmark-results.json`.
-This script itself applies no gate and always exits 0 on a completed run.
+This script itself applies no latency regression gate. Required output checks
+and initialization/pricing failures still cause a nonzero exit.
 
 ## Output
 
@@ -140,8 +150,9 @@ set. Nothing is committed. Benchmarks do not gate PR CI.
   `setup`/`cleanup` parameters of `bench` when per-iteration state is needed.
 - Pick an iteration count that keeps the row under roughly a second. The existing
   spread runs from 3 (50k-path American MC) to 20,000 (`normCdf`).
-- Use `benchTry` for anything whose fixture may drift with a schema change, and
-  `bench` for the stable primitives.
+- Use `benchRequired` with a meaningful output check for valuation and portfolio
+  controls. Schema drift must fail these required cases. `benchTry` is reserved
+  for the existing optional controls in other domains.
 - Reference flat bindgen names off `w`, matching the rest of the file. Do not
   import the facade here.
 - eslint runs over this file under `mise run wasm-lint`; the `no-console`

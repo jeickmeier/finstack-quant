@@ -66,4 +66,12 @@ mod sensitivities;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+#[path = "../../../tests/performance/tranches.rs"]
+mod performance_diagnostics;
+
+#[cfg(test)]
+#[path = "../../../tests/performance/calibration.rs"]
+mod calibration_performance_diagnostics;
+
 pub use pricer::CdsTranchePricer;

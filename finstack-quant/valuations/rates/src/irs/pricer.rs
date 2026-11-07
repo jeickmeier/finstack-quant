@@ -127,7 +127,7 @@ impl InterestRateSwap {
     ///
     /// Uses Kahan compensated summation for accurate PV calculation on
     /// long-dated swaps with many periods (30Y+ = 120+ quarterly payments).
-    /// Discounts the amounts and payment dates emitted by the fixed-leg schedule.
+    /// Discounts the amounts and payment dates emitted by the floating-leg schedule.
     ///
     /// # Errors
     ///
@@ -139,16 +139,17 @@ impl InterestRateSwap {
         context: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
-        // Delegate rate projection to the cashflow builder so the pricer and
-        // the signed schedule surfaced by `cashflow_schedule` / `dated_cashflows`
-        // use bit-for-bit identical coupon amounts. The builder reads the
-        // named term-index curve at `reset_date` (`fwd.rate(t_reset)`);
-        // `index_tenor` is diagnostic error-context only, not a FRA window.
+        // Reuse the floating schedule's exact daily coupon calculation while
+        // omitting the projected-fixing metadata needed only by cashflow exports.
+        // Term coupons still read the named index curve at
+        // `reset_date` (`fwd.rate(t_reset)`); `index_tenor` is diagnostic error
+        // context only, not a FRA window.
         use finstack_quant_core::cashflow::CFKind;
 
         if as_of >= self.float_leg.end {
-            let dates =
-                crate::irs::cashflow::float_leg_schedule_with_curves_as_of(self, None, None)?;
+            let dates = crate::irs::cashflow::float_leg_schedule_with_curves_as_of(
+                self, None, None, false,
+            )?;
             if dates.get_flows().iter().all(|flow| flow.date <= as_of) {
                 return Ok(0.0);
             }
@@ -158,6 +159,7 @@ impl InterestRateSwap {
             self,
             Some(context),
             Some(as_of),
+            false,
         )?;
 
         let mut acc = NeumaierAccumulator::new();

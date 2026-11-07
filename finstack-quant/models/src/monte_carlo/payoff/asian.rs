@@ -373,6 +373,73 @@ impl Payoff for Asian {
     }
 }
 
+/// Arithmetic Asian target and geometric control observing the same path.
+///
+/// Both accumulators only read `PathState`; forwarding an event therefore
+/// preserves the independent payoff calculations without a second simulation.
+#[derive(Debug, Clone)]
+pub(crate) struct AsianPair {
+    arithmetic: Asian,
+    geometric: Asian,
+}
+
+impl AsianPair {
+    /// Clone an arithmetic contract and change only the control's averaging.
+    ///
+    /// # Arguments
+    ///
+    /// * `arithmetic` - Arithmetic target with the contractual fixing schedule,
+    ///   historical aggregates, deterministic multipliers and payoff scale.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Validation`] when the supplied target is geometric.
+    pub(crate) fn new(arithmetic: &Asian) -> Result<Self> {
+        if arithmetic.averaging != AveragingMethod::Arithmetic {
+            return Err(Error::Validation(
+                "Asian paired pricing requires an arithmetic target".to_owned(),
+            ));
+        }
+        let mut geometric = arithmetic.clone();
+        geometric.averaging = AveragingMethod::Geometric;
+        Ok(Self {
+            arithmetic: arithmetic.clone(),
+            geometric,
+        })
+    }
+
+    /// Read the undiscounted geometric control after the shared path events.
+    ///
+    /// # Arguments
+    ///
+    /// * `currency` - Currency attached to the contract's scalar payoff.
+    pub(crate) fn control_value(&self, currency: Currency) -> Result<Money> {
+        self.geometric.value(currency)
+    }
+}
+
+impl Payoff for AsianPair {
+    fn on_event(&mut self, state: &mut PathState) -> Result<()> {
+        self.arithmetic.on_event(state)?;
+        self.geometric.on_event(state)
+    }
+
+    fn value(&self, currency: Currency) -> Result<Money> {
+        self.arithmetic.value(currency)
+    }
+
+    fn max_event_step(&self) -> Option<usize> {
+        self.arithmetic
+            .max_event_step()
+            .max(self.geometric.max_event_step())
+    }
+
+    fn reset(&mut self) {
+        self.arithmetic.reset();
+        self.geometric.reset();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -383,6 +450,142 @@ mod tests {
         let mut state = PathState::new(step, step as f64 * 0.1);
         state.set(state_keys::SPOT, spot);
         state
+    }
+
+    #[test]
+    fn asian_pair_matches_separate_payoffs_with_history_and_repeated_fixings() {
+        for option_type in [OptionType::Call, OptionType::Put] {
+            for notional in [1.0, 250.0] {
+                let history = AsianFixingHistory {
+                    sum: 193.0,
+                    log_sum: 90.0_f64.ln() + 103.0_f64.ln(),
+                    count: 2,
+                };
+                let fixing_steps = vec![2, 0, 2, 4];
+                let multipliers = [1.0, 0.95, 1.08, 1.03];
+                let mut arithmetic = Asian::with_history(
+                    option_type,
+                    100.0,
+                    notional,
+                    AveragingMethod::Arithmetic,
+                    fixing_steps.clone(),
+                    history,
+                )
+                .expect("arithmetic contract")
+                .with_fixing_multipliers(&multipliers)
+                .expect("arithmetic multipliers");
+                let mut geometric = Asian::with_history(
+                    option_type,
+                    100.0,
+                    notional,
+                    AveragingMethod::Geometric,
+                    fixing_steps,
+                    history,
+                )
+                .expect("geometric contract")
+                .with_fixing_multipliers(&multipliers)
+                .expect("geometric multipliers");
+                let mut pair = AsianPair::new(&arithmetic).expect("arithmetic target");
+                assert_eq!(pair.max_event_step(), Some(4));
+
+                // Different paths after each reset expose leakage in either
+                // accumulator while keeping historical fixings intact.
+                for spots in [
+                    [100.0, 1_000.0, 140.0, 1_000.0, 120.0],
+                    [80.0, 1_000.0, 60.0, 1_000.0, 70.0],
+                ] {
+                    pair.reset();
+                    arithmetic.reset();
+                    geometric.reset();
+                    for (step, spot) in spots.into_iter().enumerate() {
+                        let mut paired_state = create_state(step, spot);
+                        paired_state.add_cashflow(0.5, 17.0);
+                        let mut arithmetic_state = paired_state.clone();
+                        let mut geometric_state = paired_state.clone();
+                        pair.on_event(&mut paired_state).expect("paired event");
+                        arithmetic
+                            .on_event(&mut arithmetic_state)
+                            .expect("arithmetic event");
+                        geometric
+                            .on_event(&mut geometric_state)
+                            .expect("geometric event");
+                        assert_eq!(paired_state.step, step);
+                        assert_eq!(paired_state.time.to_bits(), (step as f64 * 0.1).to_bits());
+                        assert_eq!(paired_state.spot(), Some(spot));
+                        assert_eq!(paired_state.cashflows(), arithmetic_state.cashflows());
+                        assert_eq!(paired_state.cashflows(), geometric_state.cashflows());
+                        for (actual, expected) in [
+                            (
+                                pair.value(Currency::USD).expect("paired target"),
+                                arithmetic.value(Currency::USD).expect("separate target"),
+                            ),
+                            (
+                                pair.control_value(Currency::USD).expect("paired control"),
+                                geometric.value(Currency::USD).expect("separate control"),
+                            ),
+                        ] {
+                            assert_eq!(actual.currency(), expected.currency());
+                            assert_eq!(actual.amount().to_bits(), expected.amount().to_bits());
+                        }
+                    }
+                    assert_eq!(pair.arithmetic.num_fixings_seen, 6);
+                    assert_eq!(pair.geometric.num_fixings_seen, 6);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn asian_pair_preserves_fully_observed_payoffs_on_reset() {
+        for option_type in [OptionType::Call, OptionType::Put] {
+            let arithmetic = Asian::with_history(
+                option_type,
+                100.0,
+                1.0,
+                AveragingMethod::Arithmetic,
+                Vec::new(),
+                AsianFixingHistory {
+                    sum: 204.0,
+                    log_sum: 64.0_f64.ln() + 140.0_f64.ln(),
+                    count: 2,
+                },
+            )
+            .expect("fully observed target");
+            let mut geometric = arithmetic.clone();
+            geometric.averaging = AveragingMethod::Geometric;
+            let mut pair = AsianPair::new(&arithmetic).expect("arithmetic target");
+            assert_eq!(pair.max_event_step(), None);
+            for _ in 0..2 {
+                pair.reset();
+                // No future fixing needs a spot, even when events occur.
+                pair.on_event(&mut PathState::new(0, 0.0))
+                    .expect("no fixing at event");
+                assert_eq!(
+                    pair.value(Currency::USD).expect("paired target"),
+                    arithmetic.value(Currency::USD).expect("separate target")
+                );
+                assert_eq!(
+                    pair.control_value(Currency::USD).expect("paired control"),
+                    geometric.value(Currency::USD).expect("separate control")
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn asian_pair_rejects_geometric_target() {
+        let geometric = Asian::new(
+            OptionType::Call,
+            100.0,
+            1.0,
+            AveragingMethod::Geometric,
+            vec![1],
+        )
+        .expect("geometric contract");
+        assert!(matches!(
+            AsianPair::new(&geometric),
+            Err(Error::Validation(_))
+        ));
     }
 
     #[test]

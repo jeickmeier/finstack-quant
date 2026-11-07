@@ -23,7 +23,7 @@ use crate::monte_carlo::estimate::Estimate;
 use crate::monte_carlo::process::ou::{HullWhite1FParams, HullWhite1FProcess};
 use crate::monte_carlo::results::MoneyEstimate;
 use crate::monte_carlo::rng::philox::PhiloxRng;
-use crate::monte_carlo::traits::{Discretization, PathState, Payoff, RandomStream, StateKey};
+use crate::monte_carlo::traits::{PathState, Payoff, RandomStream, StateKey};
 use crate::rates::hw1f::bank_account::bank_step_factor;
 use crate::rates::hw1f::config::{Hw1fMcConfig, SampleSplit};
 use finstack_quant_core::Result;
@@ -164,14 +164,11 @@ impl Hw1fPaths<'_> {
         P: Payoff,
     {
         let process = HullWhite1FProcess::new(self.process_params.clone());
-        let disc = ExactHullWhite1F::new();
-        let num_steps = self.grid.num_steps();
+        let prepared = ExactHullWhite1F::prepare_grid(&process, self.grid);
         let base_rng = PhiloxRng::new(self.config.seed);
 
-        // Per-path scratch buffers hoisted out of the path loop; the
-        // discretization step fully overwrites `work` and `z` each step,
-        // so reusing them across paths is bit-identical to fresh allocations.
-        let mut work = vec![0.0; disc.work_size(&process)];
+        // Every leg consumes the same interval coefficients. Only its normal
+        // draw, short rate, bank account and payoff accumulator vary by path.
         let mut z = [0.0_f64; 1];
 
         let multiplicity = self.config.split().multiplicity;
@@ -188,22 +185,14 @@ impl Hw1fPaths<'_> {
                 state.set_key(StateKey::BankAccount, bank);
 
                 let mut next_event = 0usize;
-                for step in 0..num_steps {
-                    let t = self.grid.time(step);
+                for (step, interval) in prepared.get_steps().iter().enumerate() {
                     let dt = self.grid.dt(step);
                     rng.fill_std_normals(&mut z);
                     if anti == 1 {
                         z[0] = -z[0];
                     }
                     let r_prev = r;
-                    disc.step(
-                        &process,
-                        t,
-                        dt,
-                        core::slice::from_mut(&mut r),
-                        &z,
-                        &mut work,
-                    );
+                    r = interval.apply(r, z[0]);
                     bank *= bank_step_factor(r_prev, r, dt);
 
                     let t_next = self.grid.time(step + 1);
@@ -354,6 +343,7 @@ fn push_subdivided_segment(times: &mut Vec<f64>, from: f64, to: f64, min_steps: 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::monte_carlo::traits::Discretization;
     use finstack_quant_core::money::Money;
 
     /// Trivial "pays 1.0 at the first event" payoff used for end-to-end sanity checks.
@@ -391,6 +381,189 @@ mod tests {
         }
         fn reset(&mut self) {
             self.pv = 0.0;
+        }
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    struct RateObservation {
+        step: usize,
+        time_bits: u64,
+        rate_bits: u64,
+        bank_bits: u64,
+    }
+
+    #[derive(Debug, Clone, Default)]
+    struct RateTracePayoff {
+        observations: Vec<RateObservation>,
+    }
+
+    impl Payoff for RateTracePayoff {
+        fn on_event(&mut self, state: &mut PathState) -> Result<()> {
+            self.observations.push(RateObservation {
+                step: state.step,
+                time_bits: state.time.to_bits(),
+                rate_bits: state
+                    .get_key(StateKey::ShortRate)
+                    .expect("short rate supplied at each event")
+                    .to_bits(),
+                bank_bits: state
+                    .get_key(StateKey::BankAccount)
+                    .expect("bank account supplied at each event")
+                    .to_bits(),
+            });
+            Ok(())
+        }
+
+        fn value(&self, currency: Currency) -> Result<Money> {
+            Money::new(0.0, currency)
+        }
+
+        fn reset(&mut self) {
+            self.observations.clear();
+        }
+    }
+
+    // This oracle steps directly from the process and grid, without using
+    // prepared intervals, and retains the original length-one normal draws.
+    fn direct_rate_traces(driver: &Hw1fPaths<'_>) -> Vec<Vec<RateObservation>> {
+        let process = HullWhite1FProcess::new(driver.process_params.clone());
+        let disc = ExactHullWhite1F::new();
+        let base_rng = PhiloxRng::new(driver.config.seed);
+        let mut paths = Vec::new();
+        for path_id in 0..driver.config.num_paths {
+            for anti in 0..driver.config.split().multiplicity {
+                let mut rng = base_rng.substream(path_id as u64);
+                let mut rate = [driver.r0];
+                let mut bank = 1.0;
+                let mut z = [0.0];
+                let mut observations = Vec::new();
+                let mut next_event = 0;
+                for step in 0..driver.grid.num_steps() {
+                    rng.fill_std_normals(&mut z);
+                    if anti == 1 {
+                        z[0] = -z[0];
+                    }
+                    let previous_rate = rate[0];
+                    let dt = driver.grid.dt(step);
+                    disc.step(&process, driver.grid.time(step), dt, &mut rate, &z, &mut []);
+                    bank *= bank_step_factor(previous_rate, rate[0], dt);
+                    while next_event < driver.event_step_indices.len()
+                        && driver.event_step_indices[next_event] == step + 1
+                    {
+                        observations.push(RateObservation {
+                            step: step + 1,
+                            time_bits: driver.grid.time(step + 1).to_bits(),
+                            rate_bits: rate[0].to_bits(),
+                            bank_bits: bank.to_bits(),
+                        });
+                        next_event += 1;
+                    }
+                }
+                paths.push(observations);
+            }
+        }
+        paths
+    }
+
+    #[test]
+    fn prepared_rate_driver_preserves_rates_banks_and_event_order() {
+        let grids = [
+            TimeGrid::from_times(vec![0.0]).expect("zero-step grid"),
+            TimeGrid::uniform(1.4, 4).expect("uniform grid"),
+            TimeGrid::from_times(vec![0.0, 0.07, 0.2, 0.75, 1.0, 1.45]).expect("nonuniform grid"),
+        ];
+        for kappa in [1e-10, 0.03] {
+            let parameters = [
+                HullWhite1FParams::with_time_dependent_theta(
+                    kappa,
+                    0.012,
+                    vec![-0.02, 0.04, 0.01, 0.06, -0.01],
+                    vec![0.0, 0.08, 0.2, 0.55, 1.05],
+                )
+                .expect("theta schedule"),
+                HullWhite1FParams::with_piecewise_sigma(
+                    kappa,
+                    vec![0.0, 0.11, 0.75],
+                    vec![0.012, 0.021, 0.008],
+                    vec![-0.02, 0.04, 0.01, 0.06, -0.01],
+                    vec![0.0, 0.08, 0.2, 0.55, 1.05],
+                )
+                .expect("sigma and theta schedules"),
+            ];
+            for params in &parameters {
+                for grid in &grids {
+                    let all_events: Vec<_> = (1..=grid.num_steps()).collect();
+                    let sparse_events = if grid.num_steps() == 0 {
+                        vec![]
+                    } else {
+                        vec![1, 1, grid.num_steps()]
+                    };
+                    for event_steps in [&all_events, &sparse_events] {
+                        for seed in [0, 42, u64::MAX] {
+                            for r0 in [-0.01, 0.03] {
+                                for antithetic in [false, true] {
+                                    for oos_lsmc in [false, true] {
+                                        let config = Hw1fMcConfig {
+                                            num_paths: 4,
+                                            seed,
+                                            antithetic,
+                                            oos_lsmc,
+                                            ..Default::default()
+                                        };
+                                        let driver = Hw1fPaths {
+                                            process_params: params,
+                                            r0,
+                                            grid,
+                                            event_step_indices: event_steps,
+                                            config: &config,
+                                        };
+                                        let expected = direct_rate_traces(&driver);
+                                        let mut actual = Vec::new();
+                                        let mut event_order = Vec::new();
+                                        driver
+                                            .simulate(
+                                                RateTracePayoff::default,
+                                                |path_id, event_id, payoff, rate, bank| {
+                                                    assert_eq!(
+                                                        payoff.observations.len(),
+                                                        event_id + 1
+                                                    );
+                                                    let observation =
+                                                        &payoff.observations[event_id];
+                                                    assert_eq!(
+                                                        observation.rate_bits,
+                                                        rate.to_bits()
+                                                    );
+                                                    assert_eq!(
+                                                        observation.bank_bits,
+                                                        bank.to_bits()
+                                                    );
+                                                    event_order.push((path_id, event_id));
+                                                    Ok(())
+                                                },
+                                                |path_id, payoff| {
+                                                    assert_eq!(path_id, actual.len());
+                                                    actual.push(payoff.observations.clone());
+                                                    Ok(())
+                                                },
+                                            )
+                                            .expect("prepared path simulation");
+                                        assert_eq!(actual.len(), config.simulated_path_count());
+                                        assert_eq!(actual, expected);
+                                        let expected_order: Vec<_> = (0..actual.len())
+                                            .flat_map(|path_id| {
+                                                (0..event_steps.len())
+                                                    .map(move |event_id| (path_id, event_id))
+                                            })
+                                            .collect();
+                                        assert_eq!(event_order, expected_order);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 

@@ -35,6 +35,9 @@ use finstack_quant_valuations::instruments::fx::fx_touch_option::{FxTouchOption,
 use finstack_quant_valuations::instruments::fx::fx_variance_swap::FxVarianceSwap;
 use finstack_quant_valuations::instruments::fx::quanto_option::QuantoOption;
 use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
+use finstack_quant_valuations::pricer::ModelKey;
+
+mod support;
 use std::hint::black_box;
 use std::sync::Arc;
 use time::Month;
@@ -300,132 +303,243 @@ fn make_quanto(as_of: Date, tenor_years: i32) -> QuantoOption {
 
 // Benchmarks
 
-/// Scale barrier option pricing vs tenor (1Y, 2Y, 5Y).
-///
-/// Measures the Rubinstein-Reiner closed-form single-barrier pricer including
-/// spot and vol-surface lookups and discount-factor interpolation.
+/// Price a two-year live up-and-out barrier with the continuous closed form.
 fn bench_barrier_option_tenor(c: &mut Criterion) {
-    let as_of = base_date();
-    let market = create_market(as_of);
-
     let mut group = c.benchmark_group("fx_barrier_option/tenor");
     let years = 2;
-    let inst = make_barrier(as_of, years, BarrierType::UpAndOut);
     group.bench_with_input(
         BenchmarkId::from_parameter(format!("{years}Y")),
         &years,
-        |b, _| b.iter(|| black_box(inst.value(black_box(&market), black_box(as_of))).unwrap()),
+        |b, years| {
+            let as_of = base_date();
+            let market = create_market(as_of);
+            let inst = make_barrier(as_of, *years, BarrierType::UpAndOut);
+            assert_eq!(inst.default_model(), ModelKey::FxBarrierBSContinuous);
+            assert!(inst.expiry > as_of);
+            assert!(inst.barrier > 1.10);
+            support::bench(
+                b,
+                || {
+                    inst.value(black_box(&market), black_box(as_of))
+                        .expect("FX barrier option PV")
+                },
+                |value| {
+                    assert_eq!(value.currency(), Currency::USD);
+                    assert!(value.amount().is_finite());
+                },
+            );
+        },
     );
     group.finish();
 }
 
-/// Compare all four barrier types: UpAndOut, UpAndIn, DownAndOut, DownAndIn.
+/// Compare live up barriers and explicitly identified already-breached down controls.
 fn bench_barrier_option_type(c: &mut Criterion) {
-    let as_of = base_date();
-    let market = create_market(as_of);
-
     let cases = [
         ("UpAndOut", BarrierType::UpAndOut),
         ("UpAndIn", BarrierType::UpAndIn),
-        ("DownAndOut", BarrierType::DownAndOut),
-        ("DownAndIn", BarrierType::DownAndIn),
+        (
+            "DownAndOut_already_breached_control",
+            BarrierType::DownAndOut,
+        ),
+        ("DownAndIn_already_breached_control", BarrierType::DownAndIn),
     ];
-
     let mut group = c.benchmark_group("fx_barrier_option/barrier_type");
-    for (name, barrier_type) in &cases {
-        let inst = make_barrier(as_of, 1, *barrier_type);
-        group.bench_with_input(BenchmarkId::from_parameter(*name), name, |b, _| {
-            b.iter(|| black_box(inst.value(black_box(&market), black_box(as_of))).unwrap())
-        });
+    for (name, barrier_type) in cases {
+        group.bench_with_input(
+            BenchmarkId::from_parameter(name),
+            &barrier_type,
+            |b, barrier_type| {
+                let as_of = base_date();
+                let market = create_market(as_of);
+                let inst = make_barrier(as_of, 1, *barrier_type);
+                assert_eq!(inst.default_model(), ModelKey::FxBarrierBSContinuous);
+                assert_eq!(inst.barrier_type, *barrier_type);
+                assert!(inst.expiry > as_of);
+                // The preserved 1.20 barrier is above spot: live for up barriers,
+                // already breached for the explicitly named down controls.
+                assert!(matches!(
+                    market.get_price("EURUSD-SPOT"),
+                    Ok(MarketScalar::Unitless(spot)) if inst.barrier > *spot
+                ));
+                support::bench(
+                    b,
+                    || {
+                        inst.value(black_box(&market), black_box(as_of))
+                            .expect("FX barrier option PV")
+                    },
+                    |value| {
+                        assert_eq!(value.currency(), Currency::USD);
+                        assert!(value.amount().is_finite());
+                        if *barrier_type == BarrierType::DownAndOut {
+                            assert_eq!(value.amount(), 0.0);
+                        }
+                    },
+                );
+            },
+        );
     }
     group.finish();
 }
 
-/// Scale touch option pricing vs tenor (1Y, 2Y, 5Y).
+/// Price a two-year one-touch contract with the closed form.
 fn bench_touch_option_tenor(c: &mut Criterion) {
-    let as_of = base_date();
-    let market = create_market(as_of);
-
     let mut group = c.benchmark_group("fx_touch_option/tenor");
     let years = 2;
-    let inst = make_touch(as_of, years, TouchType::OneTouch);
     group.bench_with_input(
         BenchmarkId::from_parameter(format!("{years}Y")),
         &years,
-        |b, _| b.iter(|| black_box(inst.value(black_box(&market), black_box(as_of))).unwrap()),
+        |b, years| {
+            let as_of = base_date();
+            let market = create_market(as_of);
+            let inst = make_touch(as_of, *years, TouchType::OneTouch);
+            assert_eq!(inst.default_model(), ModelKey::Black76);
+            assert_eq!(inst.touch_type, TouchType::OneTouch);
+            assert!(inst.expiry > as_of);
+            assert!(inst.barrier < 1.10);
+            support::bench(
+                b,
+                || {
+                    inst.value(black_box(&market), black_box(as_of))
+                        .expect("FX one-touch PV")
+                },
+                |value| {
+                    assert_eq!(value.currency(), Currency::USD);
+                    assert!(value.amount().is_finite());
+                },
+            );
+        },
     );
     group.finish();
 }
 
 /// Compare one-touch vs no-touch pricing.
 fn bench_touch_option_type(c: &mut Criterion) {
-    let as_of = base_date();
-    let market = create_market(as_of);
-
     let mut group = c.benchmark_group("fx_touch_option/touch_type");
     for (name, touch_type) in [
         ("OneTouch", TouchType::OneTouch),
         ("NoTouch", TouchType::NoTouch),
     ] {
-        let inst = make_touch(as_of, 1, touch_type);
-        group.bench_with_input(BenchmarkId::from_parameter(name), &name, |b, _| {
-            b.iter(|| black_box(inst.value(black_box(&market), black_box(as_of))).unwrap())
-        });
+        group.bench_with_input(
+            BenchmarkId::from_parameter(name),
+            &touch_type,
+            |b, touch_type| {
+                let as_of = base_date();
+                let market = create_market(as_of);
+                let inst = make_touch(as_of, 1, *touch_type);
+                assert_eq!(inst.default_model(), ModelKey::Black76);
+                assert_eq!(inst.touch_type, *touch_type);
+                assert!(inst.expiry > as_of);
+                assert!(inst.barrier < 1.10);
+                support::bench(
+                    b,
+                    || {
+                        inst.value(black_box(&market), black_box(as_of))
+                            .expect("FX touch option PV")
+                    },
+                    |value| {
+                        assert_eq!(value.currency(), Currency::USD);
+                        assert!(value.amount().is_finite());
+                    },
+                );
+            },
+        );
     }
     group.finish();
 }
 
 /// Compare cash-or-nothing vs asset-or-nothing digital options.
 fn bench_digital_option_payout_type(c: &mut Criterion) {
-    let as_of = base_date();
-    let market = create_market(as_of);
-
     let mut group = c.benchmark_group("fx_digital_option/payout_type");
     for (name, payout_type) in [
         ("CashOrNothing", DigitalPayoutType::CashOrNothing),
         ("AssetOrNothing", DigitalPayoutType::AssetOrNothing),
     ] {
-        let inst = make_digital(as_of, 1, payout_type);
-        group.bench_with_input(BenchmarkId::from_parameter(name), &name, |b, _| {
-            b.iter(|| black_box(inst.value(black_box(&market), black_box(as_of))).unwrap())
-        });
+        group.bench_with_input(
+            BenchmarkId::from_parameter(name),
+            &payout_type,
+            |b, payout_type| {
+                let as_of = base_date();
+                let market = create_market(as_of);
+                let inst = make_digital(as_of, 1, *payout_type);
+                assert_eq!(inst.default_model(), ModelKey::Black76);
+                assert_eq!(inst.payout_type, *payout_type);
+                assert!(inst.expiry > as_of);
+                support::bench(
+                    b,
+                    || {
+                        inst.value(black_box(&market), black_box(as_of))
+                            .expect("FX digital option PV")
+                    },
+                    |value| {
+                        assert_eq!(value.currency(), Currency::USD);
+                        assert!(value.amount().is_finite());
+                    },
+                );
+            },
+        );
     }
     group.finish();
 }
 
-/// Scale variance swap replication vs tenor (1Y, 2Y, 5Y).
-///
-/// Fair-strike is computed via Carr-Madan replication integrating over the vol
-/// surface. Longer tenors require wider strike ranges and more interpolation calls.
+/// Price a two-year variance swap using Carr-Madan replication over its vol surface.
 fn bench_variance_swap_tenor(c: &mut Criterion) {
-    let as_of = base_date();
-    let market = create_market(as_of);
-
     let mut group = c.benchmark_group("fx_variance_swap/tenor");
     let years = 2;
-    let inst = make_variance_swap(as_of, years);
     group.bench_with_input(
         BenchmarkId::from_parameter(format!("{years}Y")),
         &years,
-        |b, _| b.iter(|| black_box(inst.value(black_box(&market), black_box(as_of))).unwrap()),
+        |b, years| {
+            let as_of = base_date();
+            let market = create_market(as_of);
+            let inst = make_variance_swap(as_of, *years);
+            assert_eq!(inst.default_model(), ModelKey::Discounting);
+            assert_eq!(inst.start_date, as_of);
+            assert!(inst.maturity > as_of);
+            support::bench(
+                b,
+                || {
+                    inst.value(black_box(&market), black_box(as_of))
+                        .expect("FX variance swap PV")
+                },
+                |value| {
+                    assert_eq!(value.currency(), Currency::USD);
+                    assert!(value.amount().is_finite());
+                },
+            );
+        },
     );
     group.finish();
 }
 
-/// Scale quanto option pricing vs tenor (1Y, 2Y, 5Y).
-///
-/// Measures quanto drift adjustment and BS pricing.
+/// Price a two-year quanto option with the drift-adjusted Black-Scholes model.
 fn bench_quanto_option_tenor(c: &mut Criterion) {
-    let as_of = base_date();
-    let market = create_market(as_of);
-
     let mut group = c.benchmark_group("fx_quanto_option/tenor");
     let years = 2;
-    let inst = make_quanto(as_of, years);
     group.bench_with_input(
         BenchmarkId::from_parameter(format!("{years}Y")),
         &years,
-        |b, _| b.iter(|| black_box(inst.value(black_box(&market), black_box(as_of))).unwrap()),
+        |b, years| {
+            let as_of = base_date();
+            let market = create_market(as_of);
+            let inst = make_quanto(as_of, *years);
+            assert_eq!(inst.default_model(), ModelKey::QuantoBS);
+            assert_eq!(inst.base_currency, Currency::JPY);
+            assert_eq!(inst.quote_currency, Currency::USD);
+            assert!(inst.quantity.is_some() && inst.payoff_fx_rate.is_some());
+            assert!(inst.expiry > as_of);
+            support::bench(
+                b,
+                || {
+                    inst.value(black_box(&market), black_box(as_of))
+                        .expect("quanto option PV")
+                },
+                |value| {
+                    assert_eq!(value.currency(), Currency::USD);
+                    assert!(value.amount().is_finite());
+                },
+            );
+        },
     );
     group.finish();
 }

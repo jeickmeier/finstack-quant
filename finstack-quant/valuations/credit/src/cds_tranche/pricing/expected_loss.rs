@@ -507,6 +507,40 @@ impl CdsTranchePricer {
             )
         })
     }
+
+    /// Expose the actual four caps used by projection to offline numerical tests.
+    ///
+    /// # Arguments
+    /// * `tranche` - Frozen contract supplying effective attachment and detachment.
+    /// * `index_data` - Frozen constituent data and base-correlation curve.
+    /// * `date` - Accrual-end date at which projection evaluates default exposure.
+    #[cfg(test)]
+    pub(super) fn paired_capped_expectations_for_test(
+        &self,
+        tranche: &CdsTranche,
+        index_data: &CreditIndexData,
+        date: Date,
+    ) -> Result<[f64; 4]> {
+        let inv = self.el_invariants(tranche, index_data)?;
+        if inv.eff_detach <= inv.eff_attach || inv.orig_width <= 1e-9 {
+            return Ok([0.0; 4]);
+        }
+        let attach = self.calculate_equity_tranche_capped_pair(
+            inv.eff_attach * 100.0,
+            (1.0 - inv.eff_attach) * 100.0,
+            inv.corr_attach,
+            index_data,
+            date,
+        )?;
+        let detach = self.calculate_equity_tranche_capped_pair(
+            inv.eff_detach * 100.0,
+            (1.0 - inv.eff_detach) * 100.0,
+            inv.corr_detach,
+            index_data,
+            date,
+        )?;
+        Ok([attach.0, attach.1, detach.0, detach.1])
+    }
 }
 
 #[cfg(test)]
@@ -528,5 +562,82 @@ mod production_credit_audit {
             .resolve_tranchelet_difference(0.01 - 4.0 * tolerance, 0.01, 3.0, 7.0, date)
             .expect_err("materially negative loss");
         assert!(error.to_string().contains("integration budget"));
+    }
+}
+
+#[cfg(test)]
+mod paired_integration_accuracy {
+    use super::*;
+    use crate::cds_tranche::pricing::pricer::{
+        CORR_BOUNDARY_WIDTH, MAX_CORRELATION, MIN_CORRELATION,
+    };
+
+    #[test]
+    fn homogeneous_pair_matches_independent_loss_and_recovery_references() {
+        let reference: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/production_tranche_loss_reference.json"
+        ))
+        .expect("independent finite-pool reference");
+        let pricer = CdsTranchePricer::new();
+        let identity_band =
+            (MIN_CORRELATION + CORR_BOUNDARY_WIDTH)..=(MAX_CORRELATION - CORR_BOUNDARY_WIDTH);
+        let mut compared = 0;
+        for row in reference["cases"].as_array().expect("reference cases") {
+            let count = row["n"].as_u64().expect("pool size") as usize;
+            let default_prob = row["pd"].as_f64().expect("default probability");
+            let correlation = row["correlation"].as_f64().expect("correlation");
+            if !identity_band.contains(&correlation) {
+                continue;
+            }
+            let recovery = row["recovery"].as_f64().expect("recovery");
+            let loss_exposure = 1.0 - recovery;
+            let loss_cap = row["cap"].as_f64().expect("loss cap");
+            let expected_loss = row["expected_loss"].as_f64().expect("independent loss");
+            assert!(loss_cap <= loss_exposure);
+            let recovery_scale = recovery / loss_exposure;
+            let recovery_cap = loss_cap * recovery_scale;
+            let expected_recovery = expected_loss * recovery_scale;
+
+            // These are genuine complementary production caps. Below the
+            // loss/recovery seam, recovered principal is uncapped and has
+            // the analytic mean R*p. Above it, use the independent identity
+            // min(R*K/N, cap*R/LGD) = (R/LGD)*min(LGD*K/N, cap).
+            // This maps the independently integrated loss pin to recovery
+            // without using production integration to generate its oracle.
+            let lower_pair = pricer
+                .homogeneous_capped_pair(
+                    loss_cap,
+                    1.0 - loss_cap,
+                    count,
+                    default_prob,
+                    recovery,
+                    correlation,
+                )
+                .expect("loss-binding complementary pair");
+            let upper_pair = pricer
+                .homogeneous_capped_pair(
+                    1.0 - recovery_cap,
+                    recovery_cap,
+                    count,
+                    default_prob,
+                    recovery,
+                    correlation,
+                )
+                .expect("recovery-binding complementary pair");
+            for (label, actual, expected) in [
+                ("lower loss", lower_pair.0, expected_loss),
+                ("lower recovery", lower_pair.1, recovery * default_prob),
+                ("upper loss", upper_pair.0, loss_exposure * default_prob),
+                ("upper recovery", upper_pair.1, expected_recovery),
+            ] {
+                assert!(
+                    (actual - expected).abs() < 2e-10,
+                    "{label}: N={count}, PD={default_prob}, rho={correlation}, \
+                     loss cap={loss_cap}: {actual:.15} vs {expected:.15}"
+                );
+            }
+            compared += 1;
+        }
+        assert!(compared > 0, "no independent paired reference was checked");
     }
 }

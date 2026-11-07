@@ -21,6 +21,10 @@ use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
 use finstack_quant_valuations_credit::cds_tranche::CdsTranchePricer;
 use std::sync::Arc;
 
+#[cfg(test)]
+#[path = "../../tests/performance/base_correlation.rs"]
+mod performance_diagnostics;
+
 /// Prepared CDS tranche quote paired with its normalized detachment percentage.
 #[derive(Debug, Clone)]
 pub(crate) struct CdsTrancheCalibrationQuote {

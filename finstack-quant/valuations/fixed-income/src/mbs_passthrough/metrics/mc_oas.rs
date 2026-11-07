@@ -8,8 +8,8 @@
 //!
 //! 1. Simulate N interest rate paths using HW1F exact discretization
 //! 2. For each path, project cashflows with rate-dependent prepayment
-//! 3. Discount each path's cashflows at the simulated short rates + OAS
-//! 4. Average across paths to get the model price
+//! 3. Average each month's cashflows discounted at the simulated short rates
+//! 4. Apply OAS discounting to these monthly coefficients to get the model price
 //! 5. Use Brent's method to find OAS that equates model price to market price
 //!
 //! # Prepayment Model
@@ -299,10 +299,10 @@ fn rate_adjusted_smm(base_smm: f64, current_rate: f64, base_rate: f64, sensitivi
     (base_smm * multiplier).clamp(0.0, SMM_SAFETY_CAP)
 }
 
-/// Price MBS on a single rate path with a given OAS.
+/// Add one path's zero-OAS discounted cashflows to the monthly coefficients.
 ///
-/// Projects monthly cashflows using rate-dependent prepayment and
-/// discounts each cashflow at the path's short rate + OAS.
+/// Prepayment and amortization depend on the path's rates, not the trial OAS,
+/// so each path is projected only once before the spread solver starts.
 ///
 /// The projection grid, accrual fractions, and seasoning come from the
 /// precomputed [`McStepSchedule`], which mirrors the deterministic pricer:
@@ -310,24 +310,23 @@ fn rate_adjusted_smm(base_smm: f64, current_rate: f64, base_rate: f64, sensitivi
 /// in-flight receivable), interest accrues on the pool day-count over the
 /// actual calendar month, and the PSA/CPR ramp reflects the true pool age.
 ///
-fn price_on_path(
+fn accumulate_zero_oas_cashflows(
     mbs: &AgencyMbsPassthrough,
     path: &RatePath,
     base_rate: f64,
-    oas: f64,
     prepay_sensitivity: f64,
     steps: &McStepSchedule,
-) -> f64 {
+    coefficients: &mut [f64],
+) {
     let dt = 1.0 / 12.0;
 
     let mut balance = mbs.current_face.amount();
-    let mut pv = 0.0;
     let mut cumulative_df = 1.0;
 
     let wam = mbs.wam_months as usize;
     let num_steps = path.rates.len().saturating_sub(1).min(wam).min(steps.len());
 
-    for month in 0..num_steps {
+    for (month, coefficient) in coefficients.iter_mut().enumerate().take(num_steps) {
         if balance < 0.01 {
             break;
         }
@@ -339,8 +338,9 @@ fn price_on_path(
         // accumulated over the 360 monthly steps (~3 bp on price).
         let current_rate = path.rates[month];
 
-        // Discount factor for this step: exp(-(r + oas) × dt)
-        let step_df = (-(current_rate + oas) * dt).exp();
+        // Zero-OAS discount factor for this step; spread discounting is
+        // applied later using the actual payment time.
+        let step_df = (-current_rate * dt).exp();
         cumulative_df *= step_df;
 
         let base_smm = steps.base_smms[month];
@@ -368,16 +368,90 @@ fn price_on_path(
         // PV of this month's cashflow, discounted to the actual payment date:
         // the cumulative grid DF covers up to the step's grid endpoint, and
         // the (possibly negative) payment extra adjusts to the actual payment
-        // date at the current short rate + OAS (matching the deterministic
+        // date at the current short rate (matching the deterministic
         // pricer's payment dating).
         let extra = steps.payment_extras[month];
-        let delay_df = (-(current_rate + oas) * extra).exp();
-        pv += total_cf * cumulative_df * delay_df;
+        let delay_df = (-current_rate * extra).exp();
+        *coefficient += total_cf * cumulative_df * delay_df;
 
         balance = step.ending_balance;
     }
+}
 
-    pv
+/// Mean monthly zero-OAS discounted cashflows, prepared once per valuation.
+///
+/// Fixed contiguous blocks bound scratch storage to at most 32 monthly
+/// vectors. Indexed collection and an ordered serial merge keep the arithmetic
+/// independent of Rayon scheduling and thread count; WASM uses the same blocks.
+fn mean_zero_oas_cashflows(
+    mbs: &AgencyMbsPassthrough,
+    paths: &[RatePath],
+    base_rate: f64,
+    prepay_sensitivity: f64,
+    steps: &McStepSchedule,
+) -> Vec<f64> {
+    const MAX_BLOCKS: usize = 32;
+    let block_len = paths.len().div_ceil(MAX_BLOCKS).max(1);
+    let project_block = |block: &[RatePath]| {
+        let mut coefficients = vec![0.0; steps.len()];
+        for path in block {
+            accumulate_zero_oas_cashflows(
+                mbs,
+                path,
+                base_rate,
+                prepay_sensitivity,
+                steps,
+                &mut coefficients,
+            );
+        }
+        coefficients
+    };
+
+    #[cfg(not(target_arch = "wasm32"))]
+    let blocks: Vec<Vec<f64>> = {
+        use rayon::prelude::*;
+        paths.par_chunks(block_len).map(project_block).collect()
+    };
+    #[cfg(target_arch = "wasm32")]
+    let blocks: Vec<Vec<f64>> = paths.chunks(block_len).map(project_block).collect();
+
+    let mut coefficients = vec![0.0; steps.len()];
+    for block in blocks {
+        for (coefficient, contribution) in coefficients.iter_mut().zip(block) {
+            *coefficient += contribution;
+        }
+    }
+    for coefficient in &mut coefficients {
+        *coefficient /= paths.len() as f64;
+    }
+    coefficients
+}
+
+/// Actual payment times on the same curve clock as the simulated monthly grid.
+fn oas_payment_times(steps: &McStepSchedule) -> Vec<f64> {
+    steps
+        .payment_extras
+        .iter()
+        .enumerate()
+        .map(|(month, extra)| (month as f64 + 1.0) * (1.0 / 12.0) + extra)
+        .collect()
+}
+
+/// Apply a decimal OAS to the prepared monthly mean cashflows.
+fn spread_value(coefficients: &[f64], payment_times: &[f64], oas: f64) -> f64 {
+    coefficients
+        .iter()
+        .zip(payment_times)
+        .map(|(&coefficient, &time)| {
+            // Fully paid-off months have no contribution. Do not turn a zero
+            // tail into NaN by evaluating an overflowing long-horizon factor.
+            if coefficient == 0.0 {
+                0.0
+            } else {
+                coefficient * (-oas * time).exp()
+            }
+        })
+        .sum()
 }
 
 /// Calculate Monte Carlo OAS for an agency MBS.
@@ -395,7 +469,8 @@ fn price_on_path(
 ///   excludes the prior month's in-flight payment (see `quote_basis_pool`).
 /// * `market` - Market context with discount curves
 /// * `as_of` - Valuation date
-/// * `config` - Monte Carlo configuration (paths, HW params, seed)
+/// * `config` - Monte Carlo configuration with at least one independent path,
+///   Hull-White parameters and a deterministic root seed.
 ///
 /// # Returns
 ///
@@ -421,6 +496,12 @@ pub(crate) fn calculate_mc_oas(
     as_of: Date,
     config: &McOasConfig,
 ) -> Result<f64> {
+    if config.num_paths == 0 {
+        return Err(Error::Validation(
+            "MBS MC-OAS requires at least one simulation path".into(),
+        ));
+    }
+
     // The clean quote plus settlement-month accrued buys the settlement-month
     // accrual onward, so project the pool the buyer receives: the prior
     // month's in-flight P&I belongs to the seller.
@@ -452,36 +533,17 @@ pub(crate) fn calculate_mc_oas(
         config.seed,
     );
 
-    // Objective: average price across paths minus market price.
-    //
-    // Paths are independent, so price them in parallel and collect the results
-    // in path order; the sum is then taken serially in that order, keeping the
-    // objective value bit-identical to the serial implementation (and therefore
-    // keeping Brent's iterates — and the solved OAS — unchanged).
-    let objective = |oas: f64| -> f64 {
-        let price_one = |path: &_| {
-            price_on_path(
-                mbs,
-                path,
-                initial_rate,
-                oas,
-                super::PREPAY_RATE_SENSITIVITY,
-                &steps,
-            )
-        };
-
-        #[cfg(not(target_arch = "wasm32"))]
-        let path_pvs: Vec<f64> = {
-            use rayon::prelude::*;
-            paths.par_iter().map(price_one).collect()
-        };
-
-        #[cfg(target_arch = "wasm32")]
-        let path_pvs: Vec<f64> = paths.iter().map(price_one).collect();
-
-        let total: f64 = path_pvs.iter().sum();
-        total / config.num_paths as f64 - market_price
-    };
+    // Projection and path discounting are independent of OAS. The objective
+    // only applies spread discounting to the mean monthly coefficients.
+    let coefficients = mean_zero_oas_cashflows(
+        mbs,
+        &paths,
+        initial_rate,
+        super::PREPAY_RATE_SENSITIVITY,
+        &steps,
+    );
+    let payment_times = oas_payment_times(&steps);
+    let objective = |oas: f64| spread_value(&coefficients, &payment_times, oas) - market_price;
 
     // Solve for OAS using Brent's method
     let solver = BrentSolver::new()
@@ -515,6 +577,24 @@ mod tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::{CurveId, InstrumentId};
     use time::Month;
+
+    fn prepared_path_pv(
+        mbs: &AgencyMbsPassthrough,
+        path: &RatePath,
+        base_rate: f64,
+        oas: f64,
+        prepay_sensitivity: f64,
+        steps: &McStepSchedule,
+    ) -> f64 {
+        let coefficients = mean_zero_oas_cashflows(
+            mbs,
+            std::slice::from_ref(path),
+            base_rate,
+            prepay_sensitivity,
+            steps,
+        );
+        spread_value(&coefficients, &oas_payment_times(steps), oas)
+    }
 
     fn create_test_mbs() -> AgencyMbsPassthrough {
         AgencyMbsPassthrough::builder()
@@ -572,6 +652,66 @@ mod tests {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn monthly_aggregation_is_identical_across_thread_counts() {
+        let mut mbs = create_test_mbs();
+        mbs.wam_months = 12;
+        mbs.maturity = Date::from_calendar_date(2025, Month::January, 1).expect("valid");
+        let steps = mc_step_schedule(&mbs, mbs.issue_date, 12, DayCount::Act365F).expect("steps");
+        let params = HullWhite1FParams::new(0.05, 0.01, 0.04).expect("HW parameters");
+        let paths = simulate_rate_paths(0.04, &params, 65, 12, 42);
+        let prepare = |threads| {
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(threads)
+                .build()
+                .expect("local Rayon pool")
+                .install(|| {
+                    mean_zero_oas_cashflows(
+                        &mbs,
+                        &paths,
+                        0.04,
+                        super::super::PREPAY_RATE_SENSITIVITY,
+                        &steps,
+                    )
+                })
+        };
+        let serial = prepare(1);
+        let parallel = prepare(8);
+        assert_eq!(serial.len(), 12);
+        assert_eq!(parallel.len(), serial.len());
+        for (left, right) in serial.iter().zip(&parallel) {
+            assert_eq!(left.to_bits(), right.to_bits());
+        }
+        let times = oas_payment_times(&steps);
+        for spread in [-0.10, -0.05, -0.01, 0.0, 0.01, 0.05, 0.10, 0.20] {
+            assert_eq!(
+                spread_value(&serial, &times, spread).to_bits(),
+                spread_value(&parallel, &times, spread).to_bits()
+            );
+        }
+    }
+
+    #[test]
+    fn mc_oas_rejects_zero_paths() {
+        let mbs = create_test_mbs();
+        let config = McOasConfig {
+            num_paths: 0,
+            ..McOasConfig::resolve(&mbs).expect("config")
+        };
+        let result = calculate_mc_oas(&mbs, 95.0, &MarketContext::new(), mbs.issue_date, &config);
+        assert!(
+            matches!(result, Err(Error::Validation(message)) if message.contains("at least one simulation path"))
+        );
+    }
+
+    #[test]
+    fn paid_off_months_do_not_evaluate_spread_discount() {
+        let pv = spread_value(&[100.0, 0.0], &[0.25, 1e6], -0.10);
+        let expected = 100.0 * 0.025_f64.exp();
+        assert_eq!(pv.to_bits(), expected.to_bits());
+    }
+
     #[test]
     fn test_rate_adjusted_smm() {
         let base_smm = 0.005;
@@ -622,7 +762,7 @@ mod tests {
             rates: vec![base_rate; wam + 1],
         };
 
-        // Re-derive the per-period principal exactly as price_on_path does and
+        // Re-derive the per-period principal exactly as prepared_path_pv does and
         // assert the post-amortization invariant holds every month.
         let monthly_mortgage_rate = mbs.wac / 12.0;
         let mut balance = mbs.current_face.amount();
@@ -633,7 +773,7 @@ mod tests {
             if balance < 0.01 {
                 break;
             }
-            // Use issue_date as as_of (fresh pool) to match price_on_path convention.
+            // Use issue_date as as_of (fresh pool) to match prepared_path_pv convention.
             let base_seasoning = mbs.seasoning_months(mbs.issue_date);
             let seasoning = base_seasoning + month as u32 + 1;
             let base_smm = mbs.prepayment_spec.smm(seasoning).expect("smm");
@@ -667,11 +807,11 @@ mod tests {
             "total principal {total_principal} exceeds starting balance {start_balance}"
         );
 
-        // And price_on_path itself must run without producing a non-finite PV.
+        // And prepared_path_pv itself must run without producing a non-finite PV.
         // Use the MBS issue date so seasoning starts at 0 (fresh pool).
         let as_of = mbs.issue_date;
         let steps = mc_step_schedule(&mbs, as_of, wam, DayCount::Act365F).expect("steps");
-        let pv = price_on_path(&mbs, &path, base_rate, 0.0, 7.0, &steps);
+        let pv = prepared_path_pv(&mbs, &path, base_rate, 0.0, 7.0, &steps);
         assert!(
             pv.is_finite() && pv > 0.0,
             "path PV must be finite/positive"
@@ -702,7 +842,7 @@ mod tests {
         let total: f64 = paths
             .iter()
             .map(|path| {
-                price_on_path(
+                prepared_path_pv(
                     &mbs,
                     path,
                     initial_rate,
@@ -759,8 +899,8 @@ mod tests {
             gnma1_steps.payment_extras[0]
         );
 
-        let pv_fnma = price_on_path(&fnma, &flat_path, base_rate, 0.0, 7.0, &fnma_steps);
-        let pv_gnma1 = price_on_path(&gnma1, &flat_path, base_rate, 0.0, 7.0, &gnma1_steps);
+        let pv_fnma = prepared_path_pv(&fnma, &flat_path, base_rate, 0.0, 7.0, &fnma_steps);
+        let pv_gnma1 = prepared_path_pv(&gnma1, &flat_path, base_rate, 0.0, 7.0, &gnma1_steps);
 
         assert!(
             pv_fnma < pv_gnma1,
@@ -878,8 +1018,8 @@ mod tests {
             mc_step_schedule(&fresh_mbs, as_of, wam, DayCount::Act365F).expect("fresh steps");
         let seasoned_steps =
             mc_step_schedule(&seasoned_mbs, as_of, wam, DayCount::Act365F).expect("seasoned steps");
-        let fresh_pv = price_on_path(&fresh_mbs, &flat_path, base_rate, 0.0, 7.0, &fresh_steps);
-        let seasoned_pv = price_on_path(
+        let fresh_pv = prepared_path_pv(&fresh_mbs, &flat_path, base_rate, 0.0, 7.0, &fresh_steps);
+        let seasoned_pv = prepared_path_pv(
             &seasoned_mbs,
             &flat_path,
             base_rate,
@@ -971,7 +1111,7 @@ mod tests {
             .expect("curve")
             .day_count();
         let steps = mc_step_schedule(&mbs, as_of, wam, curve_dc).expect("steps");
-        let mc_pv = price_on_path(&mbs, &flat_path, flat_rate, 0.0, 7.0, &steps);
+        let mc_pv = prepared_path_pv(&mbs, &flat_path, flat_rate, 0.0, 7.0, &steps);
 
         assert!(det_pv > 0.0 && mc_pv > 0.0);
         let rel_diff = (mc_pv - det_pv).abs() / det_pv;
@@ -1109,3 +1249,7 @@ mod production_mortgage_audit {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "../../../tests/performance/mc_oas.rs"]
+mod mbs_oas_performance_accuracy;

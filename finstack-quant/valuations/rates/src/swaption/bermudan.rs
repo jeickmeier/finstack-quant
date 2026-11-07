@@ -5,6 +5,7 @@ use crate::swaption::pricing::BermudanSwaptionTreeValuator;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::math::time_grid::TimeGrid;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::rates::clock::ModelDiscountCurve;
 use finstack_quant_models::rates::hull_white::{
@@ -183,6 +184,15 @@ pub struct BermudanSwaptionPricerConfig {
     /// instrument via `model_config.mc_paths`), seed, antithetic sampling,
     /// minimum sub-steps between exercise dates and regression basis degree.
     pub mc: Hw1fMcConfig,
+    /// Optional number of uniform base intervals for LSMC simulation.
+    ///
+    /// `Some(n)` requires `n > 0` and builds `n` uniform intervals over the
+    /// ACT/365F model horizon, then inserts every contractual exercise time.
+    /// The resulting grid can be nonuniform and have more than `n` intervals.
+    /// `None` uses the event-aligned grid controlled by
+    /// `mc.min_steps_between_events`; that setting is ignored when this field
+    /// is `Some`. Hull-White tree pricing does not read this field.
+    pub mc_base_steps: Option<usize>,
     /// Prepared Hull-White tree for model reuse.
     ///
     /// When set, the pricer reuses this prepared tree directly. This avoids
@@ -214,6 +224,56 @@ impl BermudanSwaptionPricerConfig {
         basis_degree: 3,
         oos_lsmc: false,
     };
+
+    fn lsmc_grid(
+        &self,
+        exercise_times: &[f64],
+        maturity: f64,
+    ) -> finstack_quant_core::Result<(TimeGrid, Vec<usize>)> {
+        let Some(base_steps) = self.mc_base_steps else {
+            return build_event_aligned_grid(
+                exercise_times,
+                maturity,
+                self.mc.min_steps_between_events,
+            );
+        };
+        if base_steps == 0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "LSMC mc_base_steps must be greater than zero".into(),
+            ));
+        }
+        let mut previous = 0.0;
+        for &time in exercise_times {
+            if !time.is_finite() || time <= previous || time > maturity {
+                return Err(finstack_quant_core::Error::Validation(
+                    "LSMC exercise times must increase strictly within (0, maturity]".into(),
+                ));
+            }
+            previous = time;
+        }
+        let grid = TimeGrid::uniform_with_required_times(
+            maturity,
+            base_steps as f64 / maturity,
+            base_steps,
+            exercise_times,
+        )?;
+        // Resolve contractual events once, using the grid builder's merge
+        // tolerance. No event lookup occurs inside the path-stepping loop.
+        let exercise_indices = exercise_times
+            .iter()
+            .map(|time| {
+                grid.times()
+                    .iter()
+                    .position(|node| (node - time).abs() < 1e-10)
+                    .ok_or_else(|| {
+                        finstack_quant_core::Error::Validation(format!(
+                            "LSMC exercise time {time} is missing from the simulation grid"
+                        ))
+                    })
+            })
+            .collect::<finstack_quant_core::Result<Vec<_>>>()?;
+        Ok((grid, exercise_indices))
+    }
 }
 
 impl Default for BermudanSwaptionPricerConfig {
@@ -221,6 +281,7 @@ impl Default for BermudanSwaptionPricerConfig {
         Self {
             tree_steps: Self::DEFAULT_TREE_STEPS,
             mc: Self::DEFAULT_MC,
+            mc_base_steps: None,
             prepared_model: None,
         }
     }
@@ -491,11 +552,7 @@ impl BermudanSwaptionPricer {
         };
 
         // Build exercise-aligned time grid
-        let (time_grid, exercise_indices) = build_event_aligned_grid(
-            &valid_exercise_times,
-            ttm,
-            self.config.mc.min_steps_between_events,
-        )?;
+        let (time_grid, exercise_indices) = self.config.lsmc_grid(&valid_exercise_times, ttm)?;
 
         // Build θ(t) times for calibration (use grid times)
         let theta_times: Vec<f64> = time_grid
@@ -852,6 +909,67 @@ mod lsmc_diagnostics_tests {
     use time::macros::date;
 
     #[test]
+    fn lsmc_default_grid_preserves_event_interval_policy() {
+        let config = BermudanSwaptionPricerConfig::default();
+        let times = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5];
+        let (grid, indices) = config.lsmc_grid(&times, 5.0).expect("default grid");
+        let (reference, reference_indices) =
+            build_event_aligned_grid(&times, 5.0, config.mc.min_steps_between_events)
+                .expect("event-interval reference");
+        assert_eq!(config.mc_base_steps, None);
+        assert_eq!(grid.times(), reference.times());
+        assert_eq!(indices, reference_indices);
+    }
+
+    #[test]
+    fn lsmc_base_grid_retains_contractual_events() {
+        let times = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5];
+        for base_steps in [64, 128, 256] {
+            let config = BermudanSwaptionPricerConfig {
+                mc_base_steps: Some(base_steps),
+                ..Default::default()
+            };
+            let (grid, indices) = config.lsmc_grid(&times, 5.0).expect("uniform base grid");
+            // 2.5 years is already a uniform node; the seven other events split intervals.
+            assert_eq!(grid.num_steps(), base_steps + 7);
+            assert_eq!(grid.time(0), 0.0);
+            assert_eq!(grid.time(grid.num_steps()), 5.0);
+            assert!(grid.times().windows(2).all(|pair| pair[0] < pair[1]));
+            for (&event, &index) in times.iter().zip(&indices) {
+                assert_eq!(grid.time(index), event);
+            }
+            let changed_minimum = BermudanSwaptionPricerConfig {
+                mc: Hw1fMcConfig {
+                    min_steps_between_events: 1000,
+                    ..config.mc
+                },
+                ..config
+            };
+            let (same_grid, same_indices) = changed_minimum
+                .lsmc_grid(&times, 5.0)
+                .expect("base steps own grid density");
+            assert_eq!(grid.times(), same_grid.times());
+            assert_eq!(indices, same_indices);
+        }
+    }
+
+    #[test]
+    fn lsmc_base_grid_rejects_zero_steps_and_invalid_events() {
+        let zero = BermudanSwaptionPricerConfig {
+            mc_base_steps: Some(0),
+            ..Default::default()
+        };
+        assert!(zero.lsmc_grid(&[1.0], 2.0).is_err());
+        let config = BermudanSwaptionPricerConfig {
+            mc_base_steps: Some(64),
+            ..Default::default()
+        };
+        for events in [&[1.0, 0.5][..], &[0.0][..], &[1.0, 1.0][..], &[3.0][..]] {
+            assert!(config.lsmc_grid(events, 2.0).is_err());
+        }
+    }
+
+    #[test]
     fn public_lsmc_counts_pricing_estimators_and_preserves_seed_determinism() {
         let as_of = date!(2026 - 01 - 15);
         let mut swaption = BermudanSwaption::example().expect("swaption");
@@ -862,39 +980,54 @@ mod lsmc_diagnostics_tests {
         let market = MarketContext::new()
             .insert(DiscountCurve::flat("USD-OIS", as_of, 0.03).expect("discount curve"));
 
-        for antithetic in [false, true] {
-            for oos_lsmc in [false, true] {
-                let pricer =
-                    BermudanSwaptionPricer::lsmc_with_config(BermudanSwaptionPricerConfig {
-                        mc: Hw1fMcConfig {
-                            // The instrument override supplies the 64 actual streams.
-                            num_paths: 16,
-                            antithetic,
-                            oos_lsmc,
-                            seed: 42,
-                            ..BermudanSwaptionPricerConfig::DEFAULT_MC
-                        },
-                        ..Default::default()
-                    });
-                let result = pricer.price_dyn(&swaption, &market, as_of).expect("price");
-                let repeat = pricer.price_dyn(&swaption, &market, as_of).expect("repeat");
-                assert_eq!(
-                    result.measures["lsmc_num_paths"],
-                    if oos_lsmc { 32.0 } else { 64.0 }
-                );
-                assert_eq!(result.value, repeat.value);
-                assert_eq!(result.measures["mc_stderr"], repeat.measures["mc_stderr"]);
-                assert_eq!(
-                    result.measures["lsmc_ci95_low"],
-                    repeat.measures["lsmc_ci95_low"]
-                );
-                assert_eq!(
-                    result.measures["lsmc_ci95_high"],
-                    repeat.measures["lsmc_ci95_high"]
-                );
-                assert!(result.measures["lsmc_ci95_low"] <= result.value.amount());
-                assert!(result.measures["lsmc_ci95_high"] >= result.value.amount());
+        for mc_base_steps in [None, Some(64)] {
+            for antithetic in [false, true] {
+                for oos_lsmc in [false, true] {
+                    let pricer =
+                        BermudanSwaptionPricer::lsmc_with_config(BermudanSwaptionPricerConfig {
+                            mc_base_steps,
+                            mc: Hw1fMcConfig {
+                                // The instrument override supplies the 64 actual streams.
+                                num_paths: 16,
+                                antithetic,
+                                oos_lsmc,
+                                seed: 42,
+                                ..BermudanSwaptionPricerConfig::DEFAULT_MC
+                            },
+                            ..Default::default()
+                        });
+                    let result = pricer.price_dyn(&swaption, &market, as_of).expect("price");
+                    let repeat = pricer.price_dyn(&swaption, &market, as_of).expect("repeat");
+                    assert_eq!(
+                        result.measures["lsmc_num_paths"],
+                        if oos_lsmc { 32.0 } else { 64.0 }
+                    );
+                    assert_eq!(result.value, repeat.value);
+                    assert_eq!(result.measures["mc_stderr"], repeat.measures["mc_stderr"]);
+                    assert_eq!(
+                        result.measures["lsmc_ci95_low"],
+                        repeat.measures["lsmc_ci95_low"]
+                    );
+                    assert_eq!(
+                        result.measures["lsmc_ci95_high"],
+                        repeat.measures["lsmc_ci95_high"]
+                    );
+                    assert!(result.measures["lsmc_ci95_low"] <= result.value.amount());
+                    assert!(result.measures["lsmc_ci95_high"] >= result.value.amount());
+                }
             }
         }
+        let invalid = BermudanSwaptionPricer::lsmc_with_config(BermudanSwaptionPricerConfig {
+            mc_base_steps: Some(0),
+            ..Default::default()
+        });
+        let error = invalid
+            .price_dyn(&swaption, &market, as_of)
+            .expect_err("public pricing must reject zero base steps");
+        assert!(error.to_string().contains("mc_base_steps"));
     }
 }
+
+#[cfg(test)]
+#[path = "../../tests/performance/bermudan.rs"]
+mod performance_accuracy;

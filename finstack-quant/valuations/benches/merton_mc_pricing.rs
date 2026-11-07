@@ -17,12 +17,38 @@
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use finstack_quant_models::credit::{MertonBarrierType, MertonModel};
 use finstack_quant_valuations::instruments::fixed_income::bond::pricing::merton_mc::{
-    MertonMcEngine, MertonMcRun,
+    MertonMcEngine, MertonMcResult, MertonMcRun,
 };
 use finstack_quant_valuations::instruments::{
     BarrierCrossing, MertonMcConfig, PikMode, PikSchedule,
 };
 use std::hint::black_box;
+
+mod support;
+
+fn assert_merton_result(result: &MertonMcResult, run: &MertonMcRun) {
+    for value in [
+        result.clean_price_pct,
+        result.dirty_price_pct,
+        result.expected_loss,
+        result.unexpected_loss,
+        result.expected_shortfall_95,
+        result.average_pik_fraction,
+        result.effective_spread_bp,
+        result.standard_error,
+        result.path_statistics.default_rate,
+        result.path_statistics.avg_default_time,
+        result.path_statistics.avg_terminal_notional,
+        result.path_statistics.avg_recovery_rate,
+        result.path_statistics.pik_exercise_rate,
+    ] {
+        assert!(value.is_finite(), "non-finite Merton MC output");
+    }
+    assert!(result.standard_error >= 0.0);
+    assert!((0.0..=1.0).contains(&result.path_statistics.default_rate));
+    // The result counts independent estimators; each antithetic pair counts once.
+    assert_eq!(result.num_paths, run.num_paths);
+}
 
 // Shared fixtures
 
@@ -64,19 +90,22 @@ fn bench_merton_mc_path_count(c: &mut Criterion) {
 
     group.throughput(Throughput::Elements(n_paths as u64));
     group.bench_with_input(BenchmarkId::from_parameter(n_paths), &n_paths, |b, _| {
-        b.iter(|| {
-            MertonMcEngine::price(
-                black_box(100.0),
-                black_box(0.08),
-                black_box(5.0),
-                black_box(2),
-                black_box(&config),
-                black_box(&config_run),
-                black_box(0.04),
-            )
-            .unwrap()
-            .clean_price_pct
-        });
+        support::bench(
+            b,
+            || {
+                MertonMcEngine::price(
+                    black_box(100.0),
+                    black_box(0.08),
+                    black_box(5.0),
+                    black_box(2),
+                    black_box(&config),
+                    black_box(&config_run),
+                    black_box(0.04),
+                )
+                .expect("Merton MC price")
+            },
+            |result| assert_merton_result(result, &config_run),
+        );
     });
 
     group.finish();
@@ -103,19 +132,22 @@ fn bench_merton_mc_tenor(c: &mut Criterion) {
         BenchmarkId::from_parameter(label),
         &maturity_years,
         |b, &mat| {
-            b.iter(|| {
-                MertonMcEngine::price(
-                    black_box(100.0),
-                    black_box(0.08),
-                    black_box(mat),
-                    black_box(2),
-                    black_box(&config),
-                    black_box(&config_run),
-                    black_box(0.04),
-                )
-                .unwrap()
-                .clean_price_pct
-            });
+            support::bench(
+                b,
+                || {
+                    MertonMcEngine::price(
+                        black_box(100.0),
+                        black_box(0.08),
+                        black_box(mat),
+                        black_box(2),
+                        black_box(&config),
+                        black_box(&config_run),
+                        black_box(0.04),
+                    )
+                    .expect("Merton MC price")
+                },
+                |result| assert_merton_result(result, &config_run),
+            );
         },
     );
 
@@ -146,35 +178,41 @@ fn bench_merton_mc_antithetic(c: &mut Criterion) {
     };
 
     group.bench_function("antithetic_on", |b| {
-        b.iter(|| {
-            MertonMcEngine::price(
-                black_box(100.0),
-                black_box(0.08),
-                black_box(5.0),
-                black_box(2),
-                black_box(&config_on),
-                black_box(&config_on_run),
-                black_box(0.04),
-            )
-            .unwrap()
-            .clean_price_pct
-        });
+        support::bench(
+            b,
+            || {
+                MertonMcEngine::price(
+                    black_box(100.0),
+                    black_box(0.08),
+                    black_box(5.0),
+                    black_box(2),
+                    black_box(&config_on),
+                    black_box(&config_on_run),
+                    black_box(0.04),
+                )
+                .expect("Merton MC price")
+            },
+            |result| assert_merton_result(result, &config_on_run),
+        );
     });
 
     group.bench_function("antithetic_off", |b| {
-        b.iter(|| {
-            MertonMcEngine::price(
-                black_box(100.0),
-                black_box(0.08),
-                black_box(5.0),
-                black_box(2),
-                black_box(&config_off),
-                black_box(&config_off_run),
-                black_box(0.04),
-            )
-            .unwrap()
-            .clean_price_pct
-        });
+        support::bench(
+            b,
+            || {
+                MertonMcEngine::price(
+                    black_box(100.0),
+                    black_box(0.08),
+                    black_box(5.0),
+                    black_box(2),
+                    black_box(&config_off),
+                    black_box(&config_off_run),
+                    black_box(0.04),
+                )
+                .expect("Merton MC price")
+            },
+            |result| assert_merton_result(result, &config_off_run),
+        );
     });
 
     group.finish();
@@ -208,19 +246,22 @@ fn bench_merton_mc_pik_mode(c: &mut Criterion) {
         ("toggle", &config_toggle),
     ] {
         group.bench_function(label, |b| {
-            b.iter(|| {
-                MertonMcEngine::price(
-                    black_box(100.0),
-                    black_box(0.08),
-                    black_box(5.0),
-                    black_box(2),
-                    black_box(config),
-                    black_box(&run),
-                    black_box(0.04),
-                )
-                .unwrap()
-                .clean_price_pct
-            });
+            support::bench(
+                b,
+                || {
+                    MertonMcEngine::price(
+                        black_box(100.0),
+                        black_box(0.08),
+                        black_box(5.0),
+                        black_box(2),
+                        black_box(config),
+                        black_box(&run),
+                        black_box(0.04),
+                    )
+                    .expect("Merton MC price")
+                },
+                |result| assert_merton_result(result, &run),
+            );
         });
     }
 
@@ -253,35 +294,41 @@ fn bench_merton_mc_barrier_type(c: &mut Criterion) {
     };
 
     group.bench_function("terminal_discrete", |b| {
-        b.iter(|| {
-            MertonMcEngine::price(
-                black_box(100.0),
-                black_box(0.08),
-                black_box(5.0),
-                black_box(2),
-                black_box(&config_terminal),
-                black_box(&config_terminal_run),
-                black_box(0.04),
-            )
-            .unwrap()
-            .clean_price_pct
-        });
+        support::bench(
+            b,
+            || {
+                MertonMcEngine::price(
+                    black_box(100.0),
+                    black_box(0.08),
+                    black_box(5.0),
+                    black_box(2),
+                    black_box(&config_terminal),
+                    black_box(&config_terminal_run),
+                    black_box(0.04),
+                )
+                .expect("Merton MC price")
+            },
+            |result| assert_merton_result(result, &config_terminal_run),
+        );
     });
 
     group.bench_function("first_passage_bridge", |b| {
-        b.iter(|| {
-            MertonMcEngine::price(
-                black_box(100.0),
-                black_box(0.08),
-                black_box(5.0),
-                black_box(2),
-                black_box(&config_fp),
-                black_box(&config_fp_run),
-                black_box(0.04),
-            )
-            .unwrap()
-            .clean_price_pct
-        });
+        support::bench(
+            b,
+            || {
+                MertonMcEngine::price(
+                    black_box(100.0),
+                    black_box(0.08),
+                    black_box(5.0),
+                    black_box(2),
+                    black_box(&config_fp),
+                    black_box(&config_fp_run),
+                    black_box(0.04),
+                )
+                .expect("Merton MC price")
+            },
+            |result| assert_merton_result(result, &config_fp_run),
+        );
     });
 
     group.finish();

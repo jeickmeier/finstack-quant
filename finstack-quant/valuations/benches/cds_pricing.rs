@@ -18,9 +18,11 @@ use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
 use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations::results::ValuationResult;
 #[allow(dead_code, unused_imports, clippy::expect_used, clippy::unwrap_used)]
 #[path = "../tests/support/credit.rs"]
 mod credit_support;
+mod support;
 use std::hint::black_box;
 use time::Month;
 
@@ -77,16 +79,26 @@ fn create_market() -> MarketContext {
 
 fn bench_cds_pv(c: &mut Criterion) {
     let mut group = c.benchmark_group("cds_pv");
-    let market = create_market();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
     for tenor in [1, 3, 5, 10].iter() {
-        let cds = create_cds(*tenor);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}Y", tenor)),
             tenor,
             |b, _| {
-                b.iter(|| cds.value(black_box(&market), black_box(as_of)));
+                let market = create_market();
+                let cds = create_cds(*tenor);
+                support::bench(
+                    b,
+                    || {
+                        cds.value(black_box(&market), black_box(as_of))
+                            .expect("CDS PV")
+                    },
+                    |value| {
+                        assert_eq!(value.currency(), Currency::USD);
+                        assert!(value.amount().is_finite());
+                    },
+                );
             },
         );
     }
@@ -95,26 +107,28 @@ fn bench_cds_pv(c: &mut Criterion) {
 
 fn bench_cds_cs01(c: &mut Criterion) {
     let mut group = c.benchmark_group("cds_cs01");
-    let market = create_market();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
     for tenor in [1, 3, 5, 10].iter() {
-        let cds = create_cds(*tenor);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}Y", tenor)),
             tenor,
             |b, _| {
-                b.iter(|| {
-                    let result = cds
-                        .price_with_metrics(
+                let market = create_market();
+                let cds = create_cds(*tenor);
+                support::bench(
+                    b,
+                    || {
+                        cds.price_with_metrics(
                             black_box(&market),
                             black_box(as_of),
                             black_box(&[MetricId::Cs01]),
                             credit_support::pricing_options(),
                         )
-                        .unwrap();
-                    black_box(result)
-                });
+                        .expect("CDS CS01")
+                    },
+                    |result| validate_metrics(result, &[MetricId::Cs01]),
+                );
             },
         );
     }
@@ -123,9 +137,7 @@ fn bench_cds_cs01(c: &mut Criterion) {
 
 fn bench_cds_cs01_metrics(c: &mut Criterion) {
     let mut group = c.benchmark_group("cds_cs01_metrics");
-    let market = create_market();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-    let cds = create_cds(5);
 
     let cases = [
         ("parallel", MetricId::Cs01),
@@ -135,17 +147,21 @@ fn bench_cds_cs01_metrics(c: &mut Criterion) {
     for (name, metric) in cases {
         let metrics = [metric];
         group.bench_function(name, |b| {
-            b.iter(|| {
-                let result = cds
-                    .price_with_metrics(
+            let market = create_market();
+            let cds = create_cds(5);
+            support::bench(
+                b,
+                || {
+                    cds.price_with_metrics(
                         black_box(&market),
                         black_box(as_of),
                         black_box(metrics.as_slice()),
                         credit_support::pricing_options(),
                     )
-                    .unwrap();
-                black_box(result)
-            });
+                    .expect("CDS requested spread risk")
+                },
+                |result| validate_metrics(result, &metrics),
+            );
         });
     }
 
@@ -154,27 +170,52 @@ fn bench_cds_cs01_metrics(c: &mut Criterion) {
 
 fn bench_cds_par_spread(c: &mut Criterion) {
     let mut group = c.benchmark_group("cds_par_spread");
-    let market = create_market();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
     for tenor in [1, 3, 5, 10].iter() {
-        let cds = create_cds(*tenor);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}Y", tenor)),
             tenor,
             |b, _| {
-                b.iter(|| {
-                    cds.price_with_metrics(
-                        black_box(&market),
-                        black_box(as_of),
-                        black_box(&[MetricId::ParSpread]),
-                        finstack_quant_valuations::instruments::PricingOptions::default(),
-                    )
-                });
+                let market = create_market();
+                let cds = create_cds(*tenor);
+                support::bench(
+                    b,
+                    || {
+                        cds.price_with_metrics(
+                            black_box(&market),
+                            black_box(as_of),
+                            black_box(&[MetricId::ParSpread]),
+                            finstack_quant_valuations::instruments::PricingOptions::default(),
+                        )
+                        .expect("CDS par spread")
+                    },
+                    |result| validate_metrics(result, &[MetricId::ParSpread]),
+                );
             },
         );
     }
     group.finish();
+}
+
+fn validate_metrics(result: &ValuationResult, metrics: &[MetricId]) {
+    assert_eq!(result.value.currency(), Currency::USD);
+    assert!(result.value.amount().is_finite());
+    assert!(result.measures.values().all(|value| value.is_finite()));
+    for metric in metrics {
+        assert!(result.measures.contains_key(metric), "missing {metric}");
+        if metric == &MetricId::BucketedCs01 {
+            let prefix = "bucketed_cs01::ACME-HAZARD::";
+            assert_eq!(
+                result
+                    .measures
+                    .keys()
+                    .filter(|key| key.as_str().starts_with(prefix))
+                    .count(),
+                4
+            );
+        }
+    }
 }
 
 criterion_group!(

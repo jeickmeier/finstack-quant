@@ -13,13 +13,15 @@
 use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::time_grid::TimeGrid;
-use finstack_quant_models::monte_carlo::discretization::exact_hw1f::ExactHullWhite1F;
+use finstack_quant_models::monte_carlo::discretization::exact_hw1f::{
+    ExactHullWhite1F, HullWhiteStep,
+};
 use finstack_quant_models::monte_carlo::pricer::basis::BasisFunctions;
 use finstack_quant_models::monte_carlo::pricer::lsq::solve_least_squares;
 use finstack_quant_models::monte_carlo::process::ou::HullWhite1FProcess;
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
-use finstack_quant_models::monte_carlo::traits::{Discretization, RandomStream};
+use finstack_quant_models::monte_carlo::traits::RandomStream;
 use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
 use finstack_quant_models::rates::hw1f::money_estimate_from_pairs;
 
@@ -157,79 +159,66 @@ impl SwaptionLsmcPricer {
         initial_rate: f64,
         time_grid: &TimeGrid,
     ) -> Result<Vec<Vec<f64>>> {
+        let prepared = ExactHullWhite1F::prepare_grid(&self.hw_process, time_grid);
         if self.config.antithetic {
-            self.generate_antithetic_paths_with_grid(initial_rate, time_grid)
+            self.generate_antithetic_paths(initial_rate, prepared.get_steps())
         } else {
-            self.generate_standard_paths_with_grid(initial_rate, time_grid)
+            self.generate_standard_paths(initial_rate, prepared.get_steps())
         }
     }
 
     /// Step a short-rate path using one explicit innovation per grid interval.
-    /// The caller owns the discretization and reusable work buffer, including
-    /// reuse between the positive and negative legs of an antithetic pair.
+    /// The coefficient slice fixes the path length; the callback supplies the
+    /// innovation at each interval without truncating either sequence.
     fn rate_path_with_innovations(
-        &self,
         initial_rate: f64,
-        time_grid: &TimeGrid,
-        innovations: impl Iterator<Item = f64>,
-        disc: &ExactHullWhite1F,
-        work: &mut [f64],
+        intervals: &[HullWhiteStep],
+        mut innovation: impl FnMut(usize) -> f64,
     ) -> Vec<f64> {
-        let mut rate_path = Vec::with_capacity(time_grid.num_steps() + 1);
-        let mut state = vec![initial_rate];
-        let mut z_step = [0.0_f64];
+        let mut rate_path = Vec::with_capacity(intervals.len() + 1);
+        let mut rate = initial_rate;
         rate_path.push(initial_rate);
 
-        for (step, innovation) in innovations.enumerate() {
-            let t = time_grid.time(step);
-            let dt = time_grid.dt(step);
-            z_step[0] = innovation;
-            disc.step(&self.hw_process, t, dt, &mut state, &z_step, work);
-            rate_path.push(state[0]);
+        for (step, interval) in intervals.iter().enumerate() {
+            rate = interval.apply(rate, innovation(step));
+            rate_path.push(rate);
         }
         rate_path
     }
 
-    /// Generate standard (non-antithetic) paths using a time grid.
-    fn generate_standard_paths_with_grid(
+    /// Generate standard paths using the prepared simulation intervals.
+    fn generate_standard_paths(
         &self,
         initial_rate: f64,
-        time_grid: &TimeGrid,
+        intervals: &[HullWhiteStep],
     ) -> Result<Vec<Vec<f64>>> {
-        let disc = ExactHullWhite1F::new();
         let rng = PhiloxRng::new(self.config.seed);
-        let num_steps = time_grid.num_steps();
         let mut paths = Vec::with_capacity(self.config.num_paths);
 
         for path_id in 0..self.config.num_paths {
             let mut path_rng = rng.substream(path_id as u64);
             let mut z = vec![0.0];
-            let mut work = vec![];
             // Keep the standard stream's length-one fills in their original order.
-            let innovations = (0..num_steps).map(|_| {
-                path_rng.fill_std_normals(&mut z);
-                z[0]
-            });
-            paths.push(self.rate_path_with_innovations(
+            paths.push(Self::rate_path_with_innovations(
                 initial_rate,
-                time_grid,
-                innovations,
-                &disc,
-                &mut work,
+                intervals,
+                |_| {
+                    path_rng.fill_std_normals(&mut z);
+                    z[0]
+                },
             ));
         }
         Ok(paths)
     }
 
-    /// Generate adjacent antithetic path pairs (Z, -Z) using a time grid.
-    fn generate_antithetic_paths_with_grid(
+    /// Generate adjacent antithetic pairs using the prepared simulation intervals.
+    fn generate_antithetic_paths(
         &self,
         initial_rate: f64,
-        time_grid: &TimeGrid,
+        intervals: &[HullWhiteStep],
     ) -> Result<Vec<Vec<f64>>> {
-        let disc = ExactHullWhite1F::new();
         let rng = PhiloxRng::new(self.config.seed);
-        let num_steps = time_grid.num_steps();
+        let num_steps = intervals.len();
         let mut paths = Vec::with_capacity(self.config.simulated_path_count());
 
         for pair_id in 0..self.config.num_paths {
@@ -237,20 +226,15 @@ impl SwaptionLsmcPricer {
             // Preserve the original batched fill and Box-Muller spare-normal use.
             let mut z_draws = vec![0.0; num_steps];
             path_rng.fill_std_normals(&mut z_draws);
-            let mut work = vec![];
-            paths.push(self.rate_path_with_innovations(
+            paths.push(Self::rate_path_with_innovations(
                 initial_rate,
-                time_grid,
-                z_draws.iter().copied(),
-                &disc,
-                &mut work,
+                intervals,
+                |step| z_draws[step],
             ));
-            paths.push(self.rate_path_with_innovations(
+            paths.push(Self::rate_path_with_innovations(
                 initial_rate,
-                time_grid,
-                z_draws.iter().map(|&z| -z),
-                &disc,
-                &mut work,
+                intervals,
+                |step| -z_draws[step],
             ));
         }
         Ok(paths)
@@ -427,6 +411,7 @@ mod tests {
     use super::*;
     use finstack_quant_models::monte_carlo::pricer::basis::PolynomialBasis;
     use finstack_quant_models::monte_carlo::process::ou::HullWhite1FParams;
+    use finstack_quant_models::monte_carlo::traits::Discretization;
 
     fn pricer(num_paths: usize, antithetic: bool, oos_lsmc: bool) -> SwaptionLsmcPricer {
         SwaptionLsmcPricer::with_config(
@@ -560,6 +545,29 @@ mod tests {
         Ok(paths)
     }
 
+    fn assert_paths_match_direct(p: &SwaptionLsmcPricer, initial_rate: f64, grid: &TimeGrid) {
+        let expected = if p.config.antithetic {
+            reference_antithetic_paths(p, initial_rate, grid)
+        } else {
+            reference_standard_paths(p, initial_rate, grid)
+        }
+        .expect("direct paths");
+        let actual = p
+            .generate_rate_paths_with_grid(initial_rate, grid)
+            .expect("prepared paths");
+        assert_eq!(actual.len(), p.config.simulated_path_count());
+        assert_eq!(actual.len(), expected.len());
+        for (path_id, (actual_path, expected_path)) in actual.iter().zip(&expected).enumerate() {
+            let actual_bits: Vec<_> = actual_path.iter().map(|v| v.to_bits()).collect();
+            let expected_bits: Vec<_> = expected_path.iter().map(|v| v.to_bits()).collect();
+            assert_eq!(
+                actual_bits, expected_bits,
+                "seed={}, initial={initial_rate}, antithetic={}, oos={}, path={path_id}",
+                p.config.seed, p.config.antithetic, p.config.oos_lsmc,
+            );
+        }
+    }
+
     #[test]
     fn shared_stepping_preserves_legacy_paths_bit_for_bit() {
         // Odd and even interval counts exercise both Box-Muller spare states;
@@ -577,28 +585,60 @@ mod tests {
                         for oos_lsmc in [false, true] {
                             let mut p = pricer(8, antithetic, oos_lsmc);
                             p.config.seed = seed;
-                            let expected = if antithetic {
-                                reference_antithetic_paths(&p, initial_rate, &grid)
-                            } else {
-                                reference_standard_paths(&p, initial_rate, &grid)
-                            }
-                            .expect("legacy paths");
-                            let actual = p
-                                .generate_rate_paths_with_grid(initial_rate, &grid)
-                                .expect("shared-step paths");
-                            assert_eq!(actual.len(), p.config.simulated_path_count());
-                            assert_eq!(actual.len(), expected.len());
-                            for (path_id, (actual_path, expected_path)) in
-                                actual.iter().zip(&expected).enumerate()
-                            {
-                                let actual_bits: Vec<_> =
-                                    actual_path.iter().map(|v| v.to_bits()).collect();
-                                let expected_bits: Vec<_> =
-                                    expected_path.iter().map(|v| v.to_bits()).collect();
-                                assert_eq!(
-                                    actual_bits, expected_bits,
-                                    "seed={seed}, initial={initial_rate}, antithetic={antithetic}, oos={oos_lsmc}, path={path_id}"
-                                );
+                            assert_paths_match_direct(&p, initial_rate, &grid);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn prepared_paths_preserve_scheduled_parameters_and_rebuilt_grids() {
+        // Repeated generation on the same pricer includes equal-length grids
+        // with different start times for equal-width intervals and a zero-step
+        // grid between nonempty grids. Every request must prepare its own data.
+        let grids = [
+            TimeGrid::uniform(1.2, 4).expect("uniform grid"),
+            TimeGrid::from_times(vec![0.0, 0.1, 0.4, 0.7, 1.2]).expect("first grid"),
+            TimeGrid::from_times(vec![0.0, 0.2, 0.5, 0.8, 1.2]).expect("shifted grid"),
+            TimeGrid::from_times(vec![0.0]).expect("zero-step grid"),
+            TimeGrid::from_times(vec![0.0, 0.07, 0.4, 0.7, 1.0, 1.3]).expect("odd grid"),
+        ];
+        for kappa in [1e-10, 0.03] {
+            let parameters = [
+                HullWhite1FParams::with_time_dependent_theta(
+                    kappa,
+                    0.012,
+                    vec![-0.02, 0.04, 0.01, 0.06, -0.01],
+                    vec![0.0, 0.08, 0.4, 0.55, 1.05],
+                )
+                .expect("theta schedule"),
+                HullWhite1FParams::with_piecewise_sigma(
+                    kappa,
+                    vec![0.0, 0.11, 0.7],
+                    vec![0.012, 0.021, 0.008],
+                    vec![-0.02, 0.04, 0.01, 0.06, -0.01],
+                    vec![0.0, 0.08, 0.4, 0.55, 1.05],
+                )
+                .expect("sigma and theta schedules"),
+            ];
+            for params in parameters {
+                for antithetic in [false, true] {
+                    for oos_lsmc in [false, true] {
+                        let p = SwaptionLsmcPricer::with_config(
+                            Hw1fMcConfig {
+                                num_paths: 6,
+                                seed: 42,
+                                antithetic,
+                                oos_lsmc,
+                                ..Default::default()
+                            },
+                            HullWhite1FProcess::new(params.clone()),
+                        );
+                        for initial_rate in [-0.01, 0.03] {
+                            for grid in &grids {
+                                assert_paths_match_direct(&p, initial_rate, grid);
                             }
                         }
                     }

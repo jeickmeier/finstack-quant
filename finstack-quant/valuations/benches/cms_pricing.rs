@@ -1,11 +1,8 @@
 //! CMS option and CMS swap pricing benchmarks.
 //!
-//! Both instruments use Gauss-Legendre quadrature via static replication to
-//! compute the convexity-adjusted CMS rate, iterating over the full swaption
-//! vol surface for each fixing date. The computational cost scales with:
-//!   - Number of fixing dates  (outer loop)
-//!   - CMS tenor              (annuity sum loop inside each GL node)
-//!   - Number of GL nodes     (integration accuracy)
+//! Default CMS cap and swap cases use Black76 with the Hagan convexity
+//! adjustment. The explicitly named replication cap uses Gauss-Legendre
+//! quadrature over the swaption volatility smile at each fixing date.
 //!
 //! Scenarios:
 //! - CMS cap/floor: representative 20 quarterly fixings
@@ -14,9 +11,11 @@
 
 #![allow(clippy::unwrap_used)]
 
+mod support;
+
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DayCount, Tenor};
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
@@ -30,7 +29,7 @@ use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricing
 use finstack_quant_valuations::instruments::rates::cms_option::CmsOption;
 use finstack_quant_valuations::instruments::rates::cms_option::replication_pricer::CmsReplicationPricer;
 use finstack_quant_valuations::instruments::rates::cms_swap::{CmsSwap, FundingLegSpec};
-use finstack_quant_valuations::pricer::Pricer;
+use finstack_quant_valuations::pricer::{ModelKey, Pricer};
 use rust_decimal::Decimal;
 use std::hint::black_box;
 use time::Month;
@@ -65,9 +64,17 @@ fn create_market(as_of: Date) -> MarketContext {
         .build()
         .unwrap();
 
-    // Flat 20% vol surface across strikes and expiries
+    // Cover the first near-dated CMS fixing as well as the later quarterly
+    // fixings without relying on expiry extrapolation.
     let strikes = vec![0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07];
-    let expiries = vec![0.5, 1.0, 2.0, 5.0, 10.0, 20.0];
+    let first_expiry = DayCount::Act365F
+        .year_fraction(
+            as_of,
+            as_of + time::Duration::days(1),
+            DayCountContext::default(),
+        )
+        .expect("CMS surface expiry year fraction");
+    let expiries = vec![first_expiry, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0];
     let flat_row = vec![0.20_f64; strikes.len()];
 
     let mut vol_builder = VolSurface::builder(CurveId::new("USD-CMS10Y-VOL"))
@@ -92,7 +99,7 @@ fn make_cms_option(as_of: Date, n_periods: usize, cms_tenor: Tenor) -> CmsOption
     let mut accrual_fractions = Vec::with_capacity(n_periods);
 
     // Start a week after as-of so the first coupon is a live forward, and pay
-    // in arrears so the coupon date is after the SOFR 2bd reference-swap start.
+    // in arrears so the coupon date is after the 2bd reference-swap start.
     let start = as_of + time::Duration::days(7);
     for i in 0..n_periods {
         let fix_date = start + time::Duration::days(i as i64 * 91);
@@ -111,7 +118,9 @@ fn make_cms_option(as_of: Date, n_periods: usize, cms_tenor: Tenor) -> CmsOption
         payment_dates,
         accrual_fractions,
         cms_tenor,
-        index_id: None,
+        // Match the existing legacy 3M forward curve and semiannual 30/360
+        // reference-swap conventions explicitly.
+        index_id: Some(IndexId::new("USD-LIBOR-3M")),
         swap_fixed_frequency: Some(Tenor::semi_annual()),
         swap_float_frequency: Some(Tenor::quarterly()),
         swap_fixed_day_count: Some(DayCount::Thirty360),
@@ -131,24 +140,30 @@ fn make_cms_option(as_of: Date, n_periods: usize, cms_tenor: Tenor) -> CmsOption
 
 fn bench_cms_option_period_count(c: &mut Criterion) {
     let mut group = c.benchmark_group("cms_option_periods");
-    let as_of = base_date();
-    let market = create_market(as_of);
-
     let n = 20;
-    let cap = make_cms_option(
-        as_of,
-        n,
-        Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).unwrap(),
-    );
-
     group.throughput(Throughput::Elements(n as u64));
     group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
-        b.iter(|| {
-            black_box(&cap)
-                .value(black_box(&market), black_box(as_of))
-                .unwrap()
-                .amount()
-        });
+        let as_of = base_date();
+        let market = create_market(as_of);
+        let cap = make_cms_option(
+            as_of,
+            n,
+            Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).unwrap(),
+        );
+        assert_eq!(cap.default_model(), ModelKey::Black76);
+        assert_eq!(cap.fixing_dates.len(), n);
+        support::bench(
+            b,
+            || {
+                black_box(&cap)
+                    .value(black_box(&market), black_box(as_of))
+                    .expect("CMS cap pricing must succeed")
+            },
+            |value| {
+                assert!(value.amount().is_finite());
+                assert_eq!(value.currency(), Currency::USD);
+            },
+        );
     });
 
     group.finish();
@@ -158,20 +173,26 @@ fn bench_cms_option_period_count(c: &mut Criterion) {
 
 fn bench_cms_option_cms_tenor(c: &mut Criterion) {
     let mut group = c.benchmark_group("cms_option_cms_tenor");
-    let as_of = base_date();
-    let market = create_market(as_of);
-
     let label = "10Y";
-    let cms_tenor = Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).unwrap();
-    let cap = make_cms_option(as_of, 20, cms_tenor);
-
     group.bench_with_input(BenchmarkId::from_parameter(label), label, |b, _| {
-        b.iter(|| {
-            black_box(&cap)
-                .value(black_box(&market), black_box(as_of))
-                .unwrap()
-                .amount()
-        });
+        let as_of = base_date();
+        let market = create_market(as_of);
+        let cms_tenor = Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).unwrap();
+        let cap = make_cms_option(as_of, 20, cms_tenor);
+        assert_eq!(cap.default_model(), ModelKey::Black76);
+        assert_eq!(cap.cms_tenor, cms_tenor);
+        support::bench(
+            b,
+            || {
+                black_box(&cap)
+                    .value(black_box(&market), black_box(as_of))
+                    .expect("CMS cap pricing must succeed")
+            },
+            |value| {
+                assert!(value.amount().is_finite());
+                assert_eq!(value.currency(), Currency::USD);
+            },
+        );
     });
 
     group.finish();
@@ -181,48 +202,54 @@ fn bench_cms_option_cms_tenor(c: &mut Criterion) {
 
 fn bench_cms_swap_period_count(c: &mut Criterion) {
     let mut group = c.benchmark_group("cms_swap_periods");
-    let as_of = base_date();
-    let market = create_market(as_of);
-
     let n = 20;
-    let end_days = n as i64 * 91;
-    // Spot-start plus a fixing lag would treat the first coupon as seasoned
-    // and require a historical CMS series. Start a week after as-of so every
-    // coupon is still a live forward.
-    let start = as_of + time::Duration::days(7);
-    let end = start + time::Duration::days(end_days);
-
-    let swap = CmsSwap::from_schedule(
-        finstack_quant_valuations::instruments::rates::cms_swap::CmsSwapScheduleParams {
-            id: "CMSSWAP-BENCH".into(),
-            start_date: start,
-            maturity: end,
-            cms_frequency: Tenor::quarterly(),
-            cms_tenor: Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).unwrap(),
-            cms_spread_bp: Decimal::ZERO,
-            funding_leg: FundingLegSpec::Fixed {
-                rate: Decimal::new(3, 2),
-                day_count: DayCount::Thirty360,
-            },
-            notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
-            day_count: DayCount::Act360,
-            index_id: IndexId::new("USD-SOFR-OIS"),
-            side: PayReceive::Receive,
-            discount_curve_id: "USD-OIS".into(),
-            forward_curve_id: "USD-LIBOR-3M".into(),
-            vol_surface_id: "USD-CMS10Y-VOL".into(),
-        },
-    )
-    .unwrap();
-
     group.throughput(Throughput::Elements(n as u64));
     group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
-        b.iter(|| {
-            black_box(&swap)
-                .value(black_box(&market), black_box(as_of))
-                .unwrap()
-                .amount()
-        });
+        let as_of = base_date();
+        let market = create_market(as_of);
+        let end_days = n as i64 * 91;
+        // Spot-start plus a fixing lag would treat the first coupon as seasoned
+        // and require a historical CMS series. Start a week after as-of so every
+        // coupon is still a live forward.
+        let start = as_of + time::Duration::days(7);
+        let end = start + time::Duration::days(end_days);
+
+        let swap = CmsSwap::from_schedule(
+            finstack_quant_valuations::instruments::rates::cms_swap::CmsSwapScheduleParams {
+                id: "CMSSWAP-BENCH".into(),
+                start_date: start,
+                maturity: end,
+                cms_frequency: Tenor::quarterly(),
+                cms_tenor: Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).unwrap(),
+                cms_spread_bp: Decimal::ZERO,
+                funding_leg: FundingLegSpec::Fixed {
+                    rate: Decimal::new(3, 2),
+                    day_count: DayCount::Thirty360,
+                },
+                notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+                day_count: DayCount::Act360,
+                index_id: IndexId::new("USD-SOFR-OIS"),
+                side: PayReceive::Receive,
+                discount_curve_id: "USD-OIS".into(),
+                forward_curve_id: "USD-LIBOR-3M".into(),
+                vol_surface_id: "USD-CMS10Y-VOL".into(),
+            },
+        )
+        .unwrap();
+
+        assert_eq!(swap.default_model(), ModelKey::Black76);
+        support::bench(
+            b,
+            || {
+                black_box(&swap)
+                    .value(black_box(&market), black_box(as_of))
+                    .expect("CMS swap pricing must succeed")
+            },
+            |value| {
+                assert!(value.amount().is_finite());
+                assert_eq!(value.currency(), Currency::USD);
+            },
+        );
     });
 
     group.finish();
@@ -231,25 +258,31 @@ fn bench_cms_swap_period_count(c: &mut Criterion) {
 /// Static-replication CMS cap (vol-slice cache lives on this path).
 fn bench_cms_option_replication(c: &mut Criterion) {
     let mut group = c.benchmark_group("cms_option_replication");
-    let as_of = base_date();
-    let market = create_market(as_of);
     let n = 20;
-    let cap = make_cms_option(
-        as_of,
-        n,
-        Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).unwrap(),
-    );
-    let pricer = CmsReplicationPricer;
-
     group.throughput(Throughput::Elements(n as u64));
     group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
-        b.iter(|| {
-            pricer
-                .price_dyn(black_box(&cap), black_box(&market), black_box(as_of))
-                .unwrap()
-                .value
-                .amount()
-        });
+        let as_of = base_date();
+        let market = create_market(as_of);
+        let cap = make_cms_option(
+            as_of,
+            n,
+            Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).unwrap(),
+        );
+        let pricer = CmsReplicationPricer;
+        assert_eq!(pricer.key().model, ModelKey::StaticReplication);
+        assert_eq!(cap.fixing_dates.len(), n);
+        support::bench(
+            b,
+            || {
+                pricer
+                    .price_dyn(black_box(&cap), black_box(&market), black_box(as_of))
+                    .expect("CMS replication pricing must succeed")
+            },
+            |result| {
+                assert!(result.value.amount().is_finite());
+                assert_eq!(result.value.currency(), Currency::USD);
+            },
+        );
     });
 
     group.finish();

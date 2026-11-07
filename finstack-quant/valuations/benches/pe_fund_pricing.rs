@@ -15,7 +15,7 @@
 //! - Style: European vs. American waterfall
 //! - IRR iteration: direct `run_waterfall()` vs. full `value()` with NAV discounting
 
-#![allow(clippy::unwrap_used)]
+mod support;
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use finstack_quant_core::currency::Currency;
@@ -26,7 +26,8 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::equity::pe_fund::{
-    ClawbackSpec, FundEvent, PeFundWaterfallSpec, PrivateMarketsFund, WaterfallStyle,
+    AllocationLedger, ClawbackSpec, FundEvent, FundEventKind, PeFundWaterfallSpec,
+    PrivateMarketsFund, WaterfallStyle,
 };
 use std::hint::black_box;
 use time::Month;
@@ -157,18 +158,63 @@ fn make_fund(
     }
 }
 
+fn validate_money(value: &Money) {
+    assert!(value.amount().is_finite());
+    assert_eq!(value.currency(), Currency::USD);
+}
+
+fn validate_ledger(ledger: &AllocationLedger, fund: &PrivateMarketsFund) {
+    assert!(!ledger.rows.is_empty());
+    for row in &ledger.rows {
+        for value in [row.to_lp, row.to_gp, row.lp_unreturned, row.gp_carry_cum] {
+            validate_money(&value);
+        }
+        if let Some(irr) = row.lp_irr_to_date {
+            assert!(irr.is_finite());
+        }
+        if fund.waterfall_spec.style == WaterfallStyle::American {
+            assert_eq!(row.deal_id.as_deref(), Some("BENCH-DEAL"));
+        }
+    }
+
+    let cashflows = ledger.lp_cashflows().expect("reconstructed LP cashflows");
+    assert_eq!(cashflows.len(), fund.events.len());
+    for (date, value) in &cashflows {
+        validate_money(value);
+        assert!(fund.events.iter().any(|event| event.date == *date));
+    }
+    for event in &fund.events {
+        let (_, amount) = cashflows
+            .iter()
+            .find(|(date, _)| *date == event.date)
+            .expect("every fund event contributes an LP cashflow");
+        if event.kind == FundEventKind::Contribution {
+            assert_eq!(amount.amount(), -event.amount.amount());
+        } else {
+            assert!(amount.amount() > 0.0);
+            assert!(ledger.rows.iter().any(|row| row.date == event.date));
+        }
+    }
+}
+
 // Benchmark: event count scaling (run_waterfall only, no discounting)
 
 fn bench_pe_waterfall_event_count(c: &mut Criterion) {
     let mut group = c.benchmark_group("pe_fund_waterfall_events");
-    let spec = standard_waterfall();
-
     let n = 30;
-    let fund = make_fund(make_events(n), spec, false);
 
     group.throughput(Throughput::Elements(n as u64));
     group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
-        b.iter(|| black_box(&fund).run_waterfall().unwrap());
+        let fund = make_fund(make_events(n), standard_waterfall(), false);
+        support::bench(
+            b,
+            || {
+                black_box(&fund)
+                    .run_waterfall()
+                    .expect("PE event-count waterfall")
+            },
+            |ledger| validate_ledger(ledger, &fund),
+        );
     });
 
     group.finish();
@@ -178,23 +224,24 @@ fn bench_pe_waterfall_event_count(c: &mut Criterion) {
 
 fn bench_pe_waterfall_complexity(c: &mut Criterion) {
     let mut group = c.benchmark_group("pe_fund_waterfall_complexity");
-    let events = make_events(30);
 
-    let simple = make_fund(events.clone(), simple_waterfall(), false);
-    let standard = make_fund(events.clone(), standard_waterfall(), false);
-    let full = make_fund(
-        make_clawback_events(30),
-        full_waterfall_with_clawback(),
-        false,
-    );
-
-    for (label, fund) in [
-        ("simple", &simple),
-        ("standard", &standard),
-        ("full_clawback", &full),
-    ] {
+    for label in ["simple", "standard", "full_clawback"] {
         group.bench_function(label, |b| {
-            b.iter(|| black_box(fund).run_waterfall().unwrap());
+            let (events, spec) = match label {
+                "simple" => (make_events(30), simple_waterfall()),
+                "standard" => (make_events(30), standard_waterfall()),
+                _ => (make_clawback_events(30), full_waterfall_with_clawback()),
+            };
+            let fund = make_fund(events, spec, false);
+            support::bench(
+                b,
+                || {
+                    black_box(&fund)
+                        .run_waterfall()
+                        .expect("PE complexity waterfall")
+                },
+                |ledger| validate_ledger(ledger, &fund),
+            );
         });
     }
 
@@ -205,20 +252,36 @@ fn bench_pe_waterfall_complexity(c: &mut Criterion) {
 
 fn bench_pe_waterfall_style(c: &mut Criterion) {
     let mut group = c.benchmark_group("pe_fund_waterfall_style");
-    let events = make_events(30);
-
-    let european = make_fund(events.clone(), standard_waterfall(), false);
-    let american_events = events
-        .into_iter()
-        .map(|event| event.with_deal_id("BENCH-DEAL"))
-        .collect();
-    let american = make_fund(american_events, american_waterfall(), false);
 
     group.bench_function("european", |b| {
-        b.iter(|| black_box(&european).run_waterfall().unwrap());
+        let european = make_fund(make_events(30), standard_waterfall(), false);
+        assert_eq!(european.waterfall_spec.style, WaterfallStyle::European);
+        support::bench(
+            b,
+            || {
+                black_box(&european)
+                    .run_waterfall()
+                    .expect("European PE waterfall")
+            },
+            |ledger| validate_ledger(ledger, &european),
+        );
     });
     group.bench_function("american", |b| {
-        b.iter(|| black_box(&american).run_waterfall().unwrap());
+        let american_events = make_events(30)
+            .into_iter()
+            .map(|event| event.with_deal_id("BENCH-DEAL"))
+            .collect();
+        let american = make_fund(american_events, american_waterfall(), false);
+        assert_eq!(american.waterfall_spec.style, WaterfallStyle::American);
+        support::bench(
+            b,
+            || {
+                black_box(&american)
+                    .run_waterfall()
+                    .expect("American PE waterfall")
+            },
+            |ledger| validate_ledger(ledger, &american),
+        );
     });
 
     group.finish();
@@ -228,21 +291,22 @@ fn bench_pe_waterfall_style(c: &mut Criterion) {
 
 fn bench_pe_fund_full_pricing(c: &mut Criterion) {
     let mut group = c.benchmark_group("pe_fund_full_pricing");
-    let market = create_market();
-    let as_of = date!(2025 - 01 - 01);
-    let spec = standard_waterfall();
-
     let n = 30;
-    let fund = make_fund(make_events(n), spec, true);
 
     group.throughput(Throughput::Elements(n as u64));
     group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
-        b.iter(|| {
-            black_box(&fund)
-                .value(black_box(&market), black_box(as_of))
-                .unwrap()
-                .amount()
-        });
+        let market = create_market();
+        let as_of = date!(2025 - 01 - 01);
+        let fund = make_fund(make_events(n), standard_waterfall(), true);
+        support::bench(
+            b,
+            || {
+                black_box(&fund)
+                    .value(black_box(&market), black_box(as_of))
+                    .expect("full PE fund price")
+            },
+            validate_money,
+        );
     });
 
     group.finish();

@@ -160,6 +160,46 @@ impl ListedFutureTerms {
         Ok(self.position.sign() * self.contracts * self.multiplier * (mark - self.entry_price))
     }
 
+    /// Resolve a supplied live quote or official final futures mark.
+    ///
+    /// Live contracts return `quoted_price` when supplied and `None` when a
+    /// theoretical mark must be calculated. After trading ends, the official
+    /// `settlement_price` is required; an earlier live quote is never reused.
+    ///
+    /// # Arguments
+    ///
+    /// * `instrument_id` - Identifier included in missing-settlement diagnostics.
+    /// * `as_of` - Valuation date used to separate live and post-trading states.
+    ///   The contract remains live on `last_trading_date` itself.
+    ///
+    /// # Returns
+    ///
+    /// A finite observed mark in contract price points, or `None` only when
+    /// the contract is live and has no supplied quote. This lookup does not
+    /// calculate a model mark or require its market inputs.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for invalid terms or a missing official
+    /// settlement price after `last_trading_date`, including after settlement.
+    pub fn get_observed_mark(
+        &self,
+        instrument_id: &str,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<Option<f64>> {
+        self.validate()?;
+        if as_of > self.last_trading_date {
+            self.settlement_price.map(Some).ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
+                    "listed future '{instrument_id}' requires settlement_price after last_trading_date {}",
+                    self.last_trading_date
+                ))
+            })
+        } else {
+            Ok(self.quoted_price)
+        }
+    }
+
     /// Resolve the lifecycle-appropriate futures mark.
     ///
     /// Live contracts use `quoted_price` when supplied and otherwise evaluate
@@ -180,17 +220,8 @@ impl ListedFutureTerms {
     where
         F: FnOnce() -> finstack_quant_core::Result<f64>,
     {
-        self.validate()?;
-        if as_of > self.last_trading_date {
-            self.settlement_price.ok_or_else(|| {
-                finstack_quant_core::Error::Validation(format!(
-                    "listed future '{instrument_id}' requires settlement_price after last_trading_date {}",
-                    self.last_trading_date
-                ))
-            })
-        } else {
-            self.quoted_price.map_or_else(model_mark, Ok)
-        }
+        self.get_observed_mark(instrument_id, as_of)?
+            .map_or_else(model_mark, Ok)
     }
 
     /// Variation-margin P&L for the lifecycle-appropriate mark.
@@ -257,6 +288,53 @@ mod tests {
                 .resolve_mark("TEST", date!(2026 - 06 - 29), || Ok(100.0))
                 .expect("official settlement"),
             92.0
+        );
+    }
+
+    #[test]
+    fn observed_mark_requires_model_only_for_live_unquoted_contracts() {
+        let mut terms = ListedFutureTerms::new(
+            1.0,
+            10.0,
+            Currency::USD,
+            90.0,
+            date!(2026 - 06 - 28),
+            date!(2026 - 06 - 30),
+            Position::Long,
+        )
+        .expect("terms");
+        assert_eq!(
+            terms
+                .get_observed_mark("TEST", date!(2026 - 06 - 28))
+                .expect("live unquoted mark"),
+            None
+        );
+
+        terms.quoted_price = Some(91.0);
+        assert_eq!(
+            terms
+                .get_observed_mark("TEST", date!(2026 - 06 - 28))
+                .expect("live observed mark"),
+            Some(91.0)
+        );
+        let error = terms
+            .get_observed_mark("TEST", date!(2026 - 06 - 29))
+            .expect_err("a live quote cannot substitute for official settlement");
+        assert!(error.to_string().contains("requires settlement_price"));
+
+        terms.settlement_price = Some(92.0);
+        assert_eq!(
+            terms
+                .get_observed_mark("TEST", date!(2026 - 06 - 29))
+                .expect("official mark"),
+            Some(92.0)
+        );
+        terms.contracts = 0.0;
+        assert!(
+            terms
+                .get_observed_mark("TEST", date!(2026 - 06 - 29))
+                .is_err(),
+            "observed marks must still validate the terms"
         );
     }
 }

@@ -10,6 +10,8 @@
 //!
 //! Market Standards Review (Week 5)
 
+mod support;
+
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_cashflows::builder::RateSpec;
@@ -21,9 +23,11 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CreditRating;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheStructure,
+    AssetPool, DealType, PoolAsset, StandardDealParams, StructuredCredit, Tranche, TrancheStructure,
 };
 use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations::pricer::ModelKey;
+use finstack_quant_valuations::results::ValuationResult;
 use finstack_quant_valuations::results::structured_credit::TrancheSeniority;
 use std::hint::black_box;
 use time::Month;
@@ -121,30 +125,73 @@ fn create_deal(deal_type: DealType, num_assets: usize) -> StructuredCredit {
 
     let id = format!("{deal_type:?}-BENCHMARK");
     let (close, legal) = (closing_date(), maturity_date());
-    match deal_type {
-        DealType::Clo => StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Clo, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: id.into(), pool, tranches, closing_date: close, maturity: legal, discount_curve_id: "USD-OIS".into(), calendar_id: None }),
-        DealType::Cmbs => StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Cmbs, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: id.into(), pool, tranches, closing_date: close, maturity: legal, discount_curve_id: "USD-OIS".into(), calendar_id: None }),
-        DealType::Rmbs => StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Rmbs, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: id.into(), pool, tranches, closing_date: close, maturity: legal, discount_curve_id: "USD-OIS".into(), calendar_id: None }),
-        DealType::Abs => StructuredCredit::new_standard(finstack_quant_valuations::instruments::fixed_income::structured_credit::DealType::Abs, finstack_quant_valuations::instruments::fixed_income::structured_credit::StandardDealParams { id: id.into(), pool, tranches, closing_date: close, maturity: legal, discount_curve_id: "USD-OIS".into(), calendar_id: None }),
-        other => panic!("benchmark has no deal profile for {other:?}"),
+    let mut deal = StructuredCredit::new_standard(
+        deal_type,
+        StandardDealParams {
+            id: id.into(),
+            pool,
+            tranches,
+            closing_date: close,
+            maturity: legal,
+            discount_curve_id: "USD-OIS".into(),
+            calendar_id: Some("nyse".into()),
+        },
+    )
+    .expect("valid structured-credit dates");
+    // Spread duration and CS01 solve the quoted settlement price's z-spread.
+    deal.instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price_pct = Some(100.0);
+    deal
+}
+
+fn validate_value(value: &Money) {
+    assert_eq!(value.currency(), Currency::USD);
+    assert!(value.amount().is_finite());
+    assert!(value.amount() > 0.0);
+}
+
+fn validate_metrics(result: &ValuationResult, requested: &[MetricId]) {
+    validate_value(&result.value);
+    assert_eq!(result.as_of, test_date());
+    assert_eq!(
+        result
+            .provenance
+            .as_ref()
+            .expect("pricing provenance")
+            .model,
+        ModelKey::Discounting,
+    );
+    for metric in requested {
+        let value = result
+            .metric(metric.clone())
+            .unwrap_or_else(|| panic!("missing requested metric {metric}"));
+        assert!(value.is_finite(), "non-finite requested metric {metric}");
     }
-    .expect("valid structured-credit dates")
+    assert!(result.measures.values().all(|value| value.is_finite()));
 }
 
 // NPV Benchmarks by Deal Type
 
 fn bench_npv_by_deal_type(c: &mut Criterion) {
     let mut group = c.benchmark_group("structured_credit_npv");
-    let market = create_market();
-    let as_of = test_date();
 
     for deal_type in [DealType::Abs, DealType::Clo, DealType::Cmbs, DealType::Rmbs].iter() {
-        let deal = create_deal(*deal_type, 10);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{:?}", deal_type)),
             deal_type,
             |b, _| {
-                b.iter(|| deal.value(black_box(&market), black_box(as_of)));
+                let market = create_market();
+                let as_of = test_date();
+                let deal = create_deal(*deal_type, 10);
+                support::bench(
+                    b,
+                    || {
+                        deal.value(black_box(&market), black_box(as_of))
+                            .expect("structured-credit NPV")
+                    },
+                    validate_value,
+                );
             },
         );
     }
@@ -155,19 +202,37 @@ fn bench_npv_by_deal_type(c: &mut Criterion) {
 
 fn bench_cashflow_generation(c: &mut Criterion) {
     let mut group = c.benchmark_group("structured_credit_cashflows");
-    let market = create_market();
-    let as_of = test_date();
 
     {
         let num_assets = &50;
-        let deal = create_deal(DealType::Clo, *num_assets);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}assets", num_assets)),
             num_assets,
             |b, _| {
-                b.iter(|| {
-                    CashflowProvider::dated_cashflows(&deal, black_box(&market), black_box(as_of))
-                });
+                let market = create_market();
+                let as_of = test_date();
+                let deal = create_deal(DealType::Clo, *num_assets);
+                support::bench(
+                    b,
+                    || {
+                        CashflowProvider::dated_cashflows(
+                            &deal,
+                            black_box(&market),
+                            black_box(as_of),
+                        )
+                        .expect("structured-credit waterfall cashflows")
+                    },
+                    |flows| {
+                        assert!(!flows.is_empty());
+                        assert!(flows.windows(2).all(|pair| pair[0].0 <= pair[1].0));
+                        for (date, amount) in flows {
+                            assert!(*date >= as_of);
+                            assert_eq!(amount.currency(), Currency::USD);
+                            assert!(amount.amount().is_finite());
+                        }
+                        assert!(flows.iter().any(|(_, amount)| amount.amount() > 0.0));
+                    },
+                );
             },
         );
     }
@@ -178,23 +243,28 @@ fn bench_cashflow_generation(c: &mut Criterion) {
 
 fn bench_wal_calculation(c: &mut Criterion) {
     let mut group = c.benchmark_group("structured_credit_wal");
-    let market = create_market();
-    let as_of = test_date();
 
     for deal_type in [DealType::Clo, DealType::Rmbs].iter() {
-        let deal = create_deal(*deal_type, 20);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{:?}", deal_type)),
             deal_type,
             |b, _| {
-                b.iter(|| {
-                    deal.price_with_metrics(
-                        black_box(&market),
-                        black_box(as_of),
-                        black_box(&[MetricId::WAL]),
-                        finstack_quant_valuations::instruments::PricingOptions::default(),
-                    )
-                });
+                let market = create_market();
+                let as_of = test_date();
+                let deal = create_deal(*deal_type, 20);
+                support::bench(
+                    b,
+                    || {
+                        deal.price_with_metrics(
+                            black_box(&market),
+                            black_box(as_of),
+                            black_box(&[MetricId::WAL]),
+                            finstack_quant_valuations::instruments::PricingOptions::default(),
+                        )
+                        .expect("structured-credit WAL")
+                    },
+                    |result| validate_metrics(result, &[MetricId::WAL]),
+                );
             },
         );
     }
@@ -203,45 +273,54 @@ fn bench_wal_calculation(c: &mut Criterion) {
 
 fn bench_duration_metrics(c: &mut Criterion) {
     let mut group = c.benchmark_group("structured_credit_duration");
-    let market = create_market();
-    let as_of = test_date();
-    let deal = create_deal(DealType::Clo, 25);
-
-    let metrics = vec![MetricId::DurationMod, MetricId::SpreadDuration];
 
     group.bench_function("duration_suite", |b| {
-        b.iter(|| {
-            deal.price_with_metrics(
-                black_box(&market),
-                black_box(as_of),
-                black_box(&metrics),
-                finstack_quant_valuations::instruments::PricingOptions::default(),
-            )
-        });
+        let market = create_market();
+        let as_of = test_date();
+        let deal = create_deal(DealType::Clo, 25);
+        let metrics = vec![MetricId::DurationMod, MetricId::SpreadDuration];
+        support::bench(
+            b,
+            || {
+                deal.price_with_metrics(
+                    black_box(&market),
+                    black_box(as_of),
+                    black_box(&metrics),
+                    finstack_quant_valuations::instruments::PricingOptions::default(),
+                )
+                .expect("structured-credit duration metrics")
+            },
+            |result| validate_metrics(result, &metrics),
+        );
     });
     group.finish();
 }
 
 fn bench_cs01(c: &mut Criterion) {
     let mut group = c.benchmark_group("structured_credit_cs01");
-    let market = create_market();
-    let as_of = test_date();
 
     {
         let num_assets = &50;
-        let deal = create_deal(DealType::Clo, *num_assets);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}assets", num_assets)),
             num_assets,
             |b, _| {
-                b.iter(|| {
-                    deal.price_with_metrics(
-                        black_box(&market),
-                        black_box(as_of),
-                        black_box(&[MetricId::Cs01]),
-                        finstack_quant_valuations::instruments::PricingOptions::default(),
-                    )
-                });
+                let market = create_market();
+                let as_of = test_date();
+                let deal = create_deal(DealType::Clo, *num_assets);
+                support::bench(
+                    b,
+                    || {
+                        deal.price_with_metrics(
+                            black_box(&market),
+                            black_box(as_of),
+                            black_box(&[MetricId::Cs01]),
+                            finstack_quant_valuations::instruments::PricingOptions::default(),
+                        )
+                        .expect("structured-credit CS01")
+                    },
+                    |result| validate_metrics(result, &[MetricId::Cs01]),
+                );
             },
         );
     }
@@ -252,26 +331,30 @@ fn bench_cs01(c: &mut Criterion) {
 
 fn bench_pool_metrics(c: &mut Criterion) {
     let mut group = c.benchmark_group("structured_credit_pool_metrics");
-    let market = create_market();
-    let as_of = test_date();
-
-    let pool_metrics = vec![MetricId::CloWas, MetricId::WAM];
 
     {
         let num_assets = &100;
-        let deal = create_deal(DealType::Clo, *num_assets);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}assets", num_assets)),
             num_assets,
             |b, _| {
-                b.iter(|| {
-                    deal.price_with_metrics(
-                        black_box(&market),
-                        black_box(as_of),
-                        black_box(&pool_metrics),
-                        finstack_quant_valuations::instruments::PricingOptions::default(),
-                    )
-                });
+                let market = create_market();
+                let as_of = test_date();
+                let deal = create_deal(DealType::Clo, *num_assets);
+                let pool_metrics = vec![MetricId::CloWas, MetricId::WAM];
+                support::bench(
+                    b,
+                    || {
+                        deal.price_with_metrics(
+                            black_box(&market),
+                            black_box(as_of),
+                            black_box(&pool_metrics),
+                            finstack_quant_valuations::instruments::PricingOptions::default(),
+                        )
+                        .expect("structured-credit pool metrics")
+                    },
+                    |result| validate_metrics(result, &pool_metrics),
+                );
             },
         );
     }
@@ -280,24 +363,29 @@ fn bench_pool_metrics(c: &mut Criterion) {
 
 fn bench_warf_calculation(c: &mut Criterion) {
     let mut group = c.benchmark_group("structured_credit_warf");
-    let market = create_market();
-    let as_of = test_date();
 
     {
         let num_assets = &100;
-        let deal = create_deal(DealType::Clo, *num_assets);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}assets", num_assets)),
             num_assets,
             |b, _| {
-                b.iter(|| {
-                    deal.price_with_metrics(
-                        black_box(&market),
-                        black_box(as_of),
-                        black_box(&[MetricId::CloWarf]),
-                        finstack_quant_valuations::instruments::PricingOptions::default(),
-                    )
-                });
+                let market = create_market();
+                let as_of = test_date();
+                let deal = create_deal(DealType::Clo, *num_assets);
+                support::bench(
+                    b,
+                    || {
+                        deal.price_with_metrics(
+                            black_box(&market),
+                            black_box(as_of),
+                            black_box(&[MetricId::CloWarf]),
+                            finstack_quant_valuations::instruments::PricingOptions::default(),
+                        )
+                        .expect("structured-credit WARF")
+                    },
+                    |result| validate_metrics(result, &[MetricId::CloWarf]),
+                );
             },
         );
     }
@@ -308,25 +396,29 @@ fn bench_warf_calculation(c: &mut Criterion) {
 
 fn bench_price_metrics(c: &mut Criterion) {
     let mut group = c.benchmark_group("structured_credit_prices");
-    let market = create_market();
-    let as_of = test_date();
-    let deal = create_deal(DealType::Abs, 20);
-
-    let price_metrics = vec![
-        MetricId::DirtyPrice,
-        MetricId::CleanPrice,
-        MetricId::Accrued,
-    ];
 
     group.bench_function("price_suite", |b| {
-        b.iter(|| {
-            deal.price_with_metrics(
-                black_box(&market),
-                black_box(as_of),
-                black_box(&price_metrics),
-                finstack_quant_valuations::instruments::PricingOptions::default(),
-            )
-        });
+        let market = create_market();
+        let as_of = test_date();
+        let deal = create_deal(DealType::Abs, 20);
+        let price_metrics = vec![
+            MetricId::DirtyPrice,
+            MetricId::CleanPrice,
+            MetricId::Accrued,
+        ];
+        support::bench(
+            b,
+            || {
+                deal.price_with_metrics(
+                    black_box(&market),
+                    black_box(as_of),
+                    black_box(&price_metrics),
+                    finstack_quant_valuations::instruments::PricingOptions::default(),
+                )
+                .expect("structured-credit price metrics")
+            },
+            |result| validate_metrics(result, &price_metrics),
+        );
     });
     group.finish();
 }
@@ -335,32 +427,36 @@ fn bench_price_metrics(c: &mut Criterion) {
 
 fn bench_full_metrics_suite(c: &mut Criterion) {
     let mut group = c.benchmark_group("structured_credit_full_metrics");
-    let market = create_market();
-    let as_of = test_date();
-    let deal = create_deal(DealType::Clo, 50);
-
-    let all_metrics = vec![
-        MetricId::DirtyPrice,
-        MetricId::CleanPrice,
-        MetricId::Accrued,
-        MetricId::WAL,
-        MetricId::DurationMod,
-        MetricId::SpreadDuration,
-        MetricId::Cs01,
-        MetricId::CloWas,
-        MetricId::WAM,
-        MetricId::CloWarf,
-    ];
 
     group.bench_function("all_metrics", |b| {
-        b.iter(|| {
-            deal.price_with_metrics(
-                black_box(&market),
-                black_box(as_of),
-                black_box(&all_metrics),
-                finstack_quant_valuations::instruments::PricingOptions::default(),
-            )
-        });
+        let market = create_market();
+        let as_of = test_date();
+        let deal = create_deal(DealType::Clo, 50);
+        let all_metrics = vec![
+            MetricId::DirtyPrice,
+            MetricId::CleanPrice,
+            MetricId::Accrued,
+            MetricId::WAL,
+            MetricId::DurationMod,
+            MetricId::SpreadDuration,
+            MetricId::Cs01,
+            MetricId::CloWas,
+            MetricId::WAM,
+            MetricId::CloWarf,
+        ];
+        support::bench(
+            b,
+            || {
+                deal.price_with_metrics(
+                    black_box(&market),
+                    black_box(as_of),
+                    black_box(&all_metrics),
+                    finstack_quant_valuations::instruments::PricingOptions::default(),
+                )
+                .expect("structured-credit full metric suite")
+            },
+            |result| validate_metrics(result, &all_metrics),
+        );
     });
     group.finish();
 }
@@ -369,17 +465,24 @@ fn bench_full_metrics_suite(c: &mut Criterion) {
 
 fn bench_scaling_with_pool_size(c: &mut Criterion) {
     let mut group = c.benchmark_group("structured_credit_scaling");
-    let market = create_market();
-    let as_of = test_date();
 
     {
         let num_assets = &100;
-        let deal = create_deal(DealType::Clo, *num_assets);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}assets", num_assets)),
             num_assets,
             |b, _| {
-                b.iter(|| deal.value(black_box(&market), black_box(as_of)));
+                let market = create_market();
+                let as_of = test_date();
+                let deal = create_deal(DealType::Clo, *num_assets);
+                support::bench(
+                    b,
+                    || {
+                        deal.value(black_box(&market), black_box(as_of))
+                            .expect("structured-credit scaled NPV")
+                    },
+                    validate_value,
+                );
             },
         );
     }

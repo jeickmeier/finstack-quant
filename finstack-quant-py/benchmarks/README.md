@@ -1,9 +1,9 @@
 # Python binding benchmarks
 
-Micro- and workflow-level timings for the PyO3 bindings. Everything here measures
-the *binding* cost — argument conversion, GIL handling, wrapper construction — on
-top of the Rust work, so a number from this directory is only meaningful next to
-the corresponding Criterion number from `finstack-quant/*/benches/`.
+Micro- and workflow-level timings through the PyO3 bindings. These include Rust
+calculation work plus argument conversion, GIL handling and wrapper construction.
+They do not isolate binding overhead; compare with a matching Criterion workload
+from `finstack-quant/*/benches/` only when fixtures and timing boundaries agree.
 
 Two harnesses live here: a pytest-benchmark suite for discovery, and a standalone
 CLI that emits raw latency samples for the one benchmark path that is gated
@@ -54,14 +54,30 @@ Every class is marked `perf`. Selection within the suite is by class or by the
 | `TestStatementsBenchmarks` | `FinancialModelSpec.from_json`, `ModelBuilder`, `Evaluator.evaluate`, `parse_formula`, `parse_and_compile`, `normalize` |
 | `TestStatementsAnalyticsBenchmarks` | Sensitivity, variance, scenario sets, goal seek, dependency tracing, `explain_formula` — each benched **twice**, once on the JSON path and once on the typed path, so the serialization overhead of the wire surface is directly visible. `backtest_forecast` is the one unpaired case |
 | `TestPortfolioBenchmarks` | `Portfolio.from_materialization` (cold-unique, cold-dedup, warm-dedup) and `parse_portfolio_spec_json` / `Portfolio.from_spec` |
-| `TestPortfolioCompoundWorkflow` | The realistic calling pattern (value + metrics + cashflows) over 500 positions, JSON path vs. typed `Portfolio`/`MarketContext` path |
-| `TestPortfolioReleaseControls` | Release-scale controls: metrics attribution (40/120 positions), `scenario_pnl_batch` vs. repeated `scenario_pnl` (10/100 scenarios), 20-snapshot `replay_portfolio`, standard-risk valuation at 3,000 positions, PV-only valuation at 3,000 and 25,000 positions |
+| `TestPortfolioCompoundWorkflow` | Deposit-only value + metrics + cashflows over 500 positions, JSON inputs vs. typed `Portfolio`/`MarketContext` inputs; both return typed results |
+| `TestPortfolioReleaseControls` | Deposit-only controls: metrics attribution (40/120 deposits), `scenario_pnl_batch` vs. repeated `scenario_pnl` (10/100 scenarios over 500 deposits), 20-snapshot `replay_portfolio`, strict standard-risk valuation at 3,000 deposits, PV-only valuation at 3,000 and 25,000 deposits |
 | `TestPortfolioRiskInputBenchmarks` | `position_risk_report` over a parametric (256×256) and a historical (200×1,000) source, and `build_stress_attribution` (200×1,000) with `list` and contiguous NumPy inputs — that pair exists to measure the zero-copy path, so keep both |
-| `TestValuationsBenchmarks` | `validate_instrument_json`, `list_standard_metrics` |
-| `TestScenariosBenchmarks` | Template registry, `parse_scenario_spec`, `validate_scenario_spec`, `build_scenario_spec`, `compose_scenarios` |
+| `TestValuationsBenchmarks` | Deposit JSON validation, `list_standard_metrics`, and serialize/deserialize round-trip of a successfully priced deposit `ValuationResult` with DV01 |
+| `TestScenariosBenchmarks` | Template registry, `ScenarioSpec.from_json`, `validate_scenario_spec`, `ScenarioSpec` construction, `compose_scenarios` |
 
 Uncovered domains: `attribution`, `cashflows`, `covenants`, `factor_model`,
-`features`. The module docstring's claim of full domain coverage is stale.
+`features`. The deposit portfolio controls do not establish mixed-instrument
+valuation performance or cross-language workload parity.
+
+Valuation and compound-workflow controls check complete position counts, finite
+prices and requested DV01, `risk_metrics_complete`, and the absence of risk
+errors or degraded positions before timing and on the returned measured result.
+Portfolio risk requests explicitly use strict risk. Scenario and replay controls
+check their requested result counts and finite values. Failures abort the case.
+The deposit result round-trip prices once outside timing; each measured call
+serializes that result and deserializes it through `ValuationResult.from_json`.
+The JSON-validation row is validation only, with no pricing in its timer.
+
+The release controls use five measured rounds and one warmup round, replacing
+the former single-call observations. These are discovery timings, not enough
+samples to claim stable tail latency. Other short rows use pytest-benchmark's
+automatic repeated sampling. Changed case names and repaired workloads are new
+baseline identities; old validation-only “valuation-result” timings are invalid.
 
 ## Running
 
@@ -77,6 +93,13 @@ Direct pytest, once a release extension is installed:
 ```bash
 uv run pytest finstack-quant-py/benchmarks/bench_bindings.py -m "perf and not slow" --benchmark-only
 uv run pytest finstack-quant-py/benchmarks/bench_bindings.py -m perf --benchmark-only -v
+```
+
+After the release build, run only the valuation/deposit workflow validity checks
+without collecting a timing baseline:
+
+```bash
+uv run pytest finstack-quant-py/benchmarks/bench_bindings.py -m perf -k "ValuationsBenchmarks or PortfolioCompoundWorkflow or PortfolioReleaseControls" --benchmark-disable
 ```
 
 `testpaths` in `pyproject.toml` is `finstack-quant-py/tests`, and `python_files`

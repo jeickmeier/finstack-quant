@@ -350,6 +350,10 @@ impl finstack_quant_valuations_core::instruments::Instrument for AsianOption {
         }
     }
 
+    fn expiry(&self) -> Option<Date> {
+        Some(self.expiry)
+    }
+
     fn market_dependencies(
         &self,
     ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>

@@ -21,6 +21,7 @@ use finstack_quant_valuations::metrics::risk::{
 use finstack_quant_valuations::pricer::PricingDispatch;
 use std::hint::black_box;
 use time::Month;
+mod support;
 
 fn make_var_market() -> MarketContext {
     let base = Date::from_calendar_date(2025, Month::January, 1).unwrap();
@@ -77,29 +78,59 @@ fn make_history(as_of: Date, n: usize) -> MarketHistory {
 fn bench_taylor_var(c: &mut Criterion) {
     let mut group = c.benchmark_group("taylor_var");
     let base = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-    let market = make_var_market();
-    let bond = make_var_bond(base);
-    let config = VarConfig::var_99()
-        .with_method(VarMethod::TaylorApproximation)
-        .with_reporting_currency(Currency::USD);
 
     for &n in &[250_usize, 1000] {
-        let history = make_history(base, n);
-        group.bench_with_input(BenchmarkId::from_parameter(n), &history, |b, history| {
-            b.iter(|| {
-                black_box(
+        group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, &n| {
+            let market = make_var_market();
+            let bond = make_var_bond(base);
+            let history = make_history(base, n);
+            let config = VarConfig::var_99()
+                .with_method(VarMethod::TaylorApproximation)
+                .with_reporting_currency(Currency::USD);
+            assert_eq!(config.method, VarMethod::TaylorApproximation);
+            assert_eq!(config.reporting_currency, Some(Currency::USD));
+            let base_value = bond
+                .value(&market, base)
+                .expect("Taylor VaR base bond price");
+            assert_eq!(base_value.currency(), Currency::USD);
+            assert!(base_value.amount().is_finite() && base_value.amount() > 0.0);
+            support::bench(
+                b,
+                || {
                     calculate_var(
                         black_box(&[&bond as &dyn Instrument]),
                         &market,
-                        history,
+                        &history,
                         base,
                         &config,
                         PricingDispatch::InstrumentDefault,
                         None,
                     )
-                    .unwrap(),
-                )
-            });
+                    .expect("Taylor VaR")
+                },
+                |result| {
+                    assert_eq!(result.num_scenarios, n);
+                    assert_eq!(result.pnl_distribution.len(), n);
+                    assert_eq!(result.confidence_level, 0.99);
+                    assert!(result.var.is_finite() && result.var <= 0.0);
+                    assert!(
+                        result.expected_shortfall.is_finite()
+                            && result.expected_shortfall <= result.var
+                    );
+                    assert!(
+                        result
+                            .pnl_distribution
+                            .iter()
+                            .all(|value| value.is_finite())
+                    );
+                    assert!(
+                        result
+                            .pnl_distribution
+                            .windows(2)
+                            .all(|pair| pair[0] <= pair[1])
+                    );
+                },
+            );
         });
     }
     group.finish();

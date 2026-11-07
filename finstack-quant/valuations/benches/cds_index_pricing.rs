@@ -23,6 +23,11 @@ use finstack_quant_valuations::instruments::credit_derivatives::cds_index::{
     CdsIndex, CdsIndexConstituent, CdsIndexParams, IndexPricing,
 };
 use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations::results::ValuationResult;
+#[allow(dead_code, unused_imports, clippy::expect_used, clippy::unwrap_used)]
+#[path = "../tests/support/credit.rs"]
+mod credit_support;
+mod support;
 use std::hint::black_box;
 use time::Month;
 
@@ -86,20 +91,23 @@ fn create_market_single_curve() -> MarketContext {
         .build()
         .unwrap();
 
-    let hazard = HazardCurve::builder("CDX-HAZARD")
-        .base_date(base)
-        .knots([
-            (0.0, 0.0),
-            (1.0, 0.02),
-            (3.0, 0.025),
-            (5.0, 0.03),
-            (10.0, 0.035),
-        ])
-        .recovery_rate(0.40)
-        .build()
-        .unwrap();
+    let source_market = MarketContext::new().insert(disc);
+    let hazard = credit_support::calibrated_hazard_curve_with_pillars(
+        &source_market,
+        base,
+        "CDX-HAZARD",
+        "CDX",
+        "USD-OIS",
+        &[
+            (365, 120.0),
+            (3 * 365, 150.0),
+            (5 * 365, 180.0),
+            (10 * 365, 210.0),
+        ],
+    )
+    .expect("calibrated index hazard with replay metadata");
 
-    MarketContext::new().insert(disc).insert(hazard)
+    source_market.insert(hazard)
 }
 
 fn create_market_constituents(num_names: usize) -> MarketContext {
@@ -128,18 +136,40 @@ fn create_market_constituents(num_names: usize) -> MarketContext {
     market
 }
 
+fn validate_price(value: &Money) {
+    assert_eq!(value.currency(), Currency::USD);
+    assert!(value.amount().is_finite());
+}
+
+fn validate_metrics(result: &ValuationResult, metrics: &[MetricId]) {
+    validate_price(&result.value);
+    assert!(result.measures.values().all(|value| value.is_finite()));
+    for metric in metrics {
+        assert!(result.measures.contains_key(metric), "missing {metric}");
+    }
+}
+
 fn bench_cds_index_pv_single(c: &mut Criterion) {
     let mut group = c.benchmark_group("cds_index_pv_single");
-    let market = create_market_single_curve();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
     for tenor in [1, 3, 5, 10].iter() {
-        let index = create_cds_index_single_curve(*tenor);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}Y", tenor)),
             tenor,
             |b, _| {
-                b.iter(|| index.value(black_box(&market), black_box(as_of)));
+                let index = create_cds_index_single_curve(*tenor);
+                let market = create_market_single_curve();
+                assert_eq!(index.pricing, IndexPricing::SingleCurve);
+                support::bench(
+                    b,
+                    || {
+                        index
+                            .value(black_box(&market), black_box(as_of))
+                            .expect("CDS index value")
+                    },
+                    validate_price,
+                );
             },
         );
     }
@@ -153,14 +183,24 @@ fn bench_cds_index_pv_constituents(c: &mut Criterion) {
 
     {
         let num_names = &50;
-        let index = create_cds_index_constituents(tenor, *num_names);
-        let market = create_market_constituents(*num_names);
 
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}names", num_names)),
             num_names,
             |b, _| {
-                b.iter(|| index.value(black_box(&market), black_box(as_of)));
+                let index = create_cds_index_constituents(tenor, *num_names);
+                let market = create_market_constituents(*num_names);
+                assert_eq!(index.pricing, IndexPricing::Constituents);
+                assert_eq!(index.constituents.len(), *num_names);
+                support::bench(
+                    b,
+                    || {
+                        index
+                            .value(black_box(&market), black_box(as_of))
+                            .expect("CDS index value")
+                    },
+                    validate_price,
+                );
             },
         );
     }
@@ -169,16 +209,25 @@ fn bench_cds_index_pv_constituents(c: &mut Criterion) {
 
 fn bench_cds_index_par_spread(c: &mut Criterion) {
     let mut group = c.benchmark_group("cds_index_par_spread");
-    let market = create_market_single_curve();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
     for tenor in [1, 3, 5, 10].iter() {
-        let index = create_cds_index_single_curve(*tenor);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}Y", tenor)),
             tenor,
             |b, _| {
-                b.iter(|| index.par_spread(black_box(&market), black_box(as_of)));
+                let index = create_cds_index_single_curve(*tenor);
+                let market = create_market_single_curve();
+                assert_eq!(index.pricing, IndexPricing::SingleCurve);
+                support::bench(
+                    b,
+                    || {
+                        index
+                            .par_spread(black_box(&market), black_box(as_of))
+                            .expect("CDS index par_spread")
+                    },
+                    |value| assert!(value.is_finite()),
+                );
             },
         );
     }
@@ -187,23 +236,30 @@ fn bench_cds_index_par_spread(c: &mut Criterion) {
 
 fn bench_cds_index_cs01(c: &mut Criterion) {
     let mut group = c.benchmark_group("cds_index_cs01");
-    let market = create_market_single_curve();
-    let recalibration_provider = CachedRecalibrationProvider::default();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
     for tenor in [1, 3, 5, 10].iter() {
-        let index = create_cds_index_single_curve(*tenor);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}Y", tenor)),
             tenor,
             |b, _| {
-                b.iter(|| {
-                    index.cs01(
-                        black_box(&market),
-                        black_box(as_of),
-                        black_box(&recalibration_provider),
-                    )
-                });
+                let index = create_cds_index_single_curve(*tenor);
+                let market = create_market_single_curve();
+                assert_eq!(index.pricing, IndexPricing::SingleCurve);
+                let recalibration_provider = CachedRecalibrationProvider::default();
+                support::bench(
+                    b,
+                    || {
+                        index
+                            .cs01(
+                                black_box(&market),
+                                black_box(as_of),
+                                black_box(&recalibration_provider),
+                            )
+                            .expect("CDS index risk")
+                    },
+                    |value| assert!(value.is_finite()),
+                );
             },
         );
     }
@@ -212,16 +268,25 @@ fn bench_cds_index_cs01(c: &mut Criterion) {
 
 fn bench_cds_index_risky_pv01(c: &mut Criterion) {
     let mut group = c.benchmark_group("cds_index_risky_pv01");
-    let market = create_market_single_curve();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
     for tenor in [1, 3, 5, 10].iter() {
-        let index = create_cds_index_single_curve(*tenor);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}Y", tenor)),
             tenor,
             |b, _| {
-                b.iter(|| index.risky_pv01(black_box(&market), black_box(as_of)));
+                let index = create_cds_index_single_curve(*tenor);
+                let market = create_market_single_curve();
+                assert_eq!(index.pricing, IndexPricing::SingleCurve);
+                support::bench(
+                    b,
+                    || {
+                        index
+                            .risky_pv01(black_box(&market), black_box(as_of))
+                            .expect("CDS index risky_pv01")
+                    },
+                    |value| assert!(value.is_finite()),
+                );
             },
         );
     }
@@ -230,25 +295,32 @@ fn bench_cds_index_risky_pv01(c: &mut Criterion) {
 
 fn bench_cds_index_metrics(c: &mut Criterion) {
     let mut group = c.benchmark_group("cds_index_metrics");
-    let market = create_market_single_curve();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
     let metrics = vec![MetricId::ParSpread, MetricId::Cs01, MetricId::RiskyPv01];
 
     for tenor in [3, 5, 10].iter() {
-        let index = create_cds_index_single_curve(*tenor);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}Y", tenor)),
             tenor,
             |b, _| {
-                b.iter(|| {
-                    index.price_with_metrics(
-                        black_box(&market),
-                        black_box(as_of),
-                        black_box(&metrics),
-                        finstack_quant_valuations::instruments::PricingOptions::default(),
-                    )
-                });
+                let index = create_cds_index_single_curve(*tenor);
+                let market = create_market_single_curve();
+                assert_eq!(index.pricing, IndexPricing::SingleCurve);
+                support::bench(
+                    b,
+                    || {
+                        index
+                            .price_with_metrics(
+                                black_box(&market),
+                                black_box(as_of),
+                                black_box(&metrics),
+                                credit_support::pricing_options(),
+                            )
+                            .expect("CDS index risk")
+                    },
+                    |result| validate_metrics(result, &metrics),
+                );
             },
         );
     }

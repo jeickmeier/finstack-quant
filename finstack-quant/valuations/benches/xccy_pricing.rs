@@ -15,6 +15,8 @@
 
 #![allow(clippy::unwrap_used)]
 
+mod support;
+
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
@@ -155,23 +157,35 @@ fn make_xccy(base: Date, maturity: Date, exchange: NotionalExchange) -> XccySwap
 
 fn bench_xccy_tenor(c: &mut Criterion) {
     let mut group = c.benchmark_group("xccy_tenor");
-    let base = base_date();
-    let market = create_market();
-
     let label = "5Y";
     let years = 5;
-    let maturity = Date::from_calendar_date(2025 + years, Month::January, 2).unwrap();
-    let swap = make_xccy(base, maturity, NotionalExchange::InitialAndFinal);
     let n_periods = years as u64 * 4 * 2; // 4 Q/yr × 2 legs
 
     group.throughput(Throughput::Elements(n_periods));
     group.bench_with_input(BenchmarkId::from_parameter(label), label, |b, _| {
-        b.iter(|| {
-            black_box(&swap)
-                .value(black_box(&market), black_box(base))
-                .unwrap()
-                .amount()
-        });
+        let base = base_date();
+        let market = create_market();
+        let maturity = Date::from_calendar_date(2025 + years, Month::January, 2).unwrap();
+        let swap = make_xccy(base, maturity, NotionalExchange::InitialAndFinal);
+        support::bench(
+            b,
+            || {
+                black_box(&swap)
+                    .value(black_box(&market), black_box(base))
+                    .expect("XCCY PV should calculate successfully")
+            },
+            |value| {
+                assert!(value.amount().is_finite());
+                assert_eq!(value.currency(), Currency::USD);
+                assert_eq!(swap.notional_exchange, NotionalExchange::InitialAndFinal);
+                for leg in [&swap.leg1, &swap.leg2] {
+                    assert_eq!(leg.leg.start, base);
+                    assert_eq!(leg.leg.end, maturity);
+                    assert_eq!(leg.leg.frequency, Tenor::quarterly());
+                    assert!(!leg.leg.compounding.is_overnight());
+                }
+            },
+        );
     });
 
     group.finish();
@@ -181,23 +195,35 @@ fn bench_xccy_tenor(c: &mut Criterion) {
 
 fn bench_xccy_notional_exchange(c: &mut Criterion) {
     let mut group = c.benchmark_group("xccy_notional_exchange");
-    let base = base_date();
-    let maturity = Date::from_calendar_date(2030, Month::January, 2).unwrap();
-    let market = create_market();
-
     for (label, exchange) in [
         ("none", NotionalExchange::None),
         ("final", NotionalExchange::Final),
         ("initial_and_final", NotionalExchange::InitialAndFinal),
     ] {
-        let swap = make_xccy(base, maturity, exchange);
         group.bench_function(label, |b| {
-            b.iter(|| {
-                black_box(&swap)
-                    .value(black_box(&market), black_box(base))
-                    .unwrap()
-                    .amount()
-            });
+            let base = base_date();
+            let maturity = Date::from_calendar_date(2030, Month::January, 2).unwrap();
+            let market = create_market();
+            let swap = make_xccy(base, maturity, exchange);
+            support::bench(
+                b,
+                || {
+                    black_box(&swap)
+                        .value(black_box(&market), black_box(base))
+                        .expect("XCCY PV should calculate successfully")
+                },
+                |value| {
+                    assert!(value.amount().is_finite());
+                    assert_eq!(value.currency(), Currency::USD);
+                    assert_eq!(swap.notional_exchange, exchange);
+                    for leg in [&swap.leg1, &swap.leg2] {
+                        assert_eq!(leg.leg.start, base);
+                        assert_eq!(leg.leg.end, maturity);
+                        assert_eq!(leg.leg.frequency, Tenor::quarterly());
+                        assert!(!leg.leg.compounding.is_overnight());
+                    }
+                },
+            );
         });
     }
 

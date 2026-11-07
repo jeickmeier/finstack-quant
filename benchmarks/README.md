@@ -4,29 +4,33 @@ Checked-in performance *records* — not benchmark code. The measurement
 harnesses live with the code they measure (Criterion benches under
 `finstack-quant/*/benches/`, pytest-benchmark under
 `finstack-quant-py/benchmarks/`, and `finstack-quant-wasm/benchmarks/bench.mjs`).
-What is tracked here is the portfolio-materialization acceptance record: the
-immutable baselines a comparison run is gated against, and the machine-readable
-result set the Markdown document quotes.
+This directory contains the portfolio-materialization acceptance record and
+the valuation benchmark validity/performance record. Materialization has
+immutable baselines and gated comparison results; the valuation record states
+which validity checks, numerical references and performance measurements are
+complete.
 
-Only the materialization path is recorded this way. Every other benchmark in
-the workspace is discovery-oriented: run it, read the numbers, nothing is
-committed.
+Other benchmarks remain discovery-oriented unless a specific record states
+otherwise. Benchmark availability does not create a library-wide performance
+gate.
 
 ## Contents
 
 | Path | What it is |
 | --- | --- |
+| [`VALUATION_PERFORMANCE.md`](VALUATION_PERFORMANCE.md) | Valuation validity, numerical evidence and the six scoped performance investigations. Currently a pre-timing checkpoint; no performance gain or final acceptance is claimed. |
+| [`valuation-performance-results.json`](valuation-performance-results.json) | Compact valuation status, evidence paths/hashes and per-investigation summaries; comparative measurement rows are pending. |
 | [`MATERIALIZATION_BENCHMARKS.md`](MATERIALIZATION_BENCHMARKS.md) | The procedure and the human-readable reference result: fixture definitions, timing boundaries, gates, profiling recipe, and hardware/toolchain provenance. |
 | `materialization/materialization-rust-baseline.json` | Immutable Rust baseline `materialization-v1`. Median-per-case for `cold_a_5000_unique`, `cold_b_5000_50`, `warm_b_5000_50`, `validation_b_5000_50`, plus tree revision and fixture digest. |
 | `materialization/materialization-python-baseline.json` | Immutable Python baseline `python-materialization-v1`. Same three timed cases minus validation-only. |
 | `materialization/materialization-benchmark-baseline.json` | Manifest sealing both baselines: their paths, names, tree revisions, fixture digests, SHA-256s, case lists, and the 10% median-regression threshold. |
 | `materialization/materialization-benchmark-results.json` | The full record produced by one acceptance run: raw samples, percentiles, bootstrap intervals, phase counters, environment, exact commands, gate evaluations, and Criterion baseline/current/change estimates for Rust, Python, and WASM. |
 
-Each JSON carries a `schema` field
+The materialization JSON files carry a `schema` field
 (`finstack_quant.materialization_benchmark_results/1` and siblings). These are
 data artifacts written by tooling — edit them only through the steps below.
 
-## Fixtures are not checked in
+## Materialization fixtures are not checked in
 
 Both fixtures are regenerated deterministically before every run:
 
@@ -44,7 +48,7 @@ generator body is shared with the Criterion bench via
 and Node/WASM measure identical bytes. A run whose combined fixture digest does
 not match the sealed baseline is rejected before any comparison.
 
-## Regenerating the record
+## Regenerating the materialization record
 
 One command produces the result set:
 

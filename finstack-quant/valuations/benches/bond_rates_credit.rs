@@ -13,6 +13,8 @@
 //! Measure the single-threaded cost, which is what a WASM host pays, with
 //! `RAYON_NUM_THREADS=1`.
 
+mod support;
+
 use criterion::{Criterion, criterion_group, criterion_main};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, StubKind};
@@ -25,7 +27,6 @@ use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, CallPut, 
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::pricer::ModelKey;
-use std::hint::black_box;
 use time::macros::date;
 
 const AS_OF: Date = date!(2024 - 07 - 15);
@@ -82,31 +83,64 @@ fn options() -> PricingOptions {
 }
 
 fn bench_rates_credit(c: &mut Criterion) {
-    let market = market();
-    let unquoted = callable_credit_bond();
-    let mut quoted = callable_credit_bond();
-    quoted
-        .instrument_pricing_overrides
-        .market_quotes
-        .quoted_clean_price_pct = Some(101.0);
-
     let mut group = c.benchmark_group("bond_rates_credit");
-    group.sample_size(10);
     group.bench_function("base_pv", |b| {
-        b.iter(|| {
-            let result = unquoted
-                .price_with_metrics(&market, AS_OF, &[], options())
-                .expect("base PV");
-            black_box(result.value.amount())
-        })
+        let market = market();
+        let unquoted = callable_credit_bond();
+        assert!(unquoted.credit_curve_id.is_some());
+        assert!(
+            unquoted
+                .call_put
+                .as_ref()
+                .is_some_and(CallPutSchedule::has_options)
+        );
+        assert_eq!(
+            unquoted
+                .instrument_pricing_overrides
+                .model_config
+                .hw1f_sigma,
+            Some(0.01)
+        );
+        assert!(
+            unquoted
+                .instrument_pricing_overrides
+                .market_quotes
+                .quoted_clean_price_pct
+                .is_none()
+        );
+        support::bench(
+            b,
+            || {
+                unquoted
+                    .price_with_metrics(&market, AS_OF, &[], options())
+                    .expect("rates-credit base PV")
+            },
+            |result| {
+                assert_eq!(result.value.currency(), Currency::USD);
+                assert!(result.value.amount().is_finite());
+            },
+        );
     });
     group.bench_function("oas", |b| {
-        b.iter(|| {
-            let result = quoted
-                .price_with_metrics(&market, AS_OF, &[MetricId::Oas], options())
-                .expect("OAS");
-            black_box(result.measures["oas"])
-        })
+        let market = market();
+        let mut quoted = callable_credit_bond();
+        quoted
+            .instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price_pct = Some(101.0);
+        support::bench(
+            b,
+            || {
+                quoted
+                    .price_with_metrics(&market, AS_OF, &[MetricId::Oas], options())
+                    .expect("rates-credit OAS")
+            },
+            |result| {
+                assert_eq!(result.value.currency(), Currency::USD);
+                assert!(result.value.amount().is_finite());
+                assert!(result.measures["oas"].is_finite());
+            },
+        );
     });
     group.finish();
 }

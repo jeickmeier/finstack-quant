@@ -1,0 +1,6 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Generated tranche oracle fixture: oracle_cache_key values are content hashes, not secrets"
+paths = ['''finstack-quant/valuations/credit/tests/fixtures/valuation_b4_tranche_reference\.json''']

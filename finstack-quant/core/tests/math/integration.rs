@@ -2,8 +2,8 @@
 //!
 use finstack_quant_core::math::{
     integration::{
-        GaussHermiteQuadrature, adaptive_simpson, gauss_legendre_integrate_adaptive,
-        gauss_legendre_integrate_composite, simpson_rule,
+        GaussHermiteQuadrature, adaptive_simpson, adaptive_simpson_pair,
+        gauss_legendre_integrate_adaptive, gauss_legendre_integrate_composite, simpson_rule,
     },
     special_functions::{erf, norm_cdf},
 };
@@ -407,4 +407,206 @@ fn production_credit_audit_simpson_uses_total_error_budget() {
         )
         .is_err()
     );
+}
+
+#[test]
+fn adaptive_simpson_pair_checks_unequal_scales_independently() {
+    // The large, exactly integrated component must not hide quadrature error
+    // in the small component, regardless of tuple order.
+    let large = 1_048_576.0;
+    let small_exact = 1e-3 * (1.0_f64.exp() - 1.0);
+    for swapped in [false, true] {
+        let (first, second) = adaptive_simpson_pair(
+            |x| {
+                let small = 1e-3 * x.exp();
+                if swapped {
+                    (small, large)
+                } else {
+                    (large, small)
+                }
+            },
+            0.0,
+            1.0,
+            1e-12,
+            24,
+        )
+        .expect("each independent absolute budget converges");
+        let (large_actual, small_actual) = if swapped {
+            (second, first)
+        } else {
+            (first, second)
+        };
+        assert!((large_actual - large).abs() < 1e-9);
+        assert!((small_actual - small_exact).abs() < 2e-12);
+    }
+}
+
+#[test]
+fn adaptive_simpson_pair_refines_distinct_localized_components() {
+    // Both peaks have analytic arctangent integrals and need refinement in
+    // different parts of the domain. The second also has a smaller scale.
+    let (first, second) = adaptive_simpson_pair(
+        |x| {
+            (
+                1.0 / (1.0 + (40.0 * (x - 0.2)).powi(2)),
+                1e-3 / (1.0 + (80.0 * (x - 0.8)).powi(2)),
+            )
+        },
+        0.0,
+        1.0,
+        1e-11,
+        24,
+    )
+    .expect("both localized integrals converge");
+    let first_exact = (32.0_f64.atan() - (-8.0_f64).atan()) / 40.0;
+    let second_exact = 1e-3 * (16.0_f64.atan() - (-64.0_f64).atan()) / 80.0;
+    assert!((first - first_exact).abs() < 2e-11);
+    assert!((second - second_exact).abs() < 2e-11);
+}
+
+#[test]
+fn adaptive_simpson_pair_preserves_total_error_budget_at_depth_limit() {
+    use finstack_quant_core::{Error, InputError};
+
+    let boundary = 0.123_456_7;
+    let f = |x: f64| (if x >= boundary { 1.0 } else { 0.0 }, x * x * x);
+    let (step, cube) = adaptive_simpson_pair(f, 0.0, 1.0, 1e-6, 20)
+        .expect("a depth-limited leaf can fit the global budget");
+    assert!((step - (1.0 - boundary)).abs() <= 1e-6);
+    assert!((cube - 0.25).abs() <= 1e-12);
+    assert!(matches!(
+        adaptive_simpson_pair(f, 0.0, 1.0, 1e-12, 2),
+        Err(Error::Input(InputError::SolverConvergenceFailed { .. }))
+    ));
+}
+
+#[test]
+fn adaptive_simpson_pair_reports_the_failing_component() {
+    use finstack_quant_core::{Error, InputError};
+
+    // Simpson integrates the constant exactly, but x^5 cannot meet zero
+    // tolerance at depth zero. Either tuple position must cause failure.
+    for failing_component in [1, 2] {
+        let result = adaptive_simpson_pair(
+            |x| {
+                if failing_component == 1 {
+                    (x.powi(5), 1.0)
+                } else {
+                    (1.0, x.powi(5))
+                }
+            },
+            0.0,
+            1.0,
+            0.0,
+            0,
+        );
+        let Err(Error::Input(InputError::SolverConvergenceFailed {
+            iterations,
+            residual,
+            last_x,
+            reason,
+        })) = result
+        else {
+            panic!("expected component {failing_component} convergence failure: {result:?}");
+        };
+        assert_eq!(iterations, 0);
+        assert!(residual.is_finite() && residual > 0.0);
+        assert_eq!(last_x, 0.5);
+        assert!(reason.contains(&format!("component {failing_component}")));
+    }
+
+    let both = adaptive_simpson_pair(|x| (x.powi(5), x.powi(6)), 0.0, 1.0, 0.0, 0);
+    let Err(Error::Input(InputError::SolverConvergenceFailed { reason, .. })) = both else {
+        panic!("both unconverged components must fail: {both:?}");
+    };
+    assert!(reason.contains("component 1"));
+}
+
+#[test]
+fn adaptive_simpson_pair_rejects_non_finite_components_and_arithmetic() {
+    use finstack_quant_core::{Error, InputError};
+
+    for values in [
+        (f64::NAN, 1.0),
+        (1.0, f64::NAN),
+        (f64::INFINITY, 1.0),
+        (1.0, f64::NEG_INFINITY),
+        // Finite callback values whose Simpson weighted sum overflows must
+        // not become a successful non-finite estimate.
+        (1.0, f64::MAX / 2.0),
+    ] {
+        assert!(matches!(
+            adaptive_simpson_pair(|_| values, 0.0, 1.0, 1e-8, 20),
+            Err(Error::Input(InputError::SolverConvergenceFailed { .. }))
+        ));
+    }
+}
+
+#[test]
+fn adaptive_simpson_pair_preserves_interval_and_budget_validation() {
+    use finstack_quant_core::Error;
+
+    for (a, b, tol) in [
+        (f64::NAN, 1.0, 1e-8),
+        (0.0, f64::INFINITY, 1e-8),
+        (0.0, 1.0, -1e-8),
+        (0.0, 1.0, f64::NAN),
+        (0.0, 1.0, f64::INFINITY),
+    ] {
+        assert!(matches!(
+            adaptive_simpson_pair(|x| (x, x * x), a, b, tol, 20),
+            Err(Error::Validation(_))
+        ));
+    }
+
+    let zero = adaptive_simpson_pair(|x| (x, x * x), 2.0, 2.0, 0.0, 0)
+        .expect("finite zero-width integrals");
+    assert_eq!(zero, (0.0, 0.0));
+    let reversed = adaptive_simpson_pair(|x| (1.0, x * x * x), 1.0, 0.0, 0.0, 0)
+        .expect("exact signed polynomial integrals");
+    assert_eq!(reversed, (-1.0, -0.25));
+}
+
+#[test]
+fn adaptive_simpson_pair_shares_callback_work_and_preserves_node_order() {
+    use std::cell::{Cell, RefCell};
+
+    let calls = RefCell::new(Vec::new());
+    let exact = adaptive_simpson_pair(
+        |x| {
+            calls.borrow_mut().push(x);
+            (x * x, x * x * x)
+        },
+        0.0,
+        1.0,
+        1e-12,
+        0,
+    )
+    .expect("exact polynomial pair");
+    assert_eq!(*calls.borrow(), [0.0, 1.0, 0.5, 0.25, 0.75]);
+    assert!((exact.0 - 1.0 / 3.0).abs() < 1e-12);
+    assert!((exact.1 - 0.25).abs() < 1e-12);
+
+    let pair_calls = Cell::new(0);
+    let pair = adaptive_simpson_pair(
+        |x| {
+            pair_calls.set(pair_calls.get() + 1);
+            (x.exp(), x.exp())
+        },
+        0.0,
+        1.0,
+        1e-10,
+        20,
+    )
+    .expect("identical smooth components");
+    let scalar_calls = Cell::new(0);
+    let scalar_integrand = |x: f64| {
+        scalar_calls.set(scalar_calls.get() + 1);
+        x.exp()
+    };
+    let first = adaptive_simpson(scalar_integrand, 0.0, 1.0, 1e-10, 20).expect("first scalar");
+    let second = adaptive_simpson(scalar_integrand, 0.0, 1.0, 1e-10, 20).expect("second scalar");
+    assert_eq!(pair.0.to_bits(), first.to_bits());
+    assert_eq!(pair.1.to_bits(), second.to_bits());
+    assert_eq!(pair_calls.get() * 2, scalar_calls.get());
 }

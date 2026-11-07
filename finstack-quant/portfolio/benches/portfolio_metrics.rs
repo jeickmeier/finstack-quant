@@ -12,20 +12,39 @@
 #[path = "bench_common.rs"]
 mod bench_common;
 
+#[path = "support/validity.rs"]
+mod validity;
+
 use bench_common::{create_institutional_portfolio, create_market_context};
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_core::config::FinstackConfig;
-use finstack_quant_portfolio::metrics::aggregate_metrics;
-use finstack_quant_portfolio::valuation::{
-    PortfolioValuationOptions, RequestedMetrics, value_portfolio,
-};
+use finstack_quant_portfolio::metrics::{PortfolioMetrics, aggregate_metrics};
+use finstack_quant_portfolio::valuation::{PortfolioValuationOptions, value_portfolio};
 use finstack_quant_portfolio::{dataframe::metrics_to_table, dataframe::positions_to_table};
+use finstack_quant_valuations::metrics::MetricId;
 use std::hint::black_box;
 
-fn best_effort_metrics() -> PortfolioValuationOptions {
-    PortfolioValuationOptions {
-        strict_risk: false,
-        metrics: RequestedMetrics::Standard,
+/// Require finite aggregates and a complete position-level metric export.
+///
+/// # Arguments
+///
+/// * `metrics` - Aggregated result inspected outside the timing loop.
+/// * `position_count` - Number of positions in the successfully valued source book.
+fn check_metrics(metrics: &PortfolioMetrics, position_count: usize) {
+    assert_eq!(metrics.by_position.len(), position_count);
+    assert!(metrics.degraded_positions.is_empty());
+    assert!(metrics.skipped_metrics.is_empty());
+    assert!(
+        metrics
+            .get_total("dv01")
+            .is_some_and(|value| value.is_finite())
+    );
+    for metric in metrics.aggregated.values() {
+        assert!(metric.total.is_finite());
+        assert!(metric.by_entity.values().all(|value| value.is_finite()));
+    }
+    for position in metrics.by_position.values() {
+        assert!(position.metrics.values().all(|value| value.is_finite()));
     }
 }
 
@@ -33,22 +52,34 @@ fn best_effort_metrics() -> PortfolioValuationOptions {
 
 fn bench_metrics_only(c: &mut Criterion) {
     let mut group = c.benchmark_group("portfolio_metrics_only");
-    let market = create_market_context();
-    let config = FinstackConfig::default();
 
     // 63/64 straddles POSITION_PARALLEL_MIN_POSITIONS; 250 is the workflow
-    // default; 3,000 is the institutional control. Aggregation is cheap
-    // relative to pricing, so the large case stays in the default matrix.
+    // default; 3,000 is the institutional control. Build and value only the
+    // selected case, before measuring aggregation.
     for num_positions in [63_usize, 64, 250, 3_000] {
-        let portfolio = create_institutional_portfolio(num_positions);
-        let valuation =
-            value_portfolio(&portfolio, &market, &config, &best_effort_metrics()).unwrap();
-
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}pos", num_positions)),
             &num_positions,
-            |b, _| {
-                b.iter(|| aggregate_metrics(black_box(&valuation), black_box(&market)).unwrap());
+            |b, &num_positions| {
+                let market = create_market_context();
+                let config = FinstackConfig::default();
+                let portfolio = create_institutional_portfolio(num_positions);
+                let valuation = value_portfolio(
+                    &portfolio,
+                    &market,
+                    &config,
+                    &PortfolioValuationOptions::default(),
+                )
+                .expect("complete standard-risk benchmark valuation");
+                validity::valuation(&portfolio, &valuation, &[MetricId::Dv01]);
+                validity::bench(
+                    b,
+                    || {
+                        aggregate_metrics(black_box(&valuation), black_box(&market))
+                            .expect("complete benchmark metric aggregation")
+                    },
+                    |metrics| check_metrics(metrics, num_positions),
+                );
             },
         );
     }
@@ -59,46 +90,81 @@ fn bench_metrics_only(c: &mut Criterion) {
 
 fn bench_value_and_metrics(c: &mut Criterion) {
     let mut group = c.benchmark_group("portfolio_value_metrics");
-    let market = create_market_context();
-    let config = FinstackConfig::default();
-
-    {
-        let num_positions = 250usize;
-        let portfolio = create_institutional_portfolio(num_positions);
-
-        group.bench_with_input(
-            BenchmarkId::from_parameter(format!("{}pos", num_positions)),
-            &num_positions,
-            |b, _| {
-                b.iter(|| {
+    let num_positions = 250usize;
+    group.bench_with_input(
+        BenchmarkId::from_parameter(format!("{}pos", num_positions)),
+        &num_positions,
+        |b, &num_positions| {
+            let market = create_market_context();
+            let config = FinstackConfig::default();
+            let portfolio = create_institutional_portfolio(num_positions);
+            let options = PortfolioValuationOptions::default();
+            let preflight = value_portfolio(&portfolio, &market, &config, &options)
+                .expect("complete standard-risk benchmark valuation");
+            validity::valuation(&portfolio, &preflight, &[MetricId::Dv01]);
+            drop(preflight);
+            validity::bench(
+                b,
+                || {
                     let valuation = value_portfolio(
                         black_box(&portfolio),
                         black_box(&market),
                         black_box(&config),
-                        &best_effort_metrics(),
+                        &options,
                     )
-                    .unwrap();
-                    aggregate_metrics(black_box(&valuation), black_box(&market)).unwrap()
-                });
-            },
-        );
-    }
+                    .expect("complete standard-risk benchmark valuation");
+                    aggregate_metrics(black_box(&valuation), black_box(&market))
+                        .expect("complete benchmark metric aggregation")
+                },
+                |metrics| check_metrics(metrics, num_positions),
+            );
+        },
+    );
     group.finish();
 }
 
 fn bench_metrics_export(c: &mut Criterion) {
     let mut group = c.benchmark_group("portfolio_metrics_export");
-    let market = create_market_context();
-    let config = FinstackConfig::default();
-    let portfolio = create_institutional_portfolio(250);
-    let valuation = value_portfolio(&portfolio, &market, &config, &best_effort_metrics()).unwrap();
-    let metrics = aggregate_metrics(&valuation, &market).unwrap();
 
     group.bench_function("metrics_to_table_250pos", |b| {
-        b.iter(|| metrics_to_table(black_box(&metrics)).unwrap());
+        let market = create_market_context();
+        let config = FinstackConfig::default();
+        let portfolio = create_institutional_portfolio(250);
+        let valuation = value_portfolio(
+            &portfolio,
+            &market,
+            &config,
+            &PortfolioValuationOptions::default(),
+        )
+        .expect("complete standard-risk export fixture");
+        validity::valuation(&portfolio, &valuation, &[MetricId::Dv01]);
+        let metrics = aggregate_metrics(&valuation, &market).expect("complete export metrics");
+        check_metrics(&metrics, 250);
+        let expected_rows: usize = metrics.by_position.values().map(|p| p.metrics.len()).sum();
+        assert!(expected_rows > 0);
+        validity::bench(
+            b,
+            || metrics_to_table(black_box(&metrics)).expect("metrics table export"),
+            |table| assert_eq!(table.row_count, expected_rows),
+        );
     });
     group.bench_function("positions_to_table_250pos", |b| {
-        b.iter(|| positions_to_table(black_box(&valuation)).unwrap());
+        let market = create_market_context();
+        let config = FinstackConfig::default();
+        let portfolio = create_institutional_portfolio(250);
+        let valuation = value_portfolio(
+            &portfolio,
+            &market,
+            &config,
+            &PortfolioValuationOptions::default(),
+        )
+        .expect("complete standard-risk export fixture");
+        validity::valuation(&portfolio, &valuation, &[MetricId::Dv01]);
+        validity::bench(
+            b,
+            || positions_to_table(black_box(&valuation)).expect("positions table export"),
+            |table| assert_eq!(table.row_count, 250),
+        );
     });
     group.finish();
 }

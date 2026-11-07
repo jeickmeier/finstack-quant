@@ -19,6 +19,9 @@ use finstack_quant_valuations::instruments::fx::fx_swap::FxSwap;
 use finstack_quant_valuations::instruments::fx::ndf::Ndf;
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations::pricer::ModelKey;
+
+mod support;
 use std::hint::black_box;
 use std::sync::Arc;
 use time::Month;
@@ -75,28 +78,34 @@ fn create_market() -> MarketContext {
 
 fn bench_fx_spot_pv(c: &mut Criterion) {
     let mut group = c.benchmark_group("fx_spot_pv");
-    let market = create_market();
-    let as_of = base_date();
-    let spot = FxSpot::builder()
-        .id(InstrumentId::new("EURUSD"))
-        .base_currency(Currency::EUR)
-        .quote_currency(Currency::USD)
-        .notional(Money::from((1_i64, Currency::EUR)))
-        .build()
-        .expect("valid FX spot");
-
     group.bench_function("eurusd", |b| {
-        b.iter(|| spot.value(black_box(&market), black_box(as_of)));
+        let market = create_market();
+        let as_of = base_date();
+        let spot = FxSpot::builder()
+            .id(InstrumentId::new("EURUSD"))
+            .base_currency(Currency::EUR)
+            .quote_currency(Currency::USD)
+            .notional(Money::from((1_i64, Currency::EUR)))
+            .build()
+            .expect("valid FX spot");
+        assert_eq!(spot.default_model(), ModelKey::Discounting);
+        support::bench(
+            b,
+            || {
+                spot.value(black_box(&market), black_box(as_of))
+                    .expect("FX spot PV")
+            },
+            |value| {
+                assert_eq!(value.currency(), Currency::USD);
+                assert!(value.amount().is_finite());
+            },
+        );
     });
     group.finish();
 }
 
 fn bench_fx_swap_pv(c: &mut Criterion) {
     let mut group = c.benchmark_group("fx_swap_pv");
-    let market = create_market();
-    let as_of = base_date();
-    let near_date = Date::from_calendar_date(2025, Month::January, 3).unwrap();
-
     let swaps = [
         (
             "1M",
@@ -111,51 +120,78 @@ fn bench_fx_swap_pv(c: &mut Criterion) {
             Date::from_calendar_date(2026, Month::January, 3).unwrap(),
         ),
     ];
-
     for (label, far_date) in swaps {
-        let swap = FxSwap::builder()
-            .id(InstrumentId::new(format!("EURUSD-SWAP-{label}")))
-            .base_currency(Currency::EUR)
-            .quote_currency(Currency::USD)
-            .near_date(near_date)
-            .far_date(far_date)
-            .notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
-            .domestic_discount_curve_id("USD-OIS".into())
-            .foreign_discount_curve_id("EUR-OIS".into())
-            .build()
-            .unwrap();
-
-        group.bench_with_input(BenchmarkId::from_parameter(label), label, |b, _| {
-            b.iter(|| swap.value(black_box(&market), black_box(as_of)));
-        });
+        group.bench_with_input(
+            BenchmarkId::from_parameter(label),
+            &far_date,
+            |b, far_date| {
+                let market = create_market();
+                let as_of = base_date();
+                let near_date = Date::from_calendar_date(2025, Month::January, 3).unwrap();
+                let swap = FxSwap::builder()
+                    .id(InstrumentId::new(format!("EURUSD-SWAP-{label}")))
+                    .base_currency(Currency::EUR)
+                    .quote_currency(Currency::USD)
+                    .near_date(near_date)
+                    .far_date(*far_date)
+                    .notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
+                    .domestic_discount_curve_id("USD-OIS".into())
+                    .foreign_discount_curve_id("EUR-OIS".into())
+                    .build()
+                    .unwrap();
+                assert_eq!(swap.default_model(), ModelKey::Discounting);
+                assert!(swap.near_date > as_of && swap.far_date > swap.near_date);
+                support::bench(
+                    b,
+                    || {
+                        swap.value(black_box(&market), black_box(as_of))
+                            .expect("FX swap PV")
+                    },
+                    |value| {
+                        assert_eq!(value.currency(), Currency::USD);
+                        assert!(value.amount().is_finite());
+                    },
+                );
+            },
+        );
     }
     group.finish();
 }
 
 fn bench_fx_forward_pv(c: &mut Criterion) {
     let mut group = c.benchmark_group("fx_forward_pv");
-    let market = create_market();
-    let as_of = base_date();
-
     let tenors: [(&str, i64); 4] = [("1M", 30), ("3M", 90), ("6M", 180), ("1Y", 365)];
-
     for (label, days) in tenors {
-        let maturity = as_of + time::Duration::days(days);
-        let forward = FxForward::builder()
-            .id(InstrumentId::new(format!("EURUSD-FWD-{label}")))
-            .base_currency(Currency::EUR)
-            .quote_currency(Currency::USD)
-            .maturity(maturity)
-            .notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
-            .contract_rate_opt(Some(1.05))
-            .domestic_discount_curve_id(CurveId::new("USD-OIS"))
-            .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
-            .attributes(Attributes::new())
-            .build()
-            .unwrap();
-
-        group.bench_with_input(BenchmarkId::from_parameter(label), label, |b, _| {
-            b.iter(|| forward.value(black_box(&market), black_box(as_of)));
+        group.bench_with_input(BenchmarkId::from_parameter(label), &days, |b, days| {
+            let market = create_market();
+            let as_of = base_date();
+            let maturity = as_of + time::Duration::days(*days);
+            let forward = FxForward::builder()
+                .id(InstrumentId::new(format!("EURUSD-FWD-{label}")))
+                .base_currency(Currency::EUR)
+                .quote_currency(Currency::USD)
+                .maturity(maturity)
+                .notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
+                .contract_rate_opt(Some(1.05))
+                .domestic_discount_curve_id(CurveId::new("USD-OIS"))
+                .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
+                .attributes(Attributes::new())
+                .build()
+                .unwrap();
+            assert_eq!(forward.default_model(), ModelKey::Discounting);
+            assert!(forward.maturity > as_of);
+            support::bench(
+                b,
+                || {
+                    forward
+                        .value(black_box(&market), black_box(as_of))
+                        .expect("FX forward PV")
+                },
+                |value| {
+                    assert_eq!(value.currency(), Currency::USD);
+                    assert!(value.amount().is_finite());
+                },
+            );
         });
     }
     group.finish();
@@ -163,15 +199,49 @@ fn bench_fx_forward_pv(c: &mut Criterion) {
 
 fn bench_fx_option_pv(c: &mut Criterion) {
     let mut group = c.benchmark_group("fx_option_pv");
-    let market = create_market();
-    let as_of = base_date();
-
     let expiries: [(&str, i64); 3] = [("3M", 90), ("6M", 180), ("12M", 365)];
-
     for (label, days) in expiries {
-        let expiry = as_of + time::Duration::days(days);
+        group.bench_with_input(BenchmarkId::from_parameter(label), &days, |b, days| {
+            let market = create_market();
+            let as_of = base_date();
+            let expiry = as_of + time::Duration::days(*days);
+            let option = option_support::fx_option_european_call(
+                InstrumentId::new(format!("FX-CALL-{label}")),
+                Currency::EUR,
+                Currency::USD,
+                1.10,
+                expiry,
+                Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
+                "EURUSD-VOL",
+            )
+            .unwrap();
+            assert_eq!(option.default_model(), ModelKey::Black76);
+            assert!(option.expiry > as_of);
+            support::bench(
+                b,
+                || {
+                    option
+                        .value(black_box(&market), black_box(as_of))
+                        .expect("FX option PV")
+                },
+                |value| {
+                    assert_eq!(value.currency(), Currency::USD);
+                    assert!(value.amount().is_finite());
+                },
+            );
+        });
+    }
+    group.finish();
+}
+
+fn bench_fx_option_greeks(c: &mut Criterion) {
+    let mut group = c.benchmark_group("fx_option_greeks");
+    group.bench_function("6M_delta_gamma_vega_theta_rho", |b| {
+        let market = create_market();
+        let as_of = base_date();
+        let expiry = as_of + time::Duration::days(180);
         let option = option_support::fx_option_european_call(
-            InstrumentId::new(format!("FX-CALL-{label}")),
+            "FX-CALL-6M",
             Currency::EUR,
             Currency::USD,
             1.10,
@@ -180,61 +250,65 @@ fn bench_fx_option_pv(c: &mut Criterion) {
             "EURUSD-VOL",
         )
         .unwrap();
-
-        group.bench_with_input(BenchmarkId::from_parameter(label), label, |b, _| {
-            b.iter(|| option.value(black_box(&market), black_box(as_of)));
-        });
-    }
-    group.finish();
-}
-
-fn bench_fx_option_greeks(c: &mut Criterion) {
-    let mut group = c.benchmark_group("fx_option_greeks");
-    let market = create_market();
-    let as_of = base_date();
-    let expiry = as_of + time::Duration::days(180);
-
-    let option = option_support::fx_option_european_call(
-        "FX-CALL-6M",
-        Currency::EUR,
-        Currency::USD,
-        1.10,
-        expiry,
-        Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
-        "EURUSD-VOL",
-    )
-    .unwrap();
-
-    let greeks = vec![
-        MetricId::Delta,
-        MetricId::Gamma,
-        MetricId::Vega,
-        MetricId::Theta,
-        MetricId::Rho,
-    ];
-
-    group.bench_function("6M_delta_gamma_vega_theta_rho", |b| {
-        b.iter(|| {
-            option.price_with_metrics(
-                black_box(&market),
-                black_box(as_of),
-                black_box(&greeks),
-                PricingOptions::default(),
-            )
-        });
+        let greeks = [
+            MetricId::Delta,
+            MetricId::Gamma,
+            MetricId::Vega,
+            MetricId::Theta,
+            MetricId::Rho,
+        ];
+        assert_eq!(option.default_model(), ModelKey::Black76);
+        assert!(option.expiry > as_of);
+        support::bench(
+            b,
+            || {
+                option
+                    .price_with_metrics(
+                        black_box(&market),
+                        black_box(as_of),
+                        black_box(&greeks),
+                        PricingOptions::default(),
+                    )
+                    .expect("FX option Greeks")
+            },
+            |result| {
+                assert_eq!(result.value.currency(), Currency::USD);
+                assert!(result.value.amount().is_finite());
+                for metric in &greeks {
+                    assert!(
+                        result
+                            .measures
+                            .get(metric)
+                            .expect("requested Greek")
+                            .is_finite()
+                    );
+                }
+            },
+        );
     });
     group.finish();
 }
 
 fn bench_ndf_pv(c: &mut Criterion) {
     let mut group = c.benchmark_group("ndf_pv");
-    let market = create_market();
-    let as_of = base_date();
-
-    let ndf = Ndf::example().expect("example");
-
     group.bench_function("cnyusd", |b| {
-        b.iter(|| ndf.value(black_box(&market), black_box(as_of)));
+        let market = create_market();
+        let as_of = base_date();
+        let ndf = Ndf::example().expect("example");
+        assert_eq!(ndf.default_model(), ModelKey::Discounting);
+        assert!(ndf.fixing_date > as_of);
+        assert_eq!(ndf.quoted_forward, Some(7.25));
+        support::bench(
+            b,
+            || {
+                ndf.value(black_box(&market), black_box(as_of))
+                    .expect("NDF PV")
+            },
+            |value| {
+                assert_eq!(value.currency(), Currency::USD);
+                assert!(value.amount().is_finite());
+            },
+        );
     });
     group.finish();
 }

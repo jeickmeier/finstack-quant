@@ -1,0 +1,803 @@
+{
+  "as_of": "2026-05-08",
+  "benchmark": "calibration_base_correlation_full_plan_5_knots",
+  "cases": [
+    {
+      "id": "CDX-IG-46-0-3",
+      "instrument": {
+        "attach_pct": 0.0,
+        "attributes": {},
+        "business_day_convention": "modified_following",
+        "calendar_id": "nyse",
+        "coupon_bp": 100.0,
+        "credit_index_id": "CDX-NA-IG-46",
+        "day_count": "act_360",
+        "detach_pct": 3.0,
+        "discount_curve_id": "USD-OIS",
+        "frequency": {
+          "count": 3,
+          "unit": "months"
+        },
+        "id": "CDX-IG-46-0-3",
+        "index_name": "CDX-NA-IG-46",
+        "maturity": "2031-06-20",
+        "notional": {
+          "amount": "0.03",
+          "currency": "USD"
+        },
+        "realized_loss": 0.0,
+        "roll_rule": "cds_imm",
+        "series": 46,
+        "side": "pay",
+        "start_date": "2026-03-20",
+        "stub": "short_front",
+        "upfront": [
+          "2026-05-13",
+          {
+            "amount": "0.020051522982",
+            "currency": "USD"
+          }
+        ]
+      },
+      "quote_id": "CDX-IG-46-0-3",
+      "role": "quoted"
+    },
+    {
+      "id": "CDX-IG-46-3-7",
+      "instrument": {
+        "attach_pct": 3.0,
+        "attributes": {},
+        "business_day_convention": "modified_following",
+        "calendar_id": "nyse",
+        "coupon_bp": 100.0,
+        "credit_index_id": "CDX-NA-IG-46",
+        "day_count": "act_360",
+        "detach_pct": 7.000000000000001,
+        "discount_curve_id": "USD-OIS",
+        "frequency": {
+          "count": 3,
+          "unit": "months"
+        },
+        "id": "CDX-IG-46-3-7",
+        "index_name": "CDX-NA-IG-46",
+        "maturity": "2031-06-20",
+        "notional": {
+          "amount": "0.04000000000000001",
+          "currency": "USD"
+        },
+        "realized_loss": 0.0,
+        "roll_rule": "cds_imm",
+        "series": 46,
+        "side": "pay",
+        "start_date": "2026-03-20",
+        "stub": "short_front",
+        "upfront": [
+          "2026-05-13",
+          {
+            "amount": "0.011473854152",
+            "currency": "USD"
+          }
+        ]
+      },
+      "quote_id": "CDX-IG-46-3-7",
+      "role": "quoted"
+    },
+    {
+      "id": "CDX-IG-46-7-10",
+      "instrument": {
+        "attach_pct": 7.000000000000001,
+        "attributes": {},
+        "business_day_convention": "modified_following",
+        "calendar_id": "nyse",
+        "coupon_bp": 100.0,
+        "credit_index_id": "CDX-NA-IG-46",
+        "day_count": "act_360",
+        "detach_pct": 10.0,
+        "discount_curve_id": "USD-OIS",
+        "frequency": {
+          "count": 3,
+          "unit": "months"
+        },
+        "id": "CDX-IG-46-7-10",
+        "index_name": "CDX-NA-IG-46",
+        "maturity": "2031-06-20",
+        "notional": {
+          "amount": "0.03",
+          "currency": "USD"
+        },
+        "realized_loss": 0.0,
+        "roll_rule": "cds_imm",
+        "series": 46,
+        "side": "pay",
+        "start_date": "2026-03-20",
+        "stub": "short_front",
+        "upfront": [
+          "2026-05-13",
+          {
+            "amount": "0.003206319519",
+            "currency": "USD"
+          }
+        ]
+      },
+      "quote_id": "CDX-IG-46-7-10",
+      "role": "quoted"
+    },
+    {
+      "id": "CDX-IG-46-10-15",
+      "instrument": {
+        "attach_pct": 10.0,
+        "attributes": {},
+        "business_day_convention": "modified_following",
+        "calendar_id": "nyse",
+        "coupon_bp": 100.0,
+        "credit_index_id": "CDX-NA-IG-46",
+        "day_count": "act_360",
+        "detach_pct": 15.0,
+        "discount_curve_id": "USD-OIS",
+        "frequency": {
+          "count": 3,
+          "unit": "months"
+        },
+        "id": "CDX-IG-46-10-15",
+        "index_name": "CDX-NA-IG-46",
+        "maturity": "2031-06-20",
+        "notional": {
+          "amount": "0.05",
+          "currency": "USD"
+        },
+        "realized_loss": 0.0,
+        "roll_rule": "cds_imm",
+        "series": 46,
+        "side": "pay",
+        "start_date": "2026-03-20",
+        "stub": "short_front",
+        "upfront": [
+          "2026-05-13",
+          {
+            "amount": "0.001208673585",
+            "currency": "USD"
+          }
+        ]
+      },
+      "quote_id": "CDX-IG-46-10-15",
+      "role": "quoted"
+    },
+    {
+      "id": "CDX-IG-46-15-30",
+      "instrument": {
+        "attach_pct": 15.0,
+        "attributes": {},
+        "business_day_convention": "modified_following",
+        "calendar_id": "nyse",
+        "coupon_bp": 100.0,
+        "credit_index_id": "CDX-NA-IG-46",
+        "day_count": "act_360",
+        "detach_pct": 30.0,
+        "discount_curve_id": "USD-OIS",
+        "frequency": {
+          "count": 3,
+          "unit": "months"
+        },
+        "id": "CDX-IG-46-15-30",
+        "index_name": "CDX-NA-IG-46",
+        "maturity": "2031-06-20",
+        "notional": {
+          "amount": "0.15",
+          "currency": "USD"
+        },
+        "realized_loss": 0.0,
+        "roll_rule": "cds_imm",
+        "series": 46,
+        "side": "pay",
+        "start_date": "2026-03-20",
+        "stub": "short_front",
+        "upfront": [
+          "2026-05-13",
+          {
+            "amount": "-0.00484315773",
+            "currency": "USD"
+          }
+        ]
+      },
+      "quote_id": "CDX-IG-46-15-30",
+      "role": "quoted"
+    },
+    {
+      "id": "calibration_off_grid_0_5",
+      "instrument": {
+        "attach_pct": 0.0,
+        "attributes": {},
+        "business_day_convention": "modified_following",
+        "calendar_id": "nyse",
+        "coupon_bp": 100.0,
+        "credit_index_id": "CDX-NA-IG-46",
+        "day_count": "act_360",
+        "detach_pct": 5.0,
+        "discount_curve_id": "USD-OIS",
+        "frequency": {
+          "count": 3,
+          "unit": "months"
+        },
+        "id": "calibration_off_grid_0_5",
+        "index_name": "CDX-NA-IG-46",
+        "maturity": "2031-06-20",
+        "notional": {
+          "amount": "0.03",
+          "currency": "USD"
+        },
+        "realized_loss": 0.0,
+        "roll_rule": "cds_imm",
+        "series": 46,
+        "side": "pay",
+        "start_date": "2026-03-20",
+        "stub": "short_front",
+        "upfront": null
+      },
+      "quote_id": null,
+      "role": "off_grid"
+    },
+    {
+      "id": "calibration_off_grid_5_12",
+      "instrument": {
+        "attach_pct": 5.0,
+        "attributes": {},
+        "business_day_convention": "modified_following",
+        "calendar_id": "nyse",
+        "coupon_bp": 100.0,
+        "credit_index_id": "CDX-NA-IG-46",
+        "day_count": "act_360",
+        "detach_pct": 12.0,
+        "discount_curve_id": "USD-OIS",
+        "frequency": {
+          "count": 3,
+          "unit": "months"
+        },
+        "id": "calibration_off_grid_5_12",
+        "index_name": "CDX-NA-IG-46",
+        "maturity": "2031-06-20",
+        "notional": {
+          "amount": "0.03",
+          "currency": "USD"
+        },
+        "realized_loss": 0.0,
+        "roll_rule": "cds_imm",
+        "series": 46,
+        "side": "pay",
+        "start_date": "2026-03-20",
+        "stub": "short_front",
+        "upfront": null
+      },
+      "quote_id": null,
+      "role": "off_grid"
+    }
+  ],
+  "envelope_hash": "sha256:9d927645bcc0b6eddcd35425df4e972ec53ff6e61f84cf44ea57d3c8efc3c64d",
+  "market": {
+    "credit_indices": [
+      {
+        "base_correlation_curve_id": "CDX-NA-IG-46_CORR",
+        "id": "CDX-NA-IG-46",
+        "index_credit_curve_id": "CDX-NA-IG-46",
+        "issuer_credit_curve_ids": null,
+        "issuer_recovery_rates": null,
+        "issuer_weights": null,
+        "num_constituents": 125,
+        "recovery_rate": 0.4
+      }
+    ],
+    "curves": [
+      {
+        "base": "2026-05-08",
+        "currency": "USD",
+        "day_count": "act_360",
+        "fx_policy": null,
+        "hazard_calibration": {
+          "calibration_config": {
+            "compute_diagnostics": false,
+            "discount_curve": {
+              "allow_non_monotonic_final": null,
+              "bootstrap_seed_global_solve": true,
+              "df_hard_max": 1000000.0,
+              "df_hard_min": 1e-12,
+              "jacobian_step_size": 1e-06,
+              "min_scan_grid_points": 20,
+              "scan_grid_points": 48,
+              "scan_grid_step": 0.0001,
+              "validation_tolerance": 1e-08,
+              "weighting_scheme": "sqrt_time"
+            },
+            "fail_on_bad_fit": true,
+            "forward_curve": {
+              "validation_tolerance": 1e-08,
+              "weighting_scheme": "sqrt_time"
+            },
+            "fx": {
+              "cache_capacity": 256,
+              "enable_triangulation": true,
+              "pivot_currency": "USD"
+            },
+            "hazard_curve": {
+              "hazard_hard_max": 10.0,
+              "hazard_hard_min": 0.0,
+              "validation_tolerance": 1e-08,
+              "weighting_scheme": "sqrt_time"
+            },
+            "inflation_curve": {
+              "cpi_hard_max": 10000.0,
+              "cpi_hard_min": 1.0,
+              "validation_tolerance": 1e-08,
+              "weighting_scheme": "sqrt_time"
+            },
+            "rate_bounds": {
+              "max_rate": 0.5,
+              "min_rate": -0.02
+            },
+            "rate_bounds_policy": "auto_currency",
+            "solver": {
+              "max_iterations": 100,
+              "tolerance": 1e-12
+            },
+            "use_parallel": false,
+            "validation": {
+              "allow_negative_rates": false,
+              "check_arbitrage": true,
+              "check_forward_positivity": true,
+              "check_monotonicity": true,
+              "max_cpi_growth": 0.5,
+              "max_forward_rate": 0.5,
+              "max_fwd_inflation": 0.5,
+              "max_hazard_rate": 0.5,
+              "max_volatility": 5.0,
+              "min_cpi_growth": -0.1,
+              "min_forward_rate": -0.01,
+              "min_fwd_inflation": -0.2,
+              "minimum_lgd_for_hazard_guess": 1e-06,
+              "recovery_rate_abs_tolerance": 1e-12,
+              "tolerance": 1e-10
+            },
+            "validation_mode": "error",
+            "vol_surface": {
+              "validation_tolerance": 0.001
+            }
+          },
+          "calibration_inputs": [
+            {
+              "pillar_date": "2027-06-20",
+              "pillar_time": 1.1333333333333333,
+              "quote": {
+                "convention": {
+                  "currency": "USD",
+                  "doc_clause": "isda_na"
+                },
+                "entity": "CDX.NA.IG.46",
+                "id": "CDX-IG-46-1Y",
+                "pillar": {
+                  "tenor": {
+                    "count": 1,
+                    "unit": "years"
+                  }
+                },
+                "recovery_rate": 0.4,
+                "spread_bp": 50.0,
+                "type": "cds_par_spread"
+              }
+            },
+            {
+              "pillar_date": "2029-06-20",
+              "pillar_time": 3.1638888888888888,
+              "quote": {
+                "convention": {
+                  "currency": "USD",
+                  "doc_clause": "isda_na"
+                },
+                "entity": "CDX.NA.IG.46",
+                "id": "CDX-IG-46-3Y",
+                "pillar": {
+                  "tenor": {
+                    "count": 3,
+                    "unit": "years"
+                  }
+                },
+                "recovery_rate": 0.4,
+                "spread_bp": 75.0,
+                "type": "cds_par_spread"
+              }
+            },
+            {
+              "pillar_date": "2031-06-20",
+              "pillar_time": 5.191666666666666,
+              "quote": {
+                "convention": {
+                  "currency": "USD",
+                  "doc_clause": "isda_na"
+                },
+                "entity": "CDX.NA.IG.46",
+                "id": "CDX-IG-46-5Y",
+                "pillar": {
+                  "tenor": {
+                    "count": 5,
+                    "unit": "years"
+                  }
+                },
+                "recovery_rate": 0.4,
+                "spread_bp": 100.0,
+                "type": "cds_par_spread"
+              }
+            },
+            {
+              "pillar_date": "2033-06-20",
+              "pillar_time": 7.222222222222222,
+              "quote": {
+                "convention": {
+                  "currency": "USD",
+                  "doc_clause": "isda_na"
+                },
+                "entity": "CDX.NA.IG.46",
+                "id": "CDX-IG-46-7Y",
+                "pillar": {
+                  "tenor": {
+                    "count": 7,
+                    "unit": "years"
+                  }
+                },
+                "recovery_rate": 0.4,
+                "spread_bp": 110.0,
+                "type": "cds_par_spread"
+              }
+            },
+            {
+              "pillar_date": "2036-06-20",
+              "pillar_time": 10.266666666666667,
+              "quote": {
+                "convention": {
+                  "currency": "USD",
+                  "doc_clause": "isda_na"
+                },
+                "entity": "CDX.NA.IG.46",
+                "id": "CDX-IG-46-10Y",
+                "pillar": {
+                  "tenor": {
+                    "count": 10,
+                    "unit": "years"
+                  }
+                },
+                "recovery_rate": 0.4,
+                "spread_bp": 120.0,
+                "type": "cds_par_spread"
+              }
+            }
+          ],
+          "hazard_params": {
+            "base_date": "2026-05-08",
+            "currency": "USD",
+            "curve_id": "CDX-NA-IG-46",
+            "discount_curve_id": "USD-OIS",
+            "entity": "CDX.NA.IG.46",
+            "method": "bootstrap",
+            "notional": 1.0,
+            "par_interp": "linear",
+            "recovery_rate": 0.4,
+            "seniority": "senior"
+          },
+          "spread_risk_inputs": [
+            {
+              "pillar_date": "2027-06-20",
+              "pillar_time": 1.1333333333333333,
+              "quote": {
+                "convention": {
+                  "currency": "USD",
+                  "doc_clause": "isda_na"
+                },
+                "entity": "CDX.NA.IG.46",
+                "id": "CDX-IG-46-1Y",
+                "pillar": {
+                  "tenor": {
+                    "count": 1,
+                    "unit": "years"
+                  }
+                },
+                "recovery_rate": 0.4,
+                "spread_bp": 50.0,
+                "type": "cds_par_spread"
+              }
+            },
+            {
+              "pillar_date": "2029-06-20",
+              "pillar_time": 3.1638888888888888,
+              "quote": {
+                "convention": {
+                  "currency": "USD",
+                  "doc_clause": "isda_na"
+                },
+                "entity": "CDX.NA.IG.46",
+                "id": "CDX-IG-46-3Y",
+                "pillar": {
+                  "tenor": {
+                    "count": 3,
+                    "unit": "years"
+                  }
+                },
+                "recovery_rate": 0.4,
+                "spread_bp": 75.0,
+                "type": "cds_par_spread"
+              }
+            },
+            {
+              "pillar_date": "2031-06-20",
+              "pillar_time": 5.191666666666666,
+              "quote": {
+                "convention": {
+                  "currency": "USD",
+                  "doc_clause": "isda_na"
+                },
+                "entity": "CDX.NA.IG.46",
+                "id": "CDX-IG-46-5Y",
+                "pillar": {
+                  "tenor": {
+                    "count": 5,
+                    "unit": "years"
+                  }
+                },
+                "recovery_rate": 0.4,
+                "spread_bp": 100.0,
+                "type": "cds_par_spread"
+              }
+            },
+            {
+              "pillar_date": "2033-06-20",
+              "pillar_time": 7.222222222222222,
+              "quote": {
+                "convention": {
+                  "currency": "USD",
+                  "doc_clause": "isda_na"
+                },
+                "entity": "CDX.NA.IG.46",
+                "id": "CDX-IG-46-7Y",
+                "pillar": {
+                  "tenor": {
+                    "count": 7,
+                    "unit": "years"
+                  }
+                },
+                "recovery_rate": 0.4,
+                "spread_bp": 110.0,
+                "type": "cds_par_spread"
+              }
+            },
+            {
+              "pillar_date": "2036-06-20",
+              "pillar_time": 10.266666666666667,
+              "quote": {
+                "convention": {
+                  "currency": "USD",
+                  "doc_clause": "isda_na"
+                },
+                "entity": "CDX.NA.IG.46",
+                "id": "CDX-IG-46-10Y",
+                "pillar": {
+                  "tenor": {
+                    "count": 10,
+                    "unit": "years"
+                  }
+                },
+                "recovery_rate": 0.4,
+                "spread_bp": 120.0,
+                "type": "cds_par_spread"
+              }
+            }
+          ]
+        },
+        "id": "CDX-NA-IG-46",
+        "issuer": "CDX.NA.IG.46",
+        "knot_points": [
+          [
+            1.1333333333333333,
+            0.008281414431846816
+          ],
+          [
+            3.1638888888888888,
+            0.014969844588791092
+          ],
+          [
+            5.191666666666666,
+            0.024149828286131766
+          ],
+          [
+            7.222222222222222,
+            0.023558385398641378
+          ],
+          [
+            10.266666666666667,
+            0.025312484500345366
+          ]
+        ],
+        "par_interp": "linear",
+        "par_points": [
+          [
+            1.1333333333333333,
+            50.0
+          ],
+          [
+            3.1638888888888888,
+            75.0
+          ],
+          [
+            5.191666666666666,
+            100.0
+          ],
+          [
+            7.222222222222222,
+            110.0
+          ],
+          [
+            10.266666666666667,
+            120.0
+          ]
+        ],
+        "recovery_rate": 0.4,
+        "seniority": "senior",
+        "type": "hazard"
+      },
+      {
+        "correlations": [
+          0.20066202918105408,
+          0.21114989424558556,
+          0.21967934116464416,
+          0.2317704160688706,
+          0.24896498928161678
+        ],
+        "detachment_points": [
+          3.0,
+          7.000000000000001,
+          10.0,
+          15.0,
+          30.0
+        ],
+        "id": "CDX-NA-IG-46_CORR",
+        "type": "base_correlation"
+      },
+      {
+        "allow_non_monotonic": false,
+        "base": "2026-05-08",
+        "day_count": "act_365f",
+        "extrapolation": "flat_forward",
+        "fx_policy": null,
+        "id": "USD-OIS",
+        "interp_style": "linear",
+        "knot_points": [
+          [
+            0.0,
+            1.0
+          ],
+          [
+            0.0958904109589041,
+            0.9949217535493369
+          ],
+          [
+            0.26301369863013696,
+            0.9863126300274143
+          ],
+          [
+            1.0164383561643835,
+            0.9500181643911029
+          ],
+          [
+            2.0246575342465754,
+            0.9065521544949088
+          ],
+          [
+            5.019178082191781,
+            0.7999882376687321
+          ],
+          [
+            10.024657534246575,
+            0.6677728466654677
+          ]
+        ],
+        "min_forward_rate": -0.005,
+        "min_forward_tenor": 1e-06,
+        "rate_calibration": {
+          "currency": "USD",
+          "curve_day_count": "act_365f",
+          "method": "bootstrap",
+          "ois_compounding": null,
+          "quotes": [
+            {
+              "deposit": {
+                "index_id": "USD-SOFR-OIS",
+                "pillar": {
+                  "tenor": {
+                    "count": 1,
+                    "unit": "months"
+                  }
+                },
+                "rate": 0.0525
+              }
+            },
+            {
+              "deposit": {
+                "index_id": "USD-SOFR-OIS",
+                "pillar": {
+                  "tenor": {
+                    "count": 3,
+                    "unit": "months"
+                  }
+                },
+                "rate": 0.052
+              }
+            },
+            {
+              "swap": {
+                "index_id": "USD-SOFR-OIS",
+                "pillar": {
+                  "tenor": {
+                    "count": 1,
+                    "unit": "years"
+                  }
+                },
+                "rate": 0.051,
+                "spread_decimal": null
+              }
+            },
+            {
+              "swap": {
+                "index_id": "USD-SOFR-OIS",
+                "pillar": {
+                  "tenor": {
+                    "count": 2,
+                    "unit": "years"
+                  }
+                },
+                "rate": 0.049,
+                "spread_decimal": null
+              }
+            },
+            {
+              "swap": {
+                "index_id": "USD-SOFR-OIS",
+                "pillar": {
+                  "tenor": {
+                    "count": 5,
+                    "unit": "years"
+                  }
+                },
+                "rate": 0.045,
+                "spread_decimal": null
+              }
+            },
+            {
+              "swap": {
+                "index_id": "USD-SOFR-OIS",
+                "pillar": {
+                  "tenor": {
+                    "count": 10,
+                    "unit": "years"
+                  }
+                },
+                "rate": 0.041,
+                "spread_decimal": null
+              }
+            }
+          ],
+          "role": {
+            "discount": {
+              "projection_curve_id": "USD-OIS"
+            }
+          }
+        },
+        "type": "discount"
+      }
+    ],
+    "dividends": [],
+    "fx": null,
+    "fx_delta_vol_surfaces": [],
+    "hierarchy": null,
+    "inflation_indices": [],
+    "prices": {},
+    "schema_version": 1,
+    "series": [],
+    "surfaces": [],
+    "vol_cubes": []
+  },
+  "schema_version": 1
+}

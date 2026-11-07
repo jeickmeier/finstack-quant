@@ -11,7 +11,9 @@
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
+use finstack_quant_core::dates::{
+    BusinessDayConvention, Date, DateExt, DayCount, DayCountContext, StubKind, Tenor,
+};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
@@ -24,15 +26,20 @@ use finstack_quant_valuations::instruments::rates::swaption::{CashSettlementMeth
 use finstack_quant_valuations::instruments::{FixedLegSpec, FloatLegSpec};
 use finstack_quant_valuations::instruments::{Instrument, SettlementType, VolatilityModel};
 use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_valuations::pricer::ModelKey;
 use rust_decimal::Decimal;
 use std::hint::black_box;
 use time::Month;
 
-fn create_swaption(expiry_months: i64, swap_tenor_years: i32) -> Swaption {
+mod support;
+
+fn create_swaption(expiry_months: i32, swap_tenor_years: i32) -> Swaption {
     let base = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-    let expiry = base + time::Duration::days(expiry_months * 30);
+    let expiry = base.add_months(expiry_months).expect("valid expiry tenor");
     let swap_start = expiry;
-    let swap_end = Date::from_calendar_date(2025 + swap_tenor_years, Month::January, 1).unwrap();
+    let swap_end = swap_start
+        .add_months(12 * swap_tenor_years)
+        .expect("valid underlying swap tenor");
 
     let fixed = FixedLegSpec {
         discount_curve_id: CurveId::new("USD-OIS"),
@@ -83,7 +90,7 @@ fn create_swaption(expiry_months: i64, swap_tenor_years: i32) -> Swaption {
         .expect("valid benchmark swaption")
 }
 
-fn create_swaption_with_sabr(expiry_months: i64, swap_tenor_years: i32) -> Swaption {
+fn create_swaption_with_sabr(expiry_months: i32, swap_tenor_years: i32) -> Swaption {
     let mut swaption = create_swaption(expiry_months, swap_tenor_years);
     swaption.sabr_params = Some(SabrParameters {
         alpha: 0.15,
@@ -93,6 +100,25 @@ fn create_swaption_with_sabr(expiry_months: i64, swap_tenor_years: i32) -> Swapt
         shift: None,
     });
     swaption
+}
+
+fn assert_swaption(swaption: &Swaption, expiry_months: i32, swap_tenor: i32, sabr: bool) {
+    let base = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+    let expiry = base.add_months(expiry_months).unwrap();
+    let maturity = expiry.add_months(12 * swap_tenor).unwrap();
+    assert_eq!(swaption.expiry, expiry);
+    assert_eq!(swaption.underlying_fixed_leg.start, expiry);
+    assert_eq!(swaption.underlying_float_leg.start, expiry);
+    assert_eq!(swaption.underlying_fixed_leg.end, maturity);
+    assert_eq!(swaption.underlying_float_leg.end, maturity);
+    assert_eq!(swaption.default_model(), ModelKey::Black76);
+    assert_eq!(swaption.sabr_params.is_some(), sabr);
+}
+
+fn assert_usd(value: &Money) {
+    assert!(value.amount().is_finite());
+    assert!(value.amount() >= 0.0);
+    assert_eq!(value.currency(), Currency::USD);
 }
 
 fn create_market() -> MarketContext {
@@ -126,12 +152,22 @@ fn create_market() -> MarketContext {
         .build()
         .unwrap();
 
-    // Create a vol surface for swaption volatility
+    // Calendar expiries are not exact quarter-year fractions. The one-month
+    // pillar also covers the rolled expiry used by the three-month theta case.
+    let expiries = [1, 3, 6, 12, 24, 60].map(|months| {
+        DayCount::Act365F
+            .year_fraction(
+                base,
+                base.add_months(months).expect("valid surface expiry"),
+                DayCountContext::default(),
+            )
+            .expect("surface expiry year fraction")
+    });
     let vol_surface = VolSurface::from_grid(
         "SWAPTION-VOL",
-        &[0.25, 0.5, 1.0, 2.0, 5.0],     // Expiry times
+        &expiries,
         &[0.02, 0.03, 0.04, 0.05, 0.06], // Strike rates
-        &[0.20; 25],                     // Flat 20% vol
+        &[0.20; 30],                     // Flat 20% vol
         Default::default(),
         None,
     )
@@ -145,16 +181,25 @@ fn create_market() -> MarketContext {
 
 fn bench_swaption_pv(c: &mut Criterion) {
     let mut group = c.benchmark_group("swaption_pv");
-    let market = create_market();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
     for (expiry_months, swap_tenor) in [(3, 5), (6, 5), (12, 5), (12, 10)].iter() {
-        let swaption = create_swaption(*expiry_months, *swap_tenor);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}Mx{}Y", expiry_months, swap_tenor)),
             &(expiry_months, swap_tenor),
             |b, _| {
-                b.iter(|| swaption.value(black_box(&market), black_box(as_of)));
+                let market = create_market();
+                let swaption = create_swaption(*expiry_months, *swap_tenor);
+                assert_swaption(&swaption, *expiry_months, *swap_tenor, false);
+                support::bench(
+                    b,
+                    || {
+                        swaption
+                            .value(black_box(&market), black_box(as_of))
+                            .expect("Black76 swaption PV")
+                    },
+                    assert_usd,
+                );
             },
         );
     }
@@ -163,16 +208,25 @@ fn bench_swaption_pv(c: &mut Criterion) {
 
 fn bench_swaption_sabr(c: &mut Criterion) {
     let mut group = c.benchmark_group("swaption_sabr");
-    let market = create_market();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
     for (expiry_months, swap_tenor) in [(3, 5), (6, 5), (12, 5), (12, 10)].iter() {
-        let swaption = create_swaption_with_sabr(*expiry_months, *swap_tenor);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}Mx{}Y", expiry_months, swap_tenor)),
             &(expiry_months, swap_tenor),
             |b, _| {
-                b.iter(|| swaption.value(black_box(&market), black_box(as_of)));
+                let market = create_market();
+                let swaption = create_swaption_with_sabr(*expiry_months, *swap_tenor);
+                assert_swaption(&swaption, *expiry_months, *swap_tenor, true);
+                support::bench(
+                    b,
+                    || {
+                        swaption
+                            .value(black_box(&market), black_box(as_of))
+                            .expect("SABR swaption PV")
+                    },
+                    assert_usd,
+                );
             },
         );
     }
@@ -181,7 +235,6 @@ fn bench_swaption_sabr(c: &mut Criterion) {
 
 fn bench_swaption_greeks(c: &mut Criterion) {
     let mut group = c.benchmark_group("swaption_greeks");
-    let market = create_market();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
     let greeks = vec![
@@ -192,19 +245,36 @@ fn bench_swaption_greeks(c: &mut Criterion) {
     ];
 
     for (expiry_months, swap_tenor) in [(3, 5), (6, 5), (12, 10)].iter() {
-        let swaption = create_swaption(*expiry_months, *swap_tenor);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}Mx{}Y", expiry_months, swap_tenor)),
             &(expiry_months, swap_tenor),
             |b, _| {
-                b.iter(|| {
-                    swaption.price_with_metrics(
-                        black_box(&market),
-                        black_box(as_of),
-                        black_box(&greeks),
-                        finstack_quant_valuations::instruments::PricingOptions::default(),
-                    )
-                });
+                let market = create_market();
+                let swaption = create_swaption(*expiry_months, *swap_tenor);
+                assert_swaption(&swaption, *expiry_months, *swap_tenor, false);
+                support::bench(
+                    b,
+                    || {
+                        swaption
+                            .price_with_metrics(
+                                black_box(&market),
+                                black_box(as_of),
+                                black_box(&greeks),
+                                finstack_quant_valuations::instruments::PricingOptions::default(),
+                            )
+                            .expect("swaption Greeks")
+                    },
+                    |result| {
+                        assert_usd(&result.value);
+                        assert!(result.measures.values().all(|value| value.is_finite()));
+                        for metric in &greeks {
+                            assert!(
+                                result.measures.contains_key(metric),
+                                "missing metric {metric}"
+                            );
+                        }
+                    },
+                );
             },
         );
     }
@@ -213,16 +283,25 @@ fn bench_swaption_greeks(c: &mut Criterion) {
 
 fn bench_forward_swap_rate(c: &mut Criterion) {
     let mut group = c.benchmark_group("swaption_forward_rate");
-    let market = create_market();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
     for (expiry_months, swap_tenor) in [(3, 5), (6, 5), (12, 5), (12, 10)].iter() {
-        let swaption = create_swaption(*expiry_months, *swap_tenor);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}Mx{}Y", expiry_months, swap_tenor)),
             &(expiry_months, swap_tenor),
             |b, _| {
-                b.iter(|| swaption.forward_swap_rate(black_box(&market), black_box(as_of)));
+                let market = create_market();
+                let swaption = create_swaption(*expiry_months, *swap_tenor);
+                assert_swaption(&swaption, *expiry_months, *swap_tenor, false);
+                support::bench(
+                    b,
+                    || {
+                        swaption
+                            .forward_swap_rate(black_box(&market), black_box(as_of))
+                            .expect("forward swap rate")
+                    },
+                    |rate| assert!(rate.is_finite() && *rate > 0.0),
+                );
             },
         );
     }
@@ -231,21 +310,28 @@ fn bench_forward_swap_rate(c: &mut Criterion) {
 
 fn bench_swap_annuity(c: &mut Criterion) {
     let mut group = c.benchmark_group("swaption_annuity");
-    let market = create_market();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
     for (expiry_months, swap_tenor) in [(3, 5), (6, 5), (12, 5), (12, 10)].iter() {
-        let swaption = create_swaption(*expiry_months, *swap_tenor);
-        let disc = market
-            .get_discount(swaption.get_discount_curve_id())
-            .unwrap();
-        let disc = disc.as_ref();
-
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}Mx{}Y", expiry_months, swap_tenor)),
             &(expiry_months, swap_tenor),
             |b, _| {
-                b.iter(|| swaption.swap_annuity(black_box(disc), black_box(as_of)));
+                let market = create_market();
+                let swaption = create_swaption(*expiry_months, *swap_tenor);
+                assert_swaption(&swaption, *expiry_months, *swap_tenor, false);
+                let disc = market
+                    .get_discount(swaption.get_discount_curve_id())
+                    .unwrap();
+                support::bench(
+                    b,
+                    || {
+                        swaption
+                            .swap_annuity(black_box(disc.as_ref()), black_box(as_of))
+                            .expect("swap annuity")
+                    },
+                    |annuity| assert!(annuity.is_finite() && *annuity > 0.0),
+                );
             },
         );
     }

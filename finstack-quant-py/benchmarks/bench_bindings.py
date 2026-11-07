@@ -1,4 +1,4 @@
-"""Comprehensive pytest-benchmark suite for all finstack-quant Python binding domains.
+"""Pytest-benchmark controls for selected finstack-quant Python binding domains.
 
 Run the complete suite against an optimized extension::
 
@@ -70,6 +70,7 @@ from finstack_quant.models.monte_carlo import (
 from finstack_quant.portfolio import (
     InstrumentArtifactCache,
     Portfolio,
+    PortfolioValuation,
     aggregate_full_cashflows,
     aggregate_metrics,
     attribute_portfolio_pnl,
@@ -82,12 +83,11 @@ from finstack_quant.portfolio import (
 from finstack_quant.scenarios import (
     CurveKind,
     OperationSpec,
+    ScenarioSpec,
     build_from_template,
-    build_scenario_spec,
     compose_scenarios,
     list_builtin_templates,
     list_template_components,
-    parse_scenario_spec,
     validate_scenario_spec,
 )
 from finstack_quant.statements import (
@@ -102,14 +102,14 @@ from finstack_quant.statements import (
 from finstack_quant.statements_analytics import (
     DependencyTracer,
     backtest_forecast,
-    direct_dependencies,
     evaluate_scenario_set,
     explain_formula,
     goal_seek,
     run_sensitivity,
     run_variance,
 )
-from finstack_quant.valuations.instruments import list_standard_metrics, validate_instrument_json
+from finstack_quant.valuations import ValuationResult
+from finstack_quant.valuations.instruments import list_standard_metrics, price_instrument, validate_instrument_json
 
 # Shared data
 
@@ -259,22 +259,7 @@ PORTFOLIO_SPEC_JSON = json.dumps({
             "position_id": "POS-1",
             "entity_id": "ENTITY-1",
             "instrument_id": "DEP-1",
-            "instrument_spec": {
-                "schema": "finstack_quant.instrument/1",
-                "instrument": {
-                    "type": "deposit",
-                    "spec": {
-                        "id": "DEP-1",
-                        "notional": {"amount": "1000000", "currency": "USD"},
-                        "start_date": "2025-01-15",
-                        "maturity": "2025-06-15",
-                        "day_count": "act_360",
-                        "fixed_rate": "0.05",
-                        "discount_curve_id": "USD-OIS",
-                        "attributes": {},
-                    },
-                },
-            },
+            "instrument_spec": json.loads(DEPOSIT_INSTRUMENT_JSON)["instrument"],
             "quantity": 1.0,
             "unit": "units",
         }
@@ -334,10 +319,82 @@ _BENCH_MARKET_JSON = _BENCH_MARKET.to_json()
 _BENCH_MARKET_T1 = _build_bench_market(0.0525, date(2025, 1, 16))
 
 
+def _assert_deposit_valuation(valuation, n_positions: int, *, standard_risk: bool = True) -> None:
+    """Check the complete deposit book outside the pricing timer."""
+    assert len(valuation) == n_positions
+    assert valuation.base_currency == "USD"
+    assert math.isfinite(valuation.total_value)
+    assert not valuation.degraded_positions
+    positions = valuation.position_values
+    assert len(positions) == n_positions
+    for position in positions.values():
+        assert position.risk_metrics_complete
+        assert position.risk_error is None
+        assert not position.inapplicable_metrics
+        assert math.isfinite(position.value_native.amount)
+        assert math.isfinite(position.value_base.amount)
+        result = position.valuation_result
+        assert result is not None
+        assert result["value"]["currency"] == "USD"
+        measures = result["measures"]
+        assert all(math.isfinite(value) for value in measures.values())
+        if standard_risk:
+            assert "dv01" in measures
+        else:
+            assert not measures
+
+
+def _assert_deposit_workflow(result, n_positions: int) -> None:
+    valuation, metrics, cashflows = result
+    _assert_deposit_valuation(valuation, n_positions)
+    assert not metrics.skipped_metrics
+    assert not metrics.degraded_positions
+    assert len(metrics.by_position) == n_positions
+    assert "dv01" in metrics.aggregated
+    assert math.isfinite(metrics.aggregated["dv01"]["total"])
+    assert not cashflows.issues
+    by_position = cashflows.by_position
+    events = cashflows.events
+    assert set(by_position) == {f"POS-{index}" for index in range(n_positions)}
+    # The valuation date equals the contractual start, so the initial exchange
+    # remains alongside the separately classified maturity interest/principal.
+    expected_flows = [("2025-01-15", "notional"), ("2025-06-15", "fixed"), ("2025-06-15", "notional")]
+    assert len(events) == 3 * n_positions
+    position_events = []
+    for index in range(n_positions):
+        position_id = f"POS-{index}"
+        flows = by_position[position_id]
+        assert sorted((event["date"], event["kind"]) for event in flows) == expected_flows
+        for event in flows:
+            assert event["position_id"] == position_id
+            assert event["instrument_id"] == f"DEP-{index}"
+            assert event["amount"]["currency"] == "USD"
+            amount = float(event["amount"]["amount"])
+            assert math.isfinite(amount)
+            if event["kind"] == "notional":
+                sign = -1 if event["date"] == "2025-01-15" else 1
+                assert amount == sign * (1_000_000 + index)
+            else:
+                assert amount > 0.0
+        position_events.extend(flows)
+
+    def event_order(event):
+        return event["date"], event["position_id"], event["kind"]
+
+    assert sorted(events, key=event_order) == sorted(position_events, key=event_order)
+
+
+def _assert_deposit_scenario_pnl(result, n_positions: int) -> None:
+    assert result.currency == "USD"
+    assert math.isfinite(result.total)
+    assert len(result.by_position) == n_positions
+    assert all(math.isfinite(value) for value in result.by_position.values())
+
+
 def _build_curve_scenario_jsons(n_scenarios: int) -> tuple[str, ...]:
     """Build validated parallel-shift scenarios before benchmark timing begins."""
     return tuple(
-        build_scenario_spec(
+        ScenarioSpec(
             f"bench-parallel-{index}",
             [
                 OperationSpec.curve_parallel_bp(
@@ -868,7 +925,7 @@ class TestStatementsAnalyticsBenchmarks:
     def test_dependency_tracer_json(self, benchmark) -> None:
         def _trace():
             tree = DependencyTracer(_MODEL_JSON).dependency_tree("gross_profit")
-            deps = direct_dependencies(_MODEL_JSON, "gross_profit")
+            deps = DependencyTracer(_MODEL_JSON).direct_dependencies("gross_profit")
             return tree, deps
 
         benchmark(_trace)
@@ -876,7 +933,7 @@ class TestStatementsAnalyticsBenchmarks:
     def test_dependency_tracer_typed(self, benchmark) -> None:
         def _trace():
             tree = DependencyTracer(_MODEL_SPEC).dependency_tree("gross_profit")
-            deps = direct_dependencies(_MODEL_SPEC, "gross_profit")
+            deps = DependencyTracer(_MODEL_SPEC).direct_dependencies("gross_profit")
             return tree, deps
 
         benchmark(_trace)
@@ -941,112 +998,137 @@ class TestPortfolioBenchmarks:
             warmup_rounds=0,
         )
 
-    def test_parse_and_build(self, benchmark) -> None:
+    def test_parse_and_build_one_deposit(self, benchmark) -> None:
         def _parse_build():
             spec = parse_portfolio_spec_json(PORTFOLIO_SPEC_JSON)
             return Portfolio.from_spec(spec).to_json()
 
-        benchmark.pedantic(_parse_build, rounds=10, warmup_rounds=1)
+        assert len(json.loads(_parse_build())["positions"]) == 1
+        result = benchmark.pedantic(_parse_build, rounds=10, warmup_rounds=1)
+        assert len(json.loads(result)["positions"]) == 1
 
-    def test_portfolio_spec_round_trip(self, benchmark) -> None:
-        benchmark(parse_portfolio_spec_json, PORTFOLIO_SPEC_JSON)
+    def test_parse_one_deposit_portfolio_spec_json(self, benchmark) -> None:
+        result = benchmark(parse_portfolio_spec_json, PORTFOLIO_SPEC_JSON)
+        assert len(json.loads(result)["positions"]) == 1
 
 
 @pytest.mark.perf
 class TestPortfolioCompoundWorkflow:
-    """Compound workflows — each function used to rebuild the portfolio.
+    """Deposit-only compound workflows through the Python binding.
 
     These measure the realistic calling pattern (value + metrics + cashflows)
     with JSON inputs and with the typed :class:`Portfolio` /
     :class:`MarketContext` fast path.
     """
 
-    def test_json_path_value_metrics_cashflows(self, benchmark) -> None:
-        """JSON inputs, 500-position portfolio: every call re-parses + rebuilds."""
+    def test_json_path_500_deposits_value_metrics_cashflows(self, benchmark) -> None:
+        """JSON inputs, 500 deposits: every call re-parses + rebuilds."""
 
         def _run():
-            val = value_portfolio(_BENCH_SPEC_JSON_500, _BENCH_MARKET_JSON)
+            val = value_portfolio(_BENCH_SPEC_JSON_500, _BENCH_MARKET_JSON, strict_risk=True)
             agg = aggregate_metrics(val, _BENCH_MARKET_JSON)
             cf = aggregate_full_cashflows(_BENCH_SPEC_JSON_500, _BENCH_MARKET_JSON)
             return val, agg, cf
 
-        benchmark.pedantic(_run, rounds=5, warmup_rounds=1)
+        _assert_deposit_workflow(_run(), 500)
+        result = benchmark.pedantic(_run, rounds=5, warmup_rounds=1)
+        _assert_deposit_workflow(result, 500)
 
-    def test_typed_pipeline_500_value_metrics_cashflows(self, benchmark) -> None:
-        """Typed inputs, 500 positions: Portfolio + MarketContext built once."""
+    def test_typed_pipeline_500_deposits_value_metrics_cashflows(self, benchmark) -> None:
+        """Typed inputs, 500 deposits: Portfolio + MarketContext built once."""
         portfolio = Portfolio.from_spec(_BENCH_SPEC_JSON_500)
 
         def _run():
-            val = value_portfolio(portfolio, _BENCH_MARKET)
+            val = value_portfolio(portfolio, _BENCH_MARKET, strict_risk=True)
             agg = aggregate_metrics(val, _BENCH_MARKET)
             cf = aggregate_full_cashflows(portfolio, _BENCH_MARKET)
             return val, agg, cf
 
-        benchmark.pedantic(_run, rounds=5, warmup_rounds=1)
+        _assert_deposit_workflow(_run(), 500)
+        result = benchmark.pedantic(_run, rounds=5, warmup_rounds=1)
+        _assert_deposit_workflow(result, 500)
 
-    def test_typed_portfolio_from_spec(self, benchmark) -> None:
-        """One-time cost of building a typed Portfolio from a 500-position spec."""
-        benchmark(Portfolio.from_spec, _BENCH_SPEC_JSON_500)
+    def test_typed_deposit_portfolio_from_spec_500(self, benchmark) -> None:
+        """Cost of building a typed Portfolio from a 500-deposit spec."""
+        result = benchmark(Portfolio.from_spec, _BENCH_SPEC_JSON_500)
+        assert len(result) == 500
 
-    def test_value_portfolio_prebuilt_inputs_500(self, benchmark) -> None:
+    def test_value_500_deposits_prebuilt_inputs(self, benchmark) -> None:
         """Typed input and output path, avoiding valuation JSON serialization."""
         portfolio = Portfolio.from_spec(_BENCH_SPEC_JSON_500)
-        benchmark(value_portfolio, portfolio, _BENCH_MARKET)
+        _assert_deposit_valuation(value_portfolio(portfolio, _BENCH_MARKET, strict_risk=True), 500)
+        result = benchmark(value_portfolio, portfolio, _BENCH_MARKET, strict_risk=True)
+        _assert_deposit_valuation(result, 500)
 
-    def test_value_portfolio_json_500(self, benchmark) -> None:
-        """Pure value_portfolio on the JSON path, 500 positions."""
-        benchmark(value_portfolio, _BENCH_SPEC_JSON_500, _BENCH_MARKET_JSON)
+    def test_value_500_deposits_json_inputs(self, benchmark) -> None:
+        """Pure value_portfolio with JSON inputs and typed output, 500 deposits."""
+        _assert_deposit_valuation(value_portfolio(_BENCH_SPEC_JSON_500, _BENCH_MARKET_JSON, strict_risk=True), 500)
+        result = benchmark(value_portfolio, _BENCH_SPEC_JSON_500, _BENCH_MARKET_JSON, strict_risk=True)
+        _assert_deposit_valuation(result, 500)
 
 
 @pytest.mark.perf
 class TestPortfolioReleaseControls:
-    """Representative release-scale controls for the typed portfolio bindings."""
+    """Deposit-only release-scale controls for the typed portfolio bindings."""
 
     @pytest.mark.parametrize(
         "n_positions",
         [40, pytest.param(120, marks=pytest.mark.slow)],
-        ids=["40-positions", "120-positions"],
+        ids=["40-deposits", "120-deposits"],
     )
     def test_metrics_based_attribution(self, benchmark, n_positions: int) -> None:
-        """Metrics attribution over typed portfolios at 40 and 120 positions."""
+        """Metrics attribution over typed books of 40 and 120 deposits."""
         portfolio = Portfolio.from_spec(_build_portfolio_spec_json(n_positions))
-        benchmark.pedantic(
-            attribute_portfolio_pnl,
-            args=(
+
+        def _run():
+            return attribute_portfolio_pnl(
                 portfolio,
                 _BENCH_MARKET,
                 _BENCH_MARKET_T1,
                 "2025-01-15",
                 "2025-01-16",
                 "metrics_based",
-            ),
-            rounds=1,
-            warmup_rounds=0,
-        )
+            )
+
+        preflight = _run()
+        assert len(preflight.by_position) == n_positions
+        assert not preflight.result_invalid
+        assert math.isfinite(preflight.total_pnl.amount)
+        result = benchmark.pedantic(_run, rounds=5, warmup_rounds=1)
+        assert len(result.by_position) == n_positions
+        assert not result.result_invalid
+        assert math.isfinite(result.total_pnl.amount)
 
     @pytest.mark.parametrize(
         "n_scenarios",
         [10, pytest.param(100, marks=pytest.mark.slow)],
         ids=["10-scenarios", "100-scenarios"],
     )
-    def test_scenario_pnl_batch_500(self, benchmark, n_scenarios: int) -> None:
-        """One-shot scenarios over a typed 500-position portfolio."""
+    def test_scenario_pnl_batch_500_deposits(self, benchmark, n_scenarios: int) -> None:
+        """Batched scenarios over a typed 500-deposit portfolio."""
         portfolio = Portfolio.from_spec(_BENCH_SPEC_JSON_500)
         scenarios_json = _build_curve_scenario_jsons(n_scenarios)
         batch_json = f"[{','.join(scenarios_json)}]"
-        benchmark.pedantic(
+        preflight = scenario_pnl_batch(portfolio, batch_json, _BENCH_MARKET)
+        assert len(preflight) == n_scenarios
+        for item in preflight:
+            _assert_deposit_scenario_pnl(item.pnl, 500)
+        result = benchmark.pedantic(
             scenario_pnl_batch,
             args=(portfolio, batch_json, _BENCH_MARKET),
-            rounds=1,
-            warmup_rounds=0,
+            rounds=5,
+            warmup_rounds=1,
         )
+        assert len(result) == n_scenarios
+        for item in result:
+            _assert_deposit_scenario_pnl(item.pnl, 500)
 
     @pytest.mark.parametrize(
         "n_scenarios",
         [10, pytest.param(100, marks=pytest.mark.slow)],
         ids=["10-scenarios", "100-scenarios"],
     )
-    def test_scenario_pnl_repeated_500(self, benchmark, n_scenarios: int) -> None:
+    def test_scenario_pnl_repeated_500_deposits(self, benchmark, n_scenarios: int) -> None:
         """Repeated single-scenario control for the corresponding batch shape."""
         portfolio = Portfolio.from_spec(_BENCH_SPEC_JSON_500)
         scenarios_json = _build_curve_scenario_jsons(n_scenarios)
@@ -1054,49 +1136,69 @@ class TestPortfolioReleaseControls:
         def _run_repeated():
             return tuple(scenario_pnl(portfolio, scenario_json, _BENCH_MARKET) for scenario_json in scenarios_json)
 
-        benchmark.pedantic(_run_repeated, rounds=1, warmup_rounds=0)
+        preflight = _run_repeated()
+        assert len(preflight) == n_scenarios
+        for item in preflight:
+            _assert_deposit_scenario_pnl(item.pnl, 500)
+        result = benchmark.pedantic(_run_repeated, rounds=5, warmup_rounds=1)
+        assert len(result) == n_scenarios
+        for item in result:
+            _assert_deposit_scenario_pnl(item.pnl, 500)
 
-    def test_replay_pv_only_20_snapshots(self, benchmark) -> None:
-        """PV-only replay through twenty prebuilt dated market snapshots."""
+    def test_replay_500_deposits_pv_only_20_snapshots(self, benchmark) -> None:
+        """PV-only 500-deposit replay through twenty prebuilt snapshots."""
         portfolio = Portfolio.from_spec(_BENCH_SPEC_JSON_500)
         snapshots_json = _build_replay_snapshots_json(20)
-        benchmark.pedantic(
-            replay_portfolio,
-            args=(
+
+        def _run():
+            return replay_portfolio(
                 portfolio,
                 snapshots_json,
-                ('{"mode":"pv_only","valuation_options":{"strict_risk":false,"metrics":{"mode":"only","metrics":[]}}}'),
-            ),
-            rounds=1,
-            warmup_rounds=0,
-        )
+                ('{"mode":"pv_only","valuation_options":{"strict_risk":true,"metrics":{"mode":"only","metrics":[]}}}'),
+            )
+
+        def _check(result):
+            assert not result.skipped_dates
+            assert len(result.steps) == 20
+            for step in result.steps:
+                valuation = PortfolioValuation.from_json(json.dumps(step["valuation"]))
+                _assert_deposit_valuation(valuation, 500, standard_risk=False)
+
+        _check(_run())
+        _check(benchmark.pedantic(_run, rounds=5, warmup_rounds=1))
 
     @pytest.mark.slow
-    def test_value_portfolio_standard_risk_3000(self, benchmark) -> None:
-        """Default standard-risk valuation for a typed 3,000-position portfolio."""
+    def test_value_3000_deposits_standard_risk(self, benchmark) -> None:
+        """Strict standard-risk valuation for a typed 3,000-deposit portfolio."""
         portfolio = Portfolio.from_spec(_build_portfolio_spec_json(3_000))
-        benchmark.pedantic(
+        _assert_deposit_valuation(value_portfolio(portfolio, _BENCH_MARKET, strict_risk=True), 3_000)
+        result = benchmark.pedantic(
             value_portfolio,
             args=(portfolio, _BENCH_MARKET),
-            rounds=1,
-            warmup_rounds=0,
+            kwargs={"strict_risk": True},
+            rounds=5,
+            warmup_rounds=1,
         )
+        _assert_deposit_valuation(result, 3_000)
 
     @pytest.mark.parametrize(
         "n_positions",
         [3_000, pytest.param(25_000, marks=pytest.mark.slow)],
-        ids=["3000-positions", "25000-positions"],
+        ids=["3000-deposits", "25000-deposits"],
     )
-    def test_value_portfolio_pv_only(self, benchmark, n_positions: int) -> None:
-        """PV-only valuation control with typed inputs and typed output."""
+    def test_value_deposit_portfolio_pv_only(self, benchmark, n_positions: int) -> None:
+        """Deposit-only PV control with typed inputs and typed output."""
         portfolio = Portfolio.from_spec(_build_portfolio_spec_json(n_positions))
-        benchmark.pedantic(
+        preflight = value_portfolio(portfolio, _BENCH_MARKET, strict_risk=True, metrics=[])
+        _assert_deposit_valuation(preflight, n_positions, standard_risk=False)
+        result = benchmark.pedantic(
             value_portfolio,
             args=(portfolio, _BENCH_MARKET),
-            kwargs={"metrics": []},
-            rounds=1,
-            warmup_rounds=0,
+            kwargs={"strict_risk": True, "metrics": []},
+            rounds=5,
+            warmup_rounds=1,
         )
+        _assert_deposit_valuation(result, n_positions, standard_risk=False)
 
 
 @pytest.mark.perf
@@ -1137,17 +1239,29 @@ class TestPortfolioRiskInputBenchmarks:
 
 @pytest.mark.perf
 class TestValuationsBenchmarks:
-    """Instrument validation and metric listing."""
+    """Deposit JSON validation, successful-result round-trip and metric listing."""
 
-    def test_validate_instrument_json(self, benchmark) -> None:
-        benchmark(validate_instrument_json, DEPOSIT_INSTRUMENT_JSON)
+    def test_validate_deposit_instrument_json(self, benchmark) -> None:
+        result = benchmark(validate_instrument_json, DEPOSIT_INSTRUMENT_JSON)
+        assert json.loads(result)["instrument"]["type"] == "deposit"
 
     def test_list_standard_metrics(self, benchmark) -> None:
-        benchmark(list_standard_metrics)
+        result = benchmark(list_standard_metrics)
+        assert "dv01" in result
 
-    def test_valuation_result_round_trip(self, benchmark) -> None:
-        validated = validate_instrument_json(DEPOSIT_INSTRUMENT_JSON)
-        benchmark(validate_instrument_json, validated)
+    def test_deposit_valuation_result_round_trip(self, benchmark) -> None:
+        valuation = price_instrument(DEPOSIT_INSTRUMENT_JSON, _BENCH_MARKET, "2025-01-15", metrics=["dv01"])
+        assert valuation.instrument_id == "DEP-1"
+        assert valuation.currency == "USD"
+        assert math.isfinite(valuation.price)
+        assert math.isfinite(valuation.metrics["dv01"])
+
+        def _round_trip():
+            return ValuationResult.from_json(valuation.to_json())
+
+        assert _round_trip() == valuation
+        result = benchmark(_round_trip)
+        assert result == valuation
 
 
 # Scenarios domain
@@ -1173,15 +1287,15 @@ class TestScenariosBenchmarks:
         spec_json = build_from_template(templates[0]).to_json()
 
         def _parse_validate():
-            parsed = parse_scenario_spec(spec_json)
+            parsed = ScenarioSpec.from_json(spec_json)
             validate_scenario_spec(parsed.to_json())
 
         benchmark(_parse_validate)
 
-    def test_build_scenario_spec(self, benchmark) -> None:
+    def test_scenario_spec_constructor(self, benchmark) -> None:
         operations = [OperationSpec.stmt_forecast_assign("revenue", 120.0)]
         benchmark(
-            build_scenario_spec,
+            ScenarioSpec,
             "bench-scenario",
             operations,
             "Bench",
@@ -1190,12 +1304,12 @@ class TestScenariosBenchmarks:
 
     def test_compose_scenarios(self, benchmark) -> None:
         specs = [
-            build_scenario_spec(
+            ScenarioSpec(
                 "s1",
                 [OperationSpec.stmt_forecast_assign("revenue", 120.0)],
                 priority=0,
             ),
-            build_scenario_spec(
+            ScenarioSpec(
                 "s2",
                 [OperationSpec.stmt_forecast_assign("cogs", 70.0)],
                 priority=1,

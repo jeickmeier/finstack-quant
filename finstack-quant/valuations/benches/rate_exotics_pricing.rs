@@ -15,22 +15,36 @@
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DayCount};
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
+use finstack_quant_models::monte_carlo::engine::PathCaptureMode;
+use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricerConfig;
+use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
+use finstack_quant_valuations::instruments::common_impl::helpers::merged_path_config;
 use finstack_quant_valuations::instruments::exotics::callable_range_accrual::CallableRangeAccrual;
 use finstack_quant_valuations::instruments::exotics::range_accrual::RangeAccrual;
 use finstack_quant_valuations::instruments::exotics::snowball::Snowball;
 use finstack_quant_valuations::instruments::exotics::tarn::Tarn;
-use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
+use finstack_quant_valuations::instruments::pricing::hw1f_params::{
+    Hw1fParamFamily, resolve_hw1f_params,
+};
+use finstack_quant_valuations::instruments::pricing_overrides::{
+    InstrumentPricingOverrides, ModelConfig,
+};
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions, QuantoSpec};
 use finstack_quant_valuations::pricer::STANDARD;
 use finstack_quant_valuations::pricer::{InstrumentType, ModelKey, PricerKey};
+use finstack_quant_valuations::results::ValuationResult;
 use std::hint::black_box;
 use time::Month;
+
+#[path = "support/record.rs"]
+mod record;
+mod support;
 
 const MC_PATHS: u64 = 2_500;
 
@@ -97,24 +111,215 @@ fn with_mc_paths<T>(mut inst: T, apply: impl FnOnce(&mut T, InstrumentPricingOve
     inst
 }
 
+fn assert_usd(value: &Money) {
+    assert!(value.amount().is_finite());
+    assert_eq!(value.currency(), Currency::USD);
+}
+
+fn capture_range(
+    case: &str,
+    inst: &RangeAccrual,
+    market: &MarketContext,
+    as_of: Date,
+    model: ModelKey,
+    output: impl FnOnce() -> serde_json::Value,
+) {
+    record::capture(case, || {
+        let mc = (model == ModelKey::MonteCarloGBM).then(|| {
+            let mut config = merged_path_config(
+                &PathDependentPricerConfig::default(),
+                &inst.instrument_pricing_overrides,
+            )
+            .expect("capture range accrual configuration");
+            config.seed = inst.instrument_pricing_overrides.model_config.mc_seed(&inst.id);
+            let final_date = inst.terms.payment_date.unwrap_or_else(|| {
+                *inst.terms.observation_dates.last().expect("observation schedule")
+            });
+            let horizon = inst
+                .terms
+                .day_count
+                .year_fraction(as_of, final_date, DayCountContext::default())
+                .expect("capture payment horizon");
+            let observation_times: Vec<_> = inst
+                .terms
+                .observation_dates
+                .iter()
+                .filter(|&&date| date > as_of)
+                .map(|&date| {
+                    inst.terms
+                        .day_count
+                        .year_fraction(as_of, date, DayCountContext::default())
+                        .expect("capture observation time")
+                })
+                .collect();
+            let grid = config
+                .build_time_grid(horizon, &observation_times)
+                .expect("capture range accrual grid");
+            let capture_mode = match &config.path_capture.capture_mode {
+                PathCaptureMode::All => serde_json::json!({"mode": "all"}),
+                PathCaptureMode::Sample { count, seed } => {
+                    serde_json::json!({"mode": "sample", "count": count, "seed": seed})
+                }
+            };
+            serde_json::json!({
+                "config": {
+                    "num_paths": config.num_paths,
+                    "seed": config.seed,
+                    "use_parallel": config.use_parallel,
+                    "chunk_size": config.chunk_size,
+                    "path_capture": {
+                        "enabled": config.path_capture.enabled,
+                        "capture_mode": capture_mode,
+                        "capture_payoffs": config.path_capture.capture_payoffs,
+                    },
+                    "steps_per_year": config.steps_per_year,
+                    "min_steps": config.min_steps,
+                    "use_sobol": config.use_sobol,
+                    "antithetic": config.antithetic,
+                    "use_brownian_bridge": config.use_brownian_bridge,
+                },
+                "seed": config.seed,
+                "independent_estimators": config.num_paths,
+                "physical_paths": config.num_paths * if config.antithetic { 2 } else { 1 },
+                "grid": {
+                    "source": "reconstructed with the production public grid builder",
+                    "clock": inst.terms.day_count,
+                    "horizon": horizon,
+                    "actual_steps": grid.times().len() - 1,
+                    "time_bits": grid.times().iter().map(|time| time.to_bits()).collect::<Vec<_>>(),
+                    "observation_times": observation_times,
+                },
+                "uncertainty": {
+                    "available": false,
+                    "reason": "RangeAccrual GBM pricer returns the mean without publishing MoneyEstimate diagnostics",
+                },
+            })
+        });
+        serde_json::json!({
+            "fixture": {
+                "instrument": inst,
+                "market": market,
+                "as_of": as_of,
+                "model": model,
+                "config": {
+                    "instrument_pricing_overrides": inst.instrument_pricing_overrides,
+                    "mc": mc.as_ref().map(|data| &data["config"]),
+                },
+                "seed": mc.as_ref().map(|data| &data["seed"]),
+                "independent_estimators": mc.as_ref().map(|data| &data["independent_estimators"]),
+                "physical_paths": mc.as_ref().map(|data| &data["physical_paths"]),
+                "grid": mc.as_ref().map(|data| &data["grid"]),
+                "uncertainty": mc.as_ref().map(|data| &data["uncertainty"]),
+            },
+            "output": output(),
+        })
+    });
+}
+
+fn capture_hw1f<T: Instrument + serde::Serialize>(
+    case: &str,
+    inst: &T,
+    market: &MarketContext,
+    as_of: Date,
+    discount_curve_id: &str,
+    model_config: &ModelConfig,
+    result: &ValuationResult,
+) {
+    record::capture(case, || {
+        let config = Hw1fMcConfig::default().with_instrument_overrides(
+            &finstack_quant_core::types::InstrumentId::new(inst.id()),
+            model_config.mc_paths,
+            model_config.mc_seed_scenario.as_deref(),
+        );
+        let parameters = resolve_hw1f_params(
+            Hw1fParamFamily::CapFloor,
+            discount_curve_id,
+            model_config,
+            None,
+            case,
+            market,
+        )
+        .expect("capture HW1F parameters");
+        assert_eq!(result.measures["mc_num_paths"], config.num_paths as f64);
+        assert_eq!(
+            result.measures["mc_num_simulated_paths"],
+            config.simulated_path_count() as f64
+        );
+        assert!(result.measures["mc_stderr"] >= 0.0);
+        serde_json::json!({
+            "fixture": {
+                "instrument": inst,
+                "market": market,
+                "as_of": as_of,
+                "model": ModelKey::MonteCarloHullWhite1F,
+                "model_parameters": parameters,
+                "model_config": model_config,
+                "config": config,
+                "seed": config.seed,
+                "independent_estimators": config.num_paths,
+                "physical_paths": config.simulated_path_count(),
+                "requested_metrics": [],
+                "pricing_options": "PricingOptions::default()",
+                "grid": {
+                    "available": false,
+                    "reason": "the note event-schedule builders and actual runtime grid are private",
+                    "policy": "event-aligned HW1F grid",
+                    "clock": DayCount::Act365F,
+                    "min_steps_between_events": config.min_steps_between_events,
+                },
+                "theta": {
+                    "available": false,
+                    "reason": "the note pricer does not expose its fitted theta schedule",
+                },
+            },
+            "output": {
+                "value": result.value,
+                "value_bits": result.value.amount().to_bits(),
+                "measures": result.measures,
+            },
+        })
+    });
+}
+
 fn bench_range_accrual_analytic(c: &mut Criterion) {
     let mut group = c.benchmark_group("range_accrual_analytic");
-    let as_of = date(2024, Month::January, 1);
-    let market = equity_range_market(as_of);
-    let inst = RangeAccrual::example().expect("example");
     group.bench_function("12_monthly_obs", |b| {
-        b.iter(|| {
-            black_box(&inst)
-                .value(black_box(&market), black_box(as_of))
-                .unwrap()
-                .amount()
-        });
+        let as_of = date(2024, Month::January, 1);
+        let market = equity_range_market(as_of);
+        let inst = RangeAccrual::example().expect("example");
+        assert_eq!(inst.default_model(), ModelKey::StaticReplication);
+        assert_eq!(inst.terms.observation_dates.len(), 12);
+        assert!(
+            inst.terms
+                .observation_dates
+                .iter()
+                .all(|date| *date > as_of)
+        );
+        assert!(inst.terms.quanto.is_none());
+        support::bench(
+            b,
+            || {
+                black_box(&inst)
+                    .value(black_box(&market), black_box(as_of))
+                    .expect("analytic range accrual PV")
+            },
+            |value| {
+                assert_usd(value);
+                capture_range(
+                    "range_accrual_analytic/12_monthly_obs",
+                    &inst,
+                    &market,
+                    as_of,
+                    ModelKey::StaticReplication,
+                    || serde_json::json!({"value": value, "value_bits": value.amount().to_bits()}),
+                );
+            },
+        );
     });
     group.finish();
 }
 
-fn bench_quanto_range_accrual(c: &mut Criterion) {
-    let as_of = date(2024, Month::January, 1);
+fn quanto_range_fixture(as_of: Date) -> (RangeAccrual, MarketContext) {
     let market = equity_range_market(as_of)
         .insert(
             DiscountCurve::builder("EUR-OIS")
@@ -146,23 +351,75 @@ fn bench_quanto_range_accrual(c: &mut Criterion) {
     });
     inst.instrument_pricing_overrides =
         InstrumentPricingOverrides::default().with_mc_paths(MC_PATHS as usize);
+    (inst, market)
+}
+
+fn bench_quanto_range_accrual(c: &mut Criterion) {
     let mut group = c.benchmark_group("quanto_range_accrual");
     group.bench_function("analytic_12_observations", |b| {
-        b.iter(|| inst.value(black_box(&market), black_box(as_of)).unwrap());
+        let as_of = date(2024, Month::January, 1);
+        let (inst, market) = quanto_range_fixture(as_of);
+        assert_eq!(inst.default_model(), ModelKey::StaticReplication);
+        assert_eq!(inst.terms.observation_dates.len(), 12);
+        assert!(inst.terms.quanto.is_some());
+        support::bench(
+            b,
+            || {
+                inst.value(black_box(&market), black_box(as_of))
+                    .expect("analytic quanto range accrual PV")
+            },
+            |value| {
+                assert_usd(value);
+                capture_range(
+                    "quanto_range_accrual/analytic_12_observations",
+                    &inst,
+                    &market,
+                    as_of,
+                    ModelKey::StaticReplication,
+                    || serde_json::json!({"value": value, "value_bits": value.amount().to_bits()}),
+                );
+            },
+        );
     });
-    let registry = STANDARD.pricers();
-    let pricer = registry
-        .get_pricer(PricerKey::new(
-            InstrumentType::RangeAccrual,
-            ModelKey::MonteCarloGBM,
-        ))
-        .unwrap();
     group.bench_function("gbm_2500_paths_12_observations", |b| {
-        b.iter(|| {
-            pricer
-                .price_dyn(black_box(&inst), black_box(&market), black_box(as_of))
-                .unwrap()
-        });
+        let as_of = date(2024, Month::January, 1);
+        let (inst, market) = quanto_range_fixture(as_of);
+        let registry = STANDARD.pricers();
+        let key = PricerKey::new(InstrumentType::RangeAccrual, ModelKey::MonteCarloGBM);
+        let pricer = registry.get_pricer(key).expect("GBM range accrual pricer");
+        assert_eq!(pricer.key(), key);
+        assert_eq!(
+            inst.instrument_pricing_overrides.model_config.mc_paths,
+            Some(MC_PATHS as usize)
+        );
+        assert_eq!(inst.terms.observation_dates.len(), 12);
+        assert!(inst.terms.quanto.is_some());
+        support::bench(
+            b,
+            || {
+                pricer
+                    .price_dyn(black_box(&inst), black_box(&market), black_box(as_of))
+                    .expect("GBM quanto range accrual PV")
+            },
+            |result| {
+                assert_usd(&result.value);
+                assert!(result.measures.values().all(|value| value.is_finite()));
+                capture_range(
+                    "quanto_range_accrual/gbm_2500_paths_12_observations",
+                    &inst,
+                    &market,
+                    as_of,
+                    ModelKey::MonteCarloGBM,
+                    || {
+                        serde_json::json!({
+                            "value": result.value,
+                            "value_bits": result.value.amount().to_bits(),
+                            "measures": result.measures,
+                        })
+                    },
+                );
+            },
+        );
     });
     group.finish();
 }
@@ -170,27 +427,48 @@ fn bench_quanto_range_accrual(c: &mut Criterion) {
 fn bench_callable_range_accrual_lsmc(c: &mut Criterion) {
     let mut group = c.benchmark_group("callable_range_accrual_lsmc");
     group.throughput(Throughput::Elements(MC_PATHS));
-    let as_of = date(2026, Month::January, 1);
-    let market = hw1f_market(as_of);
-    let inst = with_mc_paths(
-        CallableRangeAccrual::example().expect("example"),
-        |inst, overrides| {
-            inst.instrument_pricing_overrides = overrides;
-        },
-    );
     group.bench_with_input(BenchmarkId::from_parameter(MC_PATHS), &MC_PATHS, |b, _| {
-        b.iter(|| {
-            black_box(&inst)
-                .price_with_metrics(
-                    black_box(&market),
-                    black_box(as_of),
-                    black_box(&[]),
-                    PricingOptions::default(),
-                )
-                .unwrap()
-                .value
-                .amount()
-        });
+        let as_of = date(2026, Month::January, 1);
+        let market = hw1f_market(as_of);
+        let inst = with_mc_paths(
+            CallableRangeAccrual::example().expect("example"),
+            |inst, overrides| {
+                inst.instrument_pricing_overrides = overrides;
+            },
+        );
+        assert_eq!(inst.default_model(), ModelKey::MonteCarloHullWhite1F);
+        assert_eq!(
+            inst.instrument_pricing_overrides.model_config.mc_paths,
+            Some(MC_PATHS as usize)
+        );
+        assert_eq!(inst.range_accrual.observation_dates.len(), 12);
+        assert!(!inst.call_provision.eligible_call_dates().is_empty());
+        support::bench(
+            b,
+            || {
+                black_box(&inst)
+                    .price_with_metrics(
+                        black_box(&market),
+                        black_box(as_of),
+                        black_box(&[]),
+                        PricingOptions::default(),
+                    )
+                    .expect("callable range accrual HW1F LSMC PV")
+            },
+            |result| {
+                assert_usd(&result.value);
+                assert!(result.measures.values().all(|value| value.is_finite()));
+                capture_hw1f(
+                    "callable_range_accrual_lsmc/2500",
+                    &inst,
+                    &market,
+                    as_of,
+                    inst.range_accrual.discount_curve_id.as_str(),
+                    &inst.instrument_pricing_overrides.model_config,
+                    result,
+                );
+            },
+        );
     });
     group.finish();
 }
@@ -198,24 +476,45 @@ fn bench_callable_range_accrual_lsmc(c: &mut Criterion) {
 fn bench_snowball_mc(c: &mut Criterion) {
     let mut group = c.benchmark_group("snowball_hw1f_mc");
     group.throughput(Throughput::Elements(MC_PATHS));
-    let as_of = date(2026, Month::January, 1);
-    let market = hw1f_market(as_of);
-    let inst = with_mc_paths(Snowball::example().expect("example"), |inst, overrides| {
-        inst.instrument_pricing_overrides = overrides;
-    });
     group.bench_with_input(BenchmarkId::from_parameter(MC_PATHS), &MC_PATHS, |b, _| {
-        b.iter(|| {
-            black_box(&inst)
-                .price_with_metrics(
-                    black_box(&market),
-                    black_box(as_of),
-                    black_box(&[]),
-                    PricingOptions::default(),
-                )
-                .unwrap()
-                .value
-                .amount()
+        let as_of = date(2026, Month::January, 1);
+        let market = hw1f_market(as_of);
+        let inst = with_mc_paths(Snowball::example().expect("example"), |inst, overrides| {
+            inst.instrument_pricing_overrides = overrides;
         });
+        assert_eq!(inst.default_model(), ModelKey::MonteCarloHullWhite1F);
+        assert_eq!(
+            inst.instrument_pricing_overrides.model_config.mc_paths,
+            Some(MC_PATHS as usize)
+        );
+        assert!(inst.start_date > as_of);
+        assert_eq!(inst.payment_dates.len(), 5);
+        support::bench(
+            b,
+            || {
+                black_box(&inst)
+                    .price_with_metrics(
+                        black_box(&market),
+                        black_box(as_of),
+                        black_box(&[]),
+                        PricingOptions::default(),
+                    )
+                    .expect("snowball HW1F Monte Carlo PV")
+            },
+            |result| {
+                assert_usd(&result.value);
+                assert!(result.measures.values().all(|value| value.is_finite()));
+                capture_hw1f(
+                    "snowball_hw1f_mc/2500",
+                    &inst,
+                    &market,
+                    as_of,
+                    inst.discount_curve_id.as_str(),
+                    &inst.instrument_pricing_overrides.model_config,
+                    result,
+                );
+            },
+        );
     });
     group.finish();
 }
@@ -223,24 +522,45 @@ fn bench_snowball_mc(c: &mut Criterion) {
 fn bench_tarn_mc(c: &mut Criterion) {
     let mut group = c.benchmark_group("tarn_hw1f_mc");
     group.throughput(Throughput::Elements(MC_PATHS));
-    let as_of = date(2026, Month::January, 1);
-    let market = hw1f_market(as_of);
-    let inst = with_mc_paths(Tarn::example().expect("example"), |inst, overrides| {
-        inst.instrument_pricing_overrides = overrides;
-    });
     group.bench_with_input(BenchmarkId::from_parameter(MC_PATHS), &MC_PATHS, |b, _| {
-        b.iter(|| {
-            black_box(&inst)
-                .price_with_metrics(
-                    black_box(&market),
-                    black_box(as_of),
-                    black_box(&[]),
-                    PricingOptions::default(),
-                )
-                .unwrap()
-                .value
-                .amount()
+        let as_of = date(2026, Month::January, 1);
+        let market = hw1f_market(as_of);
+        let inst = with_mc_paths(Tarn::example().expect("example"), |inst, overrides| {
+            inst.instrument_pricing_overrides = overrides;
         });
+        assert_eq!(inst.default_model(), ModelKey::MonteCarloHullWhite1F);
+        assert_eq!(
+            inst.instrument_pricing_overrides.model_config.mc_paths,
+            Some(MC_PATHS as usize)
+        );
+        assert!(inst.start_date > as_of);
+        assert_eq!(inst.payment_dates.len(), 9);
+        support::bench(
+            b,
+            || {
+                black_box(&inst)
+                    .price_with_metrics(
+                        black_box(&market),
+                        black_box(as_of),
+                        black_box(&[]),
+                        PricingOptions::default(),
+                    )
+                    .expect("TARN HW1F Monte Carlo PV")
+            },
+            |result| {
+                assert_usd(&result.value);
+                assert!(result.measures.values().all(|value| value.is_finite()));
+                capture_hw1f(
+                    "tarn_hw1f_mc/2500",
+                    &inst,
+                    &market,
+                    as_of,
+                    inst.discount_curve_id.as_str(),
+                    &inst.instrument_pricing_overrides.model_config,
+                    result,
+                );
+            },
+        );
     });
     group.finish();
 }

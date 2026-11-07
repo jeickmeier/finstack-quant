@@ -11,7 +11,8 @@ use crate::monte_carlo::traits::{Discretization, Payoff, RandomStream, Stochasti
 use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::math::linalg::{CorrelationFactor, cholesky_correlation};
-use finstack_quant_core::math::stats::OnlineStats;
+use finstack_quant_core::math::stats::{OnlineCovariance, OnlineStats};
+use finstack_quant_core::money::Money;
 
 use std::ops::Range;
 
@@ -443,6 +444,109 @@ impl McEngine {
         MoneyEstimate::from_estimate(estimate.0, inputs.currency)
     }
 
+    /// Collect discounted target/control moments from the same simulated paths.
+    ///
+    /// The payoff owns both accumulators; the callback only reads the completed
+    /// control value. Fixed chunks are merged in path-range order in both serial
+    /// and parallel runs. This moments-only route rejects path capture,
+    /// antithetic sampling, and auto-stopping.
+    ///
+    /// # Arguments
+    ///
+    /// * `inputs` - Process, scheme, payoff and discount inputs with the same
+    ///   units and validation as [`Self::price`]. Each path contributes one
+    ///   independent paired observation.
+    /// * `control_value` - Reads the undiscounted control payoff from the same
+    ///   finished accumulator in the requested result currency; must not mutate
+    ///   the accumulator or consume random draws.
+    pub(crate) fn paired_moments<R, P, D, F, C>(
+        &self,
+        inputs: McPricingInputs<'_, R, P, D, F>,
+        control_value: C,
+    ) -> Result<OnlineCovariance>
+    where
+        R: RandomStream,
+        P: StochasticProcess,
+        D: Discretization<P> + Clone,
+        F: Payoff,
+        C: Fn(&F, Currency) -> Result<Money> + Sync,
+    {
+        self.validate_inputs(inputs, None)?;
+        if self.config.antithetic {
+            return Err(finstack_quant_core::Error::Validation(
+                "paired moments do not support antithetic sampling".to_string(),
+            ));
+        }
+        if self.config.path_capture.enabled {
+            return Err(finstack_quant_core::Error::Validation(
+                "paired moments do not support path capture".to_string(),
+            ));
+        }
+        if self.config.target_ci_half_width.is_some() {
+            return Err(finstack_quant_core::Error::Validation(
+                "paired moments do not support auto-stopping".to_string(),
+            ));
+        }
+
+        let (disc, correlation) = self.prepare_run(inputs.process, inputs.disc)?;
+        let path_inputs = PathInputs {
+            process: inputs.process,
+            disc: &disc,
+            initial_state: inputs.initial_state,
+            correlation: correlation.as_ref(),
+            currency: inputs.currency,
+            discount_factor: inputs.discount_factor,
+        };
+        let chunk_size = self
+            .config
+            .chunk_size
+            .unwrap_or_else(|| adaptive_chunk_size(self.config.num_paths));
+        let chunks = parallel_path_chunks(self.config.num_paths, chunk_size);
+
+        #[cfg(not(target_arch = "wasm32"))]
+        if self.config.use_parallel {
+            use rayon::prelude::*;
+
+            let chunk_results: Vec<Result<OnlineCovariance>> = chunks
+                .into_par_iter()
+                .map(|range| {
+                    let mut scratch = PathScratch::new(path_inputs, inputs.payoff, false);
+                    self.run_pair_chunk(
+                        range,
+                        &mut RngSource::Split(inputs.rng),
+                        path_inputs,
+                        &mut scratch,
+                        &control_value,
+                    )
+                })
+                .collect();
+            let mut combined = OnlineCovariance::new();
+            for result in chunk_results {
+                combined.merge(&result?);
+            }
+            return Ok(combined);
+        }
+
+        let mut sequential_rng = (!inputs.rng.supports_splitting()).then(|| inputs.rng.clone());
+        let mut rng_source = match sequential_rng.as_mut() {
+            Some(stream) => RngSource::Sequential(stream),
+            None => RngSource::Split(inputs.rng),
+        };
+        let mut scratch = PathScratch::new(path_inputs, inputs.payoff, false);
+        let mut combined = OnlineCovariance::new();
+        for range in chunks {
+            let moments = self.run_pair_chunk(
+                range,
+                &mut rng_source,
+                path_inputs,
+                &mut scratch,
+                &control_value,
+            )?;
+            combined.merge(&moments);
+        }
+        Ok(combined)
+    }
+
     /// Run every pre-simulation check shared by [`Self::price`] and
     /// [`Self::price_with_capture`].
     fn validate_inputs<R, P, D, F>(
@@ -710,6 +814,96 @@ impl McEngine {
             run_path_loop(rng, &path, payoff, buffers)?
         };
         validate_discounted_payoff(path_id, payoff_value, inputs.discount_factor)
+    }
+
+    /// Simulate one path and read both discounted payoff values from it.
+    ///
+    /// The caller validates runtime inputs before entering a path loop. The
+    /// antithetic guard prevents mixing a pair-averaged target with an unpaired
+    /// control even if this internal helper is called with incompatible scratch.
+    ///
+    /// # Arguments
+    ///
+    /// * `rng` - Path-local random stream, including an injected Sobol point
+    ///   stream when driven by the path-dependent pricer.
+    /// * `inputs` - Prepared process, discretization, state and scalar present
+    ///   value factor shared by both payoff amounts.
+    /// * `scratch` - Reused path buffers and a payoff that accumulates both
+    ///   target and control values; antithetic scratch is unsupported.
+    /// * `path_id` - Zero-based path identifier used in finite-value diagnostics.
+    /// * `control_value` - Read-only extraction of the undiscounted control
+    ///   amount in the requested result currency after the path has finished.
+    pub(crate) fn simulate_discounted_pair<R, P, D, F, C>(
+        &self,
+        rng: &mut R,
+        inputs: PathInputs<'_, P, D>,
+        scratch: &mut PathScratch<F>,
+        path_id: usize,
+        control_value: &C,
+    ) -> Result<(f64, f64)>
+    where
+        R: RandomStream,
+        P: StochasticProcess,
+        D: Discretization<P>,
+        F: Payoff,
+        C: Fn(&F, Currency) -> Result<Money> + Sync,
+    {
+        if scratch.payoff_anti.is_some() {
+            return Err(finstack_quant_core::Error::Validation(
+                "paired moments do not support antithetic sampling".to_string(),
+            ));
+        }
+        let target = self.simulate_discounted(rng, inputs, scratch, path_id, None)?;
+        let control = control_value(&scratch.payoff, inputs.currency)?.amount();
+        let control = validate_discounted_payoff(path_id, control, inputs.discount_factor)?;
+        Ok((target, control))
+    }
+
+    /// Accumulate one fixed chunk without retaining per-path values.
+    fn run_pair_chunk<R, P, D, F, C>(
+        &self,
+        range: Range<usize>,
+        rng: &mut RngSource<'_, R>,
+        inputs: PathInputs<'_, P, D>,
+        scratch: &mut PathScratch<F>,
+        control_value: &C,
+    ) -> Result<OnlineCovariance>
+    where
+        R: RandomStream,
+        P: StochasticProcess,
+        D: Discretization<P>,
+        F: Payoff,
+        C: Fn(&F, Currency) -> Result<Money> + Sync,
+    {
+        let mut moments = OnlineCovariance::new();
+        for path_id in range {
+            let (target, control) = match rng {
+                RngSource::Split(root) => {
+                    let mut path_rng = root.split(path_id as u64).ok_or_else(|| {
+                        finstack_quant_core::Error::Validation(
+                            "RandomStream reports splitting support but split() returned None"
+                                .to_string(),
+                        )
+                    })?;
+                    self.simulate_discounted_pair(
+                        &mut path_rng,
+                        inputs,
+                        scratch,
+                        path_id,
+                        control_value,
+                    )?
+                }
+                RngSource::Sequential(stream) => self.simulate_discounted_pair(
+                    &mut **stream,
+                    inputs,
+                    scratch,
+                    path_id,
+                    control_value,
+                )?,
+            };
+            moments.update(target, control);
+        }
+        Ok(moments)
     }
 
     /// Accumulate the discounted values of the paths in `range`.

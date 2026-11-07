@@ -21,11 +21,15 @@ use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations::instruments::exotics::asian_option::AsianOption;
 use finstack_quant_valuations::instruments::exotics::barrier_option::BarrierOption;
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
+use finstack_quant_valuations::pricer::{ModelKey, STANDARD};
+use finstack_quant_valuations::results::ValuationResult;
 #[allow(dead_code, unused_imports, clippy::expect_used, clippy::unwrap_used)]
 #[path = "../tests/support/equity_fx_options.rs"]
 mod option_support;
 use std::hint::black_box;
 use time::Month;
+
+mod support;
 
 fn as_of() -> Date {
     Date::from_calendar_date(2025, Month::January, 1).unwrap()
@@ -152,17 +156,53 @@ const FD_GREEK_SET: [finstack_quant_valuations::metrics::MetricId; 5] = [
     finstack_quant_valuations::metrics::MetricId::Volga,
 ];
 
-fn bench_full_greek_set<I: Instrument>(c: &mut Criterion, name: &str, instrument: &I) {
-    let market = create_market();
+fn assert_greeks(result: &ValuationResult, model: ModelKey) {
+    assert!(result.value.amount().is_finite());
+    assert_eq!(result.value.currency(), Currency::USD);
+    assert_eq!(
+        result
+            .provenance
+            .as_ref()
+            .expect("pricing provenance")
+            .model,
+        model
+    );
+    for metric in &FD_GREEK_SET {
+        assert!(
+            result
+                .measures
+                .get(metric)
+                .expect("requested FD Greek")
+                .is_finite(),
+            "non-finite {metric}"
+        );
+    }
+}
+
+fn bench_full_greek_set<I: Instrument>(
+    c: &mut Criterion,
+    name: &str,
+    make_instrument: impl Fn() -> I,
+    model: ModelKey,
+) {
     c.bench_function(name, |b| {
-        b.iter(|| {
-            instrument.price_with_metrics(
-                black_box(&market),
-                black_box(as_of()),
-                black_box(&FD_GREEK_SET),
-                PricingOptions::default(),
-            )
-        })
+        let market = create_market();
+        let instrument = make_instrument();
+        assert_eq!(instrument.default_model(), model);
+        support::bench(
+            b,
+            || {
+                instrument
+                    .price_with_metrics(
+                        black_box(&market),
+                        black_box(as_of()),
+                        black_box(&FD_GREEK_SET),
+                        PricingOptions::default(),
+                    )
+                    .expect("full FD Greek set")
+            },
+            |result| assert_greeks(result, model),
+        );
     });
 }
 
@@ -170,10 +210,44 @@ fn bench_fd_greeks(c: &mut Criterion) {
     bench_full_greek_set(
         c,
         "fd_greeks/equity_option_closed_form",
-        &create_equity_option(),
+        create_equity_option,
+        ModelKey::Black76,
     );
-    bench_full_greek_set(c, "fd_greeks/barrier_option_fd", &create_barrier_option());
-    bench_full_greek_set(c, "fd_greeks/asian_option_mc_fd", &create_asian_option());
+    bench_full_greek_set(
+        c,
+        "fd_greeks/barrier_option_fd",
+        create_barrier_option,
+        ModelKey::BarrierBSContinuous,
+    );
+    c.bench_function("fd_greeks/asian_option_mc_fd", |b| {
+        let market = create_market();
+        let instrument = create_asian_option();
+        let registry = STANDARD.pricers();
+        assert_eq!(instrument.expiry(), Some(instrument.expiry));
+        assert_eq!(
+            instrument
+                .instrument_pricing_overrides
+                .model_config
+                .mc_paths,
+            Some(200)
+        );
+        support::bench(
+            b,
+            || {
+                registry
+                    .price_with_metrics(
+                        black_box(&instrument),
+                        ModelKey::MonteCarloGBM,
+                        black_box(&market),
+                        black_box(as_of()),
+                        black_box(&FD_GREEK_SET),
+                        PricingOptions::default(),
+                    )
+                    .expect("Monte Carlo full FD Greek set")
+            },
+            |result| assert_greeks(result, ModelKey::MonteCarloGBM),
+        );
+    });
 }
 
 criterion_group!(benches, bench_fd_greeks);

@@ -1743,3 +1743,505 @@ fn hull_white_capture_uses_metadata_for_rate_slot_zero() {
         }
     }
 }
+
+mod paired_tests {
+    use super::*;
+    use crate::monte_carlo::discretization::exact::ExactGbm;
+    use crate::monte_carlo::payoff::asian::{
+        Asian, AsianFixingHistory, AsianPair, AveragingMethod,
+    };
+    use crate::monte_carlo::process::gbm::{GbmParams, GbmProcess};
+    use crate::monte_carlo::rng::philox::PhiloxRng;
+    use crate::monte_carlo::traits::ProcessMetadata;
+    use crate::types::OptionType;
+    use finstack_quant_core::math::stats::OnlineCovariance;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::{Arc, Mutex};
+
+    fn components(moments: &OnlineCovariance) -> [f64; 5] {
+        [
+            moments.mean_x(),
+            moments.mean_y(),
+            moments.variance_x(),
+            moments.variance_y(),
+            moments.covariance(),
+        ]
+    }
+
+    #[derive(Clone)]
+    struct CountedGbm {
+        steps: Arc<AtomicUsize>,
+    }
+
+    impl Discretization<GbmProcess> for CountedGbm {
+        fn step(
+            &self,
+            process: &GbmProcess,
+            t: f64,
+            dt: f64,
+            x: &mut [f64],
+            z: &[f64],
+            work: &mut [f64],
+        ) {
+            self.steps.fetch_add(1, Ordering::Relaxed);
+            ExactGbm.step(process, t, dt, x, z, work);
+        }
+    }
+
+    #[derive(Clone)]
+    struct TracedAsian {
+        pair: AsianPair,
+        states: Vec<(usize, u64, u64)>,
+    }
+
+    impl Payoff for TracedAsian {
+        fn on_event(&mut self, state: &mut PathState) -> finstack_quant_core::Result<()> {
+            self.states.push((
+                state.step,
+                state.time.to_bits(),
+                state.spot().expect("GBM spot").to_bits(),
+            ));
+            self.pair.on_event(state)
+        }
+
+        fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
+            self.pair.value(currency)
+        }
+
+        fn reset(&mut self) {
+            self.states.clear();
+            self.pair.reset();
+        }
+
+        fn max_event_step(&self) -> Option<usize> {
+            self.pair.max_event_step()
+        }
+    }
+
+    #[test]
+    fn paired_moments_match_independent_captures_and_single_path_work() {
+        let process = GbmProcess::new(GbmParams::new(0.03, 0.01, 0.2).expect("GBM"));
+        let rng = PhiloxRng::new(574_311);
+        let discount_factor = (-0.03_f64).exp();
+        for (num_paths, option_type, quantity) in [
+            (999, OptionType::Call, 1.0),
+            (1000, OptionType::Put, 1.0),
+            (1001, OptionType::Call, 3.0),
+        ] {
+            // Include history, time-zero and repeated fixings, and distinct
+            // multipliers at one model time in the same exact-path comparison.
+            let arithmetic = Asian::with_history(
+                option_type,
+                100.0,
+                quantity,
+                AveragingMethod::Arithmetic,
+                vec![0, 3, 3, 8, 12],
+                AsianFixingHistory {
+                    sum: 195.0,
+                    log_sum: 97.0_f64.ln() + 98.0_f64.ln(),
+                    count: 2,
+                },
+            )
+            .expect("payoff")
+            .with_fixing_multipliers(&[1.0, 0.99, 1.01, 1.02, 1.03])
+            .expect("fixing multipliers");
+            let mut geometric = arithmetic.clone();
+            geometric.averaging = AveragingMethod::Geometric;
+            let config = McEngineConfig::uniform(num_paths, 1.0, 12)
+                .expect("grid")
+                .parallel(false)
+                .chunk_size(1000);
+            let captured_engine =
+                McEngine::new(config.clone().path_capture(PathCaptureConfig::all()));
+            let capture = |payoff: &Asian| {
+                captured_engine
+                    .price_with_capture(
+                        McPricingInputs {
+                            rng: &rng,
+                            process: &process,
+                            disc: &ExactGbm,
+                            initial_state: &[100.0],
+                            payoff,
+                            currency: Currency::USD,
+                            discount_factor,
+                        },
+                        process.metadata(),
+                    )
+                    .expect("independent captured pass")
+                    .paths
+                    .expect("captured paths")
+                    .paths
+            };
+            let target_paths = capture(&arithmetic);
+            let control_paths = capture(&geometric);
+            let mut reference = OnlineCovariance::new();
+            let mut reference_traces = Vec::new();
+            for (target, control) in target_paths.iter().zip(&control_paths) {
+                assert_eq!(target.path_id, control.path_id);
+                let states = |path: &crate::monte_carlo::paths::SimulatedPath| {
+                    path.points
+                        .iter()
+                        .map(|point| (point.step, point.time.to_bits(), point.state[0].to_bits()))
+                        .collect::<Vec<_>>()
+                };
+                let target_states = states(target);
+                assert_eq!(target_states, states(control));
+                reference_traces.push((
+                    target_states,
+                    target.final_value.to_bits(),
+                    control.final_value.to_bits(),
+                ));
+                reference.update(target.final_value, control.final_value);
+            }
+            reference_traces.sort();
+            let traced = TracedAsian {
+                pair: AsianPair::new(&arithmetic).expect("arithmetic pair"),
+                states: Vec::new(),
+            };
+            for parallel in [false, true] {
+                let engine = McEngine::new(config.clone().parallel(parallel));
+                let steps = Arc::new(AtomicUsize::new(0));
+                let traces = Mutex::new(Vec::new());
+                let moments = engine
+                    .paired_moments(
+                        McPricingInputs {
+                            rng: &rng,
+                            process: &process,
+                            disc: &CountedGbm {
+                                steps: Arc::clone(&steps),
+                            },
+                            initial_state: &[100.0],
+                            payoff: &traced,
+                            currency: Currency::USD,
+                            discount_factor,
+                        },
+                        |payoff, currency| {
+                            let target = payoff.value(currency)?.amount() * discount_factor;
+                            let control = payoff.pair.control_value(currency)?;
+                            traces.lock().expect("trace lock").push((
+                                payoff.states.clone(),
+                                target.to_bits(),
+                                (control.amount() * discount_factor).to_bits(),
+                            ));
+                            Ok(control)
+                        },
+                    )
+                    .expect("paired moments");
+                assert_eq!(moments.count(), num_paths);
+                assert_eq!(steps.load(Ordering::Relaxed), num_paths * 12);
+                let mut actual_traces = traces.into_inner().expect("trace lock");
+                actual_traces.sort();
+                assert_eq!(actual_traces, reference_traces);
+                for (index, (actual, expected)) in components(&moments)
+                    .into_iter()
+                    .zip(components(&reference))
+                    .enumerate()
+                {
+                    let scale = if index < 2 {
+                        quantity
+                    } else {
+                        quantity * quantity
+                    };
+                    assert!((actual - expected).abs() / scale <= 1e-10);
+                }
+            }
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn paired_moments_are_bit_identical_across_thread_counts_and_chunk_boundaries() {
+        for num_paths in [999, 1000, 1001, 2017] {
+            for chunk_size in [257, 1000] {
+                let price = |parallel| {
+                    McEngine::new(
+                        McEngineConfig::uniform(num_paths, 1.0, 2)
+                            .expect("grid")
+                            .parallel(parallel)
+                            .chunk_size(chunk_size),
+                    )
+                    .paired_moments(
+                        McPricingInputs {
+                            rng: &PhiloxRng::new(391),
+                            process: &DummyProcess,
+                            disc: &DummyDisc,
+                            initial_state: &[100.0],
+                            payoff: &CapturedValuePayoff::default(),
+                            currency: Currency::USD,
+                            discount_factor: 0.97,
+                        },
+                        |payoff, currency| {
+                            let value = payoff.value(currency)?.amount();
+                            Money::new(value * value, currency)
+                        },
+                    )
+                    .expect("paired moments")
+                };
+                let serial = price(false);
+                for threads in [1, 2, 8] {
+                    let pool = rayon::ThreadPoolBuilder::new()
+                        .num_threads(threads)
+                        .build()
+                        .expect("test pool");
+                    let parallel = pool.install(|| price(true));
+                    assert_eq!(parallel.count(), num_paths);
+                    assert_eq!(
+                        components(&serial).map(f64::to_bits),
+                        components(&parallel).map(f64::to_bits),
+                    );
+                }
+            }
+        }
+    }
+
+    #[derive(Clone)]
+    struct SequentialPhilox(PhiloxRng);
+
+    impl RandomStream for SequentialPhilox {
+        fn split(&self, _stream_id: u64) -> Option<Self> {
+            None
+        }
+
+        fn supports_splitting(&self) -> bool {
+            false
+        }
+
+        fn fill_u01(&mut self, out: &mut [f64]) {
+            self.0.fill_u01(out);
+        }
+
+        fn fill_std_normals(&mut self, out: &mut [f64]) {
+            self.0.fill_std_normals(out);
+        }
+    }
+
+    #[test]
+    fn paired_moments_preserve_sequential_stream_across_chunks() {
+        let rng = SequentialPhilox(PhiloxRng::new(791));
+        let payoff = CapturedValuePayoff::default();
+        let inputs = McPricingInputs {
+            rng: &rng,
+            process: &DummyProcess,
+            disc: &DummyDisc,
+            initial_state: &[100.0],
+            payoff: &payoff,
+            currency: Currency::USD,
+            discount_factor: 1.0,
+        };
+        let config = McEngineConfig::uniform(11, 1.0, 2)
+            .expect("grid")
+            .parallel(false);
+        let captured = McEngine::new(
+            config
+                .clone()
+                .chunk_size(11)
+                .path_capture(PathCaptureConfig::all()),
+        )
+        .price_with_capture(inputs, ProcessParams::new("constant"))
+        .expect("one-chunk reference")
+        .paths
+        .expect("captured reference");
+        let observed = Mutex::new(Vec::new());
+        let actual = McEngine::new(config.chunk_size(3))
+            .paired_moments(inputs, |payoff, currency| {
+                let value = payoff.value(currency)?.amount();
+                observed.lock().expect("value lock").push(value.to_bits());
+                Money::new(value * value, currency)
+            })
+            .expect("sequential paired moments");
+        let mut reference = OnlineCovariance::new();
+        for path in &captured.paths {
+            reference.update(path.final_value, path.final_value * path.final_value);
+        }
+        assert_eq!(actual.count(), 11);
+        assert_eq!(
+            observed.into_inner().expect("value lock"),
+            captured
+                .paths
+                .iter()
+                .map(|path| path.final_value.to_bits())
+                .collect::<Vec<_>>(),
+        );
+        for (actual, expected) in components(&actual).into_iter().zip(components(&reference)) {
+            assert!((actual - expected).abs() <= 1e-12);
+        }
+    }
+
+    #[test]
+    fn paired_moments_handle_zero_control_and_propagate_failures() {
+        for parallel in [false, true] {
+            let engine = McEngine::new(
+                McEngineConfig::uniform(11, 1.0, 2)
+                    .expect("grid")
+                    .parallel(parallel)
+                    .chunk_size(3),
+            );
+            let inputs = McPricingInputs {
+                rng: &DummyRng,
+                process: &DummyProcess,
+                disc: &DummyDisc,
+                initial_state: &[100.0],
+                payoff: &DummyPayoff,
+                currency: Currency::USD,
+                discount_factor: 0.9,
+            };
+            let zero = engine
+                .paired_moments(inputs, |_, currency| Money::new(0.0, currency))
+                .expect("zero control is valid");
+            assert_eq!(zero.count(), 11);
+            assert_eq!(components(&zero), [90.0, 0.0, 0.0, 0.0, 0.0]);
+
+            let err = engine
+                .paired_moments(inputs, |_, _| {
+                    Err(finstack_quant_core::Error::Validation(
+                        "control failure".to_owned(),
+                    ))
+                })
+                .expect_err("control error must propagate");
+            assert!(err.to_string().contains("control failure"));
+            let err = engine
+                .paired_moments(
+                    McPricingInputs {
+                        discount_factor: 1e300,
+                        ..inputs
+                    },
+                    |_, currency| Money::new(1e20, currency),
+                )
+                .expect_err("discounted control overflow must fail");
+            assert!(err.to_string().contains("non-finite discounted payoff"));
+
+            let calls = AtomicUsize::new(0);
+            let err = engine
+                .paired_moments(
+                    McPricingInputs {
+                        rng: inputs.rng,
+                        process: inputs.process,
+                        disc: inputs.disc,
+                        initial_state: inputs.initial_state,
+                        payoff: &OverflowAfterDiscountPayoff,
+                        currency: inputs.currency,
+                        discount_factor: 1e300,
+                    },
+                    |_, currency| {
+                        calls.fetch_add(1, Ordering::Relaxed);
+                        Money::new(0.0, currency)
+                    },
+                )
+                .expect_err("discounted target overflow must fail before control readout");
+            assert!(err.to_string().contains("non-finite discounted payoff"));
+            assert_eq!(calls.load(Ordering::Relaxed), 0);
+        }
+    }
+
+    #[test]
+    fn paired_moments_reject_unsupported_modes_and_invalid_runtime_inputs() {
+        let base = McEngineConfig::uniform(10, 1.0, 2)
+            .expect("grid")
+            .parallel(false);
+        let mut auto_stop = base.clone();
+        auto_stop.target_ci_half_width = Some(1.0);
+        let inputs = McPricingInputs {
+            rng: &DummyRng,
+            process: &DummyProcess,
+            disc: &DummyDisc,
+            initial_state: &[100.0],
+            payoff: &DummyPayoff,
+            currency: Currency::USD,
+            discount_factor: 1.0,
+        };
+        for (config, expected) in [
+            (base.clone().antithetic(true), "antithetic"),
+            (
+                base.clone().path_capture(PathCaptureConfig::all()),
+                "path capture",
+            ),
+            (auto_stop, "auto-stopping"),
+            (base.clone().chunk_size(0), "chunk_size"),
+        ] {
+            let err = McEngine::new(config)
+                .paired_moments(inputs, |_, currency| Money::new(0.0, currency))
+                .expect_err("unsupported mode must fail");
+            assert!(err.to_string().contains(expected), "{err}");
+        }
+        for num_paths in [0, 1] {
+            let mut config = base.clone();
+            config.num_paths = num_paths;
+            let err = McEngine::new(config)
+                .paired_moments(inputs, |_, currency| Money::new(0.0, currency))
+                .expect_err("insufficient observations must fail");
+            assert!(
+                err.to_string()
+                    .contains("at least 2 independent estimators")
+            );
+        }
+        let err = McEngine::new(base.clone())
+            .paired_moments(
+                McPricingInputs {
+                    initial_state: &[],
+                    ..inputs
+                },
+                |_, currency| Money::new(0.0, currency),
+            )
+            .expect_err("state shape must be validated");
+        assert!(err.to_string().contains("initial_state length"));
+        let err = McEngine::new(base.clone().parallel(true))
+            .paired_moments(
+                McPricingInputs {
+                    rng: &NonSplittableRng,
+                    process: inputs.process,
+                    disc: inputs.disc,
+                    initial_state: inputs.initial_state,
+                    payoff: inputs.payoff,
+                    currency: inputs.currency,
+                    discount_factor: inputs.discount_factor,
+                },
+                |_, currency| Money::new(0.0, currency),
+            )
+            .expect_err("parallel streams must split");
+        assert!(err.to_string().contains("splittable RNG"));
+        let sobol = finstack_quant_core::math::random::SobolRng::try_new(1, 0).expect("Sobol");
+        let err = McEngine::new(base.clone())
+            .paired_moments(
+                McPricingInputs {
+                    rng: &sobol,
+                    process: inputs.process,
+                    disc: inputs.disc,
+                    initial_state: inputs.initial_state,
+                    payoff: inputs.payoff,
+                    currency: inputs.currency,
+                    discount_factor: inputs.discount_factor,
+                },
+                |_, currency| Money::new(0.0, currency),
+            )
+            .expect_err("Sobol must use the replicate driver");
+        assert!(err.to_string().contains("quasi-random"));
+
+        let payoff = Asian::new(
+            OptionType::Call,
+            100.0,
+            1.0,
+            AveragingMethod::Arithmetic,
+            vec![3],
+        )
+        .expect("payoff");
+        let payoff = AsianPair::new(&payoff).expect("pair");
+        let err = McEngine::new(base)
+            .paired_moments(
+                McPricingInputs {
+                    rng: inputs.rng,
+                    process: inputs.process,
+                    disc: inputs.disc,
+                    initial_state: inputs.initial_state,
+                    payoff: &payoff,
+                    currency: inputs.currency,
+                    discount_factor: inputs.discount_factor,
+                },
+                AsianPair::control_value,
+            )
+            .expect_err("out-of-grid fixing must fail before simulation");
+        assert!(
+            err.to_string()
+                .contains("payoff expects an event at step 3")
+        );
+    }
+}

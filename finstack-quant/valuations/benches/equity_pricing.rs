@@ -10,6 +10,8 @@
 
 #![allow(clippy::unwrap_used)]
 
+mod support;
+
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_cashflows::builder::ScheduleParams;
 use finstack_quant_core::currency::Currency;
@@ -232,29 +234,54 @@ fn variance_swap(months: i64) -> VarianceSwap {
 
 fn bench_equity_pv(c: &mut Criterion) {
     let mut group = c.benchmark_group("equity_pv");
-    let market = create_equity_market();
-    let as_of = base_date();
-    let equity = sample_equity();
-
     group.bench_function("spx_spot", |b| {
-        b.iter(|| equity.value(black_box(&market), black_box(as_of)));
+        let market = create_equity_market();
+        let as_of = base_date();
+        let equity = sample_equity();
+        support::bench(
+            b,
+            || {
+                equity
+                    .value(black_box(&market), black_box(as_of))
+                    .expect("spot equity PV")
+            },
+            |pv| {
+                assert!(pv.amount().is_finite());
+                assert_eq!(pv.currency(), Currency::USD);
+                assert_eq!(pv.amount(), 100.0 * 5000.0);
+            },
+        );
     });
     group.finish();
 }
 
 fn bench_equity_trs_pv(c: &mut Criterion) {
     let mut group = c.benchmark_group("equity_trs_pv");
-    let market = create_equity_market();
-    let as_of = base_date();
-
     {
         let years = 3;
-        let trs = equity_trs(years);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{years}Y")),
             &years,
             |b, _| {
-                b.iter(|| trs.value(black_box(&market), black_box(as_of)));
+                let market = create_equity_market();
+                let as_of = base_date();
+                let trs = equity_trs(years);
+                assert!(as_of < trs.schedule.start);
+                assert_eq!(
+                    (trs.schedule.end - trs.schedule.start).whole_days(),
+                    365 * i64::from(years)
+                );
+                support::bench(
+                    b,
+                    || {
+                        trs.value(black_box(&market), black_box(as_of))
+                            .expect("equity total-return-swap PV")
+                    },
+                    |pv| {
+                        assert!(pv.amount().is_finite());
+                        assert_eq!(pv.currency(), Currency::USD);
+                    },
+                );
             },
         );
     }
@@ -263,32 +290,58 @@ fn bench_equity_trs_pv(c: &mut Criterion) {
 
 fn bench_equity_future_pv(c: &mut Criterion) {
     let mut group = c.benchmark_group("equity_future_pv");
-    let market = create_equity_market();
-    let as_of = base_date();
-
-    let near_settlement = Date::from_calendar_date(2025, Month::June, 20).unwrap();
-    let near_last = Date::from_calendar_date(2025, Month::June, 19).unwrap();
-    let near = equity_future(near_settlement, near_last, "ES-NEAR");
-
     group.bench_function("near_expiry", |b| {
-        b.iter(|| near.value(black_box(&market), black_box(as_of)));
+        let market = create_equity_market();
+        let as_of = base_date();
+        let near_settlement = Date::from_calendar_date(2025, Month::June, 20).unwrap();
+        let near_last = Date::from_calendar_date(2025, Month::June, 19).unwrap();
+        let near = equity_future(near_settlement, near_last, "ES-NEAR");
+        assert!(as_of < near_last);
+        support::bench(
+            b,
+            || {
+                near.value(black_box(&market), black_box(as_of))
+                    .expect("cost-of-carry equity future PV")
+            },
+            |pv| {
+                assert!(pv.amount().is_finite());
+                assert_eq!(pv.currency(), Currency::USD);
+            },
+        );
     });
     group.finish();
 }
 
 fn bench_variance_swap_pv(c: &mut Criterion) {
     let mut group = c.benchmark_group("variance_swap_pv");
-    let market = create_equity_market();
-    let as_of = base_date();
-
     {
         let months = 6;
-        let swap = variance_swap(months);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{months}M")),
             &months,
             |b, _| {
-                b.iter(|| swap.value(black_box(&market), black_box(as_of)));
+                let market = create_equity_market();
+                let as_of = base_date();
+                let swap = variance_swap(months);
+                // A missing override selects Carr-Madan surface replication.
+                assert!(
+                    swap.instrument_pricing_overrides
+                        .market_quotes
+                        .implied_volatility
+                        .is_none()
+                );
+                assert!(as_of < swap.start_date);
+                support::bench(
+                    b,
+                    || {
+                        swap.value(black_box(&market), black_box(as_of))
+                            .expect("Carr-Madan equity variance-swap PV")
+                    },
+                    |pv| {
+                        assert!(pv.amount().is_finite());
+                        assert_eq!(pv.currency(), Currency::USD);
+                    },
+                );
             },
         );
     }
@@ -297,39 +350,49 @@ fn bench_variance_swap_pv(c: &mut Criterion) {
 
 // Volatility index benchmarks
 
-/// Benchmark VIX future pricing vs tenor (1M, 3M, 6M).
+/// Benchmark three-month VIX future pricing.
 ///
 /// Measures the vol index forward curve interpolation and discount factor
 /// lookup required to mark a VIX futures position to market.
 fn bench_vol_index_future_pv(c: &mut Criterion) {
-    let market = create_equity_market();
-    let as_of = base_date();
-
     let mut group = c.benchmark_group("vol_index_future/tenor");
     {
         let (label, months) = ("3M", 3_i64);
-        let expiry = as_of + time::Duration::days(months * 30);
-        let fut = VolatilityIndexFuture::builder()
-            .id(InstrumentId::new(format!("VIX-FUT-{label}")))
-            .terms(
-                ListedFutureTerms::new(
-                    100_000.0 / (1_000.0 * 18.5),
-                    1_000.0,
-                    Currency::USD,
-                    18.5,
-                    expiry,
-                    expiry,
-                    Position::Long,
-                )
-                .unwrap(),
-            )
-            .vol_index_curve_id(CurveId::new("VIX"))
-            .attributes(Attributes::new())
-            .build()
-            .unwrap();
-
         group.bench_with_input(BenchmarkId::from_parameter(label), &label, |b, _| {
-            b.iter(|| black_box(fut.value(black_box(&market), black_box(as_of))).unwrap())
+            let market = create_equity_market();
+            let as_of = base_date();
+            let expiry = as_of + time::Duration::days(months * 30);
+            let fut = VolatilityIndexFuture::builder()
+                .id(InstrumentId::new(format!("VIX-FUT-{label}")))
+                .terms(
+                    ListedFutureTerms::new(
+                        100_000.0 / (1_000.0 * 18.5),
+                        1_000.0,
+                        Currency::USD,
+                        18.5,
+                        expiry,
+                        expiry,
+                        Position::Long,
+                    )
+                    .unwrap(),
+                )
+                .vol_index_curve_id(CurveId::new("VIX"))
+                .attributes(Attributes::new())
+                .build()
+                .unwrap();
+
+            assert!(as_of < expiry);
+            support::bench(
+                b,
+                || {
+                    fut.value(black_box(&market), black_box(as_of))
+                        .expect("volatility-index future PV")
+                },
+                |pv| {
+                    assert!(pv.amount().is_finite());
+                    assert_eq!(pv.currency(), Currency::USD);
+                },
+            );
         });
     }
     group.finish();
@@ -337,48 +400,66 @@ fn bench_vol_index_future_pv(c: &mut Criterion) {
 
 /// Benchmark a listed volatility-future call via Black-76.
 ///
-/// Measures vol-of-vol surface lookup, Black-76 evaluation, and discount
-/// factor interpolation for options on a volatility index.
+/// Measures Black-76 evaluation with an explicit flat vol-of-vol quote and
+/// discount factor interpolation for an option on a volatility index.
 fn bench_equity_future_option_pv(c: &mut Criterion) {
-    let market = create_equity_market();
-    let as_of = base_date();
-
     let mut group = c.benchmark_group("equity_future_option/type");
     {
         let (label, opt_type) = ("call", OptionType::Call);
-        let expiry = as_of + time::Duration::days(90);
-        let terms = FutureOptionTerms::builder()
-            .underlying("VIX-FUT".to_string())
-            .futures_price(20.0)
-            .strike(20.0)
-            .contracts(100.0)
-            .multiplier(100.0)
-            .currency(Currency::USD)
-            .option_type(opt_type)
-            .position(Position::Long)
-            .exercise_style(ExerciseStyle::European)
-            .expiry(expiry)
-            .settlement(FutureOptionSettlement::Cash {
-                payment_date: expiry,
-            })
-            .model(FutureOptionModel::Black76)
-            .premium_style(FutureOptionPremiumStyle::PremiumPaid)
-            .day_count(DayCount::Act365F)
-            .discount_curve_id(CurveId::new("USD-OIS"))
-            .build()
-            .unwrap();
-        let opt = EquityFutureOption::builder()
-            .id(InstrumentId::new(format!("VIX-OPT-{label}")))
-            .terms(terms)
-            .instrument_pricing_overrides(
-                InstrumentPricingOverrides::default().with_implied_volatility(0.80),
-            )
-            .attributes(Attributes::new())
-            .build()
-            .unwrap();
-
         group.bench_with_input(BenchmarkId::from_parameter(label), &label, |b, _| {
-            b.iter(|| black_box(opt.value(black_box(&market), black_box(as_of))).unwrap())
+            let market = create_equity_market();
+            let as_of = base_date();
+            let expiry = as_of + time::Duration::days(90);
+            let terms = FutureOptionTerms::builder()
+                .underlying("VIX-FUT".to_string())
+                .futures_price(20.0)
+                .strike(20.0)
+                .contracts(100.0)
+                .multiplier(100.0)
+                .currency(Currency::USD)
+                .option_type(opt_type)
+                .position(Position::Long)
+                .exercise_style(ExerciseStyle::European)
+                .expiry(expiry)
+                .settlement(FutureOptionSettlement::Cash {
+                    payment_date: expiry,
+                })
+                .model(FutureOptionModel::Black76)
+                .premium_style(FutureOptionPremiumStyle::PremiumPaid)
+                .day_count(DayCount::Act365F)
+                .discount_curve_id(CurveId::new("USD-OIS"))
+                .build()
+                .unwrap();
+            let opt = EquityFutureOption::builder()
+                .id(InstrumentId::new(format!("VIX-OPT-{label}")))
+                .terms(terms)
+                .instrument_pricing_overrides(
+                    InstrumentPricingOverrides::default().with_implied_volatility(0.80),
+                )
+                .attributes(Attributes::new())
+                .build()
+                .unwrap();
+
+            assert_eq!(opt.terms.exercise_style, ExerciseStyle::European);
+            assert_eq!(opt.terms.model, FutureOptionModel::Black76);
+            assert_eq!(
+                opt.instrument_pricing_overrides
+                    .market_quotes
+                    .implied_volatility,
+                Some(0.80)
+            );
+            assert!(as_of < opt.terms.expiry);
+            support::bench(
+                b,
+                || {
+                    opt.value(black_box(&market), black_box(as_of))
+                        .expect("Black-76 equity future-option PV")
+                },
+                |pv| {
+                    assert!(pv.amount().is_finite());
+                    assert_eq!(pv.currency(), Currency::USD);
+                },
+            );
         });
     }
     group.finish();

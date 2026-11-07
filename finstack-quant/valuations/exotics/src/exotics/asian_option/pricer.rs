@@ -5,6 +5,7 @@ use crate::exotics::asian_option::types::{AsianOption, average_intrinsic, realiz
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
+#[cfg(test)]
 use finstack_quant_core::math::stats::OnlineCovariance;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::monte_carlo::payoff::asian::AsianFixingHistory;
@@ -16,6 +17,7 @@ use finstack_quant_valuations_core::results::ValuationResult;
 
 // MC-specific imports
 use finstack_quant_models::monte_carlo::control_variate::apply_control_variate;
+#[cfg(test)]
 use finstack_quant_models::monte_carlo::engine::PathCaptureConfig;
 use finstack_quant_models::monte_carlo::payoff::asian::{Asian, AveragingMethod};
 use finstack_quant_models::monte_carlo::pricer::path_dependent::{
@@ -82,6 +84,7 @@ pub(super) fn map_fixings_to_steps(
 }
 
 /// Welford moments of the paired per-path payoffs `(xs[i], ys[i])`.
+#[cfg(test)]
 fn paired_moments(xs: &[f64], ys: &[f64]) -> OnlineCovariance {
     let mut moments = OnlineCovariance::new();
     for (&x, &y) in xs.iter().zip(ys) {
@@ -266,9 +269,14 @@ impl AsianOptionMcPricer {
         as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
         inst.validate_past_fixings(as_of)?;
-        let t = inst
-            .day_count
-            .year_fraction(as_of, inst.expiry, DayCountContext::default())?;
+        // Day counts reject reversed dates; expired contracts use their
+        // realized payoff without reading live market inputs.
+        let t = if as_of >= inst.expiry {
+            0.0
+        } else {
+            inst.day_count
+                .year_fraction(as_of, inst.expiry, DayCountContext::default())?
+        };
 
         let (hist_sum, hist_prod_log, hist_count) = inst.accumulated_state(as_of);
 
@@ -344,40 +352,12 @@ impl AsianOptionMcPricer {
             inst.averaging_method,
             finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod::Arithmetic
         ) {
-            // Use path capture to get per-path discounted payoffs for covariance
-            let mut cfg_cap = config;
-            cfg_cap.path_capture = PathCaptureConfig::all();
-            let pricer_cap = PathDependentPricer::new(cfg_cap);
-
-            // Arithmetic payoff
+            let pricer = PathDependentPricer::new(config);
             let arith_payoff = Asian::with_history(
                 inst.option_type,
                 inst.strike,
                 inst.quantity,
                 finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod::Arithmetic,
-                fixing_steps.clone(),
-                AsianFixingHistory {
-                    sum: hist_sum,
-                    log_sum: hist_prod_log,
-                    count: hist_count,
-                },
-            )?
-            .with_fixing_multipliers(&fixing_multipliers)?;
-            let arith_full = pricer_cap.price_with_paths_and_grid(
-                &process,
-                spot,
-                time_grid.clone(),
-                &arith_payoff,
-                inst.currency,
-                discount_factor,
-            )?;
-
-            // Geometric payoff (same RNG via same seed)
-            let geom_payoff = Asian::with_history(
-                inst.option_type,
-                inst.strike,
-                inst.quantity,
-                finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod::Geometric,
                 fixing_steps,
                 AsianFixingHistory {
                     sum: hist_sum,
@@ -386,46 +366,18 @@ impl AsianOptionMcPricer {
                 },
             )?
             .with_fixing_multipliers(&fixing_multipliers)?;
-            let geom_full = pricer_cap.price_with_paths_and_grid(
+            // Both existing payoffs observe one path; the collector retains
+            // discounted paired moments instead of full simulated paths.
+            let moments = pricer.price_asian_pair(
                 &process,
                 spot,
                 time_grid,
-                &geom_payoff,
+                &arith_payoff,
                 inst.currency,
                 discount_factor,
             )?;
-            // Extract per-path discounted payoffs
-            // paths should be Some when path_capture is enabled in price_with_paths
-            let xs: Vec<f64> = arith_full
-                .paths
-                .as_ref()
-                .ok_or_else(|| {
-                    finstack_quant_core::Error::Validation(
-                        "Path capture enabled but paths not captured".into(),
-                    )
-                })?
-                .paths
-                .iter()
-                .map(|p| p.final_value)
-                .collect();
-            let ys: Vec<f64> = geom_full
-                .paths
-                .as_ref()
-                .ok_or_else(|| {
-                    finstack_quant_core::Error::Validation(
-                        "Path capture enabled but paths not captured".into(),
-                    )
-                })?
-                .paths
-                .iter()
-                .map(|p| p.final_value)
-                .collect();
 
-            let n = xs.len();
-            // Welford sample moments — the control-variate estimator sums up
-            // to `num_paths` terms, so naive summation would lose precision at
-            // large path counts (W-05).
-            let moments = paired_moments(&xs, &ys);
+            let n = moments.count();
             let (mean_x, mean_y) = (moments.mean_x(), moments.mean_y());
             let (var_x, var_y) = (moments.variance_x(), moments.variance_y());
             let cov_xy = moments.covariance();
@@ -443,8 +395,8 @@ impl AsianOptionMcPricer {
             // folded in, so it is the true mean of the simulated geometric
             // payoff for both seasoned and unseasoned options. The seasoned
             // path therefore keeps the variance reduction instead of
-            // discarding the geometric pass.
-            // The MC payoffs (xs/ys) are notional-scaled while the
+            // discarding the geometric control.
+            // The paired MC payoffs are notional-scaled while the
             // closed form is per unit notional, so the control mean must
             // be scaled to the same units before the CV adjustment.
             let control_analytical = inst.quantity
@@ -2292,3 +2244,7 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "../../../tests/performance/asian_option.rs"]
+mod performance_accuracy;
