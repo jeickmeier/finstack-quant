@@ -75,7 +75,7 @@
     },
     {
       "id": "ANALYTICS-015",
-      "title": "Complete-case or pairwise correlation and automatic matrix repair",
+      "title": "Common-sample Pearson correlation, provenance and numerical validation",
       "path": "15-correlation-alignment-and-repair.md"
     }
   ],
