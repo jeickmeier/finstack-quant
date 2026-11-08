@@ -23,6 +23,8 @@ mod market_data;
 mod math;
 #[path = "money.rs"]
 mod money;
+#[path = "performance.rs"]
+mod performance;
 #[path = "serde.rs"]
 mod serde;
 #[path = "sobol_golden.rs"]

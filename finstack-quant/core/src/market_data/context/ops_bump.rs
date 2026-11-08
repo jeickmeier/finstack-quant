@@ -274,7 +274,14 @@ impl MarketContext {
     fn apply_curve_bump(&mut self, curve_id: CurveId, bump_spec: BumpSpec) -> Result<bool> {
         let cid = curve_id.as_str();
 
-        if let Some(storage) = Arc::make_mut(&mut self.curves).get_mut(cid) {
+        #[cfg(test)]
+        if self.curves.contains_key(cid) {
+            super::context_bump_work::record_generic_curves_make_mut(self, cid);
+        }
+
+        if self.curves.contains_key(cid)
+            && let Some(storage) = Arc::make_mut(&mut self.curves).get_mut(cid)
+        {
             storage.apply_bump_preserving_id(&curve_id, bump_spec)?;
             return Ok(self.curve_affects_credit_indices(&curve_id));
         }

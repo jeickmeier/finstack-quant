@@ -37,6 +37,10 @@
 //! floating PIK is rejected in that mode rather than misstating
 //! path-dependent principal.
 
+#[cfg(test)]
+#[path = "../../../tests/performance/cashflow_accrual_loan_owner.rs"]
+mod cashflow_accrual_owner;
+
 use crate::term_loan::TermLoan;
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_core::Result;

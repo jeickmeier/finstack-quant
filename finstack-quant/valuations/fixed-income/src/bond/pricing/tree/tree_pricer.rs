@@ -1,5 +1,10 @@
 //! Pricing-engine components for fixed-income bonds.
 //!
+
+#[cfg(test)]
+#[path = "../../../../tests/performance/cashflow_accrual_bond_owner.rs"]
+mod cashflow_accrual_owner;
+
 use super::bond_valuator::BondValuator;
 use super::config::{TreeModelChoice, TreePricerConfig};
 use super::lsmc::{BondLsmcConfig, price_bond_lsmc};

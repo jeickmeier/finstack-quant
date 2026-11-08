@@ -257,6 +257,8 @@ pub fn accrued_interest_amount(
 pub struct AccrualIndex {
     /// Per-period accrual inputs; empty when the schedule has no coupon periods.
     period_inputs: Vec<PeriodInputs>,
+    /// Monotone suffix minima of whole-coupon starts, in period input order.
+    suffix_min_coupon_start: Vec<Date>,
     /// Configuration captured at build time; every query reuses it.
     cfg: AccrualConfig,
 }
@@ -301,8 +303,21 @@ impl AccrualIndex {
             build_period_inputs(schedule, &periods, &outstanding_path, cfg.frequency)?
         };
 
+        let mut suffix_min_coupon_start: Vec<Date> = Vec::with_capacity(period_inputs.len());
+        for inputs in period_inputs.iter().rev() {
+            let minimum = suffix_min_coupon_start
+                .last()
+                .copied()
+                .map_or(inputs.coupon_start, |minimum| {
+                    minimum.min(inputs.coupon_start)
+                });
+            suffix_min_coupon_start.push(minimum);
+        }
+        suffix_min_coupon_start.reverse();
+
         Ok(Self {
             period_inputs,
+            suffix_min_coupon_start,
             cfg: cfg.clone(),
         })
     }
@@ -330,7 +345,20 @@ impl AccrualIndex {
             return Ok(0.0);
         }
 
-        let active = find_active_periods_and_elapsed(&self.period_inputs, as_of, &self.cfg)?;
+        // Payment dates retain schedule order. Suffix minima bound future
+        // whole coupons without assuming that individual segment starts are sorted.
+        let first = self
+            .period_inputs
+            .partition_point(|inputs| inputs.payment_date <= as_of);
+        let upper = self
+            .suffix_min_coupon_start
+            .partition_point(|&start| start <= as_of);
+        if first >= upper {
+            return Ok(0.0);
+        }
+
+        let active =
+            find_active_periods_and_elapsed(&self.period_inputs[first..upper], as_of, &self.cfg)?;
         let mut accrued = finstack_quant_core::math::summation::NeumaierAccumulator::default();
         for (inputs, elapsed_yf) in active {
             accrued.add(accrue_in_period(inputs, elapsed_yf, &self.cfg.method)?);
@@ -796,9 +824,13 @@ fn accrue_in_period(
 }
 
 #[cfg(test)]
+#[path = "../tests/performance/accrual_work.rs"]
+mod performance_work;
+
+#[cfg(test)]
 mod tests {
     use super::*;
-    use crate::builder::{CashFlowSchedule, Notional};
+    use crate::builder::{CashFlowMeta, CashFlowSchedule, Notional};
     use finstack_quant_core::cashflow::{CashFlow, CashFlowAccrual};
     use finstack_quant_core::currency::Currency;
     use time::Month;
@@ -832,6 +864,175 @@ mod tests {
             day_count,
             meta: Default::default(),
         }
+    }
+
+    #[test]
+    fn accrual_window_bounds_preserve_full_scan_order_and_values() {
+        let jan1 = make_date(2025, 1, 1);
+        let may1 = make_date(2025, 5, 1);
+        let jun1 = make_date(2025, 6, 1);
+        let jun28 = make_date(2025, 6, 28);
+        let jul1 = make_date(2025, 7, 1);
+        let aug30 = make_date(2025, 8, 30);
+        let sep1 = make_date(2025, 9, 1);
+        let oct1 = make_date(2025, 10, 1);
+        let dec1 = make_date(2025, 12, 1);
+        let flows = [
+            (may1, jun1, jun1, (may1, jun1), 25_000_i64),
+            (jan1, jul1, jul1, (jan1, jul1), 25_000),
+            (jun28, jul1, jul1, (jan1, jul1), 25_000),
+            // A zero prefix must still set the later segment's whole-coupon start.
+            (jan1, aug30, sep1, (jan1, sep1), 0),
+            (aug30, sep1, sep1, (jan1, sep1), 25_000),
+            (oct1, dec1, dec1, (oct1, dec1), 25_000),
+        ]
+        .into_iter()
+        .map(|(start, end, payment, reference, amount)| {
+            CashFlow::new(
+                payment,
+                None,
+                Money::from((amount, Currency::USD)),
+                CFKind::Fixed,
+                (end - start).whole_days() as f64 / 365.0,
+                None,
+            )
+            .with_accrual(CashFlowAccrual {
+                start,
+                end,
+                day_count: DayCount::Act365F,
+                projected_index_rate: None,
+                calendar_id: None,
+                coupon_period: Some(reference),
+                end_is_termination_date: false,
+            })
+        })
+        .collect();
+        let schedule = CashFlowSchedule::from_flows(
+            flows,
+            Notional::par(1_000_000.0, Currency::USD).unwrap(),
+            DayCount::Act365F,
+            CashFlowMeta {
+                issue_date: Some(jan1),
+                maturity: Some(dec1),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        for cfg in [
+            AccrualConfig::default(),
+            AccrualConfig {
+                ex_coupon: Some(ExCouponRule {
+                    days_before_coupon: 7,
+                    calendar_id: None,
+                }),
+                ..Default::default()
+            },
+        ] {
+            let index = AccrualIndex::build(&schedule, &cfg).unwrap();
+            assert_eq!(index.period_inputs.len(), 5);
+            assert_eq!(
+                index.suffix_min_coupon_start.len(),
+                index.period_inputs.len()
+            );
+            assert!(
+                index
+                    .period_inputs
+                    .windows(2)
+                    .all(|pair| { pair[0].payment_date <= pair[1].payment_date })
+            );
+            assert!(
+                index
+                    .period_inputs
+                    .windows(2)
+                    .any(|pair| pair[0].start > pair[1].start)
+            );
+            assert!(
+                index
+                    .suffix_min_coupon_start
+                    .windows(2)
+                    .all(|pair| pair[0] <= pair[1])
+            );
+            for (i, &minimum) in index.suffix_min_coupon_start.iter().enumerate() {
+                assert_eq!(
+                    minimum,
+                    index.period_inputs[i..]
+                        .iter()
+                        .map(|inputs| inputs.coupon_start)
+                        .min()
+                        .unwrap()
+                );
+            }
+            let future = index
+                .period_inputs
+                .iter()
+                .find(|inputs| inputs.start == aug30)
+                .unwrap();
+            assert_eq!(future.coupon_start, jan1);
+
+            // Independent queries include repeats, descending order, boundaries and extrema.
+            for as_of in [
+                make_date(2025, 6, 29),
+                jan1,
+                make_date(2025, 8, 26),
+                jun1,
+                jul1,
+                make_date(2025, 5, 15),
+                sep1,
+                make_date(2025, 10, 15),
+                make_date(2025, 6, 29),
+                Date::MIN,
+                Date::MAX,
+            ] {
+                let full =
+                    find_active_periods_and_elapsed(&index.period_inputs, as_of, &cfg).unwrap();
+                let first = index
+                    .period_inputs
+                    .partition_point(|inputs| inputs.payment_date <= as_of);
+                let upper = index
+                    .suffix_min_coupon_start
+                    .partition_point(|&start| start <= as_of);
+                let bounded = if first < upper {
+                    find_active_periods_and_elapsed(&index.period_inputs[first..upper], as_of, &cfg)
+                        .unwrap()
+                } else {
+                    Vec::new()
+                };
+                assert_eq!(full.len(), bounded.len());
+                for ((left, left_elapsed), (right, right_elapsed)) in full.iter().zip(&bounded) {
+                    assert!(std::ptr::eq(*left, *right));
+                    assert_eq!(left_elapsed.to_bits(), right_elapsed.to_bits());
+                }
+                let mut expected =
+                    finstack_quant_core::math::summation::NeumaierAccumulator::default();
+                for (inputs, elapsed) in full {
+                    expected.add(accrue_in_period(inputs, elapsed, &cfg.method).unwrap());
+                }
+                assert_eq!(
+                    index.accrued_at(as_of).unwrap().to_bits(),
+                    expected.total().to_bits()
+                );
+            }
+        }
+
+        let empty = CashFlowSchedule::from_flows(
+            Vec::new(),
+            schedule.get_notional().clone(),
+            DayCount::Act365F,
+            schedule.get_meta().clone(),
+        )
+        .unwrap();
+        let index = AccrualIndex::build(&empty, &AccrualConfig::default()).unwrap();
+        assert!(index.period_inputs.is_empty());
+        assert!(index.suffix_min_coupon_start.is_empty());
+        assert_eq!(
+            index.accrued_at(Date::MIN).unwrap().to_bits(),
+            0.0_f64.to_bits()
+        );
+        assert_eq!(
+            index.accrued_at(Date::MAX).unwrap().to_bits(),
+            0.0_f64.to_bits()
+        );
     }
 
     #[test]
@@ -1379,8 +1580,10 @@ mod tests {
             coupon_total: f64::MAX,
             ..compounded_inputs()
         };
+        let coupon_start = inputs.coupon_start;
         let index = AccrualIndex {
             period_inputs: vec![inputs; 3],
+            suffix_min_coupon_start: vec![coupon_start; 3],
             cfg: AccrualConfig::default(),
         };
         let error = index

@@ -23,6 +23,8 @@ mod materialization_benchmark_contract;
 mod materialization_schema;
 mod numerical_stability;
 mod optimization_basic;
+#[path = "performance/context_bump.rs"]
+mod performance_context_bump;
 #[cfg(feature = "json-schema")]
 mod portfolio_schema_contract;
 mod replay;

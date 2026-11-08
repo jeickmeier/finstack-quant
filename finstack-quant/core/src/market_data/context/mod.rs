@@ -54,6 +54,10 @@ mod ops_roll;
 mod state_serde;
 mod stats;
 
+#[cfg(test)]
+#[path = "../../../tests/performance/context_bump_work.rs"]
+mod context_bump_work;
+
 pub use curve_storage::CurveStorage;
 pub(crate) use curve_storage::for_each_context_curve;
 pub use stats::ContextStats;

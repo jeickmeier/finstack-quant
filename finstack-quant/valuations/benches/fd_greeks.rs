@@ -31,6 +31,9 @@ use time::Month;
 
 mod support;
 
+#[path = "../tests/performance/context_bump_fixture.rs"]
+mod context_bump_fixture;
+
 fn as_of() -> Date {
     Date::from_calendar_date(2025, Month::January, 1).unwrap()
 }
@@ -250,5 +253,62 @@ fn bench_fd_greeks(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, bench_fd_greeks);
+fn bench_context_bump_vanna(c: &mut Criterion) {
+    use finstack_quant_valuations::metrics::MetricId;
+
+    for unrelated in [64usize, 1024] {
+        c.bench_function(
+            &format!("context_bump_consumer/equity_vanna/curves_{unrelated}"),
+            |b| {
+                let market = context_bump_fixture::market(unrelated);
+                let instrument = context_bump_fixture::option();
+                assert!(
+                    instrument
+                        .instrument_pricing_overrides
+                        .market_quotes
+                        .implied_volatility
+                        .is_none()
+                );
+                let reference = ((context_bump_fixture::reference_price(101.0, 0.21)
+                    - context_bump_fixture::reference_price(99.0, 0.21))
+                    / 2.0
+                    - (context_bump_fixture::reference_price(101.0, 0.19)
+                        - context_bump_fixture::reference_price(99.0, 0.19))
+                        / 2.0)
+                    / 2.0; // Report per one vol point, not per decimal volatility.
+                let metrics = [MetricId::Vanna];
+                support::bench(
+                    b,
+                    || {
+                        instrument
+                            .price_with_metrics(
+                                black_box(&market),
+                                context_bump_fixture::as_of(),
+                                black_box(&metrics),
+                                PricingOptions::default(),
+                            )
+                            .expect("surface-backed native Vanna")
+                    },
+                    |result| {
+                        assert_eq!(result.value.currency(), Currency::USD);
+                        assert!(result.value.amount().is_finite());
+                        let actual = *result.measures.get(&MetricId::Vanna).expect("Vanna output");
+                        assert!(actual.is_finite());
+                        assert!((actual - reference).abs() <= 1e-9 * reference.abs().max(1.0));
+                        assert_eq!(
+                            result
+                                .provenance
+                                .as_ref()
+                                .expect("native model provenance")
+                                .model,
+                            instrument.default_model()
+                        );
+                    },
+                );
+            },
+        );
+    }
+}
+
+criterion_group!(benches, bench_fd_greeks, bench_context_bump_vanna);
 criterion_main!(benches);

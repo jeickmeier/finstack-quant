@@ -43,6 +43,10 @@ use finstack_quant_models::rates::hw1f::{build_event_aligned_grid, money_estimat
 
 const EXERCISE_TIME_TOLERANCE: f64 = 1e-10;
 
+#[cfg(test)]
+#[path = "../../../tests/performance/lmm_consumer.rs"]
+mod ccm_lmm_consumer;
+
 /// Underlying swap of an LMM Bermudan swaption.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LmmBermudanSwap {

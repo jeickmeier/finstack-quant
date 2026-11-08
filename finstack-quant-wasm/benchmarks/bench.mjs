@@ -12,6 +12,15 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { delimiter, dirname, isAbsolute, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import {
+  CCM_NODE_CASES,
+  CCM_NUMERICS,
+  captureOwned,
+  ccmSettings,
+  disposeAll,
+  measureCheckedBatches,
+  parseBenchmarkMode,
+} from './ccm-measure.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_NODE_DIR = join(__dirname, '..', 'pkg-node');
@@ -41,12 +50,13 @@ function materializationSampleCount() {
   return samples;
 }
 
-const MATERIALIZATION_SAMPLES = materializationSampleCount();
-const MATERIALIZATION_ONLY = process.argv.includes('--materialization-only');
-const VALUATION_ONLY = process.argv.includes('--valuation-only');
-if (MATERIALIZATION_ONLY && VALUATION_ONLY) {
-  throw new Error('--materialization-only and --valuation-only are mutually exclusive');
-}
+const OPTIONS = parseBenchmarkMode(process.argv.slice(2));
+const MATERIALIZATION_ONLY = OPTIONS.mode === '--materialization-only';
+const VALUATION_ONLY = OPTIONS.mode === '--valuation-only';
+const CORE_MODELS_ONLY = OPTIONS.mode === '--core-models-only';
+// The scoped CCM selector does not depend on materialization configuration.
+const MATERIALIZATION_SAMPLES =
+  CORE_MODELS_ONLY || OPTIONS.help ? undefined : materializationSampleCount();
 
 function resolveCargo() {
   const executable = process.platform === 'win32' ? 'cargo.exe' : 'cargo';
@@ -96,18 +106,22 @@ Options:
                 Run only validation and materialization benchmarks
   --valuation-only
                 Run required deposit valuation and nonempty portfolio controls
+  --core-models-only
+                Run 22 checked, batched core/correlation/Black-Scholes controls
 
 Prerequisites:
   The wasm-pack Node build must exist under pkg-node/. If missing, run:
     npm run build:node
 
 Raw wasm-bindgen calls, including Rust pricing and JS result conversion.
-Timing uses performance.now(); each row is one measured call per iteration
-(unless noted). Monte Carlo uses 50,000 paths per call.
+Timing uses performance.now(). CCM controls use fixed batched calls, with
+10 measured batches and one warmup batch by default. Their model rows are
+Black-Scholes closed forms; no option Monte Carlo simulation is measured.
+FQ_CCM_RAW_OUTPUT writes their complete raw observations and artifact identity.
 `);
 }
 
-if (process.argv.includes('--help') || process.argv.includes('-h')) {
+if (OPTIONS.help) {
   printHelp();
   process.exit(0);
 }
@@ -702,29 +716,527 @@ async function main() {
     }
   }
 
+  function runCoreModelBenchmarks() {
+    const startedUtc = new Date().toISOString();
+    const settings = ccmSettings(process.env);
+    const requiredRows = [];
+    const hashFile = (file) => createHash('sha256').update(readFileSync(file)).digest('hex');
+    const hashValue = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+    const externalRecord = (name) => {
+      const supplied = process.env[name];
+      if (!supplied) return null;
+      const file = isAbsolute(supplied) ? supplied : join(REPO_ROOT, supplied);
+      return {
+        path: file,
+        sha256: hashFile(file),
+        payload: JSON.parse(readFileSync(file, 'utf8')),
+      };
+    };
+    // Artifact hashes establish identity. Only the root's successful release
+    // build receipt can establish profile/source coherence; do not infer it.
+    const provenance = {
+      process_id: process.pid,
+      executable: process.execPath,
+      node_version: process.version,
+      versions: process.versions,
+      platform: process.platform,
+      arch: process.arch,
+      argv: process.argv,
+      rayon_num_threads: process.env.RAYON_NUM_THREADS ?? null,
+      harness_sha256: hashFile(fileURLToPath(import.meta.url)),
+      helper_sha256: hashFile(join(__dirname, 'ccm-measure.mjs')),
+      raw_js_sha256: hashFile(WASM_JS),
+      wasm_sha256: hashFile(WASM_BIN),
+      declarations_sha256: hashFile(join(PKG_NODE_DIR, 'finstack_quant_wasm.d.ts')),
+      source_identity: externalRecord('FQ_CCM_SOURCE_IDENTITY'),
+      build_receipt: externalRecord('FQ_CCM_BUILD_RECEIPT'),
+      profile_evidence:
+        'Artifact identity only; release provenance is supplied by the external build receipt.',
+    };
+    const near = (actual, expected, absolute = CCM_NUMERICS.scalar_absolute) => {
+      assert.ok(Number.isFinite(actual), 'finite numeric result');
+      assert.ok(
+        Math.abs(actual - expected) <= absolute + CCM_NUMERICS.scalar_relative * Math.abs(expected),
+        `expected ${expected}, received ${actual}`
+      );
+    };
+    const vector = (actual, expected, absolute) => {
+      assert.equal(actual.length, expected.length, 'complete result shape');
+      Array.from(actual).forEach((value, index) => near(value, expected[index], absolute));
+    };
+    const moneyValue = (money) => {
+      const currency = money.currency;
+      try {
+        return { amount: money.amount, currency: currency.toString() };
+      } finally {
+        currency.free();
+      }
+    };
+    const bounds = (p1, p2) => {
+      const denominator = Math.sqrt(p1 * (1 - p1) * p2 * (1 - p2));
+      return [
+        (Math.max(0, p1 + p2 - 1) - p1 * p2) / denominator,
+        (Math.min(p1, p2) - p1 * p2) / denominator,
+      ];
+    };
+    const bernoulli = (p1, p2, correlation) => {
+      const p11 = p1 * p2 + correlation * Math.sqrt(p1 * (1 - p1) * p2 * (1 - p2));
+      return [p11, p1 - p11, p2 - p11, 1 - p1 - p2 + p11];
+    };
+    const run = (
+      id,
+      parameters,
+      operation,
+      validate,
+      snapshot = (value) => value,
+      cleanup = () => {},
+      boundary = 'Binding call and complete returned value'
+    ) => {
+      const definition = CCM_NODE_CASES.find((entry) => entry.id === id);
+      assert.ok(definition, `registered CCM row ${id}`);
+      assert.ok(!requiredRows.some((entry) => entry.id === id), `unique CCM row ${id}`);
+      const measured = measureCheckedBatches({
+        operation,
+        validate,
+        snapshot,
+        cleanup,
+        batchSize: definition.batch_size,
+        samples: settings.samples,
+        warmupSamples: settings.warmup_samples,
+      });
+      const row = {
+        ...definition,
+        parameters,
+        fixture_sha256: hashValue(parameters),
+        timing_boundary: `${boundary}; batch loop/result assignment included; preflight, warmup, result-buffer allocation, validation, snapshots and disposal excluded`,
+        ...measured,
+      };
+      requiredRows.push(row);
+      rows.push(row);
+    };
+    const disposeCaptured = (result) => disposeAll(result.handles.reverse());
+    const shared = captureOwned((own) => {
+      const usd = own(new w.Currency('USD'));
+      const gaussianSpec = own(w.CopulaSpec.gaussian());
+      const recoverySpec = own(w.RecoverySpec.constant(0.4));
+      return {
+        moneyA: own(new w.Money(100, usd)),
+        moneyB: own(new w.Money(25.5, usd)),
+        dayCount: own(w.DayCount.act360()),
+        dayCountContext: own(new w.DayCountContext()),
+        curve: own(
+          new w.DiscountCurve({
+            id: 'USD-OIS',
+            baseDate: '2024-01-02',
+            knots: [0, 1, 1, 0.98, 5, 0.88],
+          })
+        ),
+        fxPolicy: own(new w.FxConversionPolicy()),
+        pair: own(new w.CorrelatedBernoulli(0.05, 0.08, 0.2)),
+        gaussian: own(gaussianSpec.build()),
+        recovery: own(recoverySpec.build()),
+      };
+    });
+    let firstError;
+    try {
+      const {
+        moneyA,
+        moneyB,
+        dayCount,
+        dayCountContext,
+        curve,
+        fxPolicy,
+        pair,
+        gaussian,
+        recovery,
+      } = shared.output;
+      const start = w.createDate(2024, 1, 2);
+      const end = w.createDate(2025, 1, 2);
+      const dfKnots = [
+        [0, 1],
+        [1, 0.98],
+        [5, 0.88],
+      ];
+      dfKnots.forEach(([time, df]) => near(curve.df(time), df));
+      assert.equal(gaussian.numFactors, 1);
+      assert.equal(gaussian.modelName, 'One-Factor Gaussian Copula');
+
+      run(
+        'core/currency_constructor',
+        { code: 'USD' },
+        () => new w.Currency('USD'),
+        (value) => {
+          assert.equal(value.toString(), 'USD');
+          assert.equal(value.numeric, 840);
+          assert.equal(value.decimals, 2);
+        },
+        (value) => ({ code: value.toString(), numeric: value.numeric, decimals: value.decimals }),
+        (value) => value.free(),
+        'Currency construction'
+      );
+
+      const moneySnapshot = (value) => value.output.map(moneyValue);
+      run(
+        'core/money_add_sub',
+        { a: 100, b: 25.5, currency: 'USD', operations: ['a+b', 'a-b'] },
+        () =>
+          captureOwned((own) => [own(moneyA.checkedAdd(moneyB)), own(moneyA.checkedSub(moneyB))]),
+        (value) => {
+          assert.deepEqual(moneySnapshot(value), [
+            { amount: 125.5, currency: 'USD' },
+            { amount: 74.5, currency: 'USD' },
+          ]);
+        },
+        moneySnapshot,
+        disposeCaptured,
+        'Two independent Money operations, shared inputs'
+      );
+
+      run(
+        'core/daycount_year_fraction',
+        { convention: 'act_360', start: '2024-01-02', end: '2025-01-02', actual_days: 366 },
+        () => dayCount.yearFraction(start, end, dayCountContext),
+        (value) => near(value, 366 / 360)
+      );
+      run(
+        'core/discount_curve_df',
+        {
+          id: 'USD-OIS',
+          base_date: '2024-01-02',
+          knots: dfKnots,
+          time_years: 1.25,
+          interpolation: 'monotone_convex',
+          extrapolation: 'flat_forward',
+        },
+        () => curve.df(1.25),
+        (value) => {
+          assert.ok(
+            Number.isFinite(value) && value > 0.88 && value < 0.98,
+            'DF inside supplied neighboring pillars'
+          );
+        }
+      );
+
+      const checkCholesky = (factor) => {
+        assert.equal(factor.length, 9);
+        for (let i = 0; i < 3; i++) {
+          assert.ok(factor[i * 3 + i] > 0);
+          for (let j = 0; j < 3; j++) {
+            assert.ok(Number.isFinite(factor[i * 3 + j]));
+            if (j > i) near(factor[i * 3 + j], 0);
+            let reconstructed = 0;
+            for (let k = 0; k < 3; k++) reconstructed += factor[i * 3 + k] * factor[j * 3 + k];
+            near(reconstructed, cholMat[i * 3 + j], CCM_NUMERICS.matrix_absolute);
+          }
+        }
+      };
+      run(
+        'core/cholesky_decomposition',
+        { matrix: cholMat, dimension: 3 },
+        () => w.choleskyDecomposition(cholMat, 3),
+        checkCholesky,
+        (value) => Array.from(value)
+      );
+      const referenceSum = statsArr.reduce((sum, value) => sum + value, 0);
+      const referenceMean = referenceSum / statsArr.length;
+      const referenceVariance =
+        statsArr.reduce((sum, value) => sum + (value - referenceMean) ** 2, 0) /
+        (statsArr.length - 1);
+      run(
+        'core/mean_variance_512',
+        { data: statsArr, count: 512, variance_denominator: 'n-1' },
+        () => [w.mean(statsArr), w.variance(statsArr)],
+        (value) =>
+          vector(value, [referenceMean, referenceVariance], CCM_NUMERICS.statistics_absolute)
+      );
+
+      run(
+        'core/rate_bps',
+        { decimal_rate: 0.05, basis_points: 50 },
+        () =>
+          captureOwned((own) => {
+            const rate = own(new w.Rate(0.05));
+            const bps = own(new w.Bps(50));
+            return {
+              decimal: rate.asDecimal,
+              percent: rate.asPercent,
+              bp: rate.asBp,
+              bps_decimal: bps.asDecimal,
+            };
+          }),
+        (value) =>
+          assert.deepEqual(value.output, {
+            decimal: 0.05,
+            percent: 5,
+            bp: 500,
+            bps_decimal: 0.005,
+          }),
+        (value) => value.output,
+        disposeCaptured,
+        'Rate and Bps construction and numeric conversions'
+      );
+      run(
+        'core/tenor_parse',
+        { text: '3M', replaces_invalid_row: 'Tenor construction + toYears' },
+        () =>
+          captureOwned((own) => {
+            const tenor = own(w.Tenor.parse('3M'));
+            return { tenor, years: tenor.toYears() };
+          }),
+        (value) => {
+          assert.equal(value.output.tenor.toString(), '3M');
+          near(value.output.years, 0.25);
+        },
+        (value) => ({ text: value.output.tenor.toString(), years: value.output.years }),
+        disposeCaptured,
+        'Tenor parse and toYears'
+      );
+      const forwardParameters = {
+        id: 'USD-FWD',
+        tenor: 0.25,
+        baseDate: '2024-01-02',
+        knots: [0, 0.03, 5, 0.035],
+      };
+      run(
+        'core/forward_curve',
+        { ...forwardParameters, time_years: 1.25, interpolation: 'linear' },
+        () =>
+          captureOwned((own) => {
+            const forward = own(new w.ForwardCurve(forwardParameters));
+            return forward.rate(1.25);
+          }),
+        (value) => near(value.output, 0.03125),
+        (value) => value.output,
+        disposeCaptured,
+        'ForwardCurve construction and rate lookup'
+      );
+      run(
+        'core/fx_matrix',
+        { quotes: [['USD', 'EUR', 0.92]], date: '2024-01-02', policy: 'cashflow_date' },
+        () =>
+          captureOwned((own) => {
+            const fx = own(new w.FxMatrix());
+            fx.setQuotes([['USD', 'EUR', 0.92]]);
+            return own(fx.rate('USD', 'EUR', '2024-01-02', fxPolicy));
+          }),
+        (value) => {
+          near(value.output.rate, 0.92);
+          assert.equal(value.output.triangulated, false);
+        },
+        (value) => ({ rate: value.output.rate, triangulated: value.output.triangulated }),
+        disposeCaptured,
+        'FxMatrix construction, setQuotes and direct lookup; shared explicit policy'
+      );
+
+      const factor = w.choleskyDecomposition(cholMat, 3);
+      checkCholesky(factor);
+      const rhs = [1, 2, 3];
+      run(
+        'core/cholesky_solve',
+        { matrix: cholMat, rhs, dimension: 3 },
+        () => w.choleskySolve(factor, rhs),
+        (value) => {
+          assert.equal(value.length, 3);
+          for (let i = 0; i < 3; i++) {
+            let reconstructed = 0;
+            for (let j = 0; j < 3; j++) reconstructed += cholMat[i * 3 + j] * value[j];
+            near(reconstructed, rhs[i], CCM_NUMERICS.matrix_absolute);
+          }
+        },
+        (value) => Array.from(value)
+      );
+      run(
+        'core/norm_cdf',
+        { x: 0.42 },
+        () => w.normCdf(0.42),
+        (value) => near(value, CCM_NUMERICS.normal_cdf_042)
+      );
+      const sorted = [...statsArr].sort((a, b) => a - b);
+      const rank = 0.25 * (statsArr.length - 1);
+      const lo = Math.floor(rank);
+      const referenceQuantile = sorted[lo] + (rank - lo) * (sorted[lo + 1] - sorted[lo]);
+      run(
+        'core/quantile_512',
+        { data: statsArr, count: 512, probability: 0.25, rank: 'R7' },
+        () => w.quantile(statsArr, 0.25),
+        (value) => near(value, referenceQuantile)
+      );
+      run(
+        'core/kahan_sum_512',
+        { data: statsArr, count: 512 },
+        () => w.kahanSum(statsArr),
+        (value) => near(value, referenceSum, CCM_NUMERICS.statistics_absolute)
+      );
+      const checkCalendars = (value) => {
+        assert.ok(Array.isArray(value) && value.length > 0);
+        assert.ok(value.every((code) => typeof code === 'string' && code.length > 0));
+        assert.equal(new Set(value).size, value.length);
+        assert.ok(value.includes('target2'), 'fixed TARGET2 calendar exists');
+        assert.deepEqual(value, [...value].sort());
+      };
+      run(
+        'core/available_calendars',
+        { ordering: 'alphabetical', required_calendar: 'target2' },
+        () => w.availableCalendars(),
+        checkCalendars
+      );
+      run(
+        'core/adjust',
+        {
+          date: '2024-01-02',
+          convention: 'modified_following',
+          calendar: 'target2',
+          branch: 'already_business_day',
+        },
+        () => w.adjust(start, 'modified_following', 'target2'),
+        (value) => assert.equal(value, start)
+      );
+      run(
+        'correlation/bounds',
+        { p1: 0.05, p2: 0.08 },
+        () => w.correlationBounds(0.05, 0.08),
+        (value) => vector(value, bounds(0.05, 0.08)),
+        (value) => Array.from(value)
+      );
+      run(
+        'correlation/bernoulli',
+        { p1: 0.05, p2: 0.08, correlation: 0.2, order: ['p11', 'p10', 'p01', 'p00'] },
+        () => pair.jointProbabilities(),
+        (value) => {
+          vector(value, bernoulli(0.05, 0.08, 0.2));
+          assert.ok(Array.from(value).every((probability) => probability >= 0 && probability <= 1));
+          near(
+            Array.from(value).reduce((sum, probability) => sum + probability, 0),
+            1
+          );
+        },
+        (value) => Array.from(value),
+        () => {},
+        'Joint probability query; Bernoulli construction excluded'
+      );
+      run(
+        'correlation/gaussian',
+        {
+          model: 'Gaussian',
+          factors: 1,
+          threshold: -0.5,
+          factor_realization: [0.1],
+          correlation: 0.25,
+          replaces_misleading_label: 'Copula gaussian + conditionalDefaultProb',
+        },
+        () => gaussian.conditionalDefaultProb(-0.5, [0.1], 0.25),
+        (value) => near(value, CCM_NUMERICS.gaussian_conditional),
+        (value) => value,
+        () => {},
+        'Conditional probability query; specification/build excluded'
+      );
+      run(
+        'correlation/recovery',
+        {
+          model: 'constant',
+          recovery: 0.4,
+          market_factor: -0.15,
+          replaces_misleading_label: 'RecoverySpec.constant + conditionalRecovery',
+        },
+        () => recovery.conditionalRecovery(-0.15),
+        (value) => near(value, 0.4),
+        (value) => value,
+        () => {},
+        'Recovery query; specification/build excluded'
+      );
+      const bsParameters = {
+        spot: 100,
+        strike: 100,
+        rate: 0.05,
+        dividend_yield: 0,
+        volatility: 0.2,
+        expiry_years: 1,
+      };
+      run(
+        'models/bs_call',
+        { ...bsParameters, option_type: 'call' },
+        () => w.bsPrice(100, 100, 0.05, 0, 0.2, 1, true),
+        (value) => near(value, CCM_NUMERICS.black_scholes_call, CCM_NUMERICS.black_scholes_absolute)
+      );
+      run(
+        'models/bs_put',
+        { ...bsParameters, option_type: 'put' },
+        () => w.bsPrice(100, 100, 0.05, 0, 0.2, 1, false),
+        (value) => near(value, CCM_NUMERICS.black_scholes_put, CCM_NUMERICS.black_scholes_absolute)
+      );
+    } catch (error) {
+      firstError = error;
+    }
+    try {
+      disposeAll(shared.handles.reverse());
+    } catch (error) {
+      firstError ??= error;
+    }
+    if (firstError) throw firstError;
+    assert.deepEqual(
+      requiredRows.map((row) => row.id),
+      CCM_NODE_CASES.map((row) => row.id)
+    );
+    const output = process.env.FQ_CCM_RAW_OUTPUT;
+    if (output) {
+      const file = isAbsolute(output) ? output : join(REPO_ROOT, output);
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(
+        file,
+        `${JSON.stringify(
+          {
+            schema_version: 1,
+            protocol: 'CCM-B2-host-v1',
+            selector: CORE_MODELS_ONLY ? '--core-models-only' : 'all',
+            started_utc: startedUtc,
+            completed_utc: new Date().toISOString(),
+            provenance,
+            settings,
+            numerical_contract: CCM_NUMERICS,
+            normal_reference_provenance:
+              'Independent erf Taylor expansion, 40 terms, computed before the first host run; no project code used.',
+            expected_ids: CCM_NODE_CASES.map((row) => row.id),
+            direct_cashflows_coverage: 'absent',
+            cases: requiredRows,
+          },
+          null,
+          2
+        )}\n`,
+        { flag: 'wx' }
+      );
+    }
+  }
+
   function printRows() {
     const dW = Math.max(12, ...rows.map((r) => r.domain.length));
     const nW = Math.max(36, ...rows.map((r) => r.name.length));
 
     console.log('\nfinstack-quant-wasm benchmarks (raw wasm-bindgen pkg-node)\n');
     console.log(
-      `${'Domain'.padEnd(dW)}  ${'Benchmark'.padEnd(nW)}  ${'Iter'.padStart(5)}  ${'Best (ms)'.padStart(10)}  ${'Avg (ms)'.padStart(10)}  ${'p95 (ms)'.padStart(10)}  ${'Ops/sec'.padStart(12)}`
+      `${'Domain'.padEnd(dW)}  ${'Benchmark'.padEnd(nW)}  ${'Iter'.padStart(5)}  ${'Best (ms)'.padStart(10)}  ${'Avg (ms)'.padStart(10)}  ${'Median (ms)'.padStart(11)}  ${'p95 (ms)'.padStart(10)}  ${'Ops/sec'.padStart(12)}`
     );
     console.log(
-      `${''.padEnd(dW, '-')}  ${''.padEnd(nW, '-')}  ${''.padStart(5, '-')}  ${''.padStart(10, '-')}  ${''.padStart(10, '-')}  ${''.padStart(10, '-')}  ${''.padStart(12, '-')}`
+      `${''.padEnd(dW, '-')}  ${''.padEnd(nW, '-')}  ${''.padStart(5, '-')}  ${''.padStart(10, '-')}  ${''.padStart(10, '-')}  ${''.padStart(11, '-')}  ${''.padStart(10, '-')}  ${''.padStart(12, '-')}`
     );
 
     for (const r of rows) {
       const bestStr = r.iterations ? r.best.toFixed(4) : '—';
       const avgStr = r.iterations ? r.avg.toFixed(4) : '—';
+      const medianStr = r.iterations ? r.median.toFixed(4) : '—';
       const p95Str = r.iterations ? r.p95.toFixed(4) : '—';
       const opsStr = r.iterations ? r.opsPerSec.toFixed(0) : '—';
       const iterStr = r.iterations ? String(r.iterations) : '—';
       console.log(
-        `${r.domain.padEnd(dW)}  ${r.name.padEnd(nW)}  ${iterStr.padStart(5)}  ${bestStr.padStart(10)}  ${avgStr.padStart(10)}  ${p95Str.padStart(10)}  ${opsStr.padStart(12)}`
+        `${r.domain.padEnd(dW)}  ${r.name.padEnd(nW)}  ${iterStr.padStart(5)}  ${bestStr.padStart(10)}  ${avgStr.padStart(10)}  ${medianStr.padStart(11)}  ${p95Str.padStart(10)}  ${opsStr.padStart(12)}`
       );
     }
     console.log('');
+  }
+
+  if (CORE_MODELS_ONLY) {
+    runCoreModelBenchmarks();
+    printRows();
+    return;
   }
 
   if (MATERIALIZATION_ONLY) {
@@ -739,19 +1251,7 @@ async function main() {
     return;
   }
 
-  const usd = new w.Currency('USD');
-  const moneyA = new w.Money(100.0, usd);
-  const moneyB = new w.Money(25.5, usd);
-  const day_count = w.DayCount.act360();
-  // Raw pkg-node binding: the context is required (the facade defaults it).
-  const day_count_ctx = new w.DayCountContext();
-  const t0d = w.createDate(2024, 1, 2);
-  const t1d = w.createDate(2025, 1, 2);
-  const curve = new w.DiscountCurve({
-    id: 'USD-OIS',
-    baseDate: '2024-01-02',
-    knots: [0.0, 1.0, 1.0, 0.98, 5.0, 0.88],
-  });
+  runCoreModelBenchmarks();
   const pricePerf = new w.Performance({
     dates: priceDates,
     series: [prices],
@@ -766,36 +1266,6 @@ async function main() {
     ticker_names: ['bench', 'benchmark'],
     benchmark_ticker: 'benchmark',
     frequency: 'daily',
-  });
-
-  const constructCurrency = () => new w.Currency('USD');
-  for (let i = 0; i < 20; i++) {
-    w.mean(statsArr);
-    constructCurrency();
-  }
-
-  bench('core', 'Currency constructor', 5000, constructCurrency);
-
-  bench('core', 'Money add / sub', 8000, () => {
-    moneyA.checkedAdd(moneyB);
-    moneyA.checkedSub(moneyB);
-  });
-
-  bench('core', 'DayCount.yearFraction', 10000, () => {
-    day_count.yearFraction(t0d, t1d, day_count_ctx);
-  });
-
-  bench('core', 'DiscountCurve.df', 15000, () => {
-    curve.df(1.25);
-  });
-
-  bench('core', 'choleskyDecomposition', 3000, () => {
-    w.choleskyDecomposition(cholMat, 3);
-  });
-
-  bench('core', 'mean + variance (512)', 5000, () => {
-    w.mean(statsArr);
-    w.variance(statsArr);
   });
 
   bench('analytics', 'sharpe', 20000, () => {
@@ -816,19 +1286,6 @@ async function main() {
 
   bench('analytics', 'maxDrawdown', 8000, () => {
     returnPerf.maxDrawdown();
-  });
-
-  bench('correlation', 'correlationBounds', 20000, () => {
-    w.correlationBounds(0.05, 0.08);
-  });
-
-  const bernoulliPair = new w.CorrelatedBernoulli(0.05, 0.08, 0.2);
-  bench('correlation', 'CorrelatedBernoulli.jointProbabilities', 20000, () => {
-    bernoulliPair.jointProbabilities();
-  });
-
-  bench('models', 'bsPrice (call)', 20000, () => {
-    w.bsPrice(100, 100, 0.05, 0.0, 0.2, 1.0, true);
   });
 
   const csaCanonical = w.csaSpecUsdRegulatory();
@@ -891,71 +1348,6 @@ async function main() {
   });
 
   // --- Extended benchmarks (additional coverage) --------------------------------
-
-  bench('core', 'Rate / Bps conversions', 12000, () => {
-    const r = new w.Rate(0.05);
-    const _sum = r.asDecimal + r.asPercent + r.asBp;
-    void _sum;
-    void new w.Bps(50).asDecimal;
-  });
-
-  bench('core', 'Tenor construction + toYears', 8000, () => {
-    const t = new w.Tenor('3M');
-    t.toYears();
-  });
-
-  bench('core', 'ForwardCurve construction + rate()', 4000, () => {
-    const fc = new w.ForwardCurve({
-      id: 'USD-FWD',
-      tenor: 0.25,
-      baseDate: '2024-01-02',
-      knots: [0.0, 0.03, 5.0, 0.035],
-    });
-    fc.rate(1.25);
-  });
-
-  bench('core', 'FxMatrix setQuotes + rate', 4000, () => {
-    const fx = new w.FxMatrix();
-    fx.setQuotes([['USD', 'EUR', 0.92]]);
-    // Raw pkg-node twin of the facade's `rate(base, quote, date)`.
-    fx.rateWithDefaultPolicy('USD', 'EUR', '2024-01-02');
-  });
-
-  const cholFactor = w.choleskyDecomposition(cholMat, 3);
-  const cholRhs = [1.0, 2.0, 3.0];
-  bench('core', 'choleskySolve', 5000, () => {
-    w.choleskySolve(cholFactor, cholRhs);
-  });
-
-  bench('core', 'normCdf', 20000, () => {
-    w.normCdf(0.42);
-  });
-
-  bench('core', 'quantile (512)', 6000, () => {
-    w.quantile(statsArr, 0.25);
-  });
-
-  bench('core', 'kahanSum (512)', 6000, () => {
-    w.kahanSum(statsArr);
-  });
-
-  let calCode = 'target2';
-  try {
-    const cals = w.availableCalendars();
-    if (Array.isArray(cals) && cals.length > 0) {
-      calCode = String(cals[0]);
-    }
-  } catch {
-    /* use default */
-  }
-
-  bench('core', 'availableCalendars', 800, () => {
-    w.availableCalendars();
-  });
-
-  bench('core', 'adjust', 4000, () => {
-    w.adjust(t0d, 'modified_following', calCode);
-  });
 
   const benchRf = returns.map(() => 0.0001);
 
@@ -1033,20 +1425,6 @@ async function main() {
 
   bench('analytics', 'calmar', 20000, () => {
     returnPerf.calmar();
-  });
-
-  const gaussCop = w.CopulaSpec.gaussian().build();
-  bench('correlation', 'Copula gaussian + conditionalDefaultProb', 15000, () => {
-    gaussCop.conditionalDefaultProb(-0.5, [0.1], 0.25);
-  });
-
-  const recoveryBuilt = w.RecoverySpec.constant(0.4).build();
-  bench('correlation', 'RecoverySpec.constant + conditionalRecovery', 15000, () => {
-    recoveryBuilt.conditionalRecovery(-0.15);
-  });
-
-  bench('models', 'bsPrice (put)', 20000, () => {
-    w.bsPrice(100, 100, 0.05, 0.0, 0.2, 1.0, false);
   });
 
   bench('margin', 'csaSpecEurRegulatory', 2000, () => {

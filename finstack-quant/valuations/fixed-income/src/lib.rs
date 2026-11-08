@@ -73,6 +73,13 @@
 //! - [`AgencyMbsPassthrough`](crate::mbs_passthrough::AgencyMbsPassthrough) for mortgage pass-throughs
 //! - [`finstack_quant_cashflows`] for cashflow generation
 
+#[cfg(test)]
+use crate as fi;
+
+#[cfg(test)]
+#[path = "../tests/performance/cashflow_accrual_support.rs"]
+mod cashflow_accrual_support;
+
 /// Bond module - Fixed and floating rate bonds.
 pub mod bond;
 /// Bond future module - Bond futures contracts.

@@ -1,11 +1,11 @@
 //! Scaling guards for `finstack-quant-cashflows`.
 //!
 //! Complements `cashflow_hot_paths.rs` (absolute cost at one size) by measuring
-//! how cost grows with schedule length. Read ns-per-coupon across sizes: flat
-//! is linear; rising means a super-linear term is back.
+//! how cost grows with schedule length. Throughput counts coupons, synthetic
+//! amortization rows, or accrued-interest queries as documented for each group.
 //!
 //! ```sh
-//! cargo bench -p finstack-quant-cashflows --bench cashflow_scaling
+//! mise run rust-bench-crate -- finstack-quant-cashflows cashflow_scaling
 //! ```
 
 #![allow(clippy::unwrap_used)]
@@ -14,13 +14,22 @@
 #[path = "support/fixtures.rs"]
 mod fixtures;
 
+#[path = "support/checks.rs"]
+mod checks;
+
+#[path = "support/accrual_workloads.rs"]
+mod accrual_workloads;
+
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use finstack_quant_cashflows::accrual::{AccrualConfig, AccrualIndex};
+use finstack_quant_cashflows::accrual::{AccrualConfig, AccrualIndex, accrued_interest_amount};
 use finstack_quant_cashflows::builder::{
     AmortizationSpec, CashFlowSchedule, CouponType, FixedCouponSpec, ScheduleParams,
 };
+use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
+use finstack_quant_core::dates::{
+    BusinessDayConvention, Date, DateExt, DayCount, StubKind, Tenor, adjust, calendar_by_id_strict,
+};
 use finstack_quant_core::money::Money;
 use rust_decimal_macros::dec;
 use std::hint::black_box;
@@ -91,10 +100,115 @@ fn build_adjusted(
         .unwrap()
 }
 
-/// Business-day-adjustment cost by axis (`accrual_adjusted` ≈ `payment_only`).
+fn check_adjusted_schedule(
+    schedule: &CashFlowSchedule,
+    base: Date,
+    adjust_accrual_dates: bool,
+    lag: i32,
+) {
+    checks::rows(schedule, 82);
+    checks::fixed_amounts(schedule);
+    let calendar = calendar_by_id_strict("usny").unwrap();
+    let coupons: Vec<_> = schedule.coupons().collect();
+    assert_eq!(coupons.len(), 80);
+    assert_eq!(schedule.get_meta().issue_date, Some(base));
+    assert_eq!(
+        schedule.get_meta().maturity,
+        Some(base.add_months(240).unwrap())
+    );
+    for (i, coupon) in coupons.iter().enumerate() {
+        let start = base.add_months(3 * i as i32).unwrap();
+        let end = base.add_months(3 * (i + 1) as i32).unwrap();
+        let adjusted_start =
+            adjust(start, BusinessDayConvention::ModifiedFollowing, calendar).unwrap();
+        let adjusted_end = adjust(end, BusinessDayConvention::ModifiedFollowing, calendar).unwrap();
+        let accrual = coupon
+            .accrual
+            .as_ref()
+            .expect("fixed coupon accrual metadata");
+        assert_eq!(
+            accrual.start,
+            if adjust_accrual_dates {
+                adjusted_start
+            } else {
+                start
+            }
+        );
+        assert_eq!(
+            accrual.end,
+            if adjust_accrual_dates {
+                adjusted_end
+            } else {
+                end
+            }
+        );
+        assert_eq!(
+            coupon.date,
+            adjusted_end.add_business_days(lag, calendar).unwrap()
+        );
+    }
+    let redemption = schedule.get_flows().last().unwrap();
+    assert_eq!(redemption.kind, CFKind::Notional);
+    assert_eq!(redemption.date, coupons.last().unwrap().date);
+    checks::close(redemption.amount.amount(), 1_000_000.0, 1e-8);
+}
+
+fn check_amortizing_monthly(schedule: &CashFlowSchedule, base: Date, coupons: usize) {
+    checks::rows(schedule, coupons * 2 + 1);
+    let coupon_rows: Vec<_> = schedule.coupons().collect();
+    let principal_rows: Vec<_> = schedule
+        .get_flows()
+        .iter()
+        .filter(|flow| flow.kind == CFKind::Amortization)
+        .collect();
+    assert_eq!(coupon_rows.len(), coupons);
+    assert_eq!(principal_rows.len(), coupons);
+    assert_eq!(schedule.get_meta().issue_date, Some(base));
+    assert_eq!(
+        schedule.get_meta().maturity,
+        Some(base.add_months(coupons as i32).unwrap())
+    );
+    for (i, (coupon, principal)) in coupon_rows.iter().zip(&principal_rows).enumerate() {
+        let start = base.add_months(i as i32).unwrap();
+        let end = base.add_months((i + 1) as i32).unwrap();
+        let accrual = coupon
+            .accrual
+            .as_ref()
+            .expect("monthly coupon accrual metadata");
+        assert_eq!((accrual.start, accrual.end), (start, end));
+        assert_eq!(coupon.date, end);
+        assert_eq!(principal.date, end);
+        assert_eq!(principal.get_balance_date(), end);
+        let opening = 1_000_000.0 * (coupons - i) as f64 / coupons as f64;
+        let expected_coupon = opening * 0.06 * (end - start).whole_days() as f64 / 365.0;
+        checks::close(coupon.amount.amount(), expected_coupon, 1e-6);
+        checks::close(
+            principal.amount.amount(),
+            1_000_000.0 / coupons as f64,
+            1e-6,
+        );
+    }
+    checks::close(
+        principal_rows.iter().map(|flow| flow.amount.amount()).sum(),
+        1_000_000.0,
+        1e-6,
+    );
+    checks::close(
+        schedule
+            .outstanding_by_date()
+            .unwrap()
+            .last()
+            .unwrap()
+            .1
+            .amount(),
+        0.0,
+        1e-6,
+    );
+}
+
+/// Fixed-size business-day adjustment axes; this is not a length sweep.
 fn bench_adjustment_axes(c: &mut Criterion) {
     let mut group = c.benchmark_group("scaling_build_adjustment_axes_20y_q");
-    let base = base_date();
 
     for (label, adjust_accruals, lag) in [
         ("payment_only", false, 0),
@@ -102,13 +216,17 @@ fn bench_adjustment_axes(c: &mut Criterion) {
         ("accrual_adjusted_lag2", true, 2),
     ] {
         group.bench_with_input(BenchmarkId::from_parameter(label), &label, |b, _| {
+            let base = base_date();
+            let schedule = build_adjusted(base, 20, adjust_accruals, lag);
+            check_adjusted_schedule(&schedule, base, adjust_accruals, lag);
+            drop(schedule);
             b.iter(|| {
-                build_adjusted(
+                black_box(build_adjusted(
                     black_box(base),
                     20,
                     black_box(adjust_accruals),
                     black_box(lag),
-                )
+                ))
             });
         });
     }
@@ -120,13 +238,16 @@ fn bench_adjustment_axes(c: &mut Criterion) {
 /// Regression signal: ns-per-coupon should be roughly flat across sizes.
 fn bench_build_scaling(c: &mut Criterion) {
     let mut group = c.benchmark_group("scaling_build_monthly");
-    let base = base_date();
 
     for years in [5i32, 10, 20, 40, 80] {
         let n = (years * 12) as u64;
         group.throughput(Throughput::Elements(n));
         group.bench_with_input(BenchmarkId::from_parameter(n), &years, |b, &y| {
-            b.iter(|| build_monthly(black_box(base), black_box(y)));
+            let base = base_date();
+            let schedule = build_monthly(base, y);
+            checks::fixed_bullet(&schedule, base, y, n as usize, false);
+            drop(schedule);
+            b.iter(|| black_box(build_monthly(black_box(base), black_box(y))));
         });
     }
     group.finish();
@@ -135,43 +256,43 @@ fn bench_build_scaling(c: &mut Criterion) {
 /// Construction with amortization must avoid scanning all boundaries per period.
 fn bench_amortizing_build_scaling(c: &mut Criterion) {
     let mut group = c.benchmark_group("scaling_build_amortizing_monthly");
-    let base = base_date();
     for years in [5i32, 10, 20, 40, 80] {
         let coupons = (years * 12) as u64;
-        let maturity = Date::from_calendar_date(2025 + years, Month::January, 15).unwrap();
-        let mut builder = CashFlowSchedule::builder();
-        let _ = builder
-            .principal(
-                Money::new(1_000_000.0, Currency::USD).unwrap(),
-                base,
-                maturity,
-            )
-            .amortization(AmortizationSpec::LinearTo {
-                final_notional: Money::new(0.0, Currency::USD).unwrap(),
-            })
-            .fixed_cf(FixedCouponSpec {
-                coupon_type: CouponType::Cash,
-                rate: dec!(0.06),
-                schedule: ScheduleParams {
-                    frequency: Tenor::monthly(),
-                    business_day_convention: BusinessDayConvention::Unadjusted,
-                    calendar_id: "weekends_only".into(),
-                    day_count: DayCount::Act365F,
-                    stub: StubKind::None,
-                    end_of_month: false,
-                    payment_lag_days: 0,
-                    adjust_accrual_dates: false,
-                    roll_rule: finstack_quant_cashflows::builder::RollRule::None,
-                },
-            });
         group.throughput(Throughput::Elements(coupons));
-        group.bench_with_input(
-            BenchmarkId::from_parameter(coupons),
-            &builder,
-            |b, builder| {
-                b.iter(|| black_box(builder).build(None).unwrap());
-            },
-        );
+        group.bench_with_input(BenchmarkId::from_parameter(coupons), &years, |b, &y| {
+            let base = base_date();
+            let maturity = Date::from_calendar_date(2025 + y, Month::January, 15).unwrap();
+            // Configuration remains outside timing; build still compiles/projects each call.
+            let mut builder = CashFlowSchedule::builder();
+            let _ = builder
+                .principal(
+                    Money::new(1_000_000.0, Currency::USD).unwrap(),
+                    base,
+                    maturity,
+                )
+                .amortization(AmortizationSpec::LinearTo {
+                    final_notional: Money::new(0.0, Currency::USD).unwrap(),
+                })
+                .fixed_cf(FixedCouponSpec {
+                    coupon_type: CouponType::Cash,
+                    rate: dec!(0.06),
+                    schedule: ScheduleParams {
+                        frequency: Tenor::monthly(),
+                        business_day_convention: BusinessDayConvention::Unadjusted,
+                        calendar_id: "weekends_only".into(),
+                        day_count: DayCount::Act365F,
+                        stub: StubKind::None,
+                        end_of_month: false,
+                        payment_lag_days: 0,
+                        adjust_accrual_dates: false,
+                        roll_rule: finstack_quant_cashflows::builder::RollRule::None,
+                    },
+                });
+            let schedule = builder.build(None).unwrap();
+            check_amortizing_monthly(&schedule, base, coupons as usize);
+            drop(schedule);
+            b.iter(|| black_box(black_box(&builder).build(None).unwrap()));
+        });
     }
     group.finish();
 }
@@ -179,23 +300,30 @@ fn bench_amortizing_build_scaling(c: &mut Criterion) {
 /// Cost of a single accrued-interest query against schedule length.
 fn bench_accrued_single(c: &mut Criterion) {
     let mut group = c.benchmark_group("scaling_accrued_single_query");
-    let base = base_date();
-    let cfg = AccrualConfig::default();
-    let as_of = base + time::Duration::days(400);
 
     for years in [5i32, 10, 20, 40] {
         let n = (years * 12) as u64;
-        let schedule = build_monthly(base, years);
-
         group.throughput(Throughput::Elements(n));
-        group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
+        group.bench_with_input(BenchmarkId::from_parameter(n), &years, |b, &y| {
+            let base = base_date();
+            let cfg = AccrualConfig::default();
+            let as_of = base + time::Duration::days(400);
+            let schedule = build_monthly(base, y);
+            checks::fixed_bullet(&schedule, base, y, n as usize, false);
+            checks::close(
+                accrued_interest_amount(&schedule, as_of, &cfg).unwrap(),
+                checks::linear_accrued(&schedule, as_of),
+                1e-7,
+            );
             b.iter(|| {
-                finstack_quant_cashflows::accrual::accrued_interest_amount(
-                    black_box(&schedule),
-                    black_box(as_of),
-                    black_box(&cfg),
+                black_box(
+                    accrued_interest_amount(
+                        black_box(&schedule),
+                        black_box(as_of),
+                        black_box(&cfg),
+                    )
+                    .unwrap(),
                 )
-                .unwrap()
             });
         });
     }
@@ -205,63 +333,93 @@ fn bench_accrued_single(c: &mut Criterion) {
 /// Accrued interest once per exercise date: rebuild vs prebuilt [`AccrualIndex`].
 fn bench_accrued_per_exercise_date(c: &mut Criterion) {
     let mut group = c.benchmark_group("scaling_accrued_per_exercise_date");
-    let base = base_date();
-    let cfg = AccrualConfig::default();
 
-    for years in [5i32, 10, 20] {
+    for years in [5i32, 10, 20, 40] {
         let n = (years * 12) as u64;
-        let schedule = build_monthly(base, years);
-        let exercise_dates: Vec<Date> = (0..n)
-            .map(|i| base + time::Duration::days((i as i64) * 30 + 15))
-            .collect();
-
         group.throughput(Throughput::Elements(n));
-
-        group.bench_with_input(BenchmarkId::new("per_call_rebuild", n), &n, |b, _| {
-            b.iter(|| {
-                let mut acc = 0.0;
-                for &d in &exercise_dates {
-                    acc += finstack_quant_cashflows::accrual::accrued_interest_amount(
-                        black_box(&schedule),
-                        black_box(d),
-                        black_box(&cfg),
-                    )
-                    .unwrap_or(0.0);
+        for (label, rebuild) in [("per_call_rebuild", true), ("prebuilt_index", false)] {
+            group.bench_with_input(BenchmarkId::new(label, n), &years, |b, &y| {
+                let base = base_date();
+                let cfg = AccrualConfig::default();
+                let schedule = build_monthly(base, y);
+                checks::fixed_bullet(&schedule, base, y, n as usize, false);
+                let exercise_dates: Vec<Date> = (0..n)
+                    .map(|i| base + time::Duration::days((i as i64) * 30 + 15))
+                    .collect();
+                assert_eq!(exercise_dates.len(), n as usize);
+                assert!(exercise_dates.windows(2).all(|pair| pair[0] < pair[1]));
+                let index = AccrualIndex::build(&schedule, &cfg).unwrap();
+                let mut expected_total = 0.0;
+                let mut actual_total = 0.0;
+                for &date in &exercise_dates {
+                    let expected = checks::linear_accrued(&schedule, date);
+                    let actual = if rebuild {
+                        accrued_interest_amount(&schedule, date, &cfg).unwrap()
+                    } else {
+                        index.accrued_at(date).unwrap()
+                    };
+                    checks::close(actual, expected, 1e-7);
+                    expected_total += expected;
+                    actual_total += actual;
                 }
-                acc
-            });
-        });
-
-        group.bench_with_input(BenchmarkId::new("prebuilt_index", n), &n, |b, _| {
-            b.iter(|| {
-                let index = AccrualIndex::build(black_box(&schedule), black_box(&cfg)).unwrap();
-                let mut acc = 0.0;
-                for &d in &exercise_dates {
-                    acc += index.accrued_at(black_box(d)).unwrap_or(0.0);
+                checks::close(actual_total, expected_total, 1e-6);
+                drop(index);
+                if rebuild {
+                    b.iter(|| {
+                        let mut acc = 0.0;
+                        for &date in &exercise_dates {
+                            acc += black_box(
+                                accrued_interest_amount(
+                                    black_box(&schedule),
+                                    black_box(date),
+                                    black_box(&cfg),
+                                )
+                                .unwrap(),
+                            );
+                        }
+                        black_box(acc)
+                    });
+                } else {
+                    b.iter(|| {
+                        // One reusable index is deliberately prepared inside each operation.
+                        let index =
+                            AccrualIndex::build(black_box(&schedule), black_box(&cfg)).unwrap();
+                        let mut acc = 0.0;
+                        for &date in &exercise_dates {
+                            acc += black_box(index.accrued_at(black_box(date)).unwrap());
+                        }
+                        black_box(acc)
+                    });
                 }
-                acc
             });
-        });
+        }
     }
     group.finish();
 }
 
 fn bench_build_overnight_scaling(c: &mut Criterion) {
     let mut group = c.benchmark_group("scaling_build_overnight_quarterly");
-    let base = fixtures::base_date();
-    let market = fixtures::make_forward_market(base);
 
     for years in [5i32, 10, 20] {
         let n = (years * 4) as u64;
         group.throughput(Throughput::Elements(n));
         group.bench_with_input(BenchmarkId::from_parameter(n), &years, |b, &y| {
+            let base = fixtures::base_date();
+            let market = fixtures::make_forward_market(base);
+            let method =
+                finstack_quant_cashflows::builder::FloatingLegCompounding::CompoundedInArrears {
+                    lookback_days: 0,
+                };
+            let schedule = fixtures::build_overnight(base, y, method, &market);
+            checks::floating_bullet(&schedule, base, y, n as usize, true);
+            drop(schedule);
             b.iter(|| {
-                fixtures::build_overnight(
+                black_box(fixtures::build_overnight(
                     black_box(base),
                     black_box(y),
-                    finstack_quant_cashflows::builder::FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
+                    method,
                     black_box(&market),
-                )
+                ))
             });
         });
     }
@@ -270,15 +428,22 @@ fn bench_build_overnight_scaling(c: &mut Criterion) {
 
 fn bench_floating_term_scaling(c: &mut Criterion) {
     let mut group = c.benchmark_group("scaling_build_floating_term");
-    let base = fixtures::base_date();
-    let market = fixtures::make_forward_market(base);
 
     for years in [5i32, 10, 20, 40] {
         let n = (years * 4) as u64;
         group.throughput(Throughput::Elements(n));
         group.bench_with_input(BenchmarkId::from_parameter(n), &years, |b, &y| {
+            let base = fixtures::base_date();
+            let market = fixtures::make_forward_market(base);
+            let schedule = fixtures::build_floating_term(base, y, &market);
+            checks::floating_bullet(&schedule, base, y, n as usize, false);
+            drop(schedule);
             b.iter(|| {
-                fixtures::build_floating_term(black_box(base), black_box(y), black_box(&market))
+                black_box(fixtures::build_floating_term(
+                    black_box(base),
+                    black_box(y),
+                    black_box(&market),
+                ))
             });
         });
     }
@@ -287,26 +452,34 @@ fn bench_floating_term_scaling(c: &mut Criterion) {
 
 fn bench_pv_by_period_scaling(c: &mut Criterion) {
     let mut group = c.benchmark_group("scaling_pv_by_period");
-    let base = fixtures::base_date();
-    let market = fixtures::make_discount_market(base);
-    let disc_id = finstack_quant_core::types::CurveId::from("USD-OIS");
 
     for years in [5i32, 10, 20, 40] {
         let n = (years * 12) as u64;
-        let schedule = fixtures::build_monthly(base, years);
-        let periods = fixtures::make_quarterly_periods(base, (years * 4) as u32 + 4);
         group.throughput(Throughput::Elements(n));
-        group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
+        group.bench_with_input(BenchmarkId::from_parameter(n), &years, |b, &y| {
+            let base = fixtures::base_date();
+            let market = fixtures::make_discount_market(base);
+            let disc_id = finstack_quant_core::types::CurveId::from("USD-OIS");
+            let schedule = fixtures::build_monthly(base, y);
+            let periods = fixtures::make_quarterly_periods(base, (y * 4) as u32 + 4);
+            checks::fixed_bullet(&schedule, base, y, n as usize, false);
+            let output = schedule
+                .pv_by_period(&periods, &market, &disc_id, None, base)
+                .unwrap();
+            checks::period_pv(&schedule, &periods, &output, &market, base, None);
+            drop(output);
             b.iter(|| {
-                black_box(&schedule)
-                    .pv_by_period(
-                        black_box(&periods),
-                        black_box(&market),
-                        black_box(&disc_id),
-                        None,
-                        base,
-                    )
-                    .unwrap()
+                black_box(
+                    black_box(&schedule)
+                        .pv_by_period(
+                            black_box(&periods),
+                            black_box(&market),
+                            black_box(&disc_id),
+                            None,
+                            base,
+                        )
+                        .unwrap(),
+                )
             });
         });
     }
@@ -315,13 +488,14 @@ fn bench_pv_by_period_scaling(c: &mut Criterion) {
 
 fn bench_outstanding_scaling(c: &mut Criterion) {
     let mut group = c.benchmark_group("scaling_outstanding_by_date");
-    let base = fixtures::base_date();
 
     for n in [40usize, 80, 160, 320] {
-        let schedule = fixtures::make_amortizing_schedule(base, n);
         group.throughput(Throughput::Elements(n as u64));
         group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
-            b.iter(|| black_box(&schedule).outstanding_by_date().unwrap());
+            let base = fixtures::base_date();
+            let schedule = fixtures::make_amortizing_schedule(base, n);
+            checks::amortization_path(&schedule, n, base);
+            b.iter(|| black_box(black_box(&schedule).outstanding_by_date().unwrap()));
         });
     }
     group.finish();
@@ -336,6 +510,7 @@ criterion_group!(
     bench_floating_term_scaling,
     bench_accrued_single,
     bench_accrued_per_exercise_date,
+    accrual_workloads::register,
     bench_pv_by_period_scaling,
     bench_outstanding_scaling,
 );

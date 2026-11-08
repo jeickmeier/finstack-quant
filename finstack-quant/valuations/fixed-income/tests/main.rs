@@ -13,3 +13,6 @@ mod inflation_linked_bond;
 mod revolving_credit;
 #[path = "term_loan/mod.rs"]
 mod term_loan;
+
+#[path = "performance/cashflow_accrual.rs"]
+mod cashflow_accrual;

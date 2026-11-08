@@ -1,8 +1,9 @@
 //! Shared fixtures for Monte Carlo Criterion targets.
 //!
-//! Built once outside `b.iter` so process / grid / payoff construction is not
-//! folded into the measured path cost. Inputs are deterministic: seeded Philox
-//! or closed-form designs, never a clock.
+//! Construct these only inside Criterion's selected-case closure, outside
+//! `b.iter`. EuropeanPricer cases deliberately construct their consumed grid
+//! inside `b.iter`, retaining their complete public-call boundary. Inputs are
+//! deterministic: seeded Philox or closed-form designs, never a clock.
 
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
@@ -118,12 +119,15 @@ pub fn barrier_up_out(num_steps: usize) -> BarrierOptionPayoff {
 }
 
 pub fn serial_engine(num_paths: usize, num_steps: usize) -> McEngine {
-    McEngine::new(
-        McEngineConfig::uniform(num_paths, 1.0, num_steps)
-            .expect("valid engine")
-            .parallel(false)
-            .antithetic(false),
-    )
+    McEngine::new(McEngineConfig {
+        num_paths,
+        time_grid: TimeGrid::uniform(1.0, num_steps).expect("valid engine grid"),
+        target_ci_half_width: None,
+        use_parallel: false,
+        chunk_size: None,
+        path_capture: PathCaptureConfig::new(),
+        antithetic: false,
+    })
 }
 
 pub fn antithetic_engine(num_paths: usize, num_steps: usize) -> McEngine {

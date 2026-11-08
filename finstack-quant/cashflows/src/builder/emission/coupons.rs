@@ -288,7 +288,7 @@ pub(crate) struct ResolvedFloatMarket<'a> {
     /// Forward curves, one per float schedule.
     pub(crate) curves: &'a [Option<std::sync::Arc<ForwardCurve>>],
     /// Historical fixing series (`FIXING:{forward_curve_id}`), one per float schedule.
-    pub(crate) fixings: &'a [Option<ScalarTimeSeries>],
+    pub(crate) fixings: &'a [Option<&'a ScalarTimeSeries>],
 }
 
 #[derive(Clone, Copy)]
@@ -605,7 +605,7 @@ pub(crate) fn emit_float_coupons_on(
                 period,
                 &segments,
                 &observation,
-                (resolved_curve.as_deref(), resolved_fixing.as_ref()),
+                (resolved_curve.as_deref(), *resolved_fixing),
                 market.observation_date,
                 projected_fixings,
             ) {
@@ -623,7 +623,7 @@ pub(crate) fn emit_float_coupons_on(
                         &observation,
                         market.observation_date,
                         resolved_curve.as_deref(),
-                        resolved_fixing.as_ref(),
+                        *resolved_fixing,
                         spec.rate_spec.forward_curve_id.as_str(),
                     )?;
                     let index_rate = resolve_floating_rate_fallback(

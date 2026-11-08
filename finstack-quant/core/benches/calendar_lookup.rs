@@ -1,87 +1,83 @@
-//! Measurement for the `is_holiday` rule-scan disposition.
+//! Warm year-cache calendar classification of all 365 dates in 2025.
 //!
-//! `Calendar::is_holiday` evaluates every holiday rule linearly per query. The
-//! module documentation characterises this as "a short linear scan; typically a
-//! handful of rules per calendar". Rule counts actually range from 7 (`asx`) to
-//! 50 (`sse`, `cnbe`), so this bench measures the spread across that range and
-//! the business-day-adjustment shape that consumes it.
+//! Calendar resolution, date construction, known-date checks and cache warming
+//! are outside timing and run only for the selected case. These are not raw
+//! rule-scan or cold year-materialization measurements.
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
-use finstack_quant_core::dates::calendar_by_id_strict;
+use finstack_quant_core::dates::{DateExt, HolidayCalendar, calendar_by_id_strict};
 use std::hint::black_box;
 use time::{Date, Month};
 
-/// Calendars spanning the observed rule-count range, low to high.
-const CALENDARS: &[(&str, usize)] = &[
-    ("asx", 7),
-    ("nyse", 15),
-    ("jpx", 20),
-    ("bse", 44),
-    ("cnbe", 50),
-];
+const CALENDARS: &[&str] = &["asx", "nyse", "jpx", "bse", "cnbe"];
 
-fn sample_dates() -> Vec<Date> {
-    // One full year of consecutive dates: the shape a schedule build produces.
-    let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid");
-    (0..365)
-        .map(|i| {
-            start
-                .checked_add(time::Duration::days(i))
-                .expect("in range")
-        })
-        .collect()
+fn checked_fixture(id: &str) -> (&'static dyn HolidayCalendar, Vec<Date>) {
+    let cal = calendar_by_id_strict(id).expect("registered benchmark calendar");
+    let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+    let dates: Vec<_> = (0..365).map(|i| start + time::Duration::days(i)).collect();
+    assert_eq!(dates.len(), 365);
+    assert_eq!(dates.last().expect("nonempty dates").year(), 2025);
+
+    // Published fixed-date closures independent of the full-year count.
+    let holiday = match id {
+        "bse" => Date::from_calendar_date(2025, Month::August, 15),
+        "cnbe" => Date::from_calendar_date(2025, Month::October, 1),
+        _ => Date::from_calendar_date(2025, Month::January, 1),
+    }
+    .expect("valid closure date");
+    assert!(cal.is_holiday(holiday), "{id}: expected fixed-date closure");
+    assert!(!cal.is_business_day(holiday));
+    let open = Date::from_calendar_date(2025, Month::January, 15).expect("valid open date");
+    assert!(!cal.is_holiday(open), "{id}: expected ordinary weekday");
+    assert!(cal.is_business_day(open));
+
+    let mut holidays = 0;
+    let mut business_days = 0;
+    for &date in &dates {
+        let holiday = cal.is_holiday(date);
+        let business = cal.is_business_day(date);
+        assert_eq!(business, !date.is_weekend() && !holiday);
+        holidays += usize::from(holiday);
+        business_days += usize::from(business);
+    }
+    assert!(holidays > 0 && holidays < dates.len());
+    assert!((200..=262).contains(&business_days));
+    (cal, dates)
 }
 
-/// Per-query cost as a function of rule count. If the scan is genuinely cheap
-/// the curve is flat; if it is linear in rules, `cnbe` costs ~7x `asx`.
-fn bench_is_holiday_by_rule_count(c: &mut Criterion) {
-    let dates = sample_dates();
-    let mut group = c.benchmark_group("calendar_is_holiday_by_rule_count");
-    for (id, rules) in CALENDARS {
-        let Ok(cal) = calendar_by_id_strict(id) else {
-            continue;
-        };
-        group.bench_with_input(BenchmarkId::new(*id, rules), rules, |b, _| {
+fn bench_is_holiday(c: &mut Criterion) {
+    let mut group = c.benchmark_group("calendar_is_holiday_warm_2025");
+    for id in CALENDARS {
+        group.bench_with_input(BenchmarkId::new(*id, 365), id, |b, id| {
+            let (cal, dates) = checked_fixture(id);
             b.iter(|| {
-                let mut n = 0usize;
-                for d in &dates {
-                    if cal.is_holiday(black_box(*d)) {
-                        n += 1;
-                    }
+                let mut count = 0usize;
+                for date in &dates {
+                    count += usize::from(cal.is_holiday(black_box(*date)));
                 }
-                black_box(n)
+                black_box(count)
             });
         });
     }
     group.finish();
 }
 
-/// `is_business_day` is the function the adjustment path actually calls.
 fn bench_is_business_day(c: &mut Criterion) {
-    let dates = sample_dates();
-    let mut group = c.benchmark_group("calendar_is_business_day");
-    for (id, rules) in CALENDARS {
-        let Ok(cal) = calendar_by_id_strict(id) else {
-            continue;
-        };
-        group.bench_with_input(BenchmarkId::new(*id, rules), rules, |b, _| {
+    let mut group = c.benchmark_group("calendar_is_business_day_warm_2025");
+    for id in CALENDARS {
+        group.bench_with_input(BenchmarkId::new(*id, 365), id, |b, id| {
+            let (cal, dates) = checked_fixture(id);
             b.iter(|| {
-                let mut n = 0usize;
-                for d in &dates {
-                    if cal.is_business_day(black_box(*d)) {
-                        n += 1;
-                    }
+                let mut count = 0usize;
+                for date in &dates {
+                    count += usize::from(cal.is_business_day(black_box(*date)));
                 }
-                black_box(n)
+                black_box(count)
             });
         });
     }
     group.finish();
 }
 
-criterion_group!(
-    benches,
-    bench_is_holiday_by_rule_count,
-    bench_is_business_day
-);
+criterion_group!(benches, bench_is_holiday, bench_is_business_day);
 criterion_main!(benches);

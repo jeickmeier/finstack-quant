@@ -7,6 +7,10 @@ use finstack_quant_core::{Error, Result};
 use num_complex::Complex;
 use std::f64::consts::PI;
 
+#[cfg(test)]
+#[path = "../../../tests/performance/heston_probabilities.rs"]
+mod performance_tests;
+
 /// Fraction of the upper integration range whose absolute integrand mass is
 /// used to estimate the truncated Gil-Pelaez tail.
 const HESTON_TAIL_WINDOW_FRACTION: f64 = 0.1;

@@ -111,6 +111,20 @@ from finstack_quant.statements_analytics import (
 from finstack_quant.valuations import ValuationResult
 from finstack_quant.valuations.instruments import list_standard_metrics, price_instrument, validate_instrument_json
 
+from . import _ccm
+
+
+def _ccm_bench(benchmark, operation, validate, *, parameters, boundary):
+    return _ccm._run_checked(
+        benchmark,
+        operation,
+        validate,
+        parameters=parameters,
+        boundary=boundary,
+        identity=_ccm._runtime_identity(),
+    )
+
+
 # Shared data
 
 RETURNS_10K: list[float] = [0.0004 + (i % 17) * 1e-5 for i in range(10_000)]
@@ -511,7 +525,13 @@ class TestCoreBenchmarks:
     """Core primitives: currency, money, dates, curves, math."""
 
     def test_currency_creation(self, benchmark) -> None:
-        benchmark(Currency, "USD")
+        _ccm_bench(
+            benchmark,
+            lambda: Currency("USD"),
+            _ccm._currency,
+            parameters={"currency": "USD"},
+            boundary="Currency parsing and wrapper construction are timed.",
+        )
 
     def test_money_add_sub(self, benchmark) -> None:
         usd = Currency("USD")
@@ -522,25 +542,61 @@ class TestCoreBenchmarks:
             x = a + b
             return x - b
 
-        benchmark(_add_sub)
+        _ccm_bench(
+            benchmark,
+            _add_sub,
+            lambda value: _ccm._money(value, 100.0),
+            parameters={"currency": "USD", "left": 100.0, "right": 1.0, "operations": "(left + right) - right"},
+            boundary="Inputs exist before timing; both Money arithmetic operations and result wrappers are timed.",
+        )
 
     def test_daycount_year_fraction(self, benchmark) -> None:
         day_count = DayCount.ACT_360
         start = date(2024, 1, 1)
         end = date(2025, 1, 1)
-        benchmark(day_count.year_fraction, start, end)
+        _ccm_bench(
+            benchmark,
+            lambda: day_count.year_fraction(start, end),
+            _ccm._scalar(366.0 / 360.0),
+            parameters={"day_count": "act_360", "start": start.isoformat(), "end": end.isoformat(), "actual_days": 366},
+            boundary="DayCount and dates exist before timing; date conversion and year-fraction calculation are timed.",
+        )
 
     def test_discount_curve_df(self, benchmark) -> None:
         curve = DiscountCurve(
             "USD-BENCH",
             date(2024, 1, 1),
             [(0.0, 1.0), (1.0, 0.95), (5.0, 0.75), (10.0, 0.50)],
+            interp="monotone_convex",
             day_count="act_365f",
         )
-        benchmark(curve.df, 2.5)
+        knots = [(0.0, 1.0), (1.0, 0.95), (5.0, 0.75), (10.0, 0.50)]
+        assert curve.interp_style == "monotone_convex"
+        for time, discount in knots:
+            _ccm._close(curve.df(time), discount)
+        _ccm_bench(
+            benchmark,
+            lambda: curve.df(2.5),
+            _ccm._discount,
+            parameters={
+                "id": "USD-BENCH",
+                "base_date": "2024-01-01",
+                "knots": knots,
+                "interp": "monotone_convex",
+                "day_count": "act_365f",
+                "time_years": 2.5,
+            },
+            boundary="Curve construction is outside timing; one numeric-time DF query and result conversion are timed.",
+        )
 
     def test_cholesky_5x5(self, benchmark) -> None:
-        benchmark(linalg.cholesky_decomposition, SPD_5X5)
+        _ccm_bench(
+            benchmark,
+            lambda: linalg.cholesky_decomposition(SPD_5X5),
+            lambda value: _ccm._cholesky(value, SPD_5X5),
+            parameters={"dimension": 5, "matrix": SPD_5X5},
+            boundary="Input matrix exists before timing; conversion, factorization and the complete 5x5 returned factor are timed.",
+        )
 
     def test_forward_curve_rate(self, benchmark) -> None:
         curve = ForwardCurve(
@@ -548,14 +604,45 @@ class TestCoreBenchmarks:
             0.25,
             date(2024, 1, 1),
             [(0.0, 0.05), (1.0, 0.052), (5.0, 0.055), (10.0, 0.06)],
+            interp="linear",
         )
-        benchmark(curve.rate, 2.5)
+        assert curve.interp_style == "linear"
+        _ccm_bench(
+            benchmark,
+            lambda: curve.rate(2.5),
+            _ccm._scalar(0.052 + (2.5 - 1.0) / (5.0 - 1.0) * (0.055 - 0.052)),
+            parameters={
+                "id": "USD-SOFR-3M",
+                "base_date": "2024-01-01",
+                "tenor_years": 0.25,
+                "knots": [(0.0, 0.05), (1.0, 0.052), (5.0, 0.055), (10.0, 0.06)],
+                "interp": "linear",
+                "day_count": curve.day_count,
+                "reset_lag": curve.reset_lag,
+                "time_years": 2.5,
+                "rate_units": "decimal",
+            },
+            boundary="Forward-curve construction is outside timing; one numeric-time rate lookup and result conversion are timed.",
+        )
 
     def test_fx_matrix_rate(self, benchmark) -> None:
         fx = FxMatrix()
         fx.set_quotes([("USD", "EUR", 0.92)])
         ref_date = date(2024, 6, 15)
-        benchmark(fx.rate, "USD", "EUR", ref_date)
+        _ccm_bench(
+            benchmark,
+            lambda: fx.rate("USD", "EUR", ref_date),
+            _ccm._fx,
+            parameters={
+                "quotes": [["USD", "EUR", 0.92]],
+                "base": "USD",
+                "quote": "EUR",
+                "date": ref_date.isoformat(),
+                "policy": "cashflow_date",
+                "quote_units": "EUR per USD",
+            },
+            boundary="Matrix and quote setup are outside timing; the direct FX lookup and full FxRateResult conversion are timed.",
+        )
 
     def test_stats_mean_variance(self, benchmark) -> None:
         def _mean_var():
@@ -563,10 +650,22 @@ class TestCoreBenchmarks:
             v = stats.variance(DATA_10K)
             return m, v
 
-        benchmark(_mean_var)
+        _ccm_bench(
+            benchmark,
+            _mean_var,
+            _ccm._mean_variance,
+            parameters={"count": 10_000, "values": "i * 0.01 for i in 0..10000", "variance_denominator": "n - 1"},
+            boundary="The 10,000-item Python list exists before timing; two input conversions and mean/sample-variance calculations are timed.",
+        )
 
     def test_tenor_parsing(self, benchmark) -> None:
-        benchmark(Tenor.parse, "3M")
+        _ccm_bench(
+            benchmark,
+            lambda: Tenor.parse("3M"),
+            _ccm._tenor,
+            parameters={"text": "3M", "months": 3},
+            boundary="Tenor parsing and returned wrapper construction are timed; accessor validation is outside timing.",
+        )
 
     def test_rate_conversions(self, benchmark) -> None:
         def _round_trip():
@@ -577,7 +676,13 @@ class TestCoreBenchmarks:
             r3 = Rate.from_bp(b)
             return r2, r3
 
-        benchmark(_round_trip)
+        _ccm_bench(
+            benchmark,
+            _round_trip,
+            _ccm._rates,
+            parameters={"decimal_rate": 0.05, "percent": 5.0, "basis_points": 500},
+            boundary="Rate construction, percent/BP access and both round-trip constructors are timed.",
+        )
 
 
 # Analytics domain
@@ -653,18 +758,41 @@ class TestCorrelationBenchmarks:
     """Copula and factor model computations."""
 
     def test_copula_build_and_conditional(self, benchmark) -> None:
+        copula = CopulaSpec.gaussian().build()
+        assert copula.num_factors == 1
+        assert copula.model_name == "One-Factor Gaussian Copula"
+
         def _build_and_query():
             copula = CopulaSpec.gaussian().build()
             return copula.conditional_default_prob(-1.5, [0.0], 0.3)
 
-        benchmark(_build_and_query)
+        _ccm_bench(
+            benchmark,
+            _build_and_query,
+            _ccm._scalar(_ccm._normal_cdf(-1.5 / math.sqrt(0.7)), abs_tol=_ccm._COPULA_ABS_TOL),
+            parameters={
+                "copula": "gaussian",
+                "model_name": copula.model_name,
+                "factors": 1,
+                "default_threshold": -1.5,
+                "factor_realization": [0.0],
+                "correlation": 0.3,
+            },
+            boundary="Specification creation, concrete copula construction and one conditional-PD query are timed.",
+        )
 
     def test_correlated_bernoulli(self, benchmark) -> None:
         def _construct_and_query():
             cb = CorrelatedBernoulli(0.3, 0.5, 0.2)
             return cb.joint_probabilities()
 
-        benchmark(_construct_and_query)
+        _ccm_bench(
+            benchmark,
+            _construct_and_query,
+            _ccm._bernoulli,
+            parameters={"p1": 0.3, "p2": 0.5, "correlation": 0.2, "output_order": ["p11", "p10", "p01", "p00"]},
+            boundary="Bernoulli-pair construction and conversion of all four joint probabilities are timed.",
+        )
 
     def test_recovery_model(self, benchmark) -> None:
         def _build_and_query():
@@ -672,24 +800,70 @@ class TestCorrelationBenchmarks:
             model = spec.build()
             return model.conditional_recovery(-1.0)
 
-        benchmark(_build_and_query)
+        _ccm_bench(
+            benchmark,
+            _build_and_query,
+            _ccm._scalar(0.4),
+            parameters={"model": "constant", "recovery_fraction": 0.4, "factor_realization": -1.0},
+            boundary="Recovery specification, model construction and one conditional-recovery query are timed.",
+        )
 
     def test_factor_model(self, benchmark) -> None:
+        assert LatentFactorSpec.single_factor(0.15, 0.5).build().num_factors == 1
+
         def _build_and_query():
             spec = LatentFactorSpec.single_factor(0.15, 0.5)
             model = spec.build()
             return model.diagonal_factor_contribution(0, 1.0)
 
-        benchmark(_build_and_query)
+        _ccm_bench(
+            benchmark,
+            _build_and_query,
+            _ccm._scalar(0.15),
+            parameters={
+                "model": "single_factor",
+                "volatility": 0.15,
+                "mean_reversion": 0.5,
+                "factor_index": 0,
+                "z": 1.0,
+            },
+            boundary="Factor specification/model construction and one diagonal-factor query are timed.",
+        )
 
     def test_single_factor_model_construction(self, benchmark) -> None:
-        benchmark(LatentSingleFactor, 0.15, 0.5)
+        _ccm_bench(
+            benchmark,
+            lambda: LatentSingleFactor(0.15, 0.5),
+            _ccm._factor,
+            parameters={"volatility": 0.15, "mean_reversion": 0.5, "factors": 1},
+            boundary="Single-factor model construction is timed; complete accessor validation is outside timing.",
+        )
 
     def test_correlation_bounds(self, benchmark) -> None:
-        benchmark(correlation_bounds, 0.3, 0.5)
+        _ccm_bench(
+            benchmark,
+            lambda: correlation_bounds(0.3, 0.5),
+            _ccm._bounds,
+            parameters={"p1": 0.3, "p2": 0.5, "output_order": ["rho_min", "rho_max"]},
+            boundary="Fréchet correlation-bound computation and the complete pair conversion are timed.",
+        )
 
     def test_validate_correlation_matrix(self, benchmark) -> None:
-        benchmark(validate_correlation_matrix, CORR_5X5_FLAT, 5)
+        assert len(CORR_5X5_FLAT) == 25
+        for row in range(5):
+            assert CORR_5X5_FLAT[row * 5 + row] == 1.0
+            for column in range(5):
+                _ccm._finite(CORR_5X5_FLAT[row * 5 + column])
+                assert CORR_5X5_FLAT[row * 5 + column] == CORR_5X5_FLAT[column * 5 + row]
+        with pytest.raises(ValueError, match="entries, got 3"):
+            validate_correlation_matrix([1.0, 0.3, 0.3], 2)
+        _ccm_bench(
+            benchmark,
+            lambda: validate_correlation_matrix(CORR_5X5_FLAT, 5),
+            _ccm._none,
+            parameters={"dimension": 5, "matrix_flat_row_major": CORR_5X5_FLAT},
+            boundary="The flat matrix exists before timing; input conversion and complete correlation validation are timed.",
+        )
 
 
 # Monte Carlo domain
@@ -700,13 +874,65 @@ class TestMonteCarloBenchmarks:
     """Option pricing: analytical and simulation."""
 
     def test_black_scholes_call(self, benchmark) -> None:
-        benchmark(bs_price, 100.0, 100.0, 0.05, 0.0, 0.2, 1.0, True)
+        _ccm_bench(
+            benchmark,
+            lambda: bs_price(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, True),
+            _ccm._scalar(_ccm._bs_reference(), abs_tol=_ccm._BS_ABS_TOL),
+            parameters={
+                "spot": 100.0,
+                "strike": 100.0,
+                "rate": 0.05,
+                "dividend_yield": 0.0,
+                "volatility": 0.2,
+                "time_to_expiry": 1.0,
+                "option_type": "call",
+                "rates": "continuous decimal",
+                "time_units": "years",
+            },
+            boundary="Scalar argument conversion, Black-Scholes price and scalar result conversion are timed.",
+        )
 
     def test_lsmc_american_put(self, benchmark) -> None:
-        pricer = LsmcPricer(num_paths=5_000, seed=42, num_steps=50)
+        pricer = LsmcPricer(
+            num_paths=5_000,
+            seed=42,
+            use_parallel=False,
+            num_steps=50,
+            basis="laguerre",
+            basis_degree=3,
+            antithetic=True,
+        )
+        assert pricer.num_paths == 5_000
+        assert pricer.seed == 42
+        assert pricer.use_parallel is False
+        assert pricer.antithetic is True
+        assert pricer.basis == "laguerre"
+        assert pricer.basis_degree == 3
 
         def _price():
-            return pricer.price_american({
+            return pricer.price_american(
+                {
+                    "spot": 100.0,
+                    "strike": 100.0,
+                    "rate": 0.05,
+                    "dividend_yield": 0.0,
+                    "volatility": 0.3,
+                    "time_to_expiry": 1.0,
+                    "option_type": "put",
+                },
+                currency="USD",
+            )
+
+        _ccm_bench(
+            benchmark,
+            _price,
+            lambda value: _ccm._estimate(
+                value,
+                independent=5_000,
+                physical=10_000,
+                lower_reference=_ccm._bs_reference(volatility=0.3, is_call=False),
+            ),
+            parameters={
                 "spot": 100.0,
                 "strike": 100.0,
                 "rate": 0.05,
@@ -714,12 +940,27 @@ class TestMonteCarloBenchmarks:
                 "volatility": 0.3,
                 "time_to_expiry": 1.0,
                 "option_type": "put",
-            })
-
-        benchmark.pedantic(_price, rounds=5, warmup_rounds=1)
+                "currency": "USD",
+                "independent_estimators": 5_000,
+                "physical_paths": 10_000,
+                "steps": 50,
+                "exercise_steps": list(range(1, 51)),
+                "seed": 42,
+                "parallel": False,
+                "antithetic": True,
+                "basis": "laguerre",
+                "basis_degree": 3,
+                "retained_spot_values": 510_000,
+                "estimator": "in-sample Bermudan LSMC",
+            },
+            boundary="Pricer construction is outside timing; market-dict conversion, all path generation/storage, backward induction and full MoneyEstimate conversion are timed.",
+        )
 
     def test_european_pricer(self, benchmark) -> None:
-        pricer = EuropeanPricer(num_paths=10_000, seed=42)
+        pricer = EuropeanPricer(num_paths=10_000, seed=42, use_parallel=False)
+        assert pricer.num_paths == 10_000
+        assert pricer.seed == 42
+        assert pricer.use_parallel is False
 
         def _price():
             return pricer.price_gbm(
@@ -733,12 +974,49 @@ class TestMonteCarloBenchmarks:
                     "option_type": "call",
                 },
                 num_steps=252,
+                currency="USD",
             )
 
-        benchmark.pedantic(_price, rounds=5, warmup_rounds=1)
+        _ccm_bench(
+            benchmark,
+            _price,
+            lambda value: _ccm._estimate(value, independent=10_000, physical=10_000, reference=_ccm._bs_reference()),
+            parameters={
+                "spot": 100.0,
+                "strike": 100.0,
+                "rate": 0.05,
+                "dividend_yield": 0.0,
+                "volatility": 0.2,
+                "time_to_expiry": 1.0,
+                "option_type": "call",
+                "currency": "USD",
+                "independent_estimators": 10_000,
+                "physical_paths": 10_000,
+                "steps": 252,
+                "seed": 42,
+                "parallel": False,
+                "antithetic": False,
+                "capture": False,
+                "discretization": "exact_gbm",
+            },
+            boundary="Pricer construction is outside timing; market-dict conversion, full exact-GBM simulation and full MoneyEstimate conversion are timed.",
+        )
 
     def test_path_dependent_asian(self, benchmark) -> None:
-        pricer = PathDependentPricer(num_paths=5_000, seed=42)
+        pricer = PathDependentPricer(
+            num_paths=5_000,
+            seed=42,
+            use_parallel=False,
+            antithetic=False,
+            use_sobol=False,
+            use_brownian_bridge=False,
+        )
+        assert pricer.num_paths == 5_000
+        assert pricer.seed == 42
+        assert pricer.use_parallel is False
+        assert pricer.antithetic is False
+        assert pricer.use_sobol is False
+        assert pricer.use_brownian_bridge is False
 
         def _price():
             return pricer.price_asian(
@@ -752,12 +1030,56 @@ class TestMonteCarloBenchmarks:
                     "option_type": "call",
                 },
                 num_steps=50,
+                currency="USD",
             )
 
-        benchmark.pedantic(_price, rounds=5, warmup_rounds=1)
+        _ccm_bench(
+            benchmark,
+            _price,
+            lambda value: _ccm._estimate(value, independent=5_000, physical=5_000),
+            parameters={
+                "spot": 100.0,
+                "strike": 100.0,
+                "rate": 0.05,
+                "dividend_yield": 0.0,
+                "volatility": 0.2,
+                "time_to_expiry": 1.0,
+                "option_type": "call",
+                "currency": "USD",
+                "independent_estimators": 5_000,
+                "physical_paths": 5_000,
+                "steps": 50,
+                "fixing_steps": list(range(1, 51)),
+                "averaging": "arithmetic",
+                "seed": 42,
+                "parallel": False,
+                "antithetic": False,
+                "sobol": False,
+                "brownian_bridge": False,
+                "capture": False,
+                "discretization": "exact_gbm",
+            },
+            boundary="Pricer construction is outside timing; market-dict conversion, all exact-GBM paths and arithmetic fixing accumulation, and full MoneyEstimate conversion are timed.",
+        )
 
     def test_black_scholes_put(self, benchmark) -> None:
-        benchmark(bs_price, 100.0, 100.0, 0.05, 0.0, 0.2, 1.0, False)
+        _ccm_bench(
+            benchmark,
+            lambda: bs_price(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, False),
+            _ccm._scalar(_ccm._bs_reference(is_call=False), abs_tol=_ccm._BS_ABS_TOL),
+            parameters={
+                "spot": 100.0,
+                "strike": 100.0,
+                "rate": 0.05,
+                "dividend_yield": 0.0,
+                "volatility": 0.2,
+                "time_to_expiry": 1.0,
+                "option_type": "put",
+                "rates": "continuous decimal",
+                "time_units": "years",
+            },
+            boundary="Scalar argument conversion, Black-Scholes price and scalar result conversion are timed.",
+        )
 
 
 # Margin domain

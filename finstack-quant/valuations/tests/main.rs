@@ -27,6 +27,8 @@ mod integration;
 mod metric_request_contract;
 #[path = "metrics.rs"]
 mod metrics;
+#[path = "performance/context_bump.rs"]
+mod performance_context_bump;
 #[path = "phase2_strictness.rs"]
 mod phase2_strictness;
 #[path = "production_audit.rs"]

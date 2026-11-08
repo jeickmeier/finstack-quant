@@ -6,7 +6,7 @@ use finstack_quant_models::types::OptionType;
 
 use criterion::{Bencher, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, Tenor};
+use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
@@ -17,9 +17,10 @@ use finstack_quant_models::rates::clock::ModelDiscountCurve;
 use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
 use finstack_quant_models::rates::hw1f::{Hw1fMcConfig, build_event_aligned_grid};
 use finstack_quant_models::trees::hull_white_tree::{HullWhiteTree, HullWhiteTreeConfig};
+use finstack_quant_valuations::instruments::rates::swaption::lmm_pricer::BermudanSwaptionLmmPricer;
 use finstack_quant_valuations::instruments::rates::swaption::{
-    BermudanSchedule, BermudanSwaption, BermudanSwaptionPricer, BermudanSwaptionPricerConfig,
-    PreparedHullWhiteModel,
+    BermudanSchedule, BermudanSwaption, BermudanSwaptionParams, BermudanSwaptionPricer,
+    BermudanSwaptionPricerConfig, PreparedHullWhiteModel,
 };
 use finstack_quant_valuations::pricer::{ModelKey, Pricer};
 use std::hint::black_box;
@@ -404,10 +405,103 @@ fn bench_bermudan_hw_tree(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_lmm_consumer(c: &mut Criterion) {
+    let mut group = c.benchmark_group("mc_lmm_consumer");
+    group.throughput(Throughput::Elements(4_096));
+    for &(suffix, two_exercises) in &[
+        ("single_exercise_20f_2048_estimators", false),
+        ("two_exercise_20f_2048_estimators", true),
+    ] {
+        group.bench_function(suffix, |b| {
+            let as_of = Date::from_calendar_date(2025, Month::January, 2).expect("as-of");
+            let start = Date::from_calendar_date(2026, Month::January, 2).expect("swap start");
+            let end = Date::from_calendar_date(2036, Month::January, 2).expect("swap maturity");
+            let mut exercises = vec![start];
+            if two_exercises {
+                exercises.push(Date::from_calendar_date(2028, Month::January, 2).expect("second exercise"));
+            }
+            let mut swaption = BermudanSwaption::new(BermudanSwaptionParams {
+                id: format!("CCM-LMM-{suffix}").into(),
+                option_type: OptionType::Call,
+                notional: Money::new(1_000_000.0, Currency::USD).expect("notional"),
+                strike: 0.03,
+                underlying_start_date: start,
+                underlying_maturity: end,
+                exercise_schedule: BermudanSchedule::new(exercises.clone()),
+                discount_curve_id: "D".into(),
+                forward_curve_id: "D".into(),
+                vol_surface_id: "UNUSED".into(),
+            }).expect("supported physical co-terminal contract");
+            swaption.underlying_fixed_leg.frequency = Tenor::semi_annual();
+            swaption.underlying_fixed_leg.day_count = DayCount::Act360;
+            swaption.underlying_fixed_leg.business_day_convention = BusinessDayConvention::Unadjusted;
+            swaption.underlying_float_leg.frequency = Tenor::semi_annual();
+            swaption.underlying_float_leg.day_count = DayCount::Act360;
+            swaption.underlying_float_leg.business_day_convention = BusinessDayConvention::Unadjusted;
+            swaption.instrument_pricing_overrides.model_config.lmm_base_vol = Some(0.15);
+            let curve = DiscountCurve::builder("D")
+                .base_date(as_of)
+                .day_count(DayCount::Act365F)
+                .knots([0.0_f64, 1.0, 3.0, 7.0, 12.0].map(|t| (t, (-0.03 * t).exp())))
+                .interp(InterpStyle::LogLinear)
+                .build().expect("single-curve LMM market");
+            let market = MarketContext::new().insert(curve);
+            let discount = market.get_discount("D").expect("discount curve");
+            let params = BermudanSwaptionLmmPricer::build_lmm_params(
+                &swaption, discount.as_ref(), as_of, 0.15,
+            ).expect("canonical LMM parameters");
+            params.validate().expect("supported LMM model");
+            assert_eq!(params.num_forwards, 20);
+            assert_eq!(params.num_factors, 2);
+            assert_eq!(swaption.exercise_schedule.effective_dates(), exercises);
+            let config = Hw1fMcConfig {
+                num_paths: 2_048,
+                seed: 42,
+                antithetic: true,
+                min_steps_between_events: 4,
+                basis_degree: 2,
+                oos_lsmc: false,
+            };
+            assert_eq!(config.simulated_path_count(), 4_096);
+            let pricer = BermudanSwaptionLmmPricer::with_config(config);
+            assert_eq!(pricer.key().model, ModelKey::LmmMonteCarlo);
+            support::bench(
+                b,
+                || pricer.price_dyn(black_box(&swaption), black_box(&market), black_box(as_of))
+                    .expect("complete public LMM consumer price"),
+                |result| {
+                    assert_usd_value(&result.value);
+                    assert!(result.value.amount() > 0.0);
+                    assert!(result.measures.values().all(|value| value.is_finite()));
+                    assert!(result.measures.get("mc_stderr").is_some_and(|value| *value > 0.0));
+                    record::capture(&format!("mc_lmm_consumer/{suffix}"), || serde_json::json!({
+                        "fixture": {
+                            "as_of": as_of,
+                            "swaption": swaption,
+                            "params": params,
+                            "config": config,
+                            "curve": {"id":"D", "day_count":"ACT/365F", "interpolation":"log_linear", "flat_rate":0.03, "pillars":[0.0,1.0,3.0,7.0,12.0]},
+                            "estimators":2048,
+                            "physical_paths":4096,
+                        },
+                        "output": {
+                            "value":result.value,
+                            "value_bits":result.value.amount().to_bits(),
+                            "measures":result.measures,
+                        },
+                    }));
+                },
+            );
+        });
+    }
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_bermudan_hw_tree,
     bench_bermudan_lsmc,
-    bench_bermudan_lsmc_axes
+    bench_bermudan_lsmc_axes,
+    bench_lmm_consumer
 );
 criterion_main!(benches);

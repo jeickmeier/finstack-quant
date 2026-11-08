@@ -279,7 +279,7 @@ impl CompiledCashFlowPlan {
 
         let (resolved_curves, resolved_fixings): (
             Vec<Option<Arc<ForwardCurve>>>,
-            Vec<Option<ScalarTimeSeries>>,
+            Vec<Option<&ScalarTimeSeries>>,
         ) = if let Some(mkt) = curves {
             self.float_schedules
                 .iter()
@@ -287,9 +287,7 @@ impl CompiledCashFlowPlan {
                     let forward_curve_id = schedule.spec.rate_spec.forward_curve_id.as_str();
                     (
                         mkt.get_forward(forward_curve_id).ok(),
-                        mkt.get_series(fixing_series_id(forward_curve_id))
-                            .ok()
-                            .cloned(),
+                        mkt.get_series(fixing_series_id(forward_curve_id)).ok(),
                     )
                 })
                 .unzip()

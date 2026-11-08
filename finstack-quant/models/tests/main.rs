@@ -13,6 +13,8 @@ mod fx_delta_vol_tests;
 mod host_bridges;
 #[path = "liability_management.rs"]
 mod liability_management;
+#[path = "performance/lmm_reference.rs"]
+mod lmm_reference;
 #[path = "lookback_commodity_regressions.rs"]
 mod lookback_commodity_regressions;
 #[path = "market_data_diff_tests.rs"]
@@ -22,6 +24,12 @@ mod model_audit_regressions;
 #[cfg(feature = "json-schema")]
 #[path = "model_schema_contract.rs"]
 mod model_schema_contract;
+#[path = "performance/brownian_bridge.rs"]
+mod performance_brownian_bridge;
+#[path = "performance/lmm.rs"]
+mod performance_lmm;
+#[path = "performance/lmm_extreme.rs"]
+mod performance_lmm_extreme;
 #[path = "portfolio_loss.rs"]
 mod portfolio_loss;
 #[path = "production_audit.rs"]

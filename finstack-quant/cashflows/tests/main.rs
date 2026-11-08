@@ -8,11 +8,15 @@ mod audit_regressions;
 /// Cashflow builder, schedule generation, amortization, and credit model tests.
 #[path = "cashflows/builder/mod.rs"]
 mod builder;
+#[path = "performance/history.rs"]
+mod ccm_history;
 #[path = "coupon_spec_strictness.rs"]
 mod coupon_spec_strictness;
 /// Shared tolerances for rates, factors, and amounts.
 #[path = "cashflows/helpers.rs"]
 mod helpers;
+#[path = "performance/accrual.rs"]
+mod performance_accrual;
 #[path = "principal_credit_regressions.rs"]
 mod principal_credit_regressions;
 #[path = "production_fixing_roll.rs"]
