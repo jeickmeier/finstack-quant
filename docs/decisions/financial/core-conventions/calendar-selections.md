@@ -1,6 +1,6 @@
 # Calendar data selections at the audited revision
 
-Source revision `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; audit date 2026-11-05. This appendix forms part of [CORE-CONVENTIONS-005](005-jurisdiction-calendars.md). Decision status is Draft; these are observed selections, not adoption approval or refreshed external holiday certification.
+Source revision `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; audit date 2026-11-05. This appendix forms part of [CORE-CONVENTIONS-005](005-jurisdiction-calendars.md). Its [complete purpose/coverage/correction package](005-jurisdiction-calendars.md#accepted-decision-jurisdiction-calendar-purposes-and-coverage) was Accepted on 2026-11-07. The rows below remain observed selections at the audited revision, including known omissions, purpose ambiguities and IDs selected for retirement; they require reconciliation with that contract and are not blanket approval of existing data or refreshed external holiday certification.
 
 All 28 JSON definitions were inspected. Every rule below is consumed by the build generator; dates and effective bounds are parameters, not an independent recalculation. Holiday union, observation and span behavior are specified in [004](004-holiday-engine.md); Hong Kong/Japan procedural expansion is in [005](005-jurisdiction-calendars.md). Saturday/Sunday are nonbusiness for all built-ins. Negative nth-weekday positions count backwards from month-end. Early-close sessions are not separately modeled.
 

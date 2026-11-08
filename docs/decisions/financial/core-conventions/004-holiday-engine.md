@@ -1,15 +1,224 @@
 # CORE-CONVENTIONS-004: Holiday materialization, cache equivalence and date-table horizons
 
-- Decision status: **Draft — observed implementation, adoption pending**.
-- Implementation status: **Observed**, scoped to `dates/calendar/{algo,rule,types,year_cache}.rs`, generated lunar/equinox tables, `core/build.rs` / `core/build/generate_calendars.rs` registry generation, and the controlling Python CSV generation/rendering steps described below. The source ledger remains explicitly Rust-only.
-- Validation status: **Evidence inspected/located, not executed**. The linked tests establish available evidence, not a passing result or methodology approval.
+- Decision status: **Accepted — complete holiday-engine package, 2026-11-07**.
+- Implementation status: **Observed; reconciliation pending**, scoped to `dates/calendar/{algo,rule,types,year_cache}.rs`, generated lunar/equinox tables, `core/build.rs` / `core/build/generate_calendars.rs` registry generation, and the controlling Python CSV generation/rendering steps described below. The source ledger remains explicitly Rust-only.
+- Validation status: **Evidence inspected/located; independent qualification pending**. Documentation and independent rule/date/computus-example checks passed; production calendar tests and the astronomical generator were not executed for this review.
 - Audit date: **2026-11-05**. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; see [scope and inventory](README.md).
 
 ## Choice, scope and rationale
 
-Built-in calendars materialize full-day closures from compiled rules and exclude Saturday/Sunday from business days. This gives deterministic settlement/accrual dates; it does not model exchange sessions, half-days, exceptional future notices or weekend working-day reopenings. Calendar data and jurisdiction logic are detailed in [005](005-jurisdiction-calendars.md).
+Built-in calendars materialize full-day closures from compiled rules and exclude Saturday/Sunday from business days. This gives deterministic settlement/accrual dates; it does not model exchange sessions, half-days or weekend working-day reopenings, or automatically incorporate future notices. Calendar data and jurisdiction logic are detailed in [005](005-jurisdiction-calendars.md).
 
-## Algorithm
+## Accepted decision: holiday engine and data boundaries
+
+Accepted on **2026-11-07** after whole-record review. This complete package
+covers rule semantics, materialization, availability, caching and maintained-input
+controls together. Runtime reconciliation and independent qualification remain
+open. Jurisdiction-specific rule selection, coverage and eligibility remain
+with [005](005-jurisdiction-calendars.md). The observed algorithms and
+maintenance paths are recorded separately below.
+
+1. **Keep a full-day closure engine with Saturday/Sunday weekends.**
+   For the raw union of rule dates `H`, business days are dates that are
+   neither Saturday/Sunday nor members of `H`. `is_holiday` reports rule
+   membership, suppressing that label on weekends when `ignore_weekends`
+   is true; it is not the complement of `is_business_day`. This reporting
+   flag never reopens a weekend. The explicit weekends-only calendar has
+   no additional rule closures. Do not promise sessions, half-days,
+   non-Saturday/Sunday weekend regimes or working-weekend reopenings through
+   this engine. A jurisdiction/purpose needing those capabilities must not
+   be represented as fully supported by this model. Do not add a session
+   or reopening framework in this record.
+
+2. **Adopt the five observation transforms exactly.** Each fixed holiday
+   has one nominal occurrence; observation replaces that rule's occurrence
+   with the date below. Other rules may independently include the original
+   date. The weekend predicate remains separate.
+
+   | Observation | Saturday | Sunday | Other weekdays |
+   | --- | --- | --- | --- |
+   | None | Unchanged | Unchanged | Unchanged |
+   | Next Monday | Add two days | Add one day | Unchanged |
+   | Friday if Saturday / Monday if Sunday | Subtract one day | Add one day | Unchanged |
+   | Monday if Sunday | Unchanged | Add one day | Unchanged |
+   | Two-day weekend shift | Add two days | Add two days | Unchanged |
+
+   The last transform describes the existing paired Christmas/Boxing-Day
+   algorithm, not a general collision resolver or universal legal rule.
+   Overlapping closures form a set; duplicate dates count once and do not
+   trigger extra substitute holidays. Particular calendars must explicitly
+   supply any additional statutory collision/substitution rules.
+
+3. **Adopt exact-date, weekday and Gregorian Easter semantics.** Exact
+   dates occur only in their specified nominal year. Recurring month/day
+   rules may specify February 29, with no occurrence in a common year;
+   impossible patterns such as April 31 are invalid. Nth weekdays support
+   `-5..=-1` and `1..=5`; negative means counting backwards from month end.
+   A nonexistent fifth occurrence is a valid empty result, while zero or
+   any other ordinal is invalid. Weekday shifts mean inclusive on-or-before
+   or on-or-after, moving at most six calendar days. Easter uses the selected
+   integer Gregorian computus, with Easter Monday one day after Easter
+   Sunday and an explicit signed calendar-day offset thereafter. It is
+   ecclesiastical Easter, not a calculation from observed astronomical
+   phases; see [USNO](https://aa.usno.navy.mil/faq/easter) and the
+   [Royal Observatory algorithm](https://robinfo.oma.be/en/astro-info/calendar/algorithm-for-the-computation-of-the-easter-date/).
+   Support positive representable Gregorian years, explicitly proleptic
+   before historical adoption; this does not approve a jurisdiction's
+   historical calendar or an Orthodox Easter rule. An active Easter rule
+   outside that domain errors rather than silently contributing no holiday.
+
+4. **Make span and bridge domains explicit.** A span has positive length
+   `1..=255` and emits `anchor + offset + k` for `k = 0..len-1`, in calendar
+   days, from each supplied anchor occurrence. Reject zero length as an
+   invalid definition; omitting a rule or an inactive effective range is
+   how a rule is absent. Do not implicitly roll span dates or remove their
+   weekends. ChinaBridge takes one unobserved festival occurrence per active
+   nominal year, or a legitimate absent occurrence; reject pre-observed or
+   multi-occurrence festival sources. Keep its weekday expansion: Mon/Wed/Fri
+   emits the festival; Tue emits preceding Mon plus Tue; Thu emits Thu plus
+   following Fri; Sat/Sun emits following Mon. It neither reopens weekends
+   nor establishes an official Chinese holiday schedule. Country-specific
+   adoption, notices and estimates remain with 005.
+
+5. **Gate once on the nominal event year and retain spillovers.**
+   Inclusive `from_year` / `to_year` bounds apply to the underlying nominal
+   event year before observation, offsets, spans or bridges. Do not gate
+   again on the resulting closure date's year. Each annual event is
+   materialized once for its nominal year; transforms operate on those
+   occurrences without independently rematerializing prior-year anchors.
+   Gather all potentially contributing nominal years and then filter the
+   resulting sorted, unique closure set to the requested dates. This is an
+   explicit engine convention; jurisdictional exceptions belong in data.
+
+6. **Evaluate the complete supported transform reach.** Derive finite
+   candidate anchor ranges from validated composed offsets, observation
+   shifts and span lengths. Do not silently stop at the requested year plus
+   or minus one, or truncate the existing signed-offset domain. Preserve
+   nominal-year identity through nested transforms. Use checked date/year
+   arithmetic and reject invalid or cyclic rule definitions. Skip an
+   unavailable probe only when it is provably unable to affect the request;
+   a coarse search range is not proof that every probe is required. A
+   required unrepresentable date/source year is an explicit error. Avoid
+   unnecessary out-of-range construction, such as requiring next January
+   to find the last weekday of a representable December.
+
+7. **Distinguish valid absence from missing required data.** An inactive
+   effective rule, a common-year February 29 or a nonexistent fifth weekday
+   can validly emit no date. An active lunar/equinox table lacking a needed
+   year, unsupported calendar coverage, invalid definition or failed
+   calculation must error. Use fallible canonical rule/calendar membership
+   and counting operations, propagate their failures through financial
+   callers, and remove warning-plus-empty/false behavior and compatibility
+   paths. No failed calculation may publish a partial calendar or cache
+   entry. Source availability must cover potentially contributing spillover
+   years; irrelevant neighboring years must not create false coverage errors.
+
+8. **Separate coverage, projection and cache horizons.** Extend compiled
+   built-ins' existing calendar metadata with purpose, supported ranges, frozen
+   source edition/revision and evidence basis, distinguishing published,
+   supported recurring-rule and projected ranges within mixed datasets.
+   The 1970–2150 cache and current table extents are neither universal legal
+   coverage nor approval for every calendar/year. Queries outside the
+   declared domain fail. Forecast use requires explicit adoption for the
+   named calendar/purpose/range in 005 or its consuming product; preserve
+   the projected status and never relabel a forecast as published because
+   it appears in a table. Japanese equinox holidays become official through
+   the preceding year's Gazette publication; earlier astronomical dates
+   remain forecasts, as [NAOJ explains](https://www.nao.ac.jp/faq/a0301.html).
+   Use recorded publication evidence, not the current wall clock, to assign
+   that status. Custom calendars retain their explicit provider contracts
+   and optional metadata under [001](001-actual-day-counts.md#accepted-decision-actual-day-conventions);
+   missing custom metadata must not invent built-in coverage or a fallback.
+   No generic projection-policy framework is introduced here.
+
+9. **Require cache and direct evaluation to agree exactly.** Retain the
+   bitset/prefix cache as an optimization of the same validated closure set
+   and error contract. Keys distinguish the immutable calendar definition
+   and source data, not only its display ID; process-local rule identity is
+   sufficient for genuinely immutable built-in arrays. Never cache partial
+   success after a missing dependency. A year entry may be used only when
+   that complete entry is admissible. If a valid query needs fewer data than
+   the full year, evaluate it directly rather than introducing a cache-only
+   coverage error or publishing a partial year entry. Outside the cache window, direct
+   evaluation is permitted only when the needed rules/data are supported.
+   Count business days in `[start,end)`, once per date, using exact integers;
+   validate the calendar and requested domain before equal-date zero and reject reversed
+   unsigned ranges. Prefix and scan results must match exactly, with
+   `0 <= count <= elapsed days`. Cache equivalence proves computational
+   consistency, not the correctness or completeness of holiday sources.
+
+10. **Admit maintained JSON strictly and make financial controls explicit.**
+    Reject unknown fields recursively, malformed/case-colliding IDs,
+    impossible dates, invalid weekday ordinals, zero span lengths,
+    inverted year bounds and invalid rule composition before registry
+    generation. Keep explicitly supported informational fields such as
+    `name`, `notes` and `comment`; they do not alter financial behavior.
+    Require a fixed rule's observation choice, including explicit `none`,
+    the calendar's `ignore_weekends` Boolean and a span's offset, including
+    explicit zero. Omitted effective bounds mean unbounded on that side,
+    subject to declared data/domain coverage; they do not grant projection
+    eligibility. Canonical built-in IDs are nonempty lowercase ASCII within
+    the existing 32-byte standalone lookup domain and unique under ASCII
+    case folding. Retain case-insensitive standalone lookup without implicit
+    whitespace trimming; unknown IDs error without selecting weekends-only.
+
+11. **Render deterministically from frozen, independently covered inputs.**
+    Cargo registry generation and `gen-write` consume checked-in JSON/CSV
+    without network access or automatic astronomical refresh. Require exact
+    CSV headers and row widths, valid dates, no duplicate/missing years and
+    exactly one date for each year in each declared festival-table range.
+    Reject extra trailing cells rather than ignoring them. Declare table
+    ranges independently of the cache window; changing cache bounds must
+    not manufacture or require new holiday data. Keep stable ordering,
+    deterministic rendering and a read-only drift check. Other outputs of
+    the shared renderer retain the financial owners in [010](010-sifma-settlement.md)
+    and [012](012-money-decimal-precision.md).
+
+12. **Make astronomical maintenance reproducible and qualification explicit.**
+    Keep refresh separate from rendering and pin its existing library and
+    environment through maintained dependency controls. Record the exact
+    generator revision, command, library version, source/publication inputs,
+    output revision and civil-time assumptions. Qualify the library's UTC+8
+    interpretation and the selected UTC+8 Chinese/Qing-Ming and UTC+9 Japanese
+    date conversion. Ordinary lunar month/day selection is explicit;
+    statutory effective years, observance and exchange closures remain
+    calendar rules. Establish the CNY input's provenance and reproducible
+    refresh path within this maintenance process. Independently compare
+    dated vectors, including dates near local midnight and official
+    Japanese publications, before claiming agreement. Remove unsupported
+    cross-library/official-calibration assertions; maintained rows and a
+    passing renderer check alone do not certify market dates.
+
+13. **Keep ownership and host behavior coherent.** Preserve the existing
+    rule/calendar/generator components and propagate the selected validation,
+    availability and error semantics through Rust, Python, WASM, wire/schema
+    forms, metadata and consuming calculations. Jurisdiction delegates must
+    obey the same closure/error boundary; their legal contents are reviewed
+    in 005. No new calendar registry, automatic data service, compatibility
+    layer or market-wide session engine is adopted. Methodology agreement
+   does not implement or independently qualify these changes; the
+    [existing follow-ups](../FOLLOW_UPS.md#core-conventions) own that work.
+
+## Boundary examples for the accepted package
+
+These are independently calculated rule examples and proposed admission
+outcomes, not executed production tests or verified jurisdiction calendars.
+
+| Rule / request | Required result |
+| --- | --- |
+| Nominal January 1 with Friday-if-Saturday observation, effective from 2022 | The 2022 occurrence contributes `2021-12-31`, even when requesting closures in 2021. |
+| Same rule effective only through 2021 | Its 2022 occurrence cannot contribute `2021-12-31`. |
+| Exact `2020-01-01`, span length 1 and offset 800 days | Emit `2022-03-11`, including when querying 2022; do not lose its 2020 anchor. |
+| Fixed February 29 in 2025; fifth Monday of February 2025 | Valid empty occurrence sets. |
+| April 31, nth weekday zero or span length zero | Reject the definition. |
+| On-or-after Monday from `2025-03-03` | Remain `2025-03-03`; the search is inclusive. |
+| Two-day weekend-shift rules for December 25 and 26, 2021 | Emit `2021-12-27` and `2021-12-28`, respectively. |
+| ChinaBridge toy festival Tuesday `2025-03-04` | Emit Monday March 3 and Tuesday March 4; no claim about an actual festival. |
+| Two rules emit the same weekday closure | One holiday date and one business-day exclusion, without an invented extra substitute. |
+| Needed active table year absent; inactive rule with no needed lookup | Coverage error for the former; a valid empty occurrence for the latter. |
+| Supported date outside cache window | Same answer/error as direct evaluation; cache bounds alone neither reject nor authorize the calendar. |
+
+## Observed algorithm
 
 - Fixed-date rules apply one of five observations: none; weekend to next Monday; Saturday to Friday/Sunday to Monday; Sunday-only to Monday; or add two days to Saturday/Sunday (paired Christmas/Boxing-Day substitution).
 - Nth-weekday rules calculate positive positions from month start or negative positions from month end using weekday modular offsets; candidates outside the requested month are rejected. Weekday-shift rules are inclusive on-or-before/on-or-after, scanning at most seven days.
@@ -41,7 +250,7 @@ Neither Python script copies or queries QuantLib. The festival generator's heade
 
 ## Limitations and alternatives
 
-An algorithmic Easter rule, bounded tabular lunar/equinox dates and published exact-date notices coexist; none establishes universal calendar completeness. Rule caching preserves implementation behavior but cannot improve dataset accuracy. Alternatives requiring agreement include failing outside certified calendar windows, explicit projection flags, session-aware calendars or maintained weekend-reopening tables. They are not implemented here.
+An algorithmic Easter rule, bounded tabular lunar/equinox dates and published exact-date notices coexist; none establishes universal calendar completeness. The accepted package requires declared coverage, explicit forecast eligibility and fallible queries when required data are unavailable. Cache equivalence cannot improve dataset accuracy. Session-aware calendars, other weekend regimes and maintained weekend-reopening machinery are outside this engine's selected scope. The observed warning/omission paths remain implementation reconciliation work.
 
 ## Evidence
 
@@ -51,5 +260,5 @@ The renderer's `--check` was executed successfully only as a source-artifact con
 
 ## Follow-up tracking
 
-Adoption questions, implementation reconciliation and missing evidence are tracked in the
+Implementation reconciliation and missing evidence are tracked in the
 [core-conventions follow-ups](../FOLLOW_UPS.md#core-conventions).

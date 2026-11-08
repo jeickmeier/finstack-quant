@@ -4,12 +4,164 @@ Audit date: **2026-11-05**. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b
 
 This slice inspects **57 assigned Rust files**: 42 algorithm-bearing, 8 support, 3 dedicated test and 4 generated files. It includes the build-time calendar generator because its emitted registry is executed through `OUT_DIR/calendars.rs`. The complete one-file/one-entry map is [coverage.json](coverage.json). It also inspects all 28 calendar JSON definitions, monetary/holiday/SIFMA CSV generation dependencies and the embedded scorecard registry where they control the algorithms.
 
-The **20 records** below are **Draft (observed implementation, adoption pending)**. Implementation status is Observed for each stated scope. Validation status is Evidence inspected/located, not executed: financial unit/integration/golden tests were read or located, but no Rust test, lint or build pass was run. A reference-table generator consistency check passed; it confirms shipped source matches maintained inputs, not that market data or financial choices are correct. No runtime code, tests, fixtures or accepted financial policy were changed.
+Of the **20 records** below, the complete packages in
+[001](001-actual-day-counts.md#accepted-decision-actual-day-conventions),
+[002](002-coupon-context-day-counts.md#accepted-decision-coupon-context-day-counts),
+[003](003-thirty360.md#accepted-decision-synthetic-day-count-conventions),
+[004](004-holiday-engine.md#accepted-decision-holiday-engine-and-data-boundaries),
+[005](005-jurisdiction-calendars.md#accepted-decision-jurisdiction-calendar-purposes-and-coverage),
+[006](006-business-day-adjustments.md#accepted-decision-rolling-and-joint-calendar-conventions),
+[007](007-tenor-date-arithmetic.md#accepted-decision-tenor-and-date-arithmetic-conventions),
+[008](008-schedule-generation.md#accepted-decision-schedule-grids-events-and-failure-boundaries),
+[009](009-contractual-roll-dates.md#accepted-decision-unadjusted-roll-dates-and-product-boundaries),
+[010](010-sifma-settlement.md#accepted-decision-published-settlement-dates-classes-and-coverage),
+[011](011-fx-date-and-quote-conventions.md#accepted-decision-explicit-fx-quote-metadata-and-value-dates),
+[012](012-money-decimal-precision.md#accepted-decision-monetary-precision-rounding-and-currency-identity),
+[013](013-fx-resolution-and-shocks.md#accepted-decision-fx-resolution-state-and-relative-shocks),
+[014](014-fiscal-periods-ltm.md#accepted-decision-reporting-periods-fiscal-context-and-ltm-windows),
+[015](015-cashflow-semantics.md#accepted-decision-cash-settlement-principal-effects-and-accrual-metadata),
+[016](016-discounting.md#accepted-decision-dated-npv-selection-arithmetic-and-continuous-discounting),
+[017](017-irr.md#accepted-decision-irr-and-xirr-timing-eligibility-and-numerical-acceptance),
+[018](018-rate-units.md#accepted-decision-rate-and-bps-units-admission-and-precision),
+[019](019-credit-ratings.md#accepted-decision-generic-ratings-and-explicit-scorecard-scales)
+and [020](020-barrier-classification.md#accepted-decision-barrier-classification-touch-and-conditional-payment-timing)
+are **Accepted on 2026-11-07**. This completes methodology adoption for all
+20 core-conventions records. Implementation status is Observed for
+each stated scope; reconciliation and independent qualification remain open.
+Financial unit/integration/golden tests were read or located, but no Rust test,
+lint or build pass was run. Documentation and independent formula/rule/date
+checks passed. A reference-table generator consistency check passed; it
+confirms shipped source matches maintained inputs, not that market data or
+financial choices are correct. No runtime code, tests or fixtures were changed
+by this review.
 
 The inventory separates concrete algorithms, variants, defaults, failure behavior and numerical controls. Calendar definitions are expanded rule by rule in [calendar-selections.md](calendar-selections.md), including exact dates and effective-year bounds. No owned algorithm is deferred for later inspection. Product-level selection outside this slice and primary-source provenance not established by inspected evidence remain explicit open decisions.
 
 Shared policy is indexed in [financial conventions](../conventions/README.md);
 this catalogue traces the core implementation within that policy’s stated scope.
+
+The inventory below describes observed behavior, including equal-date context
+bypass and sequential ISDA accumulation requiring reconciliation with accepted
+001. The record keeps its formula, context and numerical choices distinct
+from evidence of the current implementation.
+
+Accepted record 002 replaces ICMA grid inference with explicit single-period
+inputs and schedule-owned composition, and replaces the frequency-dependent
+ACT/365L branch with the ISDA coupon-end-year rule. Its observed inventory
+entries below require reconciliation with that contract.
+
+Accepted record 003 retains five distinct 30/360 formulas behind the single
+DayCount interval API, explicit termination status and chronological signed
+semantics. Its public-surface and context changes require reconciliation.
+
+Accepted record 004 selects explicit nominal-year rule semantics, complete checked
+materialization, fallible availability/coverage boundaries and strict frozen
+input/provenance controls. Its observed implementation below remains distinct
+from the accepted contract requiring reconciliation.
+
+Accepted record 005 selects purpose-specific admission for all 28 audited IDs,
+retaining 26 with explicit coverage/forecast contracts and retiring generic
+CME/mainland-banking IDs. Its known regional, annual-notice and historical
+corrections require reconciliation; current registry contents remain observed evidence.
+
+Accepted record 006 selects explicit roll/calendar selection, six precise roll rules,
+checked searches without the 100-day cutoff, deliberate identity and signed
+offset/count semantics, strict joint parsing and complete member-domain/error
+propagation. Those choices require runtime reconciliation and qualification.
+
+Accepted record 007 selects exact checked calendar arithmetic, representation-based
+tenor limits, completed clamped anniversaries, explicit rolling/contextual
+time, clearly named approximations and separate payment/compounding/epoch
+boundaries. Its inference removals and host changes require reconciliation.
+
+Accepted record 008 selects explicit anchored grids and literal stubs, strict EOM/IMM
+regular-anchor admission, removal of automatic CDS start substitution, separate
+payment/fixing recipes, atomic failure, a final-output resource limit and validated
+result/state boundaries. Those schedule choices require reconciliation and qualification.
+
+Accepted record 009 selects exact unadjusted lattice and strict/inclusive search meanings,
+removal of generic option-expiry helpers, narrowed semiannual CDS selector claims
+and explicit product/date/host boundaries. Its product caller reconciliation and
+surface removals require reconciliation and qualification.
+
+Accepted record 010 selects exact published settlement cells with explicit class,
+required-data errors, strict necessary-month search and frozen class/edition
+coverage. Default/heuristic class selection and the ordinal estimator are
+removed by the accepted package; data/host/product reconciliation remains open.
+
+Accepted record 011 selects ordered explicit quote/pip metadata, checked reciprocals,
+removal of generic spot/market inference and a narrow explicit forward-value-date
+operation with conditional business-EOM preservation. Product date-policy, caller
+and host changes require reconciliation; no universal pair/venue rule is implied.
+
+Accepted record 012 requires shared exact input/wire admission, explicit float boundaries,
+exact sums and bounded transform/model-view targets, explicit financial rounding,
+precision-preserving unconfigured ingest, Decimal-rate FX and alphabetic currency
+identity with frozen historical/numeric metadata. Runtime/data reconciliation
+and independent accuracy qualification remain pending; dependency behavior alone
+does not certify the accepted guarantees.
+
+Accepted record 013 requires explicit point-date policies and routing, removal of generic
+PeriodAverage, scoped-before-global source specificity, literal directed rates and
+ordered caches, missing-only fallback, coherent generations and complete snapshots,
+atomic fresh restoration and frozen directional pair shocks. Runtime reconciliation
+and independent provider/risk/state qualification remain pending; observed
+implementation is not certified.
+
+Accepted record 014 requires exact Gregorian/fiscal partitions, explicit retained calendar
+context, strict signed parsing/ranges/stepping, structural total ordering, separate
+statistical factors, validated period/plan state and precisely complete reporting-
+period/calendar-day LTM with weekly LTM excluded. Runtime/caller/host/state
+reconciliation and independent qualification remain pending; source-observed
+fiscal defaults, sparse-grid completeness and ordering are not certified.
+
+Accepted record 015 requires signed settlement cash only in amount, explicit principal delta/date
+and zero-cash noncash events, exhaustive kind/predicate semantics, distinct date
+roles, complete single-slice day-count context, atomic validated state and faithful
+cash/event exports. Runtime/product/host/state reconciliation and independent
+qualification remain pending; existing inferred balance changes, partial accrual
+metadata and protection/margin classifications are not certified.
+
+Accepted record 016 requires explicit same-day cash selection, whole-input validation,
+empty/zero identities without unused curve queries, source-owned dated relative
+factors, strict factor/range failures, 012 Money arithmetic, ordered checked scalar
+Neumaier accumulation and positive continuous flat factors with stated numerical
+limits. Runtime/product/numeric reconciliation and independent qualification remain
+pending; source-observed fixed cutoff, manual clock mapping and underflow behavior
+are not certified.
+
+Accepted record 017 requires effective periodic/fixed-ACT365F dated returns, one canonical
+rounded net/date, one-switch eligibility, removal of guesses/general clocks,
+full-domain log bracketing, shared fallible Brent and a common returned-rate/
+residual gate with explicit numerical limits. Runtime/product/solver reconciliation
+and independent qualification remain pending; source-observed seed bypass,
+generalized timing and product diagnostic/yield behavior are not certified.
+
+Accepted record 018 requires finite binary64 Rate versus exact whole-i32 Bps, one checked
+numeric scaling rule, fractional canonical bp conversion without implicit integer
+quantization, final-domain text conversion, exact integer division, truthful
+round-trip decimal display and explicit host/wire/product boundaries. These choices
+are accepted; runtime/host/product reconciliation and independent qualification
+remain pending. Source-observed Decimal fallback, saturation, truncation and
+covenant rounding are not certified.
+
+Accepted record 019 separates generic rated quality from NR status, requires strict
+symbol aliases and honest default/style meanings, and removes unsupported embedded
+scorecard numbers and fallback selection. Its complete package requires an explicit
+immutable custom registry/selected snapshot, full-domain bands, representative
+self-membership, normalized strict references and atomic validated restoration.
+Actual scorecard consumers, comparison/key containers and hosts must reconcile in
+a future implementation slice. These choices are accepted; agency calibration,
+empirical credit data and separately owned scorecard economics are not certified.
+
+Accepted record 020 retains the small barrier/direction/timing classifications,
+removes generic economic defaults, selects exact inclusive eligible-observation
+touch and separates direction from current spot position. Timing remains
+conditional on entitlement and distinct from settlement; monitoring/history,
+numerical validation and product/model economics stay with their owners. Strict
+wire values and existing host surfaces are retained without new core abstractions.
+The complete package is accepted; runtime/product/host reconciliation and
+independent qualification remain pending.
 
 ## Methodology inventory
 
@@ -25,7 +177,7 @@ this catalogue traces the core implementation within that policy’s stated scop
 | Regular ICMA coupon accrual | Exact month/year grid hit, <=512 steps | Frequency required without reference period | [CORE-CONVENTIONS-002](002-coupon-context-day-counts.md) | Regular/stub tests located |
 | Irregular ICMA/quasi-coupons | Nominal months inferred from reference days; anchored overlap weighting | Explicit coupon_period | [CORE-CONVENTIONS-002](002-coupon-context-day-counts.md) | EOM and reference-grid tests |
 | ACT/365L annual/nonannual | Annual coupon leap-day test; otherwise coupon-end leap year | Frequency and enclosing coupon required | [CORE-CONVENTIONS-002](002-coupon-context-day-counts.md) | Partial-accrual denominator tests |
-| US SIA 30/360 | February EOM and conditional ending31 adjustment | Thirty360 enum | [CORE-CONVENTIONS-003](003-thirty360.md) | Formula fixtures/edge cases |
+| US fixed 30U/360 EOM | February EOM and conditional ending31 adjustment; source's PSA equivalence needs correction | Thirty360 enum | [CORE-CONVENTIONS-003](003-thirty360.md) | Formula fixtures/edge cases |
 | ISDA bond-basis 30/360 | 31 adjustments without February EOM rule | Raw helper only | [CORE-CONVENTIONS-003](003-thirty360.md) | Raw kernel inspected |
 | European/Italian 30/360 | Independent31 clamp; Italian also February >27 | Separate enum/helper variants | [CORE-CONVENTIONS-003](003-thirty360.md) | Stored expected fractions |
 | 30E/360 ISDA | EOM start; February termination-end exception | Context flag default false | [CORE-CONVENTIONS-003](003-thirty360.md) | Termination boundary tests |
