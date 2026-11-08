@@ -1,37 +1,16 @@
 # ANALYTICS-008: Fourth moments, Gaussian and Cornish–Fisher horizon quantiles
 
-**Decision status:** Accepted for the five scoped decisions below (2026-11-06) and the complete model-support, scaled-evaluation and exact-horizon package (2026-11-07), including its explicit refinement of the earlier finite-moment reconstruction gate. Implementation reconciliation and independent qualification remain open; other metric owners retain their scopes.
+**Decision status:** Accepted for the five scoped decisions below (2026-11-06) and the complete model-support, scaled-evaluation and exact-horizon package (2026-11-07), including its explicit refinement of the earlier finite-moment reconstruction gate.
 
-**Implementation status:** Observed in the source paths below, including the stated discrepancies and fallback behavior.
+**Implementation status:** Implemented in the analytics decision reconciliation dated 2026-11-08. The accepted sections below define the current contract.
 
-**Validation status:** Source inspected; test evidence inspected or located as identified below, not executed. No financial accuracy certification or runtime change is implied.
+**Validation status:** Scoped implementation checks and their limits are recorded in the [analytics inventory](README.md#implementation-evidence). A passing numerical fixture establishes its stated case; it does not certify a population estimator or every supported input.
 
-**Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See the [scope and exact source manifest](README.md).
-
-## Choice and input domain
-
-Explicit Gaussian and Cornish–Fisher methods estimate lower-tail simple-return quantiles from equal-weight observations. The observed validation accepts finite confidence strictly inside (0,1), a shared two-observation minimum and a positive finite optional horizon h. These current domains require reconciliation with the accepted decisions below. Omitted horizon means one observation interval. h is a count of observation periods, not calendar days or a named annualization convention. [Record 01](01-panels-windows-and-wire.md) owns the traced host defaults; [ADR 0033](0033-value-at-risk-method-selection.md#accepted-decision-fixed-historical-tail-selection) owns the accepted fixed historical scalar/summary selection, with Gaussian and CF retained as explicit alternatives.
-
-The [accepted modified-Sharpe decision](04-return-risk-ratios.md#accepted-decision-observation-period-modified-sharpe)
-requires a one-observation-period total-return CF denominator, at least four
-observations and estimable shape moments. Its current annual-horizon caller
-requires reconciliation. This record's accepted complete package below owns
-model-support, numerical and transport choices. The
-[accepted explicit-confidence contract](01-panels-windows-and-wire.md#accepted-decision-explicit-tail-confidence)
-requires supplied finite `0.5 < c < 1`, without an implicit 95% default; the
-observed wider range above requires reconciliation. CF coefficient use,
-ordering and horizons are governed by their accepted decisions below.
-Gaussian and CF outputs also follow the
-[accepted signed-tail contract](07-historical-tail-risk.md#accepted-decision-signed-tail-outputs),
-preserving valid negative, zero and positive estimates without a zero floor.
+**Audit provenance:** The original source audit was performed on 2026-11-05 at `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. Its historical discrepancies are superseded by the accepted contracts and this implementation. The [source ledger](coverage.json) retains source ownership and dated inspection fingerprints.
 
 ## Accepted decision: model support, numerical evaluation and exact horizons
 
 **Accepted:** 2026-11-07.
-**Implementation:** Not reconciled; selected source inspected at `827ebb75b9`.
-Model-support interpretation, shared exact horizon transport, scaled moments,
-stable CF evaluation/global-boundary decisions and error propagation remain
-open. No runtime estimator or host checks were executed.
 
 Keep the five accepted sections below: Type 2 reported moments, classical
 plug-in CF, the analytic global ordering gate, additive whole-period horizons
@@ -116,7 +95,7 @@ or Gaussian shape substitution is selected.
 For `[0, 1, 2, 3] * scale`, at `scale = 2^600` or `2^-600`, Type 2 skewness
 is `0`, excess kurtosis is `-1.2`, and sample SD is `sqrt(5/3) * scale`.
 Raw centered powers need not fit to report those requested quantities.
-These are independent arithmetic cases, not executed source tests.
+These are independent arithmetic cases, independent arithmetic definitions.
 
 ### Stable horizon polynomial and analytic global gate
 
@@ -166,20 +145,15 @@ compatibility alias is selected. Genuine errors in requested summary moments
 abort the summary under its accepted contract; historical summary selection
 remains fixed under ADR 0033.
 
-Reconcile canonical Rust, both bindings, declarations/stubs, parity, schemas,
-UI consumers, docs and fixtures together when implementation is authorized.
-Independently qualify short/constant versus tiny variation, separate moment
+Qualification cases include short/constant versus tiny variation, separate moment
 dependencies, large offsets/scales, subnormals, cancellation, flat/near-global
 boundaries, selected-horizon scaling, exact horizon limits, finite out-of-support
 estimates and host errors/wire outcomes. Model accuracy and i.i.d. horizon
-validity remain separately unqualified. This review changes records only.
+validity remain separately unqualified.
 
 ## Accepted decision: reported skewness and excess kurtosis
 
-**Accepted:** 2026-11-06. **Implementation:** Partial; selected source
-inspected at `5140b499cc`. The estimators match, but insufficient and constant
-histories currently produce zero instead of undefined. Implementation and
-independent numerical checks have not run.
+**Accepted:** 2026-11-06.
 
 Public skewness and excess kurtosis use Fisher-adjusted sample estimators,
 also called Type 2. With `m_j = mean((r - mean(r))^j)`, define:
@@ -204,20 +178,9 @@ contracts for [skewness](https://search.r-project.org/CRAN/refmans/e1071/html/sk
 and [excess kurtosis](https://search.r-project.org/CRAN/refmans/e1071/html/kurtosis.html),
 which cite Joanes and Gill.
 
-These rules cover reported statistics, including summary outputs and their
-Rust/Python/WASM representations. Preserve other tickers when one statistic
-is unavailable. CF coefficient use is deliberately selected in the separate
-accepted plug-in decision below, rather than inferred from sharing a helper.
-Distribution calibration is not selected. CF horizon scaling has its own
-accepted rule below.
-Reconciliation is owned by the [reported-moment follow-up](../FOLLOW_UPS.md#analytics-reported-moments).
-
 ## Accepted decision: classical plug-in CF
 
-**Accepted:** 2026-11-06. **Implementation:** Partial; selected source
-inspected at `5140b499cc`. The base-period coefficient convention matches, but
-availability, global ordering and error behavior require reconciliation.
-Implementation and independent accuracy checks have not run.
+**Accepted:** 2026-11-06.
 
 Define this API as the classical CF quantile approximation. For observation-
 period returns, use arithmetic sample mean `mu`, sample standard deviation `s`
@@ -230,6 +193,11 @@ g(z; S, K) = z + (z^2 - 1)*S/6 + (z^3 - 3*z)*K/24
              - (2*z^3 - 5*z)*S^2/36
 Q_CF(p) = mu + s * g(z; S, K)
 ```
+
+The [Fisher–Cornish primary expansion paper](../../../REFERENCES.md#fisherCornish1960)
+provides the quantile-expansion context. The explicit cubic above and its
+derivative below define this implementation, without a claim of calibrated
+moment matching or a Maillard-specific algorithm.
 
 All selected estimates must be available: require at least four valid
 observations and positive variance, otherwise return an undefined estimate.
@@ -245,22 +213,9 @@ Passing global ordering does not remove that approximation or establish tail
 accuracy. A calibrated, moment-matching CF distribution is a different
 methodology, not the meaning of this API.
 
-The plug-in approach appears in the
-[PerformanceAnalytics implementation](https://raw.githubusercontent.com/braverock/PerformanceAnalytics/master/R/PortfolioRisk.R),
-whose moment-estimator conventions differ; no exact numerical parity is
-claimed. [Amédée-Manesme, Barthélémy and Maillard](https://www.umi-source.uvsq.fr/medias/fichier/working-paper-cemotev-05-2017_1513269652739-pdf?ID_FICHE=257205&INLINE=FALSE)
-discuss the difference between expansion inputs and resulting moments.
-Confidence follows the accepted input contract in record 01; demonstrated
-accuracy ranges remain unqualified. Horizon handling follows its accepted
-rule below. Reconciliation is owned by the
-[CF plug-in follow-up](../FOLLOW_UPS.md#analytics-cf-plugin).
-
 ## Accepted decision: global CF quantile ordering
 
-**Accepted:** 2026-11-06. **Implementation:** Not reconciled; selected source
-inspected at `5140b499cc`. The current requested-confidence derivative check
-does not establish global ordering and its Gaussian substitution violates the
-existing error contract. Implementation and numerical checks have not run.
+**Accepted:** 2026-11-06.
 
 Require the CF quantile curve to be nondecreasing over the entire probability
 range `(0, 1)`, with a finite computed estimate at the requested confidence.
@@ -293,24 +248,9 @@ ordering. Conversely, `S = 0, K = 10` passes the 5% lower-tail local check but
 has a negative derivative near the median and must be rejected. Numerical
 uncertainty at the boundary must not be hidden by clamping.
 
-These conditions are derived from the implemented polynomial. Global
-monotonicity and the distinction between expansion parameters and distribution
-moments are discussed in [Amédée-Manesme, Barthélémy and Maillard, Appendix B](https://www.umi-source.uvsq.fr/medias/fichier/working-paper-cemotev-05-2017_1513269652739-pdf?ID_FICHE=257205&INLINE=FALSE).
-Passing establishes quantile ordering, not tail accuracy, moment matching or
-financial return support. A valid return history can have an unsupported CF
-approximation. Plug-in availability and absence of calibration are accepted
-above. Confidence follows the accepted input contract in record 01;
-numerical tolerances remain unqualified.
-Horizon handling is accepted below. Reconciliation is owned by
-the [CF validity follow-up](../FOLLOW_UPS.md#analytics-cf-validity).
-
 ## Accepted decision: observation-period horizons
 
-**Accepted:** 2026-11-06. **Implementation:** Partial; selected source
-inspected at `5140b499cc`. Scaling and the one-period default are present, but
-fractional horizons are accepted and invalid horizons currently yield NaN.
-Global CF validation also requires reconciliation. Implementation and
-independent accuracy checks have not run.
+**Accepted:** 2026-11-06.
 
 Gaussian and CF VaR horizons count whole observation periods: `h = 1, 2, ...`.
 Omission means one observation period. Dates and annualization frequency do not
@@ -344,20 +284,9 @@ requested horizon. Do not change `h` automatically to make a curve admissible.
 The selected horizon can legitimately change admissibility; it must be the
 caller's choice. Existing CF availability and error rules still apply.
 
-Modified Sharpe remains fixed at `h = 1`. Historical VaR/ES use supplied
-observations in their native period, without automatic square-root scaling.
-Confidence follows the separately accepted input contract above; independent
-horizon-accuracy qualification remains open. Gaussian sample and zero-variance
-availability follow their separately accepted rule below. Reconciliation is owned by the
-[tail-horizon follow-up](../FOLLOW_UPS.md#analytics-tail-horizons).
-
 ## Accepted decision: Gaussian VaR availability and failures
 
-**Accepted:** 2026-11-06. **Implementation:** Partial; selected source
-inspected at `5140b499cc`. The two-return guard, sample variance and constant-
-history formula are present. Request validation order and explicit numerical-
-failure propagation require reconciliation. No runtime estimator checks were
-executed.
+**Accepted:** 2026-11-06.
 
 Validate the explicit confidence and observation-period horizon before
 applying per-ticker sample-availability rules. An invalid request remains an
@@ -393,65 +322,6 @@ calculation failures must not become zero risk, undefined history or another
 estimator. Two observations establish computability, not reliable tail
 estimation, normality or future risklessness.
 
-CF remains separate: at least four observations and positive variance are
-required to estimate its shape inputs. A constant or short CF history stays
-undefined and does not invoke Gaussian substitution. Historical availability
-is accepted in record 07, and scalar/summary method selection in ADR 0033.
-Reconciliation and independent qualification are owned by the
-[Gaussian-availability follow-up](../FOLLOW_UPS.md#analytics-gaussian-var-availability).
+## Implementation evidence
 
-## Algorithm and controls
-
-`moments4` updates mean and centered second/third/fourth sums online, uses
-sample variance M2/(N−1), and calculates the accepted public Fisher-adjusted
-estimators. It currently substitutes zero for insufficient shape samples or
-zero variance, and returns all zeros for empty input. The public substitutions
-and CF's insufficient-history behavior require reconciliation with the accepted
-availability rules; they must not invent Gaussian shape inputs.
-
-Gaussian VaR uses sample mean μ, sample standard deviation σ and z=Φ⁻¹(1−c): `μ*h + z*σ*sqrt(h)`. Without h it uses μ+zσ. The normal quantile comes from core. Outputs are signed decimal returns, negative for losses, with no zero floor. No EWMA covariance, Student-t fit or clipping to [−1,∞) is included.
-
-The current CF kernel scales the plug-in coefficients to `S_h=S/sqrt(h)` and
-`K_h=K/h` under an i.i.d.-aggregation assumption, then uses the accepted cubic:
-
-```text
-Q_cf = mu*h + s*sqrt(h)*g(z; S_h, K_h)
-```
-
-Before returning it, evaluate the local derivative
-`D=1+2z*S_h/6+(3z²−3)K_h/24−(6z²−5)S_h²/36`.
-If D<=0, code emits a `tracing::warn!` and returns the **Gaussian** quantile.
-The public result has no selected-method/fallback flag. This conflicts with
-the accepted global-ordering/error rule above and the
-[prior explicit-error direction](0033-value-at-risk-method-selection.md#observed-choice-and-rationale).
-Nonfinite moments/derivatives can still propagate NaN without this branch.
-There is no automatic historical substitution in the observed path.
-
-## Selection, conventions and failure behavior
-
-The methods are explicitly selected on `Performance`; summary remains historical. Bad confidence produces `Error::Validation`. Invalid horizons still produce NaN inside `Ok` results, conflicting with the accepted request-error rule. The current shared two-observation CF minimum conflicts with accepted plug-in availability. `modified_sharpe` still requests h=A and inherits the CF fallback. High-order estimates can be unstable in small/extreme samples; no data trimming or parameter regularization is performed.
-
-The observed `modified_sharpe` horizon above is not an open ratio choice;
-reconcile it under the accepted modified-Sharpe decision. Standalone Gaussian
-and CF horizons follow the accepted whole-period rule above.
-The Gaussian path currently wraps computed numbers in `Ok` without a separate
-numerical-failure gate. Reconcile it with the accepted availability/failure
-contract; unavailable history and failed computation must remain distinct.
-
-## Alternatives and evidence
-
-Historical quantiles are supported separately; skewed parametric fits,
-rearranged CF, calibrated CF distributions and robust moments are different
-unimplemented methods. Classical plug-in coefficients, global ordering and
-rejection without automatic repair and whole-period horizons are accepted
-above. Confidence follows the accepted input contract in record 01;
-accuracy qualification remains open.
-
-- [Owning kernels](../../../../finstack-quant/analytics/src/risk_metrics/tail_risk.rs), [public dispatch](../../../../finstack-quant/analytics/src/performance/scalar.rs), and [modified Sharpe caller](../../../../finstack-quant/analytics/src/risk_metrics/return_based.rs).
-- Inspected inline formula/horizon tests reuse core quantiles and production moment functions, so they test wiring/algebra rather than a fully independent oracle. Located `cornish_fisher_var_falls_back_to_parametric_when_non_monotonic` explicitly protects the current conflicting fallback. Small-sample and invalid-horizon tests, including public single-observation sentinels in [correctness regressions](../../../../finstack-quant/analytics/tests/correctness_regressions.rs), were located, not executed.
-- Canonical context: [sample moments](../../../REFERENCES.md#joanesGill1998), [Cornish–Fisher](../../../REFERENCES.md#cornishFisher1937), [RiskMetrics](../../../REFERENCES.md#jpmorgan1996RiskMetrics). The named Maillard guard lacks a specific canonical reference entry; RiskMetrics naming does not turn this equal-weight estimator into EWMA. [ADR 0033](0033-value-at-risk-method-selection.md) records the broader selection boundary.
-
-## Follow-up tracking
-
-Implementation reconciliation and missing evidence are tracked in the
-[analytics follow-ups](../FOLLOW_UPS.md#analytics).
+[risk_metrics/tail_risk.rs](../../../../finstack-quant/analytics/src/risk_metrics/tail_risk.rs), [performance/scalar.rs](../../../../finstack-quant/analytics/src/performance/scalar.rs). The [crate integration tests](../../../../finstack-quant/analytics/tests/main.rs), inline numerical regressions and [schema contracts](../../../../finstack-quant/analytics/tests/schema_contract.rs) exercise this scope. See the [inventory validation record](README.md#implementation-evidence) for executed checks and evidence limits.

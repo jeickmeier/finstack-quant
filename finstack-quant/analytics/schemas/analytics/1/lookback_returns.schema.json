@@ -4,6 +4,101 @@
       "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
       "format": "date",
       "type": "string"
+    },
+    "FiscalConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for fiscal year periods.\n\nAlways holds a start month in `1..=12` and a start day in `1..=31`;\ndeserialization applies the same validation as [`FiscalConfig::new`].",
+      "properties": {
+        "start_day": {
+          "format": "uint8",
+          "maximum": 31,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "start_month": {
+          "format": "uint8",
+          "maximum": 12,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "start_month",
+        "start_day"
+      ],
+      "type": "object"
+    },
+    "LookbackSample": {
+      "additionalProperties": false,
+      "description": "Compact actual holding coverage for one selected lookback sample.",
+      "properties": {
+        "holding_end": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DateWire"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Actual final selected return endpoint; absent when empty."
+        },
+        "holding_start": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DateWire"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Actual valuation immediately before the first selected return; absent when empty."
+        },
+        "n_obs": {
+          "description": "Number of original return intervals selected, rather than calendar buckets.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "n_obs"
+      ],
+      "type": "object"
+    },
+    "NonFiniteF64Wire": {
+      "anyOf": [
+        {
+          "description": "A finite value, written as a JSON number.",
+          "format": "double",
+          "type": "number"
+        },
+        {
+          "$ref": "#/$defs/NonFiniteSentinel",
+          "description": "A non-finite value, written as its sentinel string."
+        }
+      ],
+      "description": "An `f64` in the [`non_finite_f64`] wire form: a JSON number when finite,\notherwise one of the strings `\"inf\"`, `\"-inf\"` or `\"nan\"`.\n\nContract types store plain `f64` fields with\n`#[serde(with = \"finstack_quant_core::wire::non_finite_f64\")]` and name this\ntype in `#[schemars(with = ...)]`, so the generated schema describes the\nsentinel strings the serializer actually writes."
+    },
+    "NonFiniteSentinel": {
+      "description": "Sentinel string the [`non_finite_f64`] adapter writes for a non-finite `f64`.",
+      "oneOf": [
+        {
+          "const": "inf",
+          "description": "`+∞`, written as `\"inf\"`.",
+          "type": "string"
+        },
+        {
+          "const": "-inf",
+          "description": "`-∞`, written as `\"-inf\"`.",
+          "type": "string"
+        },
+        {
+          "const": "nan",
+          "description": "`NaN`, written as `\"nan\"`.",
+          "type": "string"
+        }
+      ]
     }
   },
   "$id": "https://finstack_quant.dev/schemas/analytics/1/lookback_returns.schema.json",
@@ -11,27 +106,49 @@
   "additionalProperties": false,
   "description": "Lookback returns for each period horizon.",
   "properties": {
+    "fiscal_config": {
+      "$ref": "#/$defs/FiscalConfig",
+      "description": "Explicit fiscal partition used for fiscal-year-to-date selection."
+    },
     "fytd": {
       "description": "Fiscal-year-to-date compounded return per ticker.",
       "items": {
-        "format": "double",
-        "type": "number"
+        "$ref": "#/$defs/NonFiniteF64Wire"
+      },
+      "type": "array"
+    },
+    "fytd_samples": {
+      "description": "Observation count and actual holding boundaries for each fiscal-year-to-date value.",
+      "items": {
+        "$ref": "#/$defs/LookbackSample"
       },
       "type": "array"
     },
     "mtd": {
       "description": "Month-to-date compounded return per ticker.",
       "items": {
-        "format": "double",
-        "type": "number"
+        "$ref": "#/$defs/NonFiniteF64Wire"
+      },
+      "type": "array"
+    },
+    "mtd_samples": {
+      "description": "Observation count and actual holding boundaries for each month-to-date value.",
+      "items": {
+        "$ref": "#/$defs/LookbackSample"
       },
       "type": "array"
     },
     "qtd": {
       "description": "Quarter-to-date compounded return per ticker.",
       "items": {
-        "format": "double",
-        "type": "number"
+        "$ref": "#/$defs/NonFiniteF64Wire"
+      },
+      "type": "array"
+    },
+    "qtd_samples": {
+      "description": "Observation count and actual holding boundaries for each quarter-to-date value.",
+      "items": {
+        "$ref": "#/$defs/LookbackSample"
       },
       "type": "array"
     },
@@ -49,8 +166,14 @@
     "ytd": {
       "description": "Year-to-date compounded return per ticker.",
       "items": {
-        "format": "double",
-        "type": "number"
+        "$ref": "#/$defs/NonFiniteF64Wire"
+      },
+      "type": "array"
+    },
+    "ytd_samples": {
+      "description": "Observation count and actual holding boundaries for each year-to-date value.",
+      "items": {
+        "$ref": "#/$defs/LookbackSample"
       },
       "type": "array"
     }
@@ -61,7 +184,12 @@
     "mtd",
     "qtd",
     "ytd",
-    "fytd"
+    "fytd",
+    "fiscal_config",
+    "mtd_samples",
+    "qtd_samples",
+    "ytd_samples",
+    "fytd_samples"
   ],
   "title": "LookbackReturns",
   "type": "object"

@@ -2,7 +2,7 @@
  * `analytics.Performance.periodStats` non-finite ratio facade tests.
  *
  * `PeriodStats` documents three ratios that reach `+∞` when a sample has wins
- * and no losses (`payoff_ratio`, `profit_factor`, `cpc_ratio`).  Those fields
+ * and no losses (`payoff_ratio`, `profit_factor`, `cpc_index`).  Those fields
  * carry `#[serde(with = "core::wire::non_finite_f64")]` so the *JSON* wire form
  * can round-trip them — `serde_json` writes a bare `f64::INFINITY` as `null`
  * and then refuses to read `null` back as an `f64`.
@@ -50,7 +50,7 @@ const DATES = ['2024-01-01', '2024-01-02', '2024-01-03', '2024-01-04', '2024-01-
 const MONTH_END_DATES = ['2024-01-31', '2024-02-29', '2024-03-31', '2024-04-30', '2024-05-31'];
 
 /** The three ratios documented to reach `+∞`. */
-const INFINITE_RATIOS = ['payoff_ratio', 'profit_factor', 'cpc_ratio'];
+const INFINITE_RATIOS = ['profit_factor'];
 
 /**
  * Aggregate one return series into monthly `PeriodStats`.
@@ -62,7 +62,7 @@ const INFINITE_RATIOS = ['payoff_ratio', 'profit_factor', 'cpc_ratio'];
  */
 function periodStats(dates, returns) {
   const perf = new analytics.Performance({
-    dates,
+    dates: ['2023-12-31', ...dates],
     series: [returns],
     kind: 'returns',
     ticker_names: ['FUND'],
@@ -96,7 +96,9 @@ test('periodStats returns a plain object, not an ES2015 Map', () => {
 test('all-winning sample actually exercises the +Infinity path', () => {
   const stats = allWinningStats();
   assert.equal(stats.win_rate, 1.0, 'fixture no longer has a 100% win rate');
-  assert.equal(stats.avg_loss, 0.0, 'fixture no longer has a zero loss denominator');
+  assert.ok(Number.isNaN(stats.avg_loss));
+  assert.ok(Number.isNaN(stats.payoff_ratio));
+  assert.ok(Number.isNaN(stats.cpc_index));
 });
 
 test('non-finite ratios reach JS as the number Infinity, not a sentinel string', () => {
@@ -127,13 +129,13 @@ test('Infinity ratios compare numerically', () => {
 
 test('finite fields are unaffected and stay numeric', () => {
   const stats = allWinningStats();
-  for (const field of ['best', 'worst', 'win_rate', 'avg_return', 'avg_win', 'avg_loss']) {
+  for (const field of ['best', 'worst', 'win_rate', 'avg_return', 'avg_win']) {
     assert.equal(typeof stats[field], 'number', `${field} must be a number`);
     assert.ok(Number.isFinite(stats[field]), `${field} must be finite`);
   }
-  // kelly_criterion is guarded to 1.0 whenever payoff_ratio is infinite.
-  assert.equal(typeof stats.kelly_criterion, 'number');
-  assert.equal(stats.kelly_criterion, 1.0);
+  // One-sided observed samples have no loss-normalized Kelly estimate.
+  assert.equal(typeof stats.kelly_risk_fraction, 'number');
+  assert.ok(Number.isNaN(stats.kelly_risk_fraction));
 });
 
 test('a mixed sample keeps every ratio finite and numeric', () => {

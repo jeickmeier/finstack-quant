@@ -1,8 +1,8 @@
 //! Numerical and boundary regressions for analytics kernels.
 use finstack_quant_analytics::{
-    CagrDayCount, Performance, ReturnKind, max_drawdown, sharpe, sortino, volatility,
+    CagrDayCount, Performance, max_drawdown, sharpe, sortino, volatility,
 };
-use finstack_quant_core::dates::{Date, PeriodKind};
+use finstack_quant_core::dates::{Date, DayCountContext, PeriodKind};
 use serde_json::json;
 use time::{Duration, Month};
 
@@ -13,10 +13,11 @@ fn dates(n: usize) -> Vec<Date> {
 
 fn panel(returns: Vec<f64>, frequency: PeriodKind) -> Performance {
     Performance::new(&crate::support::returns_panel(
+        Date::from_calendar_date(2023, Month::December, 31).unwrap(),
         dates(returns.len()),
         vec![returns],
         vec!["A".into()],
-        None,
+        Some("A"),
         frequency,
     ))
     .unwrap()
@@ -27,7 +28,9 @@ fn close(actual: f64, expected: f64) {
 }
 
 fn assert_rolling_risk_matches(actual: f64, expected: f64) {
-    if expected == 0.0 || !expected.is_finite() {
+    if expected.is_nan() {
+        assert!(actual.is_nan(), "rolling={actual}, fresh={expected}");
+    } else if expected == 0.0 || !expected.is_finite() {
         assert_eq!(actual, expected);
     } else {
         assert!(
@@ -60,8 +63,11 @@ fn rolling_risk_recovers_after_outliers_leave_constant_windows() {
             assert_eq!(vol.dates, dates(returns.len())[window - 1..]);
             assert_eq!(ratio.dates, vol.dates);
             for (start, slice) in returns.windows(window).enumerate() {
-                assert_rolling_risk_matches(vol.values[start], volatility(slice, 252.0));
-                assert_rolling_ratio_matches(ratio.values[start], sharpe(slice, 0.0, 252.0));
+                assert_rolling_risk_matches(vol.values[start], volatility(slice, 252.0).unwrap());
+                assert_rolling_ratio_matches(
+                    ratio.values[start],
+                    sharpe(slice, 0.0, 252.0).unwrap(),
+                );
             }
         }
     }
@@ -74,11 +80,11 @@ fn rolling_risk_preserves_small_nonzero_variance_after_outliers_leave() {
         let perf = panel(returns.clone(), PeriodKind::Daily);
         assert_rolling_risk_matches(
             perf.rolling_volatility(0, 3).unwrap().values[2],
-            volatility(&returns[2..], 252.0),
+            volatility(&returns[2..], 252.0).unwrap(),
         );
         assert_rolling_risk_matches(
             perf.rolling_sharpe(0, 3, 0.0).unwrap().values[2],
-            sharpe(&returns[2..], 0.0, 252.0),
+            sharpe(&returns[2..], 0.0, 252.0).unwrap(),
         );
     }
 }
@@ -96,7 +102,10 @@ fn rolling_risk_sortino_recovers_after_large_losses_leave() {
                 let rolling = perf.rolling_sortino(0, window, mar).unwrap();
                 assert_eq!(rolling.dates, dates(returns.len())[window - 1..]);
                 for (start, slice) in returns.windows(window).enumerate() {
-                    assert_rolling_ratio_matches(rolling.values[start], sortino(slice, mar, 252.0));
+                    assert_rolling_ratio_matches(
+                        rolling.values[start],
+                        sortino(slice, mar, 252.0).unwrap(),
+                    );
                 }
             }
         }
@@ -119,18 +128,20 @@ fn rolling_greeks_matches_fresh_windows_across_constant_benchmark_spans() {
             let returns: Vec<f64> = (0..n).map(|i| (i % 7) as f64 * 0.001 - 0.003).collect();
             let grid = dates(n);
             let mut perf = Performance::new(&crate::support::returns_panel(
+                Date::from_calendar_date(2023, Month::December, 31).unwrap(),
                 grid.clone(),
                 vec![benchmark, returns],
                 vec!["B".into(), "P".into()],
-                None,
+                Some("B"),
                 PeriodKind::Daily,
             ))
             .unwrap();
             let rolling = perf.rolling_greeks(1, window, 0.02).unwrap();
             assert_eq!(rolling.dates, grid[window - 1..]);
             for start in 0..rolling.betas.len() {
-                perf.reset_date_range(grid[start], grid[start + window - 1]);
-                let fresh = &perf.greeks(0.02)[1];
+                perf.reset_date_range(grid[start], grid[start + window - 1])
+                    .unwrap();
+                let fresh = &perf.greeks(0.02).unwrap()[1];
                 if fresh.beta.is_nan() {
                     assert!(
                         rolling.betas[start].is_nan(),
@@ -149,13 +160,14 @@ fn rolling_greeks_matches_fresh_windows_across_constant_benchmark_spans() {
 #[test]
 fn rolling_greeks_reproduced_three_observation_window_is_undefined() {
     let perf = Performance::new(&crate::support::returns_panel(
+        Date::from_calendar_date(2023, Month::December, 31).unwrap(),
         dates(5),
         vec![
             vec![0.02, -0.03, 0.001, 0.001, 0.001],
             vec![0.04, -0.06, 0.01, 0.02, 0.03],
         ],
         vec!["B".into(), "P".into()],
-        None,
+        Some("B"),
         PeriodKind::Daily,
     ))
     .unwrap();
@@ -174,10 +186,11 @@ fn rolling_greeks_preserves_small_nonzero_benchmark_variance() {
         benchmark[1] = -0.03;
         let returns = benchmark.iter().map(|b| 2.0 * b).collect();
         let perf = Performance::new(&crate::support::returns_panel(
+            Date::from_calendar_date(2023, Month::December, 31).unwrap(),
             dates(benchmark.len()),
             vec![benchmark, returns],
             vec!["B".into(), "P".into()],
-            None,
+            Some("B"),
             PeriodKind::Daily,
         ))
         .unwrap();
@@ -211,21 +224,25 @@ fn tail_mass_is_exact_with_ties_and_fractional_observations() {
 #[test]
 fn invalid_scalar_inputs_do_not_report_zero_risk() {
     for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
-        assert!(max_drawdown(&[invalid, -0.2]).is_nan());
-        assert!(max_drawdown(&[-0.2, invalid]).is_nan());
-        assert!(sortino(&[invalid, 0.01], 0.0, 252.0).is_nan());
-        assert!(sortino(&[0.0, 0.0], invalid, 252.0).is_nan());
-        assert!(sharpe(&[0.0, 0.0], invalid, 252.0).is_nan());
-        assert!(panel(vec![0.0, 0.0], PeriodKind::Daily).sharpe(invalid)[0].is_nan());
+        assert!(max_drawdown(&[invalid, -0.2]).is_err());
+        assert!(max_drawdown(&[-0.2, invalid]).is_err());
+        assert!(sortino(&[invalid, 0.01], 0.0, 252.0).is_err());
+        assert!(sortino(&[0.0, 0.0], invalid, 252.0).is_err());
+        assert!(sharpe(&[0.0, 0.0], invalid, 252.0).is_err());
+        assert!(
+            panel(vec![0.0, 0.0], PeriodKind::Daily)
+                .sharpe(invalid)
+                .is_err()
+        );
     }
 }
 
 #[test]
 fn singleton_ratios_agree_across_entry_points() {
     let perf = panel(vec![0.01, 0.02], PeriodKind::Daily);
-    assert!(sharpe(&[0.01], 0.0, 252.0).is_nan());
-    assert!(sortino(&[0.01], 0.0, 252.0).is_nan());
-    assert!(panel(vec![0.01], PeriodKind::Daily).sharpe(0.0)[0].is_nan());
+    assert!(sharpe(&[0.01], 0.0, 252.0).unwrap().is_nan());
+    assert!(sortino(&[0.01], 0.0, 252.0).unwrap().is_nan());
+    assert!(panel(vec![0.01], PeriodKind::Daily).sharpe(0.0).unwrap()[0].is_nan());
     let rolling = perf.rolling_sharpe(0, 1, 0.0).unwrap();
     assert_eq!(rolling.dates, dates(2));
     assert!(rolling.values.iter().all(|v| v.is_nan()));
@@ -255,6 +272,7 @@ fn constructors_reject_duplicate_identity_and_unrepresentable_returns() {
     let names = vec!["A".into(), "A".into()];
     assert!(
         Performance::new(&crate::support::returns_panel(
+            Date::from_calendar_date(2023, Month::December, 31).unwrap(),
             dates(2),
             vec![vec![0.01; 2]; 2],
             names.clone(),
@@ -284,7 +302,7 @@ fn restored_state_is_validated_and_caches_are_recomputed() {
     let mut changed = state.clone();
     changed["returns"][0][0] = json!(-0.3);
     let restored: Performance = serde_json::from_value(changed).unwrap();
-    close(restored.max_drawdown()[0], -0.3);
+    close(restored.max_drawdown().unwrap()[0], -0.3);
     for (key, value) in [
         ("drawdowns", json!([[0.0, 0.0, 0.0]])),
         ("benchmark_idx", json!(99)),
@@ -306,6 +324,7 @@ fn restored_state_is_validated_and_caches_are_recomputed() {
 #[test]
 fn ragged_window_round_trip_preserves_alignment_and_initial_dates() {
     let mut perf = Performance::new(&crate::support::returns_panel(
+        Date::from_calendar_date(2023, Month::December, 31).unwrap(),
         dates(4),
         vec![
             vec![0.01, -0.1, 0.2, 0.01],
@@ -316,17 +335,20 @@ fn ragged_window_round_trip_preserves_alignment_and_initial_dates() {
         PeriodKind::Daily,
     ))
     .unwrap();
-    perf.reset_date_range(dates(4)[1], dates(4)[2]);
+    perf.reset_date_range(dates(4)[1], dates(4)[2]).unwrap();
     let restored: Performance =
         serde_json::from_str(&serde_json::to_string(&perf).unwrap()).unwrap();
     assert_eq!(restored.get_active_dates(), perf.get_active_dates());
     assert_eq!(restored.get_returns(), perf.get_returns());
-    assert_eq!(restored.max_drawdown(), perf.max_drawdown());
+    assert_eq!(
+        restored.max_drawdown().unwrap(),
+        perf.max_drawdown().unwrap()
+    );
     assert_eq!(
         restored.drawdown_details(1, 5).unwrap(),
         perf.drawdown_details(1, 5).unwrap()
     );
-    assert_eq!(restored.get_benchmark_idx(), 1);
+    assert_eq!(restored.get_benchmark_idx(), Some(1));
 }
 
 #[test]
@@ -334,7 +356,7 @@ fn initial_drawdown_uses_known_peak_date_in_full_and_windowed_panels() {
     let ds = dates(4);
     let mut perf = Performance::new(&crate::support::prices_panel(
         ds.clone(),
-        vec![vec![100.0, 90.0, 100.0, 110.0]],
+        vec![vec![100.0, 50.0, 100.0, 110.0]],
         vec!["A".into()],
         None,
         PeriodKind::Daily,
@@ -342,14 +364,13 @@ fn initial_drawdown_uses_known_peak_date_in_full_and_windowed_panels() {
     .unwrap();
     for windowed in [false, true] {
         if windowed {
-            perf.reset_date_range(ds[1], ds[2]);
+            perf.reset_date_range(ds[1], ds[2]).unwrap();
         }
         let episode = &perf.drawdown_details(0, 5).unwrap()[0];
         assert_eq!(episode.start, ds[0]);
         assert_eq!(episode.end, Some(ds[2]));
         assert_eq!(episode.duration_days, 2);
-        assert!(!episode.truncated_at_start);
-        assert_eq!(perf.max_drawdown_duration(), vec![2]);
+        assert_eq!(perf.max_drawdown_duration().unwrap(), vec![Some(2)]);
     }
 }
 
@@ -357,7 +378,7 @@ fn initial_drawdown_uses_known_peak_date_in_full_and_windowed_panels() {
 fn m_squared_self_comparison_has_no_cash_basis_residual() {
     let perf = panel(vec![0.01, -0.02, 0.03, 0.01], PeriodKind::Monthly);
     for cash in [0.0, 0.02, 0.12] {
-        close(perf.m_squared(cash)[0], 0.09);
+        close(perf.m_squared(cash).unwrap()[0], 0.09);
     }
 }
 
@@ -369,8 +390,8 @@ fn neutral_periods_do_not_change_binary_kelly_fraction() {
     let neutral = panel(vec![0.02, 0.02, -0.01, 0.0], PeriodKind::Daily)
         .period_stats(0, PeriodKind::Daily, None)
         .unwrap();
-    close(decisive.kelly_criterion, 0.5);
-    close(neutral.kelly_criterion, decisive.kelly_criterion);
+    close(decisive.kelly_risk_fraction, 0.5);
+    close(neutral.kelly_risk_fraction, decisive.kelly_risk_fraction);
     close(neutral.win_rate, 0.5);
 }
 
@@ -379,9 +400,7 @@ fn constant_response_fit_statistics_remain_undefined() {
     for n in [3, 5, 29, 57, 58] {
         let perf = panel(vec![0.01; n], PeriodKind::Daily);
         let factors: Vec<f64> = (0..n).map(|i| i as f64 * 0.001).collect();
-        let fit = perf
-            .multi_factor_greeks(0, &[&factors], ReturnKind::Excess)
-            .unwrap();
+        let fit = perf.multi_factor_greeks(0, &[&factors], 0.0).unwrap();
         assert!(
             fit.r_squared.is_nan(),
             "finite R-squared for {n} constant observations"
@@ -399,6 +418,7 @@ fn cagr_annualizes_log_growth_before_reconstructing_terminal_wealth() {
         .map(|year| Date::from_calendar_date(year, Month::January, 1).unwrap())
         .collect();
     let perf = Performance::new(&crate::support::returns_panel(
+        Date::from_calendar_date(2000, Month::January, 1).unwrap(),
         grid,
         vec![vec![-0.9; 20]],
         vec!["A".into()],
@@ -407,14 +427,16 @@ fn cagr_annualizes_log_growth_before_reconstructing_terminal_wealth() {
     ))
     .unwrap();
     // The 20-year wealth is 1e-20, but the annual growth factor remains 0.1.
-    let years = 7305.0 / 365.25;
+    let years = 7305.0 / 365.0;
     let expected = 0.1_f64.powf(20.0 / years) - 1.0;
     close(
-        perf.cagr(CagrDayCount::default(), None).unwrap()[0],
+        perf.cagr(CagrDayCount::default(), DayCountContext::default())
+            .unwrap()[0],
         expected,
     );
 
     let overflow = Performance::new(&crate::support::returns_panel(
+        Date::from_calendar_date(2020, Month::January, 1).unwrap(),
         vec![
             Date::from_calendar_date(2021, Month::January, 1).unwrap(),
             Date::from_calendar_date(2022, Month::January, 1).unwrap(),
@@ -425,8 +447,10 @@ fn cagr_annualizes_log_growth_before_reconstructing_terminal_wealth() {
         PeriodKind::Annual,
     ))
     .unwrap();
-    let result = overflow.cagr(CagrDayCount::default(), None).unwrap()[0];
-    let expected = 1e200_f64.powf(2.0 / (731.0 / 365.25));
+    let result = overflow
+        .cagr(CagrDayCount::default(), DayCountContext::default())
+        .unwrap()[0];
+    let expected = 1e200_f64.powf(2.0 / (731.0 / 365.0));
     assert!(result.is_finite());
     assert!((result / expected - 1.0).abs() < 1e-12);
 }
@@ -435,15 +459,17 @@ fn cagr_annualizes_log_growth_before_reconstructing_terminal_wealth() {
 fn identical_paths_have_zero_relative_wealth_at_extreme_absolute_wealth() {
     for returns in [vec![-0.9; 20], vec![1e300; 4]] {
         let perf = Performance::new(&crate::support::returns_panel(
+            Date::from_calendar_date(2023, Month::December, 31).unwrap(),
             dates(returns.len()),
             vec![returns.clone(), returns],
             vec!["BENCH".into(), "PORT".into()],
-            None,
+            Some("BENCH"),
             PeriodKind::Daily,
         ))
         .unwrap();
         assert!(
             perf.cumulative_returns_outperformance()
+                .unwrap()
                 .iter()
                 .flatten()
                 .all(|&relative| relative == 0.0)
@@ -459,13 +485,13 @@ fn drawdowns_remain_finite_when_absolute_wealth_overflows() {
     close(drawdown[1], 0.0);
     close(drawdown[2], -0.5);
     close(drawdown[3], -0.5);
-    close(perf.max_drawdown()[0], -0.5);
+    close(perf.max_drawdown().unwrap()[0], -0.5);
     let episodes = perf.drawdown_details(0, 5).unwrap();
     assert_eq!(episodes.len(), 1);
     close(episodes[0].max_drawdown, -0.5);
     assert_eq!(episodes[0].start, dates(4)[1]);
     assert_eq!(episodes[0].end, None);
-    assert_eq!(perf.max_drawdown_duration(), vec![2]);
+    assert_eq!(perf.max_drawdown_duration().unwrap(), vec![Some(2)]);
 }
 
 #[test]
@@ -476,17 +502,17 @@ fn positive_near_wipeout_growth_is_not_exact_wipeout() {
         PeriodKind::Daily,
     );
     let expected = (1.0 + near_wipeout).powf(1.0 / 8.0) - 1.0;
-    close(perf.geometric_mean()[0], expected);
-    assert!(perf.geometric_mean()[0] > -1.0);
+    close(perf.geometric_mean().unwrap()[0], expected);
+    assert!(perf.geometric_mean().unwrap()[0] > -1.0);
 }
 
 #[test]
 fn compounded_metrics_preserve_returns_smaller_than_machine_epsilon() {
     let movement = 1e-18;
     let perf = panel(vec![movement, movement], PeriodKind::Daily);
-    assert!((perf.cumulative_returns()[0][1] / (2.0 * movement) - 1.0).abs() < 1e-12);
-    assert!((perf.geometric_mean()[0] / movement - 1.0).abs() < 1e-12);
-    let excess = perf.excess_returns(&[movement; 2], Some(252.0)).unwrap();
+    assert!((perf.cumulative_returns().unwrap()[0][1] / (2.0 * movement) - 1.0).abs() < 1e-12);
+    assert!((perf.geometric_mean().unwrap()[0] / movement - 1.0).abs() < 1e-12);
+    let excess = perf.excess_returns(&[movement; 2]).unwrap();
     let expected = movement * (1.0 - 1.0 / 252.0);
     assert!((excess[0][0] / expected - 1.0).abs() < 1e-12);
 }
@@ -519,35 +545,32 @@ fn drawdown_ratios_propagate_invalid_cash_before_zero_risk_sentinels() {
     for returns in [vec![0.1, 0.2], vec![0.0, 0.0], vec![-0.1, 0.2]] {
         let perf = panel(returns, PeriodKind::Daily);
         for cash in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
-            assert!(perf.sterling_ratio(cash, 5).unwrap()[0].is_nan());
-            assert!(perf.burke_ratio(cash, 5).unwrap()[0].is_nan());
-            assert!(perf.pain_ratio(cash).unwrap()[0].is_nan());
+            assert!(perf.sterling_ratio(cash, 5).is_err());
+            assert!(perf.burke_ratio(cash).is_err());
+            assert!(perf.pain_ratio(cash).is_err());
         }
     }
     let positive = panel(vec![0.1, 0.2], PeriodKind::Daily);
     assert_eq!(positive.calmar().unwrap()[0], f64::INFINITY);
-    assert_eq!(positive.martin_ratio().unwrap()[0], f64::INFINITY);
+    assert_eq!(positive.martin_ratio(0.0).unwrap()[0], f64::INFINITY);
     let flat = panel(vec![0.0, 0.0], PeriodKind::Daily);
-    assert_eq!(flat.calmar().unwrap()[0], 0.0);
-    assert_eq!(flat.martin_ratio().unwrap()[0], 0.0);
+    assert!(flat.calmar().unwrap()[0].is_nan());
+    assert!(flat.martin_ratio(0.0).unwrap()[0].is_nan());
 }
 
 #[test]
-fn burke_uses_the_worst_episode_depths_without_date_metadata() {
-    // Three independently recovered episodes, with depths 10%, 20%, 30%.
-    let perf = panel(
-        vec![-0.1, 1.0 / 9.0, -0.2, 0.25, -0.3, 3.0 / 7.0],
-        PeriodKind::Daily,
+fn burke_uses_all_episodes_with_observation_normalization() {
+    // Binary-fraction losses recover exactly, with depths 50%, 75%, 87.5%.
+    let perf = panel(vec![-0.5, 1.0, -0.75, 3.0, -0.875, 7.0], PeriodKind::Daily);
+    let excess_cagr = perf
+        .cagr(CagrDayCount::default(), DayCountContext::default())
+        .unwrap()[0]
+        - 0.01;
+    let denominator = ((0.25 + 0.5625 + 0.765625) / 6.0_f64).sqrt();
+    close(
+        perf.burke_ratio(0.01).unwrap()[0],
+        excess_cagr / denominator,
     );
-    let excess_cagr = perf.cagr(CagrDayCount::default(), None).unwrap()[0] - 0.01;
-    for (n, rms) in [
-        (1, 0.3),
-        (2, ((0.09 + 0.04) / 2.0_f64).sqrt()),
-        (3, ((0.09 + 0.04 + 0.01) / 3.0_f64).sqrt()),
-        (5, ((0.09 + 0.04 + 0.01) / 3.0_f64).sqrt()),
-    ] {
-        close(perf.burke_ratio(0.01, n).unwrap()[0], excess_cagr / rms);
-    }
 }
 
 #[test]
@@ -555,6 +578,7 @@ fn fiscal_period_stats_matches_shared_boundary_groups() {
     #[derive(serde::Deserialize)]
     struct Case {
         name: String,
+        initial_date: String,
         start_month: u8,
         start_day: u8,
         dates: Vec<String>,
@@ -572,6 +596,7 @@ fn fiscal_period_stats_matches_shared_boundary_groups() {
             finstack_quant_core::dates::FiscalConfig::new(case.start_month, case.start_day)
                 .unwrap();
         let mut perf = Performance::new(&crate::support::returns_panel(
+            finstack_quant_core::dates::parse_iso_date(&case.initial_date).unwrap(),
             dates,
             vec![case.returns.clone()],
             vec!["FUND".into()],
@@ -583,7 +608,7 @@ fn fiscal_period_stats_matches_shared_boundary_groups() {
             if trim {
                 let first = perf.get_dates()[1];
                 let last = perf.get_dates()[case.returns.len() - 2];
-                perf.reset_date_range(first, last);
+                perf.reset_date_range(first, last).unwrap();
             }
             for (label, groups) in &case.groups {
                 let expected: Vec<f64> = groups
@@ -621,6 +646,7 @@ fn fiscal_period_stats_matches_shared_boundary_groups() {
 #[test]
 fn aggregation_propagates_unrepresentable_boundaries() {
     let perf = Performance::new(&crate::support::returns_panel(
+        Date::MAX.previous_day().unwrap().previous_day().unwrap(),
         vec![Date::MAX.previous_day().unwrap(), Date::MAX],
         vec![vec![0.01, 0.02]],
         vec!["FUND".into()],

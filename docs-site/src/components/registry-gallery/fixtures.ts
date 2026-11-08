@@ -185,8 +185,20 @@ export const pnlAttribution = data.pnlAttribution as unknown as Retyped<
 >;
 export const performanceReport = data.performance
   .report as unknown as PerformanceReportData;
-export const benchmarkReport = data.benchmark
-  .report as unknown as BenchmarkReportData;
+// This numeric result array uses the core's wire tokens in stored JSON;
+// restore native IEEE values for the display-only report. Ticker labels stay text.
+export const benchmarkReport = {
+  ...data.benchmark.report,
+  informationRatio: data.benchmark.report.informationRatio.map((value) =>
+    value === "nan"
+      ? Number.NaN
+      : value === "inf"
+        ? Number.POSITIVE_INFINITY
+        : value === "-inf"
+          ? Number.NEGATIVE_INFINITY
+          : value,
+  ),
+} as unknown as BenchmarkReportData;
 export const migration = data.credit as unknown as Retyped<
   typeof data.credit,
   { matrix: MigrationMatrixData; projection: MigrationProjectionData }

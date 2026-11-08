@@ -110,17 +110,22 @@
       "sha256": "da6944e5f7595b113ba603d0c82cd7bc6b3305550fbd028e65ab91a6eb8b61e4"
     },
     {
+      "path": "finstack-quant/analytics/src/correlation.rs",
+      "classification": "algorithm",
+      "records": [
+        "ANALYTICS-015"
+      ],
+      "reason": "Common-sample normalized Pearson Gram matrix, all-column eligibility, bounded endpoint normalization, final PSD checks and validated observation-provenance carrier without repair.",
+      "sha256": "d75d1574fe8b26c2b7fc703e82bbb2238213c71e1643ec58bd62f21828edcf0f",
+      "inspection_date": "2026-11-08"
+    },
+    {
       "path": "finstack-quant/analytics/src/defaults.rs",
       "classification": "algorithm",
       "records": [
-        "ANALYTICS-001",
-        "ANALYTICS-002",
-        "ANALYTICS-003",
-        "ANALYTICS-006",
-        "ANALYTICS-007",
-        "ANALYTICS-009"
+        "ANALYTICS-001"
       ],
-      "reason": "Financially material exported frequency, annual cash, per-period MAR, aggregation, rolling-window, confidence, episode-count and annualization defaults.",
+      "reason": "The annualize output-unit flag default; financially used frequency, benchmark, cash, MAR, confidence and window inputs are supplied explicitly.",
       "sha256": "8a8a8c8ed0a1a9aa94b7d47a2a0c478e2f5a91e5b83a67cac6ca0e247a98dfa1"
     },
     {
@@ -133,6 +138,19 @@
       ],
       "reason": "Log-wealth peak path, threshold episode/recovery segmentation, date durations, worst-episode order, path indices and drawdown reward ratios.",
       "sha256": "3e2ba438933ae22305699b6fb8fe4b5fbc6733cb605e1a6dec5b44c9e66b724c"
+    },
+    {
+      "path": "finstack-quant/analytics/src/exact.rs",
+      "classification": "algorithm",
+      "records": [
+        "ANALYTICS-010",
+        "ANALYTICS-011",
+        "ANALYTICS-012",
+        "ANALYTICS-015"
+      ],
+      "reason": "Exact binary-rational reconstruction of paired moments, cancellation-sensitive OLS/Pearson quantities and requested rational/square-root outputs before binary64 rounding; no estimator substitution.",
+      "sha256": "aebfa24590f83a5b0ed749368732234ea96ec7b386401000efcc272f02888872",
+      "inspection_date": "2026-11-08"
     },
     {
       "path": "finstack-quant/analytics/src/lib.rs",
@@ -299,5 +317,7 @@
       "reason": "Explicit analytics root schema artifact registry and output descriptions; estimator/default/validation behavior is owned by the listed runtime types.",
       "sha256": "9157de134811ebdde363962047819a43df31263ec7dcc8d1f113c120bb8b2545"
     }
-  ]
+  ],
+  "implementation_date": "2026-11-08",
+  "source_snapshot_note": "Existing hashes retain the original dated audit fingerprints. Correlation and exact-statistics modules were added and inspected during the 2026-11-08 implementation reconciliation; their entries carry that date. Source ownership reflects the current module tree."
 }

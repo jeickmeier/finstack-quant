@@ -1,15 +1,11 @@
-//! Generated analytics schemas describe exactly what serde writes.
-//!
-//! Every contract with a custom wire shape (non-finite `f64` sentinels, the
-//! `Performance` state document) is serialized, validated against its
-//! registered schema and read back.
+//! Serde/schema agreement and restoration admission for analytics result carriers.
 
 use finstack_quant_analytics::schema::ARTIFACTS;
 use finstack_quant_analytics::{
-    BetaResult, DatedSeries, DrawdownEpisode, GreeksResult, LookbackReturns, MultiFactorResult,
-    Performance, PeriodStats, RollingGreeks,
+    BetaResult, CorrelationResult, DatedSeries, DrawdownEpisode, GreeksResult, LookbackReturns,
+    MultiFactorResult, Performance, PeriodStats, RollingGreeks,
 };
-use finstack_quant_core::dates::{Date, PeriodKind};
+use finstack_quant_core::dates::{Date, FiscalConfig, PeriodKind};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
@@ -24,112 +20,43 @@ fn schema(type_name: &str) -> Value {
         .expect("schema renders")
 }
 
-/// Serialize `value`, validate it against the `type_name` schema, read it back
-/// and require the second serialization to match the first.
 fn assert_wire_matches_schema<T: Serialize + DeserializeOwned>(type_name: &str, value: &T) {
     let wire = serde_json::to_value(value).expect("serialize");
     let validator = jsonschema::options()
         .should_validate_formats(true)
         .build(&schema(type_name))
         .expect("schema compiles");
-    let errors: Vec<String> = validator
+    let errors: Vec<_> = validator
         .iter_errors(&wire)
-        .map(|e| e.to_string())
+        .map(|error| error.to_string())
         .collect();
     assert!(errors.is_empty(), "{type_name}: {errors:?}\n{wire}");
     let back: T = serde_json::from_value(wire.clone()).expect("deserialize");
     assert_eq!(serde_json::to_value(&back).expect("reserialize"), wire);
 }
 
-fn from_json<T: DeserializeOwned>(value: Value) -> T {
-    serde_json::from_value(value).expect("fixture deserializes")
-}
-
-#[test]
-fn non_finite_results_validate_against_their_schemas() {
-    let beta: BetaResult = from_json(json!({
-        "beta": "nan", "std_err": "inf", "ci_lower": "-inf", "ci_upper": 1.25, "n_obs": 6, "confidence_level": 0.95
-    }));
-    assert_wire_matches_schema("BetaResult", &beta);
-
-    let greeks: GreeksResult = from_json(json!({
-        "alpha": 0.01, "beta": "nan", "r_squared": "nan", "adjusted_r_squared": "-inf", "n_obs": 6
-    }));
-    assert_wire_matches_schema("GreeksResult", &greeks);
-
-    let multi: MultiFactorResult = from_json(json!({
-        "alpha": 0.02, "betas": [0.5, 1.1], "r_squared": "nan",
-        "adjusted_r_squared": "nan", "residual_vol": 0.1, "n_obs": 6
-    }));
-    assert_wire_matches_schema("MultiFactorResult", &multi);
-
-    let stats: PeriodStats = from_json(json!({
-        "best": 0.05, "worst": -0.02, "consecutive_wins": 3, "consecutive_losses": 1,
-        "win_rate": 0.6, "avg_return": 0.01, "avg_win": 0.02, "avg_loss": -0.01,
-        "payoff_ratio": "inf", "profit_factor": "inf", "cpc_ratio": "inf",
-        "kelly_criterion": 0.4
-    }));
-    assert_wire_matches_schema("PeriodStats", &stats);
-
-    let series: DatedSeries = from_json(json!({
-        "values": [0.1, "nan", "inf"],
-        "dates": ["2025-01-02", "2025-01-03", "2025-01-06"],
-        "value_column": "sharpe"
-    }));
-    assert_wire_matches_schema("DatedSeries", &series);
-}
-
-#[test]
-fn schema_rejects_an_unknown_sentinel() {
-    let validator = jsonschema::options()
-        .build(&schema("BetaResult"))
-        .expect("schema compiles");
-    let wire = json!({ "beta": "infinite", "std_err": 0.1, "ci_lower": 0.0, "ci_upper": 1.0, "n_obs": 6, "confidence_level": 0.95 });
-    assert!(!validator.is_valid(&wire));
-}
-
-#[test]
-fn performance_state_validates_against_its_schema() {
-    let dates: Vec<Date> = (2..=8)
-        .map(|day| Date::from_calendar_date(2025, Month::January, day).expect("valid date"))
-        .collect();
-    let prices = vec![
-        vec![100.0, 101.0, 100.5, 102.0, 103.0, 102.5, 104.0],
-        vec![50.0, 50.5, 50.2, 51.0, 51.5, 51.2, 52.0],
-    ];
-    let perf = Performance::new(&crate::support::prices_panel(
-        dates,
-        prices,
-        vec!["SPY".into(), "QQQ".into()],
-        Some("SPY"),
-        PeriodKind::Daily,
-    ))
-    .expect("valid panel");
-    assert_wire_matches_schema("Performance", &perf);
-}
-
 fn assert_strict_result<T: Serialize + DeserializeOwned>(
     type_name: &str,
-    wire: Value,
+    value: &T,
     required_metadata: &[&str],
 ) {
-    let value: T = from_json(wire.clone());
-    assert_wire_matches_schema(type_name, &value);
+    assert_wire_matches_schema(type_name, value);
+    let wire = serde_json::to_value(value).expect("serialize");
     let validator = jsonschema::options()
         .build(&schema(type_name))
-        .expect("valid schema");
+        .expect("schema compiles");
     let mut extra = wire.clone();
     extra
         .as_object_mut()
         .expect("object")
-        .insert("unknown_result_field".to_owned(), json!(true));
+        .insert("unknown_result_field".into(), json!(true));
     assert!(
         serde_json::from_value::<T>(extra.clone()).is_err(),
-        "{type_name} accepted an unknown field"
+        "{type_name} accepted unknown field"
     );
     assert!(
         !validator.is_valid(&extra),
-        "{type_name} schema accepted an unknown field"
+        "{type_name} schema accepted unknown field"
     );
     for field in required_metadata {
         let mut missing = wire.clone();
@@ -145,68 +72,153 @@ fn assert_strict_result<T: Serialize + DeserializeOwned>(
     }
 }
 
+fn fixture() -> Performance {
+    let dates = (1..=4)
+        .map(|day| Date::from_calendar_date(2025, Month::January, day).unwrap())
+        .collect();
+    Performance::new(&finstack_quant_analytics::PerformancePanel {
+        dates,
+        series: vec![vec![-0.1, 0.1, 0.0]],
+        kind: finstack_quant_analytics::PanelSeriesKind::Returns,
+        ticker_names: vec!["FUND".into()],
+        benchmark_ticker: Some("FUND".into()),
+        frequency: Some(PeriodKind::Daily),
+    })
+    .unwrap()
+}
+
 #[test]
-fn result_metadata_is_required_and_unknown_fields_are_rejected() {
+fn computed_result_carriers_round_trip_through_their_schemas() {
+    let perf = fixture();
+    assert_strict_result::<Performance>(
+        "Performance",
+        &perf,
+        &[
+            "price_dates",
+            "returns",
+            "return_spans",
+            "ticker_names",
+            "start_idx",
+            "end_idx",
+        ],
+    );
     assert_strict_result::<BetaResult>(
         "BetaResult",
-        json!({
-            "beta": "nan", "std_err": "nan", "ci_lower": "nan", "ci_upper": "nan",
-            "n_obs": 2, "confidence_level": 0.95
-        }),
+        &perf.beta().unwrap()[0],
         &["n_obs", "confidence_level"],
     );
-    assert_strict_result::<GreeksResult>(
-        "GreeksResult",
-        json!({
-            "alpha": "nan", "beta": "nan", "r_squared": "nan", "adjusted_r_squared": "nan", "n_obs": 1
-        }),
-        &["n_obs"],
-    );
+    assert_strict_result::<GreeksResult>("GreeksResult", &perf.greeks(0.0).unwrap()[0], &["n_obs"]);
+    let factor = [-0.1, 0.1, 0.0];
     assert_strict_result::<MultiFactorResult>(
         "MultiFactorResult",
-        json!({
-            "alpha": 0.0, "betas": [1.0], "r_squared": "nan", "adjusted_r_squared": "nan", "residual_vol": 0.0, "n_obs": 4
-        }),
+        &perf.multi_factor_greeks(0, &[&factor], 0.0).unwrap(),
         &["n_obs"],
-    );
-    assert_strict_result::<DrawdownEpisode>(
-        "DrawdownEpisode",
-        json!({
-            "start": "2025-01-01", "valley": "2025-01-02", "end": null, "duration_days": 2,
-            "max_drawdown": -0.1, "near_recovery_threshold": -0.001, "truncated_at_start": true
-        }),
-        &["truncated_at_start"],
     );
     assert_strict_result::<PeriodStats>(
         "PeriodStats",
-        json!({
-            "best": 0.01, "worst": -0.01, "consecutive_wins": 1, "consecutive_losses": 1,
-            "win_rate": 0.5, "avg_return": 0.0, "avg_win": 0.01, "avg_loss": -0.01,
-            "payoff_ratio": 1.0, "profit_factor": 1.0, "cpc_ratio": 0.5, "kelly_criterion": 0.0
-        }),
-        &[],
+        &perf.period_stats(0, PeriodKind::Daily, None).unwrap(),
+        &["n_obs", "wins", "losses"],
+    );
+    assert_strict_result::<DrawdownEpisode>(
+        "DrawdownEpisode",
+        &perf.drawdown_details(0, 1).unwrap()[0],
+        &["start", "valley", "duration_days", "max_drawdown"],
     );
     assert_strict_result::<RollingGreeks>(
         "RollingGreeks",
-        json!({
-            "dates": ["2025-01-02"], "alphas": [0.0], "betas": [1.0]
-        }),
-        &[],
+        &perf.rolling_greeks(0, 1, 0.0).unwrap(),
+        &["dates", "alphas", "betas"],
+    );
+    assert_strict_result::<DatedSeries>(
+        "DatedSeries",
+        &perf.rolling_sharpe(0, 1, 0.0).unwrap(),
+        &["dates", "values", "value_column"],
     );
     assert_strict_result::<LookbackReturns>(
         "LookbackReturns",
-        json!({
-            "ref_date": "2025-01-02", "ticker_names": ["FUND"], "mtd": [0.1], "qtd": [0.1], "ytd": [0.1], "fytd": [0.1]
-        }),
-        &[],
+        &perf
+            .lookback_returns(None, Some(FiscalConfig::calendar_year()))
+            .unwrap(),
+        &[
+            "ref_date",
+            "ticker_names",
+            "fiscal_config",
+            "mtd_samples",
+            "qtd_samples",
+            "ytd_samples",
+            "fytd_samples",
+        ],
+    );
+    assert_strict_result::<CorrelationResult>(
+        "CorrelationResult",
+        &perf.correlation_matrix().unwrap(),
+        &["tickers", "matrix", "n_obs", "start_date", "end_date"],
     );
 }
 
 #[test]
-fn drawdown_recovery_date_remains_optional() {
-    let episode: DrawdownEpisode = from_json(json!({
-        "start": "2025-01-01", "valley": "2025-01-02", "duration_days": 2,
-        "max_drawdown": -0.1, "near_recovery_threshold": -0.001, "truncated_at_start": false
-    }));
+fn unavailable_rolling_and_regression_results_preserve_nan_sentinels() {
+    let mut perf = fixture();
+    let date = perf.get_dates()[0];
+    perf.reset_date_range(date, date).unwrap();
+    let beta = perf.beta().unwrap()[0].clone();
+    let beta_wire = serde_json::to_value(&beta).unwrap();
+    for field in ["beta", "std_err", "ci_lower", "ci_upper"] {
+        assert_eq!(beta_wire[field], "nan");
+    }
+    assert_wire_matches_schema("BetaResult", &beta);
+    let rolling = fixture().rolling_greeks(0, 1, 0.0).unwrap();
+    let rolling_wire = serde_json::to_value(&rolling).unwrap();
+    assert_eq!(rolling_wire["alphas"], json!(["nan", "nan", "nan"]));
+    assert_eq!(rolling_wire["betas"], json!(["nan", "nan", "nan"]));
+    assert_wire_matches_schema("RollingGreeks", &rolling);
+    let single_sided = Performance::new(&crate::support::returns_panel(
+        Date::from_calendar_date(2025, Month::January, 1).unwrap(),
+        vec![
+            Date::from_calendar_date(2025, Month::January, 2).unwrap(),
+            Date::from_calendar_date(2025, Month::January, 3).unwrap(),
+        ],
+        vec![vec![0.1, 0.2]],
+        vec!["GAIN".into()],
+        None,
+        PeriodKind::Daily,
+    ))
+    .unwrap()
+    .period_stats(0, PeriodKind::Daily, None)
+    .unwrap();
+    assert!(single_sided.profit_factor.is_infinite());
+    assert!(single_sided.payoff_ratio.is_nan());
+    assert_wire_matches_schema("PeriodStats", &single_sided);
+}
+
+#[test]
+fn malformed_result_state_and_unknown_sentinels_are_rejected() {
+    let perf = fixture();
+    let mut beta = serde_json::to_value(&perf.beta().unwrap()[0]).unwrap();
+    beta["beta"] = json!("infinite");
+    assert!(serde_json::from_value::<BetaResult>(beta.clone()).is_err());
+    assert!(
+        !jsonschema::options()
+            .build(&schema("BetaResult"))
+            .unwrap()
+            .is_valid(&beta)
+    );
+    let mut rolling = serde_json::to_value(perf.rolling_greeks(0, 1, 0.0).unwrap()).unwrap();
+    rolling["betas"] = json!(["nan"]);
+    assert!(serde_json::from_value::<RollingGreeks>(rolling).is_err());
+    let mut stats =
+        serde_json::to_value(perf.period_stats(0, PeriodKind::Daily, None).unwrap()).unwrap();
+    stats["wins"] = json!(99);
+    assert!(serde_json::from_value::<PeriodStats>(stats).is_err());
+    let mut correlation = serde_json::to_value(perf.correlation_matrix().unwrap()).unwrap();
+    correlation["matrix"] = json!([[0.9]]);
+    assert!(serde_json::from_value::<CorrelationResult>(correlation).is_err());
+}
+
+#[test]
+fn open_drawdown_recovery_date_is_optional() {
+    let mut wire = serde_json::to_value(&fixture().drawdown_details(0, 1).unwrap()[0]).unwrap();
+    wire.as_object_mut().unwrap().remove("end");
+    let episode: DrawdownEpisode = serde_json::from_value(wire).unwrap();
     assert!(episode.end.is_none());
 }

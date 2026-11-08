@@ -2,7 +2,7 @@
   "artifacts": [
     {
       "$id": "https://finstack_quant.dev/schemas/analytics/1/beta_result.schema.json",
-      "bytes": 3076,
+      "bytes": 3066,
       "kind": "output",
       "path": "schemas/analytics/1/beta_result.schema.json",
       "summary": "OLS beta result with standard error and 95% confidence interval.",
@@ -11,7 +11,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/analytics/1/cagr_day_count.schema.json",
-      "bytes": 15740,
+      "bytes": 15792,
       "kind": "component",
       "path": "schemas/analytics/1/cagr_day_count.schema.json",
       "summary": "Day-count convention for CAGR annualization over explicit calendar dates.",
@@ -19,8 +19,17 @@
       "type_name": "CagrDayCount"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/analytics/1/correlation_result.schema.json",
+      "bytes": 1516,
+      "kind": "output",
+      "path": "schemas/analytics/1/correlation_result.schema.json",
+      "summary": "Common-sample Pearson correlation with ticker and sample provenance.",
+      "title": "CorrelationResult",
+      "type_name": "CorrelationResult"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/analytics/1/dated_series.schema.json",
-      "bytes": 3529,
+      "bytes": 3605,
       "kind": "component",
       "path": "schemas/analytics/1/dated_series.schema.json",
       "summary": "A dated time-series column: scalar values aligned with window-end dates.",
@@ -29,7 +38,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/analytics/1/drawdown_episode.schema.json",
-      "bytes": 2165,
+      "bytes": 1494,
       "kind": "component",
       "path": "schemas/analytics/1/drawdown_episode.schema.json",
       "summary": "Drawdown episode with start, valley, optional recovery, and max drawdown.",
@@ -38,7 +47,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/analytics/1/greeks_result.schema.json",
-      "bytes": 2764,
+      "bytes": 2746,
       "kind": "output",
       "path": "schemas/analytics/1/greeks_result.schema.json",
       "summary": "Greeks (alpha, beta, R-squared, adjusted R-squared) from a single-factor regression.",
@@ -47,7 +56,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/analytics/1/lookback_returns.schema.json",
-      "bytes": 1728,
+      "bytes": 5889,
       "kind": "component",
       "path": "schemas/analytics/1/lookback_returns.schema.json",
       "summary": "Lookback returns for each period horizon.",
@@ -55,8 +64,17 @@
       "type_name": "LookbackReturns"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/analytics/1/lookback_sample.schema.json",
+      "bytes": 1242,
+      "kind": "component",
+      "path": "schemas/analytics/1/lookback_sample.schema.json",
+      "summary": "Observation count and actual holding bounds for a lookback return.",
+      "title": "LookbackSample",
+      "type_name": "LookbackSample"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/analytics/1/multi_factor_result.schema.json",
-      "bytes": 3018,
+      "bytes": 4510,
       "kind": "output",
       "path": "schemas/analytics/1/multi_factor_result.schema.json",
       "summary": "Result of a multi-factor regression.",
@@ -65,7 +83,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/analytics/1/performance.schema.json",
-      "bytes": 3494,
+      "bytes": 3622,
       "kind": "input",
       "path": "schemas/analytics/1/performance.schema.json",
       "summary": "Central performance analytics engine.",
@@ -74,7 +92,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/analytics/1/performance_panel.schema.json",
-      "bytes": 4217,
+      "bytes": 3621,
       "kind": "input",
       "path": "schemas/analytics/1/performance_panel.schema.json",
       "summary": "Dated price or return panel, one series per ticker, that a Performance is built from.",
@@ -83,7 +101,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/analytics/1/period_stats.schema.json",
-      "bytes": 3996,
+      "bytes": 4607,
       "kind": "output",
       "path": "schemas/analytics/1/period_stats.schema.json",
       "summary": "Period-level aggregate statistics.",
@@ -92,7 +110,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/analytics/1/periodic_return.schema.json",
-      "bytes": 848,
+      "bytes": 826,
       "kind": "component",
       "path": "schemas/analytics/1/periodic_return.schema.json",
       "summary": "One calendar bucket of a periodic-return series.",
@@ -101,7 +119,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/analytics/1/return_kind.schema.json",
-      "bytes": 1258,
+      "bytes": 1360,
       "kind": "component",
       "path": "schemas/analytics/1/return_kind.schema.json",
       "summary": "How the dependent return series is interpreted in a multi-factor regression.",
@@ -110,7 +128,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/analytics/1/rolling_greeks.schema.json",
-      "bytes": 1033,
+      "bytes": 2032,
       "kind": "component",
       "path": "schemas/analytics/1/rolling_greeks.schema.json",
       "summary": "Rolling greeks output.",

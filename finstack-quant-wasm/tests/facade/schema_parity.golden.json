@@ -53,7 +53,7 @@
             "$id": "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json",
             "type_name": "TableEnvelope",
             "kind": "output",
-            "bytes": 7846
+            "bytes": 9612
           }
         ]
       },
@@ -2161,7 +2161,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json",
             "type_name": "MonteCarloResults",
             "kind": "output",
-            "bytes": 32177
+            "bytes": 33951
           },
           {
             "path": "schemas/statements/1/normalization_config.schema.json",
@@ -4128,7 +4128,7 @@
             "$id": "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json",
             "type_name": "TableEnvelope",
             "kind": "output",
-            "bytes": 7846
+            "bytes": 9612
           },
           {
             "domain": "factor_model",
@@ -4808,7 +4808,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json",
             "type_name": "MonteCarloResults",
             "kind": "output",
-            "bytes": 32177
+            "bytes": 33951
           },
           {
             "domain": "statements",

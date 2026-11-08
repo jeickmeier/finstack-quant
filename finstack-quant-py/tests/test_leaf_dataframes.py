@@ -37,6 +37,7 @@ from finstack_quant.models.factor.credit import (
     decompose_levels,
     decompose_period,
 )
+from tests.analytics_helpers import valuation_grid
 
 # analytics
 
@@ -55,7 +56,7 @@ def _benchmarked_performance() -> Performance:
     fund = [2.0 * value + noise for value, noise in zip(benchmark, residual, strict=True)]
     return Performance.from_panel(
         PerformancePanel(
-            dates=dates,
+            dates=valuation_grid(dates),
             series=[fund, benchmark],
             kind="returns",
             ticker_names=["FUND", "BENCH"],
@@ -95,7 +96,7 @@ def test_beta_result_to_dataframe_is_one_row() -> None:
 
 
 def test_greeks_result_to_dataframe_is_one_row() -> None:
-    result = _benchmarked_performance().greeks()[0]
+    result = _benchmarked_performance().greeks(risk_free_rate=0.0)[0]
     df = result.to_dataframe()
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 1
@@ -122,10 +123,17 @@ def _multi_factor_result(swap_factors: bool = False) -> MultiFactorResult:
     dates = [dt_date(2024, 1, 1) + timedelta(days=i) for i in range(8)]
     returns = [2.0 * a + 0.5 * b for a, b in zip(_FACTOR_A, _FACTOR_B, strict=True)]
     perf = Performance.from_panel(
-        PerformancePanel(dates=dates, series=[returns], kind="returns", ticker_names=["FUND"], frequency="monthly")
+        PerformancePanel(
+            dates=valuation_grid(dates),
+            series=[returns],
+            kind="returns",
+            ticker_names=["FUND"],
+            frequency="monthly",
+            benchmark_ticker="FUND",
+        )
     )
     factors = [_FACTOR_B, _FACTOR_A] if swap_factors else [_FACTOR_A, _FACTOR_B]
-    return perf.multi_factor_greeks(0, factors)
+    return perf.multi_factor_greeks(0, factors, risk_free_rate=0.0)
 
 
 def test_multi_factor_result_to_dataframe_is_one_row_per_factor() -> None:
@@ -162,9 +170,16 @@ def test_multi_factor_result_to_dataframe_accepts_factor_names() -> None:
 def test_multi_factor_constant_response_frame_preserves_nan() -> None:
     dates = [dt_date(2024, 1, 1) + timedelta(days=i) for i in range(8)]
     perf = Performance.from_panel(
-        PerformancePanel(dates=dates, series=[[0.01] * 8], kind="returns", ticker_names=["FUND"])
+        PerformancePanel(
+            dates=valuation_grid(dates),
+            series=[[0.01] * 8],
+            kind="returns",
+            ticker_names=["FUND"],
+            frequency="daily",
+            benchmark_ticker="FUND",
+        )
     )
-    result = perf.multi_factor_greeks(0, [[-0.02, -0.01, 0.0, 0.01, 0.02, 0.03, 0.015, -0.005]])
+    result = perf.multi_factor_greeks(0, [[-0.02, -0.01, 0.0, 0.01, 0.02, 0.03, 0.015, -0.005]], risk_free_rate=0.0)
     frame = result.to_dataframe(["market"])
     for column in ("r_squared", "adjusted_r_squared"):
         assert math.isnan(frame[column].iloc[0])

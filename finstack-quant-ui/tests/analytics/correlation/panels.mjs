@@ -12,7 +12,7 @@ const round = (value) => Math.round(value * 1e6) / 1e6;
 const series = (f) => dates.map((_, i) => round(f(i)));
 /** The valid panel: a rates, a credit, an equity and a gold sleeve. */
 export const panel = {
-  dates,
+  dates: ["2023-12-29", ...dates],
   series: [
     series((i) => 0.0003 + 0.004 * Math.sin(i / 7)),
     series(

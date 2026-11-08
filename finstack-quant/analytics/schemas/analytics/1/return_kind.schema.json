@@ -5,17 +5,17 @@
   "oneOf": [
     {
       "const": "excess",
-      "description": "`returns` are already excess returns. Alpha is the annualized OLS\nintercept of excess `y` on the supplied (already-excess) factors.",
+      "description": "`returns` are already excess returns. Alpha is the annualized OLS\nintercept of excess `y` on the supplied explanatory observations.",
       "type": "string"
     },
     {
       "additionalProperties": false,
-      "description": "`returns` are total returns. The geometrically decompounded period\nrisk-free rate is subtracted from `y` only, then OLS is run.\nAlpha is the annualized intercept and is Jensen-style for the\ndependent variable.",
+      "description": "`returns` are total returns. The geometrically decompounded period\nrisk-free rate is subtracted from `y` only, then OLS is run.\nAlpha is the annualized intercept; its Jensen interpretation requires\nthe caller's intended excess-return factor model.",
       "properties": {
         "total": {
           "properties": {
             "risk_free_rate": {
-              "description": "Annualized risk-free rate in decimal form (e.g. `0.02` for 2%).",
+              "description": "Finite annual-effective decimal cash rate above `-1`, including\nexplicit zero (for example, `0.02` for 2% effective per year).",
               "format": "double",
               "type": "number"
             }

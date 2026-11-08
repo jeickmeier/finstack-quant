@@ -95,21 +95,9 @@ function datedChart(
     },
   });
 }
-const numericEpisodeFields = new Set([
-  "duration_days",
-  "max_drawdown",
-  "near_recovery_threshold",
-]);
+const numericEpisodeFields = new Set(["duration_days", "max_drawdown"]);
 const episodeColumns: ColumnDef<{}, DrawdownEpisode, any>[] = (
-  [
-    "start",
-    "valley",
-    "end",
-    "duration_days",
-    "max_drawdown",
-    "near_recovery_threshold",
-    "truncated_at_start",
-  ] as const
+  ["start", "valley", "end", "duration_days", "max_drawdown"] as const
 ).map((field) => ({
   id: field,
   header: labelFor(field),

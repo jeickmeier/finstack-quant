@@ -149,12 +149,19 @@ impl JsEvaluator {
         let model =
             FinancialModelSpec::from_json(&json_text(&model, "model")?).map_err(to_js_err)?;
         let config: MonteCarloConfig = from_js_json(&config, "config")?;
-        to_js_value(
-            &self
-                .inner
-                .evaluate_monte_carlo(&model, &config)
-                .map_err(to_js_err)?,
-        )
+        let result = self
+            .inner
+            .evaluate_monte_carlo(&model, &config)
+            .map_err(to_js_err)?;
+        let js = to_js_value(&result)?;
+        if let Some(table) = &result.path_data {
+            js_sys::Reflect::set(
+                &js,
+                &JsValue::from("path_data"),
+                &crate::utils::to_js_table_numeric(table)?,
+            )?;
+        }
+        Ok(js)
     }
 }
 

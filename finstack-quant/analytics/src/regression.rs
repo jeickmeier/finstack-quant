@@ -1,347 +1,645 @@
-//! Equality-constrained least squares for factor-Brinson attribution.
+//! Full-rank, unweighted least squares with an optional holdings identity.
 //!
-//! Ordinary least squares regresses realized asset returns onto factor
-//! exposures without any guarantee that the fitted factor returns, when
-//! carried back through the *benchmark* (or portfolio) weights, reproduce the
-//! benchmark's actual realized return. Factor-Brinson attribution needs that
-//! guarantee: the attribution effects must sum exactly to the return being
-//! explained, or the decomposition does not close.
-//!
-//! [`constrained_least_squares`] solves the single linear equality constraint
-//! `w'Xf = w'r` on top of an unconstrained OLS fit, using the closed-form
-//! Lagrangian correction from Jeet & Partani (2023), Appendix A. This module
-//! is a standalone numerical building block; it does not know about
-//! portfolios, sectors, or attribution effects — those are composed by
-//! downstream callers (see `finstack-quant-portfolio`).
-//!
-//! # Quick Example
-//! ```rust
-//! use finstack_quant_analytics::regression::constrained_least_squares;
-//!
-//! // 3 assets, 2 binary factors (Exhibit 1 of Jeet & Partani 2023).
-//! let exposures = [0.0, 1.0, 1.0, 0.0, 0.0, 1.0];
-//! let returns = [0.05, 0.02, 0.01];
-//! let weights = [0.6, 0.3, 0.1];
-//!
-//! let f = constrained_least_squares(&exposures, 2, &returns, &weights).unwrap();
-//! assert_eq!(f.len(), 2);
-//! ```
-//!
-//! # References
-//! - Jeet & Partani (2023): see `docs/REFERENCES.md#jeet-partani-2023`
+//! Columns and targets are scaled independently for bounded SVD arithmetic.
+//! Holdings constrain the aggregate fitted return; they do not weight the loss.
 
 use finstack_quant_core::math::summation::neumaier_sum;
-use finstack_quant_core::{InputError, NonFiniteKind};
-use nalgebra::{DMatrix, DVector};
+use finstack_quant_core::{Error, InputError, NonFiniteKind};
+use nalgebra::DMatrix;
 
-/// Relative tolerance, on the Cauchy-Schwarz ratio `|w'Xg| / (‖w‖‖Xg‖)`,
-/// below which the constraint-restoring denominator `w'Xg` is treated as
-/// numerically zero, i.e. the equality constraint `w'Xf = w'r` cannot be
-/// enforced by any scalar Lagrangian correction.
-///
-/// This ratio is the cosine of the angle between `w` and `Xg`; it is
-/// dimensionless and invariant under any uniform rescaling of `w` (e.g.
-/// holdings expressed as percent vs. decimal fractions), unlike a bound on
-/// the raw `w'Xg` magnitude, which scales as `‖w‖²` under such a rescaling.
-/// When either `w` or `Xg` is the zero vector the ratio is (by convention)
-/// treated as `0`, which correctly flags that case as degenerate too.
-const CONSTRAINT_DEGENERACY_RELATIVE_TOLERANCE: f64 = 1e-10;
+const ACCEPTANCE_TOLERANCE: f64 = 1e-12;
 
-/// Relative tolerance for deciding that the unconstrained OLS fit already
-/// satisfies `w'Xf = w'r`, scaled by the Cauchy-Schwarz bounds for the
-/// realized and fitted weighted returns. The comparison first normalizes the
-/// vectors by their largest absolute components so finite input scales cannot
-/// overflow the bound to infinity.
-const CONSTRAINT_SATISFACTION_RELATIVE_TOLERANCE: f64 = 1e-12;
+fn calculation(message: &str) -> Error {
+    Error::Internal(format!("least-squares calculation failed: {message}"))
+}
 
-/// Relative singular-value tolerance used to detect rank-deficient design
-/// matrices in the underlying no-intercept least-squares solves.
-const RANK_TOLERANCE_FACTOR: f64 = 1.0e-10;
+/// A finite significand and unrestricted binary exponent for intermediate
+/// products. This keeps cancellation and unit conversion out of the IEEE
+/// overflow/underflow range until the requested result is materialized.
+#[derive(Clone, Copy, Debug)]
+struct Scaled {
+    significand: f64,
+    exponent: i32,
+}
 
-/// Factor returns `f` satisfying the single equality constraint `w'Xf = w'r`
-/// (Jeet & Partani 2023, Appendix A).
+impl Scaled {
+    fn new(value: f64) -> Self {
+        if value.abs() <= 0.0 {
+            return Self {
+                significand: value,
+                exponent: 0,
+            };
+        }
+        let mut value = value;
+        let mut adjustment = 0;
+        if value.abs() < f64::MIN_POSITIVE {
+            value *= 4_503_599_627_370_496.0;
+            adjustment = -52;
+        }
+        let bits = value.to_bits();
+        let exponent = ((bits >> 52) & 0x7ff) as i32 - 1022;
+        let significand = f64::from_bits((bits & !(0x7ff_u64 << 52)) | (1022_u64 << 52));
+        Self {
+            significand,
+            exponent: exponent + adjustment,
+        }
+    }
+
+    fn normalize(significand: f64, exponent: i32) -> Self {
+        let mut result = Self::new(significand);
+        if result.significand.abs() > 0.0 {
+            result.exponent += exponent;
+        }
+        result
+    }
+
+    fn mul(self, rhs: Self) -> Self {
+        Self::normalize(
+            self.significand * rhs.significand,
+            self.exponent + rhs.exponent,
+        )
+    }
+
+    fn div(self, rhs: Self) -> Self {
+        Self::normalize(
+            self.significand / rhs.significand,
+            self.exponent - rhs.exponent,
+        )
+    }
+
+    fn neg(self) -> Self {
+        Self {
+            significand: -self.significand,
+            ..self
+        }
+    }
+
+    fn at_exponent(self, exponent: i32) -> f64 {
+        if self.significand.abs() <= 0.0 {
+            return self.significand;
+        }
+        self.significand * 2.0_f64.powi(self.exponent - exponent)
+    }
+
+    fn value(self) -> finstack_quant_core::Result<f64> {
+        let value = if self.exponent > 1023 {
+            (self.significand * 2.0_f64.powi(1023)) * 2.0_f64.powi(self.exponent - 1023)
+        } else if self.exponent < -1022 {
+            (self.significand * 2.0_f64.powi(self.exponent + 1022)) * f64::MIN_POSITIVE
+        } else {
+            self.significand * 2.0_f64.powi(self.exponent)
+        };
+        if !value.is_finite() {
+            return Err(calculation(
+                "requested finite coefficient is not representable",
+            ));
+        }
+        Ok(value)
+    }
+}
+
+fn scaled_sum(values: impl IntoIterator<Item = Scaled>) -> Scaled {
+    let values: Vec<Scaled> = values
+        .into_iter()
+        .filter(|v| v.significand.abs() > 0.0)
+        .collect();
+    let exponent = values.iter().map(|v| v.exponent).max().unwrap_or(0);
+    let mut lower = Vec::new();
+    let sum = neumaier_sum(values.iter().filter_map(|v| {
+        let normalized = v.at_exponent(exponent);
+        if normalized.abs() <= 0.0 {
+            lower.push(*v);
+            None
+        } else {
+            Some(normalized)
+        }
+    }));
+    let result = Scaled::normalize(sum, exponent);
+    // Preserve terms below the current floating-point range when larger
+    // terms cancel. Rebase those terms after cancellation, rather than
+    // silently discarding the newly representable requested result.
+    if !lower.is_empty() && (result.significand.abs() <= 0.0 || result.exponent < exponent) {
+        lower.push(result);
+        return scaled_sum(lower);
+    }
+    result
+}
+
+fn scaled_dot(lhs: &[f64], rhs: &[Scaled]) -> Scaled {
+    scaled_sum(lhs.iter().zip(rhs).map(|(&a, &b)| Scaled::new(a).mul(b)))
+}
+
+fn norm(values: &[f64]) -> f64 {
+    let scale = values.iter().map(|v| v.abs()).fold(0.0, f64::max);
+    if scale <= 0.0 {
+        return 0.0;
+    }
+    scale * neumaier_sum(values.iter().map(|v| (v / scale).powi(2))).sqrt()
+}
+
+fn common_values(groups: &[&[Scaled]]) -> Vec<Vec<f64>> {
+    let exponent = groups
+        .iter()
+        .flat_map(|g| g.iter())
+        .filter(|v| v.significand.abs() > 0.0)
+        .map(|v| v.exponent)
+        .max()
+        .unwrap_or(0);
+    groups
+        .iter()
+        .map(|g| g.iter().map(|v| v.at_exponent(exponent)).collect())
+        .collect()
+}
+
+/// One column-normalized bounded decomposition, reusable for every target.
+struct NormalizedSvd {
+    original_design: DMatrix<f64>,
+    design: DMatrix<f64>,
+    scales: Vec<(f64, f64)>,
+    u: DMatrix<f64>,
+    vt: DMatrix<f64>,
+    singular_values: Vec<f64>,
+}
+
+impl NormalizedSvd {
+    fn new(mut design: DMatrix<f64>) -> finstack_quant_core::Result<Self> {
+        let (n, p) = design.shape();
+        if p == 0 || n < p {
+            return Err(InputError::DimensionMismatch.into());
+        }
+        ensure_finite(design.as_slice())?;
+        let original_design = design.clone();
+        let mut scales = Vec::with_capacity(p);
+        for mut column in design.column_iter_mut() {
+            let maximum = column.iter().map(|v| v.abs()).fold(0.0, f64::max);
+            if maximum <= 0.0 {
+                return Err(Error::Validation(
+                    "design matrix has an all-zero column".into(),
+                ));
+            }
+            let binary_scale = f64::from_bits(maximum.to_bits() & (0x7ff_u64 << 52));
+            let scale = if binary_scale > 0.0 {
+                binary_scale
+            } else {
+                maximum
+            };
+            let column_norm = neumaier_sum(column.iter().map(|v| (v / scale).powi(2))).sqrt();
+            // Retain both factors for subnormal norms too: rounding the
+            // combined norm first can substantially change the unit column.
+            scales.push((scale, column_norm));
+            for value in column.iter_mut() {
+                *value = *value / scale / column_norm;
+            }
+        }
+        let svd = design
+            .clone()
+            .try_svd(true, true, 5.0 * f64::EPSILON, 1000)
+            .ok_or_else(|| calculation("bounded SVD did not converge"))?;
+        ensure_finite(svd.singular_values.as_slice())
+            .map_err(|_| calculation("nonfinite singular values"))?;
+        if svd.singular_values.iter().any(|&value| value < 0.0) {
+            return Err(calculation("negative singular value"));
+        }
+        let maximum = svd.singular_values.iter().copied().fold(0.0, f64::max);
+        let tolerance = f64::EPSILON * n.max(p) as f64 * maximum;
+        let rank = svd
+            .singular_values
+            .iter()
+            .filter(|&&value| value > tolerance)
+            .count();
+        if rank != p {
+            return Err(Error::Validation(format!(
+                "design matrix is rank deficient (rank {rank} < {p})"
+            )));
+        }
+        let u = svd
+            .u
+            .ok_or_else(|| calculation("missing left singular vectors"))?;
+        let vt = svd
+            .v_t
+            .ok_or_else(|| calculation("missing right singular vectors"))?;
+        ensure_finite(u.as_slice()).map_err(|_| calculation("nonfinite left singular vectors"))?;
+        ensure_finite(vt.as_slice())
+            .map_err(|_| calculation("nonfinite right singular vectors"))?;
+        Ok(Self {
+            original_design,
+            design,
+            scales,
+            u,
+            vt,
+            singular_values: svd.singular_values.iter().copied().collect(),
+        })
+    }
+
+    fn projection_coordinates(&self, target: &[Scaled]) -> Vec<Scaled> {
+        self.u
+            .column_iter()
+            .map(|column| scaled_dot(column.as_slice(), target))
+            .collect()
+    }
+
+    fn resolved_projection_coordinates(&self, target: &[Scaled]) -> Vec<Scaled> {
+        // Reconstruct U' target from Z and the same SVD. This retains a
+        // small held-row projection that may have only absolute (rather
+        // than relative) accuracy in the stored left singular vectors.
+        let cross: Vec<Scaled> = self
+            .original_design
+            .column_iter()
+            .enumerate()
+            .map(|(j, column)| {
+                scaled_dot(column.as_slice(), target)
+                    .div(Scaled::new(self.scales[j].0))
+                    .div(Scaled::new(self.scales[j].1))
+            })
+            .collect();
+        (0..self.vt.nrows())
+            .map(|i| {
+                scaled_sum((0..self.vt.ncols()).map(|j| Scaled::new(self.vt[(i, j)]).mul(cross[j])))
+                    .div(Scaled::new(self.singular_values[i]))
+            })
+            .collect()
+    }
+
+    fn projected_values(&self, coordinates: &[Scaled]) -> Vec<Scaled> {
+        let normalized: Vec<Scaled> = (0..self.vt.ncols())
+            .map(|i| {
+                scaled_sum((0..self.vt.nrows()).map(|j| {
+                    Scaled::new(self.vt[(j, i)])
+                        .mul(coordinates[j])
+                        .div(Scaled::new(self.singular_values[j]))
+                }))
+            })
+            .collect();
+        (0..self.design.nrows())
+            .map(|i| {
+                scaled_sum(
+                    (0..self.design.ncols())
+                        .map(|j| Scaled::new(self.design[(i, j)]).mul(normalized[j])),
+                )
+            })
+            .collect()
+    }
+
+    fn refined_coordinates(&self, target: &[Scaled]) -> Vec<Scaled> {
+        let mut coordinates = self.projection_coordinates(target);
+        // Rebuild residuals from the design, then refine through the same
+        // bounded SVD. This recovers small components obscured by absolute
+        // roundoff in stored singular vectors without changing the model.
+        for _ in 0..2 {
+            let fitted = self.projected_values(&coordinates);
+            let residual: Vec<Scaled> = target
+                .iter()
+                .zip(fitted)
+                .map(|(&r, y)| scaled_sum([r, y.neg()]))
+                .collect();
+            let correction = self.projection_coordinates(&residual);
+            coordinates = coordinates
+                .into_iter()
+                .zip(correction)
+                .map(|(a, b)| scaled_sum([a, b]))
+                .collect();
+        }
+        coordinates
+    }
+
+    fn coefficients(
+        &self,
+        coordinates: &[Scaled],
+    ) -> finstack_quant_core::Result<(Vec<f64>, bool)> {
+        let mut underflowed = false;
+        let values = (0..self.vt.ncols())
+            .map(|i| {
+                let value = scaled_sum((0..self.vt.nrows()).map(|j| {
+                    Scaled::new(self.vt[(j, i)])
+                        .mul(coordinates[j])
+                        .div(Scaled::new(self.singular_values[j]))
+                }));
+                let requested = value
+                    .div(Scaled::new(self.scales[i].0))
+                    .div(Scaled::new(self.scales[i].1));
+                let coefficient = requested.value()?;
+                underflowed |= coefficient.abs() <= 0.0 && requested.significand.abs() > 0.0;
+                Ok(coefficient)
+            })
+            .collect::<finstack_quant_core::Result<_>>()?;
+        Ok((values, underflowed))
+    }
+
+    fn refine_rounded_coefficients(
+        &self,
+        target: &[Scaled],
+        mut coefficients: Vec<f64>,
+    ) -> finstack_quant_core::Result<Vec<f64>> {
+        for _ in 0..2 {
+            let fitted = self.fitted(&coefficients);
+            let residual: Vec<Scaled> = target
+                .iter()
+                .zip(fitted)
+                .map(|(&r, y)| scaled_sum([r, y.neg()]))
+                .collect();
+            if residual.iter().all(|v| v.significand.abs() <= 0.0) {
+                break;
+            }
+            let coordinates = self.refined_coordinates(&residual);
+            let (correction, _) = self.coefficients(&coordinates)?;
+            for (value, change) in coefficients.iter_mut().zip(correction) {
+                *value = scaled_sum([Scaled::new(*value), Scaled::new(change)]).value()?;
+            }
+        }
+        Ok(coefficients)
+    }
+
+    fn check_underflow(
+        &self,
+        underflowed: bool,
+        target: &[Scaled],
+        fitted: &[Scaled],
+    ) -> finstack_quant_core::Result<()> {
+        // A coefficient that is mathematically zero can acquire a tiny SVD
+        // rounding residue. Full column rank plus an exact original-data
+        // fit certifies the rounded vector as the unique zero-loss solution.
+        // Otherwise a collapsed requested coefficient remains unresolved.
+        if underflowed
+            && target
+                .iter()
+                .zip(fitted)
+                .any(|(&r, &y)| scaled_sum([r, y.neg()]).significand.abs() > 0.0)
+        {
+            return Err(calculation("requested finite coefficient underflowed"));
+        }
+        Ok(())
+    }
+
+    fn fitted(&self, coefficients: &[f64]) -> Vec<Scaled> {
+        (0..self.original_design.nrows())
+            .map(|i| {
+                scaled_sum((0..self.original_design.ncols()).map(|j| {
+                    Scaled::new(self.original_design[(i, j)]).mul(Scaled::new(coefficients[j]))
+                }))
+            })
+            .collect()
+    }
+
+    fn check_ols(&self, target: &[Scaled], fitted: &[Scaled]) -> finstack_quant_core::Result<()> {
+        let values = common_values(&[target, fitted]);
+        let residual: Vec<Scaled> = values[0]
+            .iter()
+            .zip(&values[1])
+            .map(|(&r, &y)| Scaled::new(r - y))
+            .collect();
+        let projected: Vec<f64> = self
+            .projection_coordinates(&residual)
+            .into_iter()
+            .map(Scaled::value)
+            .collect::<finstack_quant_core::Result<_>>()?;
+        if norm(&projected) > ACCEPTANCE_TOLERANCE * (norm(&values[0]) + norm(&values[1])) {
+            return Err(calculation(
+                "final OLS coefficients fail projection optimality",
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// Coefficients and fitted values from the same normalized full-rank solve.
+pub(crate) struct LeastSquaresFit {
+    /// Coefficients in the original design/target units.
+    pub coefficients: DMatrix<f64>,
+    /// Fitted responses divided by their corresponding target scale.
+    pub fitted: DMatrix<f64>,
+    /// Maximum absolute target values, or one for a zero target.
+    pub target_scales: Vec<f64>,
+}
+
+/// Solve equal-weight full-rank OLS and retain normalized fitted responses.
+pub(crate) fn normalized_svd_fit(
+    design: DMatrix<f64>,
+    targets: &DMatrix<f64>,
+) -> finstack_quant_core::Result<LeastSquaresFit> {
+    if targets.nrows() != design.nrows() || targets.ncols() == 0 {
+        return Err(InputError::DimensionMismatch.into());
+    }
+    ensure_finite(targets.as_slice())?;
+    let model = NormalizedSvd::new(design)?;
+    let mut coefficients = DMatrix::zeros(model.design.ncols(), targets.ncols());
+    let mut fitted = DMatrix::zeros(targets.nrows(), targets.ncols());
+    let mut target_scales = Vec::with_capacity(targets.ncols());
+    for j in 0..targets.ncols() {
+        let column = targets.column(j);
+        let target: Vec<Scaled> = column.iter().copied().map(Scaled::new).collect();
+        let coordinates = model.refined_coordinates(&target);
+        let (solution, underflowed) = model.coefficients(&coordinates)?;
+        let solution = if underflowed {
+            model.refine_rounded_coefficients(&target, solution)?
+        } else {
+            solution
+        };
+        let actual_fitted = model.fitted(&solution);
+        model.check_underflow(underflowed, &target, &actual_fitted)?;
+        model.check_ols(&target, &actual_fitted)?;
+        let scale = column.iter().map(|v| v.abs()).fold(0.0, f64::max);
+        let scale = if scale <= 0.0 { 1.0 } else { scale };
+        target_scales.push(scale);
+        for (i, value) in solution.into_iter().enumerate() {
+            coefficients[(i, j)] = value;
+        }
+        for (i, value) in actual_fitted.into_iter().enumerate() {
+            fitted[(i, j)] = value.div(Scaled::new(scale)).value()?;
+        }
+    }
+    Ok(LeastSquaresFit {
+        coefficients,
+        fitted,
+        target_scales,
+    })
+}
+
+fn equality(weights: &[f64], target: &[Scaled], fitted: &[Scaled]) -> (bool, Scaled) {
+    let realized: Vec<Scaled> = weights
+        .iter()
+        .zip(target)
+        .map(|(&w, &r)| Scaled::new(w).mul(r))
+        .collect();
+    let predicted: Vec<Scaled> = weights
+        .iter()
+        .zip(fitted)
+        .map(|(&w, &y)| Scaled::new(w).mul(y))
+        .collect();
+    let common = common_values(&[&realized, &predicted]);
+    let mismatch = neumaier_sum(common[0].iter().zip(&common[1]).map(|(&r, &y)| r - y));
+    let gross = neumaier_sum(
+        common[0]
+            .iter()
+            .zip(&common[1])
+            .map(|(&r, &y)| r.abs() + y.abs()),
+    );
+    let delta = scaled_sum(
+        realized
+            .into_iter()
+            .chain(predicted.into_iter().map(Scaled::neg)),
+    );
+    (mismatch.abs() <= ACCEPTANCE_TOLERANCE * gross, delta)
+}
+
+/// Fit unweighted residual least squares subject to `weights' X f = weights' returns`.
 ///
-/// Ordinary least squares fits `f̂ = argmin ‖r − Xf‖²`, the return-explaining
-/// factor returns. That fit generally does *not* satisfy `w'Xf̂ = w'r`: the
-/// weighted (e.g. benchmark) return implied by the fitted factor returns need
-/// not equal the weighted realized return. This function adds the minimal
-/// correction along the constraint-restoring direction
-/// `g = argmin ‖w − Xg‖² = (X'X)⁻¹X'w` so that the corrected factor returns
-/// `f = f̂ + λg` satisfy the constraint exactly, where the Lagrange multiplier
-///
-/// ```text
-/// λ = w'(r − Xf̂) / (w'Xg) = w'ε̂ / (w'Xg)
-/// ```
-///
-/// is the ratio of the weighted OLS residual to the weighted constraint
-/// direction. Both `f̂` and `g` are computed as no-intercept least-squares
-/// solves of the same design matrix `X` against `r` and `w` respectively.
+/// Signed, unnormalized and zero holdings are supported. No intercept is
+/// inserted; zero-holding assets still participate in the unweighted loss.
 ///
 /// # Arguments
 ///
-/// * `exposures` - Row-major factor exposure matrix, `n_assets × n_factors`:
-///   asset `i`'s exposure to factor `j` is `exposures[i * n_factors + j]`.
-/// * `n_factors` - Positive number of factor columns in `exposures`.
-/// * `returns` - Realized asset returns, length `n_assets`.
-/// * `weights` - Holding weights whose weighted return `w'r` must be fully
-///   reproduced by `w'Xf` (e.g. benchmark weights for a benchmark-return
-///   attribution).
-///
-/// # Returns
-///
-/// The constrained factor returns `f`, one per factor, satisfying
-/// `w'Xf = w'r` to numerical precision.
+/// * `exposures` - Finite row-major `returns.len() × n_factors` design matrix;
+///   callers supply any intercept explicitly and own exposure units/order.
+/// * `n_factors` - Positive independent factor-column count, at most the asset count.
+/// * `returns` - Finite aligned observation-period response per asset, in common units.
+/// * `weights` - Finite signed holdings per asset, defining the one aggregate identity;
+///   these are not residual-loss weights and need not sum to one.
 ///
 /// # Errors
 ///
-/// Returns an error when:
-/// - `n_factors` is `0`, or `returns` (equivalently `n_assets`) is empty.
-/// - `n_assets * n_factors` overflows, `exposures.len()` does not equal that
-///   product, or `weights.len() != n_assets` (dimension mismatch).
-/// - any input value is `NaN` or infinite.
-/// - the design matrix `X` is rank-deficient (either least-squares solve is
-///   underdetermined).
-/// - coefficient rescaling, the Lagrange multiplier, or a corrected
-///   coefficient overflows to a non-finite value.
-/// - `|w'Xg|` is numerically zero *relative to* `‖w‖·‖Xg‖` (a `1e-10`
-///   bound on the Cauchy-Schwarz ratio `|w'Xg| / (‖w‖‖Xg‖)`), meaning `w`
-///   and the constraint direction `Xg` are (numerically) orthogonal and the
-///   constraint cannot be restored by any scalar correction. This rejection
-///   applies only when the OLS fit does not already satisfy the constraint to
-///   a scale-aware `1e-12` relative tolerance. The test is scale-invariant:
-///   rescaling `weights` uniformly (e.g. percent vs. decimal) does not change
-///   whether it fires.
-///
-/// # Ill-Conditioning
-///
-/// The degeneracy guard above is a bound on how close `w` and `Xg` are to
-/// *exactly* orthogonal; it does not bound how close they are to that
-/// boundary. A `w` just inside the guard can still make `w'Xg` small enough
-/// that `λ = w'ε̂ / (w'Xg)`, and therefore `f`, is very large in magnitude.
-/// That large `f` is the mathematically correct constrained solution for an
-/// ill-conditioned `(X, w)` pair, not a bug: `|f| ≫ 1` (e.g. an implied
-/// factor return far outside any plausible range) is a signal to inspect the
-/// conditioning of the inputs — near-collinear factor exposures or a weight
-/// vector nearly orthogonal to the constraint direction — rather than
-/// evidence that this function mis-solved the constraint.
+/// Invalid dimensions, nonfinite observations, deficient design or a genuinely
+/// infeasible equality are input/model errors. Bounded decomposition exhaustion,
+/// unresolved arithmetic, unrepresentable coefficients or failed final weighted
+/// equality/projection-optimality checks are calculation errors.
 ///
 /// # Examples
 ///
 /// ```rust
 /// use finstack_quant_analytics::regression::constrained_least_squares;
-///
-/// let exposures = [1.2, -0.8, 0.5, 1.2, -0.7, 0.7];
-/// let returns = [0.05, 0.02, 0.01];
-/// let weights = [0.6, 0.3, 0.1];
-///
-/// let f = constrained_least_squares(&exposures, 2, &returns, &weights).unwrap();
-///
-/// // The constraint holds exactly (to numerical precision).
-/// let wxf: f64 = (0..3)
-///     .map(|i| weights[i] * (exposures[i * 2] * f[0] + exposures[i * 2 + 1] * f[1]))
-///     .sum();
-/// let wr: f64 = (0..3).map(|i| weights[i] * returns[i]).sum();
-/// assert!((wxf - wr).abs() < 1e-9);
+/// let fit = constrained_least_squares(
+///     &[0.0,1.0,1.0,0.0,0.0,1.0], 2,
+///     &[0.05,0.02,0.01], &[0.6,0.3,0.1],
+/// )?;
+/// assert!((0.3*fit[0]+0.7*fit[1]-0.037).abs() < 1e-12);
+/// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-///
-/// # References
-///
-/// - Jeet, V., & Partani, A. (2023). "Brinson-Style Attribution over
-///   Continuous Factors." *The Journal of Portfolio Management*, Quantitative
-///   Special Issue 2023, 216-223. See . `docs/REFERENCES.md#jeet-partani-2023`
 pub fn constrained_least_squares(
     exposures: &[f64],
     n_factors: usize,
     returns: &[f64],
     weights: &[f64],
 ) -> finstack_quant_core::Result<Vec<f64>> {
-    let n_assets = returns.len();
-    if n_assets == 0 || n_factors == 0 {
-        return Err(finstack_quant_core::Error::Validation(
-            "constrained least squares needs at least one asset and one factor".to_string(),
+    let n = returns.len();
+    if n == 0 || n_factors == 0 {
+        return Err(Error::Validation(
+            "constrained least squares needs at least one asset and one factor".into(),
         ));
     }
-    let expected_exposures = n_assets
-        .checked_mul(n_factors)
-        .ok_or(InputError::DimensionMismatch)?;
-    if exposures.len() != expected_exposures || weights.len() != n_assets {
+    if n.checked_mul(n_factors) != Some(exposures.len()) || weights.len() != n {
         return Err(InputError::DimensionMismatch.into());
     }
     ensure_finite(exposures)?;
     ensure_finite(returns)?;
     ensure_finite(weights)?;
-
-    let x_matrix = DMatrix::from_row_slice(n_assets, n_factors, exposures);
-    let r_vector = DVector::from_row_slice(returns);
-    // Uniform weight scaling leaves the equality constraint unchanged. Keep
-    // weights bounded throughout the solve and correction, so products cannot
-    // overflow or underflow merely because holdings use different units.
-    let weight_scale = weights.iter().map(|value| value.abs()).fold(0.0, f64::max);
-    let w_vector = if weight_scale > 0.0 {
-        DVector::from_iterator(n_assets, weights.iter().map(|value| value / weight_scale))
+    let model = NormalizedSvd::new(DMatrix::from_row_slice(n, n_factors, exposures))?;
+    let target: Vec<Scaled> = returns.iter().copied().map(Scaled::new).collect();
+    let coordinates = model.refined_coordinates(&target);
+    let y0 = model.projected_values(&coordinates);
+    model.check_ols(&target, &y0)?;
+    let (satisfied, delta) = equality(weights, &target, &y0);
+    let holdings: Vec<Scaled> = weights.iter().copied().map(Scaled::new).collect();
+    let direction = model.resolved_projection_coordinates(&holdings);
+    let normalized = common_values(&[&direction]);
+    let direction_norm = norm(&normalized[0]);
+    let mut corrected = coordinates.clone();
+    let mut unit_direction = None;
+    if !satisfied {
+        // Exact compensated X'w detects a genuinely orthogonal holdings
+        // vector without turning a merely small projection into infeasibility.
+        let orthogonal = model
+            .original_design
+            .column_iter()
+            .all(|column| scaled_dot(column.as_slice(), &holdings).significand.abs() <= 0.0);
+        if orthogonal {
+            return Err(InputError::ConstraintUnreachable { denominator: 0.0 }.into());
+        }
+        if direction_norm <= 0.0 {
+            return Err(calculation("nonzero holdings projection is unresolved"));
+        }
+        let largest_exponent = direction
+            .iter()
+            .filter(|v| v.significand.abs() > 0.0)
+            .map(|v| v.exponent)
+            .max()
+            .unwrap_or(0);
+        let h_norm = Scaled::normalize(direction_norm, largest_exponent);
+        let magnitude = delta.div(h_norm);
+        let unit: Vec<f64> = normalized[0].iter().map(|v| v / direction_norm).collect();
+        corrected = coordinates
+            .iter()
+            .zip(&unit)
+            .map(|(&a, &u)| scaled_sum([a, Scaled::new(u).mul(magnitude)]))
+            .collect();
+        unit_direction = Some(unit);
+    }
+    let (coefficients, underflowed) = model.coefficients(&corrected)?;
+    let coefficients = if underflowed {
+        model.refine_rounded_coefficients(&target, coefficients)?
     } else {
-        DVector::zeros(n_assets)
+        coefficients
     };
-
-    // Solve both right-hand sides from one factorization of the scaled
-    // exposure matrix:
-    // f̂ = argmin ‖r − Xf‖²
-    // g = argmin ‖w − Xg‖² = (X'X)⁻¹X'w
-    let targets = DMatrix::from_columns(&[r_vector.clone(), w_vector.clone()]);
-    let solutions = normalized_svd_least_squares(x_matrix.clone(), &targets)?;
-    let f_hat = solutions.column(0).into_owned();
-    let g = solutions.column(1).into_owned();
-
-    // ε̂ = r − Xf̂ (OLS residual).
-    let fitted = &x_matrix * &f_hat;
-    let residual = &r_vector - &fitted;
-    let w_dot_residual = w_vector.dot(&residual);
-
-    // A correction direction is unnecessary when OLS already satisfies the
-    // equality constraint. Normalize weights and returns separately before
-    // comparing the Cauchy-Schwarz-scaled ratio: the common scale factors
-    // cancel, avoiding overflow in ‖w‖ * (‖r‖ + ‖Xf̂‖).
-    let return_scale = r_vector
+    let fitted = model.fitted(&coefficients);
+    model.check_underflow(underflowed, &target, &fitted)?;
+    if !equality(weights, &target, &fitted).0 {
+        return Err(calculation(
+            "final coefficients fail weighted-gross equality",
+        ));
+    }
+    let common = common_values(&[&target, &fitted, &y0]);
+    let change: Vec<f64> = common[1]
         .iter()
-        .chain(fitted.iter())
-        .map(|value| value.abs())
-        .fold(0.0, f64::max);
-    let ols_satisfies_constraint = if weight_scale == 0.0 || return_scale == 0.0 {
-        true
-    } else if !return_scale.is_finite() {
-        false
-    } else {
-        let scaled_returns = r_vector.map(|value| value / return_scale);
-        let scaled_fitted = fitted.map(|value| value / return_scale);
-        let scaled_residual = &scaled_returns - &scaled_fitted;
-        let scaled_bound = CONSTRAINT_SATISFACTION_RELATIVE_TOLERANCE
-            * w_vector.norm()
-            * (scaled_returns.norm() + scaled_fitted.norm());
-        let scaled_weighted_residual = w_vector.dot(&scaled_residual);
-        scaled_weighted_residual.is_finite() && scaled_weighted_residual.abs() <= scaled_bound
-    };
-    if ols_satisfies_constraint {
-        return Ok(f_hat.iter().copied().collect());
-    }
-
-    let x_g = &x_matrix * &g;
-    let w_dot_xg = w_vector.dot(&x_g);
-
-    // Scale-invariant degeneracy test: compare |w'Xg| against a bound
-    // relative to ‖w‖·‖Xg‖ rather than an absolute epsilon (see the
-    // constant's doc comment). By Cauchy-Schwarz, |w'Xg| <= ‖w‖·‖Xg‖
-    // always, so this is equivalent to bounding the cosine of the angle
-    // between `w` and `Xg`. Using `<=` (not `<`) also catches the exact-zero
-    // case (either vector is zero) without a separate branch: the bound
-    // itself becomes `0`, and `0.abs() <= 0` is true.
-    let degeneracy_bound = CONSTRAINT_DEGENERACY_RELATIVE_TOLERANCE * w_vector.norm() * x_g.norm();
-    if !w_dot_xg.is_finite() || w_dot_xg.abs() <= degeneracy_bound {
-        return Err(InputError::ConstraintUnreachable {
-            denominator: w_dot_xg,
-        }
-        .into());
-    }
-
-    let lambda = w_dot_residual / w_dot_xg;
-    ensure_finite(&[lambda])?;
-    let f = f_hat + g * lambda;
-    ensure_finite(f.as_slice())?;
-
-    Ok(f.iter().copied().collect())
-}
-
-/// Solve `argmin_B ‖Y − XB‖²` after normalizing each design column.
-///
-/// The caller controls whether the design includes an intercept. The returned
-/// coefficient matrix has one row per design column and one column per target.
-pub(crate) fn normalized_svd_least_squares(
-    mut design: DMatrix<f64>,
-    targets: &DMatrix<f64>,
-) -> finstack_quant_core::Result<DMatrix<f64>> {
-    let (n, p) = design.shape();
-    if n == 0 || p == 0 || targets.nrows() != n || targets.ncols() == 0 {
-        return Err(InputError::DimensionMismatch.into());
-    }
-
-    let mut scales = Vec::with_capacity(p);
-    for column in design.column_iter() {
-        let max_value = column.iter().map(|value| value.abs()).fold(0.0, f64::max);
-        if !max_value.is_finite() || max_value <= 0.0 {
-            return Err(finstack_quant_core::Error::Validation(
-                "design matrix has an all-zero or non-finite column".to_string(),
-            ));
-        }
-        // Exact binary scaling avoids squared overflow/underflow without
-        // changing the rounding of ordinary column norms. Preserve a single
-        // rounded divisor whenever the full norm is representable.
-        let binary_scale = f64::from_bits(max_value.to_bits() & (0x7ff_u64 << 52));
-        let scale = if binary_scale > 0.0 {
-            binary_scale
-        } else {
-            max_value
-        };
-        let norm = neumaier_sum(column.iter().map(|value| (value / scale).powi(2))).sqrt();
-        let full_norm = scale * norm;
-        scales.push(if full_norm.is_finite() {
-            (full_norm, 1.0)
-        } else {
-            (scale, norm)
-        });
-    }
-
-    for (col_idx, &(scale, norm)) in scales.iter().enumerate() {
-        for row_idx in 0..n {
-            design[(row_idx, col_idx)] = design[(row_idx, col_idx)] / scale / norm;
-        }
-    }
-
-    let svd = design.svd(true, true);
-    let max_singular = svd.singular_values.iter().copied().fold(0.0_f64, f64::max);
-    let tolerance = RANK_TOLERANCE_FACTOR * max_singular.max(1.0);
-    // The column-norm guard above already rejected zero / non-finite
-    // columns, so any remaining shortfall is rank-deficiency relative to `p`.
-    let rank = svd
-        .singular_values
-        .iter()
-        .filter(|&&value| value > tolerance)
-        .count();
-    if rank < p {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "design matrix is rank deficient (rank {rank} < {p})"
-        )));
-    }
-
-    let beta_scaled = svd.solve(targets, tolerance).map_err(|_| {
-        finstack_quant_core::Error::Validation(
-            "SVD solve failed for the normalized least-squares system".to_string(),
+        .zip(&common[2])
+        .map(|(&y, &base)| y - base)
+        .collect();
+    let check = if let Some(unit) = unit_direction {
+        let change_scaled: Vec<Scaled> = change.iter().copied().map(Scaled::new).collect();
+        let coordinates = model.projection_coordinates(&change_scaled);
+        let coordinates: Vec<f64> = coordinates
+            .into_iter()
+            .map(Scaled::value)
+            .collect::<finstack_quant_core::Result<_>>()?;
+        let along = neumaier_sum(unit.iter().zip(&coordinates).map(|(&a, &b)| a * b));
+        let projected: Vec<f64> = model
+            .projected_values(
+                &unit
+                    .iter()
+                    .map(|&u| Scaled::new(u * along))
+                    .collect::<Vec<_>>(),
+            )
+            .into_iter()
+            .map(Scaled::value)
+            .collect::<finstack_quant_core::Result<_>>()?;
+        norm(
+            &change
+                .iter()
+                .zip(&projected)
+                .map(|(&v, &p)| v - p)
+                .collect::<Vec<_>>(),
         )
-    })?;
-
-    let mut beta = beta_scaled;
-    for (row_idx, &(scale, norm)) in scales.iter().enumerate() {
-        for col_idx in 0..beta.ncols() {
-            beta[(row_idx, col_idx)] = beta[(row_idx, col_idx)] / norm / scale;
-        }
+    } else {
+        model.check_ols(&target, &fitted)?;
+        norm(&change)
+    };
+    let bound = ACCEPTANCE_TOLERANCE * (norm(&common[0]) + norm(&common[1]) + norm(&common[2]));
+    if check > bound {
+        return Err(calculation(
+            "final constrained coefficients fail projection optimality",
+        ));
     }
-    ensure_finite(beta.as_slice())?;
-    Ok(beta)
+    Ok(coefficients)
 }
 
-/// Returns an error if any value in `values` is `NaN` or infinite.
+/// Returns an input error if any supplied value is NaN or infinite.
 ///
 /// # Arguments
 ///
-/// * `values` - Input or computed floating-point values that must all be finite.
+/// * `values` - Input floating-point observations required to be finite.
 pub(crate) fn ensure_finite(values: &[f64]) -> finstack_quant_core::Result<()> {
     for &value in values {
-        if value.is_nan() {
-            return Err(InputError::NonFiniteValue {
-                kind: NonFiniteKind::NaN,
-            }
-            .into());
-        }
-        if value.is_infinite() {
-            let kind = if value.is_sign_positive() {
+        if !value.is_finite() {
+            let kind = if value.is_nan() {
+                NonFiniteKind::NaN
+            } else if value.is_sign_positive() {
                 NonFiniteKind::PosInfinity
             } else {
                 NonFiniteKind::NegInfinity
@@ -351,10 +649,98 @@ pub(crate) fn ensure_finite(values: &[f64]) -> finstack_quant_core::Result<()> {
     }
     Ok(())
 }
-
 #[cfg(test)]
 mod tests {
     use super::constrained_least_squares;
+
+    #[test]
+    fn subnormal_identity_retains_exact_zero_intercept() {
+        use nalgebra::DMatrix;
+        let x = [1e-320, 2e-320, 3e-320, 4e-320];
+        let design = DMatrix::from_fn(4, 2, |i, j| if j == 0 { 1.0 } else { x[i] });
+        let target = DMatrix::from_column_slice(4, 1, &x);
+        let fit = super::normalized_svd_fit(design, &target).unwrap();
+        assert_eq!(fit.coefficients[(0, 0)], 0.0);
+        assert_eq!(fit.coefficients[(1, 0)], 1.0);
+        let exposures: Vec<f64> = x.into_iter().flat_map(|value| [1.0, value]).collect();
+        for weights in [[0.0; 4], [1.0; 4]] {
+            let constrained = constrained_least_squares(&exposures, 2, &x, &weights).unwrap();
+            assert_eq!(constrained, vec![0.0, 1.0]);
+        }
+    }
+
+    #[test]
+    fn genuinely_unrepresentable_coefficient_is_not_silently_zero() {
+        use nalgebra::DMatrix;
+        assert!(
+            super::normalized_svd_fit(
+                DMatrix::from_element(1, 1, 1e308),
+                &DMatrix::from_element(1, 1, 1e-320)
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn lower_exponent_terms_survive_large_cancellation() {
+        let value = super::scaled_sum([1e308, -1e308, 1e-320].into_iter().map(super::Scaled::new))
+            .value()
+            .unwrap();
+        assert_eq!(value, 1e-320);
+    }
+
+    #[test]
+    fn original_design_retains_tiny_held_exposure_after_column_scaling() {
+        let fit = constrained_least_squares(&[1e308, 1e-308], 1, &[0.0, 1.0], &[0.0, 1.0]).unwrap();
+        assert!((fit[0] / 1e308 - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn unheld_asset_cannot_loosen_weighted_gross_equality() {
+        let coefficients = constrained_least_squares(&[1e-14, 1.0], 1, &[2e-14, 1.0], &[1.0, 0.0])
+            .expect("tiny but resolved held exposure defines a feasible equality");
+        assert!((coefficients[0] - 2.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn zero_return_avoids_unrequested_auxiliary_overflow() {
+        assert_eq!(
+            constrained_least_squares(&[1e-320], 1, &[0.0], &[1.0]).unwrap(),
+            vec![0.0]
+        );
+    }
+
+    #[test]
+    fn subnormal_design_and_response_recover_finite_coefficients() {
+        let fit = constrained_least_squares(&[1e-320], 1, &[1e-320], &[1.0]).unwrap();
+        assert!((fit[0] - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn roundoff_rank_gate_keeps_resolvable_near_collinearity() {
+        use nalgebra::DMatrix;
+        let design = DMatrix::from_row_slice(3, 2, &[1.0, 1.0, 0.0, 1e-12, 0.0, 0.0]);
+        let target = DMatrix::from_column_slice(3, 1, &[2.0, 1e-12, 0.0]);
+        let fit = super::normalized_svd_fit(design, &target)
+            .unwrap()
+            .coefficients;
+        assert!((fit[(0, 0)] - 1.0).abs() < 1e-3, "{}", fit[(0, 0)]);
+        assert!((fit[(1, 0)] - 1.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn shared_solve_rejects_nonfinite_entries_and_underdetermined_models() {
+        use nalgebra::DMatrix;
+        let finite = DMatrix::from_element(1, 1, 1.0);
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(super::normalized_svd_fit(DMatrix::from_element(1, 1, bad), &finite).is_err());
+            assert!(
+                super::normalized_svd_fit(finite.clone(), &DMatrix::from_element(1, 1, bad))
+                    .is_err()
+            );
+        }
+        assert!(super::normalized_svd_fit(DMatrix::from_element(1, 2, 1.0), &finite).is_err());
+    }
 
     #[test]
     fn binary_factor_case_matches_hand_closed_form() {
@@ -434,10 +820,12 @@ mod tests {
 
     #[test]
     fn uniform_weight_scaling_preserves_reachable_and_unreachable_constraints() {
-        for scale in [1.0e-320, 1.0e-200, 1.0, 100.0, 1.0e200, 1.0e308] {
+        for scale in [
+            -1.0e308, -1.0, -1.0e-320, 1.0e-320, 1.0e-200, 1.0, 100.0, 1.0e200, 1.0e308,
+        ] {
             let weights = [scale, scale];
             let coefficients = constrained_least_squares(&[1.0, 0.0], 1, &[0.0, 1.0], &weights)
-                .expect("uniform weight scaling leaves the solution unchanged");
+                .unwrap_or_else(|e| panic!("uniform scale {scale}: {e}"));
             assert!((coefficients[0] - 1.0).abs() < 1.0e-12);
             assert!(constrained_least_squares(&[1.0, -1.0], 1, &[0.02, 0.01], &weights).is_err());
         }
@@ -600,18 +988,10 @@ mod tests {
             constrained_least_squares(&x, 1, &r, &w).is_err()
         };
 
-        // Below the relative-ratio tolerance (~delta): still degenerate,
-        // regardless of scale. Exercises the raw-zero test's blind spot:
-        // the old absolute threshold on w'Xg could not distinguish this
-        // near-zero-but-nonzero denominator from the exact w'Xg == 0 case
-        // that `orthogonal_weights_fail_closed` already covers.
-        assert!(classify(1e-12, 1.0), "delta=1e-12, c=1 should error");
-        assert!(classify(1e-12, 100.0), "delta=1e-12, c=100 should error");
-
-        // Above the tolerance: no longer treated as degenerate, in either
-        // scale. Under the old *absolute* threshold this pair would have
-        // disagreed (raw w'Xg scales as c^2, so only the c=1 case passed);
-        // the relative criterion agrees for both.
+        // Both directions are nonzero and resolved. There is no separate
+        // magnitude/cosine floor on feasible constraints.
+        assert!(!classify(1e-12, 1.0));
+        assert!(!classify(1e-12, 100.0));
         assert!(!classify(1e-8, 1.0), "delta=1e-8, c=1 should NOT error");
         assert!(!classify(1e-8, 100.0), "delta=1e-8, c=100 should NOT error");
     }

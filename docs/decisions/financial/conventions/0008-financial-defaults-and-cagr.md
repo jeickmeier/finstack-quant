@@ -53,8 +53,9 @@ spreadsheet reconciliation.
 ## Implementation notes and references
 
 Acceptance establishes the default; it does not certify implementation compliance.
-Implementation reconciliation is tracked in
-[the CAGR follow-up](../../FOLLOW_UPS.md#cagr-default).
+The [accepted analytics wealth and dated-growth contract](../analytics/02-wealth-and-annualization.md#accepted-decision-wealth-means-cagr-relative-wealth-and-cash-series)
+implements this default. Its [validation evidence](../analytics/README.md#implementation-evidence)
+records the checked scope and numerical limits.
 
 - [CAGR day-count type and calculation](../../../../finstack-quant/analytics/src/risk_metrics/return_based.rs).
 - [Performance CAGR and default-dependent calculations](../../../../finstack-quant/analytics/src/performance/scalar.rs).

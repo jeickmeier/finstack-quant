@@ -17,8 +17,8 @@ mod fixtures;
 use std::hint::black_box;
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use finstack_quant_analytics::Performance;
 use finstack_quant_analytics::regression::constrained_least_squares;
-use finstack_quant_analytics::{Performance, ReturnKind};
 use finstack_quant_core::dates::PeriodKind;
 use finstack_quant_core::math::linalg::{
     NearestCorrelationOpts, nearest_correlation, validate_correlation_matrix,
@@ -55,7 +55,7 @@ fn scaling_expected_shortfall(c: &mut Criterion) {
 fn scaling_from_returns(c: &mut Criterion) {
     let mut group = c.benchmark_group("scaling_from_returns");
     for n in [750_usize, 2_500, 10_000, 40_000] {
-        let dates = synthetic_dates(n);
+        let dates = synthetic_dates(n + 1);
         let rets = synthetic_returns(n, 3);
         group.throughput(Throughput::Elements(n as u64));
         group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
@@ -82,7 +82,12 @@ fn scaling_cumulative_returns(c: &mut Criterion) {
         let perf = perf_from_returns(n, 53);
         group.throughput(Throughput::Elements(n as u64));
         group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
-            b.iter(|| black_box(perf.cumulative_returns()));
+            b.iter(|| {
+                black_box(
+                    perf.cumulative_returns()
+                        .expect("representable cumulative returns"),
+                )
+            });
         });
     }
     group.finish();
@@ -124,7 +129,12 @@ fn scaling_correlation_matrix(c: &mut Criterion) {
             BenchmarkId::from_parameter(n_tickers),
             &n_tickers,
             |b, _| {
-                b.iter(|| black_box(perf.correlation_matrix().expect("correlation")));
+                b.iter(|| {
+                    black_box(
+                        perf.correlation_matrix()
+                            .expect("valid common-sample correlation"),
+                    )
+                });
             },
         );
     }
@@ -207,7 +217,7 @@ fn scaling_multi_factor_greeks(c: &mut Criterion) {
             b.iter(|| {
                 let factors: [&[f64]; 3] = [&factor_a, &factor_b, &factor_c];
                 black_box(
-                    perf.multi_factor_greeks(3, &factors, ReturnKind::Excess)
+                    perf.multi_factor_greeks(3, &factors, 0.0)
                         .expect("multi factor"),
                 )
             });

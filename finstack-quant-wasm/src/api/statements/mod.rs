@@ -334,7 +334,7 @@ pub fn statement_result_to_table_long(
 ) -> Result<JsValue, JsValue> {
     let result: finstack_quant_statements::evaluator::StatementResult =
         serde_json::from_str(&json_text(&result_json, "resultJson")?).map_err(to_js_err)?;
-    crate::utils::to_js_value(&result.to_table_long().map_err(to_js_err)?)
+    crate::utils::to_js_table_numeric(&result.to_table_long().map_err(to_js_err)?)
 }
 
 /// Export a statement result as a wide-format table.
@@ -343,7 +343,7 @@ pub fn statement_result_to_table_long(
 /// (Rust `StatementResult::to_table_wide`): one row per period in
 /// chronological order and one column per node in declaration order.
 /// @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
-/// @returns `TableEnvelope` with a `period_id` column followed by one value column per node; a node with no value in a period holds `NaN` (serialized as `null`), not zero.
+/// @returns `TableEnvelope` with a `period_id` column followed by one value column per node; a node with no value in a period holds native numeric `NaN`, not zero. Canonical table JSON retains the established `"nan"` sentinel.
 ///
 /// # Errors
 ///
@@ -359,7 +359,7 @@ pub fn statement_result_to_table_wide(
 ) -> Result<JsValue, JsValue> {
     let result: finstack_quant_statements::evaluator::StatementResult =
         serde_json::from_str(&json_text(&result_json, "resultJson")?).map_err(to_js_err)?;
-    crate::utils::to_js_value(&result.to_table_wide().map_err(to_js_err)?)
+    crate::utils::to_js_table_numeric(&result.to_table_wide().map_err(to_js_err)?)
 }
 
 /// Canonical content hash of a financial model.

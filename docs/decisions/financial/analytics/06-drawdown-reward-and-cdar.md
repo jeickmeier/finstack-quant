@@ -4,26 +4,15 @@
 availability and failure package below (2026-11-07). Path/episode construction
 and broader summary policies retain the scope of their owning records.
 
-**Implementation status:** Observed in the source paths below, including the stated discrepancies and fallback behavior.
+**Implementation status:** Implemented in the analytics decision reconciliation dated 2026-11-08. The accepted sections below define the current contract.
 
-**Validation status:** Source inspected; test evidence inspected or located as identified below, not executed. No financial accuracy certification or runtime change is implied.
+**Validation status:** Scoped implementation checks and their limits are recorded in the [analytics inventory](README.md#implementation-evidence). A passing numerical fixture establishes its stated case; it does not certify a population estimator or every supported input.
 
-**Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See the [scope and exact source manifest](README.md).
-
-## Choice, scope and conventions
-
-Reward/drawdown ratios combine the dated compounded CAGR with a path or episode denominator. CAGR's current ACT/365.25 default conflicts with accepted ACT/365F as described in [record 02](02-wealth-and-annualization.md). Drawdown depths are negative decimal fractions; risk denominators are positive magnitudes. Cash parameters on Sterling/Burke/Pain are annual rates subtracted directly from dated CAGR, unlike the geometric per-observation cash conversion used by arithmetic Sharpe.
-
-The [accepted cash-rate decision](02-wealth-and-annualization.md#accepted-decision-cash-rates)
-owns cash representation, subtraction and validation. Invalid-cash NaN
-propagation below requires reconciliation.
+**Audit provenance:** The original source audit was performed on 2026-11-05 at `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. Its historical discrepancies are superseded by the accepted contracts and this implementation. The [source ledger](coverage.json) retains source ownership and dated inspection fingerprints.
 
 ## Accepted decision: drawdown reward and CDaR
 
-**Accepted:** 2026-11-07. **Implementation:** Partial; selected source
-inspected at `5140b499cc`. Martin cash, Burke selection/normalization,
-Sterling inputs, empty-history outcomes and numerical-failure propagation
-require reconciliation. No runtime estimator checks were executed.
+**Accepted:** 2026-11-07.
 
 This package covers method, population, parameter, availability and failure
 choices in this record. Previously accepted cash conventions, ACT/365F dated
@@ -82,8 +71,7 @@ over path/episode inputs, rather than choosing their construction rules.
   zero reward/zero risk is undefined. This does not change raw path drawdowns
   or infer zero maximum drawdown from the episode list.
 - Available all-zero drawdowns give CDaR zero. A singleton CDaR sample returns
-  its observed drawdown. Empty CDaR becomes undefined, replacing the current
-  zero substitution.
+  its observed drawdown. Empty CDaR is undefined.
 - Invalid requests retain explicit validation errors. Nonfinite computed
   reward, path or risk denominator, or a nonfinite ratio computed with a finite
   positive denominator, is a calculation error rather than missing-history NaN, zero risk or
@@ -96,9 +84,16 @@ over path/episode inputs, rather than choosing their construction rules.
 
 ### Variant interpretation and scope
 
+[Martin's own Ulcer/UPI description](https://www.tangotools.com/ui/ui.htm)
+defines RMS percentage drawdown and cash-adjusted return over that risk.
+This API explicitly chooses decimal units and dated CAGR for its annual
+reward. The [Kestner bibliographic entry](../../../REFERENCES.md#kestner2003)
+records the correct 2003 edition as practitioner context, without asserting
+that every Sterling variant matches this API.
+
 The modified-Burke observation-count normalization follows the
 [package authors' documented definition](https://search.r-project.org/CRAN/refmans/PerformanceAnalytics/html/BurkeRatio.html).
-The current episode-RMS denominator instead divides by episode count. With
+An episode-RMS alternative instead divides by episode count. With
 100 return observations and four episodes, the accepted ratio is five times
 the episode-RMS ratio for identical reward and depths. Observation-normalized
 modified Burke is sampling-dependent; it must not be presented as invariant
@@ -119,62 +114,6 @@ optimization properties are not established here for the percentage variant.
 For observed drawdowns `[0, -10%, -20%, 0, -5%]` and explicit 70% confidence,
 tail mass is 1.5 and CDaR is approximately `-16.6667%`.
 
-The [accepted record-05 contract](05-drawdown-paths-and-episodes.md#accepted-decision-drawdown-paths-and-episodes)
-owns wealth/peak construction, rebased windows, strict episode recovery,
-date alignment, metadata removal, durations and standalone path-measure
-availability. This record owns the reward/CDaR aggregation over those inputs.
-Broader summary signatures, non-tail summary selection and whole-report
-partial-output behavior also remain outside this record. Source inspection,
-primary references and illustrative arithmetic do not establish numerical or
-statistical accuracy; independent implementation qualification remains open.
-Reconciliation is owned by the
-[record-06 follow-up](../FOLLOW_UPS.md#analytics-drawdown-reward-and-cdar).
+## Implementation evidence
 
-## Implemented algorithms and selection
-
-- Calmar = CAGR / absolute maximum drawdown over the current active range. No fixed Young-style 36-month lookback is enforced; the caller must select that window if required.
-- Martin = CAGR / Ulcer index. The current public method takes no cash-rate argument. This conflicts with the previously agreed cash-adjusted Martin direction; the omission is not a proposed default.
-- Recovery factor = compounded total return / absolute maximum drawdown; it is not annualized.
-- Sterling = (CAGR−cash) / absolute mean of the n deepest episode valleys. It does not add a fixed 10-percentage-point penalty or average annual calendar maxima.
-- Burke first selects the n deepest episode valleys, then computes `(CAGR−cash)/sqrt(sum(depth²)/m)`, m being the actual number retained. This is a selected-episode RMS denominator. The accepted rule above requires all episodes and normalization by return-observation count, so both selection and normalization require reconciliation. No episodes currently returns zero before division; invalid cash or NaN CAGR still yields NaN.
-- Pain ratio = (CAGR−cash) / mean absolute drawdown across observation dates.
-- CDaR takes the empirical expected shortfall of all drawdown observations at supplied confidence, including zero-drawdown dates. It uses exact fractional tail mass as in [record 07](07-historical-tail-risk.md); output is a signed nonpositive drawdown average. It is neither the average of worst episode minima nor a path-simulation optimization constraint. Empty drawdown input returns zero.
-
-Other zero-risk ratios use the common finite-input division helper: signed infinity for nonzero/zero and zero for 0/0. In particular a positive all-up path can produce infinite Calmar/Martin. Nonfinite cash is propagated before zero-risk outcomes. `n=0` is not rejected: Sterling then has a zero denominator and Burke an empty-episode result of zero. Confidence alone is validated strictly inside (0,1).
-
-Zero substitutions above require reconciliation with the
-[accepted history/zero-risk outcomes](04-return-risk-ratios.md#accepted-decision-insufficient-history-and-zero-risk).
-Episode selection, Sterling's explicit positive count and CDaR methodology
-are accepted above; conflicting source behavior requires reconciliation.
-
-CDaR confidence follows the
-[accepted explicit-confidence contract](01-panels-windows-and-wire.md#accepted-decision-explicit-tail-confidence):
-supplied finite `0.5 < c < 1`, without an implicit 95% default. The observed
-wider validator range above requires reconciliation. CDaR's endpoint
-population, fractional ES estimator and empty-history result are accepted
-in this record. The
-[accepted tail-output sign convention](07-historical-tail-risk.md#accepted-decision-signed-tail-outputs)
-retains nonpositive CDaR, including zero for a valid observed path with no
-drawdown; it does not authorize a zero result for unavailable history.
-
-The [accepted historical return VaR/ES formulas](07-historical-tail-risk.md#accepted-decision-historical-var-and-fractional-empirical-es)
-own the shared fractional empirical tail definition. This record separately
-accepts applying that definition to its drawdown population and specifies
-CDaR availability.
-
-## Rationale, alternatives and limitations
-
-The implemented ratios describe reward per historical path distress but mix two clocks: elapsed-date CAGR and equally weighted observed drawdowns. Choice of active-window rebasing, episode count and missing initial date materially affects outputs. Existing reference names do not settle variants such as Sterling's penalty or original versus modified Burke. Supported parameters are cash, n where exposed and CDaR confidence; there is no optional Martin cash input or all-episodes Burke mode selected automatically.
-
-The complete accepted package requires implementation and host-contract reconciliation, rather than renewed choice between its variants. Record 05 still owns path construction and episode mechanisms. Time-weighted underwater risk, annual-block drawdowns and simulation-based conditional drawdown distributions are not selected by this package.
-
-## Implementation and validation evidence
-
-- [Public metric composition](../../../../finstack-quant/analytics/src/performance/scalar.rs) and [episode/ratio helpers](../../../../finstack-quant/analytics/src/drawdown.rs) establish actual selection.
-- Inspected [audit regressions](../../../../finstack-quant/analytics/tests/audit_regressions.rs) `burke_uses_the_worst_episode_depths_without_date_metadata` explicitly protects n=1/2/3/5 RMS outcomes for 10%/20%/30% episodes. It is hand-formula evidence for the current conflicting behavior. Cash/zero-risk regressions and tied/fractional CDaR cases were inspected; none was run.
-- Canonical references: [Calmar](../../../REFERENCES.md#youngCalmar1991), [Martin/Ulcer](../../../REFERENCES.md#martinUlcer1987), [Sterling variants](../../../REFERENCES.md#kestner1996), [Burke](../../../REFERENCES.md#burke1994), [CDaR](../../../REFERENCES.md#chekhlov2005). Source-to-variant and application-domain reconciliation remains incomplete.
-
-## Follow-up tracking
-
-Implementation reconciliation and missing evidence are tracked in the
-[analytics follow-ups](../FOLLOW_UPS.md#analytics).
+[drawdown.rs](../../../../finstack-quant/analytics/src/drawdown.rs), [performance/scalar.rs](../../../../finstack-quant/analytics/src/performance/scalar.rs). The [crate integration tests](../../../../finstack-quant/analytics/tests/main.rs), inline numerical regressions and [schema contracts](../../../../finstack-quant/analytics/tests/schema_contract.rs) exercise this scope. See the [inventory validation record](README.md#implementation-evidence) for executed checks and evidence limits.

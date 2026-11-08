@@ -1,6 +1,7 @@
 [
   {
     "name": "october_start",
+    "initial_date": "2024-09-29",
     "start_month": 10,
     "start_day": 1,
     "dates": [
@@ -22,6 +23,7 @@
   },
   {
     "name": "april_sixth",
+    "initial_date": "2024-04-04",
     "start_month": 4,
     "start_day": 6,
     "dates": [
@@ -47,6 +49,7 @@
   },
   {
     "name": "january_midmonth",
+    "initial_date": "2024-01-13",
     "start_month": 1,
     "start_day": 15,
     "dates": ["2024-01-14", "2024-01-15", "2024-02-14", "2024-02-15"],
@@ -62,6 +65,7 @@
   },
   {
     "name": "leap_month_end",
+    "initial_date": "2024-02-27",
     "start_month": 1,
     "start_day": 31,
     "dates": ["2024-02-28", "2024-02-29", "2024-03-30", "2024-03-31"],
@@ -80,6 +84,7 @@
   },
   {
     "name": "clamped_february",
+    "initial_date": "2023-02-26",
     "start_month": 2,
     "start_day": 29,
     "dates": ["2023-02-27", "2023-02-28", "2023-03-27", "2023-03-28"],

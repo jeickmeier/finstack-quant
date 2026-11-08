@@ -214,7 +214,7 @@ pub fn pl_summary_report(
         js_string_seq(&line_items, "lineItems")?,
         parse_periods(&periods)?,
     );
-    to_js_value(&report.to_table().map_err(to_js_err)?)
+    crate::utils::to_js_table_numeric(&report.to_table().map_err(to_js_err)?)
 }
 
 /// Look up one metric of a company by name.

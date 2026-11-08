@@ -1,5 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "description": "Column-oriented table with a shared row count and typed column storage.",
   "examples": [
     {
@@ -40,6 +41,7 @@
     },
     "metadata": {
       "additionalProperties": true,
+      "default": {},
       "description": "Table-level metadata for downstream bindings and documentation.",
       "type": "object"
     },
@@ -62,6 +64,7 @@
       "description": "Column storage variants supported by the table envelope.",
       "oneOf": [
         {
+          "additionalProperties": false,
           "description": "Non-null string column.",
           "properties": {
             "type": {
@@ -82,6 +85,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Nullable string column.",
           "properties": {
             "type": {
@@ -105,6 +109,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Non-null floating-point column.",
           "properties": {
             "type": {
@@ -113,8 +118,7 @@
             },
             "values": {
               "items": {
-                "format": "double",
-                "type": "number"
+                "$ref": "#/$defs/d_5b5465b41b06bb451742"
               },
               "type": "array"
             }
@@ -126,6 +130,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Nullable floating-point column.",
           "properties": {
             "type": {
@@ -150,6 +155,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Non-null unsigned 32-bit integer column.",
           "properties": {
             "type": {
@@ -172,6 +178,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Nullable unsigned 32-bit integer column.",
           "properties": {
             "type": {
@@ -197,6 +204,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Non-null signed 64-bit integer column.",
           "properties": {
             "type": {
@@ -218,6 +226,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Nullable signed 64-bit integer column.",
           "properties": {
             "type": {
@@ -242,6 +251,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Non-null boolean column.",
           "properties": {
             "type": {
@@ -264,6 +274,7 @@
       ]
     },
     "d_29b848ae6d2c610b175e": {
+      "additionalProperties": false,
       "description": "A single named column in a [`TableEnvelope`].",
       "properties": {
         "data": {
@@ -296,6 +307,40 @@
         "data"
       ],
       "type": "object"
+    },
+    "d_523aa06debb28c76a725": {
+      "description": "Sentinel string the [`non_finite_f64`] adapter writes for a non-finite `f64`.",
+      "oneOf": [
+        {
+          "const": "inf",
+          "description": "`+∞`, written as `\"inf\"`.",
+          "type": "string"
+        },
+        {
+          "const": "-inf",
+          "description": "`-∞`, written as `\"-inf\"`.",
+          "type": "string"
+        },
+        {
+          "const": "nan",
+          "description": "`NaN`, written as `\"nan\"`.",
+          "type": "string"
+        }
+      ]
+    },
+    "d_5b5465b41b06bb451742": {
+      "anyOf": [
+        {
+          "description": "A finite value, written as a JSON number.",
+          "format": "double",
+          "type": "number"
+        },
+        {
+          "$ref": "#/$defs/d_523aa06debb28c76a725",
+          "description": "A non-finite value, written as its sentinel string."
+        }
+      ],
+      "description": "An `f64` in the [`non_finite_f64`] wire form: a JSON number when finite,\notherwise one of the strings `\"inf\"`, `\"-inf\"` or `\"nan\"`.\n\nContract types store plain `f64` fields with\n`#[serde(with = \"finstack_quant_core::wire::non_finite_f64\")]` and name this\ntype in `#[schemars(with = ...)]`, so the generated schema describes the\nsentinel strings the serializer actually writes."
     },
     "d_bc00f88f44950a08d00d": {
       "description": "Optional semantic hint for a column.",

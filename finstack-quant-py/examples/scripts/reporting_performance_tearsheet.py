@@ -23,11 +23,16 @@ def main() -> None:
     returns = pd.DataFrame({"Global Macro Composite": rets}, index=idx)
 
     # 2) Compute analytics (you own the config).
-    perf = Performance.from_returns(returns, frequency="daily")
+    perf = Performance.from_returns(returns, initial_date=dt.date(2020, 12, 31), frequency="daily", benchmark_ticker="Global Macro Composite")
 
     # 3) Render the tear sheet (Direction A house style by default).
     ts = reporting.performance_tearsheet(
         perf,
+        risk_free_rate=0.0,
+        mar=0.0,
+        omega_threshold=0.0,
+        confidence=0.95,
+        window=252,
         title="Global Macro Composite",
         generated=dt.date.today(),
     )

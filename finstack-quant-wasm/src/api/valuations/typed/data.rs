@@ -517,7 +517,7 @@ pub fn tranche_cashflows_table(
     cashflows: JsValue,
 ) -> Result<JsValue, JsValue> {
     let cashflows: TrancheCashflows = from_js_json(&cashflows, "cashflows")?;
-    to_js_value(&cashflows.to_table().map_err(to_js_err)?)
+    crate::utils::to_js_table_numeric(&cashflows.to_table().map_err(to_js_err)?)
 }
 
 /// Statistics, WARF and concentration of a collateral pool (mirrors Rust `pool_report`).
@@ -555,7 +555,7 @@ pub fn pool_report_table(
 ) -> Result<JsValue, JsValue> {
     let report: finstack_quant_valuations::instruments::fixed_income::structured_credit::PoolReport =
         from_js_json(&report, "report")?;
-    to_js_value(&report.to_table())
+    crate::utils::to_js_table_numeric(&report.to_table())
 }
 
 /// Collateral-pool statistics at a date (mirrors Rust `calculate_pool_stats`).

@@ -18,13 +18,20 @@ import pytest
 from finstack_quant.analytics import Performance, PerformancePanel
 
 FIXTURE = Path(__file__).parent / "fixtures" / "lookback_default.json"
-DATES = ["2025-01-30", "2025-01-31", "2025-02-03", "2025-02-04", "2025-02-05"]
+DATES = ["2025-01-29", "2025-01-30", "2025-01-31", "2025-02-03", "2025-02-04", "2025-02-05"]
 RETURNS = [[0.01, -0.02, 0.03, 0.005, 0.0]]
 
 
 def _panel() -> Performance:
     return Performance.from_panel(
-        PerformancePanel(dates=DATES, series=RETURNS, kind="returns", ticker_names=["asset"], frequency="daily")
+        PerformancePanel(
+            dates=DATES,
+            series=RETURNS,
+            kind="returns",
+            ticker_names=["asset"],
+            frequency="daily",
+            benchmark_ticker=(["asset"])[0],
+        )
     )
 
 
@@ -45,6 +52,6 @@ def test_default_is_the_last_active_date() -> None:
 
 def test_no_date_over_an_empty_active_range_is_rejected() -> None:
     panel = _panel()
-    panel.reset_date_range(date(2025, 2, 5), date(2025, 1, 30))
+    panel.reset_date_range(date(2026, 1, 1), date(2026, 1, 2))
     with pytest.raises(ValueError, match="ref_date"):
         panel.lookback_returns()

@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import importlib
 import inspect
+import math
 from typing import Any
 
 import pytest
@@ -247,17 +248,19 @@ def test_json_round_trip_survives_non_finite_values() -> None:
 
     analytics = importlib.import_module("finstack_quant.analytics")
 
-    # An all-positive series has wins and no losses, so the ratio denominators
-    # are zero and payoff_ratio / profit_factor / cpc_ratio are all +inf.
+    # With no observed losses, profit factor is infinite while conditional
+    # payoff/CPC are unavailable; the wire preserves each distinct outcome.
     index = [dt.date(2024, 1, day) for day in range(1, 6)]
     returns = pd.DataFrame({"asset": [0.01, 0.02, 0.03, 0.01, 0.02]}, index=index)
-    stats = analytics.Performance.from_returns(returns).period_stats(0)
+    stats = analytics.Performance.from_returns(returns, dt.date(2023, 12, 31)).period_stats(
+        0, aggregation_frequency="monthly"
+    )
 
-    assert stats.payoff_ratio == float("inf"), "fixture no longer exercises the +inf path"
+    assert stats.profit_factor == float("inf"), "fixture no longer exercises the +inf path"
 
     restored = analytics.PeriodStats.from_json(stats.to_json())
-    assert restored.payoff_ratio == float("inf")
+    assert math.isnan(restored.payoff_ratio)
     assert restored.profit_factor == float("inf")
 
     # Round-tripping our own object, matching tests/test_pickle_roundtrip.py.
-    assert pickle.loads(pickle.dumps(stats)).payoff_ratio == float("inf")  # noqa: S301
+    assert pickle.loads(pickle.dumps(stats)).profit_factor == float("inf")  # noqa: S301

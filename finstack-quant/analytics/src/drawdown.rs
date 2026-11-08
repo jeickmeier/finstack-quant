@@ -1,469 +1,336 @@
-//! Drawdown computation: series, episode detection, and drawdown-based ratios.
-//!
-//! Crate-internal except for [`DrawdownEpisode`] (re-exported at the crate root).
-//!
-//! Drawdown measures the peak-to-trough decline in cumulative wealth.
-//! This module provides three levels of granularity:
-//! - [`to_drawdown_series`]: per-period drawdown depth as a time series.
-//! - [`drawdown_details`]: structured episodes (start, valley, recovery).
-//! - [`mean_episode_drawdown`]: scalar average of the worst N episode minima.
-//!
-//! The scalar statistics (max depth, longest duration, ulcer and pain
-//! indices) and the drawdown-based ratios (Sterling, Burke, pain) are built
-//! on the per-period series and the episodes found in it.
+//! Rebased geometric drawdown paths and strictly recovered dated episodes.
 
-use crate::risk_metrics::ratio_or_sign_infinity;
 use finstack_quant_core::dates::Date;
+use finstack_quant_core::math::summation::NeumaierAccumulator;
+use finstack_quant_core::{Error, Result};
 
-/// Drawdown episode with start, valley, optional recovery, and max drawdown.
+/// An observed drawdown episode measured from the most recent local peak.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, try_from = "EpisodeWire")]
+#[cfg_attr(feature = "json-schema", schemars(!try_from, deny_unknown_fields))]
 pub struct DrawdownEpisode {
-    /// Date when the drawdown began (peak date).
+    /// Actual valuation date of the peak immediately preceding the decline.
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub start: Date,
-    /// Date of the maximum drawdown depth.
+    /// First actual observation attaining the deepest loss in the episode.
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub valley: Date,
-    /// Date when wealth recovered to the prior peak (None if still in drawdown).
+    /// First observed recovery to zero drawdown; absent for an open episode.
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
     )]
     pub end: Option<Date>,
-    /// Calendar days from start to end (or last observation).
+    /// Calendar days from peak to recovery, or last observation when open.
     pub duration_days: i64,
-    /// Maximum drawdown depth (negative fraction, e.g. −0.25 for a 25% loss).
+    /// Signed decimal peak-to-valley loss in the closed interval `[-1, 0)`.
     pub max_drawdown: f64,
-    /// Near-recovery threshold: the drawdown level at which 99% of the
-    /// peak-to-trough loss has been recovered (i.e. `max_drawdown * 0.01`,
-    /// a value slightly below zero). Useful for identifying "almost recovered"
-    /// drawdowns where the series is within 1% of the prior peak.
-    pub near_recovery_threshold: f64,
-    /// `true` when the series began already in drawdown (no observed prior
-    /// peak), so `start` is the first observation rather than a true peak.
-    /// Survival / duration analytics should treat such episodes as
-    /// left-censored.
-    pub truncated_at_start: bool,
 }
 
-/// Compute a drawdown series from a simple-return series.
-///
-/// At each time step `i`, the drawdown depth is:
-///
-/// ```text
-/// dd[i] = wealth[i] / peak[i] - 1  (≤ 0)
-/// ```
-///
-/// where `wealth[i] = Π(1 + r[j]) for j ≤ i` and `peak[i]` is the running
-/// maximum of wealth up to and including `i`.
-/// Log wealth and log peaks are compared directly, keeping drawdowns finite
-/// even when reconstructing absolute wealth would overflow.
-///
-/// # Arguments
-///
-/// * `returns` - Slice of period simple returns (e.g., `0.01` = +1 %).
-///   Returns ≤ −1.0 are clamped by the shared wealth engine to a near-zero
-///   growth factor (total wipeout). Non-finite returns mark the path
-///   invalid from that point forward, so the current and subsequent
-///   drawdowns become `NaN`.
-///
-/// # Returns
-///
-/// A `Vec<f64>` of the same length as `returns`. Each value is ≤ 0;
-/// a value of `0.0` means wealth is at or above its prior peak.
-/// Returns an empty vector if `returns` is empty.
-pub(crate) fn to_drawdown_series(returns: &[f64]) -> Vec<f64> {
-    if returns.is_empty() {
-        return vec![];
-    }
-    let mut engine = crate::returns::WealthEngine::new();
-    let mut log_peak = 0.0;
-    let mut dd = Vec::with_capacity(returns.len());
-    for &r in returns {
-        engine.step(r);
-        let log_wealth = engine.log_growth();
-        if log_wealth > log_peak {
-            log_peak = log_wealth;
-        }
-        dd.push((log_wealth - log_peak).exp_m1());
-    }
-    dd
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct EpisodeWire {
+    start: Date,
+    valley: Date,
+    end: Option<Date>,
+    duration_days: i64,
+    max_drawdown: f64,
 }
 
-/// Detect individual drawdown episodes from a drawdown series.
-///
-/// An episode begins when the drawdown series first drops below zero
-/// (i.e., wealth falls from its peak) and ends when it returns to zero
-/// (recovery to a new peak). The function collects all such episodes,
-/// sorts them by severity (most negative `max_drawdown` first), and
-/// returns the worst `n`.
-///
-/// # Arguments
-///
-/// * `drawdown` - Pre-computed drawdown series, as produced by [`to_drawdown_series`].
-/// * `dates`    - Date vector aligned with `drawdown`. Must be the same length or longer.
-/// * `n`        - Maximum number of episodes to return.
-///
-/// # Returns
-///
-/// Up to `n` [`DrawdownEpisode`] structs sorted by `max_drawdown` ascending
-/// (most severe first). Returns an empty vector if `drawdown` or `dates` is empty.
-pub(crate) fn drawdown_details(drawdown: &[f64], dates: &[Date], n: usize) -> Vec<DrawdownEpisode> {
-    if drawdown.is_empty() || dates.is_empty() {
-        return vec![];
-    }
-    let len = drawdown.len().min(dates.len());
-    let dates = &dates[..len];
+impl TryFrom<EpisodeWire> for DrawdownEpisode {
+    type Error = Error;
 
-    let mut episodes: Vec<DrawdownEpisode> = Vec::new();
-    for_each_episode(
-        &drawdown[..len],
-        |start_idx, valley_idx, end_idx, valley_val, truncated_at_start| {
-            episodes.push(make_episode(
-                dates,
-                start_idx,
-                valley_idx,
-                end_idx,
-                valley_val,
-                len - 1,
-                truncated_at_start,
+    fn try_from(value: EpisodeWire) -> Result<Self> {
+        if value.start >= value.valley
+            || value.duration_days <= 0
+            || !value.max_drawdown.is_finite()
+            || !(-1.0..0.0).contains(&value.max_drawdown)
+            || value.end.is_some_and(|end| {
+                end <= value.valley || (end - value.start).whole_days() != value.duration_days
+            })
+            || value.duration_days < (value.valley - value.start).whole_days()
+        {
+            return Err(Error::Validation(
+                "invalid drawdown episode dates, duration or depth".into(),
             ));
-        },
-    );
-
-    episodes.sort_by(|a, b| {
-        a.max_drawdown
-            .partial_cmp(&b.max_drawdown)
-            .unwrap_or(core::cmp::Ordering::Equal)
-    });
-    episodes.truncate(n);
-    episodes
+        }
+        Ok(Self {
+            start: value.start,
+            valley: value.valley,
+            end: value.end,
+            duration_days: value.duration_days,
+            max_drawdown: value.max_drawdown,
+        })
+    }
 }
 
-/// Scan `drawdown` for episodes (contiguous runs where `d < -1e-15`) and
-/// invoke `emit(start_idx, valley_idx, end_idx, valley_val, truncated_at_start)`
-/// for each. `start_idx` is the peak that preceded the episode (or `0` if the
-/// series begins in drawdown); `end_idx` is `Some(i)` on recovery or `None`
-/// when the episode runs to the end of the series.
+/// Construct one peak-relative drawdown per observed investment return.
+///
+/// # Arguments
+///
+/// * `returns` - Finite simple investment returns no smaller than `-1`;
+///   exact `-1` is permitted only as the final observation.
+///
+/// # Errors
+///
+/// Rejects invalid return histories and unrepresentable log-wealth arithmetic.
+pub(crate) fn to_drawdown_series(returns: &[f64]) -> Result<Vec<f64>> {
+    crate::returns::validate_history(returns)?;
+    // Accumulate relative to the latest peak, so a tiny loss following a
+    // large absolute wealth level is not cancelled by subtracting log peaks.
+    let mut relative_log_wealth = NeumaierAccumulator::new();
+    let mut path = Vec::with_capacity(returns.len());
+    for &value in returns {
+        if value <= -1.0 {
+            path.push(-1.0);
+            continue;
+        }
+        relative_log_wealth.add(value.ln_1p());
+        let wealth = relative_log_wealth.total();
+        if !wealth.is_finite() {
+            return Err(Error::Internal(
+                "drawdown log wealth is not representable".into(),
+            ));
+        }
+        let loss = if wealth >= 0.0 {
+            relative_log_wealth = NeumaierAccumulator::new();
+            0.0
+        } else {
+            wealth.exp_m1()
+        };
+        if !loss.is_finite() || !(-1.0..=0.0).contains(&loss) {
+            return Err(Error::Internal("drawdown loss is not representable".into()));
+        }
+        path.push(loss);
+    }
+    Ok(path)
+}
+
+fn validate_path(drawdown: &[f64]) -> Result<()> {
+    if drawdown
+        .iter()
+        .any(|v| !v.is_finite() || !(-1.0..=0.0).contains(v))
+    {
+        return Err(Error::Validation(
+            "drawdown path must contain finite fractions in [-1, 0]".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_dated_path(drawdown: &[f64], dates: &[Date]) -> Result<()> {
+    validate_path(drawdown)?;
+    if drawdown.len() != dates.len() || dates.windows(2).any(|w| w[0] >= w[1]) {
+        return Err(Error::Validation(
+            "drawdown dates must exactly align and strictly increase".into(),
+        ));
+    }
+    if !drawdown.is_empty() && drawdown[0] != 0.0 {
+        return Err(Error::Validation(
+            "dated drawdown path must include its actual opening zero".into(),
+        ));
+    }
+    Ok(())
+}
+
 fn for_each_episode<F>(drawdown: &[f64], mut emit: F)
 where
-    F: FnMut(usize, usize, Option<usize>, f64, bool),
+    F: FnMut(usize, usize, Option<usize>, f64),
 {
-    let mut in_dd = false;
-    let mut start_idx = 0usize;
-    let mut truncated_at_start = false;
-    let mut valley_idx = 0usize;
-    let mut valley_val = 0.0_f64;
-
-    for (i, &d) in drawdown.iter().enumerate() {
-        if d < -1e-15 {
-            if !in_dd {
-                in_dd = true;
-                if i > 0 {
-                    start_idx = i - 1;
-                    truncated_at_start = false;
-                } else {
-                    start_idx = 0;
-                    truncated_at_start = true;
+    let mut state: Option<(usize, usize, f64)> = None;
+    for (i, &value) in drawdown.iter().enumerate() {
+        if value < 0.0 {
+            match state.as_mut() {
+                Some((_, valley, depth)) if value < *depth => {
+                    *valley = i;
+                    *depth = value;
                 }
-                valley_idx = i;
-                valley_val = d;
-            } else if d < valley_val {
-                valley_idx = i;
-                valley_val = d;
+                None => state = Some((i.saturating_sub(1), i, value)),
+                _ => {}
             }
-        } else if in_dd {
-            emit(
-                start_idx,
-                valley_idx,
-                Some(i),
-                valley_val,
-                truncated_at_start,
-            );
-            in_dd = false;
+        } else if let Some((start, valley, depth)) = state.take() {
+            emit(start, valley, Some(i), depth);
         }
     }
-    if in_dd {
-        emit(start_idx, valley_idx, None, valley_val, truncated_at_start);
+    if let Some((start, valley, depth)) = state {
+        emit(start, valley, None, depth);
     }
 }
 
-fn make_episode(
+/// Find at most `n` episodes, deepest first and chronological on equal depths.
+///
+/// # Arguments
+///
+/// * `drawdown` - Baseline-inclusive drawdown fractions starting at zero.
+/// * `dates` - Exactly aligned actual valuation dates in strict order.
+/// * `n` - Nonnegative display count; zero yields an empty valid selection.
+///
+/// # Errors
+///
+/// Rejects malformed paths, missing opening anchors and invalid date alignment.
+pub(crate) fn drawdown_details(
+    drawdown: &[f64],
     dates: &[Date],
-    start_idx: usize,
-    valley_idx: usize,
-    end_idx: Option<usize>,
-    valley_val: f64,
-    last_data_idx: usize,
-    truncated_at_start: bool,
-) -> DrawdownEpisode {
-    let start = dates[start_idx];
-    let valley = dates[valley_idx];
-    let end = end_idx.map(|i| dates[i]);
-    let end_date = end.unwrap_or(dates[last_data_idx]);
-    let duration_days = (end_date - start).whole_days();
-    DrawdownEpisode {
-        start,
-        valley,
-        end,
-        duration_days,
-        max_drawdown: valley_val,
-        near_recovery_threshold: valley_val * 0.01,
-        truncated_at_start,
-    }
-}
-
-/// Average of the top-N worst drawdown episode minima.
-///
-/// Identifies the `n` largest drawdown episodes directly from the drawdown
-/// path and returns the arithmetic mean of their episode minima.
-///
-/// This is the **episode-based** average used in the Sterling ratio
-/// (Kestner, 1996). For the simple arithmetic mean of the full drawdown
-/// path, use [`crate::Performance::mean_drawdown`] instead.
-///
-/// # Arguments
-///
-/// * `drawdown` - Pre-computed drawdown series (values ≤ 0).
-/// * `n`        - Number of worst episodes to average.
-///
-/// # Returns
-///
-/// Mean of the `n` worst `max_drawdown` values (a negative number), or
-/// `0.0` if `drawdown` is empty or no episodes are found.
-#[must_use]
-pub(crate) fn mean_episode_drawdown(drawdown: &[f64], n: usize) -> f64 {
-    let episode_depths = worst_episode_depths(drawdown, n);
-    if episode_depths.is_empty() {
-        return 0.0;
-    }
-    let sum: f64 = episode_depths.iter().sum();
-    sum / episode_depths.len() as f64
-}
-
-/// Extract the worst `n` episode depths from a drawdown series, sorted
-/// ascending (most severe first). Shared by [`mean_episode_drawdown`]
-/// (Sterling) and [`crate::Performance::burke_ratio`].
-///
-/// # Arguments
-///
-/// * `drawdown` - Peak-relative drawdown fractions in observation order.
-/// * `n` - Maximum number of deepest episodes to retain; zero returns no depths.
-pub(crate) fn worst_episode_depths(drawdown: &[f64], n: usize) -> Vec<f64> {
+    n: usize,
+) -> Result<Vec<DrawdownEpisode>> {
+    validate_dated_path(drawdown, dates)?;
+    let mut episodes = Vec::new();
     if drawdown.is_empty() {
-        return vec![];
+        return Ok(episodes);
     }
+    for_each_episode(drawdown, |start, valley, end, max_drawdown| {
+        let end_date = dates[end.unwrap_or(dates.len() - 1)];
+        episodes.push(DrawdownEpisode {
+            start: dates[start],
+            valley: dates[valley],
+            end: end.map(|i| dates[i]),
+            duration_days: (end_date - dates[start]).whole_days(),
+            max_drawdown,
+        });
+    });
+    episodes.sort_by(|a, b| {
+        a.max_drawdown
+            .total_cmp(&b.max_drawdown)
+            .then(a.start.cmp(&b.start))
+            .then(a.valley.cmp(&b.valley))
+    });
+    episodes.truncate(n);
+    Ok(episodes)
+}
 
+/// Select deepest episode valleys from an internally validated path.
+///
+/// # Arguments
+///
+/// * `drawdown` - Validated drawdown endpoint fractions.
+/// * `n` - Maximum number of episode valleys retained.
+pub(crate) fn worst_episode_depths(drawdown: &[f64], n: usize) -> Vec<f64> {
     let mut depths = Vec::new();
-    for_each_episode(drawdown, |_, _, _, valley_val, _| depths.push(valley_val));
-    depths.sort_by(|a, b| a.partial_cmp(b).unwrap_or(core::cmp::Ordering::Equal));
+    for_each_episode(drawdown, |_, _, _, depth| depths.push(depth));
+    depths.sort_by(f64::total_cmp);
     depths.truncate(n);
     depths
 }
 
-/// Maximum drawdown duration in calendar days across all episodes.
-///
-/// Identifies all drawdown episodes and returns the longest `duration_days`.
+/// Mean of the deepest up-to-`n` episode valleys, zero for no episodes.
 ///
 /// # Arguments
 ///
-/// * `drawdown` - Pre-computed drawdown series (values ≤ 0).
-/// * `dates`    - Date vector aligned with `drawdown`.
-///
-/// # Returns
-///
-/// Duration in calendar days of the longest drawdown episode. Returns `0`
-/// if no episodes are found.
-pub(crate) fn max_drawdown_duration(drawdown: &[f64], dates: &[Date]) -> i64 {
-    if drawdown.is_empty() || dates.is_empty() {
-        return 0;
-    }
-    let len = drawdown.len().min(dates.len());
-    let last_idx = len - 1;
-    let mut max_days: i64 = 0;
-    for_each_episode(&drawdown[..len], |start_idx, _, end_idx, _, _| {
-        let end_date = match end_idx {
-            Some(i) => dates[i],
-            None => dates[last_idx],
-        };
-        let days = (end_date - dates[start_idx]).whole_days();
-        if days > max_days {
-            max_days = days;
-        }
-    });
-    max_days
-}
-
-/// Ulcer index: root-mean-square of the drawdown series.
-///
-/// Measures the depth and duration of drawdowns from a pre-computed
-/// drawdown series. A higher Ulcer Index indicates more persistent or
-/// deeper losses ("investor distress").
-///
-/// ```text
-/// UI = sqrt(mean(dd_i^2))
-/// ```
-///
-/// # Arguments
-///
-/// * `drawdown` - Pre-computed drawdown series (values ≤ 0), as produced
-///   by [`to_drawdown_series`].
-///
-/// # Returns
-///
-/// The Ulcer Index (a non-negative scalar). Returns `0.0` for an empty slice.
-///
-/// # References
-///
-/// - Martin (1987): see docs/REFERENCES.md#martinUlcer1987
-#[must_use]
-pub(crate) fn ulcer_index(drawdown: &[f64]) -> f64 {
-    if drawdown.is_empty() {
+/// * `drawdown` - Internally validated endpoint fractions.
+/// * `n` - Positive financial episode count validated by the caller.
+pub(crate) fn mean_episode_drawdown(drawdown: &[f64], n: usize) -> f64 {
+    let depths = worst_episode_depths(drawdown, n);
+    if depths.is_empty() {
         return 0.0;
     }
-    let ss: f64 = drawdown.iter().map(|&d| d * d).sum();
-    (ss / drawdown.len() as f64).sqrt()
+    let count = depths.len() as f64;
+    let scale = depths.iter().map(|d| d.abs()).fold(0.0, f64::max);
+    let mut sum = NeumaierAccumulator::new();
+    for depth in depths {
+        sum.add(depth / scale);
+    }
+    scale * (sum.total() / count)
 }
 
-/// Pain index: mean absolute drawdown over the full series.
-///
-/// ```text
-/// Pain = (1/n) Σ |dd_i|
-/// ```
-///
-/// Less sensitive to outlier drawdowns than max drawdown.
+/// Longest recovered or open episode in actual calendar days.
 ///
 /// # Arguments
 ///
-/// * `drawdown` - Pre-computed drawdown series (values ≤ 0).
+/// * `drawdown` - Baseline-inclusive path with an actual opening zero.
+/// * `dates` - Exactly aligned strictly increasing actual valuation dates.
 ///
-/// # Returns
+/// # Errors
 ///
-/// The pain index (non-negative). Returns `0.0` for an empty slice.
-#[must_use]
-pub(crate) fn pain_index(drawdown: &[f64]) -> f64 {
-    if drawdown.is_empty() {
-        return 0.0;
+/// Rejects invalid paths or chronology even when no episode exists.
+pub(crate) fn max_drawdown_duration(drawdown: &[f64], dates: &[Date]) -> Result<Option<i64>> {
+    validate_dated_path(drawdown, dates)?;
+    if drawdown.len() < 2 {
+        return Ok(None);
     }
-    let sum: f64 = drawdown.iter().map(|&d| d.abs()).sum();
-    sum / drawdown.len() as f64
+    Ok(Some(
+        drawdown_details(drawdown, dates, usize::MAX)?
+            .iter()
+            .map(|episode| episode.duration_days)
+            .max()
+            .unwrap_or(0),
+    ))
 }
 
-/// Deepest point of a pre-computed drawdown series: its maximum drawdown.
+/// Root mean square of validated endpoint drawdowns; empty is undefined.
 ///
-/// Returns the most negative value in `drawdown`, `0.0` for an empty slice,
-/// or `NaN` if any value is non-finite. The public [`crate::max_drawdown`]
-/// applies this to [`to_drawdown_series`] of a returns series.
-#[must_use]
+/// # Arguments
+///
+/// * `drawdown` - Validated fractions in `[-1, 0]`, excluding the opening zero.
+pub(crate) fn ulcer_index(drawdown: &[f64]) -> Result<f64> {
+    if drawdown.is_empty() {
+        return Ok(f64::NAN);
+    }
+    let scale = drawdown.iter().map(|d| d.abs()).fold(0.0, f64::max);
+    if scale == 0.0 {
+        return Ok(0.0);
+    }
+    let mut sum = NeumaierAccumulator::new();
+    for &d in drawdown {
+        sum.add((d / scale).powi(2));
+    }
+    nonzero_path_statistic(scale * (sum.total() / drawdown.len() as f64).sqrt())
+}
+
+/// Mean absolute validated endpoint drawdown; empty is undefined.
+///
+/// # Arguments
+///
+/// * `drawdown` - Validated fractions in `[-1, 0]`, excluding the opening zero.
+pub(crate) fn pain_index(drawdown: &[f64]) -> Result<f64> {
+    mean_drawdown(drawdown).map(|mean| -mean)
+}
+
+/// Mean signed endpoint drawdown, including observed zeros.
+///
+/// # Arguments
+///
+/// * `drawdown` - Validated fractions in `[-1, 0]`, excluding the opening zero.
+pub(crate) fn mean_drawdown(drawdown: &[f64]) -> Result<f64> {
+    if drawdown.is_empty() {
+        return Ok(f64::NAN);
+    }
+    let scale = drawdown.iter().map(|d| d.abs()).fold(0.0, f64::max);
+    if scale == 0.0 {
+        return Ok(0.0);
+    }
+    let mut sum = NeumaierAccumulator::new();
+    for &d in drawdown {
+        sum.add(d / scale);
+    }
+    nonzero_path_statistic(scale * (sum.total() / drawdown.len() as f64))
+}
+
+fn nonzero_path_statistic(value: f64) -> Result<f64> {
+    if !value.is_finite() || value == 0.0 {
+        return Err(Error::Internal(
+            "nonzero drawdown risk is not representable".into(),
+        ));
+    }
+    Ok(value)
+}
+
+/// Deepest validated endpoint loss; an empty history is undefined.
+///
+/// # Arguments
+///
+/// * `drawdown` - Validated drawdown endpoint fractions.
 pub(crate) fn deepest(drawdown: &[f64]) -> f64 {
-    if drawdown.iter().any(|value| !value.is_finite()) {
+    if drawdown.is_empty() {
         return f64::NAN;
     }
-    drawdown.iter().copied().fold(0.0_f64, f64::min)
-}
-
-/// Sterling ratio: risk-adjusted return using average drawdown.
-///
-/// ```text
-/// Sterling = (CAGR − R_f) / |mean_episode_drawdown|
-/// ```
-///
-/// # Arguments
-///
-/// * `cagr_val`       - Compound annual growth rate.
-/// * `avg_dd`         - Average of the top-N worst drawdowns (negative number).
-/// * `risk_free_rate` - Finite annualized risk-free rate as a decimal fraction.
-///
-/// # Returns
-///
-/// The Sterling ratio. Returns `±∞` if `avg_dd` is zero and the excess
-/// return is nonzero, or `0.0` if both are zero. Returns [`f64::NAN`] for
-/// non-finite risk-free rates.
-///
-/// # References
-///
-/// - Kestner (1996): see docs/REFERENCES.md#kestner1996
-#[must_use]
-pub(crate) fn sterling_ratio(cagr_val: f64, avg_dd: f64, risk_free_rate: f64) -> f64 {
-    if !risk_free_rate.is_finite() {
-        return f64::NAN;
-    }
-    ratio_or_sign_infinity(cagr_val - risk_free_rate, avg_dd.abs())
-}
-
-/// Burke ratio: return per unit of drawdown-based risk (RMS of drawdowns).
-///
-/// ```text
-/// Burke = (CAGR − R_f) / sqrt( (1/n) Σ dd_i² )
-/// ```
-///
-/// where `dd_i` are the max-drawdown depths of the top-N episodes.
-///
-/// **Convention:** this is the *modified* Burke ratio, which divides by the
-/// RMS (`1/n` inside the root). The original Burke (1994) formulation — and
-/// R `PerformanceAnalytics`' default — uses `sqrt(Σ dd_i²)` without the
-/// `1/n`, so cross-tool comparisons will differ by a factor of `sqrt(n)`.
-///
-/// # Arguments
-///
-/// * `cagr_val`       - Compound annual growth rate.
-/// * `dd_episodes`    - Slice of max-drawdown values from each episode (negative).
-/// * `risk_free_rate` - Finite annualized risk-free rate as a decimal fraction.
-///
-/// # Returns
-///
-/// The Burke ratio. Returns `0.0` if `dd_episodes` is empty, or `±∞`
-/// if the RMS of episodes is zero with nonzero excess return. Returns
-/// [`f64::NAN`] for non-finite risk-free rates, including with no episodes.
-///
-/// # References
-///
-/// - Burke (1994): see docs/REFERENCES.md#burke1994
-#[must_use]
-pub(crate) fn burke_ratio(cagr_val: f64, dd_episodes: &[f64], risk_free_rate: f64) -> f64 {
-    if cagr_val.is_nan() || !risk_free_rate.is_finite() {
-        return f64::NAN;
-    }
-    if dd_episodes.is_empty() {
-        return 0.0;
-    }
-    let n = dd_episodes.len() as f64;
-    let ss: f64 = dd_episodes.iter().map(|&d| d * d).sum();
-    let rms = (ss / n).sqrt();
-    ratio_or_sign_infinity(cagr_val - risk_free_rate, rms)
-}
-
-/// Pain ratio: return per unit of average drawdown pain.
-///
-/// ```text
-/// Pain Ratio = (CAGR − R_f) / Pain Index
-/// ```
-///
-/// # Arguments
-///
-/// * `cagr_val`       - Compound annual growth rate.
-/// * `pain`           - Pain index (from [`pain_index`]).
-/// * `risk_free_rate` - Finite annualized risk-free rate as a decimal fraction.
-///
-/// # Returns
-///
-/// The pain ratio. Returns `±∞` if the pain index is zero and the
-/// excess return is nonzero, or `0.0` if both are zero. Returns [`f64::NAN`]
-/// for non-finite risk-free rates.
-#[must_use]
-pub(crate) fn pain_ratio(cagr_val: f64, pain: f64, risk_free_rate: f64) -> f64 {
-    if !risk_free_rate.is_finite() {
-        return f64::NAN;
-    }
-    ratio_or_sign_infinity(cagr_val - risk_free_rate, pain)
+    drawdown.iter().copied().fold(0.0, f64::min)
 }
 
 #[cfg(test)]
@@ -471,189 +338,85 @@ mod tests {
     use super::*;
     use time::{Duration, Month};
 
-    fn make_dates(n: usize) -> Vec<Date> {
-        (0..n)
-            .map(|i| {
-                Date::from_calendar_date(2025, Month::January, 1).expect("valid date")
-                    + Duration::days(i as i64)
-            })
-            .collect()
+    fn dates(n: usize) -> Vec<Date> {
+        let first = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+        (0..n).map(|i| first + Duration::days(i as i64)).collect()
     }
 
     #[test]
-    fn drawdown_series_no_loss() {
-        let r = [0.01, 0.02, 0.03];
-        let dd = to_drawdown_series(&r);
-        assert!(dd.iter().all(|&v| v.abs() < 1e-12));
+    fn tiny_losses_survive_large_prior_wealth_and_scaled_risk() {
+        let path = to_drawdown_series(&[f64::MAX, -1e-17]).unwrap();
+        assert_eq!(path[0], 0.0);
+        assert_eq!(path[1], -1e-17);
+        let tiny = -f64::MIN_POSITIVE;
+        assert_eq!(ulcer_index(&[tiny, tiny]).unwrap(), -tiny);
+        assert_eq!(mean_drawdown(&[tiny, tiny]).unwrap(), tiny);
+        assert!(mean_drawdown(&[-f64::from_bits(1), 0.0]).is_err());
     }
 
     #[test]
-    fn drawdown_wealth_matches_comp_sum_on_long_mixed_sign_series() {
-        let r: Vec<f64> = (0..5000)
-            .map(|i| (((i % 17) as f64) - 8.0) * 0.0003)
-            .collect();
-        let cs = crate::returns::comp_sum(&r);
-        let mut engine = crate::returns::WealthEngine::new();
-        for &ret in &r {
-            engine.step(ret);
-        }
-        let last_wealth = engine.log_growth().exp();
-        let comp_wealth = 1.0 + cs.last().copied().unwrap_or(0.0);
-        assert!((comp_wealth - last_wealth).abs() < 1e-12);
-
-        let dd = to_drawdown_series(&r);
-        let mut engine = crate::returns::WealthEngine::new();
-        let mut peak = 1.0;
-        for (i, &ret) in r.iter().enumerate() {
-            engine.step(ret);
-            let wealth = engine.log_growth().exp();
-            if wealth > peak {
-                peak = wealth;
-            }
-            let expected_dd = wealth / peak - 1.0;
-            assert!(
-                (dd[i] - expected_dd).abs() < 1e-12,
-                "drawdown wealth path diverged at {i}: {} vs {expected_dd}",
-                dd[i]
-            );
-        }
-    }
-
-    #[test]
-    fn drawdown_series_propagates_nan() {
-        let dd = to_drawdown_series(&[0.05, f64::NAN, 0.10]);
-        assert!(dd[1].is_nan());
-        assert!(dd[2].is_nan());
-    }
-
-    #[test]
-    fn drawdown_series_handles_total_wipeout() {
-        let dd = to_drawdown_series(&[0.05, -1.0, 0.10]);
-        assert!(dd.iter().all(|v| v.is_finite()));
-        assert!(dd[1] < -0.99);
-    }
-
-    #[test]
-    fn drawdown_series_basic() {
-        let r = [0.10, -0.20, 0.05, 0.10];
-        let dd = to_drawdown_series(&r);
-        assert_eq!(dd.len(), 4);
-        assert!(dd[0].abs() < 1e-12); // no DD after gain
-        assert!(dd[1] < -0.1); // DD after big loss
-    }
-
-    #[test]
-    fn drawdown_details_basic() {
-        let r = [0.10, -0.20, 0.05, 0.10, -0.05, -0.03];
-        let dd = to_drawdown_series(&r);
-        let dates = make_dates(r.len());
-        let episodes = drawdown_details(&dd, &dates, 5);
-        assert!(!episodes.is_empty());
-        assert!(episodes[0].max_drawdown < 0.0);
-    }
-
-    #[test]
-    fn drawdown_details_bounds_unrecovered_episode_to_aligned_dates() {
-        let drawdown = [0.0, -0.10, -0.20, -0.15];
-        let dates = make_dates(6);
-        let episodes = drawdown_details(&drawdown, &dates, 5);
-        assert_eq!(episodes.len(), 1);
-        assert_eq!(episodes[0].start, dates[0]);
-        assert_eq!(episodes[0].valley, dates[2]);
-        assert_eq!(episodes[0].end, None);
-        assert_eq!(episodes[0].duration_days, 3);
-    }
-
-    #[test]
-    fn mean_episode_drawdown_empty() {
-        assert_eq!(mean_episode_drawdown(&[], 5), 0.0);
-    }
-
-    #[test]
-    fn mean_episode_drawdown_deterministic() {
-        let drawdown = [0.0, -0.10, -0.20, 0.0, -0.15, 0.0];
-        let avg = mean_episode_drawdown(&drawdown, 2);
-        assert!((avg - (-0.175)).abs() < 1e-12);
-    }
-
-    #[test]
-    fn ulcer_index_flat() {
-        let dd = [-0.10, -0.10, -0.10];
-        assert!((ulcer_index(&dd) - 0.10).abs() < 1e-12);
-    }
-
-    #[test]
-    fn ulcer_index_empty() {
-        assert_eq!(ulcer_index(&[]), 0.0);
-    }
-
-    #[test]
-    fn pain_index_hand_calc() {
-        let dd = [-0.05, -0.10, 0.0, -0.03];
-        let pi = pain_index(&dd);
-        assert!((pi - 0.045).abs() < 1e-14);
-    }
-
-    #[test]
-    fn pain_index_empty() {
-        assert_eq!(pain_index(&[]), 0.0);
-    }
-
-    #[test]
-    fn sterling_ratio_hand_calc() {
-        assert!((sterling_ratio(0.12, -0.10, 0.02) - 1.0).abs() < 1e-12);
-        assert!((sterling_ratio(0.15, -0.06, 0.03) - 2.0).abs() < 1e-12);
-    }
-
-    #[test]
-    fn sterling_ratio_zero_dd() {
-        assert_eq!(sterling_ratio(0.12, 0.0, 0.02), f64::INFINITY);
-        assert_eq!(sterling_ratio(0.01, 0.0, 0.02), f64::NEG_INFINITY);
-        assert_eq!(sterling_ratio(0.02, 0.0, 0.02), 0.0);
-    }
-
-    #[test]
-    fn burke_ratio_hand_calc() {
-        let dds = [-0.10, -0.10];
-        let b = burke_ratio(0.12, &dds, 0.02);
-        assert!((b - 1.0).abs() < 1e-12);
-    }
-
-    #[test]
-    fn burke_ratio_empty() {
-        assert_eq!(burke_ratio(0.15, &[], 0.02), 0.0);
-    }
-
-    #[test]
-    fn pain_ratio_hand_calc() {
-        assert!((pain_ratio(0.10, 0.05, 0.02) - 1.6).abs() < 1e-12);
-        assert!((pain_ratio(0.08, 0.04, 0.0) - 2.0).abs() < 1e-12);
-    }
-
-    #[test]
-    fn pain_ratio_zero_pain() {
-        assert_eq!(pain_ratio(0.10, 0.0, 0.0), f64::INFINITY);
-        assert_eq!(pain_ratio(-0.02, 0.0, 0.0), f64::NEG_INFINITY);
-        assert_eq!(pain_ratio(0.0, 0.0, 0.0), 0.0);
-    }
-
-    #[test]
-    fn drawdown_composite_helpers_compose_correctly() {
-        let returns = [0.01, -0.02, 0.015, -0.005, 0.012, 0.008];
-        let ann = 252.0;
-        let years = returns.len() as f64 / ann;
-        let cagr_val = (1.0 + crate::returns::comp_total(&returns)).powf(1.0 / years) - 1.0;
-        let dd = to_drawdown_series(&returns);
-        let max_dd = dd.iter().copied().fold(0.0_f64, f64::min);
-        let ulcer = ulcer_index(&dd);
-        let pain = pain_index(&dd);
-        let avg_episode_dd = mean_episode_drawdown(&dd, usize::MAX);
-
+    fn episode_restore_rejects_impossible_dates_and_obsolete_metadata() {
+        let valid = r#"{"start":"2025-01-01","valley":"2025-01-02","end":null,"duration_days":1,"max_drawdown":-1.0}"#;
+        let episode: DrawdownEpisode = serde_json::from_str(valid).unwrap();
+        assert_eq!(episode.max_drawdown, -1.0);
+        assert!(serde_json::from_str::<DrawdownEpisode>(&valid.replace("-1.0", "0.0")).is_err());
         assert!(
-            ratio_or_sign_infinity(crate::returns::comp_total(&returns), max_dd.abs()).is_finite()
+            serde_json::from_str::<DrawdownEpisode>(
+                &valid.replace("\"end\":null", "\"end\":\"2025-01-01\"")
+            )
+            .is_err()
         );
-        assert!(ratio_or_sign_infinity(cagr_val, ulcer).is_finite());
-        assert!(sterling_ratio(cagr_val, avg_episode_dd, 0.01).is_finite());
-        assert!(pain_ratio(cagr_val, pain, 0.01).is_finite());
+        assert!(
+            serde_json::from_str::<DrawdownEpisode>(&valid.replace(
+                "\"end\":null",
+                "\"near_recovery_threshold\":-0.01,\"end\":null"
+            ))
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn strict_recovery_preserves_tiny_unrecovered_loss_and_first_valley() {
+        let path = [0.0, -0.1, -0.2, -0.2, -1e-16, 0.0, -0.05];
+        let ds = dates(path.len());
+        let episodes = drawdown_details(&path, &ds, 10).unwrap();
+        assert_eq!(episodes.len(), 2);
+        assert_eq!(episodes[0].valley, ds[2]);
+        assert_eq!(episodes[0].end, Some(ds[5]));
+        assert_eq!(episodes[0].duration_days, 5);
+        assert_eq!(episodes[1].end, None);
+    }
+
+    #[test]
+    fn selection_validates_shapes_before_zero_count() {
+        assert!(drawdown_details(&[0.0, -0.1], &dates(3), 0).is_err());
+        assert!(drawdown_details(&[0.0, -0.1], &[dates(2)[0]; 2], 0).is_err());
+        assert!(
+            drawdown_details(&[0.0, -0.1], &dates(2), 0)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn terminal_loss_is_exact_and_cannot_continue() {
+        assert_eq!(to_drawdown_series(&[0.1, -1.0]).unwrap(), [0.0, -1.0]);
+        assert!(to_drawdown_series(&[-1.0, 0.1]).is_err());
+        assert!(to_drawdown_series(&[-1.1]).is_err());
+        assert!(to_drawdown_series(&[f64::NAN]).is_err());
+    }
+
+    #[test]
+    fn endpoint_statistics_exclude_baseline_and_empty_is_unavailable() {
+        let path = [0.0, -0.1, -0.2, 0.0, -0.05];
+        assert!((ulcer_index(&path).unwrap() - (0.0525_f64 / 5.0).sqrt()).abs() < 1e-15);
+        assert!((pain_index(&path).unwrap() - 0.07).abs() < 1e-15);
+        assert!(deepest(&[]).is_nan());
+        assert!(ulcer_index(&[]).unwrap().is_nan());
+        assert_eq!(max_drawdown_duration(&[], &[]).unwrap(), None);
+        assert_eq!(
+            max_drawdown_duration(&[0.0, 0.0], &dates(2)).unwrap(),
+            Some(0)
+        );
     }
 }

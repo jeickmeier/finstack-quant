@@ -8,7 +8,7 @@ await init({
 });
 const panel = (frequency = 'daily') =>
   new analytics.Performance({
-    dates: ['2025-01-01', '2025-01-02', '2025-01-03', '2025-01-04'],
+    dates: ['2024-12-31', '2025-01-01', '2025-01-02', '2025-01-03', '2025-01-04'],
     series: [[0.01, -0.02, 0.03, 0.005]],
     kind: 'returns',
     ticker_names: ['FUND'],
@@ -83,7 +83,7 @@ test('Performance publishes only canonical get accessors', () => {
   }
   assert.deepEqual(perf.getTickerNames(), ['FUND']);
   assert.equal(perf.getTickerIndex('FUND'), 0);
-  assert.equal(perf.getBenchmarkIdx(), 0);
+  assert.equal(perf.getBenchmarkIdx(), undefined);
   assert.equal(perf.getFrequency(), 'daily');
   assert.deepEqual(perf.getDates(), perf.getActiveDates());
   assert.deepEqual(perf.getActiveDatesForTicker(0), perf.getDates());

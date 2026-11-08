@@ -1,25 +1,16 @@
 # ANALYTICS-001: Performance panels, observation spans, defaults and wire contracts
 
-**Decision status:** Accepted for explicit observation frequency and tail confidence (2026-11-06), and the remaining complete panel/window/wire/summary package (2026-11-07). Implementation reconciliation and independent qualification remain open; other metric owners retain their scopes.
+**Decision status:** Accepted for explicit observation frequency and tail confidence (2026-11-06), and the remaining complete panel/window/wire/summary package (2026-11-07).
 
-**Implementation status:** Observed in the source paths below, including the stated discrepancies and fallback behavior.
+**Implementation status:** Implemented in the analytics decision reconciliation dated 2026-11-08. The accepted sections below define the current contract.
 
-**Validation status:** Source inspected; test evidence inspected or located as identified below, not executed. No financial accuracy certification or runtime change is implied.
+**Validation status:** Scoped implementation checks and their limits are recorded in the [analytics inventory](README.md#implementation-evidence). A passing numerical fixture establishes its stated case; it does not certify a population estimator or every supported input.
 
-**Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See the [scope and exact source manifest](README.md).
-
-## Choice, domain and rationale
-
-`Performance` accepts one common strictly increasing date grid and one price or simple-return column per uniquely named ticker. Each ticker has a contiguous observed span; only leading/trailing `NaN` gaps are allowed. Prices must be finite and positive with at least two observations; returns must be finite and strictly above −1. This enforces the accepted missing-versus-invalid distinction in [ADR 0009](../conventions/0009-missing-and-invalid-data.md). No forward filling, interior deletion, price adjustment or total-wipeout handling is implemented by this API.
-
-The [accepted terminal-loss domain](02-wealth-and-annualization.md#accepted-decision-terminal-investment-losses)
-requires terminal wipeout support; the observed stricter panel domain remains
-an implementation discrepancy.
+**Audit provenance:** The original source audit was performed on 2026-11-05 at `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. Its historical discrepancies are superseded by the accepted contracts and this implementation. The [source ledger](coverage.json) retains source ownership and dated inspection fingerprints.
 
 ## Accepted decision: explicit observation frequency
 
-**Accepted:** 2026-11-06. **Implementation:** Not reconciled; selected source
-inspected at `5140b499cc`, with no implementation checks executed.
+**Accepted:** 2026-11-06.
 
 Annualized analytics risk calculations require caller-supplied observation
 frequency, or an explicit positive finite periods-per-year factor for scalar
@@ -34,19 +25,9 @@ uses the same declared frequency. Daily trading observations conventionally
 use 252 periods per year and monthly observations use 12; weekend and holiday
 gaps do not change a declared trading frequency.
 
-Nonannualized calculations do not require frequency solely under this rule.
-Dated CAGR uses actual holding dates and its accepted ACT/365F default, and
-frequency does not authorize inventing an initial date. Irregular-time
-estimation, resampling, calendar validation and serial-correlation correction
-remain separate decisions. The current Daily default requires reconciliation
-under the [frequency follow-up](../FOLLOW_UPS.md#explicit-analytics-frequency).
-
 ## Accepted decision: explicit tail confidence
 
-**Accepted:** 2026-11-06. **Implementation:** Partial; selected source
-inspected at `5140b499cc`. Rust validates finite confidence inside `(0, 1)`,
-while Python/WASM supply an omitted confidence of `0.95`. Neither behavior
-fully meets this contract. No runtime or numerical checks were executed.
+**Accepted:** 2026-11-06.
 
 Tail-risk calculations require caller-supplied, finite decimal confidence
 `c`, strictly inside `(0.5, 1)`. Omission and values outside that interval are
@@ -77,23 +58,9 @@ The [accepted record-10 contract](10-benchmark-regression.md#accepted-decision-s
 separately retains that fixed, labelled two-sided 95% Student-t interval and
 defines field-specific beta/uncertainty availability.
 
-Valid confidence does not establish adequate historical tail resolution,
-Cornish–Fisher extreme-tail accuracy, or independent numerical qualification.
-Estimator selection and sample availability retain their separate adoption
-status. Output signs follow the
-[accepted signed-tail contract](07-historical-tail-risk.md#accepted-decision-signed-tail-outputs).
-Reconciliation is owned by the
-[tail-confidence follow-up](../FOLLOW_UPS.md#analytics-tail-confidence).
-
 ## Accepted decision: panels, windows, wire and summary
 
-**Accepted:** 2026-11-07. **Implementation:** Partial; selected source
-inspected at `827ebb75b9`. The actual valuation grid, strict admission and
-price conversion, optional context, explicit unit selection, atomic windows,
-validated state/wire and fixed-summary input/provenance/failure behavior
-require reconciliation. No runtime constructor, restoration or report checks
-were executed. The frequency and tail-confidence decisions above, actual
-initial valuation dates and accepted metric packages remain authoritative.
+**Accepted:** 2026-11-07.
 
 ### Actual valuation grid and panel admission
 
@@ -252,7 +219,7 @@ Require explicit annual-effective cash, per-observation MAR, a separate
 per-observation Omega threshold and tail confidence. Require stored explicit
 frequency and selected benchmark because this fixed report uses them.
 Validate these required inputs before empty/insufficient-history outcomes.
-Cash currently affects Sharpe in this report; MAR affects Sortino/downside,
+Cash affects Sharpe in this report; MAR affects Sortino/downside,
 Omega uses its independent hurdle, and confidence routes to historical
 VaR/ES and tail ratio. Do not reuse one input as another or require unrelated
 Sterling/window/modified-Sharpe parameters.
@@ -292,20 +259,23 @@ is introduced.
 Reuse `TableEnvelope` and the existing core nonfinite adapters/schema for
 lossless numeric results: native NaN/positive/negative infinity keep those
 meanings, and JSON uses the established `"nan"`, `"inf"`, `"-inf"` tokens.
-The current plain `Float64(Vec<f64>)` table serialization must be reconciled
-at the shared table integration boundary; do not invent a parallel analytics
-table or turn these results into null/zero. This requirement preserves
+The shared `Float64(Vec<f64>)` table integration preserves these sentinels;
+there is no parallel analytics table or conversion of these results to null/zero. This requirement preserves
 analytics outputs without adopting unrelated table/domain financial policy.
 Verify native Python/WASM behavior separately from JSON; a missing adapter is
 not proof of a demonstrated native-array failure.
 
-Validate report structure on construction and restoration: row counts,
-unique ordered column keys, ticker alignment, numeric-column lengths/types
-and required metadata, with only owner-permitted nonfinite results. Reject
+Summary construction calls `validate_summary`. After restoring a generic
+`TableEnvelope`, call the public analytics `validate_summary(&table)` before
+treating it as this canonical report. Generic table restoration checks its
+structural envelope; it does not establish analytics metadata semantics.
+The analytics validator checks row counts, unique ordered column keys, ticker
+alignment, numeric-column lengths/types and required metadata, with only
+owner-permitted nonfinite results. Reject
 malformed/unknown fields, inappropriate nulls or sentinel tokens and
 inconsistent counts instead of rebuilding a different report. A restored
 table cannot certify the underlying financial calculations without source
-data. Independently qualify host/frame/wire paths, empty/ragged windows,
+data. Qualification cases include host/frame/wire paths, empty/ragged windows,
 distinct population metadata, nonfinite identity and atomic failures.
 
 [RFC 8259](https://www.rfc-editor.org/rfc/rfc8259#section-6) excludes NaN and
@@ -315,83 +285,6 @@ supports the adjacent fractional-change distinction, without adopting
 automatic filling or certifying financial adjustments. These references do
 not validate source provenance, calendar regularity or estimator accuracy.
 
-## Algorithm and selection
+## Implementation evidence
 
-1. Validate nonempty grid/columns, name count, strict chronology and column lengths. Locate each finite span and reject invalid values within it or non-NaN values outside it.
-2. For prices, compute adjacent `P[t]/P[t−1]−1` and place returns at the ending dates. An unrepresentable/nonpositive ratio becomes NaN and is then rejected by assembly. For return columns, preserve observations and trim permitted edge gaps.
-3. Price panels retain their actual initial valuation date. Return panels prepend `frequency.prior_observation_date(first_return_date)`: daily subtracts one calendar day; weekly seven days; monthly/quarterly/semiannual/annual subtract 1/3/6/12 months with date clamping. This is an assumed date, not observed data, and remains inconsistent with the previously agreed actual-initial-date direction.
-4. Store compact columns plus global half-open spans. A single-ticker statistic uses its own active span; a benchmark statistic intersects ticker, benchmark and active spans. The omitted benchmark is ticker zero; an explicit missing name is an error.
-5. `reset_date_range(start,end)` selects return ending dates inclusively using partition points. Reversed/out-of-range dates can produce an empty window. Drawdowns are recomputed from wealth one at that window's start; full-history peaks do not carry into a reset window. CAGR includes the price date immediately before the first selected return.
-6. Restoration deserializes a separate state and re-runs assembly, including span/date/return checks; caches are rebuilt and the saved active window is restored. Malformed state is not trusted.
-
-Frequency is an explicit label, default Daily; regular spacing, trading-calendar consistency and return provenance are not inferred or checked. Annualization counts are 252/52/12/4/2/1. Exported convenience defaults are annual cash rate 0, per-period MAR 0, monthly aggregation, rolling window 63, confidence .95, five drawdown episodes and annualize=true. Most Rust operations still require their own arguments; these constants do not override explicit parameters.
-
-The implicit Daily default conflicts with the accepted frequency decision
-above. Implicit zero cash conflicts with the
-[accepted explicit cash-input rule](02-wealth-and-annualization.md#accepted-decision-cash-rates).
-Implicit zero MAR conflicts with the
-[accepted per-observation MAR rule](04-return-risk-ratios.md#accepted-decision-explicit-per-observation-mar).
-Implicit zero Omega threshold conflicts with the
-[accepted Omega rule](04-return-risk-ratios.md#accepted-decision-empirical-omega-and-explicit-threshold).
-The dual-unit annualization default is accepted for removal in this record's
-whole-record package. Calendar aggregation/fiscal/reference defaults follow
-the accepted record-03 package; accepted rolling/count choices follow their
-owning records below.
-
-The [accepted record-09 package](09-rolling-return-risk.md#accepted-decision-rolling-return-risk-calculations)
-requires explicit positive observation-window counts for rolling return,
-volatility, Sharpe and Sortino. Their current host-only 63-observation defaults
-require reconciliation. Rolling-regression window defaults remain owned by
-record 12.
-
-The accepted [record-05 display-count contract](05-drawdown-paths-and-episodes.md#accepted-decision-drawdown-paths-and-episodes)
-and [record-06 Sterling count](06-drawdown-reward-and-cdar.md#accepted-decision-drawdown-reward-and-cdar)
-also require explicit counts, replacing their five-episode host defaults.
-Modified Burke no longer has a count parameter under the accepted contract.
-
-For the tail-risk methods and summary, Rust takes confidence explicitly;
-Python/WASM currently use `DEFAULT_CONFIDENCE` when omitted, conflicting with
-the accepted explicit-confidence contract above. The current `(0, 1)`
-validator also requires reconciliation with `(0.5, 1)`. Their omitted
-Gaussian/CF horizon means one observation period, as
-required by the [accepted horizon convention](08-moments-gaussian-and-cornish-fisher.md#accepted-decision-observation-period-horizons).
-Panel frequency does not implicitly annualize VaR. Record 08 owns horizon
-calculations/errors and [ADR 0033](0033-value-at-risk-method-selection.md) owns
-the accepted fixed historical scalar/summary selection. Broader summary input
-and whole-report failure policies are accepted in this record's whole-record
-package above.
-
-## Wire behavior, limitations and failures
-
-`PerformancePanel.series` serializes every nonfinite float as `null`, and reads null as NaN. Therefore an infinite edge value rejected by direct construction loses its identity if the panel is serialized before validation: it can return as an allowed missing gap. This is a confirmed transformation in source; the end-to-end case was not executed. It requires reconciliation with ADR 0009, not adoption as a missing-data repair.
-
-`Performance` state contains only validated finite returns. `BetaResult`, `GreeksResult`, `PeriodStats` ratio fields and `DatedSeries` use explicit core nonfinite wire adapters; `RollingGreeks` has plain float vectors despite undefined windows, a separate qualification gap in [record 12](12-rolling-regression.md). Schema registrations/generation describe shapes and are not financial validation. The fixed `summary` table calls 22 existing metrics, uses zero MAR/threshold for Sortino/downside/Omega, historical VaR/ES at supplied confidence, and the current default CAGR; it does not select alternative estimators.
-
-The accepted whole-record package above distinguishes these observed paths
-from the required actual-date grid, explicit benchmark/unit selection, strict wire
-admission and fixed-summary input/availability/provenance contract. Record
-12's carrier reconciliation is now accepted in its own scope. Summary numeric
-columns currently use plain floats in [the core table envelope](../../../../finstack-quant/core/src/table.rs),
-so lossless nonfinite JSON identity is not established by the metric adapters
-alone. No end-to-end serialization experiment was executed here.
-
-The summary's hardcoded Sortino/downside MAR and Omega threshold require
-reconciliation with their corresponding accepted input rules.
-
-## Alternatives and tradeoffs
-
-Keeping actual valuation dates preserves known holding periods; synthesizing a frequency step makes a return-only panel convenient but invents the first interval. The actual-date requirement is already agreed. Explicit filling/resampling and a cash-flow-adjusted return builder remain separate policies. Accepted terminal-wipeout support remains unimplemented.
-
-## Implementation and validation evidence
-
-- Owning [panel/state/window logic](../../../../finstack-quant/analytics/src/performance/mod.rs), [panel wire adapter](../../../../finstack-quant/analytics/src/performance/panel.rs), [restoration](../../../../finstack-quant/analytics/src/performance/serialization.rs), [defaults](../../../../finstack-quant/analytics/src/defaults.rs), [summary](../../../../finstack-quant/analytics/src/performance/scalar.rs), and [core frequency/date step](../../../../finstack-quant/core/src/dates/periods/mod.rs).
-- The [Python](../../../../finstack-quant-py/src/bindings/analytics/performance.rs) and [WASM](../../../../finstack-quant-wasm/src/api/analytics/performance.rs) tail-risk/summary wrappers establish the shared omitted-argument behavior above. These selected caller traces do not extend the Rust source ledger to complete host API or parity qualification.
-- [Correctness regressions](../../../../finstack-quant/analytics/tests/correctness_regressions.rs) locate edge-ragged/interior-gap, invalid-date, empty-overlap and window-reset cases. Inspected [audit regressions](../../../../finstack-quant/analytics/tests/audit_regressions.rs) include `ragged_window_round_trip_preserves_alignment_and_initial_dates` and `initial_drawdown_uses_known_peak_date_in_full_and_windowed_panels`; these test state invariants, not the truth of a synthesized date.
-- [Schema contract tests](../../../../finstack-quant/analytics/tests/schema_contract.rs) are shape evidence. [Schema registry](../../../../finstack-quant/analytics/src/schema.rs), [generator](../../../../finstack-quant/analytics/src/bin/gen_schemas.rs), and [crate exports](../../../../finstack-quant/analytics/src/lib.rs) add no estimator.
-
-No data cleaning or schema generation was run.
-
-## Follow-up tracking
-
-Implementation reconciliation and missing evidence are tracked in the
-[panel/window/wire/summary follow-up](../FOLLOW_UPS.md#analytics-panels-windows-wire-summary).
+[performance/mod.rs](../../../../finstack-quant/analytics/src/performance/mod.rs), [performance/panel.rs](../../../../finstack-quant/analytics/src/performance/panel.rs), [performance/serialization.rs](../../../../finstack-quant/analytics/src/performance/serialization.rs), [performance/scalar.rs](../../../../finstack-quant/analytics/src/performance/scalar.rs). The [crate integration tests](../../../../finstack-quant/analytics/tests/main.rs), inline numerical regressions and [schema contracts](../../../../finstack-quant/analytics/tests/schema_contract.rs) exercise this scope. See the [inventory validation record](README.md#implementation-evidence) for executed checks and evidence limits.

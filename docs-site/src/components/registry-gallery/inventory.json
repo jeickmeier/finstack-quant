@@ -405,13 +405,13 @@
     {
       "name": "benchmark-report",
       "type": "registry:component",
-      "docs": "Display-only view of the report returned by useBenchmarkReport (analytics.Performance against a named benchmark over a host-supplied panel). A fund control selects the ticker, defaulting to the first ticker that is not the benchmark. Key-value tables show the fund's greeks (alpha, beta, R squared, adjusted R squared, observations), its beta estimate with standard error and confidence bounds, and its tracking error, information ratio, Treynor, M squared, up and down capture, capture ratio and batting average. Cumulative outperformance and drawdown difference are drawn against the fund's own active dates, rolling alpha and beta against the returned window-end dates; the multi-factor regression (alpha, one beta per factor, R squared, adjusted R squared, residual volatility, observations) or its native error is shown when a factor panel was supplied. Values are the decimal fractions and ratios Rust returns, with no units inferred; non-finite values are left out of figures and shown as returned elsewhere. Accepts report, loading, error, initialTicker, formatValue and density props; no worker or query provider required.",
+      "docs": "Display-only view of the report returned by useBenchmarkReport (analytics.Performance against a named benchmark over a host-supplied panel). A fund control selects the ticker, defaulting to the first ticker that is not the benchmark. Key-value tables show the fund's greeks (alpha, beta, R squared, adjusted R squared, observations), its beta estimate with standard error and confidence bounds, and its tracking error, information ratio, Treynor, M squared, up and down capture, capture ratio and batting average. Cumulative outperformance and drawdown difference are drawn against the fund's exact paired benchmark dates, rolling alpha and beta against the returned window-end dates; the multi-factor regression (alpha, one beta per factor, R squared, adjusted R squared, residual volatility, observations) or its native error is shown when a factor panel was supplied. Values are the decimal fractions and ratios Rust returns, with no units inferred; non-finite values are left out of figures and shown as returned elsewhere. Accepts report, loading, error, initialTicker, formatValue and density props; no worker or query provider required.",
       "worker": "none"
     },
     {
       "name": "correlation-heatmap",
       "type": "registry:component",
-      "docs": "Presents one native analytics.Performance correlationMatrix result as returned: a diverging heatmap over the fixed correlation range [-1, 0, 1] and a table of every coefficient, rows and columns in Rust's ticker order, with a Repaired stamp shown only when Rust's repaired flag says it projected the raw estimate to the nearest valid correlation matrix (Higham); the flag is Rust's, never inferred here. Rust returns a unit diagonal and every coefficient inside [-1, 1]. Connect useCorrelationMatrix. Accepts report, loading, error, formatValue and density props; no worker or query provider required.",
+      "docs": "Presents one native analytics.Performance correlationMatrix result as returned: a diverging heatmap over the fixed correlation range [-1, 0, 1] and a table of every coefficient, rows and columns in Rust's ticker order, with the actual shared observation count and first/last return-ending dates supplied by Rust. Rust returns a unit diagonal and every coefficient inside [-1, 1]. Connect useCorrelationMatrix. Accepts report, loading, error, formatValue and density props; no worker or query provider required.",
       "worker": "none"
     },
     {
@@ -1776,15 +1776,15 @@
     },
     {
       "path": "finstack-quant-ui/tests/analytics/explicit.json",
-      "sha256": "b1ce0b385893a290b0537ad8106a11d7d81cb157caa428f024c38815c25f9e04"
+      "sha256": "d9aa94b7a934cfd1f48091c995b9e88ded30f7fa550805696fb522c584ff9ca9"
     },
     {
       "path": "finstack-quant-ui/tests/analytics/benchmark.json",
-      "sha256": "7ce2ee5e91bc8247025f018ded85e84af54aad2a106e5c8b84ca60851a3d4ed0"
+      "sha256": "1fbaa734507dd395bac4fa88e14e7935ed2d990062442fc81f64578974e9a9ec"
     },
     {
       "path": "finstack-quant-ui/tests/analytics/correlation/cases.json",
-      "sha256": "e9817100ee6cf2dca6c102bbb49581fbaa52e0b3ecaa86697df583f43f541c65"
+      "sha256": "de992fbdb113a2ce665d2410e21c7261dc13c6a4077da5618e6e9be6c03abf78"
     },
     {
       "path": "finstack-quant-ui/tests/models/credit/migration.json",
@@ -1940,7 +1940,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-monte-carlo.json",
-      "sha256": "50fa244f436b35d1392fe3252e494e4139d3abe74826210f0d31a280d0f9f251"
+      "sha256": "9a72651a93d0db2788a418637792b1795dbe738ea02d6e6227507146f29095d0"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-monte-carlo-breach.json",

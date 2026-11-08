@@ -364,9 +364,10 @@ const prices = Array.from({ length: 128 }, (_, i) => 100 * (1 + 0.001 * Math.sin
 const priceDates = prices.map((_, i) =>
   new Date(Date.UTC(2025, 0, 1 + i)).toISOString().slice(0, 10)
 );
-const returnDates = returns.map((_, i) =>
-  new Date(Date.UTC(2025, 0, 1 + i)).toISOString().slice(0, 10)
-);
+const returnDates = [
+  '2024-12-31',
+  ...returns.map((_, i) => new Date(Date.UTC(2025, 0, 1 + i)).toISOString().slice(0, 10)),
+];
 const statsArr = Array.from({ length: 512 }, (_, i) => i * 0.01 + Math.sin(i));
 // Flat row-major 3x3 SPD matrix (choleskyDecomposition takes a flat array and n).
 const cholMat = [4, 2, 0, 2, 5, 1, 0, 1, 3];
@@ -1392,7 +1393,7 @@ async function main() {
   });
 
   bench('analytics', 'excessReturns', 5000, () => {
-    returnPerf.excessReturns(benchRf, 252);
+    returnPerf.excessReturns(benchRf);
   });
 
   bench('analytics', 'getDrawdownSeries', 4000, () => {

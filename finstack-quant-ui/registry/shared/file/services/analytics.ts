@@ -23,7 +23,7 @@ const series = (value: DatedSeries): PerformanceSeries => ({
   ...value,
   values: Array.from(value.values),
 });
-/** Omitted options stay unset so Rust applies its own defaults. */
+/** Optional calendar/lookback inputs retain their explicit absence. */
 const option = <T>(value: T | null | undefined) => value ?? undefined;
 /** AnalyticsApi over the analytics facade namespace; handles never outlive a call. */
 export function createAnalyticsService(
@@ -44,8 +44,8 @@ export function createAnalyticsService(
               request.fiscalYearStart.month,
               request.fiscalYearStart.day,
             );
-          const window = option(request.window);
-          const rate = option(request.riskFreeRate);
+          const window = request.window;
+          const rate = request.riskFreeRate;
           const activeDates = handle.getActiveDates();
           const cumulative = handle.cumulativeReturns();
           const drawdowns = handle.getDrawdownSeries();
@@ -54,24 +54,25 @@ export function createAnalyticsService(
             option(request.lookbackDate),
             fiscal,
           );
-          const correlation = handle.correlationMatrix();
           return {
             tickerNames,
             benchmarkIdx: request.panel.benchmark_ticker
-              ? handle.getBenchmarkIdx()
+              ? handle.getBenchmarkIdx()!
               : null,
-            frequency: handle.getFrequency(),
+            frequency: handle.getFrequency()!,
             activeDates,
-            summary: handle.summary(rate, option(request.confidence)),
+            summary: handle.summary(
+              rate,
+              request.mar,
+              request.omegaThreshold,
+              request.confidence,
+            ),
             // finstack-compose: one native call per ticker index, nothing read from the names
             tickers: tickerNames.map((_, index) => ({
               activeDates: handle.getActiveDatesForTicker(index),
               cumulativeReturns: Array.from(cumulative[index]!),
               drawdowns: Array.from(drawdowns[index]!),
-              drawdownEpisodes: handle.drawdownDetails(
-                index,
-                option(request.episodes),
-              ),
+              drawdownEpisodes: handle.drawdownDetails(index, request.episodes),
               rollingSharpe: series(handle.rollingSharpe(index, window, rate)),
               rollingVolatility: series(
                 handle.rollingVolatility(index, window),
@@ -86,11 +87,6 @@ export function createAnalyticsService(
                 ? { ...request.fiscalYearStart }
                 : null,
             },
-            correlation: {
-              // finstack-compose: copies each typed-array row out for structured clone
-              matrix: correlation.matrix.map((row) => Array.from(row)),
-              repaired: correlation.repaired,
-            },
           };
         } finally {
           performance?.free();
@@ -104,10 +100,11 @@ export function createAnalyticsService(
         try {
           const correlation = performance.correlationMatrix();
           return {
-            tickerNames: performance.getTickerNames(),
-            // finstack-compose: copies each typed-array row out for structured clone
-            matrix: correlation.matrix.map((row) => Array.from(row)),
-            repaired: correlation.repaired,
+            tickerNames: correlation.tickers,
+            matrix: correlation.matrix,
+            nObs: correlation.n_obs,
+            startDate: correlation.start_date,
+            endDate: correlation.end_date,
           };
         } finally {
           performance.free();
@@ -118,8 +115,8 @@ export function createAnalyticsService(
       return context.result((): BenchmarkReport => {
         const performance = new native.analytics.Performance(request.panel);
         try {
-          const rate = option(request.riskFreeRate);
-          const window = option(request.window);
+          const rate = request.riskFreeRate;
+          const window = request.window;
           const factors = request.factors;
           const factorReturns = factors?.returns.map((row) => [...row]);
           const outperformance = performance.cumulativeReturnsOutperformance();
@@ -127,8 +124,8 @@ export function createAnalyticsService(
           const tickerNames = performance.getTickerNames();
           return {
             tickerNames,
-            benchmarkIdx: performance.getBenchmarkIdx(),
-            frequency: performance.getFrequency(),
+            benchmarkIdx: performance.getBenchmarkIdx()!,
+            frequency: performance.getFrequency()!,
             activeDates: performance.getActiveDates(),
             factorNames: factors ? [...factors.names] : null,
             greeks: performance.greeks(rate),
@@ -145,7 +142,7 @@ export function createAnalyticsService(
             tickers: tickerNames.map((_, index) => {
               const rolling = performance.rollingGreeks(index, window, rate);
               return {
-                activeDates: performance.getActiveDatesForTicker(index),
+                activeDates: performance.getPairedDates(index),
                 outperformance: Array.from(outperformance[index]!),
                 drawdownDifference: Array.from(drawdownDifference[index]!),
                 rollingGreeks: {
@@ -159,8 +156,7 @@ export function createAnalyticsService(
                       performance.multiFactorGreeks(
                         index,
                         factorReturns,
-                        option(factors!.returnKind),
-                        option(factors!.riskFreeRate),
+                        factors!.riskFreeRate,
                       ),
                     )
                   : null,

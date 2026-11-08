@@ -64,5 +64,5 @@ pub fn capital_structure_summary_table(
     summary: JsValue,
 ) -> Result<JsValue, JsValue> {
     let summary: CapitalStructureSummary = from_js_json(&summary, "summary")?;
-    to_js_value(&summary.to_table())
+    crate::utils::to_js_table_numeric(&summary.to_table())
 }

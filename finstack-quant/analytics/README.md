@@ -1,32 +1,17 @@
 # finstack-quant-analytics
 
-Portfolio performance and risk analytics over numeric return series and
-`finstack_quant_core::dates::Date`. No DataFrame or Polars dependency: inputs
-are `Vec<Vec<f64>>` panels and `Vec<Date>` grids, outputs are `Vec<f64>` or
-small serde-derived result structs.
-
-Correlation-matrix validation and nearest-correlation repair live in
-`finstack_quant_core::math::linalg`; `Performance::correlation_matrix` uses them
-from there.
-
-## Position in the stack
-
-`finstack-quant-core` is the only workspace crate it depends on; the sole
-non-trivial third-party dependency is `nalgebra`, used by the multi-factor
-regression and the constrained least-squares solver. Consumed by:
-
-| Consumer | What it uses |
-|----------|--------------|
-| `finstack-quant-factor` | `beta` (OLS slope in the credit peel) |
-| `finstack-quant` (umbrella) | re-exported as `finstack_quant::analytics` |
-| `finstack-quant-py`, `finstack-quant-wasm` | `Performance`, the scalar `sharpe` / `sortino` / `volatility` / `max_drawdown`, `regression::constrained_least_squares`, the result and config types, and the `DEFAULT_*` constants |
+Portfolio performance and risk analytics over numeric return series and actual
+`finstack_quant_core::dates::Date` valuation grids. The canonical Rust API owns
+all calculations; Python and WASM convert types and expose the same contracts.
+No DataFrame or Polars dependency is required by the Rust crate.
 
 ## Entry point
 
-[`Performance`](src/performance/mod.rs) is the entry point. Construct it with
-`Performance::new(&PerformancePanel)` from a dated panel whose
-[`PanelSeriesKind`](src/performance/panel.rs) is `Prices` or `Returns`; every
-analytic is then a method on that instance.
+Construct [`Performance`](src/performance/mod.rs) from a
+[`PerformancePanel`](src/performance/panel.rs). Both panel kinds use the same
+actual, strictly increasing valuation grid. For `L` dates, prices have `L`
+levels and returns have `L-1` values covering the adjacent valuation intervals.
+No initial date is inferred from observation frequency.
 
 ```rust
 use finstack_quant_analytics::{PanelSeriesKind, Performance, PerformancePanel};
@@ -41,193 +26,131 @@ let perf = Performance::new(&PerformancePanel {
     series: vec![(0..10).map(|i| 100.0 + i as f64).collect()],
     kind: PanelSeriesKind::Prices,
     ticker_names: vec!["SPY".into()],
-    benchmark_ticker: None, // None selects the first ticker
+    benchmark_ticker: None,
     frequency: Some(PeriodKind::Daily),
 })
 .unwrap();
 
 assert_eq!(perf.get_ticker_names(), &["SPY"]);
-let sharpe = perf.sharpe(0.0); // Vec<f64>, one entry per ticker
+let sharpe = perf.sharpe(0.0).unwrap();
 assert_eq!(sharpe.len(), 1);
 ```
 
-Method families on `Performance`:
+Ticker labels must be unique and nonblank. Each column has a contiguous
+observed span with only leading/trailing missing observations. Native edge
+NaNs travel as JSON null; infinities and invalid values are rejected rather
+than reclassified as missing. Total investment returns must be finite and
+at least `-1`; exact `-1` or a final zero wealth level is a terminal wipeout,
+with no subsequent observed returns. Inputs already expressed as excess
+returns or factor spreads belong in the raw statistical APIs.
 
-| Family | Source | Examples |
-|--------|--------|----------|
-| Scalars | [`performance/scalar.rs`](src/performance/scalar.rs) | `cagr`, `mean_return`, `volatility`, `sharpe`, `sortino`, `calmar`, `omega_ratio`, `gain_to_pain`, `modified_sharpe`, `geometric_mean`, `downside_deviation` |
-| Tail risk | [`performance/scalar.rs`](src/performance/scalar.rs) | `value_at_risk`, `expected_shortfall`, `parametric_var`, `cornish_fisher_var`, `tail_ratio`, `skewness`, `kurtosis`, `cdar` |
-| Drawdown | [`performance/scalar.rs`](src/performance/scalar.rs), [`performance/aggregation.rs`](src/performance/aggregation.rs) | `max_drawdown`, `mean_drawdown`, `max_drawdown_duration`, `get_drawdown_series`, `drawdown_details`, `ulcer_index`, `martin_ratio`, `sterling_ratio`, `burke_ratio`, `pain_index`, `pain_ratio`, `recovery_factor` |
-| Benchmark-relative | [`performance/benchmark.rs`](src/performance/benchmark.rs) | `beta`, `greeks`, `rolling_greeks`, `multi_factor_greeks`, `tracking_error`, `information_ratio`, `r_squared`, `treynor`, `m_squared`, `up_capture`, `down_capture`, `capture_ratio`, `batting_average` |
-| Rolling series | [`performance/rolling.rs`](src/performance/rolling.rs) | `rolling_returns`, `rolling_volatility`, `rolling_sharpe`, `rolling_sortino` |
-| Panels and periods | [`performance/aggregation.rs`](src/performance/aggregation.rs) | `get_returns`, `cumulative_returns`, `excess_returns`, `correlation_matrix`, `periodic_returns`, `period_stats`, `lookback_returns`, `cumulative_returns_outperformance`, `drawdown_difference` |
-| Window and benchmark reset | [`performance/mod.rs`](src/performance/mod.rs) | `reset_date_range`, `reset_bench_ticker`, `get_active_dates`, `get_active_dates_for_ticker`, `get_returns_for_ticker` |
+Frequency and benchmark are optional panel context. A calculation that uses
+one requires it explicitly: no date-derived frequency or first-ticker
+benchmark is selected. Unannualized statistics need no unused frequency;
+absolute statistics need no unused benchmark. Callers own input adjustments,
+matching valuation intervals, cash flows, currency, fee basis and return
+provenance.
 
-The per-domain modules `aggregation`, `benchmark`, `defaults`, `drawdown`, `multi_factor`,
-`performance`, `returns`, and `risk_metrics` are `pub(crate)`;
-`regression` and `schema` (behind the default `json-schema` feature) are
-public. The crate root re-exports the result and config types `Performance`
-takes or returns, the `DEFAULT_*` constants, and the free functions listed
-below.
+## Method families
 
-## Public surface
+| Family | Methods and source |
+| --- | --- |
+| Return and reward/risk scalars | [`scalar.rs`](src/performance/scalar.rs): `cagr`, `mean_return`, `geometric_mean`, `volatility`, `sharpe`, `sortino`, `downside_deviation`, `omega_ratio`, `gain_to_pain`, `modified_sharpe`. |
+| Tail estimates and moments | [`scalar.rs`](src/performance/scalar.rs): historical `value_at_risk`/`expected_shortfall`, `tail_ratio`, explicit `parametric_var`/`cornish_fisher_var`, `skewness`, `kurtosis`. |
+| Drawdowns and rewards | [`drawdown.rs`](src/drawdown.rs), [`scalar.rs`](src/performance/scalar.rs), [`aggregation.rs`](src/performance/aggregation.rs): path/episode measures, Calmar, Martin, Sterling, Burke, Pain, recovery and CDaR. |
+| Benchmark-relative metrics | [`benchmark.rs`](src/performance/benchmark.rs): beta, Jensen/fit statistics, TE/IR, geometric capture, batting average, Treynor and absolute M-squared. |
+| Rolling estimates | [`rolling.rs`](src/performance/rolling.rs) and [`benchmark.rs`](src/performance/benchmark.rs): compact right-labelled return-risk and alpha/beta results. |
+| Grouping and lookbacks | [`aggregation.rs`](src/performance/aggregation.rs): explicit calendar/fiscal grouping, occupied-period statistics and dated lookback coverage. |
+| Correlation | [`correlation.rs`](src/correlation.rs): common-sample Pearson matrix with `CorrelationResult` sample provenance, no automatic repair. |
+| Multifactor regression | [`multi_factor.rs`](src/multi_factor.rs): raw `multi_factor_greeks` and a Total-return panel adapter. |
+| Constrained regression | [`regression.rs`](src/regression.rs): normalized full-rank SVD and single-equality `constrained_least_squares`. |
+| Summary | [`scalar.rs`](src/performance/scalar.rs): fixed 22-metric `TableEnvelope`, explicit cash/MAR/Omega/confidence and per-row sample metadata. |
 
-| Item | Module | Notes |
-|------|--------|-------|
-| `Performance` | `performance` | Entry point |
-| `LookbackReturns` | `performance` | `mtd` / `qtd` / `ytd` / `fytd`, one entry per ticker |
-| `PeriodStats` | `aggregation` | Best/worst, win rate, streaks, payoff and profit factors, CPC index |
-| `DrawdownEpisode` | `drawdown` | Returned by `Performance::drawdown_details` |
-| `BetaResult`, `GreeksResult`, `RollingGreeks` | `benchmark` | Returned by benchmark methods |
-| `MultiFactorResult`, `ReturnKind` | `multi_factor` | Returned / consumed by `Performance::multi_factor_greeks` |
-| `CagrDayCount` | `risk_metrics` | Act/365.25 default or a wrapped core `DayCount` |
-| `DatedSeries` | `risk_metrics` | Returned by `Performance::rolling_*` |
-| `PeriodicReturn` | `aggregation` | `{date, value}` point returned by `Performance::periodic_returns` |
-| `RollingMetric` | `risk_metrics` | Names the metric in `DatedSeries::value_column` |
-| `DEFAULT_*` constants | `defaults` | Values the bindings substitute for omitted arguments |
-| `schema::ARTIFACTS` | `schema` | JSON Schema registry (default `json-schema` feature) |
-| `sharpe`, `sortino`, `volatility`, `max_drawdown` | crate root | Single-series metrics without panel construction |
-| `beta` | `benchmark` | Freestanding OLS slope; consumed by `finstack-quant-factor` |
-| `regression` | `regression` | Public module: `constrained_least_squares` |
+The crate root re-exports `Performance`, its panel/result types,
+`validate_summary`, and the standalone
+`sharpe`, `sortino`, `volatility`, `max_drawdown`, `beta` and raw
+`multi_factor_greeks` functions. `regression` and the feature-gated `schema`
+registry are public modules. Domain implementation modules remain private.
 
-All other analytics building blocks are `pub(crate)`.
+## Numerical and financial conventions
 
-### `regression`
+- Returns and rates are decimal fractions: `0.01` means 1%.
+- Annual-effective cash must be supplied wherever used, finite and greater
+  than `-1`. Arithmetic cash excess uses `expm1(log1p(cash) / A)` per
+  observation. Drawdown reward ratios subtract annual cash from dated CAGR.
+- Frequency-based risk uses explicit positive finite periods per year or the
+  panel's declared `PeriodKind`. It does not infer regular spacing or adjust
+  for autocorrelation. MAR and Omega thresholds are explicit per-observation
+  decimal hurdles, independent of annual cash.
+- Dated CAGR uses each ticker's actual opening/closing valuation dates and
+  defaults to Actual/365 Fixed. Explicit alternative clocks use the core
+  `DayCountContext`; no observation-derived reference period is invented.
+- Wealth compounds with compensated log accumulation. A terminal wipeout
+  gives exact `-1` cumulative/geometric return. Empty reported histories are
+  unavailable rather than observed zero performance.
+- Volatility and tracking error use sample SD (`n-1`). Sharpe uses arithmetic
+  excess return; downside deviation uses all observations in its denominator.
+  Short history, measured zero risk, undefined `0/0` and signed infinity have
+  distinct metric-specific meanings.
+- Historical VaR is R-7 interpolation. ES averages exactly the fractional
+  empirical lower-tail mass. Both are signed native-period return estimates,
+  so positive lower-tail estimates are valid. Every tail request requires
+  explicit finite `0.5 < confidence < 1`.
+- Gaussian and CF use whole observation horizons in `1..=2^53-1`, omitted as
+  one. Their additive model quantiles can fall below `-1`; they are not
+  compounded investment observations. CF uses Type 2 shape coefficients and
+  an analytic global ordering gate, with explicit errors and no fallback.
+- Reported skewness/excess kurtosis use the Fisher-adjusted Type 2
+  estimators, requiring three/four varying observations respectively.
+  Modified Sharpe is an observation-period excess/CF-loss ratio at horizon
+  one, with its own availability rule.
+- Drawdown paths rebase at each selected actual opening. Recovery is exact
+  return to the peak, durations count calendar days, and unavailable duration
+  is nullable. Martin is cash-adjusted; modified Burke uses all episode
+  depths and normalizes squared depths by return-observation count.
+- Period grouping requires an explicit bucket frequency. Occupied partial
+  periods are retained; absent buckets do not become synthetic observations.
+  Fiscal context uses canonical core period boundaries.
+- Raw regression inputs are prealigned finite statistical arrays. Standalone
+  beta requires equal lengths. The raw multifactor API requires explicit
+  total/excess interpretation; panel multifactor inputs are Total only and
+  subtract cash from the response, with factors supplied already prepared.
+- Correlation uses one all-ticker common sample. Constant/insufficient columns
+  error the whole matrix. Singular PSD matrices are valid. The result records
+  ticker order, shared observation count and actual return-ending bounds.
+- Invalid requests and unresolved numerical failures return errors. Permitted
+  unavailable estimates remain native NaN, and intentional zero-risk limits
+  remain signed infinity. JSON results preserve them as `"nan"`, `"inf"`,
+  `"-inf"`; malformed state and inappropriate nulls are rejected.
 
-`constrained_least_squares` is an equality-constrained least-squares solver.
-`finstack-quant-portfolio`'s factor-Brinson documentation and error messages
-point callers at it for pre-solving factor return vectors; portfolio does not
-link against this crate.
+After restoring a generic `TableEnvelope`, call analytics
+`validate_summary(&table)` before treating it as the canonical summary.
+Generic table restoration validates structural fields; the analytics validator
+also checks the required report metadata and metric/ticker contract. Summary
+construction always runs this validation.
 
-## Conventions
+The [accepted methodology inventory](../../docs/decisions/financial/analytics/README.md)
+contains the full formulas, numerical gates, availability tables and evidence
+limits. [`INVARIANTS.md`](../../INVARIANTS.md) defines the workspace Decimal/f64
+boundary. This crate holds no `Money` and performs no FX conversion.
 
-- Returns are simple decimal returns (`0.01` is 1%), not percentages.
-- Annualization is derived from `finstack_quant_core::dates::PeriodKind`.
-- Risk-free rates that enter Sharpe, Treynor, M², modified Sharpe, Jensen,
-  and `ReturnKind::Total` are geometrically decompounded:
-  `rf_period = (1 + rf_annual)^{1/N} − 1`. Sterling, Burke, and pain ratios
-  subtract the annual rate from CAGR directly (`CAGR − rf_annual`, both
-  already annual); Calmar and Martin take no risk-free rate.
-- `excess_returns` subtracts a panel-aligned `rf` series (`rf.len()` must
-  equal the active date grid). `nperiods: None` decompounds at `self.ann()`.
-- CAGR defaults to Act/365.25 via `CagrDayCount`. Wrap a core `DayCount`
-  for Act/365F, Act/Act, Bus/252, and so on; Bus/252 requires a calendar.
-- Historical VaR, ES, tail ratio, parametric VaR, and Cornish–Fisher VaR
-  return `NaN` on empty or invalid series. Parametric and CF horizon
-  `None` is one period, not `ann()`.
-- Drawdown and compounding share one log-space Neumaier wealth engine.
-- Fiscal `period_stats` uses core `PeriodId::from_date` at all six frequencies,
-  including clamped month boundaries and partial final fiscal weeks.
-  `periodic_returns` remains calendar-only. Both propagate unrepresentable
-  period boundaries as errors.
-- FYTD is the first observation on or after the fiscal calendar start;
-  holidays are not skipped with `Following`.
-- Calmar is CAGR / |max DD| over the **active window**, not Young's
-  36-month CTA definition.
-- `correlation_matrix` uses complete-case when every ticker has ≥2 points
-  on the common span, otherwise pairwise, then Higham. It returns
-  `(matrix, repaired)`; `repaired` is `true` when Higham repair was
-  applied. Degenerate pairs or repair failure return `Err`.
-- `multi_factor_greeks` takes `ReturnKind::Excess` or
-  `ReturnKind::Total { risk_free_rate }`. Factors are already-excess;
-  Total subtracts decompounded rf from the dependent series only.
-  `ReturnKind::from_label` builds the kind from a host label and rate and
-  rejects a non-zero rate with `excess`.
-- Drawdown depths are non-positive fractions: `-0.25` is a 25% loss.
-- Rolling series are right-labeled — each output value carries the date of the
-  last observation in its window.
-- Benchmark inputs are assumed pre-aligned to the panel's date grid.
-- Volatility and covariance use sample statistics (`n - 1` denominator).
-  `skewness` and `kurtosis` are the bias-corrected G₁ / G₂ estimators
-  (Joanes & Gill 1998), matching Excel `SKEW()` / `KURT()`; both are built on
-  the same `n - 1` sample standard deviation and return `0.0` on
-  zero-variance or too-short series.
-- Compounding accumulates in log space with a Neumaier compensated
-  accumulator for long-series stability.
-- Degenerate cases return `0.0`, `NaN`, or `±∞` rather than panicking; the
-  crate denies `unwrap`/`expect`/`panic`/`unreachable` at the lint level.
-- This crate is `f64` throughout. It holds no `Money` and performs no FX; see
-  [`INVARIANTS.md`](../../INVARIANTS.md) §1 for the workspace Decimal/f64 split.
+## Position in the stack
 
-### Input validation
-
-`Performance::new` rejects, for either panel kind, empty inputs, ragged
-matrices, column counts that disagree with `ticker_names`, an unknown
-`benchmark_ticker`, and non-ascending dates. Per ticker, leading and trailing
-`NaN` padding is allowed but the finite span must be contiguous; an interior
-`NaN` or an active return `<= -1.0` is an error. `multi_factor_greeks` also
-rejects mismatched factor lengths, non-finite factors, an unknown or
-non-finite `ReturnKind::Total` rate, and singular or near-singular factor
-matrices. `correlation_matrix` and
-`excess_returns` return `Err` on length mismatch, degenerate pairs, or
-Higham failure.
-
-## Serialization
-
-`Performance` serializes authoritative inputs: the initial valuation and return
-dates, compact return columns and spans, unique ticker names, benchmark, frequency,
-and active window. Deserialization validates all invariants and rebuilds drawdown
-caches. Unknown fields, including serialized caches, are rejected. `LookbackReturns`, `PeriodStats`, `DrawdownEpisode`, `BetaResult`,
-`GreeksResult`, `MultiFactorResult`, `RollingGreeks`, and `DatedSeries` derive
-`Serialize`/`Deserialize`. Result objects reject unknown fields; regression
-observation counts, beta confidence levels, and drawdown truncation metadata
-are required. The `PeriodStats` fields that can legitimately be
-`±∞` (`payoff_ratio`, `profit_factor`, `cpc_ratio`, `kelly_criterion`) go through
-`finstack_quant_core::wire::non_finite_f64` so JSON round-trips exactly. See
-[`docs/SERDE_STABILITY.md`](../../docs/SERDE_STABILITY.md).
-
-## Bindings
-
-- **Python** — flat surface under `finstack_quant.analytics`: `Performance`
-  plus the result wrappers (`BetaResult`, `DatedSeries`, `DrawdownEpisode`,
-  `GreeksResult`, `LookbackReturns`, `MultiFactorResult`, `PeriodStats`,
-  `RollingGreeks`), the single-series functions `sharpe`, `sortino`,
-  `volatility` and `max_drawdown`, `constrained_least_squares`, and the
-  `AnalyticsError` exception. `Performance` keeps DataFrame-first constructors
-  (`Performance(prices_df, ...)`, `Performance.from_returns(df, ...)`, row
-  index = dates, column headings = ticker names) that build a
-  `PerformancePanel`; `Performance.from_panel(PerformancePanel(...))` is the
-  Rust-shaped path. Results carry `to_dataframe` methods.
-- **WASM** — `analytics.Performance` (`new Performance(panel)`), `analytics.constrainedLeastSquares`,
-  `analytics.maxDrawdown`, `analytics.sharpe`, `analytics.sortino`, and
-  `analytics.volatility` (see [`exports/analytics.js`](../../finstack-quant-wasm/exports/analytics.js)).
-  WASM `Performance` methods return plain JS values instead of typed wrappers.
-- Shared correlation helpers are bound under
-  `finstack_quant.models.correlation` in both hosts, with the canonical
-  `nearest_correlation` name shared across Rust, Python, and WASM.
-
-The authoritative contract, including every known gap, is
-[`parity_contract.toml`](../../finstack-quant-py/parity_contract.toml)
-(`[crates.analytics]`, `[parity.modules."finstack_quant.analytics"]`).
-
-## Tests and benchmarks
-
-| Path | Contents |
-|------|----------|
-| [`tests/performance_smoke.rs`](tests/performance_smoke.rs) | End-to-end `Performance` construction and metric coverage |
-| [`tests/correctness_regressions.rs`](tests/correctness_regressions.rs) | Hand-checked metric values pinned to `1e-12` |
-| [`benches/analytics_hot_paths.rs`](benches/analytics_hot_paths.rs) | Criterion benches for the hot scalar and rolling paths |
-| [`benches/analytics_scaling.rs`](benches/analytics_scaling.rs) | Criterion size-sweep benches (ns per element vs series / matrix size) |
-
-## References
-
-Entries live in [`docs/REFERENCES.md`](../../docs/REFERENCES.md):
-
-- Sharpe ratio — [`#sharpe1966`](../../docs/REFERENCES.md#sharpe1966)
-- Expected shortfall — [`#artzner1999CoherentRisk`](../../docs/REFERENCES.md#artzner1999CoherentRisk)
-- Active-portfolio context — [`#grinoldKahn1999ActivePortfolio`](../../docs/REFERENCES.md#grinoldKahn1999ActivePortfolio)
+`finstack-quant-core` is the only workspace dependency. `nalgebra` provides
+normalized SVD for multifactor and constrained regression. The factor crate
+uses raw beta for credit calibration; the umbrella re-exports analytics, and
+Python/WASM expose its public surface.
 
 ## Verification
 
-```bash
+Use the repository tasks for scoped iteration:
+
+```sh
 mise run rust-lint-crate -- finstack-quant-analytics
 mise run rust-test-crate -- finstack-quant-analytics
-mise run rust-bench-crate -- finstack-quant-analytics analytics_hot_paths
-mise run rust-bench-crate -- finstack-quant-analytics analytics_scaling
 ```
 
-Workspace gates (`mise run rust-lint`, `mise run rust-test`, `mise run rust-doc`)
-are what CI enforces; `mise run rust-test --doctest` runs the doctests,
-including the README samples. The scoped tasks above route through the
-project's supported lint, nextest, and Criterion tooling; see
-[`CONTRIBUTING.md`](../../CONTRIBUTING.md).
+Run `mise run gen-write` after changing public wire types or bindings, then
+complete the cross-language `mise run all` gate. Tests qualify the cases they
+cover; they do not establish forecasting accuracy or universal numerical
+certification.

@@ -17,6 +17,7 @@ from typing import Any
 import pytest
 
 from finstack_quant.analytics import Performance, PerformancePanel
+from tests.analytics_helpers import valuation_grid
 
 
 def _fixture() -> dict[str, Any]:
@@ -46,7 +47,7 @@ def _build_performance(fixture: dict[str, Any]) -> Performance:
     benchmark = fixture["benchmark"]
     return Performance.from_panel(
         PerformancePanel(
-            dates=dates,
+            dates=valuation_grid(dates),
             series=[target, benchmark],
             kind="returns",
             ticker_names=["TARGET", "BENCH"],
@@ -61,7 +62,7 @@ def test_performance_rolling_greeks_matches_fixture() -> None:
     expected = fixture["expected"]["rolling_greeks"]
 
     perf = _build_performance(fixture)
-    rolling = perf.rolling_greeks(0, window=5)
+    rolling = perf.rolling_greeks(0, window=5, risk_free_rate=0.0)
 
     _assert_sequence_close(rolling.alphas, expected["alphas"])
     _assert_sequence_close(rolling.betas, expected["betas"])
@@ -72,7 +73,7 @@ def test_performance_multi_factor_greeks_matches_fixture() -> None:
     expected = fixture["expected"]["multi_factor_greeks"]
 
     perf = _build_performance(fixture)
-    multi = perf.multi_factor_greeks(0, fixture["factors"])
+    multi = perf.multi_factor_greeks(0, fixture["factors"], risk_free_rate=0.0)
 
     assert multi.alpha == pytest.approx(expected["alpha"], abs=1e-12)
     _assert_sequence_close(multi.betas, expected["betas"])

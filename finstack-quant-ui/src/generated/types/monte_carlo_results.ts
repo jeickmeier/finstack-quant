@@ -7,6 +7,16 @@
  */
 export type DB888A5Be75073Df7B251 = string;
 /**
+ * An `f64` in the [`non_finite_f64`] wire form: a JSON number when finite,
+ * otherwise one of the strings `"inf"`, `"-inf"` or `"nan"`.
+ *
+ * Contract types store plain `f64` fields with
+ * `#[serde(with = "finstack_quant_core::wire::non_finite_f64")]` and name this
+ * type in `#[schemars(with = ...)]`, so the generated schema describes the
+ * sentinel strings the serializer actually writes.
+ */
+export type DA176Fd07772B7Dfa6E59 = number | ("inf" | "-inf" | "nan");
+/**
  * Optional semantic hint for a column.
  */
 export type D_9C2Fac7Fef3Fb26Aaf21 = "dimension" | "index" | "measure" | "attribute";
@@ -247,7 +257,6 @@ export interface DCe059E1E5Fd8531C74Da {
    * Number of rows in the table.
    */
   row_count: number;
-  [k: string]: unknown;
 }
 /**
  * A single named column in a [`TableEnvelope`].
@@ -260,47 +269,38 @@ export interface D_2F3Bf3B3F13Fb41B2Ca2 {
     | {
         type: "string";
         values: string[];
-        [k: string]: unknown;
       }
     | {
         type: "nullable_string";
         values: (string | null)[];
-        [k: string]: unknown;
       }
     | {
         type: "float64";
-        values: number[];
-        [k: string]: unknown;
+        values: DA176Fd07772B7Dfa6E59[];
       }
     | {
         type: "nullable_float64";
         values: (number | null)[];
-        [k: string]: unknown;
       }
     | {
         type: "u_int32";
         values: number[];
-        [k: string]: unknown;
       }
     | {
         type: "nullable_u_int32";
         values: (number | null)[];
-        [k: string]: unknown;
       }
     | {
         type: "int64";
         values: number[];
-        [k: string]: unknown;
       }
     | {
         type: "nullable_int64";
         values: (number | null)[];
-        [k: string]: unknown;
       }
     | {
         type: "boolean";
         values: boolean[];
-        [k: string]: unknown;
       };
   /**
    * Optional per-column metadata.
@@ -316,7 +316,6 @@ export interface D_2F3Bf3B3F13Fb41B2Ca2 {
    * Optional semantic hint for bindings and consumers.
    */
   role?: D_9C2Fac7Fef3Fb26Aaf21 | null;
-  [k: string]: unknown;
 }
 /**
  * Per-metric percentile time series.

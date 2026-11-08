@@ -232,7 +232,7 @@ pub fn scenario_comparison_table(
             .map_err(to_js_err)?;
     let metrics = js_string_seq(&metrics, "metrics")?;
     let metrics: Vec<&str> = metrics.iter().map(String::as_str).collect();
-    to_js_value(&results.to_comparison_table(&metrics).map_err(to_js_err)?)
+    crate::utils::to_js_table_numeric(&results.to_comparison_table(&metrics).map_err(to_js_err)?)
 }
 
 /// Compute forecast accuracy metrics (MAE, MAPE, sMAPE, RMSE).

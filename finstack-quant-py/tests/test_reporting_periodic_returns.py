@@ -13,7 +13,7 @@ from finstack_quant.analytics import Performance
 def _two_month_perf() -> Performance:
     idx = pd.bdate_range("2021-01-01", "2021-02-26")
     rets = pd.DataFrame({"STRAT": [0.001] * len(idx)}, index=idx)
-    return Performance.from_returns(rets)
+    return Performance.from_returns(rets, initial_date=date(2020, 12, 31))
 
 
 def test_periodic_monthly_shape_and_columns() -> None:
@@ -31,7 +31,7 @@ def test_raw_periodic_returns_are_ticker_major_dated_points() -> None:
         },
         index=idx,
     )
-    panel = Performance.from_returns(rets).periodic_returns()
+    panel = Performance.from_returns(rets, initial_date=date(2020, 12, 31)).periodic_returns("monthly")
 
     assert len(panel) == 2
     assert [len(series) for series in panel] == [2, 2]

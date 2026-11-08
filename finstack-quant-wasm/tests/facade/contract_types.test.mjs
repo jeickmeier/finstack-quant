@@ -281,6 +281,7 @@ test('namespace results match their published result types', () => {
 
   // analytics: typed-array survivors and numeric non-finite results.
   const dates = [
+    '2023-12-31',
     '2024-01-01',
     '2024-01-02',
     '2024-01-03',
@@ -301,10 +302,10 @@ test('namespace results match their published result types', () => {
   });
   try {
     declarations.push(['beta', 'fq.BetaResult[]', perf.beta()]);
-    declarations.push(['greeks', 'fq.GreeksResult[]', perf.greeks()]);
-    declarations.push(['rolling_greeks', 'fq.RollingGreeks', perf.rollingGreeks(0, 3)]);
+    declarations.push(['greeks', 'fq.GreeksResult[]', perf.greeks(0)]);
+    declarations.push(['rolling_greeks', 'fq.RollingGreeks', perf.rollingGreeks(0, 3, 0)]);
     declarations.push(['rolling_returns', 'fq.DatedSeries', perf.rollingReturns(0, 3)]);
-    declarations.push(['drawdowns', 'fq.DrawdownEpisode[]', perf.drawdownDetails(0)]);
+    declarations.push(['drawdowns', 'fq.DrawdownEpisode[]', perf.drawdownDetails(0, 5)]);
     declarations.push(['period_stats', 'fq.PeriodStats', perf.periodStats(0, 'daily')]);
     declarations.push(['lookback', 'fq.LookbackReturns', perf.lookbackReturns('2024-01-08')]);
   } finally {

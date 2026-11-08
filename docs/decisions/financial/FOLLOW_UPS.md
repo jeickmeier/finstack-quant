@@ -4,7 +4,7 @@
 authorization is implied. **Audit:** 2026-11-05, source revision
 `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-This backlog consolidates **609 review items across all 34 source scopes** in
+This backlog consolidates **588 review items across 33 source scopes with open items** in
 the [algorithm catalogue](README.md).
 Owning records provide formulas, source/test/reference evidence and scope
 limits. The [central follow-ups](../FOLLOW_UPS.md#financial-methodology-audit)
@@ -18,16 +18,16 @@ evidence with the owning entry instead of duplicating task lists in records.
 
 The labels distinguish the work required:
 
-- **Observed** (192): a static implementation, contract, dispatch or
+- **Observed** (185): a static implementation, contract, dispatch or
   documentation difference. Its financial impact is not necessarily reproduced.
-- **Investigate** (54): a source-derived numerical or economic concern
+- **Investigate** (52): a source-derived numerical or economic concern
   requiring targeted reproduction, an independent reference or convergence
   study before a defect conclusion.
-- **Decision** (291): a financial convention, supported domain, approximation,
+- **Decision** (281): a financial convention, supported domain, approximation,
   failure policy or result meaning requiring explicit agreement.
 - **Reconciliation** (1): implementation and verification work against an
   accepted contract, without reopening that contract for adoption.
-- **Evidence** (71): a particular primary-reference, empirical-calibration,
+- **Evidence** (69): a particular primary-reference, empirical-calibration,
   independent-fixture or numerical-qualification gap.
 
 These categories are not severity rankings. A decision can expose implementation
@@ -65,7 +65,6 @@ product consequences remain in their product scope.
 | [Calibration: orchestration, solvers and replay](#calibration-orchestration-solvers-and-replay) | 20 |
 | [Calibration: quotes and curve/smile targets](#calibration-quotes-and-curvesmile-targets) | 18 |
 | [Calibration: Hull–White and LMM](#calibration-hullwhite-and-lmm) | 18 |
-| [Analytics](#analytics) | 21 |
 | [Statements: capital structure](#statements-capital-structure) | 18 |
 | [Margin: collateral and initial margin](#margin-collateral-and-initial-margin) | 22 |
 | [Statements: model, formula and check contracts](#statements-model-formula-and-check-contracts) | 15 |
@@ -841,54 +840,6 @@ product consequences remain in their product scope.
 - **Evidence — LMM same-formula round trips do not qualify multi-forward pricing.** Frozen-formula round trips and the one-forward analytical premium case do not establish multi-forward Monte Carlo agreement. The small-path pricing test verifies override consumption only. Obtain independently converged multi-forward European comparisons and preserve calibration provenance before using the fitted scale as Bermudan accuracy evidence. Records: [CALIBRATION-RATE-MODELS-009](calibration-rate-models/09-lmm-rebonato-calibration.md).
 
 - **Decision — Direct and contractual HW calibration domains require explicit adoption.** Agree the direct synthetic versus contractual schedule domains and how callers preserve fit provenance. Qualify irregular calendars and curve interpolation/extrapolation independently of model-time invariance, including delayed-payment par-strike conventions and near-Black-bound inverse behavior. An initial guess is a numerical seed, not evidence of parameter identification. Records: [CALIBRATION-RATE-MODELS-001](calibration-rate-models/01-curve-entry-and-quote-domains.md), [CALIBRATION-RATE-MODELS-003](calibration-rate-models/03-atm-swaption-quotes.md).
-
-## Analytics
-
-[Scope inventory](analytics/README.md).
-
-<a id="dated-cagr-default"></a>
-
-- **Observed — Dated CAGR still conflicts with the accepted ACT/365F direction.** CagrDayCount defaults to days/365.25, and scalar Calmar/Martin/Sterling/Burke/Pain/summary consume that default despite accepted ADR 0008 requiring Actual/365 Fixed. The [Rust default](../../../finstack-quant/analytics/src/risk_metrics/return_based.rs) and [existing regressions](../../../finstack-quant/analytics/tests/correctness_regressions.rs) deliberately retain 365.25; the [performance scalar metrics](../../../finstack-quant/analytics/src/performance/scalar.rs) consume that default. Reconcile implementation, dependent calculations and tests with the agreed convention; this is not a new optional adoption decision. Records: [ANALYTICS-002](analytics/02-wealth-and-annualization.md).
-
-- **Observed — Performance panels still infer an initial valuation date.** The panel prepends a frequency-derived date without an actual initial-date input; Daily means one calendar day rather than the previous observed trading day. This changes CAGR and initial drawdown duration. Reconcile the prior actual-initial-date requirement and its callers/tests. Records: [ANALYTICS-001](analytics/01-panels-windows-and-wire.md), [ANALYTICS-002](analytics/02-wealth-and-annualization.md), [ANALYTICS-005](analytics/05-drawdown-paths-and-episodes.md).
-
-- **Observed — Invalid Cornish–Fisher adjustment still falls back to Gaussian.** The kernel warns and substitutes a Gaussian quantile when the local derivative is nonpositive, and modified Sharpe inherits it. The prior direction requires an explicit error. Reconcile that path and separately qualify global quantile validity, which positive local derivative alone does not prove. Coordinate Rust/Python/WASM contracts, tests and documentation, including modified Sharpe, without weakening the agreed error requirement. Records: [ANALYTICS-008](analytics/08-moments-gaussian-and-cornish-fisher.md).
-
-- **Observed — Up capture still includes neutral benchmark periods.** The filter uses benchmark>=0 instead of the agreed strictly positive subset. Neutral periods can change geometric subset count and numerator. Reconcile the implementation and tests with the existing direction. Records: [ANALYTICS-011](analytics/11-benchmark-relative-metrics.md).
-
-- **Observed — Martin still omits the agreed cash adjustment.** The scalar API returns CAGR divided by Ulcer and has no risk-free parameter. Propagate the existing cash-adjusted Martin requirement through the canonical calculation and exposed contract rather than opening it as a new choice. Records: [ANALYTICS-006](analytics/06-drawdown-reward-and-cdar.md).
-
-- **Observed — Burke still selects the worst n episodes.** The scalar path truncates episodes to n and divides excess CAGR by RMS over that subset, while the prior direction is modified Burke across all episodes. Existing n=1/2/3/5 regression expectations must be reconciled with that direction. Records: [ANALYTICS-006](analytics/06-drawdown-reward-and-cdar.md).
-
-- **Observed — Panel serialization can turn invalid infinity into missing data.** Every nonfinite float serializes as null and null restores as NaN; direct panel construction rejects infinity but permits edge NaNs. The transformation is statically confirmed but a complete restore/construct case was not executed. Preserve invalid-versus-missing identity or explicitly define validation order. Establish adjusted-price/return provenance requirements and qualify empty or undefined per-ticker host outcomes. Records: [ANALYTICS-001](analytics/01-panels-windows-and-wire.md).
-
-- **Investigate — Undefined rolling alpha/beta lacks an explicit wire policy.** RollingGreeks derives ordinary Vec<f64> fields while degenerate windows intentionally emit NaN, unlike adapted dated-series and batch-regression outputs. Verify serialization, restoration and host behavior before asserting an executed failure; define an explicit undefined-result contract. Cover schemas and Rust/Python/WASM restoration and sentinel behavior. Records: [ANALYTICS-012](analytics/12-rolling-regression.md).
-
-- **Decision — Standalone wealth calculations accept a broader loss domain.** WealthEngine floors finite returns at or below -100% to growth 1e-18; panels reject those inputs but standalone max_drawdown can reach the floor. Agree the supported standalone domain and interpretation of wiped-out or negative wealth. Resolve cash-input domain behavior and qualify long/extreme wealth sequences and host parity independently. Records: [ANALYTICS-002](analytics/02-wealth-and-annualization.md), [ANALYTICS-004](analytics/04-return-risk-ratios.md).
-
-- **Decision — Irregular observations retain declared-frequency risk and cash conversion.** Arithmetic risk annualization and cash-rate conversion still use the declared frequency when dates are irregular. Agree the sampling/annualization contract and distinguish it from actual-date CAGR. Records: [ANALYTICS-002](analytics/02-wealth-and-annualization.md), [ANALYTICS-004](analytics/04-return-risk-ratios.md).
-
-- **Decision — Drawdown windows and reward metrics need explicit episode conventions.** Windows reset the peak, path measures weight observations, recovery uses a -1e-15 tolerance and durations are calendar-based; near-recovery metadata is not the recovery rule. Sterling has no fixed penalty, and n=0 or empty/zero-risk cases differ across metrics. Adopt these meanings while preserving the separately agreed Martin/Burke corrections. Independently calculate near-threshold episode fixtures and qualify sample-frequency sensitivity; resolve n=0 and empty-domain behavior for the remaining metrics. Records: [ANALYTICS-005](analytics/05-drawdown-paths-and-episodes.md), [ANALYTICS-006](analytics/06-drawdown-reward-and-cdar.md).
-
-- **Decision — Empirical tail estimates have finite-sample and sign conventions.** Historical VaR uses R-7 interpolation and ES integrates fractional empirical tail mass rather than all threshold ties. Tails smaller than one observation return the worst return, signed quantiles may be positive and confidence below one half is accepted. Small-sample moment defaults are zero rather than distribution evidence. Agree the estimator/domain contract. Agree historical summary selection and the intended Gaussian/CF alternative domains, invalid-horizon versus unavailable-sample behavior, R-7/ES pairing, low-confidence/small-tail domains and tolerances. Reconcile historical public wording that promises nonpositive results under ADR 0007; signed positive quantiles are currently possible. Records: [ADR 0033](analytics/0033-value-at-risk-method-selection.md), [ANALYTICS-007](analytics/07-historical-tail-risk.md), [ANALYTICS-008](analytics/08-moments-gaussian-and-cornish-fisher.md).
-
-- **Evidence — Tail-estimator provenance is incomplete.** Establish precise Maillard and Rockafellar–Uryasev estimator references and independent numerical fixtures for the selected finite-sample and Cornish–Fisher methods; current implementation labels do not establish those specific formulations. Include independent references and justified tolerances across hosts, small samples, extreme moments and horizons, and a sourced CF validity domain beyond the local derivative. Records: [ADR 0033](analytics/0033-value-at-risk-method-selection.md), [ANALYTICS-007](analytics/07-historical-tail-risk.md), [ANALYTICS-008](analytics/08-moments-gaussian-and-cornish-fisher.md).
-
-- **Evidence — Rolling rebuild policies need independent cancellation bounds.** Scalar and benchmark kernels rebuild at different intervals (1024 and 64), with relative cancellation recovery and variance clamps after rebuilding. Fresh-window comparisons partly reuse the same kernels. Qualify accuracy under extreme levels, small variation and long windows independently. Agree window/sampling and singleton semantics and qualify cancellation thresholds using independent expected results while preserving explicit wire sentinels. Records: [ANALYTICS-009](analytics/09-rolling-return-risk.md), [ANALYTICS-012](analytics/12-rolling-regression.md).
-
-- **Decision — Benchmark alignment and uncertainty assumptions differ across APIs.** Standalone beta truncates to the shorter array while Performance intersects dates; beta uncertainty uses fixed 95% Student-t under standard OLS assumptions. Agree alignment and inference contracts and make their statistical scope explicit. Establish independent beta, standard-error and Student-t reference cases with supported sample/scaling tolerances. Records: [ANALYTICS-010](analytics/10-benchmark-regression.md), [ANALYTICS-011](analytics/11-benchmark-relative-metrics.md).
-
-- **Decision — Relative-return ratios have fixed cutoff and output conventions.** Capture returns zero near a zero benchmark denominator, Treynor and M-squared use fixed 1e-10 cutoffs, and M-squared is an absolute adjusted return. Adopt those result meanings and boundary behavior rather than assuming uniform undefined-value handling. Resolve empty/near-zero output meanings and M² labeling, and independently qualify small subsets and extreme annualization across host APIs. Records: [ANALYTICS-011](analytics/11-benchmark-relative-metrics.md).
-
-- **Decision — Multifactor fits require prealignment and response-only cash conversion.** Factors must already align to the active ticker; Total-return conversion subtracts cash only from the response. Normalized SVD rejects deficient rank at 1e-10. Agree factor/response return conventions, alignment ownership and admissible rank policy. Specify factor/response provenance, publish the rank/conditioning qualification domain, and establish independent coefficients and residual-risk cases. Records: [ANALYTICS-013](analytics/13-multifactor-regression.md), [ANALYTICS-014](analytics/14-svd-and-constrained-regression.md).
-
-- **Investigate — Constrained factor correction has no post-correction residual gate.** The method uses unweighted residual loss and one holdings-return identity, then applies a correction without checking its resulting residual. Reproduce ill-conditioned and conflicting constraints before declaring a numerical defect. The continuous reference fixture uses a local hand derivation rather than the cited paper’s unreproducible Exhibit 8. Agree rank/conditioning and residual tolerances and their public meaning; independently verify adversarial scales and near-degeneracy, decide whether a post-solve gate is required, and resolve paper-exhibit provenance without relabeling local calculations as vendor validation. Records: [ANALYTICS-014](analytics/14-svd-and-constrained-regression.md).
-
-- **Decision — Correlation alignment and repair need provenance semantics.** Two common observations suffice to select complete-case data; otherwise pairwise overlaps are used and invalid matrices are automatically projected with the core 200-iteration/1e-10 controls. The Boolean marks the projection path, not every clamp, and carries no sample-window or adjustment provenance. Agree overlap, repair and reporting policies. Qualify dimensions and conditioning beyond current fixtures and retain pair-window and adjustment-magnitude provenance where required. Records: [ANALYTICS-015](analytics/15-correlation-alignment-and-repair.md).
-
-- **Decision — Period grouping and gain/loss statistics require scoped conventions.** Agree partial-period inclusion, absent-bucket streak meaning, representable-date fallback and zero-denominator results. Document the descriptive limits of Kelly/CPC variants, establish precise source editions and independent expected cases, and independently verify extreme ratio products. Record: [ANALYTICS-003](analytics/03-periods-lookbacks-and-win-loss.md).
-
-- **Decision — Scalar reward/risk outputs need metric-specific domain semantics.** Agree undefined and zero-risk outputs for each metric and data domain, with independent high-offset/extreme-sample stability checks. Reconcile exact source-to-formula variants and justified tolerances for Sharpe, Sortino, Omega, gain-to-pain and modified Sharpe; preserve the separately required invalid-CF error correction. Record: [ANALYTICS-004](analytics/04-return-risk-ratios.md).
 
 ## Statements: capital structure
 

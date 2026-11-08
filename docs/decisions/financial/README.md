@@ -5,8 +5,9 @@ applies, and what behavior callers can rely on.
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-The catalogue maps **1,719 Rust files** to **625 detailed Draft methodology
-records across 34 source scopes**.
+The current catalogue maps **1,724 Rust files** to **625 detailed methodology
+records across 34 source scopes**. Scope ledgers distinguish original audit
+fingerprints from later source-ownership additions.
 
 - [Shared financial conventions](conventions/README.md): units, defaults, missing data, monetary arithmetic, perspectives and clocks.
 - [Methodology governance](governance/README.md): documentation policy and the [record template](governance/METHODOLOGY_TEMPLATE.md).
@@ -32,17 +33,17 @@ overviews are linked from the other affected scopes. Shared policies live in
 | [Models: trees and finite differences](models-numerical/README.md) | CRR/LR, Ho–Lee/BDT/BK/HW, joint rates-credit lattices, grids/stencils, theta/ADI stepping, obstacles and PDE bridges | 36 | 17 | [Coverage](models-numerical/coverage.json) |
 | [Models: simulation, payoffs and estimation](models-monte-carlo/README.md) | RNG/QMC, process-specific stepping, rough drivers, monitoring, path-dependent payoffs, regression/exercise, Greeks and uncertainty | 78 | 28 | [Coverage](models-monte-carlo/coverage.json) |
 | [Models and valuations: credit and liquidity](models-and-valuations-credit/README.md) | Structural/intensity/default/recovery/prepayment models, copulas/correlation, loss distributions, liquidity, CDS/index/options/tranches and risk | 131 | 20 | [Coverage](models-and-valuations-credit/coverage.json) |
-| [Valuations: shared framework and risk](valuations-framework/README.md) | Market/convention resolution, lifecycle, projection, listed products, model controls, risk bumps/recalibration, Greeks, historical risk and reporting | 128 | 20 | [Coverage](valuations-framework/coverage.json) |
+| [Valuations: shared framework and risk](valuations-framework/README.md) | Market/convention resolution, lifecycle, projection, listed products, model controls, risk bumps/recalibration, Greeks, historical risk and reporting | 129 | 20 | [Coverage](valuations-framework/coverage.json) |
 | [Valuations: rates](valuations-rates/README.md) | Deposits/FRAs, swaps/basis/XCCY, futures, inflation, repo, CMS, vanilla/early-exercise rate options and their metrics | 101 | 17 | [Coverage](valuations-rates/coverage.json) |
 | [Valuations: bonds](valuations-bonds/README.md) | Settlement/quotes, discount/hazard/tree/joint/Merton pricing, yield/spread/OAS inverses, exercise/return floors and bond risk/returns | 71 | 20 | [Coverage](valuations-bonds/coverage.json) |
 | [Valuations: other fixed income](valuations-other-fixed-income/README.md) | Loans/revolvers, convertibles, inflation bonds, MBS/TBA/dollar rolls, futures and fixed-income TRS | 87 | 16 | [Coverage](valuations-other-fixed-income/coverage.json) |
-| [Valuations: equity, property and composition](valuations-equity-and-composition/README.md) | Equity/options/path products, DCF/private equity, real estate, baskets, composite sizing/history and selected-model risk | 97 | 24 | [Coverage](valuations-equity-and-composition/coverage.json) |
+| [Valuations: equity, property and composition](valuations-equity-and-composition/README.md) | Equity/options/path products, DCF/private equity, real estate, baskets, composite sizing/history and selected-model risk | 99 | 24 | [Coverage](valuations-equity-and-composition/coverage.json) |
 | [Valuations: FX, commodity and exotic products](valuations-fx-and-exotics/README.md) | FX linear/option/barrier/touch/variance contracts; commodity curves/averages/options; Asian/barrier/lookback/range/snowball/TARN calculations | 113 | 22 | [Coverage](valuations-fx-and-exotics/coverage.json) |
 | [Valuations: structured credit](valuations-structured-credit/README.md) | Statistical/instrument collateral, waterfall claims/triggers, servicing/recovery/reinvestment, stochastic pools/OAS, CMO and facilities | 100 | 22 | [Coverage](valuations-structured-credit/coverage.json) |
 | [Calibration: orchestration, solvers and replay](calibration-framework/README.md) | Plan validation and dependencies, quote/build materialization, bootstrap/global solvers, acceptance/reporting, quote risk and recalibration | 50 | 23 | [Coverage](calibration-framework/coverage.json) |
 | [Calibration: quotes and curve/smile targets](calibration-targets/README.md) | Discount/forward/hazard/CPI/XCCY curves, parametric term structures, SABR/SVI/swaption surfaces, base correlation and tail calibration | 25 | 17 | [Coverage](calibration-targets/coverage.json) |
 | [Calibration: Hull–White and LMM](calibration-rate-models/README.md) | Contractual/synthetic option targets, scalar/piecewise Hull–White fits, objectives and schedules, LMM covariance and parameter fits | 12 | 9 | [Coverage](calibration-rate-models/coverage.json) |
-| [Analytics](analytics/README.md) | Returns and windows, wealth/ratios, drawdowns and tail risk, rolling statistics, benchmarks/capture, regression and multifactor estimation | 21 | 15 | [Coverage](analytics/coverage.json) |
+| [Analytics](analytics/README.md) | Returns and windows, wealth/ratios, drawdowns and tail risk, rolling statistics, benchmarks/capture, regression and multifactor estimation | 23 | 15 | [Coverage](analytics/coverage.json) |
 | [Statements: contracts, formulas and checks](statements-contracts/README.md) | Model and builder validation, DSL compilation, built-in financial metrics, input/registry conventions and statement checks | 36 | 16 | [Coverage](statements-contracts/coverage.json) |
 | [Statements: evaluation, forecasting and adjustments](statements-evaluation/README.md) | Dependency/evaluation ordering, formula/time-series semantics, forecast sampling, periods/rollups, FX/capital integration and normalization | 28 | 15 | [Coverage](statements-evaluation/coverage.json) |
 | [Statements: capital structure](statements-capital/README.md) | Dated debt and hedge flows, principal/PIK balances, residual schedules, funding/prepayment waterfalls and capital results | 19 | 9 | [Coverage](statements-capital/coverage.json) |
@@ -59,7 +60,7 @@ overviews are linked from the other affected scopes. Shared policies live in
 | [Panel features](features/README.md) | Panel indexing and pipelines, cross-sectional transforms/weights, time-series windows and moments, regression and multivariate transforms | 11 | 22 | [Coverage](features/coverage.json) |
 | [Arrow interchange](arrow-interchange/README.md) | Tabular type/schema mapping, typed-array conversion, null/nonfinite behavior, metadata and record-batch validation | 1 | 3 | [Coverage](arrow-interchange/coverage.json) |
 
-The classifications are **1377 algorithm-bearing**, **285 support**,
+The classifications are **1379 algorithm-bearing**, **288 support**,
 **53 dedicated test**, and **4 generated** Rust files. The
 [readable source map](SOURCE_COVERAGE.md) links every source to its records or
 explains its non-algorithm responsibility. A source can implement several
@@ -85,12 +86,14 @@ convention.
 
 The [invariant-to-decision map](../INVARIANT_MAP.md) records the detailed
 cross-crate conventions covered by these decisions. Acceptance does not adopt
-drafts 0027–0033 or every observed instrument default.
+drafts 0027–0032 or every observed instrument default; accepted analytics
+selection in 0033 retains its own scope.
 
 ## Methodology records
 
-The governance policy is accepted; the seven model-selection overviews
-below remain Draft. Their detailed algorithms are in the owning catalogues.
+The governance policy and analytics tail-selection overview are accepted.
+The six model-selection overviews 0027–0032 remain Draft. Detailed algorithms
+and their individually recorded statuses are in the owning catalogues.
 
 | Record | Decision status | Implementation status | Validation status |
 | --- | --- | --- | --- |
@@ -101,20 +104,24 @@ below remain Draft. Their detailed algorithms are in the owning catalogues.
 | [0030: CDS survival and integration](models-and-valuations-credit/0030-cds-survival-and-integration.md) | Draft | CDS convention and integration paths observed | Source/test evidence inspected; numerical checks not rerun |
 | [0031: Tranche loss model selection](models-and-valuations-credit/0031-tranche-loss-model-selection.md) | Draft | Gaussian default and explicit copula paths observed | Source/test evidence inspected; numerical checks not rerun |
 | [0032: Curve interpolation and calibration](calibration-targets/0032-curve-interpolation-and-calibration.md) | Draft | Raw curve and calibration defaults observed | Source/test evidence inspected; numerical checks not rerun |
-| [0033: Return-series VaR and ES](analytics/0033-value-at-risk-method-selection.md) | Draft; preserves prior explicit-error direction | Scalar/summary selection and host defaults observed; CF fallback conflicts with prior direction | Source/test evidence inspected; numerical checks not rerun |
+| [0033: Return-series VaR and ES](analytics/0033-value-at-risk-method-selection.md) | Accepted fixed historical selection | Historical scalar/summary dispatch; explicit inputs and invalid-CF errors reconciled | [Scoped implementation evidence](analytics/README.md#implementation-evidence) |
 
 Use [ADR 0026's independent statuses](governance/0026-methodology-decisions-and-inventory.md#independent-statuses)
 to distinguish agreement, observed implementation and validation evidence.
-Accepted contracts and prior agreed directions retain their scope; they do
-not adopt the Draft algorithms or selection choices listed here.
+Accepted contracts and prior agreed directions retain their stated scope.
+The [15 accepted analytics records](analytics/README.md#accepted-scopes-in-detailed-records)
+define the implemented analytics methods; acceptance does not adopt unrelated
+Draft algorithms or selection choices.
 
 ## Boundary and evidence
 
 The [audit boundary](AUDIT_BOUNDARY.md) defines source inclusion, excluded
 surfaces and the limits of inspected evidence. The catalogue records observed
-algorithms, controls, branch differences and discrepancies; implementation
-reconciliation and independent numerical qualification remain open. Numerical
-suites, simulations and vendor comparisons were not rerun.
+algorithms, controls, branch differences and discrepancies. Remaining
+implementation and qualification work is scoped in its owning records.
+Numerical suites, simulations and vendor comparisons were not rerun in the
+original documentation audit; subsequent analytics implementation checks are
+recorded in its [inventory evidence](analytics/README.md#implementation-evidence).
 
 The [algorithm backlog](FOLLOW_UPS.md) owns detailed reconciliation, investigation,
 decision and evidence items. The [central follow-ups](../FOLLOW_UPS.md#financial-methodology-audit)

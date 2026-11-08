@@ -9,9 +9,11 @@ function correlation(request) {
   try {
     const result = performance.correlationMatrix();
     return {
-      tickerNames: performance.getTickerNames(),
-      matrix: result.matrix.map((row) => Array.from(row)),
-      repaired: result.repaired,
+      tickerNames: result.tickers,
+      matrix: result.matrix,
+      nObs: result.n_obs,
+      startDate: result.start_date,
+      endDate: result.end_date,
     };
   } finally {
     performance.free();
@@ -27,7 +29,7 @@ function failure(request) {
 }
 const value = {
   description:
-    "Native analytics.Performance correlation matrix of a host panel of four sleeves' daily decimal returns over 60 business days from 2024-01-02 (tests/analytics/correlation/panels.mjs), with Rust's repaired flag, and the native errors of a zero-variance series, an interior missing return and two series with no overlapping observations. Gaps are null; the panels live in panels.mjs and only the valid one is stored.",
+    "Native analytics.Performance correlation matrix of a host panel of four sleeves' daily decimal returns over 60 business days from 2024-01-02 (tests/analytics/correlation/panels.mjs), with the shared sample count and return-ending bounds, and the native errors of a zero-variance series, an interior missing return and two series with no overlapping observations. Gaps are null; the panels live in panels.mjs and only the valid one is stored.",
   request: { panel },
   result: correlation({ panel }),
   errors: Object.fromEntries(

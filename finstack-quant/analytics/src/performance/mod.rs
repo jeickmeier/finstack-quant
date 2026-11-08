@@ -12,6 +12,7 @@ use super::drawdown::to_drawdown_series;
 use super::returns::pairwise_returns;
 
 pub use panel::{PanelSeriesKind, PerformancePanel};
+pub use scalar::validate_summary;
 
 mod aggregation;
 mod benchmark;
@@ -85,8 +86,8 @@ pub(crate) fn returns_panel(
 ///     frequency: Some(PeriodKind::Daily),
 /// })?;
 ///
-/// let sharpe = perf.sharpe(0.02);
-/// let beta = perf.beta();
+/// let sharpe = perf.sharpe(0.02)?;
+/// let beta = perf.beta()?;
 /// let rolling = perf.rolling_sharpe(1, 3, 0.02)?;
 /// assert_eq!(sharpe.len(), 2);
 /// assert_eq!(beta.len(), 2);
@@ -95,8 +96,8 @@ pub(crate) fn returns_panel(
 /// perf.reset_date_range(
 ///     Date::from_calendar_date(2025, Month::January, 3).unwrap(),
 ///     Date::from_calendar_date(2025, Month::January, 6).unwrap(),
-/// );
-/// assert_eq!(perf.cagr(finstack_quant_analytics::CagrDayCount::Act365_25, None)?.len(), 2);
+/// )?;
+/// assert_eq!(perf.cagr(finstack_quant_analytics::CagrDayCount::default(), finstack_quant_core::dates::DayCountContext::default())?.len(), 2);
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
@@ -111,18 +112,19 @@ pub struct Performance {
     returns: Vec<Vec<f64>>,
     return_spans: Vec<TickerSpan>,
     ticker_names: Vec<String>,
-    benchmark_idx: usize,
+    benchmark_idx: Option<usize>,
     #[serde(skip_serializing)]
     drawdowns: Vec<Vec<f64>>,
     #[serde(skip_serializing)]
     active_window_drawdowns: Option<Vec<Vec<f64>>>,
-    frequency: PeriodKind,
+    frequency: Option<PeriodKind>,
     start_idx: usize,
     end_idx: usize,
 }
 
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 struct TickerSpan {
     start: usize,
     end: usize,
@@ -176,6 +178,19 @@ fn ticker_index(ticker_names: &[String], ticker: &str) -> finstack_quant_core::R
         })
 }
 
+fn validate_ticker_names(ticker_names: &[String]) -> finstack_quant_core::Result<()> {
+    let mut names = HashSet::with_capacity(ticker_names.len());
+    for (index, name) in ticker_names.iter().enumerate() {
+        if name.trim().is_empty() {
+            return Err(invalid_return_series(name, index, "ticker name must not be blank").into());
+        }
+        if !names.insert(name) {
+            return Err(invalid_return_series(name, index, "duplicate ticker name").into());
+        }
+    }
+    Ok(())
+}
+
 /// Reject empty, duplicate, or non-monotonic date inputs at construction.
 ///
 /// Several lookback and aggregation paths use [`slice::partition_point`] on
@@ -217,7 +232,7 @@ fn check_panel_inputs(
     n_names: usize,
     what: &str,
 ) -> finstack_quant_core::Result<()> {
-    if n_columns == 0 || dates.is_empty() {
+    if n_columns == 0 || dates.len() < 2 {
         return Err(
             invalid_return_series("<panel>", 0, format!("{what} or dates is empty")).into(),
         );
@@ -234,64 +249,6 @@ fn check_panel_inputs(
     Ok(())
 }
 
-fn valid_price(value: f64) -> bool {
-    value.is_finite() && value > 0.0
-}
-
-fn validate_edge_missing_prices(
-    col: &[f64],
-    ticker: &str,
-) -> finstack_quant_core::Result<(usize, usize)> {
-    let Some(first) = col.iter().position(|&value| valid_price(value)) else {
-        return Err(invalid_return_series(
-            ticker,
-            0,
-            "price column has no finite positive observations",
-        )
-        .into());
-    };
-    let last = col
-        .iter()
-        .rposition(|&value| valid_price(value))
-        .unwrap_or(first);
-
-    for (idx, &value) in col.iter().enumerate() {
-        if idx < first || idx > last {
-            if !value.is_nan() {
-                return Err(invalid_return_series(
-                    ticker,
-                    idx,
-                    format!(
-                        "edge missing prices must be NaN; found {value} outside the finite price span"
-                    ),
-                )
-                .into());
-            }
-            continue;
-        }
-
-        if !valid_price(value) {
-            let reason = if value.is_nan() {
-                "interior missing price inside finite price span".to_string()
-            } else {
-                format!("non-positive or non-finite price inside finite price span ({value})")
-            };
-            return Err(invalid_return_series(ticker, idx, reason).into());
-        }
-    }
-
-    if last == first {
-        return Err(invalid_return_series(
-            ticker,
-            first,
-            "price column needs at least two finite positive observations",
-        )
-        .into());
-    }
-
-    Ok((first, last))
-}
-
 fn price_column_to_returns(
     col: &[f64],
     ticker: &str,
@@ -300,20 +257,39 @@ fn price_column_to_returns(
     if col.len() != expected_price_len {
         return Err(invalid_return_series(
             ticker,
-            col.len().min(expected_price_len),
-            format!(
-                "price column length {} does not match dates length {}",
-                col.len(),
-                expected_price_len
-            ),
+            col.len(),
+            "price column length must equal valuation-grid length",
         )
         .into());
     }
-
-    let (first_price_idx, last_price_idx) = validate_edge_missing_prices(col, ticker)?;
-    let returns = pairwise_returns(&col[first_price_idx..=last_price_idx]);
-    let span = TickerSpan::new(first_price_idx, last_price_idx);
-    Ok((returns, span))
+    let Some(first) = col.iter().position(|value| !value.is_nan()) else {
+        return Err(invalid_return_series(ticker, 0, "price column has no observations").into());
+    };
+    let last = col
+        .iter()
+        .rposition(|value| !value.is_nan())
+        .unwrap_or(first);
+    if first == last {
+        return Err(invalid_return_series(
+            ticker,
+            first,
+            "price column needs an opening and closing observation",
+        )
+        .into());
+    }
+    for (index, &value) in col[first..=last].iter().enumerate() {
+        let absolute = first + index;
+        if !value.is_finite() || value < 0.0 || (value == 0.0 && absolute != last) {
+            return Err(invalid_return_series(
+                ticker,
+                absolute,
+                "price must be finite and positive, except an actual final zero wealth observation",
+            )
+            .into());
+        }
+    }
+    let returns = pairwise_returns(&col[first..=last])?;
+    Ok((returns, TickerSpan::new(first, last)))
 }
 
 fn return_column_to_span(
@@ -324,59 +300,23 @@ fn return_column_to_span(
     if col.len() != expected_len {
         return Err(invalid_return_series(
             ticker,
-            col.len().min(expected_len),
-            format!(
-                "column length {} does not match return-date grid length {}",
-                col.len(),
-                expected_len
-            ),
+            col.len(),
+            "return column length must equal valuation-grid length minus one",
         )
         .into());
     }
-
-    let Some(first) = col.iter().position(|value| value.is_finite()) else {
-        return Err(
-            invalid_return_series(ticker, 0, "return column has no finite observations").into(),
-        );
+    let Some(first) = col.iter().position(|value| !value.is_nan()) else {
+        return Err(invalid_return_series(ticker, 0, "return column has no observations").into());
     };
     let last = col
         .iter()
-        .rposition(|value| value.is_finite())
+        .rposition(|value| !value.is_nan())
         .unwrap_or(first);
-
-    for (index, &value) in col.iter().enumerate() {
-        if index < first || index > last {
-            if !value.is_nan() {
-                return Err(invalid_return_series(
-                    ticker,
-                    index,
-                    format!(
-                        "edge missing returns must be NaN; found {value} outside the finite return span"
-                    ),
-                )
-                .into());
-            }
-            continue;
-        }
-
-        if !value.is_finite() {
-            return Err(invalid_return_series(
-                ticker,
-                index,
-                format!("interior non-finite return ({value})"),
-            )
-            .into());
-        }
-        if value <= -1.0 {
-            return Err(invalid_return_series(
-                ticker,
-                index,
-                format!("return <= -1.0 ({value}); total wipeout remains outside Performance panel support"),
-            )
-            .into());
+    for (index, &value) in col[first..=last].iter().enumerate() {
+        if !value.is_finite() || value < -1.0 || (value <= -1.0 && first + index != last) {
+            return Err(invalid_return_series(ticker, first + index, "returns must be finite and at least -1, with wipeout allowed only as the final observation").into());
         }
     }
-
     Ok((col[first..=last].to_vec(), TickerSpan::new(first, last + 1)))
 }
 
@@ -388,20 +328,6 @@ fn local_range(span: TickerSpan, global: TickerSpan) -> core::ops::Range<usize> 
         .min(span.len())
         .max(start);
     start..end
-}
-
-fn build_synthetic_price_dates(
-    dates: &[Date],
-    frequency: PeriodKind,
-) -> finstack_quant_core::Result<Vec<Date>> {
-    let Some(&first) = dates.first() else {
-        return Ok(Vec::new());
-    };
-    let prior_date = frequency.prior_observation_date(first)?;
-    let mut price_dates = Vec::with_capacity(dates.len() + 1);
-    price_dates.push(prior_date);
-    price_dates.extend_from_slice(dates);
-    Ok(price_dates)
 }
 
 impl Performance {
@@ -490,34 +416,24 @@ impl Performance {
 impl Performance {
     /// Construct from a dated price or return panel.
     ///
-    /// A price panel ([`PanelSeriesKind::Prices`]) is converted to simple
-    /// returns pairwise, so the series have one entry per date and the
-    /// returns one fewer. A return panel ([`PanelSeriesKind::Returns`]) is
-    /// used as given; a synthetic prior date
-    /// ([`PeriodKind::prior_observation_date`] of the first date, one
-    /// frequency step back) anchors the internal price-date grid so CAGR and
-    /// other date-aware metrics see a holding period of `dates.len()`
-    /// periods. Drawdowns are built per ticker and one ticker is designated
-    /// the benchmark.
+    /// Both kinds use the caller's actual strictly increasing valuation grid.
+    /// Prices contain one level per valuation date; returns contain one value per
+    /// adjacent interval, hence one fewer value than dates. No initial date,
+    /// frequency or benchmark is inferred. Each ticker has a contiguous observed
+    /// span with missing observations allowed only at either edge. A terminal
+    /// `-1` return or final zero wealth level ends that ticker's observations.
     ///
     /// # Arguments
     ///
-    /// * `panel` - Strictly ascending dates, ticker-major series of the
-    ///   panel's kind (each ticker's finite span contiguous; prices strictly
-    ///   positive), unique ticker names, an optional benchmark ticker (the
-    ///   first ticker when omitted) and an optional observation frequency
-    ///   ([`crate::DEFAULT_FREQUENCY`] when omitted) used for annualization.
+    /// * `panel` - Actual valuation dates, ticker-major price or decimal-return
+    ///   columns, unique nonblank identities, and optional explicit benchmark and
+    ///   observation frequency. Return provenance and interval alignment are the caller's responsibility.
     ///
     /// # Errors
     ///
-    /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when
-    /// the series or dates are empty, the series count does not match
-    /// `ticker_names` or a name is duplicated, a series length differs from
-    /// `dates.len()`, a ticker has no contiguous finite span (positive for
-    /// prices), or a return is non-finite or at or below `-1.0`. Returns
-    /// [`finstack_quant_core::InputError::NotFound`] when `benchmark_ticker`
-    /// is not one of `ticker_names`, and propagates a date-range error if the
-    /// synthetic prior date of a return panel underflows the calendar.
+    /// Rejects malformed grids, shapes, names, missing spans, nonfinite economic
+    /// observations, returns below `-1`, observations after wipeout and unknown
+    /// benchmarks. Unrepresentable price-derived interval returns fail explicitly.
     ///
     /// # Tracing
     ///
@@ -547,7 +463,7 @@ impl Performance {
     /// ```
     #[tracing::instrument(level = "debug", skip(panel), fields(n_tickers = panel.series.len(), n_dates = panel.dates.len(), kind = ?panel.kind, frequency = ?panel.frequency))]
     pub fn new(panel: &PerformancePanel) -> finstack_quant_core::Result<Self> {
-        let frequency = panel.frequency.unwrap_or(crate::DEFAULT_FREQUENCY);
+        let frequency = panel.frequency;
         let what = match panel.kind {
             PanelSeriesKind::Prices => "prices",
             PanelSeriesKind::Returns => "returns",
@@ -559,22 +475,24 @@ impl Performance {
             what,
         )?;
 
+        validate_ticker_names(&panel.ticker_names)?;
+        if let Some(benchmark) = panel.benchmark_ticker.as_deref() {
+            ticker_index(&panel.ticker_names, benchmark)?;
+        }
+
         let mut returns: Vec<Vec<f64>> = Vec::with_capacity(panel.series.len());
         let mut return_spans: Vec<TickerSpan> = Vec::with_capacity(panel.series.len());
         for (ticker, col) in panel.ticker_names.iter().zip(&panel.series) {
             let (column, span) = match panel.kind {
                 PanelSeriesKind::Prices => price_column_to_returns(col, ticker, panel.dates.len())?,
                 PanelSeriesKind::Returns => {
-                    return_column_to_span(col.clone(), ticker, panel.dates.len())?
+                    return_column_to_span(col.clone(), ticker, panel.dates.len() - 1)?
                 }
             };
             returns.push(column);
             return_spans.push(span);
         }
-        let price_dates = match panel.kind {
-            PanelSeriesKind::Prices => panel.dates.clone(),
-            PanelSeriesKind::Returns => build_synthetic_price_dates(&panel.dates, frequency)?,
-        };
+        let price_dates = panel.dates.clone();
 
         Self::assemble(
             price_dates,
@@ -596,7 +514,7 @@ impl Performance {
         return_spans: Vec<TickerSpan>,
         ticker_names: Vec<String>,
         benchmark_ticker: Option<&str>,
-        frequency: PeriodKind,
+        frequency: Option<PeriodKind>,
     ) -> finstack_quant_core::Result<Self> {
         if price_dates.len() < 2 || returns.is_empty() {
             return Err(invalid_return_series("<panel>", 0, "returns or dates is empty").into());
@@ -616,16 +534,11 @@ impl Performance {
             .into());
         }
 
-        let mut names = HashSet::with_capacity(ticker_names.len());
-        for (index, name) in ticker_names.iter().enumerate() {
-            if !names.insert(name) {
-                return Err(invalid_return_series(name, index, "duplicate ticker name").into());
-            }
-        }
+        validate_ticker_names(&ticker_names)?;
 
         let benchmark_idx = match benchmark_ticker {
-            Some(name) => ticker_index(&ticker_names, name)?,
-            None => 0,
+            Some(name) => Some(ticker_index(&ticker_names, name)?),
+            None => None,
         };
 
         if return_spans.len() != returns.len() {
@@ -652,16 +565,16 @@ impl Performance {
                 .into());
             }
             for (index, &value) in col.iter().enumerate() {
-                if !value.is_finite() || value <= -1.0 {
+                if !value.is_finite() || value < -1.0 || (value <= -1.0 && index + 1 != col.len()) {
                     return Err(invalid_return_series(
                         ticker,
                         span.start + index,
-                        "returns must be finite and strictly greater than -1.0",
+                        "returns must be finite and at least -1; a wipeout must be the final observation",
                     )
                     .into());
                 }
             }
-            let dd = to_drawdown_series(col);
+            let dd = to_drawdown_series(col)?;
             all_drawdowns.push(dd);
         }
 
@@ -706,14 +619,25 @@ impl Performance {
     /// # Arguments
     ///
     /// * `start` - First date to include (inclusive).
-    /// * `end`   - Last date to include (inclusive).
-    pub fn reset_date_range(&mut self, start: Date, end: Date) {
-        self.start_idx = self.get_dates().partition_point(|&d| d < start);
-        self.end_idx = self
-            .get_dates()
-            .partition_point(|&d| d <= end)
-            .max(self.start_idx);
-        self.refresh_active_drawdown_cache();
+    /// * `end`   - Last return-ending date to include (inclusive); must not precede `start`.
+    ///
+    /// # Errors
+    ///
+    /// Reversed bounds or a numerical cache failure leave the previous selection unchanged.
+    pub fn reset_date_range(&mut self, start: Date, end: Date) -> finstack_quant_core::Result<()> {
+        if start > end {
+            return Err(finstack_quant_core::Error::Validation(
+                "active window start must not be after end".into(),
+            ));
+        }
+        let start_idx = self.get_dates().partition_point(|&d| d < start);
+        let end_idx = self.get_dates().partition_point(|&d| d <= end);
+        let next = TickerSpan::new(start_idx, end_idx);
+        let cache = self.build_active_drawdown_cache(next)?;
+        self.start_idx = start_idx;
+        self.end_idx = end_idx;
+        self.active_window_drawdowns = cache;
+        Ok(())
     }
 
     /// Designate a different ticker as the benchmark for all subsequent analytics.
@@ -732,7 +656,7 @@ impl Performance {
     /// Returns [`finstack_quant_core::InputError::NotFound`] when `ticker` is not
     /// among the loaded ticker names; the benchmark is left unchanged.
     pub fn reset_bench_ticker(&mut self, ticker: &str) -> finstack_quant_core::Result<()> {
-        self.benchmark_idx = self.get_ticker_index(ticker)?;
+        self.benchmark_idx = Some(self.get_ticker_index(ticker)?);
         Ok(())
     }
 
@@ -740,17 +664,26 @@ impl Performance {
         self.start_idx == 0 && self.end_idx >= self.get_dates().len()
     }
 
-    fn refresh_active_drawdown_cache(&mut self) {
-        if self.using_full_range() {
-            self.active_window_drawdowns = None;
-            return;
+    fn build_active_drawdown_cache(
+        &self,
+        active: TickerSpan,
+    ) -> finstack_quant_core::Result<Option<Vec<Vec<f64>>>> {
+        if active.start == 0 && active.end == self.get_dates().len() {
+            return Ok(None);
         }
+        (0..self.returns.len())
+            .map(|ticker_idx| {
+                let span = self.return_spans[ticker_idx].intersect(active);
+                to_drawdown_series(self.returns_for_span(ticker_idx, span))
+            })
+            .collect::<finstack_quant_core::Result<Vec<_>>>()
+            .map(Some)
+    }
 
-        self.active_window_drawdowns = Some(
-            (0..self.returns.len())
-                .map(|ticker_idx| to_drawdown_series(self.active_returns(ticker_idx)))
-                .collect(),
-        );
+    fn refresh_active_drawdown_cache(&mut self) -> finstack_quant_core::Result<()> {
+        self.active_window_drawdowns =
+            self.build_active_drawdown_cache(self.global_active_span())?;
+        Ok(())
     }
 
     /// Resolve a ticker name to its zero-based column index.
@@ -771,18 +704,18 @@ impl Performance {
         ticker_index(&self.ticker_names, ticker)
     }
 
-    /// Reject a tail `confidence` outside the open interval `(0, 1)`.
+    /// Reject a tail `confidence` outside the open interval `(0.5, 1)`.
     ///
     /// Tail metrics (`value_at_risk`, `expected_shortfall`, `tail_ratio`,
     /// `cdar`, `parametric_var`, `cornish_fisher_var`, `modified_sharpe`)
     /// route through this guard so a confidence such as `95.0` or `1.0`
     /// surfaces as an explicit error rather than a `NaN` column.
     fn ensure_confidence(confidence: f64) -> finstack_quant_core::Result<()> {
-        if confidence.is_finite() && confidence > 0.0 && confidence < 1.0 {
+        if confidence.is_finite() && confidence > 0.5 && confidence < 1.0 {
             Ok(())
         } else {
             Err(finstack_quant_core::Error::Validation(format!(
-                "confidence must lie in the open interval (0, 1); got {confidence}"
+                "confidence must lie in the open interval (0.5, 1); got {confidence}"
             )))
         }
     }
@@ -890,6 +823,21 @@ impl Performance {
         Ok(self.active_dates_for_ticker_unchecked(ticker_idx))
     }
 
+    /// Exact return-ending dates shared by a ticker and the selected benchmark.
+    ///
+    /// # Arguments
+    ///
+    /// * `ticker_idx` - Zero-based ticker column in supplied order; both ticker and benchmark must be loaded.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for an invalid ticker index or an absent benchmark.
+    pub fn get_paired_dates(&self, ticker_idx: usize) -> finstack_quant_core::Result<&[Date]> {
+        self.ensure_ticker_idx(ticker_idx)?;
+        let benchmark = self.benchmark()?;
+        Ok(self.dates_for_span(self.active_two_ticker_span(ticker_idx, benchmark)))
+    }
+
     fn active_dates_for_ticker_unchecked(&self, ticker_idx: usize) -> &[Date] {
         self.dates_for_span(self.active_span_for_ticker(ticker_idx))
     }
@@ -910,8 +858,18 @@ impl Performance {
             .unwrap_or(&[])
     }
 
-    fn ann(&self) -> f64 {
-        f64::from(self.frequency.periods_per_year())
+    fn ann(&self) -> finstack_quant_core::Result<f64> {
+        self.frequency.map(|frequency| f64::from(frequency.periods_per_year())).ok_or_else(|| {
+            finstack_quant_core::Error::Validation("explicit observation frequency is required for annualization or cash conversion".into())
+        })
+    }
+
+    fn benchmark(&self) -> finstack_quant_core::Result<usize> {
+        self.benchmark_idx.ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "an explicit benchmark ticker is required".into(),
+            )
+        })
     }
 
     /// Map a per-ticker closure over all tickers in column order.
@@ -928,14 +886,17 @@ impl Performance {
 
     /// Map a closure over each ticker's overlapping `(portfolio, benchmark)` return slices.
     #[inline]
-    fn map_pair_returns<T, F>(&self, mut f: F) -> Vec<T>
+    fn map_pair_returns<T, F>(&self, mut f: F) -> finstack_quant_core::Result<Vec<T>>
     where
-        F: FnMut(&[f64], &[f64]) -> T,
+        F: FnMut(&[f64], &[f64]) -> finstack_quant_core::Result<T>,
     {
-        self.map_tickers(|i| {
-            let (r, bench) = self.active_two_ticker_returns(i, self.benchmark_idx);
-            f(r, bench)
-        })
+        let benchmark = self.benchmark()?;
+        (0..self.ticker_names.len())
+            .map(|i| {
+                let (r, bench) = self.active_two_ticker_returns(i, benchmark);
+                f(r, bench)
+            })
+            .collect()
     }
 
     /// Full return-aligned date vector (independent of any active window).
@@ -958,16 +919,16 @@ impl Performance {
     ///
     /// # Returns
     ///
-    /// The zero-based index of the active benchmark ticker.
-    pub fn get_benchmark_idx(&self) -> usize {
+    /// The zero-based index of the selected benchmark, or `None` when absent.
+    pub fn get_benchmark_idx(&self) -> Option<usize> {
         self.benchmark_idx
     }
     /// Observation frequency.
     ///
     /// # Returns
     ///
-    /// The frequency used to annualize facade-level metrics.
-    pub fn get_frequency(&self) -> PeriodKind {
+    /// The explicitly supplied nominal observation frequency, or `None` when absent.
+    pub fn get_frequency(&self) -> Option<PeriodKind> {
         self.frequency
     }
 }
@@ -975,7 +936,8 @@ impl Performance {
 /// Lookback returns for each period horizon.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "serialization::LookbackReturnsState")]
+#[cfg_attr(feature = "json-schema", schemars(!try_from, deny_unknown_fields))]
 pub struct LookbackReturns {
     /// Date on which every lookback window ended: the requested date, else the
     /// last active date of the panel.
@@ -987,11 +949,41 @@ pub struct LookbackReturns {
     /// Ticker names aligned with every per-ticker vector below.
     pub ticker_names: Vec<String>,
     /// Month-to-date compounded return per ticker.
+    #[serde(with = "finstack_quant_core::wire::non_finite_f64_seq")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<finstack_quant_core::wire::NonFiniteF64Wire>")
+    )]
     pub mtd: Vec<f64>,
     /// Quarter-to-date compounded return per ticker.
+    #[serde(with = "finstack_quant_core::wire::non_finite_f64_seq")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<finstack_quant_core::wire::NonFiniteF64Wire>")
+    )]
     pub qtd: Vec<f64>,
     /// Year-to-date compounded return per ticker.
+    #[serde(with = "finstack_quant_core::wire::non_finite_f64_seq")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<finstack_quant_core::wire::NonFiniteF64Wire>")
+    )]
     pub ytd: Vec<f64>,
     /// Fiscal-year-to-date compounded return per ticker.
+    #[serde(with = "finstack_quant_core::wire::non_finite_f64_seq")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<finstack_quant_core::wire::NonFiniteF64Wire>")
+    )]
     pub fytd: Vec<f64>,
+    /// Explicit fiscal partition used for fiscal-year-to-date selection.
+    pub fiscal_config: finstack_quant_core::dates::FiscalConfig,
+    /// Observation count and actual holding boundaries for each month-to-date value.
+    pub mtd_samples: Vec<crate::aggregation::LookbackSample>,
+    /// Observation count and actual holding boundaries for each quarter-to-date value.
+    pub qtd_samples: Vec<crate::aggregation::LookbackSample>,
+    /// Observation count and actual holding boundaries for each year-to-date value.
+    pub ytd_samples: Vec<crate::aggregation::LookbackSample>,
+    /// Observation count and actual holding boundaries for each fiscal-year-to-date value.
+    pub fytd_samples: Vec<crate::aggregation::LookbackSample>,
 }

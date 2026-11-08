@@ -1287,6 +1287,17 @@
       ],
       "reason": "Procedural-macro entry point delegates FinancialBuilder expansion; crate lint attributes and token forwarding introduce no independent defaults/calculation.",
       "sha256": "fbbf150ab500a250cd7f1af2f788a8b2cc12a04ae597185a5f51596b3c4b2906"
+    },
+    {
+      "path": "finstack-quant/valuations/src/bin/gen_registry_snapshot.rs",
+      "classification": "support",
+      "records": [
+        "VALUATIONS-FRAMEWORK-01",
+        "VALUATIONS-FRAMEWORK-08"
+      ],
+      "reason": "Generate/check the registered pricer and metric snapshot by enumerating the canonical registry; no pricing or financial selection logic. Ownership added on 2026-11-08 without extending the original numerical audit.",
+      "sha256": "e6a8e2989066918a81b6e91ccc9926cfde1cdadc0fe255660f549be8f0127ac1",
+      "inspection_date": "2026-11-08"
     }
   ]
 }

@@ -114,18 +114,20 @@ class TestAnalyticsNamespace:
         from finstack_quant.analytics import (  # noqa: F401
             AnalyticsError,
             BetaResult,
+            CorrelationResult,
             DatedSeries,
             DrawdownEpisode,
             GreeksResult,
             LookbackReturns,
+            LookbackSample,
             MultiFactorResult,
             Performance,
             PeriodStats,
             RollingGreeks,
         )
 
-    def test_analytics_drops_freestanding_helpers(self) -> None:
-        """Every freestanding analytic is now a method on `Performance`."""
+    def test_analytics_exposes_supported_freestanding_functions(self) -> None:
+        """Panel methods and canonical raw statistical APIs have distinct roles."""
         from finstack_quant import analytics
 
         for name in (
@@ -138,7 +140,6 @@ class TestAnalyticsNamespace:
             "expected_shortfall",
             "rolling_sharpe",
             "rolling_greeks",
-            "multi_factor_greeks",
             "rolling_var_forecasts",
             "classify_breaches",
             "fit_garch11",
@@ -150,9 +151,15 @@ class TestAnalyticsNamespace:
             assert not hasattr(analytics, name)
             assert name not in analytics.__all__
 
-        # These four remain as freestanding convenience wrappers alongside
-        # the equivalent `Performance` methods.
-        for name in ("sharpe", "sortino", "volatility", "max_drawdown"):
+        for name in (
+            "sharpe",
+            "sortino",
+            "volatility",
+            "max_drawdown",
+            "constrained_least_squares",
+            "multi_factor_greeks",
+            "validate_summary",
+        ):
             assert hasattr(analytics, name)
             assert name in analytics.__all__
 

@@ -1459,7 +1459,7 @@ pub fn bond_workout_ladder_table(
 ) -> Result<JsValue, JsValue> {
     let ladder: finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::BondWorkoutLadder =
         crate::utils::input::from_js_json(&ladder, "ladder")?;
-    to_js_value(&ladder.to_table())
+    crate::utils::to_js_table_numeric(&ladder.to_table())
 }
 
 /// The quote set of a bond as a one-row table (mirrors Rust `BondQuoteSet::to_table`).
@@ -1475,7 +1475,7 @@ pub fn bond_quote_set_table(
 ) -> Result<JsValue, JsValue> {
     let quotes: finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::BondQuoteSet =
         crate::utils::input::from_js_json(&quotes, "quotes")?;
-    to_js_value(&quotes.to_table())
+    crate::utils::to_js_table_numeric(&quotes.to_table())
 }
 
 /// Every price, yield and spread quote of a bond, solved from any one of them (mirrors Rust `compute_quotes`).

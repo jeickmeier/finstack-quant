@@ -558,20 +558,24 @@ export interface AttributedPnl {
   /** attribution.pnlAttributionPctOfTotalByBucket: every money bucket with its share of total, in Rust's order. */
   readonly buckets: readonly PnlBucketShare[];
 }
-/** Rust PerformancePanel: ISO dates, ticker-major price or return series (a gap is null), ticker names and an optional benchmark and frequency left to Rust when omitted. */
+/** Rust PerformancePanel: actual valuation dates, L price levels or L-1 interval returns per ticker (an edge gap is null), ticker names and optional benchmark/frequency context. */
 export type PerformancePanel = analyticsWire.PerformancePanel;
-/** A panel for analytics.Performance with the report's options; every omitted option is left to Rust. */
+/** A panel and explicit inputs for the fixed analytics performance report. */
 export interface PerformanceReportRequest {
   /** The panel new analytics.Performance(panel) is built from. */
   readonly panel: PerformancePanel;
-  /** Annualized decimal risk-free rate for summary() and rollingSharpe; omitted is Rust's default. */
-  readonly riskFreeRate?: number | null;
-  /** Tail confidence for summary() VaR, ES and tail ratio; omitted is Rust's default. */
-  readonly confidence?: number | null;
-  /** Rolling window in observations; omitted is Rust's default. */
-  readonly window?: number | null;
-  /** Number of drawdown episodes per ticker; omitted is Rust's default. */
-  readonly episodes?: number | null;
+  /** Annual-effective decimal cash for summary Sharpe and rollingSharpe. */
+  readonly riskFreeRate: number;
+  /** Per-observation decimal MAR for summary Sortino and downside deviation. */
+  readonly mar: number;
+  /** Per-observation decimal Omega threshold, independent of MAR. */
+  readonly omegaThreshold: number;
+  /** Explicit confidence inside (0.5, 1) for summary VaR, ES and tail ratio. */
+  readonly confidence: number;
+  /** Explicit positive rolling window in observations. */
+  readonly window: number;
+  /** Explicit number of drawdown episodes selected per ticker. */
+  readonly episodes: number;
   /** Lookback end date; omitted is the last active panel date. */
   readonly lookbackDate?: string | null;
   /** Fiscal-year start for FYTD (a core.FiscalConfig); omitted is Rust's calendar year. */
@@ -592,15 +596,13 @@ export interface PerformanceTickerReport extends Omit<
   rollingSharpe: PerformanceSeries;
   rollingVolatility: PerformanceSeries;
 }
-/** Native report including the host table envelope and correlation matrix. */
+/** Native report including the host table envelope and per-ticker series. */
 export interface PerformanceReport extends Omit<
   PerformanceReportData,
   "summary" | "tickers"
 > {
   summary: TableEnvelope;
   tickers: PerformanceTickerReport[];
-  /** correlationMatrix rows in tickerNames order. */
-  correlation: { matrix: number[][]; repaired: boolean };
 }
 /** A return or price panel whose Pearson correlation matrix Rust estimates; host-supplied, never defaulted. */
 export interface CorrelationMatrixRequest {
@@ -612,30 +614,31 @@ export interface CorrelationMatrixReport {
   tickerNames: string[];
   /** Pearson correlations, one row per ticker, unit diagonal. */
   matrix: number[][];
-  /** True when Rust projected the raw estimate to the nearest valid correlation matrix (Higham). */
-  repaired: boolean;
+  /** Number of interval observations shared by all tickers. */
+  nObs: number;
+  /** First and last shared return-ending dates. */
+  startDate: string;
+  endDate: string;
 }
-/** A panel measured against its named benchmark; every omitted option is left to Rust. */
+/** A panel measured against its explicitly selected benchmark and frequency. */
 export interface BenchmarkReportRequest {
   /** The panel; its benchmark_ticker is the ticker every relative measure is taken against, and Rust rejects an unknown one. */
   readonly panel: PerformancePanel & { readonly benchmark_ticker: string };
-  /** Annualized decimal risk-free rate for greeks, treynor, mSquared and rollingGreeks; omitted is Rust's default. */
-  readonly riskFreeRate?: number | null;
-  /** rollingGreeks window in observations; omitted is Rust's default. */
-  readonly window?: number | null;
+  /** Annual-effective decimal cash for greeks, Treynor, M-squared and rolling greeks. */
+  readonly riskFreeRate: number;
+  /** Explicit rollingGreeks window in observations. */
+  readonly window: number;
   /** Factor panel for multiFactorGreeks of every ticker; omitted skips the regression. */
   readonly factors?: {
     /** Display labels, one per factor row. */
     readonly names: readonly string[];
     /** `returns[factor][observation]`: already-excess decimal factor returns. */
     readonly returns: readonly (readonly number[])[];
-    /** "excess" or "total"; omitted is Rust's default. */
-    readonly returnKind?: string | null;
-    /** Annualized decimal risk-free rate of a "total" regression; omitted is Rust's default. */
-    readonly riskFreeRate?: number | null;
+    /** Explicit annual-effective decimal cash subtracted from the total-investment response only. */
+    readonly riskFreeRate: number;
   } | null;
 }
-/** One ticker's native relative series, aligned with that ticker's own active dates. */
+/** One ticker's native relative series, aligned with its exact paired benchmark dates. */
 export interface BenchmarkTickerReport extends Omit<
   BenchmarkTickerData,
   "rollingGreeks" | "multiFactor"
@@ -1286,11 +1289,11 @@ export interface AttributionApi {
 }
 /** analytics: performance reports over a host-supplied panel. */
 export interface AnalyticsApi {
-  /** analytics.Performance (fromReturns or the price constructor) + summary, series, drawdowns, rolling, periodic, lookback (core.FiscalConfig when a fiscal start is set) and correlation; every handle is freed. */
+  /** analytics.Performance over the actual valuation grid + summary, series, drawdowns, rolling, periodic, lookback (core.FiscalConfig when a fiscal start is set) and sample metadata; every handle is freed. */
   performanceReport(
     request: PerformanceReportRequest,
   ): Promise<Envelope<PerformanceReport>>;
-  /** analytics.Performance (fromReturns or the price constructor) + getTickerNames and correlationMatrix; the handle is freed. */
+  /** analytics.Performance over the actual valuation grid + getTickerNames and correlationMatrix; the handle is freed. */
   correlationMatrix(
     request: CorrelationMatrixRequest,
   ): Promise<Envelope<CorrelationMatrixReport>>;

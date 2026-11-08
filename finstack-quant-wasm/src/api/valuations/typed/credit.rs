@@ -740,7 +740,7 @@ pub fn convertible_spot_ladder_table(
 ) -> Result<JsValue, JsValue> {
     let ladder: finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleSpotLadder =
         from_js_json(&ladder, "ladder")?;
-    to_js_value(&ladder.to_table())
+    crate::utils::to_js_table_numeric(&ladder.to_table())
 }
 
 factories!(JsConvertibleBond, "ConvertibleBond", finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond, {

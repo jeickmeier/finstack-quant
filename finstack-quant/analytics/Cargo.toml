@@ -12,9 +12,12 @@ autotests = false
 
 [dependencies]
 finstack-quant-core = { path = "../core", version = "0.11.0-dev.202610210600", default-features = false }
+num-rational = { version = "0.4", features = ["num-bigint"] }
+num-traits = "0.2"
 nalgebra = { version = "0.35", default-features = false, features = ["std"] }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 time = { workspace = true }
 tracing = { version = "0.1", default-features = false, features = ["attributes"] }
 
@@ -25,7 +28,6 @@ json-schema = ["dep:schemars", "finstack-quant-core/json-schema"]
 [dev-dependencies]
 criterion = { workspace = true }
 jsonschema = { version = "0.28", default-features = false }
-serde_json = { workspace = true }
 
 [[bin]]
 name = "gen_analytics_schemas"

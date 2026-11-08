@@ -80,8 +80,7 @@ pub(crate) fn table_to_dataframe<'py>(
 
 /// Build a `pd.Series` from already-converted data plus a label index.
 ///
-/// Shared by [`values_to_series`] and [`int_values_to_series`] so both dtypes
-/// reach pandas through the same `pd.Series(data, index=..., name=...)` call.
+/// Values reach pandas through one `pd.Series(data, index=..., name=...)` call.
 fn build_series<'py>(
     py: Python<'py>,
     data: Bound<'py, PyAny>,
@@ -105,20 +104,6 @@ fn build_series<'py>(
 pub fn values_to_series<'py>(
     py: Python<'py>,
     values: Vec<f64>,
-    index: &[String],
-    name: &str,
-) -> PyResult<Bound<'py, PyAny>> {
-    build_series(py, PyArray1::from_vec(py, values).into_any(), index, name)
-}
-
-/// Build an int64 `pd.Series` from per-entity values labelled by `index`.
-///
-/// The integer counterpart of [`values_to_series`], so integer-valued metrics
-/// (drawdown durations in calendar days) keep an integer dtype instead of
-/// being silently widened to float64.
-pub fn int_values_to_series<'py>(
-    py: Python<'py>,
-    values: Vec<i64>,
     index: &[String],
     name: &str,
 ) -> PyResult<Bound<'py, PyAny>> {

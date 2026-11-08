@@ -341,7 +341,10 @@ test('numbers are not coerced by ToNumber (F372)', () => {
 
 test('number arrays must be arrays of numbers or Float64Array', () => {
   const returns = [0.01, -0.02, 0.015, 0.003];
-  assert.equal(analytics.sharpe(returns), analytics.sharpe(Float64Array.from(returns)));
+  assert.equal(
+    analytics.sharpe(returns, 0, 252),
+    analytics.sharpe(Float64Array.from(returns), 0, 252)
+  );
   assert.equal(core.mean([1, 2, 3]), 2);
   assert.throws(() => analytics.sharpe('0.01,0.02'), invalidType('returns'));
   assert.throws(() => analytics.sharpe({}), invalidType('returns'));
@@ -356,13 +359,13 @@ test('number arrays must be arrays of numbers or Float64Array', () => {
   assert.equal(core.mean([1, Number.POSITIVE_INFINITY]), Number.POSITIVE_INFINITY);
 });
 
-test('optional numbers: omitted and null mean the default, other types throw', () => {
+test('analytics numeric policy inputs reject omission, null and wrong types', () => {
   const returns = [0.01, -0.02, 0.015, 0.003];
   const byDefault = analytics.sharpe(returns, 0, 252);
-  assert.equal(analytics.sharpe(returns), byDefault);
-  assert.equal(analytics.sharpe(returns, null, null), byDefault);
-  assert.equal(analytics.sharpe(returns, undefined, undefined), byDefault);
-  assert.notEqual(analytics.sharpe(returns, 0.02), byDefault);
+  assert.throws(() => analytics.sharpe(returns), invalidType('riskFreeRate'));
+  assert.throws(() => analytics.sharpe(returns, null, null), invalidType('riskFreeRate'));
+  assert.throws(() => analytics.sharpe(returns, undefined, undefined), invalidType('riskFreeRate'));
+  assert.notEqual(analytics.sharpe(returns, 0.02, 252), byDefault);
   assert.throws(() => analytics.sharpe(returns, '0.02'), invalidType('riskFreeRate'));
   assert.throws(() => analytics.sharpe(returns, 0, true), invalidType('periodsPerYear'));
 });

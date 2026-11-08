@@ -1432,6 +1432,28 @@ and implementation and validation evidence.
 - Artzner, P., Delbaen, F., Eber, J.-M., and Heath, D. "Coherent Measures of
   Risk." Canonical reference for Expected Shortfall as a coherent risk measure.
 
+<a id="rockafellarUryasevGeneralLoss"></a>
+
+### Rockafellar Uryasev General Loss Distributions
+
+- Rockafellar, R. T., and Uryasev, S. [*Conditional Value-at-Risk for General
+  Loss Distributions*](https://sites.math.washington.edu/~rtr/papers/rtr187-CVaR2.pdf),
+  author manuscript dated November 28, 2001. Definition 3 and Propositions
+  6 and 8 specify tail probability weighting, including splitting a boundary
+  probability atom. Analytics uses the corresponding lower-return tail and
+  retains its separately selected R-7 VaR convention.
+
+<a id="fisherCornish1960"></a>
+
+### Fisher Cornish 1960
+
+- Fisher, R. A., and Cornish, E. A. ["The Percentile Points of Distributions
+  Having Known Cumulants"](https://www.stat.cmu.edu/technometrics/59-69/VOL-02-02/v0202209.pdf).
+  *Technometrics* 2(2), 209–225, May 1960. Primary quantile-expansion context
+  and polynomial tables. Analytics explicitly specifies its retained cubic,
+  Type 2 sample plug-in coefficients and analytic global derivative gate;
+  this reference does not certify those plug-in estimates or model accuracy.
+
 <a id="joanesGill1998"></a>
 
 ### Joanes Gill 1998
@@ -1458,8 +1480,13 @@ and implementation and validation evidence.
 
 ### Martin 1987 Ulcer Index
 
-- Martin, P. G. "The Ulcer Index." Canonical practitioner reference for the
-  Ulcer Index and related Martin ratio usage.
+- Martin, P. G. ["Ulcer Index: An Alternative Approach to the Measurement
+  of Investment Risk & Risk-Adjusted Performance"](https://www.tangotools.com/ui/ui.htm).
+  The author identifies development in 1987 and first publication with
+  Byron McCann in *The Investor's Guide to Fidelity Funds* (Wiley, 1989).
+  His mean-squared percentage-drawdown definition and cash-adjusted
+  UPI/Martin formula support the selected measures; observation weighting,
+  units and dated-CAGR convention are explicit analytics choices.
 
 <a id="youngCalmar1991"></a>
 
@@ -1468,12 +1495,15 @@ and implementation and validation evidence.
 - Young, T. W. "Calmar Ratio: A Smoother Tool." Practitioner reference for the
   Calmar ratio.
 
-<a id="kestner1996"></a>
+<a id="kestner2003"></a>
 
-### Kestner 1996
+### Kestner 2003
 
-- Kestner, L. N. *Quantitative Trading Strategies*. Practitioner reference for
-  Sterling ratio conventions.
+- Kestner, L. N. *Quantitative Trading Strategies*, first edition. McGraw-Hill,
+  2003, ISBN 9780071412391. The [publisher catalogue](https://www.mheducation.com/highered/mhp/product/quantitative-trading-strategies.html)
+  establishes the edition and publication year. This is trading-strategy
+  context; the selected worst-episode-average Sterling formula is specified
+  separately in [analytics record 06](decisions/financial/analytics/06-drawdown-reward-and-cdar.md).
 
 <a id="burke1994"></a>
 

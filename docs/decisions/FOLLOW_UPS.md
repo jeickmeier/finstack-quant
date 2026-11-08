@@ -136,12 +136,6 @@ resolve the stated scope question explicitly.
   establish complete correspondence with canonical Rust names. Preserve
   contract-change reporting even when the two host surfaces agree.
 
-<a id="cagr-default"></a>
-
-- **CAGR default:** [ADR 0008](financial/conventions/0008-financial-defaults-and-cagr.md)
-  explicitly chooses Actual/365 Fixed. The
-  [dated-CAGR reconciliation](financial/FOLLOW_UPS.md#dated-cagr-default) owns
-  implementation, dependent-calculation and regression work.
 - **Final-release compatibility:** before the first final release, revisit
   [ADR 0004](project/0004-development-compatibility.md) and establish
   compatibility across a couple of releases. The exact support window,
@@ -665,14 +659,16 @@ statements, statements-analytics, scenarios, portfolio, margin, factor,
 attribution, covenants, features and Arrow interchange. The
 [source map](financial/SOURCE_COVERAGE.md) accounts for their
 declared Rust scope. The [scoped algorithm backlog](financial/FOLLOW_UPS.md)
-preserves findings from all audited catalogues, with links to the individual
+preserves remaining findings from audited catalogues, with links to the individual
 methods and their evidence. Use that backlog for detailed reconciliation;
 the items below connect it to broader decisions and qualification boundaries.
 
 [ADR 0026](financial/governance/0026-methodology-decisions-and-inventory.md) accepts the
-documentation process. Neither overview drafts 0027–0033 nor the detailed
-algorithm records approve their observed implementations. Numerical suites
-were not rerun. Static source discrepancies, suspected numerical defects
+documentation process. Overview drafts 0027–0032 do not approve their observed
+implementations.
+The [accepted analytics contracts and implementation evidence](financial/analytics/README.md)
+have their own recorded scope. The original documentation audit did not rerun
+numerical suites. Static source discrepancies, suspected numerical defects
 requiring reproduction, adoption choices and missing validation are distinct.
 
 ### Scoped algorithm reconciliation
@@ -696,10 +692,9 @@ requiring reproduction, adoption choices and missing validation are distinct.
   returned-curve conventions, clamped residual/Jacobian behavior, diagnostic
   aggregation, fit acceptance and recalibration replay. Independent evidence
   must distinguish parameter recovery from identification and market accuracy.
-- **Statements and analytics:** preserve the previously agreed reported-cost
-  D&A convention, dated-CAGR/return-metric directions and period-close
-  waterfall FX policy. Review period windows, forecast dependence, dated debt
-  balances, check/skip semantics, ECL reversion approximations and valuation
+- **Statements:** preserve the previously agreed reported-cost D&A convention
+  and period-close waterfall FX policy. Review period windows, forecast
+  dependence, dated debt balances, check/skip semantics, ECL reversion approximations and valuation
   assumptions against the detailed records.
 - **Scenarios, portfolios and attribution:** reconcile shock coordinate units,
   ordered versus parallel partial failure, state/dependency reuse, aggregation
@@ -740,25 +735,9 @@ requiring reproduction, adoption choices and missing validation are distinct.
   [0032](financial/calibration-targets/0032-curve-interpolation-and-calibration.md). Distinct hazard,
   inflation, cross-currency, SABR/SVI, HW and base-correlation calibration
   choices remain pending, including approximate-knot acceptance.
-- **Tail risk:** agree historical summary selection, R-7 quantiles versus
-  fractional-boundary empirical ES tails, horizon interpretation and unavailable-sample
-  behavior in [0033](financial/analytics/0033-value-at-risk-method-selection.md).
-  Preserve the prior agreed explicit-error direction for invalid
-  Cornish–Fisher estimates; adopting its current Gaussian substitution is not
-  an open default choice.
 
 ### Implementation reconciliation
 
-- **Prior analytics directions:** the 2026-10-11 directions require explicit
-  invalid Cornish–Fisher errors, strictly positive up-capture, cash-adjusted
-  Martin, modified Burke across all episodes, and an actual initial valuation
-  date. Current [tail-risk kernels](../../finstack-quant/analytics/src/risk_metrics/tail_risk.rs),
-  [capture selection](../../finstack-quant/analytics/src/benchmark.rs),
-  [scalar metrics](../../finstack-quant/analytics/src/performance/scalar.rs), and
-  [return-panel construction](../../finstack-quant/analytics/src/performance/mod.rs)
-  still conflict with those directions. Reconcile the affected Rust and host
-  contracts, documentation, and protected expectations together. The existing
-  CAGR item above remains a separate discrepancy under ADR 0008.
 - **Related scope:** retain the option-bearing CS01/OAS reconciliation above.
   The inventory's statement DCF path uses ACT/365.25; the dated-CAGR decision
   does not establish a DCF time-basis change. Different fixing/overnight paths
@@ -775,10 +754,11 @@ requiring reproduction, adoption choices and missing validation are distinct.
   evidence before being counted as validated. Complete missing technical
   citations identified in the draft records.
 - **Remaining adoption and audit scope:** detailed records cover the declared
-  crates across numerical frameworks, calibration, valuation, analytics,
-  statements, scenarios, portfolios, attribution, margin and factor models.
+  crates across numerical frameworks, calibration, valuation, statements,
+  scenarios, portfolios, attribution, margin and factor models.
   Covenant engines, panel features and Arrow conversions also have detailed
-  records. Their adoption remains open. The
+  records. Their individually recorded adoption and evidence status governs
+  the remaining work. The
   [audit boundaries](financial/AUDIT_BOUNDARY.md) identify separate root-package
   and host surfaces and outstanding numerical qualification. Embedded
   policy names and rule versions do not establish accounting or regulatory

@@ -1,0 +1,56 @@
+{
+  "$defs": {
+    "DateWire": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/analytics/1/correlation_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Common-sample Pearson correlation with ticker and sample provenance.",
+  "properties": {
+    "end_date": {
+      "$ref": "#/$defs/DateWire",
+      "description": "Last included return-ending date."
+    },
+    "matrix": {
+      "description": "Symmetric positive-semidefinite Pearson matrix, with exact unit diagonal.",
+      "items": {
+        "items": {
+          "format": "double",
+          "type": "number"
+        },
+        "type": "array"
+      },
+      "type": "array"
+    },
+    "n_obs": {
+      "description": "Number of shared return observations used for every entry.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "start_date": {
+      "$ref": "#/$defs/DateWire",
+      "description": "First included return-ending date, excluding the initial wealth date."
+    },
+    "tickers": {
+      "description": "Ordered unique ticker labels for both matrix axes.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "tickers",
+    "matrix",
+    "n_obs",
+    "start_date",
+    "end_date"
+  ],
+  "title": "CorrelationResult",
+  "type": "object"
+}

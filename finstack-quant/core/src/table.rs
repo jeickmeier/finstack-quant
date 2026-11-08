@@ -19,16 +19,61 @@ use serde::{Deserialize, Serialize};
 /// count. Optional metadata can record domain-specific hints such as which
 /// column is a metric, what a numeric field represents, or how a host-language
 /// binding should interpret the data.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "json-schema", schemars(deny_unknown_fields))]
 pub struct TableEnvelope {
     /// Number of rows in the table.
     pub row_count: usize,
     /// Ordered set of columns.
     pub columns: Vec<TableColumn>,
     /// Table-level metadata for downstream bindings and documentation.
-    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    #[cfg_attr(feature = "json-schema", schemars(default))]
     pub metadata: IndexMap<String, serde_json::Value>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TableEnvelopeWire {
+    row_count: usize,
+    columns: Vec<TableColumn>,
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    metadata: IndexMap<String, serde_json::Value>,
+}
+
+impl Serialize for TableEnvelope {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct;
+        self.validate().map_err(serde::ser::Error::custom)?;
+        let mut state = serializer.serialize_struct(
+            "TableEnvelope",
+            if self.metadata.is_empty() { 2 } else { 3 },
+        )?;
+        state.serialize_field("row_count", &self.row_count)?;
+        state.serialize_field("columns", &self.columns)?;
+        if !self.metadata.is_empty() {
+            state.serialize_field("metadata", &self.metadata)?;
+        }
+        state.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for TableEnvelope {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        let wire = TableEnvelopeWire::deserialize(deserializer)?;
+        let table = Self {
+            row_count: wire.row_count,
+            columns: wire.columns,
+            metadata: wire.metadata,
+        };
+        table.validate().map_err(serde::de::Error::custom)?;
+        Ok(table)
+    }
 }
 
 impl TableEnvelope {
@@ -50,19 +95,38 @@ impl TableEnvelope {
         metadata: IndexMap<String, serde_json::Value>,
     ) -> Result<Self> {
         let row_count = columns.first().map(TableColumn::len).unwrap_or(0);
+        let table = Self {
+            row_count,
+            columns,
+            metadata,
+        };
+        table.validate()?;
+        Ok(table)
+    }
+
+    /// Validate row counts and unique, nonempty ordered column names.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Validation`] for inconsistent row counts, empty column
+    /// names, or duplicate names. Numeric nonfinite results retain their meaning.
+    pub fn validate(&self) -> Result<()> {
         let mut seen = crate::FxHashSet::default();
 
-        for column in &columns {
-            if column.len() != row_count {
+        for column in &self.columns {
+            if column.len() != self.row_count {
                 return Err(Error::Validation(format!(
                     "column '{}' has {} rows but expected {}",
                     column.name,
                     column.len(),
-                    row_count
+                    self.row_count
                 )));
             }
 
-            if !seen.insert(column.name.clone()) {
+            if column.name.trim().is_empty() {
+                return Err(Error::Validation("column names must not be blank".into()));
+            }
+            if !seen.insert(&column.name) {
                 return Err(Error::Validation(format!(
                     "duplicate column name '{}'",
                     column.name
@@ -70,11 +134,12 @@ impl TableEnvelope {
             }
         }
 
-        Ok(Self {
-            row_count,
-            columns,
-            metadata,
-        })
+        if self.columns.is_empty() && self.row_count != 0 {
+            return Err(Error::Validation(
+                "a table without columns must have zero rows".into(),
+            ));
+        }
+        Ok(())
     }
 
     /// Return whether the table has no rows.
@@ -98,6 +163,7 @@ impl TableEnvelope {
 /// A single named column in a [`TableEnvelope`].
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct TableColumn {
     /// Column name.
     pub name: String,
@@ -170,14 +236,26 @@ impl TableColumn {
 /// Column storage variants supported by the table envelope.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(tag = "type", content = "values", rename_all = "snake_case")]
+#[serde(
+    tag = "type",
+    content = "values",
+    rename_all = "snake_case",
+    deny_unknown_fields
+)]
 pub enum TableColumnData {
     /// Non-null string column.
     String(Vec<String>),
     /// Nullable string column.
     NullableString(Vec<Option<String>>),
     /// Non-null floating-point column.
-    Float64(Vec<f64>),
+    Float64(
+        #[serde(with = "crate::wire::non_finite_f64_seq")]
+        #[cfg_attr(
+            feature = "json-schema",
+            schemars(with = "Vec<crate::wire::NonFiniteF64Wire>")
+        )]
+        Vec<f64>,
+    ),
     /// Nullable floating-point column.
     NullableFloat64(Vec<Option<f64>>),
     /// Non-null unsigned 32-bit integer column.
@@ -296,6 +374,51 @@ mod tests {
         assert_eq!(restored.row_count, 2);
         assert_eq!(restored.metadata.get("orientation"), Some(&json!("long")));
         assert_eq!(restored.column("period_id").map(TableColumn::len), Some(2));
+    }
+
+    #[test]
+    fn float_results_round_trip_distinct_nonfinite_values() {
+        let table = TableEnvelope::new(
+            vec![TableColumn::new(
+                "risk",
+                TableColumnData::Float64(vec![0.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY]),
+            )],
+            Default::default(),
+        )
+        .expect("table");
+        let json = serde_json::to_value(&table).expect("serialize");
+        assert_eq!(
+            json["columns"][0]["data"]["values"],
+            json!([0.0, "nan", "inf", "-inf"])
+        );
+        let restored: TableEnvelope = serde_json::from_value(json).expect("restore");
+        let TableColumnData::Float64(values) = &restored.columns[0].data else {
+            panic!("float column");
+        };
+        assert!(values[1].is_nan());
+        assert_eq!(values[2], f64::INFINITY);
+        assert_eq!(values[3], f64::NEG_INFINITY);
+    }
+
+    #[test]
+    fn table_rejects_malformed_restored_or_mutated_structure() {
+        let table = TableEnvelope::new(
+            vec![TableColumn::new("a", TableColumnData::Float64(vec![1.0]))],
+            Default::default(),
+        )
+        .expect("table");
+        let original = serde_json::to_value(&table).expect("serialize");
+        for key in ["row_count", "unknown"] {
+            let mut json = original.clone();
+            json[key] = json!(2);
+            assert!(serde_json::from_value::<TableEnvelope>(json).is_err());
+        }
+        let mut null = original;
+        null["columns"][0]["data"]["values"][0] = serde_json::Value::Null;
+        assert!(serde_json::from_value::<TableEnvelope>(null).is_err());
+        let mut mutated = table;
+        mutated.row_count = 2;
+        assert!(serde_json::to_value(mutated).is_err());
     }
 
     #[test]

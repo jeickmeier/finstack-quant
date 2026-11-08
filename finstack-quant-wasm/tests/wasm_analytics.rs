@@ -6,6 +6,7 @@
 #![cfg(target_arch = "wasm32")]
 
 use finstack_quant_wasm::api::analytics::JsPerformance;
+use finstack_quant_wasm::api::core::dates::JsDayCountContext;
 use js_sys::{Array, Float64Array, Reflect};
 use serde::Deserialize;
 use wasm_bindgen::{JsCast, JsValue};
@@ -38,8 +39,18 @@ fn return_panel(
         .iter()
         .map(|row| row.iter().map(|&v| v.is_finite().then_some(v)).collect())
         .collect();
+    // Fixtures state return-ending dates; explicitly supply their actual
+    // chosen preceding opening valuation rather than relying on runtime inference.
+    let first = time::Date::parse(
+        &dates[0],
+        &time::format_description::well_known::Iso8601::DATE,
+    )
+    .unwrap();
+    let opening = (first - time::Duration::days(1)).to_string();
+    let mut valuations = vec![opening];
+    valuations.extend_from_slice(dates);
     let panel = serde_json::json!({
-        "dates": dates,
+        "dates": valuations,
         "series": series,
         "kind": "returns",
         "ticker_names": names,
@@ -134,8 +145,8 @@ fn ticker_names_round_trip() {
     let names: Vec<String> =
         serde_wasm_bindgen::from_value(perf.get_ticker_names().unwrap()).unwrap();
     assert_eq!(names, vec!["TARGET", "BENCH"]);
-    assert_eq!(perf.get_benchmark_idx(), 1);
-    assert_eq!(perf.get_frequency(), "daily");
+    assert_eq!(perf.get_benchmark_idx(), Some(1));
+    assert_eq!(perf.get_frequency().as_deref(), Some("daily"));
 }
 
 // ---- Scalar metrics ----
@@ -143,7 +154,13 @@ fn ticker_names_round_trip() {
 #[wasm_bindgen_test]
 fn cagr_returns_per_ticker_vec() {
     let perf = build_perf();
-    let values = typed_vec(perf.cagr(None, None).unwrap());
+    let values = typed_vec(
+        perf.cagr(
+            None,
+            &JsDayCountContext::new(None, None, None, None, None).unwrap(),
+        )
+        .unwrap(),
+    );
     assert_eq!(values.len(), 2);
     assert!(values.iter().all(|v| v.is_finite()));
 }
@@ -152,10 +169,10 @@ fn cagr_returns_per_ticker_vec() {
 fn sharpe_sortino_volatility_finite() {
     let perf = build_perf();
     for raw in [
-        perf.sharpe(Some(JsValue::from(0.0))).unwrap(),
-        perf.sortino(Some(JsValue::from(0.0))).unwrap(),
-        perf.volatility(Some(JsValue::from(true))).unwrap(),
-        perf.mean_return(Some(JsValue::from(true))).unwrap(),
+        perf.sharpe(JsValue::from(0.0)).unwrap(),
+        perf.sortino(JsValue::from(0.0)).unwrap(),
+        perf.volatility(JsValue::from(true)).unwrap(),
+        perf.mean_return(JsValue::from(true)).unwrap(),
     ] {
         let v = typed_vec(raw);
         assert_eq!(v.len(), 2);
@@ -167,15 +184,13 @@ fn sharpe_sortino_volatility_finite() {
 fn tail_metrics_finite() {
     let perf = build_perf();
     for raw in [
-        perf.value_at_risk(Some(JsValue::from(0.95)))
+        perf.value_at_risk(JsValue::from(0.95))
             .expect("valid confidence"),
-        perf.expected_shortfall(Some(JsValue::from(0.95)))
+        perf.expected_shortfall(JsValue::from(0.95))
             .expect("valid confidence"),
-        perf.parametric_var(Some(JsValue::from(0.95)), None)
+        perf.parametric_var(JsValue::from(0.95), None)
             .expect("valid confidence"),
-        perf.cornish_fisher_var(Some(JsValue::from(0.95)), None)
-            .expect("valid confidence"),
-        perf.tail_ratio(Some(JsValue::from(0.95)))
+        perf.tail_ratio(JsValue::from(0.95))
             .expect("valid confidence"),
     ] {
         let v = typed_vec(raw);
@@ -187,7 +202,7 @@ fn tail_metrics_finite() {
 #[wasm_bindgen_test]
 fn drawdown_scalars_match_panel_width() {
     let perf = build_perf();
-    let max_dd = typed_vec(perf.max_drawdown());
+    let max_dd = typed_vec(perf.max_drawdown().unwrap());
     assert_eq!(max_dd.len(), 2);
     assert!(max_dd.iter().all(|v| v <= &0.0));
 
@@ -195,12 +210,23 @@ fn drawdown_scalars_match_panel_width() {
     assert_eq!(calmar.len(), 2);
 }
 
+#[wasm_bindgen_test]
+fn globally_invalid_cornish_fisher_is_an_explicit_error() {
+    // This bounded near-uniform sample has negative excess kurtosis, so
+    // its classical cubic polynomial cannot be ordered over all real z.
+    assert!(
+        build_perf()
+            .cornish_fisher_var(JsValue::from(0.95), None)
+            .is_err()
+    );
+}
+
 // ---- Vector outputs ----
 
 #[wasm_bindgen_test]
 fn cumulative_and_drawdown_series_are_per_ticker_panels() {
     let perf = build_perf();
-    let cum = typed_matrix(perf.cumulative_returns());
+    let cum = typed_matrix(perf.cumulative_returns().unwrap());
     assert_eq!(cum.len(), 2);
     assert_eq!(cum[0].len(), fixture().dates.len());
 
@@ -222,13 +248,13 @@ fn periodic_returns_are_ticker_major_points_and_reconcile() {
         JsPerformance::new(return_panel(&dates, &returns, &names, "BENCH", "daily")).unwrap();
 
     let outer = perf
-        .periodic_returns(None)
+        .periodic_returns(JsValue::from("monthly"))
         .unwrap()
         .dyn_into::<Array>()
         .expect("expected ticker-major outer Array");
     assert_eq!(outer.length(), 2);
 
-    let cumulative = typed_matrix(perf.cumulative_returns());
+    let cumulative = typed_matrix(perf.cumulative_returns().unwrap());
     for ticker_idx in 0..outer.length() {
         let points = outer
             .get(ticker_idx)
@@ -261,7 +287,7 @@ fn periodic_returns_are_ticker_major_points_and_reconcile() {
 #[wasm_bindgen_test]
 fn periodic_returns_reject_unknown_frequency() {
     let error = build_perf()
-        .periodic_returns(Some(JsValue::from("hourly".to_string())))
+        .periodic_returns(JsValue::from("hourly".to_string()))
         .expect_err("hourly must not be accepted");
     let message: String = error
         .dyn_into::<js_sys::Error>()
@@ -278,9 +304,10 @@ fn periodic_returns_reject_unknown_frequency() {
 fn correlation_matrix_is_square() {
     let perf = build_perf();
     let result = perf.correlation_matrix().unwrap();
-    let repaired = js_sys::Reflect::get(&result, &JsValue::from("repaired")).unwrap();
-    assert_eq!(repaired.as_bool(), Some(false));
-    let mat = typed_matrix(js_sys::Reflect::get(&result, &JsValue::from("matrix")).unwrap());
+    assert!(!Reflect::has(&result, &JsValue::from("repaired")).unwrap());
+    let mat: Vec<Vec<f64>> =
+        serde_wasm_bindgen::from_value(Reflect::get(&result, &JsValue::from("matrix")).unwrap())
+            .unwrap();
     assert_eq!(mat.len(), 2);
     assert_eq!(mat[0].len(), 2);
     assert!((mat[0][0] - 1.0).abs() < 1e-12);
@@ -295,7 +322,7 @@ fn beta_and_greeks_return_per_ticker_structs() {
     assert_eq!(betas.as_array().unwrap().len(), 2);
 
     let greeks: serde_json::Value =
-        serde_wasm_bindgen::from_value(perf.greeks(None).unwrap()).unwrap();
+        serde_wasm_bindgen::from_value(perf.greeks(JsValue::from(0.0)).unwrap()).unwrap();
     assert_eq!(greeks.as_array().unwrap().len(), 2);
 }
 
@@ -325,7 +352,7 @@ fn degenerate_beta_and_greeks_preserve_javascript_nan() {
     }
 
     let greeks = perf
-        .greeks(None)
+        .greeks(JsValue::from(0.0))
         .unwrap()
         .dyn_into::<Array>()
         .expect("greeks results should be an array");
@@ -364,9 +391,9 @@ fn greeks_optional_risk_free_rate_changes_alpha() {
     .unwrap();
 
     let zero: serde_json::Value =
-        serde_wasm_bindgen::from_value(perf.greeks(None).unwrap()).unwrap();
+        serde_wasm_bindgen::from_value(perf.greeks(JsValue::from(0.0)).unwrap()).unwrap();
     let nonzero: serde_json::Value =
-        serde_wasm_bindgen::from_value(perf.greeks(Some(JsValue::from(0.12))).unwrap()).unwrap();
+        serde_wasm_bindgen::from_value(perf.greeks(JsValue::from(0.12)).unwrap()).unwrap();
     let zero_alpha = zero[0]["alpha"].as_f64().unwrap();
     let nonzero_alpha = nonzero[0]["alpha"].as_f64().unwrap();
 
@@ -378,7 +405,7 @@ fn greeks_optional_risk_free_rate_changes_alpha() {
 fn rolling_greeks_emit_dates_alphas_betas() {
     let perf = build_perf();
     let raw = perf
-        .rolling_greeks(JsValue::from(0.0), Some(JsValue::from(5.0)), None)
+        .rolling_greeks(JsValue::from(0.0), JsValue::from(5.0), JsValue::from(0.0))
         .unwrap();
     let date_array: Array = Reflect::get(&raw, &JsValue::from_str("dates"))
         .unwrap()
@@ -415,7 +442,11 @@ fn multi_factor_greeks_resolves_to_struct() {
     let perf = build_perf();
     let fx = fixture();
     let raw = perf
-        .multi_factor_greeks(JsValue::from(0.0), to_f64_matrix(&fx.factors), None, None)
+        .multi_factor_greeks(
+            JsValue::from(0.0),
+            to_f64_matrix(&fx.factors),
+            JsValue::from(0.0),
+        )
         .unwrap();
     let value: serde_json::Value = serde_wasm_bindgen::from_value(raw).unwrap();
     assert!(value["alpha"].is_number());
@@ -442,10 +473,7 @@ fn lookback_returns_emit_mtd_qtd_ytd_fytd_arrays() {
 fn period_stats_emit_win_rate() {
     let perf = build_perf();
     let raw = perf
-        .period_stats(
-            JsValue::from(0.0),
-            Some(JsValue::from("weekly".to_string())),
-        )
+        .period_stats(JsValue::from(0.0), JsValue::from("weekly".to_string()))
         .unwrap();
     let value: serde_json::Value = serde_wasm_bindgen::from_value(raw).unwrap();
     assert!(value["win_rate"].as_f64().is_some());
@@ -470,5 +498,5 @@ fn reset_date_range_narrows_active_dates() {
 fn reset_bench_ticker_updates_index() {
     let mut perf = build_perf();
     perf.reset_bench_ticker(JsValue::from("TARGET")).unwrap();
-    assert_eq!(perf.get_benchmark_idx(), 0);
+    assert_eq!(perf.get_benchmark_idx(), Some(0));
 }

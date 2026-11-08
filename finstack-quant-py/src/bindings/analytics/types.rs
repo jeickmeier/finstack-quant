@@ -1,5 +1,6 @@
 //! Result classes for the analytics domain.
 
+use crate::bindings::core::dates::periods::PyFiscalConfig;
 use crate::bindings::date_utils::date_to_py;
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::{
@@ -7,8 +8,8 @@ use crate::bindings::pandas_utils::{
 };
 use crate::bindings::pydoc::pydoc;
 use finstack_quant_analytics::{
-    BetaResult, DatedSeries, DrawdownEpisode, GreeksResult, LookbackReturns, MultiFactorResult,
-    PeriodStats, RollingGreeks,
+    BetaResult, CorrelationResult, DatedSeries, DrawdownEpisode, GreeksResult, LookbackReturns,
+    LookbackSample, MultiFactorResult, PeriodStats, RollingGreeks,
 };
 use numpy::PyArray1;
 use pyo3::prelude::*;
@@ -22,6 +23,21 @@ pub struct PyPeriodStats {
 
 #[pymethods]
 impl PyPeriodStats {
+    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.n_obs")]
+    #[getter]
+    fn n_obs(&self) -> usize {
+        self.inner.n_obs
+    }
+    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.wins")]
+    #[getter]
+    fn wins(&self) -> usize {
+        self.inner.wins
+    }
+    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.losses")]
+    #[getter]
+    fn losses(&self) -> usize {
+        self.inner.losses
+    }
     #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.best")]
     #[getter]
     fn best(&self) -> f64 {
@@ -72,15 +88,15 @@ impl PyPeriodStats {
     fn profit_factor(&self) -> f64 {
         self.inner.profit_factor
     }
-    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.cpc_ratio")]
+    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.cpc_index")]
     #[getter]
-    fn cpc_ratio(&self) -> f64 {
-        self.inner.cpc_ratio
+    fn cpc_index(&self) -> f64 {
+        self.inner.cpc_index
     }
-    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.kelly_criterion")]
+    #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.kelly_risk_fraction")]
     #[getter]
-    fn kelly_criterion(&self) -> f64 {
-        self.inner.kelly_criterion
+    fn kelly_risk_fraction(&self) -> f64 {
+        self.inner.kelly_risk_fraction
     }
 
     #[doc = pydoc!("finstack_quant.analytics._types", "PeriodStats.to_series")]
@@ -99,7 +115,10 @@ impl PyPeriodStats {
         for (name, value) in self.fields() {
             data.set_item(name, PyArray1::from_slice(py, &[value]))?;
         }
-        // Streak counts stay integer columns; re-setting a key keeps its position.
+        // Observation and streak counts stay integer columns.
+        data.set_item("n_obs", vec![self.inner.n_obs])?;
+        data.set_item("wins", vec![self.inner.wins])?;
+        data.set_item("losses", vec![self.inner.losses])?;
         data.set_item("consecutive_wins", vec![self.inner.consecutive_wins])?;
         data.set_item("consecutive_losses", vec![self.inner.consecutive_losses])?;
         dict_to_dataframe(py, &data, None)
@@ -116,9 +135,12 @@ impl PyPeriodStats {
 impl PyPeriodStats {
     /// Statistic names and values in `PeriodStats` field order (streak
     /// counts as `f64`).
-    fn fields(&self) -> [(&'static str, f64); 12] {
+    fn fields(&self) -> [(&'static str, f64); 15] {
         let s = &self.inner;
         [
+            ("n_obs", s.n_obs as f64),
+            ("wins", s.wins as f64),
+            ("losses", s.losses as f64),
             ("best", s.best),
             ("worst", s.worst),
             ("consecutive_wins", s.consecutive_wins as f64),
@@ -129,8 +151,8 @@ impl PyPeriodStats {
             ("avg_loss", s.avg_loss),
             ("payoff_ratio", s.payoff_ratio),
             ("profit_factor", s.profit_factor),
-            ("cpc_ratio", s.cpc_ratio),
-            ("kelly_criterion", s.kelly_criterion),
+            ("cpc_index", s.cpc_index),
+            ("kelly_risk_fraction", s.kelly_risk_fraction),
         ]
     }
 }
@@ -432,16 +454,6 @@ impl PyDrawdownEpisode {
     fn max_drawdown(&self) -> f64 {
         self.inner.max_drawdown
     }
-    #[doc = pydoc!("finstack_quant.analytics._types", "DrawdownEpisode.near_recovery_threshold")]
-    #[getter]
-    fn near_recovery_threshold(&self) -> f64 {
-        self.inner.near_recovery_threshold
-    }
-    #[doc = pydoc!("finstack_quant.analytics._types", "DrawdownEpisode.truncated_at_start")]
-    #[getter]
-    fn truncated_at_start(&self) -> bool {
-        self.inner.truncated_at_start
-    }
 
     #[doc = pydoc!("finstack_quant.analytics._types", "DrawdownEpisode.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -462,14 +474,6 @@ impl PyDrawdownEpisode {
             PyArray1::from_slice(py, &[e.duration_days]),
         )?;
         data.set_item("max_drawdown", PyArray1::from_slice(py, &[e.max_drawdown]))?;
-        data.set_item(
-            "near_recovery_threshold",
-            PyArray1::from_slice(py, &[e.near_recovery_threshold]),
-        )?;
-        data.set_item(
-            "truncated_at_start",
-            PyArray1::from_slice(py, &[e.truncated_at_start]),
-        )?;
         dict_to_dataframe(py, &data, None)
     }
 
@@ -498,6 +502,53 @@ impl PyLookbackReturns {
     #[getter]
     fn ticker_names(&self) -> Vec<String> {
         self.inner.ticker_names.clone()
+    }
+    #[doc = pydoc!("finstack_quant.analytics._types", "LookbackReturns.fiscal_config")]
+    #[getter]
+    fn fiscal_config(&self) -> PyFiscalConfig {
+        PyFiscalConfig {
+            inner: self.inner.fiscal_config,
+        }
+    }
+    #[doc = pydoc!("finstack_quant.analytics._types", "LookbackReturns.mtd_samples")]
+    #[getter]
+    fn mtd_samples(&self) -> Vec<PyLookbackSample> {
+        self.inner
+            .mtd_samples
+            .iter()
+            .cloned()
+            .map(|inner| PyLookbackSample { inner })
+            .collect()
+    }
+    #[doc = pydoc!("finstack_quant.analytics._types", "LookbackReturns.qtd_samples")]
+    #[getter]
+    fn qtd_samples(&self) -> Vec<PyLookbackSample> {
+        self.inner
+            .qtd_samples
+            .iter()
+            .cloned()
+            .map(|inner| PyLookbackSample { inner })
+            .collect()
+    }
+    #[doc = pydoc!("finstack_quant.analytics._types", "LookbackReturns.ytd_samples")]
+    #[getter]
+    fn ytd_samples(&self) -> Vec<PyLookbackSample> {
+        self.inner
+            .ytd_samples
+            .iter()
+            .cloned()
+            .map(|inner| PyLookbackSample { inner })
+            .collect()
+    }
+    #[doc = pydoc!("finstack_quant.analytics._types", "LookbackReturns.fytd_samples")]
+    #[getter]
+    fn fytd_samples(&self) -> Vec<PyLookbackSample> {
+        self.inner
+            .fytd_samples
+            .iter()
+            .cloned()
+            .map(|inner| PyLookbackSample { inner })
+            .collect()
     }
     #[doc = pydoc!("finstack_quant.analytics._types", "LookbackReturns.mtd")]
     #[getter]
@@ -586,6 +637,76 @@ impl PyDatedSeries {
             self.inner.value_column.as_str(),
             self.inner.values.len()
         )
+    }
+}
+
+#[doc = pydoc!("finstack_quant.analytics._types", "LookbackSample")]
+#[pyclass(name = "LookbackSample", module = "finstack_quant.analytics", frozen)]
+pub struct PyLookbackSample {
+    pub(super) inner: LookbackSample,
+}
+
+#[pymethods]
+impl PyLookbackSample {
+    #[doc = pydoc!("finstack_quant.analytics._types", "LookbackSample.n_obs")]
+    #[getter]
+    fn n_obs(&self) -> usize {
+        self.inner.n_obs
+    }
+    #[doc = pydoc!("finstack_quant.analytics._types", "LookbackSample.holding_start")]
+    #[getter]
+    fn holding_start<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .holding_start
+            .map(|date| date_to_py(py, date))
+            .transpose()
+    }
+    #[doc = pydoc!("finstack_quant.analytics._types", "LookbackSample.holding_end")]
+    #[getter]
+    fn holding_end<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .holding_end
+            .map(|date| date_to_py(py, date))
+            .transpose()
+    }
+}
+
+#[doc = pydoc!("finstack_quant.analytics._types", "CorrelationResult")]
+#[pyclass(
+    name = "CorrelationResult",
+    module = "finstack_quant.analytics",
+    frozen
+)]
+pub struct PyCorrelationResult {
+    pub(super) inner: CorrelationResult,
+}
+
+#[pymethods]
+impl PyCorrelationResult {
+    #[doc = pydoc!("finstack_quant.analytics._types", "CorrelationResult.tickers")]
+    #[getter]
+    fn tickers(&self) -> Vec<String> {
+        self.inner.tickers.clone()
+    }
+    #[doc = pydoc!("finstack_quant.analytics._types", "CorrelationResult.matrix")]
+    #[getter]
+    fn matrix(&self) -> Vec<Vec<f64>> {
+        self.inner.matrix.clone()
+    }
+    #[doc = pydoc!("finstack_quant.analytics._types", "CorrelationResult.n_obs")]
+    #[getter]
+    fn n_obs(&self) -> usize {
+        self.inner.n_obs
+    }
+    #[doc = pydoc!("finstack_quant.analytics._types", "CorrelationResult.start_date")]
+    #[getter]
+    fn start_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        date_to_py(py, self.inner.start_date)
+    }
+    #[doc = pydoc!("finstack_quant.analytics._types", "CorrelationResult.end_date")]
+    #[getter]
+    fn end_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        date_to_py(py, self.inner.end_date)
     }
 }
 
@@ -679,6 +800,8 @@ impl_repr_html_via_dataframe!(
 );
 
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<PyCorrelationResult>()?;
+    m.add_class::<PyLookbackSample>()?;
     m.add_class::<PyPeriodStats>()?;
     m.add_class::<PyBetaResult>()?;
     m.add_class::<PyGreeksResult>()?;
@@ -689,3 +812,17 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDatedSeries>()?;
     Ok(())
 }
+
+wire_methods!(
+    PyLookbackSample,
+    LookbackSample,
+    "LookbackSample",
+    module = "finstack_quant.analytics._types"
+);
+
+wire_methods!(
+    PyCorrelationResult,
+    CorrelationResult,
+    "CorrelationResult",
+    module = "finstack_quant.analytics._types"
+);

@@ -1,159 +1,125 @@
-//! Return computation utilities: simple returns from prices, excess returns,
-//! and compounded returns, accumulated with `math::summation` for numerical
-//! stability.
-//!
-//! Crate-internal: callers use these through [`crate::Performance`].
+//! Validated total-investment returns, annual-effective cash and log wealth.
 
 use finstack_quant_core::math::summation::NeumaierAccumulator;
+use finstack_quant_core::{Error, Result};
 
-/// Pairwise simple (percentage-change) returns from a price series.
-///
-/// For prices `[p0, p1, p2, ...]` returns `[p1/p0 - 1, p2/p1 - 1, ...]`
-/// (length `prices.len() - 1`). Unlike the Python "prepend a zero before
-/// first valid" convention, no leading `0.0` is emitted, so the output
-/// pairs 1:1 with the return-aligned date grid used by
-/// [`crate::Performance::new`].
-///
-/// Callers pass a validated span of finite positive prices; a price ratio
-/// that overflows or underflows yields `NaN` for that element.
-///
-/// # Arguments
-///
-/// * `prices` - Slice of asset prices in chronological order.
-///
-/// # Returns
-///
-/// A `Vec<f64>` of length `prices.len() - 1`. Returns an empty vector for
-/// fewer than two prices.
-pub(crate) fn pairwise_returns(prices: &[f64]) -> Vec<f64> {
-    if prices.len() < 2 {
-        return Vec::new();
-    }
-    let mut out = Vec::with_capacity(prices.len() - 1);
-    for w in prices.windows(2) {
-        let ratio = w[1] / w[0];
-        if !ratio.is_finite() || ratio <= 0.0 {
-            out.push(f64::NAN);
-        } else {
-            out.push(ratio - 1.0);
+/// Check chronological nonnegative-wealth investment returns, including a final wipeout.
+pub(crate) fn validate_history(returns: &[f64]) -> Result<()> {
+    for (i, &r) in returns.iter().enumerate() {
+        if !r.is_finite() || r < -1.0 || (r <= -1.0 && i + 1 != returns.len()) {
+            return Err(Error::Validation(format!(
+                "return {i} must be finite and greater than -1, except a final terminal -1"
+            )));
         }
     }
-    out
+    Ok(())
 }
 
-/// Geometric decompounding of an annualized risk-free rate to one period.
-///
-/// ```text
-/// rf_period = (1 + rf_annual)^{1/N} − 1
-/// ```
-///
-/// This is the crate-wide compounding rule for Sharpe-family excess returns
-/// and for per-period excess-return series.
-///
-/// # Arguments
-///
-/// * `risk_free_rate` - Annualized risk-free rate in decimal form (e.g. `0.02`
-///   for 2%).
-/// * `ann_factor` - Periods per year `N` used to decompound (e.g. `252` daily,
-///   `12` monthly).
-///
-/// # Returns
-///
-/// The equivalent one-period simple rate. Returns [`f64::NAN`] when
-/// `risk_free_rate` is non-finite; `ann_factor` is a positive finite
-/// periods-per-year count supplied by every caller.
-#[must_use]
-pub(crate) fn periodic_risk_free_rate(risk_free_rate: f64, ann_factor: f64) -> f64 {
-    if !risk_free_rate.is_finite() {
-        return f64::NAN;
+/// Check an explicitly supplied observations-per-year convention.
+pub(crate) fn validate_frequency(frequency: f64) -> Result<()> {
+    if !frequency.is_finite() || frequency <= 0.0 {
+        return Err(Error::Validation(
+            "observation frequency must be positive and finite".into(),
+        ));
     }
-    if (ann_factor - 1.0).abs() <= f64::EPSILON {
-        return risk_free_rate;
-    }
-    (risk_free_rate.ln_1p() / ann_factor).exp_m1()
+    Ok(())
 }
 
-/// Linearly annualized excess return after geometric rf decompounding.
-///
-/// `ann_return` is the arithmetic mean scaled by `N` (`μ × N`). The
-/// annualized risk-free rate is first converted to a period rate, then
-/// subtracted from the period mean and rescaled:
-///
-/// ```text
-/// excess_ann = (μ − rf_period) × N = ann_return − rf_period × N
-/// ```
-///
-/// # Arguments
-///
-/// * `ann_return` - Linearly annualized arithmetic mean return (`μ × N`).
-/// * `risk_free_rate` - Annualized risk-free rate in decimal form.
-/// * `ann_factor` - Periods per year `N` used to decompound `risk_free_rate`.
-///
-/// # Returns
-///
-/// Annualized excess return. Propagates [`f64::NAN`] when decompounding
-/// is undefined.
-#[must_use]
-pub(crate) fn annualized_excess_return(
-    ann_return: f64,
-    risk_free_rate: f64,
-    ann_factor: f64,
-) -> f64 {
-    ann_return - periodic_risk_free_rate(risk_free_rate, ann_factor) * ann_factor
+/// Check an explicitly supplied annual-effective decimal cash rate.
+pub(crate) fn validate_cash(cash: f64) -> Result<()> {
+    if !cash.is_finite() || cash <= -1.0 {
+        return Err(Error::Validation(
+            "annual-effective cash must be finite and greater than -1".into(),
+        ));
+    }
+    Ok(())
 }
 
-/// Excess returns = portfolio returns minus risk-free returns.
-///
-/// The risk-free rate is de-compounded to the
-/// observation frequency before subtraction:
-///
-/// ```text
-/// rf_adj = (1 + rf)^(1/nperiods) - 1
-/// ```
-///
-/// For example, if `rf` is an annualized rate and observations are monthly,
-/// pass `nperiods = 12.0`.
-///
-/// # Arguments
-///
-/// * `returns` - Portfolio return series.
-/// * `rf` - Risk-free rate series, aligned with `returns`. If longer, the
-///   excess length is ignored.
-/// * `nperiods` - Compounding periods per year. Use `1.0` for already-periodic
-///   rates. Negative, zero, or non-finite values yield an all-`NaN` output.
-///
-/// # Returns
-///
-/// A `Vec<f64>` of length `min(returns.len(), rf.len())` containing
-/// `returns[i] - rf_adj[i]` for each observation.
-pub(crate) fn excess_returns(returns: &[f64], rf: &[f64], nperiods: f64) -> Vec<f64> {
-    let n = returns.len().min(rf.len());
-    if !nperiods.is_finite() || nperiods <= 0.0 {
-        return vec![f64::NAN; n];
+/// Reject an unrepresentable required statistic rather than manufacture a sentinel.
+pub(crate) fn finite_result(value: f64, metric: &str) -> Result<f64> {
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(Error::Internal(format!(
+            "{metric} calculation is not representable"
+        )))
     }
-    let mut out = Vec::with_capacity(n);
-    for i in 0..n {
-        let rf_adj = periodic_risk_free_rate(rf[i], nperiods);
-        out.push(returns[i] - rf_adj);
-    }
-    out
 }
 
-/// Smallest growth factor allowed before taking the log.
-///
-/// Returns of exactly −100% (total wipeout) or worse would produce −∞ or NaN
-/// in log-space. Clamping to this floor keeps the accumulator valid while
-/// still representing an effectively total loss.
-const MIN_GROWTH_FACTOR: f64 = 1e-18;
+/// Derive one return per adjacent price interval, preserving a final zero price.
+pub(crate) fn pairwise_returns(prices: &[f64]) -> Result<Vec<f64>> {
+    if prices
+        .iter()
+        .enumerate()
+        .any(|(i, &p)| !p.is_finite() || p < 0.0 || (p == 0.0 && i + 1 != prices.len()))
+    {
+        return Err(Error::Validation(
+            "prices must be positive and finite, with only a final zero allowed".into(),
+        ));
+    }
+    prices
+        .windows(2)
+        .map(|w| {
+            if w[1] == 0.0 {
+                return Ok(-1.0);
+            }
+            let r = finite_result((w[1] - w[0]) / w[0], "price return")?;
+            if r <= -1.0 {
+                return Err(Error::Internal(
+                    "positive price ratio collapsed to a terminal return".into(),
+                ));
+            }
+            Ok(r)
+        })
+        .collect()
+}
 
-/// Log-space wealth accumulator shared by compounding and drawdown.
-///
-/// Each step multiplies wealth by `max(1 + r, MIN_GROWTH_FACTOR)` via a
-/// Neumaier sum of log growth factors. Non-finite returns mark the path
-/// invalid from that point forward.
+/// Convert annual-effective decimal cash to one declared observation period.
+pub(crate) fn periodic_risk_free_rate(risk_free_rate: f64, ann_factor: f64) -> Result<f64> {
+    validate_cash(risk_free_rate)?;
+    validate_frequency(ann_factor)?;
+    if ann_factor.total_cmp(&1.0).is_eq() {
+        return Ok(risk_free_rate);
+    }
+    let value = finite_result(
+        (risk_free_rate.ln_1p() / ann_factor).exp_m1(),
+        "period cash",
+    )?;
+    if value <= -1.0 || (value == 0.0 && risk_free_rate != 0.0) {
+        return Err(Error::Internal(
+            "period cash lost its positive-growth or nonzero identity".into(),
+        ));
+    }
+    Ok(value)
+}
+
+/// Arithmetic investment-minus-cash observations on an exactly aligned grid.
+pub(crate) fn excess_returns(returns: &[f64], rf: &[f64], nperiods: f64) -> Result<Vec<f64>> {
+    validate_history(returns)?;
+    validate_frequency(nperiods)?;
+    if returns.len() != rf.len() {
+        return Err(Error::Validation(
+            "cash and investment histories must have identical lengths".into(),
+        ));
+    }
+    rf.iter().try_for_each(|&cash| validate_cash(cash))?;
+    returns
+        .iter()
+        .zip(rf)
+        .map(|(&r, &cash)| {
+            finite_result(
+                r - periodic_risk_free_rate(cash, nperiods)?,
+                "arithmetic excess return",
+            )
+        })
+        .collect()
+}
+
+/// Compensated positive log wealth with a separate, exact terminal-zero state.
 pub(crate) struct WealthEngine {
     acc: NeumaierAccumulator,
     invalid: bool,
+    terminal: bool,
 }
 
 impl WealthEngine {
@@ -161,98 +127,57 @@ impl WealthEngine {
         Self {
             acc: NeumaierAccumulator::new(),
             invalid: false,
+            terminal: false,
         }
     }
 
-    /// Apply one simple return without reconstructing wealth.
-    ///
-    /// Returns at or below `-1.0` use the growth-factor floor. Non-finite
-    /// returns invalidate the current and all subsequent log-growth values.
+    /// Apply a simple return; continuation after a terminal event is invalid.
     pub(crate) fn step(&mut self, r: f64) {
-        if self.invalid || !r.is_finite() {
+        if self.invalid || self.terminal || !r.is_finite() || r < -1.0 {
             self.invalid = true;
-            return;
-        }
-        let log_growth = if r > -1.0 {
-            r.ln_1p()
+        } else if r <= -1.0 {
+            self.terminal = true;
         } else {
-            MIN_GROWTH_FACTOR.ln()
-        };
-        self.acc.add(log_growth);
+            self.acc.add(r.ln_1p());
+        }
     }
 
-    /// Accumulated log growth from starting wealth `1`.
-    ///
-    /// Returns `0.0` before the first observation and [`f64::NAN`] once a
-    /// non-finite return has been seen. Callers can annualize or compare
-    /// wealth in log space without overflowing or rounding small wealth to zero.
+    /// Positive log wealth, negative infinity for explicit zero, or NaN for invalid history.
     pub(crate) fn log_growth(&self) -> f64 {
         if self.invalid {
             f64::NAN
+        } else if self.terminal {
+            f64::NEG_INFINITY
         } else {
             self.acc.total()
         }
     }
 }
 
-/// Cumulative compounded returns: `(1+r).cumprod() - 1`.
-///
-/// At each step `i` the cumulative return is:
-///
-/// ```text
-/// comp_sum[i] = Π_{j=0}^{i} (1 + r[j]) - 1
-/// ```
-///
-/// Uses the shared [`WealthEngine`] (Neumaier log-space, `MIN_GROWTH_FACTOR`
-/// clamp). Returns ≤ −1.0 produce a near-total-loss (≈ −100 %) rather than
-/// NaN. Non-finite returns mark the path invalid from that point forward.
-///
-/// # Arguments
-///
-/// * `returns` - Slice of simple period returns.
-///
-/// # Returns
-///
-/// A `Vec<f64>` of the same length as `returns`. Returns an empty vector
-/// if `returns` is empty.
-pub(crate) fn comp_sum(returns: &[f64]) -> Vec<f64> {
+/// One cumulative return per selected return endpoint, without a baseline row.
+pub(crate) fn comp_sum(returns: &[f64]) -> Result<Vec<f64>> {
+    validate_history(returns)?;
     let mut engine = WealthEngine::new();
-    let mut out = Vec::with_capacity(returns.len());
-    for &r in returns {
-        engine.step(r);
-        out.push(engine.log_growth().exp_m1());
-    }
-    out
+    returns
+        .iter()
+        .map(|&r| {
+            engine.step(r);
+            finite_result(engine.log_growth().exp_m1(), "cumulative return")
+        })
+        .collect()
 }
 
-/// Total compounded return over the full slice: `Π(1 + r_i) - 1`.
-///
-/// Equivalent to `comp_sum(returns).last()`, but computed in a single pass
-/// without allocating an intermediate vector.
-///
-/// Uses a Neumaier accumulator in log-space for numerical stability
-/// (matching [`comp_sum`]). Growth factors are clamped to
-/// `MIN_GROWTH_FACTOR` so that returns ≤ −1.0 produce a near-total-loss
-/// rather than NaN. Non-finite returns (NaN, ±Inf) immediately propagate
-/// invalidity by returning `NaN`.
-///
-/// # Arguments
-///
-/// * `returns` - Slice of simple period returns.
-///
-/// # Returns
-///
-/// The total compounded return as a scalar. Returns `0.0` for an empty slice.
-#[must_use]
-pub(crate) fn comp_total(returns: &[f64]) -> f64 {
+/// Final compound return; empty observed histories are undefined.
+pub(crate) fn comp_total(returns: &[f64]) -> Result<f64> {
+    validate_history(returns)?;
     if returns.is_empty() {
-        return 0.0;
+        return Ok(f64::NAN);
     }
     let mut engine = WealthEngine::new();
     for &r in returns {
         engine.step(r);
     }
-    engine.log_growth().exp_m1()
+    finite_result(engine.log_growth().exp_m1(), "total return")
 }
 
 #[cfg(test)]
@@ -260,114 +185,38 @@ mod tests {
     use super::*;
 
     #[test]
-    fn pairwise_returns_basic() {
-        let prices = [100.0, 110.0, 99.0];
-        let r = pairwise_returns(&prices);
-        assert_eq!(r.len(), 2);
-        assert!((r[0] - 0.1).abs() < 1e-12);
-        assert!((r[1] - (-0.1)).abs() < 1e-12);
+    fn terminal_loss_is_exact_and_cannot_continue() {
+        assert_eq!(comp_total(&[0.05, -1.0]).unwrap(), -1.0);
+        assert_eq!(comp_sum(&[0.05, -1.0]).unwrap()[1], -1.0);
+        assert!(comp_total(&[-1.0, 0.0]).is_err());
+        assert!(comp_total(&[-1.01]).is_err());
+        assert!(comp_total(&[f64::NAN]).is_err());
     }
 
     #[test]
-    fn pairwise_returns_empty() {
-        assert!(pairwise_returns(&[]).is_empty());
-    }
-
-    #[test]
-    fn pairwise_returns_single() {
-        assert!(pairwise_returns(&[100.0]).is_empty());
-    }
-
-    #[test]
-    fn periodic_risk_free_rate_geometric_decompound() {
-        let rf_period = periodic_risk_free_rate(0.02, 252.0);
-        assert!((rf_period - (1.02_f64.powf(1.0 / 252.0) - 1.0)).abs() < 1e-15);
-        assert!(periodic_risk_free_rate(f64::NAN, 252.0).is_nan());
-    }
-
-    #[test]
-    fn annualized_excess_return_differs_from_linear_subtraction() {
-        let mu = 0.0004_f64;
-        let ann = 252.0;
-        let geometric = annualized_excess_return(mu * ann, 0.02, ann);
-        let linear = mu * ann - 0.02;
-        let rf_period = 1.02_f64.powf(1.0 / ann) - 1.0;
-        assert!((geometric - (mu - rf_period) * ann).abs() < 1e-12);
-        assert!((geometric - linear).abs() > 1e-6);
-    }
-
-    #[test]
-    fn excess_returns_defect_fix() {
-        let ret = [0.05, 0.03, -0.02];
-        let rf = [0.10, 0.10, 0.10];
-        let ex = excess_returns(&ret, &rf, 12.0);
-        // rf_adj = (1.10)^(1/12) - 1 ≈ 0.00797
-        let rf_adj = 1.1_f64.powf(1.0 / 12.0) - 1.0;
-        assert!((ex[0] - (0.05 - rf_adj)).abs() < 1e-10);
-    }
-
-    #[test]
-    fn excess_returns_invalid_nperiods_returns_nan_series() {
-        let ret = [0.05, 0.03, -0.02];
-        let rf = [0.10, 0.10, 0.10];
-        let ex = excess_returns(&ret, &rf, -12.0);
-        assert_eq!(ex.len(), 3);
-        assert!(ex.iter().all(|v| v.is_nan()));
-    }
-
-    #[test]
-    fn comp_sum_and_total() {
-        let r = [0.01, 0.02, -0.005];
-        let cs = comp_sum(&r);
-        assert_eq!(cs.len(), 3);
-        let ct = comp_total(&r);
-        assert!((cs[2] - ct).abs() < 1e-12);
-        // manual: (1.01 * 1.02 * 0.995) - 1
-        let expected = 1.01 * 1.02 * 0.995 - 1.0;
-        assert!((ct - expected).abs() < 1e-12);
-    }
-
-    #[test]
-    fn comp_total_matches_comp_sum_on_long_mixed_sign_series() {
-        let r: Vec<f64> = (0..5000)
-            .map(|i| (((i % 17) as f64) - 8.0) * 0.0003)
-            .collect();
-        let cs = comp_sum(&r);
-        let ct = comp_total(&r);
-        assert!((cs.last().copied().unwrap_or(0.0) - ct).abs() < 1e-12);
-    }
-
-    #[test]
-    fn comp_total_handles_total_wipeout() {
-        let r = [0.05, -1.0, 0.10];
-        let ct = comp_total(&r);
-        assert!(ct.is_finite(), "comp_total must not produce NaN/Inf");
-        assert!(ct < -0.99, "total wipeout should be near −100%");
-    }
-
-    #[test]
-    fn comp_sum_handles_return_below_minus_one() {
-        let r = [0.05, -1.5, 0.10];
-        let cs = comp_sum(&r);
+    fn cash_validation_precedes_empty_shortcuts() {
+        assert!(excess_returns(&[], &[], 0.0).is_err());
+        assert!(excess_returns(&[0.1], &[-1.0], 12.0).is_err());
+        assert!(excess_returns(&[0.1], &[], 12.0).is_err());
+        assert_eq!(periodic_risk_free_rate(0.05, 1.0).unwrap(), 0.05);
         assert!(
-            cs.iter().all(|v| v.is_finite()),
-            "all values must be finite"
+            (periodic_risk_free_rate(0.05, 12.0).unwrap() - 0.0040741237836483535).abs() < 1e-16
         );
     }
 
     #[test]
-    fn comp_total_propagates_nan_returns() {
-        let ct = comp_total(&[0.05, f64::NAN, 0.10]);
-        assert!(ct.is_nan(), "NaN inputs should remain invalid");
+    fn final_only_growth_does_not_require_finite_prefix_wealth() {
+        let r = [1e200, 1e200, -0.9999999999999999];
+        assert!(comp_sum(&r).is_err());
+        assert!(comp_total(&[1e200, -0.5]).unwrap().is_finite());
+        assert!(comp_total(&[]).unwrap().is_nan());
     }
 
     #[test]
-    fn comp_sum_propagates_nan_returns() {
-        let cs = comp_sum(&[0.05, f64::NAN, 0.10]);
-        assert!(cs[1].is_nan(), "NaN period should mark the path invalid");
-        assert!(
-            cs[2].is_nan(),
-            "invalid compounding should propagate forward"
-        );
+    fn price_returns_preserve_terminal_and_small_moves() {
+        assert_eq!(pairwise_returns(&[100.0, 0.0]).unwrap(), vec![-1.0]);
+        assert!(pairwise_returns(&[100.0, 0.0, 1.0]).is_err());
+        assert!(pairwise_returns(&[1e308, 1e-308]).is_err());
+        assert!(pairwise_returns(&[0.0]).unwrap().is_empty());
     }
 }

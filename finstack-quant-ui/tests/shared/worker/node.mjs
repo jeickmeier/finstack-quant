@@ -160,9 +160,6 @@ class Performance extends facade.analytics.Performance {
     super(...args);
     countPerformance(this);
   }
-  static fromReturns(...args) {
-    return countPerformance(super.fromReturns(...args));
-  }
 }
 let fiscalConstructed = 0,
   fiscalFreed = 0;

@@ -313,14 +313,14 @@ const displays = [
     route: "returned-analytics",
     deferred: "machine-readable-units",
     convention:
-      "Returned analytics.Performance results of a host-supplied panel: the summary TableEnvelope, per-ticker series against each ticker's own active dates, rolling series, monthly and annual periodic returns, drawdown episodes and lookback returns (FYTD from a core.FiscalConfig only when a fiscal-year start is supplied). Decimal fractions and ratios as returned, no unit inferred; omitted options are left to Rust; non-finite values are left out of figures. The monthly heatmap colour domain is the caller's or the returned values' extent (presentation only).",
+      "Returned analytics.Performance results of a host-supplied panel: the summary TableEnvelope, per-ticker series against each ticker's own active dates, rolling series, monthly and annual periodic returns, drawdown episodes and lookback returns (FYTD from a core.FiscalConfig only when a fiscal-year start is supplied). Decimal fractions and ratios as returned, no unit inferred; required financial inputs and units are explicit; non-finite values are left out of figures. The monthly heatmap colour domain is the caller's or the returned values' extent (presentation only).",
   },
   {
     id: "correlation-heatmap",
     api: "analytics.Performance#correlationMatrix",
     route: "returned-analytics",
     convention:
-      "Returned analytics.Performance correlationMatrix of a host-supplied panel: Pearson coefficients in Rust's ticker order as a diverging heatmap over the fixed correlation range [-1, 0, 1] (presentation only) and a table, with the Repaired stamp shown only when Rust's repaired flag is true. Nothing is estimated, clamped, reordered or inferred here; Rust returns a unit diagonal and every coefficient inside [-1, 1].",
+      "Returned analytics.Performance correlationMatrix of a host-supplied panel: Pearson coefficients in Rust's ticker order as a diverging heatmap over the fixed correlation range [-1, 0, 1] (presentation only) and a table, with the shared observation count and return-ending date bounds supplied by Rust. Nothing is estimated, clamped, reordered or inferred here; Rust returns a unit diagonal and every coefficient inside [-1, 1].",
   },
   {
     id: "benchmark-report",
@@ -328,7 +328,7 @@ const displays = [
     route: "returned-analytics",
     deferred: "machine-readable-units",
     convention:
-      "Returned analytics.Performance benchmark-relative results of a host-supplied panel against a named benchmark: greeks, beta with its confidence bounds, tracking error, information ratio, Treynor, M squared, captures and batting average per ticker; outperformance and drawdown difference against each ticker's own active dates; rollingGreeks against the returned window ends; multiFactorGreeks per ticker (or that ticker's native error) only when a factor panel is supplied. Decimal fractions and ratios as returned, alphas annualized by Rust, no unit inferred; omitted options are left to Rust; non-finite values are left out of figures. The default fund is the first ticker that is not the benchmark (presentation only).",
+      "Returned analytics.Performance benchmark-relative results of a host-supplied panel against a named benchmark: greeks, beta with its confidence bounds, tracking error, information ratio, Treynor, M squared, captures and batting average per ticker; outperformance and drawdown difference against each ticker's paired benchmark dates; rollingGreeks against the returned window ends; multiFactorGreeks per ticker (or that ticker's native error) only when a factor panel is supplied. Decimal fractions and ratios as returned, alphas annualized by Rust, no unit inferred; required financial inputs and units are explicit; non-finite values are left out of figures. The default fund is the first ticker that is not the benchmark (presentation only).",
   },
   {
     id: "portfolio-summary",

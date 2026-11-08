@@ -10,8 +10,15 @@ Examples:
 >>> from finstack_quant.reporting.performance import performance_tearsheet
 >>> dates = pd.bdate_range("2025-01-02", periods=80)
 >>> returns = [0.001 if i % 2 else -0.0004 for i in range(80)]
->>> perf = Performance.from_returns(pd.DataFrame({"Fund": returns}, index=dates))
->>> performance_tearsheet(perf, sections=[]).title
+>>> perf = Performance.from_returns(
+...     pd.DataFrame({"Fund": returns}, index=dates),
+...     initial_date="2024-12-31",
+...     frequency="daily",
+...     benchmark_ticker="Fund",
+... )
+>>> performance_tearsheet(
+...     perf, risk_free_rate=0.0, mar=0.0, omega_threshold=0.0, confidence=0.95, window=20, sections=[]
+... ).title
 'Fund'
 """
 
@@ -19,8 +26,6 @@ from __future__ import annotations
 
 import datetime as dt
 from typing import Any
-
-from finstack_quant.core.dates import PeriodKind
 
 from . import charts, format as fmt, tables
 from .document import KPI, Section, TearSheet, _resolve_sections
@@ -51,7 +56,7 @@ def _section_cumulative(cum_dates: list[Any], cum_series: list[float], theme: Th
     )
 
 
-def _section_stats(row: Any, total_return: float) -> Section:
+def _section_stats(row: Any, total_return: float, confidence: float) -> Section:
     col_a = tables.kv_table(
         [
             ("Total Return", fmt.pct(total_return, signed=True), fmt.sign_class(total_return)),
@@ -77,7 +82,7 @@ def _section_stats(row: Any, total_return: float) -> Section:
         [
             ("Skewness", fmt.ratio(row["skewness"]), ""),
             ("Excess Kurtosis", fmt.ratio(row["kurtosis"]), ""),
-            ("Value-at-Risk (95%)", fmt.pct(row["value_at_risk"] * 100, signed=True), "neg"),
+            (f"Value-at-Risk ({confidence:.1%})", fmt.pct(row["value_at_risk"] * 100, signed=True), "neg"),
             ("Expected Shortfall", fmt.pct(row["expected_shortfall"] * 100, signed=True), "neg"),
             ("Ulcer Index", fmt.ratio(row["ulcer_index"]), ""),
         ],
@@ -103,11 +108,8 @@ def _section_drawdown(perf: Any, ticker: int, theme: Theme) -> Section:
     )
 
 
-def _section_rolling(perf: Any, ticker: int, theme: Theme) -> Section:
-    # One year of observations at the panel's own frequency (Rust
-    # ``PeriodKind.periods_per_year``: 252 daily, 52 weekly, 12 monthly, ...).
-    window = PeriodKind.from_name(perf.get_frequency()).periods_per_year
-    rs = perf.rolling_sharpe(ticker, window=window).to_dataframe()
+def _section_rolling(perf: Any, ticker: int, window: int, risk_free_rate: float, theme: Theme) -> Section:
+    rs = perf.rolling_sharpe(ticker, window=window, risk_free_rate=risk_free_rate).to_dataframe()
     rv = perf.rolling_volatility(ticker, window=window).to_dataframe()
     rs_svg = charts.line_chart(fmt._dates_of(rs), rs.iloc[:, 0].tolist(), theme=theme, color=theme.ink, height=170)
     rv_svg = charts.line_chart(
@@ -119,7 +121,7 @@ def _section_rolling(perf: Any, ticker: int, theme: Theme) -> Section:
         height=170,
     )
     return Section(
-        "Rolling 12-Month Sharpe & Volatility",
+        f"Rolling {window}-Observation Sharpe & Volatility",
         f'<div class="grid2"><div>{rs_svg}</div><div>{rv_svg}</div></div>',
     )
 
@@ -158,6 +160,11 @@ def _section_drawdowns(perf: Any, ticker: int) -> Section:
 def performance_tearsheet(
     perf: Any,
     *,
+    risk_free_rate: float,
+    mar: float,
+    omega_threshold: float,
+    confidence: float,
+    window: int,
     ticker: int = 0,
     title: str | None = None,
     subtitle: str | None = None,
@@ -171,6 +178,16 @@ def performance_tearsheet(
     ----------
     perf : analytics.Performance
         A constructed performance engine (the caller owns its config).
+    risk_free_rate : float
+        Annual-effective decimal cash rate, finite and greater than -1.
+    mar : float
+        Finite per-observation minimum acceptable decimal return.
+    omega_threshold : float
+        Independent finite per-observation decimal hurdle for Omega.
+    confidence : float
+        Explicit tail confidence strictly between 0.5 and 1.
+    window : int
+        Positive observation count for the rolling charts.
     ticker : int, default 0
         Zero-based column index of the primary series.
     title : str, optional
@@ -192,7 +209,7 @@ def performance_tearsheet(
     Raises:
     ------
     ValueError
-        If ``sections`` contains an unknown section name.
+        If sections are unknown or any required analytics input is invalid.
     IndexError
         If ``ticker`` is outside the available performance-series columns.
 
@@ -203,13 +220,20 @@ def performance_tearsheet(
     >>> from finstack_quant.reporting.performance import performance_tearsheet
     >>> dates = pd.bdate_range("2025-01-02", periods=80)
     >>> returns = [0.001 if i % 2 else -0.0004 for i in range(80)]
-    >>> perf = Performance.from_returns(pd.DataFrame({"Fund": returns}, index=dates))
-    >>> performance_tearsheet(perf, sections=[]).title
+    >>> perf = Performance.from_returns(
+    ...     pd.DataFrame({"Fund": returns}, index=dates),
+    ...     initial_date="2024-12-31",
+    ...     frequency="daily",
+    ...     benchmark_ticker="Fund",
+    ... )
+    >>> performance_tearsheet(
+    ...     perf, risk_free_rate=0.0, mar=0.0, omega_threshold=0.0, confidence=0.95, window=20, sections=[]
+    ... ).title
     'Fund'
     """
     wanted = _resolve_sections(sections, ALL_SECTIONS)
 
-    summary = perf.to_dataframe()
+    summary = perf.to_dataframe(risk_free_rate, mar, omega_threshold, confidence)
     col = perf.get_ticker_names()[ticker]
     row = summary.iloc[ticker]
 
@@ -222,11 +246,11 @@ def performance_tearsheet(
     if "cumulative" in wanted:
         secs.append(_section_cumulative(cum_dates, cum_series, theme))
     if "stats" in wanted:
-        secs.append(_section_stats(row, total_return))
+        secs.append(_section_stats(row, total_return, confidence))
     if "drawdown" in wanted:
         secs.append(_section_drawdown(perf, ticker, theme))
     if "rolling" in wanted:
-        secs.append(_section_rolling(perf, ticker, theme))
+        secs.append(_section_rolling(perf, ticker, window, risk_free_rate, theme))
 
     if "monthly" in wanted or "annual" in wanted:
         by_year, annual_by_year = _build_heatmap_data(perf, ticker)

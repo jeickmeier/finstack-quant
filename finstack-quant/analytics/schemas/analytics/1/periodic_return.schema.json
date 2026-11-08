@@ -13,10 +13,10 @@
   "properties": {
     "date": {
       "$ref": "#/$defs/DateWire",
-      "description": "Date of the last observation in the bucket (the period end)."
+      "description": "Last actual observed return endpoint in this bucket."
     },
     "value": {
-      "description": "Compounded simple return over the bucket as a decimal (`0.01` is 1%).",
+      "description": "Finite compounded decimal simple return, at least `-1`.",
       "format": "double",
       "type": "number"
     }

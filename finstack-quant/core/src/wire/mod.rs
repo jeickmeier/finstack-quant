@@ -23,7 +23,8 @@ pub use counts_wire::{count, counts, signed_count};
 pub use date_wire::DateWire;
 pub use decimal_wire::{DecimalWire, decimal, optional_decimal};
 pub use non_finite::{
-    NonFiniteF64Wire, NonFiniteFields, NonFiniteSentinel, non_finite_f64, non_finite_f64_seq,
+    FiniteOrNanWire, NanSentinel, NonFiniteF64Wire, NonFiniteFields, NonFiniteSentinel,
+    non_finite_f64, non_finite_f64_seq,
 };
 
 /// Numeric schema revision for contracts whose sole supported revision is v1.

@@ -1,712 +1,503 @@
-//! Tail-risk and distribution-shape metrics: VaR, ES, skewness, kurtosis.
+//! Signed empirical and additive model tail estimates on investment returns.
 //!
-//! Crate-internal: callers use these through [`crate::Performance`].
-//!
-//! All functions operate on `&[f64]` return slices and return scalar `f64`,
-//! except `value_at_risk_and_es`, which returns the `(VaR, ES)` pair.
-//!
-//! Conventions:
-//! - returns are simple decimal returns (`-0.05` for a 5% loss)
-//! - VaR / ES / parametric VaR / Cornish-Fisher VaR are reported in **return
-//!   space**: a 5% loss reads as `-0.05`. Output is non-positive for losses
-//! - confidence levels are in `(0, 1)`, e.g. `0.95` for 95% VaR
-//! - sample skewness uses Fisher's `G_1`; sample excess kurtosis uses `G_2`
-//!   (matching Excel `SKEW()` / `KURT()`)
-//! - empty inputs, and a non-positive or non-finite parametric /
-//!   Cornish-Fisher horizon, return [`f64::NAN`] (matching Sharpe when `n < 2`)
+//! Historical estimates use R-7 VaR and exact fractional empirical ES. Gaussian
+//! and classical plug-in Cornish–Fisher quantiles approximate additive sums;
+//! their finite outputs may lie below the investment-return lower bound -1.
 
-use finstack_quant_core::math::stats::mean_var;
-use finstack_quant_core::math::stats::quantile;
+use finstack_quant_core::math::stats::{empirical_tail_mean, quantile_checked, quantile_ratio};
+use finstack_quant_core::{Error, Result};
+use num_rational::BigRational;
+use num_traits::{Signed, ToPrimitive, Zero};
 
-fn valid_horizon(ann_factor: Option<f64>) -> bool {
-    ann_factor.is_none_or(|af| af.is_finite() && af > 0.0)
+const MAX_HORIZON: u64 = (1_u64 << 53) - 1;
+
+fn calculation(message: &str) -> Error {
+    Error::Internal(format!("Tail calculation failed: {message}"))
 }
 
-/// Scale the per-period quantile `mean + z·vol` to a horizon of `ann_factor`
-/// periods (`mean·h + z·vol·√h`); `None` keeps the per-period quantile.
-#[inline]
-fn horizon_quantile(mean: f64, vol: f64, z: f64, ann_factor: Option<f64>) -> f64 {
-    match ann_factor {
-        Some(af) => mean * af + z * vol * af.sqrt(),
-        None => mean + z * vol,
-    }
-}
-
-fn historical_sample(returns: &[f64]) -> Option<Vec<f64>> {
-    (!returns.is_empty()).then(|| returns.to_vec())
-}
-
-fn expected_shortfall_from_data(data: &mut [f64], confidence: f64) -> f64 {
-    let mass = (1.0 - confidence) * data.len() as f64;
-    let whole = (mass.floor() as usize).min(data.len());
-    let boundary = whole.min(data.len() - 1);
-    data.select_nth_unstable_by(boundary, f64::total_cmp);
-    if whole == 0 {
-        return data[0];
-    }
-    let mut mean = finstack_quant_core::math::summation::NeumaierAccumulator::new();
-    for &value in &data[..whole] {
-        mean.add(value / mass);
-    }
-    if whole < data.len() {
-        mean.add(data[whole] * ((mass - whole as f64) / mass));
-    }
-    mean.total()
-}
-
-/// Historical Value-at-Risk at the given confidence level.
-///
-/// Computes the `(1 - confidence)` quantile of the empirical return
-/// distribution. For example, at `confidence = 0.95`, the 5th percentile
-/// is returned — losses exceeding this threshold occur with 5% probability
-/// under the historical distribution.
-///
-/// Returns a **negative** number representing the loss threshold.
-///
-/// Historical VaR is reported in the native period of the input return
-/// series; for horizon-scaled estimates use [`parametric_var`] or
-/// [`cornish_fisher_var`] since sqrt-T scaling is invalid for
-/// non-parametric quantiles.
-///
-/// # Quantile interpolation
-///
-/// Uses [`finstack_quant_core::math::stats::quantile`]; see that function for
-/// the exact interpolation method and cross-tool comparison notes.
-///
-/// # Arguments
-///
-/// * `returns` - Slice of period simple returns.
-/// * `confidence` - Confidence level in `(0, 1)`, e.g. `0.95` for 95% VaR.
-///
-/// # Returns
-///
-/// The VaR as a non-positive scalar. Returns [`f64::NAN`] for an empty
-/// slice.
-#[must_use]
-pub(crate) fn value_at_risk(returns: &[f64], confidence: f64) -> f64 {
-    let Some(mut data) = historical_sample(returns) else {
-        return f64::NAN;
-    };
-    quantile(&mut data, 1.0 - confidence)
-}
-/// Expected Shortfall (CVaR / ES) at the given confidence level.
-///
-/// The mean of exactly the worst `(1 - confidence)` empirical probability
-/// mass, providing a coherent measure of tail risk:
-///
-/// ```text
-/// ES_c = integral_0^{1-c} empirical_quantile(u) du / (1-c)
-/// ```
-///
-/// ES is always at least as bad (negative) as VaR at the same confidence
-/// level. Negating this return-space value gives a sub-additive coherent
-/// loss measure.
-/// Reported in the native period of the input return series; sqrt-T scaling
-/// is invalid for non-parametric tail means.
-///
-/// # Tail-set convention
-///
-/// Each observation has mass `1/n`. Include the worst `floor((1-c)*n)`
-/// observations and the required fraction of the next observation. Ties do
-/// not expand the tail. This is the discrete CVaR definition of Rockafellar
-/// & Uryasev (2002); historical VaR retains its documented interpolated
-/// quantile convention.
-///
-/// # Arguments
-///
-/// * `returns`    - Slice of period simple returns.
-/// * `confidence` - Confidence level in `(0, 1)`, e.g. `0.95`.
-///
-/// # Returns
-///
-/// The signed mean tail return (negative for losses). Returns [`f64::NAN`]
-/// for an empty slice.
-///
-/// # References
-///
-/// - Artzner et al. (1999): `docs/REFERENCES.md#artzner1999CoherentRisk`
-#[must_use]
-pub(crate) fn expected_shortfall(returns: &[f64], confidence: f64) -> f64 {
-    let Some(mut data) = historical_sample(returns) else {
-        return f64::NAN;
-    };
-    expected_shortfall_from_data(&mut data, confidence)
-}
-
-/// Compute historical VaR and Expected Shortfall together.
-///
-/// Shares one copy of the returns and one quantile calculation
-/// between the two metrics, which is the common case for summary outputs
-/// that report both.
-///
-/// Returns `(value_at_risk, expected_shortfall)`. Sentinel rules match the
-/// standalone [`value_at_risk`] / [`expected_shortfall`] functions:
-/// `(NaN, NaN)` for an empty slice.
-#[must_use]
-pub(crate) fn value_at_risk_and_es(returns: &[f64], confidence: f64) -> (f64, f64) {
-    let Some(mut data) = historical_sample(returns) else {
-        return (f64::NAN, f64::NAN);
-    };
-    let var_threshold = quantile(&mut data, 1.0 - confidence);
-    let es = expected_shortfall_from_data(&mut data, confidence);
-    (var_threshold, es)
-}
-/// Tail ratio = |upper tail| / |lower tail|.
-///
-/// Computes the ratio of the absolute upper quantile to the absolute lower
-/// quantile:
-///
-/// ```text
-/// tail_ratio = |quantile(confidence)| / |quantile(1 - confidence)|
-/// ```
-///
-/// A value greater than 1.0 indicates that the right tail (gains) is larger
-/// than the left tail (losses) at the symmetric confidence level.
-///
-/// # Arguments
-///
-/// * `returns` - Slice of period simple returns.
-/// * `confidence` - Quantile level for the upper tail (e.g., `0.95`).
-///   The lower tail uses `1 - confidence`.
-///
-/// # Returns
-///
-/// The tail ratio (non-negative). Returns [`f64::NAN`] if `returns` is
-/// empty, [`f64::INFINITY`] when the lower tail quantile is zero but the
-/// upper tail is positive, and [`f64::NAN`] when both tails are zero.
-#[must_use]
-pub(crate) fn tail_ratio(returns: &[f64], confidence: f64) -> f64 {
-    let Some(mut data) = historical_sample(returns) else {
-        return f64::NAN;
-    };
-    let upper = quantile(&mut data, confidence).abs();
-    let lower = quantile(&mut data, 1.0 - confidence).abs();
-    if lower == 0.0 {
-        return if upper > 0.0 { f64::INFINITY } else { f64::NAN };
-    }
-    upper / lower
-}
-/// Fisher-corrected sample skewness (G₁) of a return distribution.
-///
-/// Measures asymmetry: positive skewness indicates a longer right tail
-/// (large gains more likely than large losses), negative skewness the
-/// opposite. Uses the bias-corrected sample formula matching Bloomberg
-/// and Excel `SKEW()`:
-///
-/// ```text
-/// G₁ = [n / ((n-1)(n-2))] × Σ((r_i − x̄) / s)³
-/// ```
-///
-/// where `s` is the sample standard deviation (n-1 denominator).
-///
-/// # Arguments
-///
-/// * `returns` - Slice of period simple returns.
-///
-/// # Returns
-///
-/// The bias-corrected sample skewness. Returns `0.0` for fewer than 3
-/// observations or zero-variance series.
-///
-/// # References
-///
-/// - Joanes & Gill (1998): see docs/REFERENCES.md#joanesGill1998
-#[must_use]
-pub(crate) fn skewness(returns: &[f64]) -> f64 {
-    let (_, _, skew, _) = moments4(returns);
-    skew
-}
-
-/// Fisher-corrected sample excess kurtosis (G₂) of a return distribution.
-///
-/// Measures tail heaviness relative to a normal distribution. A positive
-/// value (leptokurtic) indicates fatter tails; negative (platykurtic)
-/// indicates thinner tails. Normal returns have excess kurtosis = 0.
-///
-/// Uses the bias-corrected sample formula matching Bloomberg and
-/// Excel `KURT()`:
-///
-/// ```text
-/// G₂ = [n(n+1) / ((n-1)(n-2)(n-3))] × Σ((r_i − x̄) / s)⁴
-/// − 3(n-1)² / ((n-2)(n-3))
-/// ```
-///
-/// where `s` is the sample standard deviation (n-1 denominator).
-///
-/// # Arguments
-///
-/// * `returns` - Slice of period simple returns.
-///
-/// # Returns
-///
-/// Bias-corrected excess kurtosis. Returns `0.0` for fewer than 4
-/// observations or zero-variance series.
-///
-/// # References
-///
-/// - Joanes & Gill (1998): see docs/REFERENCES.md#joanesGill1998
-#[must_use]
-pub(crate) fn kurtosis(returns: &[f64]) -> f64 {
-    let (_, _, _, kurt) = moments4(returns);
-    kurt
-}
-
-/// Parametric (Gaussian) Value-at-Risk.
-///
-/// Assumes normally distributed returns:
-///
-/// ```text
-/// VaR = μ + z_(1−α) × σ
-/// ```
-///
-/// where `z_(1−α)` is the standard normal quantile at `(1 - confidence)`.
-///
-/// # Arguments
-///
-/// * `returns`    - Slice of period simple returns.
-/// * `confidence` - Confidence level in `(0, 1)`, e.g. `0.95`.
-/// * `ann_factor` - If `Some(f)`, scales the mean term by `f` and the
-///   volatility term by `sqrt(f)`.
-///
-/// # Returns
-///
-/// The parametric VaR (typically negative). Returns [`f64::NAN`] for an
-/// empty slice or a non-positive or non-finite horizon.
-///
-/// This is equal-weight Gaussian VaR (sample mean and sample volatility),
-/// not an EWMA / RiskMetrics estimator.
-#[must_use]
-pub(crate) fn parametric_var(returns: &[f64], confidence: f64, ann_factor: Option<f64>) -> f64 {
-    if returns.len() < 2 {
-        return f64::NAN;
-    }
-    if !valid_horizon(ann_factor) {
-        return f64::NAN;
-    }
-    let (m, var) = mean_var(returns);
-    let vol = var.sqrt();
-    let z = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(1.0 - confidence);
-    horizon_quantile(m, vol, z, ann_factor)
-}
-/// Cornish-Fisher Value-at-Risk: adjusts Gaussian VaR for skewness and kurtosis.
-///
-/// Uses the Cornish-Fisher expansion to produce a more accurate VaR
-/// estimate when the return distribution departs from normality:
-///
-/// ```text
-/// z_cf = z + (z² − 1)S/6 + (z³ − 3z)K/24 − (2z³ − 5z)S²/36
-/// VaR_CF = μ + z_cf × σ
-/// ```
-///
-/// where `S` is skewness and `K` is excess kurtosis.
-///
-/// # Arguments
-///
-/// * `returns`    - Slice of period simple returns.
-/// * `confidence` - Confidence level in `(0, 1)`, e.g. `0.95`.
-/// * `ann_factor` - If `Some(f)`, scales the mean term by `f`, the
-///   volatility term by `sqrt(f)`, and the shape moments per i.i.d.
-///   aggregation: skewness by `1/sqrt(f)` and excess kurtosis by `1/f`
-///   (the central-limit decay rates), so the horizon-`f` quantile uses
-///   the horizon-`f` distribution rather than per-period tail shape.
-///
-/// # Returns
-///
-/// The Cornish-Fisher adjusted VaR (typically negative). Returns
-/// [`f64::NAN`] for an empty slice. Falls back to parametric VaR if
-/// skewness and kurtosis are both zero.
-///
-/// # Caution
-///
-/// The Cornish-Fisher expansion is a polynomial approximation valid for
-/// moderate departures from normality. For extreme skewness or kurtosis
-/// (e.g., |S| > 2 or |K| > 6), the adjusted quantile `z_cf` can become
-/// non-monotonic in confidence level, producing paradoxical results.
-/// Always cross-check against historical VaR for heavily-tailed series.
-///
-/// # Monotonicity guard (Maillard, 2012)
-///
-/// The implementation evaluates `dz_cf/dz` at the requested `z`. If the
-/// derivative is non-positive at that point, the local Cornish-Fisher
-/// quantile function is non-monotonic and the expansion is unreliable, so
-/// the function falls back to the parametric (Gaussian) VaR and logs a
-/// `tracing::warn!` diagnostic with the offending `(skewness, kurtosis,
-/// confidence)` triple.
-///
-/// # References
-///
-/// - Cornish & Fisher (1937): see docs/REFERENCES.md#cornishFisher1937
-#[must_use]
-pub(crate) fn cornish_fisher_var(returns: &[f64], confidence: f64, ann_factor: Option<f64>) -> f64 {
-    if returns.len() < 2 {
-        return f64::NAN;
-    }
-    if !valid_horizon(ann_factor) {
-        return f64::NAN;
-    }
-    let (m, vol, s, k) = moments4(returns);
-    // Scale the shape moments to the aggregation horizon before building the
-    // expansion: under i.i.d. aggregation of h periods, skewness decays as
-    // S/√h and excess kurtosis as K/h (CLT). Evaluating z_cf with the raw
-    // per-period moments while scaling mean/vol to the horizon would
-    // overstate the non-normality adjustment by up to √h / h.
-    let (s, k) = match ann_factor {
-        Some(af) => (s / af.sqrt(), k / af),
-        None => (s, k),
-    };
-    let z = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(1.0 - confidence);
-    let z2 = z * z;
-    let z3 = z2 * z;
-    // Maillard (2012) monotonicity guard: d z_cf / d z at the target z must
-    // be positive for the expansion to behave like a valid quantile function
-    // locally. If it isn't, the polynomial inversion is unreliable; fall back
-    // to parametric VaR and emit a structured warning.
-    let dz_cf =
-        1.0 + (2.0 * z) * s / 6.0 + (3.0 * z2 - 3.0) * k / 24.0 - (6.0 * z2 - 5.0) * s * s / 36.0;
-    if dz_cf <= 0.0 {
-        tracing::warn!(
-            skewness = s,
-            excess_kurtosis = k,
-            confidence,
-            dz_cf,
-            "Cornish-Fisher expansion non-monotonic at requested confidence; \
-             falling back to parametric (Gaussian) VaR"
-        );
-        return horizon_quantile(m, vol, z, ann_factor);
-    }
-    let z_cf =
-        z + (z2 - 1.0) * s / 6.0 + (z3 - 3.0 * z) * k / 24.0 - (2.0 * z3 - 5.0 * z) * s * s / 36.0;
-    horizon_quantile(m, vol, z_cf, ann_factor)
-}
-/// Compute mean, standard deviation, skewness (G₁), and excess kurtosis (G₂) in a single pass.
-///
-/// Uses a one-pass algorithm accumulating central moments (Pebay 2008, Terriberry 2007).
-/// Returns `(mean, std_dev, skewness, excess_kurtosis)` matching the bias-corrected
-/// formulas used by `skewness()` and `kurtosis()`.
-fn moments4(returns: &[f64]) -> (f64, f64, f64, f64) {
-    let n = returns.len();
-    if n == 0 {
-        return (0.0, 0.0, 0.0, 0.0);
-    }
-    let nf = n as f64;
-
-    let mut m1 = 0.0_f64;
-    let mut m2 = 0.0_f64;
-    let mut m3 = 0.0_f64;
-    let mut m4 = 0.0_f64;
-    let mut k = 0.0_f64;
-
-    for &r in returns {
-        k += 1.0;
-        let d = r - m1;
-        let d_over_k = d / k;
-        let d_over_k2 = d_over_k * d_over_k;
-        let term1 = d * d_over_k * (k - 1.0);
-        m4 += term1 * d_over_k2 * (k * k - 3.0 * k + 3.0) + 6.0 * d_over_k2 * m2
-            - 4.0 * d_over_k * m3;
-        m3 += term1 * d_over_k * (k - 2.0) - 3.0 * d_over_k * m2;
-        m2 += term1;
-        m1 += d_over_k;
-    }
-
-    let sample_var = if n < 2 { 0.0 } else { m2 / (nf - 1.0) };
-    let vol = sample_var.sqrt();
-
-    let skew = if n < 3 || sample_var == 0.0 {
-        0.0
+fn validate_confidence(confidence: f64) -> Result<()> {
+    if confidence.is_finite() && confidence > 0.5 && confidence < 1.0 {
+        Ok(())
     } else {
-        let s3 = vol * vol * vol;
-        let adj = nf / ((nf - 1.0) * (nf - 2.0));
-        adj * (m3 / s3)
-    };
+        Err(Error::Validation(
+            "confidence must be finite and strictly between 0.5 and 1".into(),
+        ))
+    }
+}
 
-    let kurt = if n < 4 || sample_var == 0.0 {
-        0.0
+fn validate_horizon(horizon_periods: Option<u64>) -> Result<f64> {
+    let count = horizon_periods.unwrap_or(1);
+    if count == 0 || count > MAX_HORIZON {
+        return Err(Error::Validation(
+            "horizon_periods must be an integer in 1..=2^53-1".into(),
+        ));
+    }
+    Ok(count as f64)
+}
+
+fn historical_sample(returns: &[f64], confidence: f64) -> Result<Vec<f64>> {
+    validate_confidence(confidence)?;
+    crate::returns::validate_history(returns)?;
+    let mut data = returns.to_vec();
+    data.sort_unstable_by(f64::total_cmp);
+    Ok(data)
+}
+
+/// Exact power-of-two normalization, including subnormal observations.
+fn normalized(value: f64) -> (f64, i32) {
+    if value == 0.0 {
+        return (0.0, 0);
+    }
+    let magnitude = value.abs();
+    let raw_exponent = ((magnitude.to_bits() >> 52) & 0x7ff) as i32;
+    if raw_exponent == 0 {
+        let (mantissa, exponent) = normalized(value * 2_f64.powi(1022));
+        return (mantissa, exponent - 1022);
+    }
+    let exponent = raw_exponent - 1023;
+    (value / 2_f64.powi(exponent), exponent)
+}
+
+fn expected_shortfall_from_sorted(data: &[f64], confidence: f64) -> Result<f64> {
+    if data.is_empty() {
+        return Ok(f64::NAN);
+    }
+    empirical_tail_mean(data, 1.0 - confidence)
+}
+
+/// Signed native-period R-7 historical lower quantile.
+///
+/// # Arguments
+/// * `returns` - Chronological investment simple decimal returns, with -1 only terminal.
+/// * `confidence` - Explicit finite tail confidence strictly between 0.5 and 1.
+///
+/// # Returns
+/// Undefined for empty history; otherwise the signed interpolated observation.
+/// Invalid inputs or unrepresentable requested estimates return an error.
+pub(crate) fn value_at_risk(returns: &[f64], confidence: f64) -> Result<f64> {
+    let data = historical_sample(returns, confidence)?;
+    if data.is_empty() {
+        return Ok(f64::NAN);
+    }
+    quantile_checked(&data, 1.0 - confidence)
+}
+
+/// Signed mean of exactly the worst empirical tail mass, including its boundary fraction.
+///
+/// # Arguments
+/// * `returns` - Chronological investment simple decimal returns, with -1 only terminal.
+/// * `confidence` - Explicit finite tail confidence strictly between 0.5 and 1.
+///
+/// # Returns
+/// Undefined for empty history; invalid requests or numerical failures return an error.
+pub(crate) fn expected_shortfall(returns: &[f64], confidence: f64) -> Result<f64> {
+    let data = historical_sample(returns, confidence)?;
+    expected_shortfall_from_sorted(&data, confidence)
+}
+
+/// Evaluate both selected historical estimators on one sorted active sample.
+///
+/// # Arguments
+/// * `returns` - Chronological investment simple decimal returns, with -1 only terminal.
+/// * `confidence` - Explicit finite tail confidence strictly between 0.5 and 1.
+///
+/// # Returns
+/// Signed R-7 VaR and fractional empirical ES; empty histories yield two NaNs.
+pub(crate) fn value_at_risk_and_es(returns: &[f64], confidence: f64) -> Result<(f64, f64)> {
+    let data = historical_sample(returns, confidence)?;
+    if data.is_empty() {
+        return Ok((f64::NAN, f64::NAN));
+    }
+    let var = quantile_checked(&data, 1.0 - confidence)?;
+    let es = expected_shortfall_from_sorted(&data, confidence)?;
+    if es > var {
+        return Err(calculation("empirical ES exceeds the paired R-7 quantile"));
+    }
+    Ok((var, es))
+}
+
+/// Unannualized magnitude ratio of upper and lower R-7 quantiles.
+///
+/// # Arguments
+/// * `returns` - Chronological investment simple decimal returns, with -1 only terminal.
+/// * `confidence` - Explicit finite tail confidence strictly between 0.5 and 1.
+///
+/// # Returns
+/// Undefined for empty history or two zero quantiles; positive infinity for a
+/// genuinely zero lower quantile and nonzero upper quantile. Numerical failures error.
+pub(crate) fn tail_ratio(returns: &[f64], confidence: f64) -> Result<f64> {
+    let data = historical_sample(returns, confidence)?;
+    if data.is_empty() {
+        return Ok(f64::NAN);
+    }
+    quantile_ratio(&data, confidence, 1.0 - confidence)
+}
+
+struct Moments {
+    exponent: i32,
+    mean: BigRational,
+    sd: f64,
+    skew: Option<BigRational>,
+    kurt: Option<BigRational>,
+}
+
+/// Dimensional quantities remain normalized until a requested final estimate is formed.
+fn moments(returns: &[f64], shape_order: u8) -> Result<Moments> {
+    let magnitude = returns.iter().map(|x| x.abs()).fold(0.0, f64::max);
+    let (_, exponent) = normalized(magnitude);
+    let exponent = exponent.max(-1022);
+    let scale = BigRational::from_integer(2.into()).pow(exponent);
+    let data: Vec<BigRational> = returns
+        .iter()
+        .map(|&x| rational(x).map(|x| x / &scale))
+        .collect::<Result<_>>()?;
+    let count = BigRational::from_integer(returns.len().into());
+    let one = BigRational::from_integer(1.into());
+    let two = BigRational::from_integer(2.into());
+    let three = BigRational::from_integer(3.into());
+    let sum: BigRational = data.iter().cloned().sum();
+    let mean = sum / &count;
+    let deviations: Vec<BigRational> = data.iter().map(|x| x - &mean).collect();
+    let max_deviation = deviations
+        .iter()
+        .map(Signed::abs)
+        .max()
+        .unwrap_or_else(BigRational::zero);
+    if max_deviation.is_zero() {
+        return Ok(Moments {
+            exponent,
+            mean,
+            sd: 0.0,
+            skew: None,
+            kurt: None,
+        });
+    }
+    // Normalize before reconstructing the bounded dimensional moment. Exact
+    // source differences and centered powers avoid both false point masses at
+    // high offsets and lost cancellation signs in requested shape estimates.
+    let mut second = BigRational::zero();
+    let mut third = BigRational::zero();
+    let mut fourth = BigRational::zero();
+    for deviation in deviations {
+        let delta = deviation / &max_deviation;
+        let square = &delta * &delta;
+        second += &square;
+        if shape_order >= 3 {
+            third += &square * &delta;
+        }
+        if shape_order >= 4 {
+            fourth += &square * &square;
+        }
+    }
+    let max_deviation = rational_output(&max_deviation)?;
+    let variance = rational_output(&(&second / (&count - &one)))?;
+    let sd = max_deviation * variance.sqrt();
+    if !sd.is_finite() || sd <= 0.0 {
+        return Err(calculation("sample dispersion could not be resolved"));
+    }
+    let skew = if shape_order >= 3 {
+        let second_sqrt = rational_output(&second)?.sqrt();
+        let n = returns.len() as f64;
+        let adjustment = n * (n - 1.0).sqrt() / (n - 2.0);
+        Some(third * rational(adjustment)? / (&second * rational(second_sqrt)?))
     } else {
-        let s4 = sample_var * sample_var;
-        let sum_z4 = m4 / s4;
-        let a = (nf * (nf + 1.0)) / ((nf - 1.0) * (nf - 2.0) * (nf - 3.0));
-        let b = (3.0 * (nf - 1.0) * (nf - 1.0)) / ((nf - 2.0) * (nf - 3.0));
-        a * sum_z4 - b
+        None
     };
+    let kurt = if shape_order >= 4 {
+        let ratio = &count * fourth / (&second * &second);
+        Some(
+            (&count - &one)
+                * ((&count + &one) * (ratio - &three) + BigRational::from_integer(6.into()))
+                / ((&count - &two) * (&count - &three)),
+        )
+    } else {
+        None
+    };
+    Ok(Moments {
+        exponent,
+        mean,
+        sd,
+        skew,
+        kurt,
+    })
+}
 
-    (m1, vol, skew, kurt)
+/// Fisher-adjusted Type 2 sample skewness.
+///
+/// # Arguments
+/// * `returns` - Chronological investment simple decimal returns, with -1 only terminal.
+///
+/// # Returns
+/// Dimensionless shape, undefined below three observations or for constant history.
+/// Invalid inputs and numerical failures return an error.
+pub(crate) fn skewness(returns: &[f64]) -> Result<f64> {
+    crate::returns::validate_history(returns)?;
+    if returns.len() < 3 {
+        return Ok(f64::NAN);
+    }
+    moments(returns, 3)?
+        .skew
+        .as_ref()
+        .map_or(Ok(f64::NAN), rational_output)
+}
+
+/// Fisher-adjusted Type 2 excess kurtosis, with zero as the normal reference.
+///
+/// # Arguments
+/// * `returns` - Chronological investment simple decimal returns, with -1 only terminal.
+///
+/// # Returns
+/// Dimensionless excess shape, undefined below four observations or for constant history.
+/// Invalid inputs and numerical failures return an error.
+pub(crate) fn kurtosis(returns: &[f64]) -> Result<f64> {
+    crate::returns::validate_history(returns)?;
+    if returns.len() < 4 {
+        return Ok(f64::NAN);
+    }
+    moments(returns, 4)?
+        .kurt
+        .as_ref()
+        .map_or(Ok(f64::NAN), rational_output)
+}
+
+fn rational(value: f64) -> Result<BigRational> {
+    BigRational::from_float(value).ok_or_else(|| calculation("nonfinite rational operand"))
+}
+
+fn rational_output(value: &BigRational) -> Result<f64> {
+    let rounded = value
+        .to_f64()
+        .ok_or_else(|| calculation("requested output cannot be reconstructed"))?;
+    if !rounded.is_finite() || rounded == 0.0 && !value.is_zero() {
+        return Err(calculation("requested nonzero output is not representable"));
+    }
+    Ok(rounded)
+}
+
+fn horizon_quantile(moment: &Moments, z: &BigRational, horizon: f64) -> Result<f64> {
+    let mean = &moment.mean * rational(horizon)?;
+    let volatility = rational(moment.sd)? * rational(horizon.sqrt())? * z;
+    let scale = BigRational::from_integer(2.into()).pow(moment.exponent);
+    rational_output(&((mean + volatility) * scale))
+}
+
+/// Gaussian signed quantile for an additive whole-observation-period horizon.
+///
+/// # Arguments
+/// * `returns` - Chronological investment simple decimal returns, with -1 only terminal.
+/// * `confidence` - Explicit finite tail confidence strictly between 0.5 and 1.
+/// * `horizon_periods` - Whole periods in 1..=2^53-1; omitted means one, independent of dates/frequency.
+///
+/// # Returns
+/// Undefined below two observations; constant history produces its additive point mass.
+/// Finite estimates may be below -1. Invalid requests and unrepresentable outputs error.
+pub(crate) fn parametric_var(
+    returns: &[f64],
+    confidence: f64,
+    horizon_periods: Option<u64>,
+) -> Result<f64> {
+    validate_confidence(confidence)?;
+    let horizon = validate_horizon(horizon_periods)?;
+    crate::returns::validate_history(returns)?;
+    if returns.len() < 2 {
+        return Ok(f64::NAN);
+    }
+    let moment = moments(returns, 2)?;
+    let z = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(1.0 - confidence);
+    horizon_quantile(&moment, &rational(z)?, horizon)
+}
+
+fn cf_polynomial(
+    z: f64,
+    skew: &BigRational,
+    kurt: &BigRational,
+    horizon: f64,
+) -> Result<BigRational> {
+    // Use the exact supplied binary coefficients and exact whole-period h.
+    // Keeping the sqrt(h) operand rational also preserves consequential
+    // scaling residues; no coefficient is rounded away before the gate.
+    let skew = skew / rational(horizon.sqrt())?;
+    let kurt = kurt / rational(horizon)?;
+    let square = &skew * &skew;
+    // Integer-scaled derivative: 72*g'(z) = A*z² + B*z + D.
+    let a = &kurt * BigRational::from_integer(9.into())
+        - &square * BigRational::from_integer(12.into());
+    let b = &skew * BigRational::from_integer(24.into());
+    let d = BigRational::from_integer(72.into()) - &kurt * BigRational::from_integer(9.into())
+        + square * BigRational::from_integer(10.into());
+    let discriminant = &a * &d * BigRational::from_integer(4.into()) - &b * &b;
+    let zero = BigRational::zero();
+    let identity = skew.is_zero() && kurt.is_zero();
+    if !identity && (a <= zero || discriminant < zero) {
+        return Err(Error::Validation(
+            "Cornish–Fisher quantile curve is not globally nondecreasing".into(),
+        ));
+    }
+    let z = rational(z)?;
+    // Exact Horner evaluation retains isolated flat points, including z³/3
+    // for S=0,K=8, and leaves final representability to the requested Q.
+    let cubic = a / BigRational::from_integer(3.into());
+    let quadratic = &skew * BigRational::from_integer(12.into());
+    let constant = -skew * BigRational::from_integer(12.into());
+    Ok((((cubic * &z + quadratic) * &z + d) * z + constant) / BigRational::from_integer(72.into()))
+}
+
+/// Classical plug-in CF quantile with an analytic global ordering gate.
+///
+/// # Arguments
+/// * `returns` - Chronological investment simple decimal returns, with -1 only terminal.
+/// * `confidence` - Explicit finite tail confidence strictly between 0.5 and 1.
+/// * `horizon_periods` - Whole periods in 1..=2^53-1; omitted means one.
+///
+/// # Returns
+/// Undefined below four observations or for constant history. Invalid CF curves
+/// and numerical failures error explicitly without estimator substitution. Valid
+/// finite outputs use additive return units and may be below -1.
+pub(crate) fn cornish_fisher_var(
+    returns: &[f64],
+    confidence: f64,
+    horizon_periods: Option<u64>,
+) -> Result<f64> {
+    validate_confidence(confidence)?;
+    let horizon = validate_horizon(horizon_periods)?;
+    crate::returns::validate_history(returns)?;
+    if returns.len() < 4 {
+        return Ok(f64::NAN);
+    }
+    let moment = moments(returns, 4)?;
+    if moment.sd == 0.0 {
+        return Ok(f64::NAN);
+    }
+    let (Some(skew), Some(kurt)) = (&moment.skew, &moment.kurt) else {
+        return Err(calculation(
+            "required CF moments are unavailable after admission",
+        ));
+    };
+    let z = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(1.0 - confidence);
+    horizon_quantile(&moment, &cf_polynomial(z, skew, kurt, horizon)?, horizon)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_core::math::stats::{mean, mean_var, variance};
 
-    fn assert_f64_eq_nan_aware(actual: f64, expected: f64) {
-        if expected.is_nan() {
-            assert!(actual.is_nan(), "expected NaN, got {actual}");
-        } else {
-            assert_eq!(actual, expected);
+    fn cf_value(z: f64, skew: f64, kurt: f64) -> Result<f64> {
+        rational_output(&cf_polynomial(z, &rational(skew)?, &rational(kurt)?, 1.0)?)
+    }
+
+    #[test]
+    fn historical_pair_uses_distinct_accepted_estimators() {
+        let mut sample = vec![0.0; 30];
+        sample[0] = -0.2;
+        sample[1] = -0.1;
+        let (var, es) = value_at_risk_and_es(&sample, 0.95).expect("valid sample");
+        assert!((var + 0.055).abs() < 1e-14);
+        assert!((es + 1.0 / 6.0).abs() < 1e-14);
+        assert!(es <= var);
+        assert_eq!(value_at_risk(&[0.01], 0.95).expect("singleton"), 0.01);
+    }
+
+    #[test]
+    fn requests_are_validated_before_availability() {
+        for confidence in [f64::NAN, 0.5, 0.1, 1.0] {
+            assert!(value_at_risk(&[], confidence).is_err());
+            assert!(parametric_var(&[], confidence, None).is_err());
+            assert!(cornish_fisher_var(&[], confidence, None).is_err());
+        }
+        for horizon in [0, 1_u64 << 53, u64::MAX] {
+            assert!(parametric_var(&[], 0.95, Some(horizon)).is_err());
+            assert!(cornish_fisher_var(&[], 0.95, Some(horizon)).is_err());
         }
     }
 
     #[test]
-    fn var_basic() {
-        let data: Vec<f64> = (-100..=100).map(|i| i as f64 / 100.0).collect();
-        let var = value_at_risk(&data, 0.95);
-        assert!(var < -0.8);
-    }
-
-    #[test]
-    fn tail_ratio_returns_infinity_when_lower_tail_is_zero_but_upper_is_positive() {
-        let returns = [0.0, 0.0, 0.02, 0.03];
-        assert_eq!(tail_ratio(&returns, 0.75), f64::INFINITY);
-    }
-
-    #[test]
-    fn tail_ratio_returns_nan_when_both_tails_are_zero() {
-        let returns = [0.0, 0.0, 0.0, 0.0];
-        assert!(tail_ratio(&returns, 0.75).is_nan());
-    }
-
-    #[test]
-    fn expected_shortfall_weights_only_the_requested_tail_mass() {
-        let data = [-3.0, -1.0, -1.0, 10.0];
-        let es = expected_shortfall(&data, 0.5);
-        let expected = (-3.0 - 1.0) / 2.0;
-        assert!((es - expected).abs() < 1e-12);
-    }
-
-    #[test]
-    fn combined_var_and_es_exactly_match_standalone_metrics() {
-        let finite = [-0.08, 0.03, -0.02, 0.01, -0.05, 0.04];
-        let tied_threshold = [-3.0, -1.0, -1.0, 10.0];
-        let cases: &[(&[f64], f64)] = &[(&finite, 0.95), (&tied_threshold, 0.5), (&[], 0.95)];
-
-        for &(returns, confidence) in cases {
-            let (combined_var, combined_es) = value_at_risk_and_es(returns, confidence);
-            assert_f64_eq_nan_aware(combined_var, value_at_risk(returns, confidence));
-            assert_f64_eq_nan_aware(combined_es, expected_shortfall(returns, confidence));
-        }
-    }
-
-    #[test]
-    fn skewness_symmetric_zero() {
-        let r: Vec<f64> = (-50..=50).map(|i| i as f64 * 0.01).collect();
-        assert!(skewness(&r).abs() < 1e-10);
-    }
-
-    #[test]
-    fn skewness_hand_calc() {
-        let r = [0.0, 0.0, 0.0, 0.0, 5.0];
-        assert!((skewness(&r) - 5.0_f64.sqrt()).abs() < 1e-12);
-    }
-
-    #[test]
-    fn skewness_negative() {
-        let r = [0.0, 0.0, 0.0, 0.0, -5.0];
-        assert!((skewness(&r) - (-5.0_f64.sqrt())).abs() < 1e-12);
-    }
-
-    #[test]
-    fn skewness_edge_cases() {
-        assert_eq!(skewness(&[]), 0.0);
-        assert_eq!(skewness(&[1.0, 2.0]), 0.0);
-        assert_eq!(skewness(&[3.0, 3.0, 3.0]), 0.0);
-    }
-
-    #[test]
-    fn kurtosis_hand_calc() {
-        let r = [0.0, 0.0, 0.0, 0.0, 5.0];
-        assert!((kurtosis(&r) - 5.0).abs() < 1e-12);
-    }
-
-    #[test]
-    fn kurtosis_uniform_analytical() {
-        let r: Vec<f64> = (0..10000).map(|i| i as f64 / 10000.0).collect();
-        let k = kurtosis(&r);
-        assert!((k - (-1.2)).abs() < 0.005);
-    }
-
-    #[test]
-    fn kurtosis_edge_cases() {
-        assert_eq!(kurtosis(&[]), 0.0);
-        assert_eq!(kurtosis(&[1.0, 2.0, 3.0]), 0.0);
-        assert_eq!(kurtosis(&[1.0, 1.0, 1.0, 1.0]), 0.0);
-    }
-
-    #[test]
-    fn parametric_var_formula_verification() {
-        let r = [-0.02, -0.01, 0.0, 0.01, 0.02];
-        let pvar = parametric_var(&r, 0.95, None);
-        let m = mean(&r);
-        let vol = variance(&r).sqrt();
-        let z = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(0.05);
-        let expected = m + z * vol;
-        assert!((pvar - expected).abs() < 1e-14);
-    }
-
-    #[test]
-    fn parametric_var_annualized() {
-        let r = [-0.02, -0.01, 0.0, 0.01, 0.02];
-        let pvar_raw = parametric_var(&r, 0.95, None);
-        let pvar_ann = parametric_var(&r, 0.95, Some(252.0));
-        assert!((pvar_ann - pvar_raw * 252.0_f64.sqrt()).abs() < 1e-12);
-    }
-
-    #[test]
-    fn parametric_var_empty() {
-        assert!(parametric_var(&[], 0.95, None).is_nan());
-    }
-
-    #[test]
-    fn parametric_var_horizon_ten_matches_formula() {
-        let returns = [0.01, -0.02, 0.03, -0.01, 0.02, -0.005];
-        let actual = parametric_var(&returns, 0.95, Some(10.0));
-        let (m, var) = mean_var(&returns);
-        let z = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(0.05);
-        let expected = m * 10.0 + z * var.sqrt() * 10.0_f64.sqrt();
-        assert!((actual - expected).abs() < 1e-14);
-        let period = parametric_var(&returns, 0.95, None);
-        assert!((actual - period).abs() > 1e-6);
-    }
-
-    #[test]
-    fn cornish_fisher_var_converges_to_parametric_for_normal_like() {
-        let r: Vec<f64> = (-500..=500).map(|i| i as f64 / 5000.0).collect();
-        let pvar = parametric_var(&r, 0.95, None);
-        let cfvar = cornish_fisher_var(&r, 0.95, None);
-        assert!((cfvar - pvar).abs() < 0.02);
-    }
-
-    #[test]
-    fn cornish_fisher_var_differs_from_parametric_for_skewed() {
-        // Mildly skewed normal-ish sample, well within the Maillard
-        // monotonicity region so the expansion is applied (not falling back
-        // to parametric).
-        let mut r: Vec<f64> = (0..200).map(|i| (i as f64 - 100.0) * 0.001).collect();
-        // Inject a handful of mildly larger losses to create modest skew.
-        for v in r.iter_mut().take(5) {
-            *v -= 0.005;
-        }
-        let pvar = parametric_var(&r, 0.95, None);
-        let cfvar = cornish_fisher_var(&r, 0.95, None);
-        assert!(pvar < 0.0);
-        assert!(cfvar < 0.0);
-        assert!((cfvar - pvar).abs() > 1e-6);
-    }
-
-    #[test]
-    fn cornish_fisher_var_falls_back_to_parametric_when_non_monotonic() {
-        // Heavily skewed bimodal sample: 80 small losses and 20 large gains.
-        // dz_cf/dz at z ≈ −1.645 is negative for this (S, K), so the
-        // Maillard guard should fire and the function should fall back to
-        // parametric VaR.
-        let mut r = vec![-0.01_f64; 80];
-        r.extend(vec![0.05; 20]);
-        let pvar = parametric_var(&r, 0.95, None);
-        let cfvar = cornish_fisher_var(&r, 0.95, None);
-        assert!((cfvar - pvar).abs() < 1e-12);
-    }
-
-    #[test]
-    fn cornish_fisher_var_empty() {
-        assert!(cornish_fisher_var(&[], 0.95, None).is_nan());
-    }
-
-    #[test]
-    fn expected_shortfall_is_at_most_var_across_distributions() {
-        let datasets: Vec<Vec<f64>> = vec![
-            (-100..=100).map(|i| i as f64 / 100.0).collect(),
-            vec![0.05, -0.10, 0.03, -0.15, 0.07, -0.02, 0.01, -0.08],
-            vec![-0.01; 50],
-        ];
-        for data in &datasets {
-            let var = value_at_risk(data, 0.95);
-            let es = expected_shortfall(data, 0.95);
-            assert!(es <= var, "ES must be ≤ VaR: es={es}, var={var}");
-        }
-    }
-
-    #[test]
-    fn cornish_fisher_formula_verification() {
-        let r = [
-            0.05, -0.10, 0.03, -0.15, 0.07, -0.02, 0.01, -0.08, -0.05, 0.02,
-        ];
-        let cf = cornish_fisher_var(&r, 0.95, None);
-        let m = mean(&r);
-        let vol = variance(&r).sqrt();
-        let s = skewness(&r);
-        let k = kurtosis(&r);
-        let z = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(0.05);
-        let z2 = z * z;
-        let z3 = z2 * z;
-        let z_cf = z + (z2 - 1.0) * s / 6.0 + (z3 - 3.0 * z) * k / 24.0
-            - (2.0 * z3 - 5.0 * z) * s * s / 36.0;
-        let expected = m + z_cf * vol;
-        assert!((cf - expected).abs() < 1e-14);
-    }
-
-    #[test]
-    fn cornish_fisher_var_scales_mean_vol_and_moments_by_horizon() {
-        let returns = [
-            0.05, -0.10, 0.03, -0.15, 0.07, -0.02, 0.01, -0.08, -0.05, 0.02,
-        ];
-        let ann_factor = 12.0_f64;
-        let m = mean(&returns);
-        let vol = variance(&returns).sqrt();
-        // Under i.i.d. aggregation over h periods, S_h = S/√h and K_h = K/h.
-        let s = skewness(&returns) / ann_factor.sqrt();
-        let k = kurtosis(&returns) / ann_factor;
-        let z = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(0.05);
-        let z2 = z * z;
-        let z3 = z2 * z;
-        let z_cf = z + (z2 - 1.0) * s / 6.0 + (z3 - 3.0 * z) * k / 24.0
-            - (2.0 * z3 - 5.0 * z) * s * s / 36.0;
-        let expected = m * ann_factor + z_cf * vol * ann_factor.sqrt();
-        let actual = cornish_fisher_var(&returns, 0.95, Some(ann_factor));
-        assert!((actual - expected).abs() < 1e-14, "{actual} vs {expected}");
-    }
-
-    #[test]
-    fn cornish_fisher_var_converges_to_parametric_at_long_horizons() {
-        // Central-limit behavior: as the aggregation horizon grows the
-        // scaled moments vanish, so CF-VaR must approach Gaussian VaR
-        // relative to the (growing) scale of the annualized quantities.
-        let returns = [
-            0.05, -0.10, 0.03, -0.15, 0.07, -0.02, 0.01, -0.08, -0.05, 0.02,
-        ];
-        let cf_1 = cornish_fisher_var(&returns, 0.99, Some(1.0));
-        let p_1 = parametric_var(&returns, 0.99, Some(1.0));
-        let cf_252 = cornish_fisher_var(&returns, 0.99, Some(252.0));
-        let p_252 = parametric_var(&returns, 0.99, Some(252.0));
-        let rel_gap_1 = (cf_1 - p_1).abs() / p_1.abs();
-        let rel_gap_252 = (cf_252 - p_252).abs() / p_252.abs();
+    fn unavailable_shape_is_distinct_from_genuine_zero_shape() {
+        assert!(skewness(&[1.0, 2.0]).expect("short").is_nan());
+        assert!(kurtosis(&[1.0; 4]).expect("constant").is_nan());
         assert!(
-            rel_gap_252 < rel_gap_1,
-            "relative CF adjustment must shrink with horizon: {rel_gap_252} vs {rel_gap_1}"
+            cornish_fisher_var(&[1.0; 4], 0.95, None)
+                .expect("constant")
+                .is_nan()
+        );
+        for exponent in [-600, 0, 600] {
+            let scale = 2_f64.powi(exponent);
+            let sample = [0.0, scale, 2.0 * scale, 3.0 * scale];
+            assert_eq!(skewness(&sample).expect("symmetric"), 0.0);
+            assert!((kurtosis(&sample).expect("scaled") + 1.2).abs() < 1e-13);
+        }
+    }
+
+    #[test]
+    fn gaussian_constant_and_model_support_are_preserved() {
+        assert_eq!(
+            parametric_var(&[-0.75, -0.75], 0.95, Some(2)).expect("point mass"),
+            -1.5
+        );
+        assert!(parametric_var(&[0.01], 0.95, None).expect("short").is_nan());
+    }
+
+    #[test]
+    fn cf_gate_is_global_and_allows_isolated_flat_points() {
+        assert!(cf_value(-1.644853626951, 0.0, 10.0).is_err());
+        let z = -1e-10;
+        let expected = z * z * z / 3.0;
+        let actual = cf_value(z, 0.0, 8.0).expect("valid flat point");
+        assert!((actual / expected - 1.0).abs() < 1e-15);
+        assert_eq!(cf_value(-2.0, 0.0, 0.0).expect("Gaussian identity"), -2.0);
+        let mut sample = vec![-0.01; 80];
+        sample.extend(vec![0.05; 20]);
+        assert!(cornish_fisher_var(&sample, 0.95, None).is_err());
+    }
+
+    #[test]
+    fn subnormal_joint_ratio_avoids_component_rounding() {
+        let u = f64::from_bits(1);
+        assert!(value_at_risk(&[0.0, u], 0.75).is_err());
+        assert_eq!(expected_shortfall(&[0.0, u], 0.75).expect("zero ES"), 0.0);
+        assert_eq!(tail_ratio(&[0.0, u], 0.75).expect("joint ratio"), 3.0);
+        assert_eq!(
+            expected_shortfall(&[u; 5], 0.6).expect("constant subnormal"),
+            u
         );
     }
 
     #[test]
-    fn empty_input_consistency() {
-        let empty: Vec<f64> = vec![];
-        assert!(value_at_risk(&empty, 0.95).is_nan());
-        assert!(expected_shortfall(&empty, 0.95).is_nan());
-        assert!(tail_ratio(&empty, 0.95).is_nan());
-        let (var, es) = value_at_risk_and_es(&empty, 0.95);
-        assert!(var.is_nan() && es.is_nan());
+    fn joint_ratio_preserves_a_consequential_subnormal_midpoint_residual() {
+        let tiny = f64::from_bits(1);
+        let sample = [-1.0 / 3.0, -tiny, 0.0, -1.0];
+        assert_eq!(tail_ratio(&sample, 0.875).expect("exact joint ratio"), tiny);
     }
 
     #[test]
-    fn parametric_var_rejects_non_positive_or_non_finite_horizon() {
-        let returns = [-0.03, -0.01, 0.01, 0.02];
-        assert!(parametric_var(&returns, 0.95, Some(0.0)).is_nan());
-        assert!(parametric_var(&returns, 0.95, Some(-12.0)).is_nan());
-        assert!(parametric_var(&returns, 0.95, Some(f64::INFINITY)).is_nan());
+    fn skewness_preserves_small_centering_residuals() {
+        let tiny = 1e-20;
+        let actual = skewness(&[1.0, tiny, -1.0]).expect("terminal valid sample");
+        assert!((actual / (-3.0 * tiny) - 1.0).abs() < 1e-14);
     }
 
     #[test]
-    fn cornish_fisher_var_rejects_non_positive_or_non_finite_horizon() {
-        let returns = [-0.03, -0.01, 0.01, 0.02];
-        assert!(cornish_fisher_var(&returns, 0.95, Some(0.0)).is_nan());
-        assert!(cornish_fisher_var(&returns, 0.95, Some(-12.0)).is_nan());
-        assert!(cornish_fisher_var(&returns, 0.95, Some(f64::INFINITY)).is_nan());
+    fn moments_resolve_half_ulp_centers_at_a_large_offset() {
+        let epsilon = f64::EPSILON;
+        let sample = [1.0, 1.0 + epsilon, 1.0 + 2.0 * epsilon, 1.0 + 3.0 * epsilon];
+        assert_eq!(skewness(&sample).expect("symmetric adjacent values"), 0.0);
+        assert!((kurtosis(&sample).expect("adjacent values") + 1.2).abs() < 1e-13);
+    }
+
+    #[test]
+    fn valid_cf_matches_the_selected_polynomial() {
+        let sample = [-0.2, 0.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        let z = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(0.05);
+        let kurt = 4.5;
+        let sd = (0.08_f64 / 9.0).sqrt();
+        let expected = sd * (z + (z * z * z - 3.0 * z) * kurt / 24.0);
+        let actual = cornish_fisher_var(&sample, 0.95, None).expect("valid global CF curve");
+        assert!((actual - expected).abs() < 1e-14);
+    }
+
+    #[test]
+    fn terminal_history_is_checked_before_tail_sorting() {
+        assert!(value_at_risk(&[-1.0, 0.01], 0.95).is_err());
+        assert!(value_at_risk(&[0.01, -1.0], 0.95).is_ok());
+        assert!(skewness(&[f64::INFINITY; 4]).is_err());
     }
 }

@@ -23,6 +23,7 @@ import { BenchmarkReport } from "@/components/finstack/analytics/components/benc
 import { unwrap } from "@/workers/finstack-contract";
 import { useWorkerHarness } from "../shared/worker/use-worker-harness";
 import { budget } from "../shared/budget";
+import { fixtureNumber } from "./fixture-numbers";
 import tearSheet from "./benchmark.json";
 import invariantsCase from "./benchmark-invariants.json";
 // The shared Rust, Python and WASM analytics parity fixture.
@@ -56,7 +57,10 @@ afterEach(() => {
 const cases = { tearSheet, invariants: invariantsCase };
 const entry = (name: keyof typeof cases) => ({
   request: cases[name].request as BenchmarkReportRequest,
-  report: cases[name].report as unknown as Report,
+  report: {
+    ...cases[name].report,
+    informationRatio: cases[name].report.informationRatio.map(fixtureNumber),
+  } as unknown as Report,
 });
 // Reports are regenerated and compared by `mise run ui-fixtures --check`
 // (tests/analytics/generate.mjs).
@@ -76,7 +80,7 @@ it.each(["tearSheet", "invariants"] as const)(
   },
   budget(15000),
 );
-it("matches the shared analytics invariants and leaves the default window to Rust", () => {
+it("matches shared analytics invariants and uses the explicit rolling window", () => {
   const target = entry("invariants").report.tickers[0]!;
   expect(target.multiFactor?.ok).toBe(true);
   if (!target.multiFactor?.ok) return;
@@ -98,14 +102,14 @@ it("matches the shared analytics invariants and leaves the default window to Rus
   expect(target.rollingGreeks.betas).toHaveLength(
     data.expected.rolling_greeks.betas.length,
   );
-  // The tear-sheet case omits the window: Rust's 63 applies.
+  // The tear-sheet case explicitly selects a 63-observation window.
   const [fund] = entry("tearSheet").report.tickers;
   expect(fund!.rollingGreeks.alphas).toHaveLength(
     fund!.activeDates.length - 62,
   );
   expect(entry("tearSheet").report.benchmarkIdx).toBe(1);
 });
-it("aligns relative series with each ticker's own active dates on a ragged panel", async () => {
+it("aligns relative series with each ticker's exact paired benchmark dates on a ragged panel", async () => {
   const { request } = entry("invariants");
   const ragged: BenchmarkReportRequest = {
     ...request,
@@ -121,10 +125,10 @@ it("aligns relative series with each ticker's own active dates on a ragged panel
   };
   const report = unwrap(await harness.proxy.benchmarkReport(ragged));
   const [fund, bench] = report.tickers;
-  expect(fund!.activeDates).toHaveLength(request.panel.dates.length - 3);
+  expect(fund!.activeDates).toHaveLength(request.panel.dates.length - 4);
   expect(fund!.outperformance).toHaveLength(fund!.activeDates.length);
   expect(fund!.drawdownDifference).toHaveLength(fund!.activeDates.length);
-  expect(bench!.outperformance).toHaveLength(request.panel.dates.length);
+  expect(bench!.outperformance).toHaveLength(request.panel.dates.length - 1);
   expect(fund!.multiFactor).toBeNull();
 });
 it("returns a ticker's rejected regression as its native error and keeps the rest of the report", async () => {
@@ -132,7 +136,7 @@ it("returns a ticker's rejected regression as its native error and keeps the res
   const report = unwrap(
     await harness.proxy.benchmarkReport({
       ...request,
-      factors: { ...request.factors!, riskFreeRate: 0.02 },
+      factors: { ...request.factors!, riskFreeRate: -1 },
     }),
   );
   for (const ticker of report.tickers) {
@@ -157,7 +161,10 @@ it("returns the native error and still frees the panel when a later call fails",
     panel: { ...request.panel, benchmark_ticker: "Missing" },
   });
   expect(unknown.ok).toBe(false);
-  if (!unknown.ok) expect(unknown.error.kind).toBe("not_found");
+  if (!unknown.ok) {
+    expect(unknown.error.kind).toBe("validation");
+    expect(unknown.error.message).toContain("Missing");
+  }
 });
 it("builds a price panel with the native constructor", async () => {
   const { request } = entry("invariants");
@@ -168,16 +175,19 @@ it("builds a price panel with the native constructor", async () => {
     ),
   );
   const panel = {
-    dates: ["2024-12-31", ...request.panel.dates],
+    dates: request.panel.dates,
     series: prices,
     kind: "prices" as const,
     ticker_names: ["TARGET", "BENCH"],
     benchmark_ticker: "BENCH",
+    frequency: "daily" as const,
   };
-  const report = unwrap(await harness.proxy.benchmarkReport({ panel }));
+  const report = unwrap(
+    await harness.proxy.benchmarkReport({ panel, riskFreeRate: 0, window: 5 }),
+  );
   const direct = new native.Performance(panel);
   try {
-    expect(report.greeks).toEqual(direct.greeks());
+    expect(report.greeks).toEqual(direct.greeks(0));
     expect(report.trackingError).toEqual(Array.from(direct.trackingError()));
   } finally {
     direct.free();
@@ -200,7 +210,7 @@ it("isolates non-finite inputs and sessions while reusing identical requests", a
   const client = { call } as unknown as FinstackClient;
   const queries = new QueryClient();
   try {
-    for (const riskFreeRate of [null, Number.NaN, Infinity, -Infinity]) {
+    for (const riskFreeRate of [0, Number.NaN, Infinity, -Infinity]) {
       const input = { ...request, riskFreeRate };
       const options = benchmarkReportOptions(client, 2, input);
       await queries.query(options);
@@ -210,7 +220,7 @@ it("isolates non-finite inputs and sessions while reusing identical requests", a
     }
     expect(call).toHaveBeenCalledTimes(4);
     await queries.query(
-      benchmarkReportOptions(client, 3, { ...request, riskFreeRate: null }),
+      benchmarkReportOptions(client, 3, { ...request, riskFreeRate: 0 }),
     );
     expect(call).toHaveBeenCalledTimes(5);
   } finally {

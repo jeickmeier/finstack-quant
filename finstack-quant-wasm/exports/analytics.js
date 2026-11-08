@@ -14,7 +14,7 @@ import * as wasm from '../pkg/finstack_quant_wasm.js';
  * skipped. The first included simple return still spans the prior close.
  * @param refDate - ISO-8601 date on which MTD, QTD, YTD, and FYTD windows end. Omitted or `null` is the last active date; the result's `ref_date` states the date used.
  * @param fiscalConfig - Optional `FiscalConfig` handle for FYTD. Omitted or `null` is the calendar year (`FiscalConfig::default`).
- * @returns The window end `ref_date` and per-ticker `{ mtd, qtd, ytd, fytd }` numeric arrays of lookback returns as decimal fractions; `fytd` is never null.
+ * @returns LookbackReturns with return estimates, fiscal context and per-ticker counts and actual holding bounds for each selected window; unavailable numeric results remain NaN.
  * @throws Error - Rejects an invalid ISO `ref_date`, an omitted one while no dates are active, or a result that cannot be serialized to JavaScript.
  *
  * @facadeClass Performance
@@ -24,13 +24,13 @@ import * as wasm from '../pkg/finstack_quant_wasm.js';
  * Aggregated period statistics for one asset at the given frequency. Without
  * a fiscal calendar, Gregorian periods are bucketed with ISO weeks.
  * @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
- * @param aggregationFrequency - Optional aggregation frequency token; defaults to monthly.
+ * @param aggregationFrequency - Required explicit grouping frequency token; no inference from observation frequency.
  * @param fiscalConfig - Optional FiscalConfig handle; omitted or null buckets Gregorian periods with ISO weeks.
  * @returns Period statistics object for the selected ticker at the requested frequency.
  * @throws Error - Rejects an unsupported `aggregation_frequency`, an out-of-range `ticker_idx`, an unrepresentable period boundary, or period statistics that cannot be serialized to JavaScript.
  *
  * @facadeClass Performance
- * @member periodStats(tickerIdx: number, aggregationFrequency?: string, fiscalConfig?: FiscalConfig | null): PeriodStats
+ * @member periodStats(tickerIdx: number, aggregationFrequency: string, fiscalConfig?: FiscalConfig | null): PeriodStats
  */
 const performance = wasm.Performance.prototype;
 const rawLookbackReturns = performance.lookbackReturns;
@@ -53,12 +53,28 @@ performance.lookbackReturns = function lookbackReturns(refDate, fiscalConfig = u
 // wasm-bindgen cannot borrow an optional FiscalConfig: joins the None and Some(config) exports.
 performance.periodStats = function periodStats(
   tickerIdx,
-  aggregationFrequency = undefined,
+  aggregationFrequency,
   fiscalConfig = undefined
 ) {
   return isNone(fiscalConfig)
     ? rawPeriodStats.call(this, tickerIdx, aggregationFrequency)
     : rawPeriodStatsWithFiscalConfig.call(this, tickerIdx, aggregationFrequency, fiscalConfig);
+};
+
+/**
+ * Actual-date compound annual growth using ACT/365F unless another clock is selected.
+ * @param dayCount - Optional day-count label; default act_365f. Explicit act365_25 selects actual-days/365.25.
+ * @param ctx - Optional validated DayCountContext; omission supplies the empty context. Required calendar/coupon inputs must be explicitly populated for clocks that use them.
+ * @returns Per-ticker Float64Array with NaN for unavailable history or zero year fraction.
+ * @throws Error - Rejects unknown clocks, missing/incompatible context, invalid actual spans or unrepresentable requested results.
+ * @facadeClass Performance
+ * @member cagr(dayCount?: string, ctx?: DayCountContext): Float64Array
+ */
+const rawCagr = performance.cagr;
+let emptyCagrContext;
+// wasm-bindgen cannot make a borrowed class handle optional; supply an empty validated context.
+performance.cagr = function cagr(dayCount = undefined, ctx = undefined) {
+  return rawCagr.call(this, dayCount, ctx ?? (emptyCagrContext ??= new wasm.DayCountContext()));
 };
 
 /**
@@ -79,6 +95,8 @@ performance.periodStats = function periodStats(
 export const analytics = {
   Performance: wasm.Performance,
   constrainedLeastSquares: wasm.constrainedLeastSquares,
+  multiFactorGreeks: wasm.multiFactorGreeks,
+  validateSummary: wasm.validateSummary,
   maxDrawdown: wasm.maxDrawdown,
   sharpe: wasm.sharpe,
   sortino: wasm.sortino,

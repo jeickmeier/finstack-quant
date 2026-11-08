@@ -28,6 +28,10 @@ rust_decimal = { workspace = true }
 schemars = { workspace = true, optional = true }
 statrs = { version = "0.18", default-features = false }
 nalgebra = { version = "0.35", default-features = false, features = ["std", "serde-serialize"] }
+# Exact binary-rational weights preserve consequential quantile/tail residuals.
+num-bigint = "0.4"
+num-rational = "0.4"
+num-traits = "0.2"
 # Production-grade random number generation
 rand = { version = "0.9.3", default-features = false, features = ["std"] }
 rand_pcg = { version = "0.9", features = ["serde"] }

@@ -23,7 +23,7 @@ export function correlationMatrixOptions(
     "No return panel supplied",
   );
 }
-/** Native analytics.Performance#correlationMatrix of a host-supplied panel with Rust's repaired flag, or the native error; null disables the call. Supply a Finstack/Query provider. */
+/** Native analytics.Performance#correlationMatrix of a host-supplied panel with its common-sample count and date bounds, or the native error; null disables the call. Supply a Finstack/Query provider. */
 export function useCorrelationMatrix(request: CorrelationMatrixRequest | null) {
   return useWorkerQuery((worker) =>
     correlationMatrixOptions(worker.client, worker.session, request),

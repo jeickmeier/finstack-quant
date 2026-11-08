@@ -63,7 +63,7 @@ def _period_stats_payload() -> dict[str, object]:
 
     performance = Performance.from_panel(
         PerformancePanel(
-            dates=[dt.date(2025, 1, 1), dt.date(2025, 2, 1)],
+            dates=[dt.date(2024, 12, 31), dt.date(2025, 1, 1), dt.date(2025, 2, 1)],
             series=[[0.01, 0.02]],
             kind="returns",
             ticker_names=["fund"],

@@ -1872,7 +1872,7 @@ fn stabilize_canonical_bytes(model: &CreditFactorModel) -> Vec<u8> {
 
 /// Generate (or regenerate) the factor-model-owned canonical artifact and hash.
 /// Run manually with:
-/// `FQ_UPDATE_CANONICAL_GOLDENS=1 cargo test -p finstack-quant-factor --test factor generate_golden_artifact -- --nocapture`
+/// `FQ_UPDATE_CANONICAL_GOLDENS=1 mise run rust-test-filter -- finstack-quant-factor generate_golden_artifact --integration factor`
 #[test]
 fn generate_golden_artifact() {
     if std::env::var_os(REGEN_CREDIT_FACTOR_MODEL_GOLDEN_ENV).is_none() {
@@ -1905,7 +1905,7 @@ fn generate_golden_artifact() {
 }
 
 /// Calibrate with the canonical fixture (Diagonal + Sample), serialize to
-/// pretty-printed JSON, and compare byte-for-byte against the checked-in
+/// canonical JSON, and compare byte-for-byte against the checked-in
 /// factor-model fixture at
 /// `tests/data/canonical/credit_factor_model.json`.
 ///
@@ -1926,8 +1926,8 @@ fn golden_credit_factor_model_matches_checked_in_json() {
         panic!(
             "Golden file not found at {golden_path}: {e}\n\
              Bootstrap it by running:\n  \
-             {REGEN_CREDIT_FACTOR_MODEL_GOLDEN_ENV}=1 cargo nextest run -p finstack-quant-factor \
-             --test factor credit_factor_model_has_exact_canonical_bytes_and_hash"
+             {REGEN_CREDIT_FACTOR_MODEL_GOLDEN_ENV}=1 mise run rust-test-filter -- finstack-quant-factor \
+             credit_factor_model_has_exact_canonical_bytes_and_hash --integration factor"
         )
     });
 

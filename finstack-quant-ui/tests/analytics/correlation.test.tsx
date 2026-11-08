@@ -55,11 +55,12 @@ it("stores the panel panels.mjs builds", () => {
   expect(request).toEqual({ panel });
 });
 it(
-  "the worker returns the native matrix and Rust's repaired flag",
+  "the worker returns the native matrix and its common-sample provenance",
   async () => {
     const matrix = unwrap(await proxy().correlationMatrix(request));
     expect(JSON.parse(JSON.stringify(matrix))).toEqual(result);
-    expect(result.repaired).toBe(false);
+    expect(result.nObs).toBe(60);
+    expect(result.startDate).toBe("2024-01-02");
   },
   budget(30000),
 );
@@ -101,20 +102,13 @@ it("draws every returned coefficient in Rust's ticker order", () => {
     );
   });
 });
-it("stamps the matrix only when Rust says it repaired it", () => {
+it("shows the common observation population and dates", () => {
   view();
-  expect(screen.queryByRole("note", { name: "Repaired" })).toBeNull();
-  expect(screen.getByText(/did not need to repair/)).toBeTruthy();
-  cleanup();
-  // The same native coefficients with Rust's flag set by hand. No panel
-  // reaches Rust's Higham repair through Performance today: its pairwise
-  // estimate has always been a valid correlation matrix, so no native fixture
-  // has repaired: true and this branch is driven by the supplied boolean.
-  view({ report: { ...result, repaired: true } });
-  expect(screen.getByRole("note", { name: "Repaired" }).textContent).toBe(
-    "Repaired",
-  );
-  expect(screen.getByText(/nearest valid one \(Higham\)/)).toBeTruthy();
+  expect(
+    screen.getByText(
+      `Pearson correlations over ${result.nObs} common observations from ${result.startDate} to ${result.endDate}.`,
+    ),
+  ).toBeTruthy();
 });
 it("shows the native error, loading and no result", () => {
   const { message } = fixture.errors.noOverlap;

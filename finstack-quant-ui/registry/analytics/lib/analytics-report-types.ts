@@ -46,7 +46,7 @@ export interface PerformanceReportData {
   };
 }
 
-/** One ticker's native relative series, each aligned with that ticker's own active dates. */
+/** One ticker's native relative series, aligned with its exact benchmark overlap. */
 export interface BenchmarkTickerData {
   activeDates: readonly string[];
   /** cumulativeReturnsOutperformance, aligned to activeDates. */

@@ -15,9 +15,6 @@ it("accepts native reports and readonly display inputs without transport-only fi
   expectTypeOf<PerformanceReport>().toExtend<PerformanceReportData>();
   expectTypeOf<BenchmarkReport>().toExtend<BenchmarkReportData>();
   expectTypeOf<
-    Omit<PerformanceReport, "correlation">
-  >().toExtend<PerformanceReportData>();
-  expectTypeOf<
     PerformanceReportProps["report"]
   >().toEqualTypeOf<PerformanceReportData | null>();
   expectTypeOf<

@@ -12,9 +12,10 @@ def constrained_least_squares(
     Fit factor returns satisfying the equality constraint ``w'Xf = w'r``.
 
     Binds Rust
-    ``finstack_quant_analytics::regression::constrained_least_squares``: adds
-    the minimal Lagrangian correction to an unconstrained OLS fit so the
-    corrected factor returns exactly reproduce the weighted realized return
+    ``finstack_quant_analytics::regression::constrained_least_squares``: fits
+    equal-weight residual least squares subject to one holdings identity,
+    validating the final normalized constraint and stationarity residuals.
+    The corrected factor returns reproduce the weighted realized return
     ``w'r``. Typically used to fit the benchmark factor returns consumed by
     :func:`finstack_quant.portfolio.factor_brinson_attribution`, which
     requires factor returns satisfying that same completeness condition.
@@ -30,7 +31,7 @@ def constrained_least_squares(
     returns : list[float]
         Realized asset returns, length ``n_assets`` (defines ``n_assets``).
     weights : list[float]
-        Holding weights whose weighted return ``w'r`` must be fully
+        Finite, possibly signed holding weights whose weighted return ``w'r`` must be fully
         reproduced by ``w'Xf`` (e.g. benchmark weights for a
         benchmark-return attribution); length ``n_assets``.
 
@@ -38,7 +39,7 @@ def constrained_least_squares(
     -------
     list[float]
         Constrained factor returns ``f``, one per factor, satisfying
-        ``w'Xf = w'r`` to numerical precision.
+        ``w'Xf = w'r`` within the solver's documented weighted-gross backward-error gate.
 
     Raises
     ------
@@ -46,10 +47,11 @@ def constrained_least_squares(
         If ``n_factors`` is zero, ``returns`` is empty, ``exposures`` or
         ``weights`` has the wrong length, ``n_assets * n_factors`` overflows,
         any input value is non-finite, the design matrix is rank-deficient,
-        coefficient rescaling or the constraint correction produces a
-        non-finite value, or ``w`` and the constraint direction are
-        numerically orthogonal while OLS does not already satisfy the
-        constraint, so no scalar correction can restore it.
+        or the holdings identity is infeasible.
+    RuntimeError
+        If scaled SVD fitting, coefficient rescaling or final constraint/
+        stationarity checks fail numerically. No clipping, rank truncation or
+        silent constraint relaxation is applied.
     TypeError
         If ``n_factors`` is not an integer.
     OverflowError

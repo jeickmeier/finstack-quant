@@ -54,7 +54,7 @@ Its `README.md` and `.d.ts` are wasm-pack copies; treat nothing in `pkg/` or
 | Namespace              | Contents                                                                                                                                                                                                                                                                                                                                                                 |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `core`                 | `Currency` (with a static per ISO code), `Money`, `Rate`/`Bps`, `CreditRating`, `FinstackConfig`, `DayCount`, `Tenor`, calendars, periods, schedules and IMM/CDS/SIFMA date rules, every curve and surface handle (`DiscountCurve` … `VolSurface`), `ScalarTimeSeries`, `InflationIndex`, `FxMatrix`, `MarketContext`, the rating-scale registry, and the `math` helpers |
-| `analytics`            | `Performance` panel engine, `constrainedLeastSquares`, scalar metrics `sharpe`/`sortino`/`volatility`/`maxDrawdown`                                                                                                                                                                                                                                                      |
+| `analytics`            | `Performance` panel engine, `constrainedLeastSquares`, raw `multiFactorGreeks`, scalar metrics `sharpe`/`sortino`/`volatility`/`maxDrawdown`                                                                                                                                                                                                                             |
 | `attribution`          | `attributePnl`, `attributePnlEnvelope` and their `*Json` twins, waterfall/metric defaults, schema validation                                                                                                                                                                                                                                                             |
 | `calibration`          | quote ingestion, market construction, plan validation, dependency graphs, and explicit Bermudan LMM base-vol fitting                                                                                                                                                                                                                                                     |
 | `cashflows`            | `CashFlowSchedule` / `CashFlowBuilder` / `AccrualIndex` handles, schedule build/validate (typed and `*Json`), accrual, period aggregation, spec constructors and presets, CPR↔SMM and CDR↔MDR conversions                                                                                                                                                                |
@@ -91,7 +91,7 @@ core.Rate.fromBp(250).asDecimal; // 0.025
 
 // Panel analytics. Per-ticker results come back as Float64Array.
 const perf = new analytics.Performance({
-  dates: ['2024-01-31', '2024-02-29', '2024-03-31'],
+  dates: ['2023-12-31', '2024-01-31', '2024-02-29', '2024-03-31'],
   series: [[0.01, -0.02, 0.03]],
   kind: 'returns',
   ticker_names: ['FUND'],

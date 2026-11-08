@@ -1,6 +1,41 @@
 {
   "$defs": {
+    "NonFiniteF64Wire": {
+      "anyOf": [
+        {
+          "description": "A finite value, written as a JSON number.",
+          "format": "double",
+          "type": "number"
+        },
+        {
+          "$ref": "#/$defs/NonFiniteSentinel",
+          "description": "A non-finite value, written as its sentinel string."
+        }
+      ],
+      "description": "An `f64` in the [`non_finite_f64`] wire form: a JSON number when finite,\notherwise one of the strings `\"inf\"`, `\"-inf\"` or `\"nan\"`.\n\nContract types store plain `f64` fields with\n`#[serde(with = \"finstack_quant_core::wire::non_finite_f64\")]` and name this\ntype in `#[schemars(with = ...)]`, so the generated schema describes the\nsentinel strings the serializer actually writes."
+    },
+    "NonFiniteSentinel": {
+      "description": "Sentinel string the [`non_finite_f64`] adapter writes for a non-finite `f64`.",
+      "oneOf": [
+        {
+          "const": "inf",
+          "description": "`+∞`, written as `\"inf\"`.",
+          "type": "string"
+        },
+        {
+          "const": "-inf",
+          "description": "`-∞`, written as `\"-inf\"`.",
+          "type": "string"
+        },
+        {
+          "const": "nan",
+          "description": "`NaN`, written as `\"nan\"`.",
+          "type": "string"
+        }
+      ]
+    },
     "TableColumn": {
+      "additionalProperties": false,
       "description": "A single named column in a [`TableEnvelope`].",
       "properties": {
         "data": {
@@ -38,6 +73,7 @@
       "description": "Column storage variants supported by the table envelope.",
       "oneOf": [
         {
+          "additionalProperties": false,
           "description": "Non-null string column.",
           "properties": {
             "type": {
@@ -58,6 +94,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Nullable string column.",
           "properties": {
             "type": {
@@ -81,6 +118,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Non-null floating-point column.",
           "properties": {
             "type": {
@@ -89,8 +127,7 @@
             },
             "values": {
               "items": {
-                "format": "double",
-                "type": "number"
+                "$ref": "#/$defs/NonFiniteF64Wire"
               },
               "type": "array"
             }
@@ -102,6 +139,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Nullable floating-point column.",
           "properties": {
             "type": {
@@ -126,6 +164,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Non-null unsigned 32-bit integer column.",
           "properties": {
             "type": {
@@ -148,6 +187,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Nullable unsigned 32-bit integer column.",
           "properties": {
             "type": {
@@ -173,6 +213,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Non-null signed 64-bit integer column.",
           "properties": {
             "type": {
@@ -194,6 +235,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Nullable signed 64-bit integer column.",
           "properties": {
             "type": {
@@ -218,6 +260,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Non-null boolean column.",
           "properties": {
             "type": {
@@ -267,6 +310,7 @@
   },
   "$id": "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "description": "Column-oriented table with a shared row count and typed column storage.",
   "examples": [
     {
@@ -307,6 +351,7 @@
     },
     "metadata": {
       "additionalProperties": true,
+      "default": {},
       "description": "Table-level metadata for downstream bindings and documentation.",
       "type": "object"
     },

@@ -1,24 +1,16 @@
 # ANALYTICS-015: Common-sample Pearson correlation, provenance and numerical validation
 
-**Decision status:** Accepted for the complete common-sample Pearson, availability, numerical-validation and result-provenance package below (2026-11-07). Implementation reconciliation and independent qualification remain open; core numerical algorithms retain their separate scope.
+**Decision status:** Accepted for the complete common-sample Pearson, availability, numerical-validation and result-provenance package below (2026-11-07).
 
-**Implementation status:** Observed in the source paths below, including the stated discrepancies and fallback behavior.
+**Implementation status:** Implemented in the analytics decision reconciliation dated 2026-11-08. The accepted sections below define the current contract.
 
-**Validation status:** Source inspected; test evidence inspected or located as identified below, not executed. No financial accuracy certification or runtime change is implied.
+**Validation status:** Scoped implementation checks and their limits are recorded in the [analytics inventory](README.md#implementation-evidence). A passing numerical fixture establishes its stated case; it does not certify a population estimator or every supported input.
 
-**Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See the [scope and exact source manifest](README.md).
-
-## Choice and domain
-
-`Performance.correlation_matrix` estimates equal-weight sample correlations and automatically projects an invalid assembled matrix to a valid correlation matrix. Date alignment is chosen at the matrix level: use one all-ticker common active span when it has at least two observations, otherwise use each pair's overlap. This mixes a statistical selection rule with a numerical repair rule; neither is established merely by registering the API.
+**Audit provenance:** The original source audit was performed on 2026-11-05 at `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. Its historical discrepancies are superseded by the accepted contracts and this implementation. The [source ledger](coverage.json) retains source ownership and dated inspection fingerprints.
 
 ## Accepted decision: common-sample Pearson correlation
 
-**Accepted:** 2026-11-07. **Implementation:** Partial; selected source
-inspected at `827ebb75b9`. Common-sample-only dispatch, all-column eligibility,
-scale-safe arithmetic, bounded endpoint normalization, final validation,
-repair/flag removal and the compact result carrier require reconciliation.
-No runtime correlation, serialization or matrix tests were executed.
+**Accepted:** 2026-11-07.
 
 This package covers the complete analytics
 sample-selection, Pearson estimator, availability, numerical normalization,
@@ -40,7 +32,7 @@ ticker or introduce a new selection/configuration mode here.
 Remove the pairwise fallback. Valid panel observations are contiguous within
 each ticker's span. If their common interval has fewer than two observations,
 the ticker starting latest and the ticker ending earliest also have fewer
-than two common observations. Thus the current fallback cannot rescue a
+than two common observations. Thus a pairwise fallback cannot rescue a
 successful multi-ticker matrix under this supported domain. A genuinely
 pairwise estimator would be a separate statistical choice; it is not needed
 to implement this complete-case contract.
@@ -103,8 +95,8 @@ other analytics retain their own per-field/per-ticker availability rules.
   variance is not representable. For example, two identical varying columns
   `[1e-200, 2e-200, 3e-200]` have correlation one.
 - Do not multiply original-unit variances before taking a square root. The
-  current shared correlation helper's zero-denominator fallback and
-  unconditional clamp do not establish correct analytics outputs. Preserve
+  zero-denominator fallback or unconditional clamp cannot establish correct
+  analytics outputs. Preserve
   a representable requested coefficient through adequate same-estimator
   reconstruction, or report a calculation error if unresolved.
 - Permit only explicit endpoint roundoff normalization: after adequate
@@ -144,10 +136,8 @@ the core projection's 200-iteration/`1e-10` controls or guarantee suitability
 for inversion, Cholesky methods requiring positive definiteness, portfolio
 optimization or out-of-sample forecasting.
 
-The current repair flag has actual binding/UI consumers. Its removal must
-propagate through Rust, Python, WASM, schemas/declarations, fixtures and the
-correlation heatmap's repair stamp and adapters in one later implementation
-slice; it is not an unused field or an invitation to retain an always-false
+The result propagates through Rust, Python, WASM, schemas/declarations,
+fixtures and correlation heatmap adapters without a repair stamp or
 compatibility flag.
 
 ### Compact result provenance and restoration
@@ -202,44 +192,6 @@ its implementation is not an independent oracle or a requirement to adopt
 unconditional clipping. These references do not qualify this implementation's
 numerical accuracy or make automatic projection an empirical estimator.
 
-## Algorithm and controls
+## Implementation evidence
 
-Initialize the diagonal to one. For each pair, choose the common span if available or its pairwise intersection otherwise. Fewer than two paired observations errors; either exactly zero sample variance errors; nonfinite correlation errors. No missing observations are filled and no pair is silently replaced by zero. A one-ticker matrix has no pairs to check and returns self-correlation one even if its active window is empty or degenerate.
-
-Flatten and run the shared correlation-matrix validator. If already valid, force diagonal entries to exactly one and clamp off-diagonals to [−1,1], returning `(matrix,false)`. If validation fails, invoke core `nearest_correlation` with its default 200 iterations and Frobenius-change tolerance 1e−10, then validate the repaired result again. Failure to obtain a valid matrix errors. Unflatten, clamp bounds/diagonal and return `(matrix,true)`.
-
-The core projection is the shared Higham/Dykstra PSD/unit-diagonal routine, whose kernel details are owned by the core-numerics methodology scope. The analytics caller does not expose repair options or opt-out. The boolean is true only for the projection path: small bound-clamping after a successful validation can alter entries while still returning false. It does not report which observation spans were used, adjustment magnitude or iteration diagnostics.
-
-These are observed source behaviors. The accepted package requires removing
-the pairwise branch, automatic projection and flag, enforcing one-ticker
-eligibility, replacing unsafe moment arithmetic, bounding numerical endpoint
-normalization, validating the actual final matrix and returning compact
-common-sample provenance.
-
-## Conventions, limitations and alternatives
-
-Correlation is dimensionless and not annualized. Pairwise-overlap assembly can be indefinite because different coefficients summarize different samples; projection yields a mathematically usable matrix but changes empirical estimates. A common span of only two points is preferred over longer pairwise spans, so sample-size and precision can change discontinuously when another ticker's history changes. No minimum-history policy beyond two observations, shrinkage intensity or sampling-error model is included.
-
-Always-complete-case estimation without automatic repair is accepted above.
-Genuine explicit pairwise estimation, shrinkage covariance and caller-
-controlled projection remain different unimplemented analytics methods.
-A valid/repaired matrix is not proof of a suitable portfolio-risk model.
-
-## Implementation and validation evidence
-
-- [Alignment/assembly/repair caller](../../../../finstack-quant/analytics/src/performance/aggregation.rs), [active-span logic](../../../../finstack-quant/analytics/src/performance/mod.rs), [shared moments](../../../../finstack-quant/core/src/math/stats.rs), and [core projection/defaults](../../../../finstack-quant/core/src/math/linalg/nearest_correlation.rs).
-- [Contiguous panel contract](../../../../finstack-quant/analytics/src/performance/panel.rs), [Python result tuple](../../../../finstack-quant-py/src/bindings/analytics/performance.rs) and [WASM matrix/flag conversion](../../../../finstack-quant-wasm/src/api/analytics/performance.rs) establish the current sample/output boundary. The UI's [correlation heatmap](../../../../finstack-quant-ui/registry/analytics/components/correlation-heatmap/correlation-heatmap.tsx) and related adapters consume the repair flag.
-- Located inline `correlation_matrix_repairs_indefinite_pairwise_fixture`, clamp-to-unit-bounds and two-asset cases establish dispatch/invariants. [Correctness regressions](../../../../finstack-quant/analytics/tests/correctness_regressions.rs) reject degenerate pairs. They do not independently validate the repaired empirical risk model or justify mixed-span estimation.
-- [Core numerical inventory](../core-numerics/README.md) owns the projection algorithm's detailed numerical evidence. [Ledoit–Wolf](../../../REFERENCES.md#ledoitwolf2004) is context for a distinct shrinkage alternative, not a claim that shrinkage is implemented here.
-
-The indefinite fixture feeds a hand-built matrix directly to the private
-finalizer. It does not reproduce a successful public pairwise-fallback matrix
-under valid contiguous panel spans. Distinguish that helper-dispatch evidence
-from public sample selection and empirical-model qualification.
-
-No matrix simulations or numerical tests were executed.
-
-## Follow-up tracking
-
-Implementation reconciliation and missing evidence are tracked in the
-[common-sample correlation follow-up](../FOLLOW_UPS.md#analytics-common-sample-correlation).
+[correlation.rs](../../../../finstack-quant/analytics/src/correlation.rs), [performance/aggregation.rs](../../../../finstack-quant/analytics/src/performance/aggregation.rs). The [crate integration tests](../../../../finstack-quant/analytics/tests/main.rs), inline numerical regressions and [schema contracts](../../../../finstack-quant/analytics/tests/schema_contract.rs) exercise this scope. See the [inventory validation record](README.md#implementation-evidence) for executed checks and evidence limits.

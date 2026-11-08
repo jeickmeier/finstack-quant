@@ -37,7 +37,7 @@ pub fn synthetic_dates(n: usize) -> Vec<Date> {
 /// Single-ticker daily `Performance` from synthetic returns.
 pub fn perf_from_returns(n: usize, seed: u64) -> Performance {
     let returns = synthetic_returns(n, seed);
-    let dates = synthetic_dates(n);
+    let dates = synthetic_dates(n + 1);
     Performance::new(&returns_panel(
         dates,
         vec![returns],
@@ -51,7 +51,7 @@ pub fn perf_from_returns(n: usize, seed: u64) -> Performance {
 /// Multi-ticker panel. Column 0 is the benchmark.
 pub fn perf_panel(n_obs: usize, n_tickers: usize, seed: u64) -> Performance {
     assert!(n_tickers >= 2, "panel must have at least benchmark + 1");
-    let dates = synthetic_dates(n_obs);
+    let dates = synthetic_dates(n_obs + 1);
     let mut columns: Vec<Vec<f64>> = Vec::with_capacity(n_tickers);
     let mut names: Vec<String> = Vec::with_capacity(n_tickers);
     for i in 0..n_tickers {

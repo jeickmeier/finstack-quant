@@ -1,220 +1,221 @@
-//! Benchmark-relative metrics on [`Performance`] (alpha/beta/greeks,
-//! tracking error, information ratio, R², capture, multi-factor).
+//! Benchmark-relative statistics on exactly paired active observations.
 
 use super::Performance;
 use crate::benchmark::{
-    BetaResult, GreeksResult, RollingGreeks, batting_average, beta, beta_only, capture_ratio,
-    down_capture, greeks, information_ratio, m_squared, r_squared, rolling_greeks, tracking_error,
-    treynor, up_capture,
+    BetaResult, GreeksResult, RollingGreeks, batting_average, beta, capture_ratio, down_capture,
+    greeks, information_ratio, m_squared_from_returns, r_squared, rolling_greeks, tracking_error,
+    treynor_from_returns, up_capture,
 };
 use crate::multi_factor::{MultiFactorResult, ReturnKind, multi_factor_greeks};
-use crate::risk_metrics;
+use crate::returns::validate_cash;
+use finstack_quant_core::Result;
 
 impl Performance {
-    /// Treynor ratio for each ticker.
+    /// Annual arithmetic excess return per unit of intercept-OLS benchmark beta.
     ///
-    /// Excess return uses the same geometric rf decompounding as
-    /// [`Self::sharpe`]: `(mean(r) − rf_period) × N`.
-    ///
-    /// # Arguments
-    ///
-    /// * `risk_free_rate` - Annualized risk-free rate in decimal form.
-    ///   Decompounded to the panel frequency before subtraction.
-    ///
-    /// # Returns
-    ///
-    /// One Treynor ratio per ticker in column order, using the active
-    /// benchmark to estimate beta. Returns [`f64::NAN`] when the overlapping
-    /// ticker/benchmark window has fewer than 2 observations (beta is not
-    /// estimable from one point), the benchmark variance is zero, or the
-    /// annualized excess return is non-finite (including a non-finite
-    /// `risk_free_rate`). For an estimable beta with magnitude below `1e-10`,
-    /// finite excess return gives signed infinity, or zero when excess return
-    /// is exactly zero.
-    pub fn treynor(&self, risk_free_rate: f64) -> Vec<f64> {
-        let ann = self.ann();
-        self.map_pair_returns(|r, bench| {
-            if r.len().min(bench.len()) < 2 {
-                return f64::NAN;
-            }
-            let ann_ret = risk_metrics::mean_return(r, true, ann);
-            let beta = beta_only(r, bench);
-            treynor(ann_ret, risk_free_rate, beta, ann)
-        })
-    }
-
-    /// Empyrical-style annualized geometric up-capture for each ticker versus the active benchmark.
-    pub fn up_capture(&self) -> Vec<f64> {
-        let ann = self.ann();
-        self.map_pair_returns(|r, bench| up_capture(r, bench, ann))
-    }
-
-    /// Empyrical-style annualized geometric down-capture for each ticker versus the active benchmark.
-    pub fn down_capture(&self) -> Vec<f64> {
-        let ann = self.ann();
-        self.map_pair_returns(|r, bench| down_capture(r, bench, ann))
-    }
-
-    /// Empyrical-style annualized geometric capture ratio for each ticker.
-    pub fn capture_ratio(&self) -> Vec<f64> {
-        let ann = self.ann();
-        self.map_pair_returns(|r, bench| capture_ratio(r, bench, ann))
-    }
-
-    /// Annualized tracking error for each ticker versus the active benchmark.
-    pub fn tracking_error(&self) -> Vec<f64> {
-        let ann = self.ann();
-        self.map_pair_returns(|r, bench| tracking_error(r, bench, ann))
-    }
-
-    /// Annualized information ratio for each ticker versus the active benchmark.
-    ///
-    /// Returns [`f64::NAN`] when the overlapping ticker/benchmark window has
-    /// fewer than 2 observations (tracking error is not estimable from one
-    /// point, so the ratio is undefined rather than a plausible `±∞`).
-    pub fn information_ratio(&self) -> Vec<f64> {
-        let ann = self.ann();
-        self.map_pair_returns(|r, bench| {
-            if r.len().min(bench.len()) < 2 {
-                return f64::NAN;
-            }
-            information_ratio(r, bench, ann)
-        })
-    }
-
-    /// R-squared for each ticker versus the active benchmark.
-    ///
-    /// Returns [`f64::NAN`] for a ticker when its overlap with the benchmark
-    /// has fewer than two observations or either overlapping series has zero
-    /// variance.
-    pub fn r_squared(&self) -> Vec<f64> {
-        self.map_pair_returns(r_squared)
-    }
-
-    /// OLS beta estimates for each ticker versus the active benchmark.
-    ///
-    /// Each [`BetaResult`] includes a standard error and 95% confidence
-    /// interval and therefore requires at least three overlapping
-    /// observations. All result fields are [`f64::NAN`] when the overlap is
-    /// shorter or the benchmark variance is zero.
-    pub fn beta(&self) -> Vec<BetaResult> {
-        self.map_pair_returns(beta)
-    }
-
-    /// Single-factor greeks for each ticker versus the active benchmark.
-    ///
-    /// Alpha is annualized Jensen alpha using the configured observation
-    /// frequency and the supplied annualized risk-free rate.
+    /// Uses exactly paired observations; two pairs and varying benchmark are
+    /// required. Zero beta gives signed infinite reward/risk for nonzero reward
+    /// and undefined for zero reward, without a beta-magnitude cutoff.
     ///
     /// # Arguments
     ///
-    /// * `risk_free_rate` - Annualized risk-free rate in decimal form,
-    ///   geometrically decompounded to the panel frequency for Jensen alpha.
-    ///
-    /// # Returns
-    ///
-    /// One [`GreeksResult`] per ticker in column order. Fields that cannot be
-    /// estimated are [`f64::NAN`]: all fields for fewer than two overlapping
-    /// observations or zero benchmark variance, both R-squared fields for
-    /// zero ticker variance, and adjusted R-squared for exactly two
-    /// observations.
-    pub fn greeks(&self, risk_free_rate: f64) -> Vec<GreeksResult> {
-        let ann = self.ann();
-        self.map_pair_returns(|r, bench| greeks(r, bench, ann, risk_free_rate))
-    }
-
-    /// Rolling greeks (alpha, beta) for a specific ticker vs the benchmark.
+    /// * `risk_free_rate` - Explicit finite annual-effective decimal cash rate
+    ///   greater than `-1`, geometrically converted at the observation frequency.
     ///
     /// # Errors
     ///
-    /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when
-    /// `ticker_idx` is outside the loaded ticker columns.
+    /// Returns a validation error for missing benchmark/frequency or invalid
+    /// cash, and a calculation error for unresolved numerical failure.
+    pub fn treynor(&self, risk_free_rate: f64) -> Result<Vec<f64>> {
+        let ann = self.ann()?;
+        validate_cash(risk_free_rate)?;
+        self.map_pair_returns(|r, bench| treynor_from_returns(r, bench, risk_free_rate, ann))
+    }
+
+    /// Signed annualized geometric capture on strictly positive benchmark periods.
+    ///
+    /// Uses the declared full observation frequency and selected observation
+    /// count. Empty regimes are undefined; ratios are not multiplied by 100.
+    /// Returns an error for missing frequency/benchmark or numerical failure.
+    pub fn up_capture(&self) -> Result<Vec<f64>> {
+        let ann = self.ann()?;
+        self.map_pair_returns(|r, bench| up_capture(r, bench, ann))
+    }
+
+    /// Signed annualized geometric capture on strictly negative benchmark periods.
+    ///
+    /// Empty regimes are undefined. Negative values retain portfolio gains in
+    /// declining benchmark periods. Errors identify missing required context or
+    /// unresolved numerical evaluation.
+    pub fn down_capture(&self) -> Result<Vec<f64>> {
+        let ann = self.ann()?;
+        self.map_pair_returns(|r, bench| down_capture(r, bench, ann))
+    }
+
+    /// Up capture divided by down capture on their respective strict regimes.
+    ///
+    /// Both regimes must be available and down capture nonzero; otherwise the
+    /// result is undefined. Errors identify missing context or numerical failure.
+    pub fn capture_ratio(&self) -> Result<Vec<f64>> {
+        let ann = self.ann()?;
+        self.map_pair_returns(|r, bench| capture_ratio(r, bench, ann))
+    }
+
+    /// Annualized centered sample SD of paired arithmetic active differences.
+    ///
+    /// Fewer than two paired observations is unavailable; observed constant
+    /// differences have zero tracking error. Errors identify missing required
+    /// frequency/benchmark or an unresolved calculation failure.
+    pub fn tracking_error(&self) -> Result<Vec<f64>> {
+        let ann = self.ann()?;
+        self.map_pair_returns(|r, bench| tracking_error(r, bench, ann))
+    }
+
+    /// Arithmetic active reward divided by centered sample tracking risk.
+    ///
+    /// Requires two pairs. Genuine zero risk gives signed infinity for nonzero
+    /// reward and undefined for zero reward. Errors identify missing required
+    /// frequency/benchmark or an unresolved calculation failure.
+    pub fn information_ratio(&self) -> Result<Vec<f64>> {
+        let ann = self.ann()?;
+        self.map_pair_returns(|r, bench| information_ratio(r, bench, ann))
+    }
+
+    /// Centered intercept-OLS R-squared on each ticker's benchmark overlap.
+    ///
+    /// Fewer than two pairs or either constant series gives undefined results.
+    /// No cash or observation frequency is required. Missing benchmark and
+    /// numerical evaluation failures return errors.
+    pub fn r_squared(&self) -> Result<Vec<f64>> {
+        self.map_pair_returns(r_squared)
+    }
+
+    /// Intercept-OLS beta and fixed 95% classical Student-t uncertainty.
+    ///
+    /// Two pairs and a varying benchmark suffice for beta; uncertainty requires
+    /// three pairs. Unavailable fields preserve NaN independently and retain the
+    /// actual sample count. No cash/frequency is required. Errors identify missing
+    /// benchmark and unresolved numerical evaluation.
+    pub fn beta(&self) -> Result<Vec<BetaResult>> {
+        self.map_pair_returns(beta)
+    }
+
+    /// Annual Jensen alpha, beta and centered OLS fit statistics on paired spans.
+    ///
+    /// # Arguments
+    ///
+    /// * `risk_free_rate` - Explicit finite annual-effective decimal cash rate
+    ///   greater than `-1`, converted geometrically to each observation period.
+    ///
+    /// # Errors
+    ///
+    /// Returns errors for missing benchmark/frequency, invalid cash and
+    /// unresolved numerical evaluation. Unavailable fields remain NaN.
+    pub fn greeks(&self, risk_free_rate: f64) -> Result<Vec<GreeksResult>> {
+        let ann = self.ann()?;
+        validate_cash(risk_free_rate)?;
+        self.map_pair_returns(|r, bench| greeks(r, bench, ann, risk_free_rate))
+    }
+
+    /// Compact trailing-window Jensen alpha and beta on exact paired dates.
+    ///
+    /// Complete windows are labelled by their final observation date; oversized
+    /// windows return empty arrays, and one-observation windows retain undefined
+    /// point estimates without dropping their dates.
+    ///
+    /// # Arguments
+    ///
+    /// * `ticker_idx` - Zero-based ticker column in the loaded panel.
+    /// * `window` - Explicit positive count of paired observations per window.
+    /// * `risk_free_rate` - Explicit finite annual-effective decimal cash rate
+    ///   greater than `-1`, converted geometrically at the declared frequency.
+    ///
+    /// # Errors
+    ///
+    /// Returns errors for invalid ticker/window/cash, missing benchmark/frequency,
+    /// malformed alignment, or unresolved numerical evaluation.
     pub fn rolling_greeks(
         &self,
         ticker_idx: usize,
         window: usize,
         risk_free_rate: f64,
-    ) -> finstack_quant_core::Result<RollingGreeks> {
+    ) -> Result<RollingGreeks> {
         self.ensure_ticker_idx(ticker_idx)?;
         Self::ensure_window(window)?;
-        let span = self.active_two_ticker_span(ticker_idx, self.benchmark_idx);
-        let r = self.returns_for_span(ticker_idx, span);
-        let bench = self.returns_for_span(self.benchmark_idx, span);
-        Ok(rolling_greeks(
-            r,
-            bench,
+        let ann = self.ann()?;
+        validate_cash(risk_free_rate)?;
+        let benchmark_idx = self.benchmark()?;
+        let span = self.active_two_ticker_span(ticker_idx, benchmark_idx);
+        rolling_greeks(
+            self.returns_for_span(ticker_idx, span),
+            self.returns_for_span(benchmark_idx, span),
             self.dates_for_span(span),
             window,
-            self.ann(),
+            ann,
             risk_free_rate,
-        ))
+        )
     }
 
-    /// Batting average for each ticker versus the active benchmark.
+    /// Fraction of paired observations with strict ticker outperformance.
     ///
-    /// Fraction of periods where the ticker's return exceeds the benchmark's
-    /// return over the active window.
-    pub fn batting_average(&self) -> Vec<f64> {
+    /// Ties remain in the denominator; empty overlap is undefined. No frequency
+    /// or cash is required. Missing benchmark or numeric failure returns an error.
+    pub fn batting_average(&self) -> Result<Vec<f64>> {
         self.map_pair_returns(batting_average)
     }
 
-    /// M-squared (Modigliani-Modigliani) for each ticker.
+    /// Absolute arithmetic annual risk-matched return, including annual cash.
     ///
-    /// Excess return uses the same geometric rf decompounding as
-    /// [`Self::sharpe`]. The cash return added back is that decompounded
-    /// period rate times the panel's periods per year, `rf_period × N`
-    /// (close to `ln(1 + rf)` at daily frequency), not the annual rate itself.
-    ///
-    /// # Arguments
-    ///
-    /// * `risk_free_rate` - Annualized risk-free rate in decimal form.
-    ///   Decompounded to the panel frequency as
-    ///   `rf_period = (1 + rf)^{1/N} − 1`; `rf_period × N` is both subtracted
-    ///   to form the excess return and added back as the cash return.
-    pub fn m_squared(&self, risk_free_rate: f64) -> Vec<f64> {
-        let ann = self.ann();
-        self.map_pair_returns(|r, bench| {
-            if r.len().min(bench.len()) < 2 {
-                return f64::NAN;
-            }
-            let (ann_ret, ann_vol) = risk_metrics::mean_vol_annualized(r, ann);
-            let (_, bench_vol) = risk_metrics::mean_vol_annualized(bench, ann);
-            m_squared(ann_ret, ann_vol, bench_vol, risk_free_rate, ann)
-        })
-    }
-
-    /// Multi-factor regression for a specific ticker.
-    ///
-    /// Factor series are treated as already-excess. [`ReturnKind::Total`]
-    /// subtracts the geometrically decompounded period risk-free rate from
-    /// the ticker's returns only. [`ReturnKind::Excess`] leaves those
-    /// returns unchanged.
+    /// Uses the same paired span for portfolio and benchmark sample SD. Zero
+    /// portfolio SD is undefined; positive portfolio SD and zero benchmark SD
+    /// returns arithmetic annual cash. No volatility floor is applied.
     ///
     /// # Arguments
     ///
-    /// * `ticker_idx` - Zero-based ticker column index in ticker-name order.
-    /// * `factor_returns` - Already-excess factor series, each the same
-    ///   length as the ticker's active return window.
-    /// * `return_kind` - Whether the ticker series is already excess or
-    ///   total. Total subtracts `(1 + rf)^{1/N} − 1` from `y` only.
+    /// * `risk_free_rate` - Explicit finite annual-effective decimal cash rate
+    ///   greater than `-1`; annual cash is `A * expm1(log1p(rate) / A)`.
     ///
     /// # Errors
     ///
-    /// Propagates errors when factor inputs are mismatched, non-finite,
-    /// insufficient, or numerically singular, or when computed coefficients,
-    /// annualized alpha, or residual volatility are non-finite.
+    /// Returns errors for missing benchmark/frequency, invalid cash or unresolved
+    /// calculation failure. Insufficient paired history remains undefined.
+    pub fn m_squared(&self, risk_free_rate: f64) -> Result<Vec<f64>> {
+        let ann = self.ann()?;
+        validate_cash(risk_free_rate)?;
+        self.map_pair_returns(|r, bench| m_squared_from_returns(r, bench, risk_free_rate, ann))
+    }
+
+    /// Multifactor intercept OLS for a ticker's total investment returns.
+    ///
+    /// The panel response is total returns; only the response has geometric
+    /// period cash subtracted. Factor arrays already carry their caller-selected
+    /// interpretation. Use the raw canonical multifactor function for an
+    /// explicitly excess-return response.
+    ///
+    /// # Arguments
+    ///
+    /// * `ticker_idx` - Zero-based panel ticker column.
+    /// * `factor_returns` - Finite factor arrays exactly matching the ticker's
+    ///   active return dates and lengths, prealigned by the caller.
+    /// * `risk_free_rate` - Explicit finite annual-effective decimal cash rate
+    ///   greater than `-1`, converted geometrically at the declared frequency.
+    ///
+    /// # Errors
+    ///
+    /// Returns errors for invalid ticker/cash, missing frequency, malformed factor
+    /// inputs, deficient design rank or unresolved numerical evaluation.
     pub fn multi_factor_greeks(
         &self,
         ticker_idx: usize,
         factor_returns: &[&[f64]],
-        return_kind: ReturnKind,
-    ) -> finstack_quant_core::Result<MultiFactorResult> {
+        risk_free_rate: f64,
+    ) -> Result<MultiFactorResult> {
         self.ensure_ticker_idx(ticker_idx)?;
         multi_factor_greeks(
             self.active_returns(ticker_idx),
             factor_returns,
-            self.ann(),
-            return_kind,
+            self.ann()?,
+            ReturnKind::Total { risk_free_rate },
         )
     }
 }

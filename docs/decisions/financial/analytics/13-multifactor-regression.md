@@ -1,24 +1,16 @@
 # ANALYTICS-013: Multifactor OLS, return-kind conversion and residual risk
 
-**Decision status:** Accepted for the complete multifactor-regression package below (2026-11-07). Implementation reconciliation and independent qualification remain open; shared solver controls remain owned by record 14.
+**Decision status:** Accepted for the complete multifactor-regression package below (2026-11-07).
 
-**Implementation status:** Observed in the source paths below, including the stated discrepancies and fallback behavior.
+**Implementation status:** Implemented in the analytics decision reconciliation dated 2026-11-08. The accepted sections below define the current contract.
 
-**Validation status:** Source inspected; test evidence inspected or located as identified below, not executed. No financial accuracy certification or runtime change is implied.
+**Validation status:** Scoped implementation checks and their limits are recorded in the [analytics inventory](README.md#implementation-evidence). A passing numerical fixture establishes its stated case; it does not certify a population estimator or every supported input.
 
-**Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See the [scope and exact source manifest](README.md).
-
-## Observed choice, scope and domain
-
-Multifactor exposure is equal-weight OLS with an intercept and full column rank. `Performance.multi_factor_greeks` supplies the ticker's active returns, but factor slices have no dates: callers must already align every factor exactly to that ticker span. At least one factor and N>=k+2 observations are required for positive residual degrees of freedom. Nonfinite factors or mismatched lengths error. No risk-model factor construction or time alignment occurs in this crate.
+**Audit provenance:** The original source audit was performed on 2026-11-05 at `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. Its historical discrepancies are superseded by the accepted contracts and this implementation. The [source ledger](coverage.json) retains source ownership and dated inspection fingerprints.
 
 ## Accepted decision: multifactor regression
 
-**Accepted:** 2026-11-07. **Implementation:** Partial; selected source
-inspected at `827ebb75b9`. The raw statistical entry point, Total-only panel
-adapter, explicit input kinds, field-wise zero-df availability, scaled
-evaluation and result restoration require reconciliation. No runtime
-estimator or wire checks were executed.
+**Accepted:** 2026-11-07.
 
 This package covers the complete record-13 statistical model,
 public input ownership, return interpretation, availability, output and
@@ -58,8 +50,7 @@ solver's exact normalization/rank controls and constrained-regression method.
   normally; no percentage continuation is permitted. Raw `Excess` responses
   and converted excess responses need only be finite statistical observations
   and may be below `-1`; they are never validated or compounded as wealth.
-  The current panel-only public surface cannot provide this unrestricted
-  excess-response domain and requires reconciliation.
+  The raw statistical API provides this unrestricted excess-response domain.
 
 Caller responsibilities include factor identity/construction, timestamps and
 observation intervals, decimal-versus-percent units, currencies, cash basis,
@@ -227,45 +218,6 @@ distinguish market excess return from SMB/HML long-short differences. These
 references do not validate this implementation's rank cutoff or numerical
 accuracy, or prescribe a factor dataset.
 
-## Algorithm and selection
+## Implementation evidence
 
-`ReturnKind::Excess` is the default and uses supplied response returns unchanged. `Total {risk_free_rate}` converts annual effective cash to q and subtracts it from the dependent response only; factor columns remain unchanged and must have the intended interpretation supplied by the caller. A nonfinite converted q errors. `from_label` accepts omitted/"excess" only when its separate cash argument is zero, rejects ignored nonzero cash, accepts "total", and rejects unknown labels.
-
-The [accepted cash-input rule](02-wealth-and-annualization.md#accepted-decision-cash-rates)
-requires explicit cash when converting total returns to excess returns.
-Already-excess inputs require no cash or dummy zero and receive no second
-subtraction. The current default input-kind selection is accepted for removal
-above; host defaults and the unused-zero helper contract require
-reconciliation under the [cash-rate follow-up](../FOLLOW_UPS.md#analytics-cash-rate-convention).
-
-Build X with an all-one intercept and k factor columns, then solve using the normalized full-rank SVD kernel in [record 14](14-svd-and-constrained-regression.md). No ridge, pseudoinverse rank truncation or dropped-factor fallback is allowed. Returned factor loadings preserve supplied factor ordering; alpha is the intercept multiplied by annualization A.
-
-To avoid squaring original-scale extreme returns, normalize the response and fitted values by the largest absolute response value (or one for all-zero response). Compute normalized residual SSE and an online response variance giving SST. `R²=1−SSE/SST`; zero SST yields NaN rather than a perfect fit. Adjusted R² is `1−(1−R²)*(N−1)/(N−k−1)`. Residual volatility is `sqrt(SSE/(N−k−1))*response_scale*sqrt(A)`. Fitted values, annual alpha/residual volatility and finite-domain fit statistics are checked for representability; overflow errors rather than returning an infinite coefficient. Constant-response undefined fit fields have explicit nonfinite wire support.
-
-## Conventions, limitations and alternatives
-
-Returns are decimal fractions per observation, A is the declared frequency, beta units depend on supplied factor units, and residual volatility is annualized sample residual risk. This measures exposure conditional on chosen factors, not causal attribution or an automatically tradable hedge. Economic changes to the factor model can change alpha and fit; pure invertible linear reparameterization of the same factor span preserves them mathematically. Column normalization is numerical scaling and is reversed before outputs. It does not standardize factor economic definitions or identify correlated factors by convention.
-
-The accepted invariance rules distinguish factor shifts from pure linear
-reparameterization. The current implementation rejects all zero-df fits and
-has no undefined-residual-volatility wire
-adapter, contrary to the accepted field-wise availability. Its original-scale
-target solve and fitted products can fail before final requested-result
-representability is assessed; scaled response sums alone do not resolve that
-boundary. These are accepted reconciliation requirements, not executed failures.
-
-Factors must be full rank at the internal tolerance; collinear/near-collinear factors fail instead of receiving a minimum-norm solution. Robust regression, ridge/Bayesian estimates, PCA factor extraction, rolling multifactor inference and heteroskedastic coefficient standard errors are unimplemented alternatives. No confidence intervals are returned.
-
-## Implementation and validation evidence
-
-- [Return-kind and multifactor algorithm](../../../../finstack-quant/analytics/src/multi_factor.rs), [public factor caller](../../../../finstack-quant/analytics/src/performance/benchmark.rs), and [SVD implementation](../../../../finstack-quant/analytics/src/regression.rs).
-- [Python Performance bindings](../../../../finstack-quant-py/src/bindings/analytics/performance.rs), [Python result fields/wire entry points](../../../../finstack-quant-py/src/bindings/analytics/types.rs) and [WASM Performance bindings](../../../../finstack-quant-wasm/src/api/analytics/performance.rs) expose the current panel-only input/default and result-conversion boundaries.
-- Located inline tests include synthetic single/two-factor recovery, manual cash subtraction, singular/hidden-collinearity rejection, scaled full-rank inputs and undefined fit-field contracts. [Correctness regressions](../../../../finstack-quant/analytics/tests/correctness_regressions.rs) cover coefficient overflow and representable large residual volatility. These are synthetic/algebraic/numerical checks; no empirical factor data was validated or test run executed.
-- [Fama–French](../../../REFERENCES.md#fama-french-1993) is factor-model context; the crate does not prescribe that particular factor set. [Matrix computations](../../../REFERENCES.md#golub-van-loan-matrix-computations) gives numerical context.
-
-The separate factor crate owns its own factor model policies.
-
-## Follow-up tracking
-
-Implementation reconciliation and missing evidence are tracked in the
-[multifactor-regression follow-up](../FOLLOW_UPS.md#analytics-multifactor-regression).
+[multi_factor.rs](../../../../finstack-quant/analytics/src/multi_factor.rs), [performance/benchmark.rs](../../../../finstack-quant/analytics/src/performance/benchmark.rs). The [crate integration tests](../../../../finstack-quant/analytics/tests/main.rs), inline numerical regressions and [schema contracts](../../../../finstack-quant/analytics/tests/schema_contract.rs) exercise this scope. See the [inventory validation record](README.md#implementation-evidence) for executed checks and evidence limits.

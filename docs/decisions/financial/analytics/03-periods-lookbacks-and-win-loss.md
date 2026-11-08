@@ -1,20 +1,16 @@
 # ANALYTICS-003: Calendar grouping, lookback returns and win/loss statistics
 
-**Decision status:** Accepted for the complete calendar/fiscal grouping, lookback and win/loss package (2026-11-07). Implementation reconciliation and independent qualification remain open; other metric owners retain their scopes.
+**Decision status:** Accepted for the complete calendar/fiscal grouping, lookback and win/loss package (2026-11-07).
 
-**Implementation status:** Observed in the source paths below, including the stated discrepancies and fallback behavior.
+**Implementation status:** Implemented in the analytics decision reconciliation dated 2026-11-08. The accepted sections below define the current contract.
 
-**Validation status:** Source inspected; test evidence inspected or located as identified below, not executed. No financial accuracy certification or runtime change is implied.
+**Validation status:** Scoped implementation checks and their limits are recorded in the [analytics inventory](README.md#implementation-evidence). A passing numerical fixture establishes its stated case; it does not certify a population estimator or every supported input.
 
-**Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See the [scope and exact source manifest](README.md).
+**Audit provenance:** The original source audit was performed on 2026-11-05 at `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. Its historical discrepancies are superseded by the accepted contracts and this implementation. The [source ledger](coverage.json) retains source ownership and dated inspection fingerprints.
 
 ## Accepted decision: calendar grouping, lookbacks and win-loss statistics
 
 **Accepted:** 2026-11-07.
-**Implementation:** Partial; selected source inspected at `827ebb75b9`.
-Explicit aggregation frequency, missing-sample outcomes, result provenance,
-conditional-statistic availability/names and numerical/wire reconciliation
-remain unimplemented. No runtime or binding checks were executed.
 
 This package settles the remaining choices in this record. The accepted
 [actual valuation grid and active-window contract](01-panels-windows-and-wire.md#accepted-decision-panels-windows-wire-and-summary)
@@ -93,7 +89,7 @@ observed zero performance; preserve other available ticker/horizon values.
 Empty grouping remains `[]`, and the private empty-product identity remains
 algebraic rather than a reported lookback result. Validate arguments and
 construct all requested boundaries before empty/terminal shortcuts. Remove
-the current boundary-to-`ref_date` fallbacks; genuine boundary failures error
+boundary-to-`ref_date` fallbacks; genuine boundary failures error
 the call.
 
 Keep `LookbackReturns`' ordered ticker names, reference date and four value
@@ -165,7 +161,7 @@ Probabilities are conditional on decisive buckets; compute `p` and `q`
 directly from their counts. Neutrals remain in ordinary win rate and CPC's
 `N`, but do not change `p`, `q`, payoff or Kelly. Preserve negative values
 without clipping to zero or `[0,1]`. Require both observed gain/loss groups;
-remove current one-sided `1`/`0` and empty/all-neutral `0` shortcuts.
+one-sided and empty/all-neutral histories are unavailable under this rule.
 
 [Kelly's original 1956 paper](https://www.princeton.edu/~wbialek/rome/refs/kelly_56.pdf)
 provides the log-wealth objective. The following unit distinction follows
@@ -219,41 +215,14 @@ or rerun an unavailable source history from compact summaries. Invalid
 requests/restored results error explicitly; no partial repair or new status
 framework is introduced. Reconcile canonical owners, both bindings,
 stubs/declarations, parity, schemas, UI consumers, docs and fixtures together
-when implementation is authorized.
+in the implementation.
 
-Independent qualification remains open for calendar/fiscal boundary and
+Relevant numerical boundary cases include calendar/fiscal boundary and
 clamping cases, cross-boundary intervals, sparse/partial/stale/empty samples,
 one-sided/neutral/negative-Kelly cases, terminal versus rounded bucket losses,
 high-scale/subnormal sums and ratios, restored metadata and matching host
-outcomes. This review changes records only.
+outcomes.
 
-## Observed choice and input domain
+## Implementation evidence
 
-Calendar/fiscal aggregation compounds the observed simple returns in each occupied period. It does not create missing periods or prorate partial buckets. `Performance` provides chronological finite spans; grouping is private and assumes those checked inputs. The canonical period-boundary library supplies `PeriodId` and fiscal rules. This reuse gives consistent boundaries, but does not establish that each financial reporting use should include a partial first or last bucket.
-
-## Observed algorithm and selection
-
-`group_period_buckets` walks aligned dates/returns, detects changes in `PeriodId::from_date`, compounds the bucket using the log-wealth kernel, and labels it with its last observed date. The public `periodic_returns(frequency)` uses calendar periods; `period_stats(ticker_idx,aggregation_frequency,fiscal_config)` can use fiscal grouping before computing statistics. Boundary-construction errors propagate.
-
-Lookbacks select returns whose ending dates lie in `[period_start,ref_date]`, further bounded by each active ticker span. MTD starts on day one of the reference month, QTD on the calendar quarter's first month, YTD on calendar-year start, FYTD on the configured fiscal-year start. Omitted reference date is the last active date; if none exists it errors. Omitted fiscal configuration is calendar year. No observations in a selected interval gives total return zero. If a fiscal start precedes the representable date range, the implementation falls back to `ref_date`; month construction also uses that fallback if it fails.
-
-For N bucket returns: best/worst are extrema; arithmetic average is a Neumaier sum/N; wins are strictly positive, losses strictly negative, zero breaks both streaks. Win rate is wins/N, while average win/loss divides only by its group's count and returns zero for an empty group. Payoff ratio is average gain/absolute average loss; profit factor is total gains/absolute total losses; CPC is profit factor × win rate × payoff ratio. Their division helper returns signed infinity for nonzero/zero and zero for 0/0, and propagates nonfinite operands as NaN.
-
-Kelly uses only decisive periods: `p=wins/(wins+losses)` and `p−(1−p)/payoff`. Infinite payoff returns one; zero payoff returns zero. Neutral buckets therefore affect ordinary win rate but not the binary Kelly fraction. Empty input returns a struct of zeros. Ratio fields explicitly preserve nonfinite wire values.
-
-## Observed conventions, limitations and alternatives
-
-Bucket returns and lookbacks are dimensionless compounded returns, not annualized rates. Streaks count adjacent occupied buckets; an unobserved calendar bucket is not inserted as a neutral outcome. Kelly here is a descriptive binary gain/loss estimate without position limits or a growth-optimal portfolio solve. CPC can overflow as a product of its component ratios. Full-period-only reporting, interpolated missing periods and weighted win rates are unimplemented alternatives requiring separate policies.
-
-## Implementation and validation evidence
-
-- [Grouping/statistics](../../../../finstack-quant/analytics/src/aggregation.rs) and [public aggregation/lookbacks](../../../../finstack-quant/analytics/src/performance/aggregation.rs) own the algorithms.
-- Located inline tests cover month/fiscal windows, default fiscal year, empty reference-date errors and monthly buckets. Inspected [audit regressions](../../../../finstack-quant/analytics/tests/audit_regressions.rs) include neutral-period Kelly invariance and shared fiscal-boundary fixtures; [fiscal data](../../../../finstack-quant/analytics/tests/data/fiscal_buckets.json) is a local fixture, not an independently certified reporting calendar.
-- [Gain-to-pain reference](../../../REFERENCES.md#schwager2012) is adjacent context, not provenance for every CPC/Kelly variant. Specific Kelly/CPC sources and independent expected cases were not established in the original audit; the accepted package above distinguishes newly located primary algebra from this API's period-data adaptation and unqualified numerical behavior.
-
-No tests or fixtures were changed.
-
-## Follow-up tracking
-
-Implementation reconciliation and missing evidence are tracked in the
-[analytics follow-ups](../FOLLOW_UPS.md#analytics).
+[aggregation.rs](../../../../finstack-quant/analytics/src/aggregation.rs), [performance/aggregation.rs](../../../../finstack-quant/analytics/src/performance/aggregation.rs). The [crate integration tests](../../../../finstack-quant/analytics/tests/main.rs), inline numerical regressions and [schema contracts](../../../../finstack-quant/analytics/tests/schema_contract.rs) exercise this scope. See the [inventory validation record](README.md#implementation-evidence) for executed checks and evidence limits.

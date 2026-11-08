@@ -10,13 +10,27 @@
 use finstack_quant_core::schema::SchemaArtifact;
 
 use crate::{
-    BetaResult, CagrDayCount, DatedSeries, DrawdownEpisode, GreeksResult, LookbackReturns,
-    MultiFactorResult, Performance, PerformancePanel, PeriodStats, PeriodicReturn, ReturnKind,
-    RollingGreeks,
+    BetaResult, CagrDayCount, CorrelationResult, DatedSeries, DrawdownEpisode, GreeksResult,
+    LookbackReturns, LookbackSample, MultiFactorResult, Performance, PerformancePanel, PeriodStats,
+    PeriodicReturn, ReturnKind, RollingGreeks,
 };
 
 /// The crate's complete schema registry.
 pub const ARTIFACTS: &[SchemaArtifact] = &[
+    finstack_quant_core::schema_artifact!(
+        CorrelationResult,
+        "analytics",
+        "correlation_result",
+        Output,
+        "Common-sample Pearson correlation with ticker and sample provenance."
+    ),
+    finstack_quant_core::schema_artifact!(
+        LookbackSample,
+        "analytics",
+        "lookback_sample",
+        Component,
+        "Observation count and actual holding bounds for a lookback return."
+    ),
     finstack_quant_core::schema_artifact!(
         BetaResult,
         "analytics",

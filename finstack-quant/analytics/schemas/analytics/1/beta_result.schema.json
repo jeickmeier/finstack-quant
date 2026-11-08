@@ -42,7 +42,7 @@
   "properties": {
     "beta": {
       "$ref": "#/$defs/NonFiniteF64Wire",
-      "description": "Estimated beta coefficient, or [`f64::NAN`] when it is not estimable\ntogether with the confidence interval."
+      "description": "Estimated beta coefficient, or [`f64::NAN`] when fewer than two pairs or a constant benchmark makes it unidentified."
     },
     "ci_lower": {
       "$ref": "#/$defs/NonFiniteF64Wire",
@@ -58,7 +58,7 @@
       "type": "number"
     },
     "n_obs": {
-      "description": "Number of paired observations the regression used: the overlap after\ntruncating both series to the shorter length. Reported even when the\nestimates are [`f64::NAN`]. Required in the serialized result.",
+      "description": "Number of paired observations the regression used: the exact equal-length position-paired sample. Reported even when the\nestimates are [`f64::NAN`]. Required in the serialized result.",
       "format": "uint",
       "minimum": 0,
       "type": "integer"

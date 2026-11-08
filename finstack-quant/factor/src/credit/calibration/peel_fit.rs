@@ -46,7 +46,7 @@ pub(super) fn run_peel(
     bucket_paths: &BTreeMap<IssuerId, Vec<String>>,
     folded: &BTreeMap<IssuerId, Vec<bool>>,
     weights: &BTreeMap<IssuerId, Vec<f64>>,
-) -> PeelOutcome {
+) -> finstack_quant_core::Result<PeelOutcome> {
     let n = panel.generic.len();
     let num_levels = config.hierarchy.levels.len();
 
@@ -77,7 +77,7 @@ pub(super) fn run_peel(
             IssuerBetaMode::BucketOnly => 1.0,
             IssuerBetaMode::IssuerBeta => {
                 gather_aligned_dense(series, &panel.generic, &mut xs, &mut ys);
-                let raw = ols_slope_pairs(&ys, &xs).unwrap_or(1.0);
+                let raw = ols_slope_pairs(&ys, &xs)?.unwrap_or(1.0);
                 let shrunk = apply_shrinkage(&config.beta_shrinkage, raw);
                 // Diagnostics on the through-origin peel residual y − β g,
                 // not the intercept-form residual used by the OLS slope.
@@ -173,12 +173,12 @@ pub(super) fn run_peel(
                             // when the LOO series (the other names) still varies.
                             // Singleton / degenerate LOO then falls back to unit β.
                             gather_aligned_sparse(r_series, factor_series, &mut xs, &mut ys);
-                            let fitted = if non_refining || ols_slope_pairs(&ys, &xs).is_none() {
+                            let fitted = if non_refining || ols_slope_pairs(&ys, &xs)?.is_none() {
                                 None
                             } else {
                                 fill_loo_series(r_series, exclude_w, stats, &mut loo_series);
                                 gather_aligned_sparse(r_series, &loo_series, &mut xs, &mut ys);
-                                ols_slope_pairs(&ys, &xs)
+                                ols_slope_pairs(&ys, &xs)?
                             };
                             let shrunk =
                                 apply_shrinkage(&config.beta_shrinkage, fitted.unwrap_or(1.0));
@@ -234,13 +234,13 @@ pub(super) fn run_peel(
         prev_bucket_members = bucket_members;
     }
 
-    PeelOutcome {
+    Ok(PeelOutcome {
         betas,
         adder_series: residuals,
         fit_quality,
         level_fit_quality,
         factor_returns,
-    }
+    })
 }
 
 /// Full-bucket weighted means plus the totals needed for O(T) leave-one-out.
@@ -435,7 +435,7 @@ fn gather_aligned_sparse(
 
 /// Shared OLS core over aligned pairs: degenerate-regressor gate, then
 /// delegate to `finstack_quant_analytics::beta`.
-fn ols_slope_pairs(ys: &[f64], xs: &[f64]) -> Option<f64> {
+fn ols_slope_pairs(ys: &[f64], xs: &[f64]) -> finstack_quant_core::Result<Option<f64>> {
     let n = xs.len();
     if n >= 2 {
         let nf = n as f64;
@@ -445,15 +445,11 @@ fn ols_slope_pairs(ys: &[f64], xs: &[f64]) -> Option<f64> {
         let var_y = ys.iter().map(|v| (v - mean_y).powi(2)).sum::<f64>();
         // Shared (n − 1) denominator cancels in the ratio test.
         if var_x <= DEGENERATE_REGRESSOR_REL_TOL * var_y {
-            return None;
+            return Ok(None);
         }
     }
-    let result = finstack_quant_analytics::beta(ys, xs);
-    if result.beta.is_nan() {
-        None
-    } else {
-        Some(result.beta)
-    }
+    let result = finstack_quant_analytics::beta(ys, xs)?;
+    Ok((!result.beta.is_nan()).then_some(result.beta))
 }
 
 /// R² and residual std on the through-origin peel residual `y − β x`.

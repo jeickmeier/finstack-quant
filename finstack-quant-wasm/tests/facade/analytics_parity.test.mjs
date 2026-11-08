@@ -47,7 +47,7 @@ const pricePanel = () =>
 
 test('Performance constructor matches the shared Python price golden', () => {
   const panel = pricePanel();
-  const sharpe = Array.from(panel.sharpe());
+  const sharpe = Array.from(panel.sharpe(0));
   sharpe.forEach((value, index) => close(value, PRICES.sharpe[index], 1e-12, `sharpe[${index}]`));
   assert.equal('fromArrays' in Performance, false);
   assert.throws(
@@ -59,7 +59,7 @@ test('Performance constructor matches the shared Python price golden', () => {
         ticker_names: NAMES,
         benchmark_ticker: 'missing',
       }),
-    (error) => error.name === 'FinstackError' && error.kind === 'not_found'
+    (error) => error.name === 'FinstackError' && error.kind === 'validation'
   );
   panel.free();
 });
@@ -71,8 +71,9 @@ test('a return panel matches the shared Python return golden', () => {
     series: returns.values,
     kind: 'returns',
     ticker_names: NAMES,
+    frequency: 'daily',
   });
-  const volatility = Array.from(panel.volatility());
+  const volatility = Array.from(panel.volatility(true));
   volatility.forEach((value, index) =>
     close(value, returns.volatility[index], 1e-12, `volatility[${index}]`)
   );
@@ -90,9 +91,9 @@ test('Performance.fromJson rebuilds an equivalent panel', () => {
   const panel = pricePanel();
   const rebuilt = Performance.fromJson(panel.toJson());
   assert.equal(rebuilt.toJson(), panel.toJson());
-  assert.deepEqual(Array.from(rebuilt.sharpe()), Array.from(panel.sharpe()));
+  assert.deepEqual(Array.from(rebuilt.sharpe(0)), Array.from(panel.sharpe(0)));
   const fromObject = Performance.fromJson(PRICES.json);
-  assert.deepEqual(Array.from(fromObject.sharpe()), Array.from(panel.sharpe()));
+  assert.deepEqual(Array.from(fromObject.sharpe(0)), Array.from(panel.sharpe(0)));
   assert.throws(
     () => Performance.fromJson('{ not json'),
     (error) => error.name === 'FinstackError' && error.kind === 'validation'

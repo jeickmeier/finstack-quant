@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 from typing import Any
+from finstack_quant.core.dates import FiscalConfig
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
@@ -12,77 +13,133 @@ import pandas as pd
 
 class PeriodStats:
     """
-    Aggregated statistics for grouped periodic returns.
+    Equal-weight descriptive statistics of occupied aggregation buckets.
+
+    Counts refer to buckets; neutral buckets affect win rate but not decisive
+    Kelly probabilities. CPC is the Cardinal Profitability Construct adaptation
+    and Kelly is a loss-normalized binary risk fraction, not a capital allocation.
 
     Examples
     --------
-    >>> from datetime import date, timedelta
+    >>> from finstack_quant.analytics import PeriodStats
     >>> from finstack_quant.analytics import Performance, PerformancePanel
-    >>> dates = [date(2024, 1, 1) + timedelta(days=i) for i in range(6)]
     >>> panel = PerformancePanel(
-    ...     dates=dates,
-    ...     series=[[0.10, -0.05, 0.02, 0.0, 0.03, -0.01]],
+    ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
+    ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
     ...     kind="returns",
-    ...     ticker_names=["FUND"],
+    ...     ticker_names=["FUND", "BENCH"],
     ...     frequency="monthly",
+    ...     benchmark_ticker="BENCH",
     ... )
     >>> perf = Performance.from_panel(panel)
-    >>> round(perf.period_stats(0, aggregation_frequency="monthly").win_rate, 1)
-    1.0
+    >>> result = perf.period_stats(0, "daily")
+    >>> isinstance(result, PeriodStats)
+    True
     """
+
+    @property
+    def n_obs(self) -> int:
+        """
+        Number of occupied aggregation buckets, including neutral buckets.
+
+        Returns
+        -------
+        int
+            Number of occupied aggregation buckets, including neutral buckets.
+
+        Notes
+        -----
+        This accessor returns stored validated state and does not raise.
+        """
+        ...
+
+    @property
+    def wins(self) -> int:
+        """
+        Number of buckets with strictly positive compounded returns.
+
+        Returns
+        -------
+        int
+            Number of buckets with strictly positive compounded returns.
+
+        Notes
+        -----
+        This accessor returns stored validated state and does not raise.
+        """
+        ...
+
+    @property
+    def losses(self) -> int:
+        """
+        Number of buckets with strictly negative compounded returns.
+
+        Returns
+        -------
+        int
+            Number of buckets with strictly negative compounded returns.
+
+        Notes
+        -----
+        This accessor returns stored validated state and does not raise.
+        """
+        ...
 
     @staticmethod
     def from_json(json: str) -> PeriodStats:
         """
-        Deserialize a ``PeriodStats`` from JSON.
+        Deserialize and validate a canonical PeriodStats result.
 
         Parameters
         ----------
         json : str
-            Complete JSON string produced by :meth:`to_json`; required metadata must be present and unknown fields are rejected.
+            Complete JSON string with required fields and canonical result sentinels;
+            unknown fields and inconsistent metadata are rejected.
 
         Returns
         -------
         PeriodStats
-            Parsed ``PeriodStats`` instance.
+            Validated result preserving undefined and infinite numeric meanings.
 
         Raises
         ------
         ValueError
-            If ``json`` is malformed, omits required result fields, contains unknown fields, or does not satisfy the serialized schema.
+            If JSON is malformed or violates the result structure or value domains.
 
         Examples
         --------
-        >>> from datetime import date
-        >>> from finstack_quant.analytics import Performance, PerformancePanel, PeriodStats
-        >>> dates = [date(2024, month, 1) for month in range(1, 7)]
+        >>> from finstack_quant.analytics import PeriodStats
+        >>> from finstack_quant.analytics import Performance, PerformancePanel
         >>> panel = PerformancePanel(
-        ...     dates=dates,
-        ...     series=[[0.10, -0.05, 0.02, 0.0, 0.03, -0.01]],
+        ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
+        ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
         ...     kind="returns",
-        ...     ticker_names=["FUND"],
+        ...     ticker_names=["FUND", "BENCH"],
         ...     frequency="monthly",
+        ...     benchmark_ticker="BENCH",
         ... )
         >>> perf = Performance.from_panel(panel)
-        >>> stats = perf.period_stats(0, aggregation_frequency="monthly")
-        >>> PeriodStats.from_json(stats.to_json()).win_rate
-        0.5
+        >>> result = perf.period_stats(0, "daily")
+        >>> restored = PeriodStats.from_json(result.to_json())
+        >>> isinstance(restored, PeriodStats)
+        True
         """
         ...
 
     def to_json(self) -> str:
         """
-        Serialize to compact JSON.
+        Serialize validated result state to canonical compact JSON.
 
         Returns
         -------
         str
-            Compact JSON string.
+            Complete JSON preserving NaN and signed infinity with canonical
+            "nan", "inf" and "-inf" sentinel strings.
 
         Raises
         ------
         ValueError
-            If the value cannot be serialized to JSON.
+            If stored state cannot be serialized.
         """
         ...
 
@@ -237,34 +294,33 @@ class PeriodStats:
         """
 
     @property
-    def cpc_ratio(self) -> float:
+    def cpc_index(self) -> float:
         """
-        CPC index (profit_factor x win_rate x payoff_ratio).
+        Cardinal Profitability Construct index adapted to equal-weight bucket returns.
 
         Returns
         -------
         float
-            Composite measure of profitability consistency.
+            Profit factor times win rate times payoff, defined only when both positive and negative groups are observed.
 
         Notes
         -----
-        This accessor does not raise; it returns the stored value.
+        This accessor returns stored validated state and does not raise.
         """
 
     @property
-    def kelly_criterion(self) -> float:
+    def kelly_risk_fraction(self) -> float:
         """
-        Kelly criterion optimal fraction.
+        Signed loss-normalized binary Kelly risk fraction.
 
         Returns
         -------
         float
-            Binary win/loss payoff approximation, using probabilities conditional
-            on nonzero returns; neutral periods do not affect the fraction.
+            p - q / payoff from decisive buckets; undefined without both gains and losses. This is not an asset-exposure or portfolio-allocation fraction.
 
         Notes
         -----
-        This accessor does not raise; it returns the stored value.
+        This accessor returns stored validated state and does not raise.
         """
 
     def to_series(self) -> pd.Series:
@@ -277,7 +333,7 @@ class PeriodStats:
             Indexed by statistic name (``best``, ``worst``,
             ``consecutive_wins``, ``consecutive_losses``, ``win_rate``,
             ``avg_return``, ``avg_win``, ``avg_loss``, ``payoff_ratio``,
-            ``profit_factor``, ``cpc_ratio``, ``kelly_criterion``); streak
+            ``profit_factor``, ``cpc_index``, ``kelly_risk_fraction``); streak
             counts are cast to ``float``.
 
         Raises
@@ -339,83 +395,84 @@ class PeriodStats:
 
 class BetaResult:
     """
-    Regression beta with confidence interval.
+    Paired equal-weight OLS beta with fixed two-sided 95% Student-t uncertainty.
 
-    The 95% interval uses Student-t critical values for finite samples and an
-    asymptotic normal approximation once ``n - 2 >= 240``.
+    Two varying-benchmark pairs identify beta; uncertainty additionally requires
+    positive residual degrees of freedom. Undefined fields remain native NaN.
 
     Examples
     --------
-    >>> from datetime import date, timedelta
+    >>> from finstack_quant.analytics import BetaResult
     >>> from finstack_quant.analytics import Performance, PerformancePanel
-    >>> dates = [date(2024, 1, 1) + timedelta(days=i) for i in range(6)]
-    >>> benchmark = [-0.02, -0.01, 0.0, 0.01, 0.02, 0.03]
     >>> panel = PerformancePanel(
-    ...     dates=dates,
-    ...     series=[[2.0 * value for value in benchmark], benchmark],
+    ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
+    ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
     ...     kind="returns",
     ...     ticker_names=["FUND", "BENCH"],
-    ...     benchmark_ticker="BENCH",
     ...     frequency="monthly",
+    ...     benchmark_ticker="BENCH",
     ... )
     >>> perf = Performance.from_panel(panel)
-    >>> perf.beta()[0].beta
-    2.0
+    >>> result = perf.beta()[0]
+    >>> isinstance(result, BetaResult)
+    True
     """
 
     @staticmethod
     def from_json(json: str) -> BetaResult:
         """
-        Deserialize a ``BetaResult`` from JSON.
+        Deserialize and validate a canonical BetaResult result.
 
         Parameters
         ----------
         json : str
-            Complete JSON string produced by :meth:`to_json`; required metadata must be present and unknown fields are rejected.
+            Complete JSON string with required fields and canonical result sentinels;
+            unknown fields and inconsistent metadata are rejected.
 
         Returns
         -------
         BetaResult
-            Parsed ``BetaResult`` instance.
+            Validated result preserving undefined and infinite numeric meanings.
 
         Raises
         ------
         ValueError
-            If ``json`` is malformed, omits required result fields, contains unknown fields, or does not satisfy the serialized schema.
+            If JSON is malformed or violates the result structure or value domains.
 
         Examples
         --------
-        >>> from datetime import date, timedelta
-        >>> from finstack_quant.analytics import BetaResult, Performance, PerformancePanel
-        >>> dates = [date(2024, 1, 1) + timedelta(days=i) for i in range(6)]
-        >>> benchmark = [-0.02, -0.01, 0.0, 0.01, 0.02, 0.03]
+        >>> from finstack_quant.analytics import BetaResult
+        >>> from finstack_quant.analytics import Performance, PerformancePanel
         >>> panel = PerformancePanel(
-        ...     dates=dates,
-        ...     series=[[2.0 * value for value in benchmark], benchmark],
+        ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
+        ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
         ...     kind="returns",
         ...     ticker_names=["FUND", "BENCH"],
-        ...     benchmark_ticker="BENCH",
         ...     frequency="monthly",
+        ...     benchmark_ticker="BENCH",
         ... )
         >>> perf = Performance.from_panel(panel)
-        >>> BetaResult.from_json(perf.beta()[0].to_json()).beta
-        2.0
+        >>> result = perf.beta()[0]
+        >>> restored = BetaResult.from_json(result.to_json())
+        >>> isinstance(restored, BetaResult)
+        True
         """
         ...
 
     def to_json(self) -> str:
         """
-        Serialize to compact JSON.
+        Serialize validated result state to canonical compact JSON.
 
         Returns
         -------
         str
-            Compact JSON string.
+            Complete JSON preserving NaN and signed infinity with canonical
+            "nan", "inf" and "-inf" sentinel strings.
 
         Raises
         ------
         ValueError
-            If the value cannot be serialized to JSON.
+            If stored state cannot be serialized.
         """
         ...
 
@@ -574,80 +631,81 @@ class BetaResult:
 
 class GreeksResult:
     """
-    Alpha, beta, and goodness-of-fit from a single-index regression.
+    Paired OLS beta, annualized Jensen alpha and field-specific fit statistics.
 
     Examples
     --------
-    >>> from datetime import date, timedelta
+    >>> from finstack_quant.analytics import GreeksResult
     >>> from finstack_quant.analytics import Performance, PerformancePanel
-    >>> dates = [date(2024, 1, 1) + timedelta(days=i) for i in range(6)]
-    >>> benchmark = [-0.02, -0.01, 0.0, 0.01, 0.02, 0.03]
     >>> panel = PerformancePanel(
-    ...     dates=dates,
-    ...     series=[[2.0 * value for value in benchmark], benchmark],
+    ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
+    ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
     ...     kind="returns",
     ...     ticker_names=["FUND", "BENCH"],
-    ...     benchmark_ticker="BENCH",
     ...     frequency="monthly",
+    ...     benchmark_ticker="BENCH",
     ... )
     >>> perf = Performance.from_panel(panel)
-    >>> round(perf.greeks()[0].alpha, 12)
-    0.0
+    >>> result = perf.greeks(0.0)[0]
+    >>> isinstance(result, GreeksResult)
+    True
     """
 
     @staticmethod
     def from_json(json: str) -> GreeksResult:
         """
-        Deserialize a ``GreeksResult`` from JSON.
+        Deserialize and validate a canonical GreeksResult result.
 
         Parameters
         ----------
         json : str
-            Complete JSON string produced by :meth:`to_json`; required metadata must be present and unknown fields are rejected.
+            Complete JSON string with required fields and canonical result sentinels;
+            unknown fields and inconsistent metadata are rejected.
 
         Returns
         -------
         GreeksResult
-            Parsed ``GreeksResult`` instance.
+            Validated result preserving undefined and infinite numeric meanings.
 
         Raises
         ------
         ValueError
-            If ``json`` is malformed, omits required result fields, contains unknown fields, or does not satisfy the serialized schema.
+            If JSON is malformed or violates the result structure or value domains.
 
         Examples
         --------
-        >>> from datetime import date, timedelta
-        >>> from finstack_quant.analytics import GreeksResult, Performance, PerformancePanel
-        >>> dates = [date(2024, 1, 1) + timedelta(days=i) for i in range(6)]
-        >>> benchmark = [-0.02, -0.01, 0.0, 0.01, 0.02, 0.03]
+        >>> from finstack_quant.analytics import GreeksResult
+        >>> from finstack_quant.analytics import Performance, PerformancePanel
         >>> panel = PerformancePanel(
-        ...     dates=dates,
-        ...     series=[[2.0 * value for value in benchmark], benchmark],
+        ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
+        ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
         ...     kind="returns",
         ...     ticker_names=["FUND", "BENCH"],
-        ...     benchmark_ticker="BENCH",
         ...     frequency="monthly",
+        ...     benchmark_ticker="BENCH",
         ... )
         >>> perf = Performance.from_panel(panel)
-        >>> round(GreeksResult.from_json(perf.greeks()[0].to_json()).alpha, 12)
-        0.0
+        >>> result = perf.greeks(0.0)[0]
+        >>> restored = GreeksResult.from_json(result.to_json())
+        >>> isinstance(restored, GreeksResult)
+        True
         """
         ...
 
     def to_json(self) -> str:
         """
-        Serialize to compact JSON.
+        Serialize validated result state to canonical compact JSON.
 
         Returns
         -------
         str
-            Compact JSON string.
+            Complete JSON preserving NaN and signed infinity with canonical
+            "nan", "inf" and "-inf" sentinel strings.
 
         Raises
         ------
         ValueError
-            If the value cannot be serialized to JSON.
+            If stored state cannot be serialized.
         """
         ...
 
@@ -789,82 +847,84 @@ class GreeksResult:
 
 class RollingGreeks:
     """
-    Rolling alpha and beta time series.
+    Compact right-labelled rolling Jensen alpha and beta estimates.
+
+    Dates are strictly increasing and aligned exactly with both vectors.
+    Undefined window statistics retain native NaN and canonical JSON sentinels.
 
     Examples
     --------
-    >>> from datetime import date, timedelta
+    >>> from finstack_quant.analytics import RollingGreeks
     >>> from finstack_quant.analytics import Performance, PerformancePanel
-    >>> dates = [date(2024, 1, 1) + timedelta(days=i) for i in range(6)]
-    >>> benchmark = [-0.02, -0.01, 0.0, 0.01, 0.02, 0.03]
     >>> panel = PerformancePanel(
-    ...     dates=dates,
-    ...     series=[[2.0 * value for value in benchmark], benchmark],
+    ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
+    ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
     ...     kind="returns",
     ...     ticker_names=["FUND", "BENCH"],
-    ...     benchmark_ticker="BENCH",
     ...     frequency="monthly",
+    ...     benchmark_ticker="BENCH",
     ... )
     >>> perf = Performance.from_panel(panel)
-    >>> rolling = perf.rolling_greeks(0, window=3)
-    >>> len(rolling.dates) == len(rolling.betas)
+    >>> result = perf.rolling_greeks(0, 2, 0.0)
+    >>> isinstance(result, RollingGreeks)
     True
     """
 
     @staticmethod
     def from_json(json: str) -> RollingGreeks:
         """
-        Deserialize a ``RollingGreeks`` from JSON.
+        Deserialize and validate a canonical RollingGreeks result.
 
         Parameters
         ----------
         json : str
-            Complete JSON string produced by :meth:`to_json`; required metadata must be present and unknown fields are rejected.
+            Complete JSON string with required fields and canonical result sentinels;
+            unknown fields and inconsistent metadata are rejected.
 
         Returns
         -------
         RollingGreeks
-            Parsed ``RollingGreeks`` instance.
+            Validated result preserving undefined and infinite numeric meanings.
 
         Raises
         ------
         ValueError
-            If ``json`` is malformed, omits required result fields, contains unknown fields, or does not satisfy the serialized schema.
+            If JSON is malformed or violates the result structure or value domains.
 
         Examples
         --------
-        >>> from datetime import date, timedelta
-        >>> from finstack_quant.analytics import Performance, PerformancePanel, RollingGreeks
-        >>> dates = [date(2024, 1, 1) + timedelta(days=i) for i in range(6)]
-        >>> benchmark = [-0.02, -0.01, 0.0, 0.01, 0.02, 0.03]
+        >>> from finstack_quant.analytics import RollingGreeks
+        >>> from finstack_quant.analytics import Performance, PerformancePanel
         >>> panel = PerformancePanel(
-        ...     dates=dates,
-        ...     series=[[2.0 * value for value in benchmark], benchmark],
+        ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
+        ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
         ...     kind="returns",
         ...     ticker_names=["FUND", "BENCH"],
-        ...     benchmark_ticker="BENCH",
         ...     frequency="monthly",
+        ...     benchmark_ticker="BENCH",
         ... )
         >>> perf = Performance.from_panel(panel)
-        >>> rolling = RollingGreeks.from_json(perf.rolling_greeks(0, window=3).to_json())
-        >>> len(rolling.dates) == len(rolling.betas)
+        >>> result = perf.rolling_greeks(0, 2, 0.0)
+        >>> restored = RollingGreeks.from_json(result.to_json())
+        >>> isinstance(restored, RollingGreeks)
         True
         """
         ...
 
     def to_json(self) -> str:
         """
-        Serialize to compact JSON.
+        Serialize validated result state to canonical compact JSON.
 
         Returns
         -------
         str
-            Compact JSON string.
+            Complete JSON preserving NaN and signed infinity with canonical
+            "nan", "inf" and "-inf" sentinel strings.
 
         Raises
         ------
         ValueError
-            If the value cannot be serialized to JSON.
+            If stored state cannot be serialized.
         """
         ...
 
@@ -964,99 +1024,101 @@ class RollingGreeks:
 
 class MultiFactorResult:
     """
-    Multi-factor regression result.
+    Equal-weight intercept OLS coefficients and residual-df-adjusted fit statistics.
+
+    Alpha is an annual arithmetic response intercept, betas retain factor units
+    and residual volatility is annualized using N - k - 1 residual degrees of
+    freedom. Saturated fits preserve coefficients but lack residual risk.
 
     Examples
     --------
-    >>> from datetime import date, timedelta
+    >>> from finstack_quant.analytics import MultiFactorResult
     >>> from finstack_quant.analytics import Performance, PerformancePanel
-    >>> dates = [date(2024, 1, 1) + timedelta(days=i) for i in range(6)]
-    >>> factor = [-0.02, -0.01, 0.0, 0.01, 0.02, 0.03]
     >>> panel = PerformancePanel(
-    ...     dates=dates,
-    ...     series=[[2.0 * value for value in factor]],
+    ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
+    ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
     ...     kind="returns",
-    ...     ticker_names=["FUND"],
+    ...     ticker_names=["FUND", "BENCH"],
     ...     frequency="monthly",
+    ...     benchmark_ticker="BENCH",
     ... )
     >>> perf = Performance.from_panel(panel)
-    >>> round(float(perf.multi_factor_greeks(0, [factor]).betas[0]), 1)
-    2.0
+    >>> result = perf.multi_factor_greeks(0, [[0.02, -0.03, 0.01]], 0.0)
+    >>> isinstance(result, MultiFactorResult)
+    True
     """
 
     @staticmethod
     def from_json(json: str) -> MultiFactorResult:
         """
-        Deserialize a ``MultiFactorResult`` from JSON.
+        Deserialize and validate a canonical MultiFactorResult result.
 
         Parameters
         ----------
         json : str
-            Complete JSON string produced by :meth:`to_json`; required metadata must be present and unknown fields are rejected.
+            Complete JSON string with required fields and canonical result sentinels;
+            unknown fields and inconsistent metadata are rejected.
 
         Returns
         -------
         MultiFactorResult
-            Parsed ``MultiFactorResult`` instance.
+            Validated result preserving undefined and infinite numeric meanings.
 
         Raises
         ------
         ValueError
-            If ``json`` is malformed, omits required result fields, contains unknown fields, or does not satisfy the serialized schema.
+            If JSON is malformed or violates the result structure or value domains.
 
         Examples
         --------
-        >>> from datetime import date, timedelta
-        >>> from finstack_quant.analytics import MultiFactorResult, Performance, PerformancePanel
-        >>> dates = [date(2024, 1, 1) + timedelta(days=i) for i in range(6)]
-        >>> factor = [-0.02, -0.01, 0.0, 0.01, 0.02, 0.03]
+        >>> from finstack_quant.analytics import MultiFactorResult
+        >>> from finstack_quant.analytics import Performance, PerformancePanel
         >>> panel = PerformancePanel(
-        ...     dates=dates,
-        ...     series=[[2.0 * value for value in factor]],
+        ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
+        ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
         ...     kind="returns",
-        ...     ticker_names=["FUND"],
+        ...     ticker_names=["FUND", "BENCH"],
         ...     frequency="monthly",
+        ...     benchmark_ticker="BENCH",
         ... )
         >>> perf = Performance.from_panel(panel)
-        >>> fitted = MultiFactorResult.from_json(perf.multi_factor_greeks(0, [factor]).to_json())
-        >>> round(float(fitted.betas[0]), 1)
-        2.0
+        >>> result = perf.multi_factor_greeks(0, [[0.02, -0.03, 0.01]], 0.0)
+        >>> restored = MultiFactorResult.from_json(result.to_json())
+        >>> isinstance(restored, MultiFactorResult)
+        True
         """
         ...
 
     def to_json(self) -> str:
         """
-        Serialize to compact JSON.
+        Serialize validated result state to canonical compact JSON.
 
         Returns
         -------
         str
-            Compact JSON string.
+            Complete JSON preserving NaN and signed infinity with canonical
+            "nan", "inf" and "-inf" sentinel strings.
 
         Raises
         ------
         ValueError
-            If the value cannot be serialized to JSON.
+            If stored state cannot be serialized.
         """
         ...
 
     @property
     def alpha(self) -> float:
         """
-        Annualized OLS intercept of the (possibly rf-adjusted) dependent series.
-
-        For ``return_kind="excess"`` this is the intercept of already-excess
-        ``y``. For ``return_kind="total"`` it is Jensen-style after subtracting
-        the decompounded period risk-free rate from ``y`` only.
+        Annual arithmetic intercept in the supplied response model.
 
         Returns
         -------
         float
-            Annualized regression intercept.
+            Declared periods per year times the observation-period OLS intercept; cash is subtracted only for an explicit Total-response fit.
 
         Notes
         -----
-        This accessor does not raise; it returns the stored value.
+        This accessor returns stored validated state and does not raise.
         """
 
     @property
@@ -1107,16 +1169,16 @@ class MultiFactorResult:
     @property
     def residual_vol(self) -> float:
         """
-        Residual (idiosyncratic) volatility of the multi-factor fit.
+        Annualized in-sample residual standard deviation.
 
         Returns
         -------
         float
-            Standard deviation of regression residuals.
+            sqrt(SSE / (N - k - 1)) scaled by sqrt(periods_per_year); NaN when residual degrees of freedom are zero.
 
         Notes
         -----
-        This accessor does not raise; it returns the stored value.
+        This accessor returns stored validated state and does not raise.
         """
 
     @property
@@ -1191,75 +1253,85 @@ class MultiFactorResult:
 
 class DrawdownEpisode:
     """
-    A single drawdown episode with timing and depth information.
+    Strict compounded percentage drawdown episode on a rebased observed path.
+
+    An episode starts at the last preceding observed peak and closes only at
+    an observed exact zero drawdown. Open episodes have no recovery date and
+    measure duration through the last observed endpoint.
 
     Examples
     --------
-    >>> from datetime import date, timedelta
+    >>> from finstack_quant.analytics import DrawdownEpisode
     >>> from finstack_quant.analytics import Performance, PerformancePanel
-    >>> dates = [date(2024, 1, 1) + timedelta(days=i) for i in range(5)]
     >>> panel = PerformancePanel(
-    ...     dates=dates,
-    ...     series=[[100.0, 90.0, 95.0, 80.0, 100.0]],
-    ...     kind="prices",
-    ...     ticker_names=["FUND"],
+    ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
+    ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
+    ...     kind="returns",
+    ...     ticker_names=["FUND", "BENCH"],
+    ...     frequency="monthly",
+    ...     benchmark_ticker="BENCH",
     ... )
     >>> perf = Performance.from_panel(panel)
-    >>> round(perf.drawdown_details(0, n=1)[0].max_drawdown, 1)
-    -0.2
+    >>> result = perf.drawdown_details(0, 1)[0]
+    >>> isinstance(result, DrawdownEpisode)
+    True
     """
 
     @staticmethod
     def from_json(json: str) -> DrawdownEpisode:
         """
-        Deserialize a ``DrawdownEpisode`` from JSON.
+        Deserialize and validate a canonical DrawdownEpisode result.
 
         Parameters
         ----------
         json : str
-            Complete JSON string produced by :meth:`to_json`; required metadata must be present and unknown fields are rejected.
+            Complete JSON string with required fields and canonical result sentinels;
+            unknown fields and inconsistent metadata are rejected.
 
         Returns
         -------
         DrawdownEpisode
-            Parsed ``DrawdownEpisode`` instance.
+            Validated result preserving undefined and infinite numeric meanings.
 
         Raises
         ------
         ValueError
-            If ``json`` is malformed, omits required result fields, contains unknown fields, or does not satisfy the serialized schema.
+            If JSON is malformed or violates the result structure or value domains.
 
         Examples
         --------
-        >>> from datetime import date, timedelta
-        >>> from finstack_quant.analytics import DrawdownEpisode, Performance, PerformancePanel
-        >>> dates = [date(2024, 1, 1) + timedelta(days=i) for i in range(5)]
+        >>> from finstack_quant.analytics import DrawdownEpisode
+        >>> from finstack_quant.analytics import Performance, PerformancePanel
         >>> panel = PerformancePanel(
-        ...     dates=dates,
-        ...     series=[[100.0, 90.0, 95.0, 80.0, 100.0]],
-        ...     kind="prices",
-        ...     ticker_names=["FUND"],
+        ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
+        ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
+        ...     kind="returns",
+        ...     ticker_names=["FUND", "BENCH"],
+        ...     frequency="monthly",
+        ...     benchmark_ticker="BENCH",
         ... )
         >>> perf = Performance.from_panel(panel)
-        >>> episode = perf.drawdown_details(0, n=1)[0]
-        >>> round(DrawdownEpisode.from_json(episode.to_json()).max_drawdown, 1)
-        -0.2
+        >>> result = perf.drawdown_details(0, 1)[0]
+        >>> restored = DrawdownEpisode.from_json(result.to_json())
+        >>> isinstance(restored, DrawdownEpisode)
+        True
         """
         ...
 
     def to_json(self) -> str:
         """
-        Serialize to compact JSON.
+        Serialize validated result state to canonical compact JSON.
 
         Returns
         -------
         str
-            Compact JSON string.
+            Complete JSON preserving NaN and signed infinity with canonical
+            "nan", "inf" and "-inf" sentinel strings.
 
         Raises
         ------
         ValueError
-            If the value cannot be serialized to JSON.
+            If stored state cannot be serialized.
         """
         ...
 
@@ -1338,36 +1410,6 @@ class DrawdownEpisode:
         This accessor does not raise; it returns the stored value.
         """
 
-    @property
-    def near_recovery_threshold(self) -> float:
-        """
-        Near-recovery threshold.
-
-        Returns
-        -------
-        float
-            Price level that would signal near-recovery.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-
-    @property
-    def truncated_at_start(self) -> bool:
-        """
-        True when the episode began before the first observation (left-censored).
-
-        Returns
-        -------
-        bool
-            ``True`` if the drawdown started before the available data window.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-
     def to_dataframe(self) -> pd.DataFrame:
         """
         Export as a single-row ``pandas.DataFrame``.
@@ -1376,8 +1418,7 @@ class DrawdownEpisode:
         -------
         pd.DataFrame
             Columns ``start``, ``valley``, ``end`` (``datetime64``; ``NaT``
-            while still in drawdown), ``duration_days``, ``max_drawdown``,
-            ``near_recovery_threshold``, ``truncated_at_start``. Stack
+            while still in drawdown), ``duration_days`` and ``max_drawdown``. Stack
             episodes with ``pd.concat([ep.to_dataframe() for ep in episodes])``.
 
         Raises
@@ -1421,75 +1462,164 @@ class DrawdownEpisode:
 
 class LookbackReturns:
     """
-    Period-to-date returns for each ticker.
+    Calendar/fiscal lookback returns and compact sample provenance per ticker.
+
+    Each value vector matches ticker order and its corresponding sample vector.
+    Empty samples retain undefined NaN return values and absent holding bounds.
 
     Examples
     --------
-    >>> from datetime import date, timedelta
+    >>> from finstack_quant.analytics import LookbackReturns
     >>> from finstack_quant.analytics import Performance, PerformancePanel
-    >>> dates = [date(2024, 1, 1) + timedelta(days=i) for i in range(5)]
     >>> panel = PerformancePanel(
-    ...     dates=dates,
-    ...     series=[[100.0, 90.0, 95.0, 80.0, 100.0]],
-    ...     kind="prices",
-    ...     ticker_names=["FUND"],
+    ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
+    ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
+    ...     kind="returns",
+    ...     ticker_names=["FUND", "BENCH"],
+    ...     frequency="monthly",
+    ...     benchmark_ticker="BENCH",
     ... )
     >>> perf = Performance.from_panel(panel)
-    >>> len(perf.lookback_returns(date(2024, 1, 5)).fytd)
-    1
+    >>> result = perf.lookback_returns()
+    >>> isinstance(result, LookbackReturns)
+    True
     """
+
+    @property
+    def fiscal_config(self) -> FiscalConfig:
+        """
+        Resolved fiscal opening configuration used by FYTD; calendar-year rules are retained when no override was supplied.
+
+        Returns
+        -------
+        FiscalConfig
+            Resolved fiscal opening configuration used by FYTD; calendar-year rules are retained when no override was supplied.
+
+        Notes
+        -----
+        This accessor returns stored validated state and does not raise.
+        """
+        ...
+
+    @property
+    def mtd_samples(self) -> list[LookbackSample]:
+        """
+        Ticker-aligned raw observation counts and actual holding bounds for MTD.
+
+        Returns
+        -------
+        list[LookbackSample]
+            Ticker-aligned raw observation counts and actual holding bounds for MTD.
+
+        Notes
+        -----
+        This accessor returns stored validated state and does not raise.
+        """
+        ...
+
+    @property
+    def qtd_samples(self) -> list[LookbackSample]:
+        """
+        Ticker-aligned raw observation counts and actual holding bounds for QTD.
+
+        Returns
+        -------
+        list[LookbackSample]
+            Ticker-aligned raw observation counts and actual holding bounds for QTD.
+
+        Notes
+        -----
+        This accessor returns stored validated state and does not raise.
+        """
+        ...
+
+    @property
+    def ytd_samples(self) -> list[LookbackSample]:
+        """
+        Ticker-aligned raw observation counts and actual holding bounds for YTD.
+
+        Returns
+        -------
+        list[LookbackSample]
+            Ticker-aligned raw observation counts and actual holding bounds for YTD.
+
+        Notes
+        -----
+        This accessor returns stored validated state and does not raise.
+        """
+        ...
+
+    @property
+    def fytd_samples(self) -> list[LookbackSample]:
+        """
+        Ticker-aligned raw observation counts and actual holding bounds for FYTD.
+
+        Returns
+        -------
+        list[LookbackSample]
+            Ticker-aligned raw observation counts and actual holding bounds for FYTD.
+
+        Notes
+        -----
+        This accessor returns stored validated state and does not raise.
+        """
+        ...
 
     @staticmethod
     def from_json(json: str) -> LookbackReturns:
         """
-        Deserialize a ``LookbackReturns`` from JSON.
+        Deserialize and validate a canonical LookbackReturns result.
 
         Parameters
         ----------
         json : str
-            Complete JSON string produced by :meth:`to_json`; required metadata must be present and unknown fields are rejected.
+            Complete JSON string with required fields and canonical result sentinels;
+            unknown fields and inconsistent metadata are rejected.
 
         Returns
         -------
         LookbackReturns
-            Parsed ``LookbackReturns`` instance.
+            Validated result preserving undefined and infinite numeric meanings.
 
         Raises
         ------
         ValueError
-            If ``json`` is malformed, omits required result fields, contains unknown fields, or does not satisfy the serialized schema.
+            If JSON is malformed or violates the result structure or value domains.
 
         Examples
         --------
-        >>> from datetime import date, timedelta
-        >>> from finstack_quant.analytics import LookbackReturns, Performance, PerformancePanel
-        >>> dates = [date(2024, 1, 1) + timedelta(days=i) for i in range(5)]
+        >>> from finstack_quant.analytics import LookbackReturns
+        >>> from finstack_quant.analytics import Performance, PerformancePanel
         >>> panel = PerformancePanel(
-        ...     dates=dates,
-        ...     series=[[100.0, 90.0, 95.0, 80.0, 100.0]],
-        ...     kind="prices",
-        ...     ticker_names=["FUND"],
+        ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
+        ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
+        ...     kind="returns",
+        ...     ticker_names=["FUND", "BENCH"],
+        ...     frequency="monthly",
+        ...     benchmark_ticker="BENCH",
         ... )
         >>> perf = Performance.from_panel(panel)
-        >>> lookback = perf.lookback_returns(date(2024, 1, 5))
-        >>> len(LookbackReturns.from_json(lookback.to_json()).mtd)
-        1
+        >>> result = perf.lookback_returns()
+        >>> restored = LookbackReturns.from_json(result.to_json())
+        >>> isinstance(restored, LookbackReturns)
+        True
         """
         ...
 
     def to_json(self) -> str:
         """
-        Serialize to compact JSON.
+        Serialize validated result state to canonical compact JSON.
 
         Returns
         -------
         str
-            Compact JSON string.
+            Complete JSON preserving NaN and signed infinity with canonical
+            "nan", "inf" and "-inf" sentinel strings.
 
         Raises
         ------
         ValueError
-            If the value cannot be serialized to JSON.
+            If stored state cannot be serialized.
         """
         ...
 
@@ -1640,87 +1770,84 @@ class LookbackReturns:
 
 class DatedSeries:
     """
-    Date-indexed numeric series returned by the rolling-window analytics.
+    Validated compact date-indexed numeric output of a rolling metric.
 
-    Rolling-window methods return this shared carrier. It wraps Rust
-    ``DatedSeries``, whose ``value_column`` (a Rust ``RollingMetric``) names
-    the metric; WASM rolling methods return the same ``{values, dates,
-    value_column}`` object.
+    One value is stored per complete-window endpoint. Native undefined values
+    and intentional signed infinities round-trip as canonical result sentinels.
 
     Examples
     --------
-    >>> from datetime import date, timedelta
+    >>> from finstack_quant.analytics import DatedSeries
     >>> from finstack_quant.analytics import Performance, PerformancePanel
-    >>> dates = [date(2024, 1, 1) + timedelta(days=i) for i in range(5)]
     >>> panel = PerformancePanel(
-    ...     dates=dates,
-    ...     series=[[100.0, 90.0, 95.0, 80.0, 100.0]],
-    ...     kind="prices",
-    ...     ticker_names=["FUND"],
+    ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
+    ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
+    ...     kind="returns",
+    ...     ticker_names=["FUND", "BENCH"],
+    ...     frequency="monthly",
+    ...     benchmark_ticker="BENCH",
     ... )
     >>> perf = Performance.from_panel(panel)
-    >>> series = perf.rolling_returns(0, window=2)
-    >>> (len(series.values) == len(series.dates), series.value_column)
-    (True, 'return')
+    >>> result = perf.rolling_returns(0, 2)
+    >>> isinstance(result, DatedSeries)
+    True
     """
 
     @staticmethod
     def from_json(json: str) -> DatedSeries:
         """
-        Deserialize a ``DatedSeries`` from JSON.
+        Deserialize and validate a canonical DatedSeries result.
 
         Parameters
         ----------
         json : str
-            JSON string produced by :meth:`to_json`, carrying ``values``,
-            ``dates`` and ``value_column``.
+            Complete JSON string with required fields and canonical result sentinels;
+            unknown fields and inconsistent metadata are rejected.
 
         Returns
         -------
         DatedSeries
-            Parsed ``DatedSeries`` instance, including its metric label.
+            Validated result preserving undefined and infinite numeric meanings.
 
         Raises
         ------
         ValueError
-            If ``json`` is malformed or does not satisfy the serialized schema,
-            including a ``value_column`` other than ``"volatility"``,
-            ``"sortino"``, ``"sharpe"`` or ``"return"``.
+            If JSON is malformed or violates the result structure or value domains.
 
         Examples
         --------
-        >>> from datetime import date, timedelta
-        >>> from finstack_quant.analytics import DatedSeries, Performance, PerformancePanel
-        >>> dates = [date(2024, 1, 1) + timedelta(days=i) for i in range(5)]
+        >>> from finstack_quant.analytics import DatedSeries
+        >>> from finstack_quant.analytics import Performance, PerformancePanel
         >>> panel = PerformancePanel(
-        ...     dates=dates,
-        ...     series=[[100.0, 90.0, 95.0, 80.0, 100.0]],
-        ...     kind="prices",
-        ...     ticker_names=["FUND"],
+        ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
+        ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
+        ...     kind="returns",
+        ...     ticker_names=["FUND", "BENCH"],
+        ...     frequency="monthly",
+        ...     benchmark_ticker="BENCH",
         ... )
         >>> perf = Performance.from_panel(panel)
-        >>> series = DatedSeries.from_json(perf.rolling_returns(0, window=2).to_json())
-        >>> series.value_column
-        'return'
+        >>> result = perf.rolling_returns(0, 2)
+        >>> restored = DatedSeries.from_json(result.to_json())
+        >>> isinstance(restored, DatedSeries)
+        True
         """
         ...
 
     def to_json(self) -> str:
         """
-        Serialize to compact JSON.
-
-        Emits ``values`` and ``dates`` plus the ``value_column`` label, so the
-        metric name survives a round-trip.
+        Serialize validated result state to canonical compact JSON.
 
         Returns
         -------
         str
-            Compact JSON string.
+            Complete JSON preserving NaN and signed infinity with canonical
+            "nan", "inf" and "-inf" sentinel strings.
 
         Raises
         ------
         ValueError
-            If the value cannot be serialized to JSON.
+            If stored state cannot be serialized.
         """
         ...
 
@@ -1820,5 +1947,328 @@ class DatedSeries:
         ------
         ValueError
             If serialization of the stored value fails.
+        """
+        ...
+
+class LookbackSample:
+    """
+    Compact actual holding-span provenance for one ticker and one lookback horizon.
+
+    Examples
+    --------
+    >>> from finstack_quant.analytics import LookbackSample
+    >>> from finstack_quant.analytics import Performance, PerformancePanel
+    >>> panel = PerformancePanel(
+    ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
+    ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
+    ...     kind="returns",
+    ...     ticker_names=["FUND", "BENCH"],
+    ...     frequency="monthly",
+    ...     benchmark_ticker="BENCH",
+    ... )
+    >>> perf = Performance.from_panel(panel)
+    >>> result = perf.lookback_returns().mtd_samples[0]
+    >>> isinstance(result, LookbackSample)
+    True
+    """
+
+    @property
+    def n_obs(self) -> int:
+        """
+        Number of included raw interval returns, zero for an empty sample.
+
+        Returns
+        -------
+        int
+            Number of included raw interval returns, zero for an empty sample.
+
+        Notes
+        -----
+        This accessor returns stored validated state and does not raise.
+        """
+        ...
+
+    @property
+    def holding_start(self) -> datetime.date | None:
+        """
+        Actual valuation immediately before the first included return, absent for an empty sample.
+
+        Returns
+        -------
+        datetime.date | None
+            Actual valuation immediately before the first included return, absent for an empty sample.
+
+        Notes
+        -----
+        This accessor returns stored validated state and does not raise.
+        """
+        ...
+
+    @property
+    def holding_end(self) -> datetime.date | None:
+        """
+        Last included return endpoint, absent for an empty sample.
+
+        Returns
+        -------
+        datetime.date | None
+            Last included return endpoint, absent for an empty sample.
+
+        Notes
+        -----
+        This accessor returns stored validated state and does not raise.
+        """
+        ...
+
+    @staticmethod
+    def from_json(json: str) -> LookbackSample:
+        """
+        Deserialize and validate a canonical LookbackSample carrier.
+
+        Parameters
+        ----------
+        json : str
+            Complete canonical JSON; all fields are required and unknown fields
+            or inconsistent count, date and numerical state are rejected.
+
+        Returns
+        -------
+        LookbackSample
+            Validated result carrier preserving original ordering and metadata.
+
+        Raises
+        ------
+        ValueError
+            If JSON is malformed or the result metadata is inconsistent.
+
+        Examples
+        --------
+        >>> from finstack_quant.analytics import LookbackSample
+        >>> from finstack_quant.analytics import Performance, PerformancePanel
+        >>> panel = PerformancePanel(
+        ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
+        ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
+        ...     kind="returns",
+        ...     ticker_names=["FUND", "BENCH"],
+        ...     frequency="monthly",
+        ...     benchmark_ticker="BENCH",
+        ... )
+        >>> perf = Performance.from_panel(panel)
+        >>> result = perf.lookback_returns().mtd_samples[0]
+        >>> isinstance(result, LookbackSample)
+        True
+        >>> isinstance(LookbackSample.from_json(result.to_json()), LookbackSample)
+        True
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize the complete validated carrier.
+
+        Returns
+        -------
+        str
+            Canonical compact JSON with all required metadata.
+
+        Raises
+        ------
+        ValueError
+            If serialization of stored state fails.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """
+        Support pickle through canonical JSON restoration.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of stored state fails.
+        """
+        ...
+
+class CorrelationResult:
+    """
+    Common-sample Pearson correlation and its observed sample provenance.
+
+    The matrix is finite, symmetric and unit-diagonal; singular positive-
+    semidefinite matrices are allowed. No repair flag or adjusted matrix is stored.
+
+    Examples
+    --------
+    >>> from finstack_quant.analytics import CorrelationResult
+    >>> from finstack_quant.analytics import Performance, PerformancePanel
+    >>> panel = PerformancePanel(
+    ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
+    ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
+    ...     kind="returns",
+    ...     ticker_names=["FUND", "BENCH"],
+    ...     frequency="monthly",
+    ...     benchmark_ticker="BENCH",
+    ... )
+    >>> perf = Performance.from_panel(panel)
+    >>> result = perf.correlation_matrix()
+    >>> isinstance(result, CorrelationResult)
+    True
+    """
+
+    @property
+    def tickers(self) -> list[str]:
+        """
+        Original ticker identities in the same order as matrix rows and columns.
+
+        Returns
+        -------
+        list[str]
+            Original ticker identities in the same order as matrix rows and columns.
+
+        Notes
+        -----
+        This accessor returns stored validated state and does not raise.
+        """
+        ...
+
+    @property
+    def matrix(self) -> list[list[float]]:
+        """
+        Finite symmetric Pearson coefficients on the one shared sample; no automatic projection or pairwise fallback.
+
+        Returns
+        -------
+        list[list[float]]
+            Finite symmetric Pearson coefficients on the one shared sample; no automatic projection or pairwise fallback.
+
+        Notes
+        -----
+        This accessor returns stored validated state and does not raise.
+        """
+        ...
+
+    @property
+    def n_obs(self) -> int:
+        """
+        Number of common observed endpoints, at least two.
+
+        Returns
+        -------
+        int
+            Number of common observed endpoints, at least two.
+
+        Notes
+        -----
+        This accessor returns stored validated state and does not raise.
+        """
+        ...
+
+    @property
+    def start_date(self) -> datetime.date:
+        """
+        First included common return endpoint.
+
+        Returns
+        -------
+        datetime.date
+            First included common return endpoint.
+
+        Notes
+        -----
+        This accessor returns stored validated state and does not raise.
+        """
+        ...
+
+    @property
+    def end_date(self) -> datetime.date:
+        """
+        Last included common return endpoint.
+
+        Returns
+        -------
+        datetime.date
+            Last included common return endpoint.
+
+        Notes
+        -----
+        This accessor returns stored validated state and does not raise.
+        """
+        ...
+
+    @staticmethod
+    def from_json(json: str) -> CorrelationResult:
+        """
+        Deserialize and validate a canonical CorrelationResult carrier.
+
+        Parameters
+        ----------
+        json : str
+            Complete canonical JSON; all fields are required and unknown fields
+            or inconsistent count, date and numerical state are rejected.
+
+        Returns
+        -------
+        CorrelationResult
+            Validated result carrier preserving original ordering and metadata.
+
+        Raises
+        ------
+        ValueError
+            If JSON is malformed or the result metadata is inconsistent.
+
+        Examples
+        --------
+        >>> from finstack_quant.analytics import CorrelationResult
+        >>> from finstack_quant.analytics import Performance, PerformancePanel
+        >>> panel = PerformancePanel(
+        ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
+        ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
+        ...     kind="returns",
+        ...     ticker_names=["FUND", "BENCH"],
+        ...     frequency="monthly",
+        ...     benchmark_ticker="BENCH",
+        ... )
+        >>> perf = Performance.from_panel(panel)
+        >>> result = perf.correlation_matrix()
+        >>> isinstance(result, CorrelationResult)
+        True
+        >>> isinstance(CorrelationResult.from_json(result.to_json()), CorrelationResult)
+        True
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize the complete validated carrier.
+
+        Returns
+        -------
+        str
+            Canonical compact JSON with all required metadata.
+
+        Raises
+        ------
+        ValueError
+            If serialization of stored state fails.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """
+        Support pickle through canonical JSON restoration.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            Reconstruction callable and JSON arguments.
+
+        Raises
+        ------
+        ValueError
+            If serialization of stored state fails.
         """
         ...

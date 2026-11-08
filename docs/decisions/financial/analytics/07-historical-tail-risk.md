@@ -1,30 +1,16 @@
 # ANALYTICS-007: Historical return VaR, exact-tail expected shortfall and tail ratio
 
-**Decision status:** Accepted for the four scoped decisions below (2026-11-06–2026-11-07) and the remaining complete historical-tail numerical evaluation/failure package (2026-11-07). Implementation reconciliation and independent qualification remain open; other metric owners retain their scopes.
+**Decision status:** Accepted for the four scoped decisions below (2026-11-06–2026-11-07) and the remaining complete historical-tail numerical evaluation/failure package (2026-11-07).
 
-**Implementation status:** Observed in the source paths below, including the stated discrepancies and fallback behavior.
+**Implementation status:** Implemented in the analytics decision reconciliation dated 2026-11-08. The accepted sections below define the current contract.
 
-**Validation status:** Source inspected; test evidence inspected or located as identified below, not executed. No financial accuracy certification or runtime change is implied.
+**Validation status:** Scoped implementation checks and their limits are recorded in the [analytics inventory](README.md#implementation-evidence). A passing numerical fixture establishes its stated case; it does not certify a population estimator or every supported input.
 
-**Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See the [scope and exact source manifest](README.md).
-
-## Choice, rationale and domain
-
-Historical tail metrics are equal-weight empirical estimators on each ticker's finite active observations, assumed to describe the requested tail. Public confidence c must be finite and strictly inside (0,1); invalid confidence produces `Error::Validation` before private kernels. Empty samples return NaN. The returned VaR/ES are signed decimal returns: −0.05 denotes a 5% loss, not a positive monetary loss. All-positive samples can produce positive outputs. There is no money conversion, zero clipping, time decay or volatility rescaling; historical tails stay in the observations' native period.
-
-The observed confidence range above conflicts with the
-[accepted explicit-confidence contract](01-panels-windows-and-wire.md#accepted-decision-explicit-tail-confidence):
-require supplied finite `0.5 < c < 1`, without an implicit 95% default.
-This input decision does not select an estimator. Output signs and the
-historical VaR/ES formulas follow their separately accepted decisions below.
+**Audit provenance:** The original source audit was performed on 2026-11-05 at `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. Its historical discrepancies are superseded by the accepted contracts and this implementation. The [source ledger](coverage.json) retains source ownership and dated inspection fingerprints.
 
 ## Accepted decision: historical-tail numerical evaluation and failures
 
 **Accepted:** 2026-11-07.
-**Implementation:** Not reconciled; selected source inspected at `827ebb75b9`.
-Rank/mass residual preservation, scaled/cancellation-aware interpolation and
-tail averaging, requested-result evaluation and calculation-error propagation
-require reconciliation. No runtime estimator checks were executed.
 
 The four accepted sections below remain authoritative: signed native-period
 R-7 historical VaR, fractional empirical ES, nonempty-sample availability and
@@ -120,7 +106,7 @@ cannot be represented as a nonzero binary64 number; that VaR request errors.
 Its ES is genuinely zero and remains reportable. For five identical `u`
 observations at supplied `c = 0.6`, ES must remain `u`, rather than vanish when individually
 weighted contributions underflow. These are independently derived arithmetic
-cases, not executed source tests or statistical-accuracy certification.
+cases, independent arithmetic definitions or statistical-accuracy certification.
 
 ### Failure propagation, outputs and shared owners
 
@@ -141,19 +127,14 @@ quantile and ES arithmetic with their other callers, including CDaR under
 [record 06](06-drawdown-reward-and-cdar.md#accepted-decision-drawdown-reward-and-cdar),
 without changing their separately accepted populations or definitions.
 
-Reconcile canonical Rust, bindings, stubs/declarations, parity, schemas,
-UI consumers, docs and fixtures together when implementation is authorized.
-Independently qualify near-integer ranks/masses, closest-to-one confidence,
+Qualification cases include near-integer ranks/masses, closest-to-one confidence,
 ties, singleton/constant and terminal samples, cancellation, subnormals,
 extreme scales, support/order invariants, separately versus jointly requested
-outputs and native/summary host errors. This review changes records only.
+outputs and native/summary host errors.
 
 ## Accepted decision: signed tail outputs
 
-**Accepted:** 2026-11-06. **Implementation:** Partial; selected source
-inspected at `5140b499cc`. The kernels preserve signed return estimates, but
-public VaR wording incorrectly promises nonpositive outputs. No runtime or
-independent numerical checks were executed.
+**Accepted:** 2026-11-06.
 
 Historical VaR, expected shortfall, Gaussian VaR and Cornish–Fisher VaR return
 signed decimal returns consistently across Rust, Python, WASM and summaries.
@@ -178,7 +159,7 @@ CDaR retains signed nonpositive drawdown outputs: `-0.12` means a mean drawdown
 of 12% in the selected worst tail. A valid observed path with no drawdown may
 produce zero. The [accepted record-06 package](06-drawdown-reward-and-cdar.md#accepted-decision-drawdown-reward-and-cdar)
 separately defines CDaR's endpoint population, fractional estimator and empty-
-history undefined result. The current empty-zero substitution requires reconciliation.
+history undefined result.
 
 Under the
 [accepted modified-Sharpe rule](04-return-risk-ratios.md#accepted-decision-observation-period-modified-sharpe),
@@ -190,19 +171,9 @@ value to manufacture a positive denominator from a nonnegative CF quantile.
 Invalid CF estimates remain explicit errors and unavailable moments remain
 undefined.
 
-The historical finite-sample formulas are accepted separately below, and
-[ADR 0033](0033-value-at-risk-method-selection.md#accepted-decision-fixed-historical-tail-selection)
-owns the accepted scalar/summary selection. Tail ratio follows its separately
-accepted magnitude definition below; economic-support treatment remains
-separately scoped. Reconciliation is owned by the
-[tail-sign follow-up](../FOLLOW_UPS.md#analytics-tail-output-signs).
-
 ## Accepted decision: historical VaR and fractional empirical ES
 
-**Accepted:** 2026-11-06. **Implementation:** Partial; selected source
-inspected at `5140b499cc`. The formulas are present, but finite-sample
-probability wording requires reconciliation. The illustrative arithmetic
-below was checked independently; no runtime estimator tests were executed.
+**Accepted:** 2026-11-06.
 
 For an eligible finite active return sample, historical VaR uses the R-7
 sample quantile at `p = 1 - c`: sort returns and linearly interpolate at
@@ -244,21 +215,9 @@ Inverse-empirical-CDF VaR would be `-10%` in that example, with the same
 fractional empirical ES. That alternative would derive both measures from
 one equal-weight scenario distribution; it is not the selected VaR estimator.
 
-This accepts the formulas for historical return VaR/ES. Summary method
-selection is accepted in ADR 0033; CDaR's drawdown sampling/estimator contract
-is separately accepted in record 06. Eligible
-history and small-tail behavior follow the separately accepted rule below.
-Passing availability checks does not qualify statistical tail accuracy.
-Reconciliation and independent
-implementation qualification are owned by the
-[historical-estimator follow-up](../FOLLOW_UPS.md#analytics-historical-tail-estimators).
-
 ## Accepted decision: historical availability and small tails
 
-**Accepted:** 2026-11-07. **Implementation:** Availability behavior observed
-in selected source at `5140b499cc`. Empty/nonempty handling and the absence of
-a tail-count cutoff match this scope; the shared confidence contract still
-requires reconciliation. No runtime estimator checks were executed.
+**Accepted:** 2026-11-07.
 
 Validate the explicitly supplied confidence before applying per-ticker
 availability, including for empty histories. Historical VaR and ES use each
@@ -289,17 +248,9 @@ changing that probability mass. Computability does not establish reliable
 tail estimation. Application-specific statistical qualification remains
 separate; do not imply it from the sample count or confidence alone.
 
-Historical summary selection is accepted separately in ADR 0033; CDaR
-availability is separately accepted in record 06.
-Qualification and cross-host reconciliation are owned by the
-[historical-availability follow-up](../FOLLOW_UPS.md#analytics-historical-tail-availability).
-
 ## Accepted decision: empirical tail ratio
 
-**Accepted:** 2026-11-07. **Implementation:** Partial; selected source
-inspected at `5140b499cc`. The formula and exact-zero/empty-history branches
-are present; gain/loss interpretation and the shared confidence contract
-require reconciliation. No runtime estimator checks were executed.
+**Accepted:** 2026-11-07.
 
 Tail ratio uses the upper and lower R-7 quantile magnitudes of each ticker's
 valid active return history, at explicitly supplied confidence `c`:
@@ -325,8 +276,7 @@ availability rather than suppressing other tickers' valid outcomes.
 Use exact-zero denominator rules, without a near-zero cutoff. One nonzero
 observation gives one; one zero observation gives undefined. These boundary
 rules do not qualify numerical overflow or underflow; their explicit
-evaluation/failure contract is accepted above. Independent
-implementation qualification remains open.
+evaluation/failure contract is accepted above. The implementation evidence is limited to its stated numerical cases.
 
 Allow all-positive and all-negative samples. The measure describes quantile
 magnitude asymmetry: an upper-gain/lower-loss interpretation applies when the
@@ -334,48 +284,6 @@ selected quantiles straddle zero. Constant `-1%` returns and constant `+1%`
 returns both give one; neither a ratio of one nor a ratio above one alone
 establishes favorable absolute performance.
 
-The magnitude convention is also used by
-[Empyrical's published implementation](https://raw.githubusercontent.com/quantopian/empyrical/master/empyrical/stats.py),
-which fixes the quantiles at 95% and 5%; this API requires explicit confidence
-and retains its own finite-input and availability contracts. No complete
-cross-library numerical parity is claimed. Computability does not establish
-reliable tail estimation. Reconciliation and qualification are owned by the
-[tail-ratio follow-up](../FOLLOW_UPS.md#analytics-tail-ratio).
+## Implementation evidence
 
-## Algorithm and selection
-
-The [accepted horizon convention](08-moments-gaussian-and-cornish-fisher.md#accepted-decision-observation-period-horizons)
-keeps historical VaR/ES in the supplied observations' native period, without
-automatic square-root scaling. Historical VaR/ES use the accepted pair above;
-confidence is governed by the separately accepted input contract.
-
-VaR copies the observations and calls the core R-7 quantile at p=1−c. For sorted x, h=(N−1)p, j=floor(h), it linearly interpolates x[j] and x[j+1]. Partial selection avoids fully sorting. A private combined VaR/ES route shares the scratch copy for summary but preserves the two distinct estimators.
-
-Expected shortfall instead integrates exact empirical lower-tail mass m=(1−c)N. Let k=floor(m). After selecting the boundary order statistic, sum the k lowest observations with weight 1/m each and add the next observation with weight (m−k)/m. If m<1, return the single worst observation. Ties do not expand the chosen probability mass: the estimator does not average every return below an interpolated VaR threshold. This difference matters in small and tied samples.
-
-Tail ratio is `abs(Q(c))/abs(Q(1−c))`, with positive upper-tail magnitude/zero lower-tail magnitude giving infinity; both zero gives NaN. The use of absolute values means the numerator is not necessarily a gain quantile. The current validator permits confidence below .5, conflicting with the accepted range; that behavior is not an open choice.
-
-`Performance.value_at_risk`, `expected_shortfall` and `tail_ratio` choose these kernels directly; summary's `value_at_risk` and `expected_shortfall` always select the historical route. `parametric_var` and `cornish_fisher_var` are separate explicit methods, not fallbacks when historical data is short. CDaR calls this ES kernel on negative drawdown observations rather than returns.
-
-## Limitations and alternatives
-
-Resolution is limited by sample size. The accepted descriptive availability rule permits any nonempty valid sample without a hard tail-count cutoff; statistical tail-accuracy qualification remains separate. The accepted pair uses R-7 interpolation for VaR and a step empirical distribution for ES. Finite panel validation is relied upon by the ES kernel, which does not perform its own full public input validation. The related [selection ADR 0033](0033-value-at-risk-method-selection.md) owns the cross-estimator selection rationale and prior CF-error requirement; this record owns the historical algorithms.
-
-The public VaR documentation promises non-positive outputs, but the kernel returns the signed quantile without a zero floor. Reconcile the wording with the accepted sign decision above and [ADR 0007](../conventions/0007-units-and-sign-conventions.md); do not change the estimator or discard positive estimates.
-
-Other empirical quantiles, exceedance-only ES, weighted historical sampling, block bootstrap, filtered historical simulation and full portfolio revaluation are not selected by this API. Naming these alternatives does not approve replacement of the observed estimator.
-
-## Implementation and validation evidence
-
-- [Tail kernels](../../../../finstack-quant/analytics/src/risk_metrics/tail_risk.rs), [public/summary dispatch](../../../../finstack-quant/analytics/src/performance/scalar.rs), and [R-7 implementation](../../../../finstack-quant/core/src/math/stats.rs).
-- Inspected [audit regression](../../../../finstack-quant/analytics/tests/audit_regressions.rs) `tail_mass_is_exact_with_ties_and_fractional_observations` specifies independent arithmetic expectations, including −.25/1.5 and worst-return tails smaller than one observation. Inline combined-versus-standalone tests are same-kernel consistency evidence. Confidence rejection tests are located in [correctness regressions](../../../../finstack-quant/analytics/tests/correctness_regressions.rs).
-- [Coherent-risk reference](../../../REFERENCES.md#artzner1999CoherentRisk) is contextual. The accepted subsection above identifies R-7 and the Rockafellar–Uryasev discrete-tail convention from primary sources. Independent implementation comparisons, numerical tolerances and statistical accuracy qualification remain incomplete.
-
-No market observations were fetched and no runtime estimators were executed.
-The accepted subsection's illustrative arithmetic is independent of production
-code and does not validate the implementation.
-
-## Follow-up tracking
-
-Implementation reconciliation and missing evidence are tracked in the
-[analytics follow-ups](../FOLLOW_UPS.md#analytics).
+[risk_metrics/tail_risk.rs](../../../../finstack-quant/analytics/src/risk_metrics/tail_risk.rs), [performance/scalar.rs](../../../../finstack-quant/analytics/src/performance/scalar.rs). The [crate integration tests](../../../../finstack-quant/analytics/tests/main.rs), inline numerical regressions and [schema contracts](../../../../finstack-quant/analytics/tests/schema_contract.rs) exercise this scope. See the [inventory validation record](README.md#implementation-evidence) for executed checks and evidence limits.

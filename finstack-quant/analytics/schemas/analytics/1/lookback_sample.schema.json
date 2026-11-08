@@ -1,0 +1,48 @@
+{
+  "$defs": {
+    "DateWire": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/analytics/1/lookback_sample.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Observation count and actual holding bounds for a lookback return.",
+  "properties": {
+    "holding_end": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DateWire"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Actual final selected return endpoint; absent when empty."
+    },
+    "holding_start": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DateWire"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Actual valuation immediately before the first selected return; absent when empty."
+    },
+    "n_obs": {
+      "description": "Number of original return intervals selected, rather than calendar buckets.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "n_obs"
+  ],
+  "title": "LookbackSample",
+  "type": "object"
+}

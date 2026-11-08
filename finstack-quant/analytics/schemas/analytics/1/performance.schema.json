@@ -41,6 +41,7 @@
       ]
     },
     "TickerSpan": {
+      "additionalProperties": false,
       "properties": {
         "end": {
           "format": "uint",
@@ -68,7 +69,10 @@
     "benchmark_idx": {
       "format": "uint",
       "minimum": 0,
-      "type": "integer"
+      "type": [
+        "integer",
+        "null"
+      ]
     },
     "end_idx": {
       "format": "uint",
@@ -76,7 +80,14 @@
       "type": "integer"
     },
     "frequency": {
-      "$ref": "#/$defs/PeriodKind"
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PeriodKind"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "price_dates": {
       "items": {
@@ -117,8 +128,6 @@
     "returns",
     "return_spans",
     "ticker_names",
-    "benchmark_idx",
-    "frequency",
     "start_idx",
     "end_idx"
   ],

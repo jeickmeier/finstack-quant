@@ -5,8 +5,10 @@
       "Performance",
       "constrainedLeastSquares",
       "maxDrawdown",
+      "multiFactorGreeks",
       "sharpe",
       "sortino",
+      "validateSummary",
       "volatility"
     ]
   },
@@ -41,6 +43,7 @@
       "getDates",
       "getDrawdownSeries",
       "getFrequency",
+      "getPairedDates",
       "getReturns",
       "getReturnsForTicker",
       "getTickerIndex",
@@ -89,6 +92,12 @@
     "getters": []
   },
   "analytics.constrainedLeastSquares": {
+    "kind": "function"
+  },
+  "analytics.multiFactorGreeks": {
+    "kind": "function"
+  },
+  "analytics.validateSummary": {
     "kind": "function"
   },
   "analytics.maxDrawdown": {

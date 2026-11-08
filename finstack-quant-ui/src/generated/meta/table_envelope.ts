@@ -93,7 +93,8 @@ export default [
   {
     "path": "#/$defs/d_1ae146054330a667eefc/oneOf/2/properties/values/items",
     "source": "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json#/$defs/TableColumnData/oneOf/2/properties/values/items",
-    "format": "double"
+    "ref": "#/$defs/NonFiniteF64Wire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json#/$defs/NonFiniteF64Wire"
   },
   {
     "path": "#/$defs/d_1ae146054330a667eefc/oneOf/3",
@@ -248,6 +249,47 @@ export default [
     "source": "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json#/$defs/TableColumn/properties/role/anyOf/1"
   },
   {
+    "path": "#/$defs/d_523aa06debb28c76a725",
+    "source": "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json#/$defs/NonFiniteSentinel",
+    "description": "Sentinel string the [`non_finite_f64`] adapter writes for a non-finite `f64`."
+  },
+  {
+    "path": "#/$defs/d_523aa06debb28c76a725/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json#/$defs/NonFiniteSentinel/oneOf/0",
+    "const": "inf",
+    "description": "`+∞`, written as `\"inf\"`."
+  },
+  {
+    "path": "#/$defs/d_523aa06debb28c76a725/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json#/$defs/NonFiniteSentinel/oneOf/1",
+    "const": "-inf",
+    "description": "`-∞`, written as `\"-inf\"`."
+  },
+  {
+    "path": "#/$defs/d_523aa06debb28c76a725/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json#/$defs/NonFiniteSentinel/oneOf/2",
+    "const": "nan",
+    "description": "`NaN`, written as `\"nan\"`."
+  },
+  {
+    "path": "#/$defs/d_5b5465b41b06bb451742",
+    "source": "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json#/$defs/NonFiniteF64Wire",
+    "description": "An `f64` in the [`non_finite_f64`] wire form: a JSON number when finite,\notherwise one of the strings `\"inf\"`, `\"-inf\"` or `\"nan\"`.\n\nContract types store plain `f64` fields with\n`#[serde(with = \"finstack_quant_core::wire::non_finite_f64\")]` and name this\ntype in `#[schemars(with = ...)]`, so the generated schema describes the\nsentinel strings the serializer actually writes."
+  },
+  {
+    "path": "#/$defs/d_5b5465b41b06bb451742/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json#/$defs/NonFiniteF64Wire/anyOf/0",
+    "description": "A finite value, written as a JSON number.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_5b5465b41b06bb451742/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json#/$defs/NonFiniteF64Wire/anyOf/1",
+    "description": "A non-finite value, written as its sentinel string.",
+    "ref": "#/$defs/NonFiniteSentinel",
+    "resolvedRef": "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json#/$defs/NonFiniteSentinel"
+  },
+  {
     "path": "#/$defs/d_bc00f88f44950a08d00d",
     "source": "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json#/$defs/TableColumnRole",
     "description": "Optional semantic hint for a column."
@@ -290,6 +332,7 @@ export default [
   {
     "path": "#/properties/metadata",
     "source": "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json#/properties/metadata",
+    "default": {},
     "description": "Table-level metadata for downstream bindings and documentation."
   },
   {

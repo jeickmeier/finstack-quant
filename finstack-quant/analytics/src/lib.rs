@@ -30,9 +30,8 @@
 //! [`ReturnKind`], [`DatedSeries`], [`RollingMetric`], [`PeriodicReturn`],
 //! [`LookbackReturns`], [`CagrDayCount`]) are re-exported here because `Performance` takes or returns them.
 //!
-//! The `DEFAULT_*` constants ([`DEFAULT_CONFIDENCE`], [`DEFAULT_ROLLING_WINDOW`],
-//! [`DEFAULT_PERIODS_PER_YEAR`], ...) are the values the Python and WebAssembly
-//! bindings substitute for omitted arguments.
+//! Calculation inputs such as confidence, cash, frequency, and windows are
+//! explicit. [`DEFAULT_ANNUALIZE`] controls only the host presentation flag.
 //!
 //! Freestanding public exceptions are intentionally narrow:
 //! - [`sharpe`], [`sortino`], [`volatility`], and [`max_drawdown`] operate on
@@ -83,8 +82,10 @@
 
 pub(crate) mod aggregation;
 pub(crate) mod benchmark;
+mod correlation;
 pub(crate) mod defaults;
 pub(crate) mod drawdown;
+mod exact;
 pub(crate) mod multi_factor;
 pub(crate) mod performance;
 pub mod regression;
@@ -93,16 +94,15 @@ pub(crate) mod risk_metrics;
 #[cfg(feature = "json-schema")]
 pub mod schema;
 
-pub use aggregation::{PeriodStats, PeriodicReturn};
+pub use aggregation::{LookbackSample, PeriodStats, PeriodicReturn};
 pub use benchmark::{BetaResult, GreeksResult, RollingGreeks, beta};
-pub use defaults::{
-    DEFAULT_ANNUALIZE, DEFAULT_CONFIDENCE, DEFAULT_DRAWDOWN_COUNT, DEFAULT_FREQUENCY, DEFAULT_MAR,
-    DEFAULT_PERIODIC_FREQUENCY, DEFAULT_PERIODS_PER_YEAR, DEFAULT_RISK_FREE_RATE,
-    DEFAULT_ROLLING_WINDOW,
-};
+pub use correlation::CorrelationResult;
+pub use defaults::DEFAULT_ANNUALIZE;
 pub use drawdown::DrawdownEpisode;
-pub use multi_factor::{MultiFactorResult, ReturnKind};
-pub use performance::{LookbackReturns, PanelSeriesKind, Performance, PerformancePanel};
+pub use multi_factor::{MultiFactorResult, ReturnKind, multi_factor_greeks};
+pub use performance::{
+    LookbackReturns, PanelSeriesKind, Performance, PerformancePanel, validate_summary,
+};
 pub use risk_metrics::{
     CagrDayCount, DatedSeries, RollingMetric, max_drawdown, sharpe, sortino, volatility,
 };

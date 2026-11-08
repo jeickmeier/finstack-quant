@@ -457,6 +457,40 @@
         }
       ]
     },
+    "NonFiniteF64Wire": {
+      "anyOf": [
+        {
+          "description": "A finite value, written as a JSON number.",
+          "format": "double",
+          "type": "number"
+        },
+        {
+          "$ref": "#/$defs/NonFiniteSentinel",
+          "description": "A non-finite value, written as its sentinel string."
+        }
+      ],
+      "description": "An `f64` in the [`non_finite_f64`] wire form: a JSON number when finite,\notherwise one of the strings `\"inf\"`, `\"-inf\"` or `\"nan\"`.\n\nContract types store plain `f64` fields with\n`#[serde(with = \"finstack_quant_core::wire::non_finite_f64\")]` and name this\ntype in `#[schemars(with = ...)]`, so the generated schema describes the\nsentinel strings the serializer actually writes."
+    },
+    "NonFiniteSentinel": {
+      "description": "Sentinel string the [`non_finite_f64`] adapter writes for a non-finite `f64`.",
+      "oneOf": [
+        {
+          "const": "inf",
+          "description": "`+∞`, written as `\"inf\"`.",
+          "type": "string"
+        },
+        {
+          "const": "-inf",
+          "description": "`-∞`, written as `\"-inf\"`.",
+          "type": "string"
+        },
+        {
+          "const": "nan",
+          "description": "`NaN`, written as `\"nan\"`.",
+          "type": "string"
+        }
+      ]
+    },
     "PercentileSeries": {
       "description": "Per-metric percentile time series.",
       "properties": {
@@ -512,6 +546,7 @@
       ]
     },
     "TableColumn": {
+      "additionalProperties": false,
       "description": "A single named column in a [`TableEnvelope`].",
       "properties": {
         "data": {
@@ -549,6 +584,7 @@
       "description": "Column storage variants supported by the table envelope.",
       "oneOf": [
         {
+          "additionalProperties": false,
           "description": "Non-null string column.",
           "properties": {
             "type": {
@@ -569,6 +605,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Nullable string column.",
           "properties": {
             "type": {
@@ -592,6 +629,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Non-null floating-point column.",
           "properties": {
             "type": {
@@ -600,8 +638,7 @@
             },
             "values": {
               "items": {
-                "format": "double",
-                "type": "number"
+                "$ref": "#/$defs/NonFiniteF64Wire"
               },
               "type": "array"
             }
@@ -613,6 +650,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Nullable floating-point column.",
           "properties": {
             "type": {
@@ -637,6 +675,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Non-null unsigned 32-bit integer column.",
           "properties": {
             "type": {
@@ -659,6 +698,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Nullable unsigned 32-bit integer column.",
           "properties": {
             "type": {
@@ -684,6 +724,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Non-null signed 64-bit integer column.",
           "properties": {
             "type": {
@@ -705,6 +746,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Nullable signed 64-bit integer column.",
           "properties": {
             "type": {
@@ -729,6 +771,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Non-null boolean column.",
           "properties": {
             "type": {
@@ -776,6 +819,7 @@
       ]
     },
     "TableEnvelope": {
+      "additionalProperties": false,
       "description": "Serializable columnar table envelope.\n\nTables preserve column order and validate that every column has the same row\ncount. Optional metadata can record domain-specific hints such as which\ncolumn is a metric, what a numeric field represents, or how a host-language\nbinding should interpret the data.",
       "properties": {
         "columns": {
@@ -787,6 +831,7 @@
         },
         "metadata": {
           "additionalProperties": true,
+          "default": {},
           "description": "Table-level metadata for downstream bindings and documentation.",
           "type": "object"
         },

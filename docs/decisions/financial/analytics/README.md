@@ -1,119 +1,105 @@
 # Analytics algorithm methodology inventory
 
-**Scope:** all **21 Rust source files** in `finstack-quant/analytics/src`, audited at `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` on 2026-11-05: **18 algorithm-bearing files and 3 support files**, no dedicated test-only or generated source files. [coverage.json](coverage.json) maps every assigned file once with the reviewed SHA-256 digest. There are **15 detailed records, all accepted for their complete scoped methodology as of 2026-11-07**, and **44 algorithm-level inventory rows**.
+The analytics crate implements the **15 accepted methodology records** below.
+Their decisions were accepted on 2026-11-06–2026-11-07 and reconciled with the
+Rust, Python, WASM, schema and UI contracts on 2026-11-08. Accepted sections
+state the current contract; the former implementation discrepancies have
+been removed from the follow-up registers.
 
-All assigned runtime implementations were inspected, including financial validation/defaults, private numerical kernels, serde reconstruction and code after test sections. Related core functions and selected tests were inspected or located for the evidence roles stated in each record. The core crates own general moment/day-count/linear-algebra kernels; this slice owns analytics caller selection and interpretation. There were **no runtime changes, builds, financial calculations, tests or benchmarks** in the original 2026-11-05 source audit. Subsequent decision reviews checked independent illustrative arithmetic; runtime implementation and estimator qualification remain open. Static coverage/link checks are documentation checks, not estimator validation.
-
-Existing accepted decisions remain authoritative. The observed code still conflicts with the accepted ACT/365F dated-CAGR default and prior directions for actual initial valuation dates, explicit invalid-Cornish–Fisher errors, strictly positive up-capture, cash-adjusted Martin and modified Burke over all episodes. Those are reconciliation requirements, not new optional methodology choices. The records distinguish these from unresolved numerical/reference qualification and new static wire-contract concerns.
+The original 2026-11-05 audit inspected **21 Rust source files** at
+`7e82fd03ad98346727769e88dd5ac5d84b56e9fc`: 18 algorithm files and three support
+files. The current tree has **23 files**, including the separate correlation and
+exact-statistics modules added in the implementation. The [source ledger](coverage.json) retains source ownership and dated
+inspection fingerprints. Source enumeration and hashes establish the
+identified source boundary, rather than numerical or statistical certification.
 
 ## Governing and overview ADRs
 
-These ADRs retain their stated scope and decision status. They are separate
-from the detailed algorithm records and source counts below.
-
-| ADR | Decision status | Scope |
-| --- | --- | --- |
-| [0008](../conventions/0008-financial-defaults-and-cagr.md) | Accepted | Financial defaults and dated-window CAGR |
-| [0009](../conventions/0009-missing-and-invalid-data.md) | Accepted | Invalid inputs, missing observations, and undefined results |
-| [0033](0033-value-at-risk-method-selection.md#accepted-decision-fixed-historical-tail-selection) | Accepted for fixed historical selection (2026-11-07) | Canonical VaR/ES and standard summary use the historical pair; Gaussian/CF remain explicit alternatives. Broader summary policies remain separately scoped. |
+| Record | Accepted scope |
+| --- | --- |
+| [0008](../conventions/0008-financial-defaults-and-cagr.md) | Dated CAGR defaults to Actual/365 Fixed. |
+| [0009](../conventions/0009-missing-and-invalid-data.md) | Invalid inputs, permitted edge gaps and undefined estimates remain distinct. |
+| [0033](0033-value-at-risk-method-selection.md#accepted-decision-fixed-historical-tail-selection) | Canonical and fixed-summary tails use historical VaR/ES; Gaussian/CF are explicit alternatives. |
 
 ## Accepted scopes in detailed records
 
-The following scopes were accepted on 2026-11-06–2026-11-07 in their existing
-owning records, which state each acceptance date. Together they complete the
-methodology decision review for all 15 records; no further analytics file
-awaits methodology adoption. Implementation and independent numerical,
-statistical and cross-interface qualification remain open.
+All 15 records are accepted for their complete scoped methodology. Each
+retains its acceptance dates, formulas, units, availability rules, numerical
+failure contracts and evidence limits.
 
-| Owning section | Accepted scope |
+| Record | Implemented scope |
 | --- | --- |
-| [01: Explicit observation frequency](01-panels-windows-and-wire.md#accepted-decision-explicit-observation-frequency) | Caller-supplied observation frequency for annualized risk; no date-index inference. |
-| [01: Explicit tail confidence](01-panels-windows-and-wire.md#accepted-decision-explicit-tail-confidence) | Caller-supplied finite `0.5 < c < 1` for tail metrics and affected summaries, without an implicit 95% default. |
-| [01: Panels, windows, wire and summary](01-panels-windows-and-wire.md#accepted-decision-panels-windows-wire-and-summary) | Complete actual valuation-grid admission, explicit context/unit selection, atomic active windows, validated state/wire and fixed-summary inputs, provenance and result/failure contract. |
-| [02: Terminal investment losses](02-wealth-and-annualization.md#accepted-decision-terminal-investment-losses) | Exact terminal wipeouts and the supported nonnegative-wealth return domain. |
-| [02: Cash rates](02-wealth-and-annualization.md#accepted-decision-cash-rates) | Explicit annual effective decimal cash wherever used, geometric period conversion and explicit validation errors. |
-| [02: Wealth, means, CAGR, relative wealth and cash series](02-wealth-and-annualization.md#accepted-decision-wealth-means-cagr-relative-wealth-and-cash-series) | Complete compounding/means, empty/terminal outcomes, actual dated CAGR/context, relative positive-benchmark domain, paired dates, aligned annual-effective cash and requested-result numerical contract. |
-| [03: Calendar grouping, lookbacks and win-loss statistics](03-periods-lookbacks-and-win-loss.md#accepted-decision-calendar-grouping-lookbacks-and-win-loss-statistics) | Complete explicit bucket-frequency, partial/occupied calendar-fiscal grouping, observed streaks, dated lookback coverage, conditional means, profit-factor/CPC/loss-normalized Kelly and numerical/wire contract. |
-| [04: Insufficient history and zero risk](04-return-risk-ratios.md#accepted-decision-insufficient-history-and-zero-risk) | Distinct unavailable sample risk, measured zero risk, undefined reward/risk `0/0` and valid signed infinities. |
-| [04: Volatility and Sharpe](04-return-risk-ratios.md#accepted-decision-sample-volatility-and-sharpe) | Sample SD, arithmetic excess-return Sharpe and unadjusted square-root frequency scaling, with stated aggregation limits. |
-| [04: Explicit MAR](04-return-risk-ratios.md#accepted-decision-explicit-per-observation-mar) | Caller-supplied per-observation MAR for Sortino, rolling Sortino, downside deviation and affected summaries. |
-| [04: Downside deviation and Sortino](04-return-risk-ratios.md#accepted-decision-downside-deviation-and-sortino) | All-observation downside denominator, frequency scaling and estimator-specific sample/zero-downside outcomes. |
-| [04: Omega](04-return-risk-ratios.md#accepted-decision-empirical-omega-and-explicit-threshold) | Empirical unannualized gain/shortfall ratio with explicit finite per-observation threshold and defined boundary outcomes. |
-| [04: Gain-to-pain](04-return-risk-ratios.md#accepted-decision-arithmetic-gain-to-pain) | Arithmetic net return sum divided by negative-return magnitudes, without annualization, and explicit zero-loss outcomes. |
-| [04: Modified Sharpe](04-return-risk-ratios.md#accepted-decision-observation-period-modified-sharpe) | Observation-period excess numerator, total-return CF loss denominator, no annualization, and estimator-specific availability/error rules. |
-| [04: Standalone scalar domains and numerical failures](04-return-risk-ratios.md#accepted-decision-standalone-scalar-domains-and-numerical-failures) | Complete standalone total-investment domain, any-finite MAR, validation order, stable requested scalar evaluation, genuine zero-risk and calculation-error contract. |
-| [05: Drawdown paths and episodes](05-drawdown-paths-and-episodes.md#accepted-decision-drawdown-paths-and-episodes) | Complete geometric/rebased path, standalone measures, strict recovery, dates/durations, output selection, metadata removal, benchmark difference and failure contract. |
-| [06: Drawdown reward and CDaR](06-drawdown-reward-and-cdar.md#accepted-decision-drawdown-reward-and-cdar) | Complete Calmar, Martin, recovery, Sterling, observation-normalized all-episode modified Burke, Pain and empirical percentage-CDaR package, including inputs, populations, availability and failure rules. |
-| [07: Signed tail outputs](07-historical-tail-risk.md#accepted-decision-signed-tail-outputs) | Signed decimal-return VaR/ES without absolute values or a zero floor; nonpositive CDaR and distinct modified-Sharpe availability. |
-| [07: Historical VaR and ES](07-historical-tail-risk.md#accepted-decision-historical-var-and-fractional-empirical-es) | R-7 interpolated VaR paired with exact fractional empirical ES, explicitly using different finite-sample conventions. |
-| [07: Historical availability](07-historical-tail-risk.md#accepted-decision-historical-availability-and-small-tails) | Any nonempty valid return sample, undefined for empty history, and no hard tail-count cutoff; computability does not qualify accuracy. |
-| [07: Tail ratio](07-historical-tail-risk.md#accepted-decision-empirical-tail-ratio) | Unannualized R-7 quantile magnitude ratio for nonempty history, with exact-zero outcomes and explicit same-sign interpretation limits. |
-| [07: Historical-tail numerical evaluation and failures](07-historical-tail-risk.md#accepted-decision-historical-tail-numerical-evaluation-and-failures) | Complete rank/mass residuals, scaled R-7/ES, empirical support, joint tail-ratio evaluation, requested-output representability and error propagation. |
-| [08: Reported moments](08-moments-gaussian-and-cornish-fisher.md#accepted-decision-reported-skewness-and-excess-kurtosis) | Fisher-adjusted Type 2 skewness/excess kurtosis; three/four observations and positive variance required, otherwise undefined. |
-| [08: CF plug-in](08-moments-gaussian-and-cornish-fisher.md#accepted-decision-classical-plug-in-cf) | Classical quantile approximation using sample mean/SD and Type 2 shape coefficients, with availability checks and no moment-matching calibration. |
-| [08: CF ordering](08-moments-gaussian-and-cornish-fisher.md#accepted-decision-global-cf-quantile-ordering) | Global analytic quantile-ordering check, finite requested estimate and explicit rejection without automatic repair or substitution. |
-| [08: Tail horizons](08-moments-gaussian-and-cornish-fisher.md#accepted-decision-observation-period-horizons) | Whole observation periods, omitted horizon one, additive i.i.d. scaling and explicit invalid-horizon errors; historical estimates stay native-period. |
-| [08: Gaussian VaR availability](08-moments-gaussian-and-cornish-fisher.md#accepted-decision-gaussian-var-availability-and-failures) | Two-return minimum, sample variance, constant-history point-mass quantiles and explicit numerical-failure errors after request validation. |
-| [08: Model support, numerical evaluation and exact horizons](08-moments-gaussian-and-cornish-fisher.md#accepted-decision-model-support-numerical-evaluation-and-exact-horizons) | Complete unbounded/additive model-output interpretation, scaled requested-output refinement, exact shared horizon counts, same-polynomial global gate and error propagation. |
-| [09: Rolling return-risk calculations](09-rolling-return-risk.md#accepted-decision-rolling-return-risk-calculations) | Complete explicit-window, compact-output, scalar-estimator, terminal-loss, validated-rebuild, genuine-zero-risk and error/carrier contract. |
-| [10: Single-factor benchmark regression](10-benchmark-regression.md#accepted-decision-single-factor-benchmark-regression) | Complete equal-weight intercept OLS, exact alignment, two-pair point estimates, Jensen alpha, fit statistics, fixed 95% Student-t uncertainty and numerical/result contract. |
-| [11: Benchmark-relative metrics](11-benchmark-relative-metrics.md#accepted-decision-benchmark-relative-metrics) | Complete paired-span TE/IR, strict batting/capture populations, signed geometric capture, Treynor, absolute M-squared, availability and numerical/error package. |
-| [12: Rolling alpha and beta](12-rolling-regression.md#accepted-decision-rolling-alpha-and-beta) | Complete explicit-window paired OLS/Jensen point estimates, dated availability, terminal-history, numerical-rebuild/error and validated result-carrier contract. |
-| [13: Multifactor regression](13-multifactor-regression.md#accepted-decision-multifactor-regression) | Complete canonical raw OLS/Total-only panel adapter, explicit return interpretation, factor alignment, field-wise availability, residual risk, invariance and numerical/result contract. |
-| [14: Normalized SVD and constrained regression](14-svd-and-constrained-regression.md#accepted-decision-normalized-svd-and-constrained-regression) | Complete roundoff-based full-rank SVD, bounded/scaled computation, unweighted single holdings identity, weighted-gross closure, final optimality and numerical-error contract. |
-| [15: Common-sample Pearson correlation](15-correlation-alignment-and-repair.md#accepted-decision-common-sample-pearson-correlation) | Complete common-sample Pearson, all-column availability, singular-PSD acceptance, bounded numerical normalization, repair/flag removal and compact validated provenance contract. |
+| [01: Panels, windows, wire and summary](01-panels-windows-and-wire.md#accepted-decision-panels-windows-wire-and-summary) | Actual valuation grid, strict panel admission, optional frequency/benchmark context without inferred defaults, explicit used inputs, atomic windows, validated wire state and fixed-summary provenance. |
+| [02: Wealth and annualization](02-wealth-and-annualization.md#accepted-decision-wealth-means-cagr-relative-wealth-and-cash-series) | Exact terminal wipeouts, compensated wealth/means, ACT/365F dated CAGR with full day-count context, relative positive-benchmark wealth, paired dates and aligned annual-effective cash. |
+| [03: Periods, lookbacks and win-loss](03-periods-lookbacks-and-win-loss.md#accepted-decision-calendar-grouping-lookbacks-and-win-loss-statistics) | Explicit calendar/fiscal grouping, occupied partial buckets, observed streaks, actual lookback coverage, conditional means, profit-factor/CPC/loss-normalized Kelly and validated outputs. |
+| [04: Return-risk ratios](04-return-risk-ratios.md#accepted-decision-standalone-scalar-domains-and-numerical-failures) | Sample SD, arithmetic-excess Sharpe, all-observation downside/Sortino, explicit MAR/Omega threshold, arithmetic gain-to-pain, native-period modified Sharpe and metric-specific zero-risk outcomes. |
+| [05: Drawdowns](05-drawdown-paths-and-episodes.md#accepted-decision-drawdown-paths-and-episodes) | Rebased geometric paths, strict recovery, actual dates/calendar durations, nullable unavailable duration, deterministic episode selection and benchmark path differences. |
+| [06: Drawdown rewards and CDaR](06-drawdown-reward-and-cdar.md#accepted-decision-drawdown-reward-and-cdar) | Calmar, cash-adjusted Martin, recovery, worst-episode Sterling, observation-normalized all-episode modified Burke, Pain and empirical percentage CDaR. |
+| [07: Historical tails](07-historical-tail-risk.md#accepted-decision-historical-tail-numerical-evaluation-and-failures) | Signed R-7 VaR, exact fractional empirical ES, nonempty-sample availability, magnitude tail ratio and scaled requested-output arithmetic. |
+| [08: Moments, Gaussian and CF](08-moments-gaussian-and-cornish-fisher.md#accepted-decision-model-support-numerical-evaluation-and-exact-horizons) | Type 2 shape estimators, classical CF plug-in, global analytic ordering, exact whole-period additive horizons, model support, scaled moments and explicit invalid-CF errors. |
+| [09: Rolling return-risk](09-rolling-return-risk.md#accepted-decision-rolling-return-risk-calculations) | Explicit windows, compact right-labelled results, scalar-estimator consistency, terminal histories, stable rebuild/error rules and validated result carriers. |
+| [10: Benchmark regression](10-benchmark-regression.md#accepted-decision-single-factor-benchmark-regression) | Exact-alignment intercept OLS, two-pair point estimates, Jensen alpha, field-specific fit/uncertainty and fixed labelled 95% Student-t intervals. |
+| [11: Benchmark-relative metrics](11-benchmark-relative-metrics.md#accepted-decision-benchmark-relative-metrics) | Paired TE/IR, strict batting/capture populations, signed geometric capture, Treynor, absolute M-squared and explicit availability/errors. |
+| [12: Rolling regression](12-rolling-regression.md#accepted-decision-rolling-alpha-and-beta) | Explicit-window paired OLS/Jensen estimates, dated availability, terminal histories, numerical rebuild/errors and strict lossless result restoration. |
+| [13: Multifactor regression](13-multifactor-regression.md#accepted-decision-multifactor-regression) | Canonical raw intercept OLS, Total-only panel adapter, explicit return interpretation, prealigned factor inputs, residual risk and field-wise availability. |
+| [14: SVD and constrained regression](14-svd-and-constrained-regression.md#accepted-decision-normalized-svd-and-constrained-regression) | Roundoff-based full-rank normalized SVD, bounded/scaled solving, unweighted holdings identity, weighted-gross closure and final optimality/error checks. |
+| [15: Correlation](15-correlation-alignment-and-repair.md#accepted-decision-common-sample-pearson-correlation) | Common-sample Pearson only, whole-matrix availability, singular PSD acceptance, bounded endpoint normalization and validated compact sample provenance without repair. |
 
-## Algorithm-level inventory
+## Implementation evidence
 
-| Calculation / supported instruments | Implemented method / material variants | Actual selection | Decision record | Implementation / validation evidence | Scope and evidence limits |
-|---|---|---|---|---|---|
-| Price/return panel construction | Contiguous valid spans; edge NaN gaps; positive prices and returns > −1; strict chronology/identity | Performance.new; Daily default | [01 — Performance panels, observation spans, defaults and wire contracts](01-panels-windows-and-wire.md) | Observed source; Panel/correctness/source invariants (not executed) | No interior fill; infinity-versus-null wire distinction |
-| Return-only initial valuation date | Prepend one frequency step; retained actual dates for price panels | Automatic for Returns panels | [01 — Performance panels, observation spans, defaults and wire contracts](01-panels-windows-and-wire.md) | Observed source; Core date steps and state fixtures (not executed) | Conflicts with agreed actual initial date |
-| Active-window and benchmark alignment | Inclusive return ending-date window; ticker span/pair intersection; drawdown rebase | Explicit reset or full window; benchmark defaults first ticker | [01 — Performance panels, observation spans, defaults and wire contracts](01-panels-windows-and-wire.md) | Observed source; Window and ragged-state regressions (not executed) | Irregular sampling/provenance and empty outcomes |
-| Wire/state restoration and summaries | Validated reconstruction; recomputed caches; nonfinite adapters; fixed 22-metric table | Serde/schema features; explicit summary | [01 — Performance panels, observation spans, defaults and wire contracts](01-panels-windows-and-wire.md) | Observed source; Schema/state/roundtrip cases (not executed) | RollingGreeks and panel infinity contracts; summary thresholds fixed |
-| Compounded and geometric returns | Compensated log1p/expm1 wealth; per-period geometric mean | Private shared kernel and Performance aggregation | [02 — Compounded wealth, relative wealth, cash conversion and dated CAGR](02-wealth-and-annualization.md) | Observed source; Tiny/extreme wealth identities (not executed) | Standalone wipeout floor differs from panel rejection |
-| Arithmetic return and cash excess | Linear mean annualization; effective annual cash converted geometrically to per-period | Frequency A or explicit factor/cash vector | [02 — Compounded wealth, relative wealth, cash conversion and dated CAGR](02-wealth-and-annualization.md) | Observed source; Geometric-cash and ragged alignment cases (not executed) | Irregular dates and invalid cash domain |
-| Dated CAGR | Log growth divided by actual dated year fraction; explicit core day counts | Current default ACT/365.25 | [02 — Compounded wealth, relative wealth, cash conversion and dated CAGR](02-wealth-and-annualization.md) | Observed source; Explicit-day-count and current-default regressions (not executed) | Accepted ACT/365F default still unimplemented |
-| Cumulative outperformance | Compensated difference of log wealth; relative wealth minus one | Overlapping benchmark returns | [02 — Compounded wealth, relative wealth, cash conversion and dated CAGR](02-wealth-and-annualization.md) | Observed source; Extreme identical-wealth and relative-wealth cases (not executed) | Return provenance and initial-date requirement |
-| Periodic returns | Compound occupied PeriodId buckets; label last observation | Calendar frequency or fiscal period_stats | [03 — Calendar grouping, lookback returns and win/loss statistics](03-periods-lookbacks-and-win-loss.md) | Observed source; Shared fiscal-boundary fixtures (not executed) | Partial/missing buckets and streak meaning |
-| MTD/QTD/YTD/FYTD | Calendar/fiscal start through inclusive reference date | Last active date default; fiscal config optional | [03 — Calendar grouping, lookback returns and win/loss statistics](03-periods-lookbacks-and-win-loss.md) | Observed source; Lookback boundary tests (not executed) | Representable-date fallback and empty return zero |
-| Win/loss/streak statistics | Strict signs; zeros break streaks; equal bucket counts | After period grouping | [03 — Calendar grouping, lookback returns and win/loss statistics](03-periods-lookbacks-and-win-loss.md) | Observed source; Hand statistics and neutral-period cases (not executed) | Occupied-bucket convention |
-| Payoff/profit factor/CPC/Kelly | Gain/loss ratios; CPC product; Kelly ignores neutral periods | PeriodStats | [03 — Calendar grouping, lookback returns and win/loss statistics](03-periods-lookbacks-and-win-loss.md) | Observed source; Formula and neutral Kelly invariants (not executed) | Zero denominators/extreme products and provenance |
-| Sample volatility | Welford n−1 variance; sqrt(A) annualization | Scalar free/Performance functions | [04 — Sample volatility, downside risk and return-based reward ratios](04-return-risk-ratios.md) | Observed source; Core/scalar moment comparisons (not executed) | Empty/singleton zero versus rolling NaN |
-| Sharpe and Sortino | Arithmetic cash excess/sample SD; per-period MAR/lower partial moment over all N | Explicit cash/MAR; frequency A | [04 — Sample volatility, downside risk and return-based reward ratios](04-return-risk-ratios.md) | Observed source; Hand downside and geometric cash cases (not executed) | Zero-risk outcomes; equal spacing assumption |
-| Omega and gain-to-pain | Threshold gain/loss sums; total arithmetic return/negative-return magnitudes | Explicit Omega threshold, currently defaulted to zero by hosts/summary; gain-to-pain uses fixed zero loss boundary | [04 — Sample volatility, downside risk and return-based reward ratios](04-return-risk-ratios.md) | Observed source; Hand formula cases (not executed) | Accepted formulas/outcomes; all-neutral results require reconciliation |
-| Modified Sharpe | Current annual arithmetic cash excess/absolute annual CF quantile | Explicit confidence; current frequency horizon | [04 — Sample volatility, downside risk and return-based reward ratios](04-return-risk-ratios.md) | Observed source; Formula consistency with CF kernel (not executed) | Conflicts with accepted observation-period ratio/sample minimum; inherits invalid-CF substitution |
-| Drawdown path and window peaks | Log wealth minus running peak; window reset to wealth one | Cached full/active paths | [05 — Log-wealth drawdowns, episode segmentation and path measures](05-drawdown-paths-and-episodes.md) | Observed source; Extreme wealth and reset invariants (not executed) | Observation-only maxima and wipeout behavior |
-| Drawdown episodes/duration | −1e−15 segmentation; dated peak/valley/recovery; sort deepest n | Details/duration/episode helpers | [05 — Log-wealth drawdowns, episode segmentation and path measures](05-drawdown-paths-and-episodes.md) | Observed source; Known peak/open episode/date fixtures (not executed) | Tolerance, initial date, metadata threshold |
-| Ulcer/Pain/mean/maximum drawdown | RMS, mean magnitude, signed mean and deepest observed path | Scalar path metrics | [05 — Log-wealth drawdowns, episode segmentation and path measures](05-drawdown-paths-and-episodes.md) | Observed source; Hand/path identities (not executed) | Observation versus time weighting |
-| Calmar and recovery factor | CAGR or total return over absolute maximum drawdown | Scalar/default dated CAGR | [06 — Calmar, Martin, Sterling, Burke, Pain and conditional drawdown risk](06-drawdown-reward-and-cdar.md) | Observed source; Calmar composition/zero-risk cases (not executed) | CAGR reconciliation and zero risk |
-| Martin | Current CAGR/Ulcer with no cash parameter | Scalar method | [06 — Calmar, Martin, Sterling, Burke, Pain and conditional drawdown risk](06-drawdown-reward-and-cdar.md) | Observed source; Current zero-risk regression (not executed) | Agreed cash-adjusted Martin unimplemented |
-| Sterling/Burke/Pain reward | Cash-adjusted CAGR over worst-n mean, worst-n RMS or mean path pain | Explicit cash and n where exposed | [06 — Calmar, Martin, Sterling, Burke, Pain and conditional drawdown risk](06-drawdown-reward-and-cdar.md) | Observed source; Hand episode-depth cases (not executed) | Agreed all-episodes modified Burke unimplemented |
-| Conditional drawdown at risk | Exact empirical ES over observed drawdown values including zeros | Explicit confidence; empty gives zero | [06 — Calmar, Martin, Sterling, Burke, Pain and conditional drawdown risk](06-drawdown-reward-and-cdar.md) | Observed source; Tied/fractional CDaR fixture (not executed) | Path sampling and signed-result domain |
-| Historical VaR | R-7 empirical lower-tail interpolation | Explicit method and summary default | [07 — Historical return VaR, exact-tail expected shortfall and tail ratio](07-historical-tail-risk.md) | Observed source; Quantile and confidence tests (not executed) | Tail resolution and positive signed returns possible |
-| Expected shortfall | Exact fractional empirical tail mass; worst value below one observation mass | Explicit and summary combined kernel | [07 — Historical return VaR, exact-tail expected shortfall and tail ratio](07-historical-tail-risk.md) | Observed source; Hand tied/fractional tail examples (not executed) | Accepted R-7/ES pair has distinct finite-sample conventions; availability and accuracy remain separately scoped |
-| Tail ratio | Absolute upper/lower empirical quantiles | Explicit confidence | [07 — Historical return VaR, exact-tail expected shortfall and tail ratio](07-historical-tail-risk.md) | Observed source; Zero-tail cases (not executed) | Accepted magnitude/availability rules; broader current confidence range and gain/loss wording require reconciliation |
-| Skewness and excess kurtosis | Online central moments with finite-sample adjustments | Public reporting and shared current CF helper | [08 — Fourth moments, Gaussian and Cornish–Fisher horizon quantiles](08-moments-gaussian-and-cornish-fisher.md) | Observed source; Hand moments and limiting-distribution checks (not executed) | Accepted reporting estimators; small-sample/constant zeros require reconciliation; CF inputs separately scoped |
-| Gaussian horizon VaR | Mean×h plus normal quantile×SD×sqrt(h) | Explicit parametric_var; no EWMA | [08 — Fourth moments, Gaussian and Cornish–Fisher horizon quantiles](08-moments-gaussian-and-cornish-fisher.md) | Observed source; Formula and horizon consistency (not executed) | IID approximation; signed unclipped quantile |
-| Cornish–Fisher horizon VaR | Shape moments scaled with h; cubic expansion and local derivative guard | Explicit CF or modified Sharpe | [08 — Fourth moments, Gaussian and Cornish–Fisher horizon quantiles](08-moments-gaussian-and-cornish-fisher.md) | Observed source; Formula and fallback tests (not executed) | Agreed explicit invalid-CF error unimplemented |
-| Rolling return | Sliding compensated log sums; 1,024-step/nonfinite rebuild | Fixed observation window | [09 — Rolling return, volatility, Sharpe and Sortino kernels with numerical rebuilds](09-rolling-return-risk.md) | Observed source; Tiny-window/outlier cases (not executed) | Final exponent overflow and sampling choice |
-| Rolling volatility/Sharpe | Remove/add Welford; variance-scale cancellation rebuild; sample risk | Fixed window and frequency A | [09 — Rolling return, volatility, Sharpe and Sortino kernels with numerical rebuilds](09-rolling-return-risk.md) | Observed source; Fresh-window/outlier comparisons (not executed) | Rebuild threshold and singleton NaN |
-| Rolling Sortino | Compensated return sum plus sliding downside squares; cancellation rebuild | Per-period MAR and window | [09 — Rolling return, volatility, Sharpe and Sortino kernels with numerical rebuilds](09-rolling-return-risk.md) | Observed source; Outlier/pointwise and wire cases (not executed) | Internal 1,024-step control qualification |
-| OLS beta and Jensen alpha | Online covariance slope and cash-adjusted annual intercept | Pair span; standalone beta truncates shorter input | [10 — Single-factor beta, Jensen alpha, fit statistics and beta uncertainty](10-benchmark-regression.md) | Observed source; Synthetic linear and empty-overlap cases (not executed) | Alignment/zero variance and inference domain |
-| Beta confidence and fit | Residual SE; Student-t 95% CI; R²/adjusted R² | BetaResult >=3; Greeks >=2 observations | [10 — Single-factor beta, Jensen alpha, fit statistics and beta uncertainty](10-benchmark-regression.md) | Observed source; T-quantile/degenerate/fit cases (not executed) | Homoskedastic independence and independent oracle |
-| Tracking error/information ratio | Sample active-return SD and annual active-return ratio | Aligned benchmark spans | [11 — Tracking error, capture, batting average, Treynor and M-squared](11-benchmark-relative-metrics.md) | Observed source; Identity/invalid annualization cases (not executed) | Different empty/singleton guards |
-| Up/down capture and batting average | Annualized geometric conditional subsets; strict outperformance win count | Up currently >=0; down <0 | [11 — Tracking error, capture, batting average, Treynor and M-squared](11-benchmark-relative-metrics.md) | Observed source; Geometric subset hand cases (not executed) | Agreed positive-up selection; near-zero returns zero |
-| Treynor and M² | Arithmetic cash excess/beta; absolute return rescaled to benchmark volatility | Frequency and explicit annual cash | [11 — Tracking error, capture, batting average, Treynor and M-squared](11-benchmark-relative-metrics.md) | Observed source; Hand/self-comparison cases (not executed) | Fixed cutoffs and absolute M² meaning |
-| Rolling alpha/beta | Recentered compensated OLS sums; 64-step/cancellation rebuild | Fixed overlap window | [12 — Sliding-window alpha and beta with recentered compensated sums](12-rolling-regression.md) | Observed source; Fresh-window/constant/outlier cases (not executed) | Undefined RollingGreeks wire and numeric budgets |
-| Multifactor regression | Intercept OLS via normalized full-rank SVD; excess or total response | Explicit aligned factor slices; excess default | [13 — Multifactor OLS, return-kind conversion and residual risk](13-multifactor-regression.md) | Observed source; Synthetic recovery/cash/rank cases (not executed) | Factor provenance/alignment; no regularization |
-| Multifactor fit/residual risk | Response-scaled SSE/SST; N−k−1 residual variance; annual alpha/volatility | Post-SVD statistics | [13 — Multifactor OLS, return-kind conversion and residual risk](13-multifactor-regression.md) | Observed source; Large-scale/constant-response regressions (not executed) | Independent fit/reference tolerances |
-| Normalized least squares | Binary/norm column scaling; SVD threshold 1e−10; finite unscaling | Shared internal solver | [14 — Normalized SVD least squares and single-equality factor-return correction](14-svd-and-constrained-regression.md) | Observed source; Rank/scaling/overflow cases (not executed) | Rank and conditioning policy |
-| Equality-constrained factor returns | Unweighted OLS plus holdings-weighted single-constraint correction | Public constrained_least_squares | [14 — Normalized SVD least squares and single-equality factor-return correction](14-svd-and-constrained-regression.md) | Observed source; Hand coefficients/weighted identity cases (not executed) | No post-correction residual check; paper exhibit provenance |
-| Correlation sample alignment | All-ticker common span if >=2; otherwise pairwise overlap | Automatic Performance method | [15 — Common-sample Pearson correlation, provenance and numerical validation](15-correlation-alignment-and-repair.md) | Observed source; Rectangular/ragged/degenerate cases (not executed) | Short common spans and pairwise provenance |
-| Correlation matrix repair | Validate; Higham projection 200 iterations/1e−10; revalidate and clamp | Automatic on invalid assembled matrix | [15 — Common-sample Pearson correlation, provenance and numerical validation](15-correlation-alignment-and-repair.md) | Observed source; Indefinite/clamp invariant fixtures (not executed) | Accepted repair/flag removal; final numerical validation and host reconciliation |
+The [analytics source](../../../../finstack-quant/analytics/src),
+[crate integration tests](../../../../finstack-quant/analytics/tests/main.rs),
+[schema contracts](../../../../finstack-quant/analytics/tests/schema_contract.rs),
+[Python bindings](../../../../finstack-quant-py/src/bindings/analytics) and
+[WASM bindings](../../../../finstack-quant-wasm/src/api/analytics) implement and
+exercise these contracts. Inline and integration regressions distinguish
+independent expected arithmetic from comparisons that reuse production
+kernels. JSON/schema cases check nonfinite identity and invalid restoration;
+they do not independently validate statistical estimators.
 
-## Evidence and adoption boundaries
+Documentation checks on 2026-11-08 passed: the methodology source-ownership
+checker covered 1,724 files and 625 records across 34 scopes, all 6,307 local
+links in the changed Markdown resolved, and the documentation diff passed
+whitespace checks. This ownership check did not reauthenticate the original
+audited source hashes; those retain their dated evidence role.
 
-Hand-calculated fixtures, production-kernel comparisons, synthetic regressions, state roundtrips and schema contracts have different evidentiary roles. None constitutes historical adoption or broad independent numerical certification. Existing references are linked through the canonical catalog; missing source-to-variant provenance is named in the records. The original source audit did not newly authenticate external publications. Later decision reviews identify their primary-source and independent-arithmetic evidence in the owning records; that evidence does not certify implementation or model accuracy.
+Verified implementation checks on 2026-11-08:
 
-Use [ADR 0008](../conventions/0008-financial-defaults-and-cagr.md), [ADR 0009](../conventions/0009-missing-and-invalid-data.md) and [VaR selection ADR 0033](0033-value-at-risk-method-selection.md) alongside these records. Detailed reconciliation and qualification items belong in the [analytics backlog](../FOLLOW_UPS.md#analytics); the [central follow-ups](../../FOLLOW_UPS.md#financial-methodology-audit) coordinate cross-domain work. The [central inventory](../README.md#coverage) navigates adjacent core, models, portfolio and factor scopes.
+- The analytics Rust suite passed **262/262** tests.
+- Focused Python decision coverage passed **22 audit** and **6 host-decision**
+  tests. Python static lint/type checks passed. Runtime documentation checks
+  passed **3,684** tests, with **112** skips.
+- All **seven analytics notebooks** passed the strict runner and saved fresh
+  outputs; their reporting derivatives were regenerated.
+- WASM validation passed **51 analytics** and **11 shared error-boundary**
+  tests.
+
+The final `mise run all` **default CI tier passed**, without the additional
+`--full` nightly tier:
+
+- Workspace Rust: **16,347 passed**, **196 skipped**.
+- Python: **14,017 passed**, **112 skipped**.
+- Native WASM: **239 passed**; Node facade: **1,090 passed**.
+- UI: **1,527 tests passed across 129 files**, with TypeScript checks passing.
+
+`mise run gen-write` completed, **482 schemas** were generated, and the final
+generation-consistency and audit checks passed. The final `mise run rust-doc`
+also passed: public input documentation was clean across **27 packages**, and
+the single-path check covered **3,458 items** with no duplicate umbrella paths.
+
+The analytics benchmark targets compiled successfully through `mise exec --
+cargo build -p finstack-quant-analytics --benches`. Performance benchmarks were
+not executed. These results are functional, structural and integration
+evidence; they make no benchmark-performance claim.
+
+Primary definitions and independent illustrative arithmetic remain linked in
+the owning records. Formula checks, finite-sample fixtures, synthetic models,
+state round trips and host parity provide evidence for their specific cases.
+They do not certify population accuracy, tail forecasting, i.i.d. horizon
+assumptions, regulatory suitability, vendor equivalence or numerical accuracy
+over every representable input. Small-sample computability and a PSD sample
+correlation are not guarantees of reliable future risk estimates.
+
+The [central inventory](../README.md#coverage) navigates adjacent core,
+models, portfolio and factor scopes. Shared core primitives retain their
+own mathematical contracts and independent adoption boundaries.

@@ -30,9 +30,13 @@ than additional production algorithm owners in this ledger.
 Detailed records distinguish decision, implementation and validation status.
 Source inspection documents the implemented algorithm and its controls; it
 does not accept the methodology or certify its numerical accuracy. Existing
-accepted policies and prior agreed directions retain their stated scope. The
-625 detailed audited algorithm records remain Draft until an explicit adoption
-decision is recorded. The governing and convention ADRs retain their separately
+accepted policies and prior agreed directions retain their stated scope.
+Detailed algorithm records retain their individually stated decision status.
+The [15 analytics records](analytics/README.md#accepted-scopes-in-detailed-records)
+and [ADR 0033](analytics/0033-value-at-risk-method-selection.md) are accepted,
+with [implementation evidence](analytics/README.md#implementation-evidence)
+recorded separately from the original audit. The governing and convention
+ADRs retain their separately
 stated statuses; describing an observed method does not approve it.
 
 Selected tests and references were inspected; this does not claim review of

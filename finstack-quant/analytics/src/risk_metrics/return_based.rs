@@ -1,58 +1,42 @@
-//! Return-based risk metrics: mean, volatility, Sharpe, Sortino, CAGR, and more.
-//!
-//! [`sharpe`], [`sortino`], [`volatility`], [`max_drawdown`] and
-//! [`CagrDayCount`] are public and re-exported at the crate root; the other
-//! functions are crate-internal building blocks for [`crate::Performance`].
-//! Functions take `&[f64]` return slices. Annualization uses the
-//! caller-supplied factor (typically from `PeriodKind::periods_per_year()`).
+//! Validated return means, sample risk and explicitly selected reward ratios.
 
-use finstack_quant_core::dates::{Date, DayCount, DayCountContext, HolidayCalendar};
-use finstack_quant_core::math::stats::{mean, mean_var, variance};
-use finstack_quant_core::math::summation::kahan_sum;
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext, TenorUnit};
+use finstack_quant_core::math::summation::{NeumaierAccumulator, neumaier_sum};
+use finstack_quant_core::{Error, Result};
 
-use super::tail_risk::cornish_fisher_var;
+use crate::returns::{
+    finite_result, periodic_risk_free_rate, validate_cash, validate_frequency, validate_history,
+};
 
-/// True when `ann_factor` is not a positive finite periods-per-year count
-/// (e.g. zero, negative, NaN, or infinity). Guards the caller-supplied
-/// `periods_per_year` of the public `sharpe` (via `mean_vol_annualized`),
-/// `sortino` and `volatility`, and the benchmark kernels `tracking_error`
-/// and `information_ratio`.
-#[inline]
-pub(crate) fn invalid_annualization_factor(ann_factor: f64) -> bool {
-    !ann_factor.is_finite() || ann_factor <= 0.0
-}
-
-/// Day-count convention for CAGR annualization over explicit calendar dates.
+/// Day-count convention applied to actual opening and closing valuations.
 ///
-/// [`CagrDayCount::Act365_25`] is the default used by [`crate::Performance::cagr`].
-/// [`CagrDayCount::DayCount`] wraps any core
-/// [`finstack_quant_core::dates::DayCount`] (Act/365F, Act/Act, Bus/252, …).
-/// `Bus252` requires a holiday calendar on the facade; missing calendar is
-/// an error.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+/// The default is Actual/365 Fixed. Explicit alternatives retain their core
+/// calendar, coupon and termination context requirements.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum CagrDayCount {
-    /// Actual calendar days divided by 365.25 (default).
-    #[default]
+    /// Actual elapsed calendar days divided by 365.25, selected explicitly.
     Act365_25,
-    /// Any core day-count convention.
+    /// A core convention evaluated with the caller's complete context.
     DayCount(DayCount),
 }
 
-impl std::str::FromStr for CagrDayCount {
-    type Err = finstack_quant_core::Error;
+impl Default for CagrDayCount {
+    fn default() -> Self {
+        Self::DayCount(DayCount::Act365F)
+    }
+}
 
-    /// Parse a CAGR day-count label.
-    ///
-    /// Accepts only `"act365_25"` for
-    /// [`CagrDayCount::Act365_25`]; every other token is parsed as a canonical core
-    /// [`DayCount`] name (for example `"act_365f"`, `"bus_252"`).
+impl std::str::FromStr for CagrDayCount {
+    type Err = Error;
+
+    /// Parse an exact canonical CAGR clock label.
     ///
     /// # Arguments
     ///
-    /// * `label` - Exact canonical day-count token; case variants, aliases and padding are rejected.
-    fn from_str(label: &str) -> Result<Self, Self::Err> {
+    /// * `label` - `act365_25` or a canonical core day-count token, without aliases or padding.
+    fn from_str(label: &str) -> Result<Self> {
         match label {
             "act365_25" => Ok(Self::Act365_25),
             other => finstack_quant_core::wire::serde_parse::<DayCount>(other).map(Self::DayCount),
@@ -69,1070 +53,699 @@ impl std::fmt::Display for CagrDayCount {
     }
 }
 
-/// Compound annual growth rate from a return series over explicit dates.
-///
-/// Computes:
-///
-/// ```text
-/// CAGR = (Π(1 + r_i))^(1/years) - 1
-/// ```
-///
-/// where `years` is the year fraction between `start` and `end` under
-/// `day_count`. Annualizes accumulated log growth before reconstructing the
-/// rate, so small or large terminal wealth does not lose precision or overflow
-/// before the annualized result is calculated.
-///
-/// # Arguments
-///
-/// * `returns`   - Slice of simple period returns.
-/// * `start`     - Start date of the holding period.
-/// * `end`       - End date of the holding period.
-/// * `day_count` - Convention used to convert the holding period to years.
-/// * `calendar`  - Holiday calendar required when `day_count` is
-///   [`CagrDayCount::DayCount`] with [`DayCount::Bus252`]. Ignored for
-///   Act/365.25 and day-counts that do not need a calendar.
-///
-/// # Returns
-///
-/// Annualized growth rate as a decimal.
-///
-/// # Errors
-///
-/// Returns [`Error::Validation`](finstack_quant_core::Error::Validation) when `returns` is empty or the
-/// date range has a non-positive span. Propagates
-/// [`finstack_quant_core::InputError::MissingCalendarForBus252`] when Bus/252 is
-/// requested without a calendar.
+/// Validate clock context even when a selected ticker has no observations.
+pub(crate) fn validate_cagr_context(
+    day_count: CagrDayCount,
+    context: DayCountContext<'_>,
+) -> Result<()> {
+    if context.bus_basis == Some(0) || context.coupon_period.is_some_and(|(s, e)| s >= e) {
+        return Err(Error::Validation("invalid CAGR day-count context".into()));
+    }
+    if let CagrDayCount::DayCount(convention @ (DayCount::ActActIsma | DayCount::Act365L)) =
+        day_count
+    {
+        if let Some((start, end)) = context.coupon_period {
+            convention.year_fraction(start, end, context)?;
+        }
+        if convention == DayCount::ActActIsma
+            && context.coupon_period.is_none()
+            && context
+                .frequency
+                .is_some_and(|f| matches!(f.unit(), TenorUnit::Days | TenorUnit::Weeks))
+        {
+            return Err(Error::Validation(
+                "ACT/ACT ISMA requires a month or year coupon frequency".into(),
+            ));
+        }
+    }
+    match day_count {
+        CagrDayCount::DayCount(DayCount::Bus252) if context.calendar.is_none() => Err(
+            Error::Validation("Bus/252 CAGR requires a holiday calendar".into()),
+        ),
+        CagrDayCount::DayCount(DayCount::ActActIsma) if context.frequency.is_none() => Err(
+            Error::Validation("ACT/ACT ISMA CAGR requires coupon frequency".into()),
+        ),
+        CagrDayCount::DayCount(DayCount::Act365L)
+            if context.frequency.is_none() || context.coupon_period.is_none() =>
+        {
+            Err(Error::Validation(
+                "ACT/365L CAGR requires coupon frequency and boundaries".into(),
+            ))
+        }
+        _ => Ok(()),
+    }
+}
+
+/// Annualize compounded log growth on an actual dated interval.
 pub(crate) fn cagr(
     returns: &[f64],
     start: Date,
     end: Date,
     day_count: CagrDayCount,
-    calendar: Option<&dyn HolidayCalendar>,
-) -> finstack_quant_core::Result<f64> {
-    if returns.is_empty() {
-        tracing::debug!(reason = "empty_returns", "invalid CAGR input");
-        return Err(finstack_quant_core::Error::Validation(
-            "returns must not be empty".to_string(),
+    context: DayCountContext<'_>,
+) -> Result<f64> {
+    validate_cagr_context(day_count, context)?;
+    validate_history(returns)?;
+    if start >= end {
+        return Err(Error::Validation(
+            "CAGR opening must precede closing".into(),
         ));
     }
-
-    let years = annualized_years(start, end, day_count, calendar)?;
-    if years <= 0.0 {
-        tracing::debug!(
-            ?start,
-            ?end,
-            ?day_count,
-            reason = "non_positive_date_span",
-            "invalid CAGR input"
-        );
-        return Err(finstack_quant_core::Error::Validation(
-            "CAGR date range must have a positive span".to_string(),
+    let years = match day_count {
+        CagrDayCount::Act365_25 => (end - start).whole_days() as f64 / 365.25,
+        CagrDayCount::DayCount(convention) => convention.year_fraction(start, end, context)?,
+    };
+    if !years.is_finite() || years < 0.0 {
+        return Err(Error::Internal(
+            "invalid computed CAGR year fraction".into(),
         ));
+    }
+    if returns.is_empty() || years == 0.0 {
+        return Ok(f64::NAN);
     }
     let mut engine = crate::returns::WealthEngine::new();
     for &r in returns {
         engine.step(r);
     }
-    Ok((engine.log_growth() / years).exp_m1())
+    let log_growth = engine.log_growth();
+    let result = finite_result((log_growth / years).exp_m1(), "CAGR")?;
+    if result == 0.0 && log_growth != 0.0 {
+        return Err(Error::Internal("nonzero CAGR underflowed".into()));
+    }
+    Ok(result)
 }
 
-fn annualized_years(
-    start: Date,
-    end: Date,
-    day_count: CagrDayCount,
-    calendar: Option<&dyn HolidayCalendar>,
-) -> finstack_quant_core::Result<f64> {
-    match day_count {
-        CagrDayCount::Act365_25 => {
-            let days = (end - start).whole_days() as f64;
-            Ok(if days <= 0.0 { 0.0 } else { days / 365.25 })
+/// Centered moments in scaled units; raw squares need never be representable.
+struct ScaledMoments {
+    scale: f64,
+    sum: f64,
+    count: f64,
+    sd: f64,
+}
+
+impl ScaledMoments {
+    fn new(values: &[f64]) -> Result<Self> {
+        if values.iter().any(|x| !x.is_finite()) {
+            return Err(Error::Validation(
+                "statistical observations must be finite".into(),
+            ));
         }
-        CagrDayCount::DayCount(convention) => {
-            let ctx = DayCountContext {
-                calendar,
-                ..DayCountContext::default()
-            };
-            convention.year_fraction(start, end, ctx)
+        let scale = values.iter().fold(0.0_f64, |s, x| s.max(x.abs()));
+        let scale = if scale == 0.0 { 1.0 } else { scale };
+        let Some(&origin) = values.first() else {
+            return Ok(Self {
+                scale,
+                sum: f64::NAN,
+                count: 0.0,
+                sd: f64::NAN,
+            });
+        };
+        let n = values.len() as f64;
+        let offset = |x: f64| {
+            let difference = x - origin;
+            if difference.is_finite() {
+                difference / scale
+            } else {
+                x / scale - origin / scale
+            }
+        };
+        let mean_offset = neumaier_sum(values.iter().map(|&x| offset(x) / n));
+        let sd = if values.len() < 2 {
+            f64::NAN
+        } else {
+            (neumaier_sum(values.iter().map(|&x| {
+                let d = offset(x) - mean_offset;
+                d * d
+            })) / (n - 1.0))
+                .sqrt()
+        };
+        if values.len() >= 2
+            && sd == 0.0
+            && values
+                .iter()
+                .any(|&x| x.partial_cmp(&origin) != Some(core::cmp::Ordering::Equal))
+        {
+            return Err(Error::Internal(
+                "positive sample dispersion was lost numerically".into(),
+            ));
         }
+        Ok(Self {
+            scale,
+            sum: neumaier_sum(values.iter().map(|&x| x / scale)),
+            count: n,
+            sd,
+        })
+    }
+
+    fn mean(&self) -> Result<f64> {
+        if self.sum.is_nan() {
+            return Ok(f64::NAN);
+        }
+        scaled_product(self.scale, self.sum, 1.0 / self.count, "arithmetic mean")
     }
 }
 
-/// Mean return, optionally annualized.
-///
-/// Computes the **arithmetic** mean of `returns`. When `annualize` is `true`,
-/// that mean is scaled by `ann_factor` (e.g., 252 for daily data):
-///
-/// ```text
-/// μ_ann = μ_period × ann_factor
-/// ```
-///
-/// This is **simple** annualization of the average **per-period** return, not a
-/// compounded (geometric) annual return. For growth over time that compounds
-/// period returns, use [`cagr`]. Volatility in this
-/// module uses the usual root-time rule (`σ_ann = σ_period × √ann_factor`); mean
-/// return uses **linear** scaling instead.
-///
-/// # Arguments
-///
-/// * `returns`    - Slice of period simple returns.
-/// * `annualize`  - Whether to multiply the mean by `ann_factor`.
-/// * `ann_factor` - Number of periods per year (e.g., 252 daily, 12 monthly).
-///
-/// # Returns
-///
-/// Arithmetic mean return, annualized if requested. Returns `0.0` for an
-/// empty slice.
-#[must_use]
-pub(crate) fn mean_return(returns: &[f64], annualize: bool, ann_factor: f64) -> f64 {
-    let m = mean(returns);
-    if annualize { m * ann_factor } else { m }
+/// Stable mean and centered sample SD of arbitrary finite arithmetic observations.
+pub(crate) fn mean_sample_sd(values: &[f64]) -> Result<(f64, f64)> {
+    let moments = ScaledMoments::new(values)?;
+    let sd = if values.len() < 2 {
+        f64::NAN
+    } else {
+        scaled_product(moments.scale, moments.sd, 1.0, "sample standard deviation")?
+    };
+    Ok((moments.mean()?, sd))
 }
 
-/// Annualized mean and volatility from one Welford pass.
-///
-/// Equivalent to `(mean_return(returns, true, ann_factor),
-/// volatility(returns, ann_factor))` but walks the slice once instead
-/// of twice. Used by callers (e.g. Sharpe / M²) that need both.
-///
-/// # Arguments
-///
-/// * `returns`    - Slice of period simple returns.
-/// * `ann_factor` - Number of periods per year (e.g., 252 daily, 12 monthly).
-///
-/// # Returns
-///
-/// `(annualized_mean, annualized_volatility)`. Returns `(NaN, NaN)` when
-/// `ann_factor` is not a positive finite number (reachable from the public
-/// `sharpe`).
-#[must_use]
-pub(crate) fn mean_vol_annualized(returns: &[f64], ann_factor: f64) -> (f64, f64) {
-    if invalid_annualization_factor(ann_factor) {
-        return (f64::NAN, f64::NAN);
+/// Stable arithmetic mean, with linear annualization only when requested.
+pub(crate) fn mean_return(returns: &[f64], annualize: bool, ann_factor: f64) -> Result<f64> {
+    validate_history(returns)?;
+    if annualize {
+        validate_frequency(ann_factor)?;
     }
-    let (m, var) = mean_var(returns);
-    (m * ann_factor, var.sqrt() * ann_factor.sqrt())
-}
-
-/// Annualized sample volatility (n−1 denominator) of one return series.
-///
-/// Uses the **sample** standard deviation, consistent with Bloomberg,
-/// QuantLib and `OnlineStats::variance()`, scaled by the square root of
-/// `periods_per_year` (square-root-of-time rule).
-///
-/// # Arguments
-///
-/// * `returns` - Per-period simple decimal returns in date order.
-/// * `periods_per_year` - Observations per year; the per-period standard
-///   deviation is scaled by its square root.
-///
-/// # Returns
-///
-/// Annualized volatility as a decimal; `0.0` for fewer than two observations
-/// and `NaN` when `periods_per_year` is not a positive finite number.
-#[must_use]
-pub fn volatility(returns: &[f64], periods_per_year: f64) -> f64 {
-    if invalid_annualization_factor(periods_per_year) {
-        return f64::NAN;
+    let moments = ScaledMoments::new(returns)?;
+    if returns.is_empty() {
+        return Ok(f64::NAN);
     }
-    variance(returns).sqrt() * periods_per_year.sqrt()
+    scaled_product(
+        moments.scale,
+        moments.sum,
+        if annualize {
+            ann_factor / moments.count
+        } else {
+            1.0 / moments.count
+        },
+        "arithmetic mean",
+    )
 }
 
-/// Sharpe ratio of one return series.
-///
-/// Annualized excess arithmetic mean over annualized sample volatility. The
-/// annual `risk_free_rate` is geometrically decompounded to the observation
-/// frequency before subtraction, then scaled by `periods_per_year`, exactly as
-/// [`crate::Performance::sharpe`]:
-///
-/// ```text
-/// rf_period = (1 + rf_annual)^{1/N} − 1
-/// excess_ann = (μ − rf_period) × N
-/// Sharpe = excess_ann / σ_ann
-/// ```
+/// Annualized centered sample standard deviation, using an n−1 denominator.
 ///
 /// # Arguments
 ///
-/// * `returns` - Per-period simple decimal returns in date order.
-/// * `risk_free_rate` - Annualized risk-free rate as a decimal (`0.02` for 2%).
-/// * `periods_per_year` - Observations per year used to annualize (`252.0`
-///   daily, `52.0` weekly, `12.0` monthly).
+/// * `returns` - Finite chronological decimal investment returns greater than -1, allowing one final terminal -1; empty or singleton history is undefined.
+/// * `periods_per_year` - Explicit positive finite observation count per year; sample SD is multiplied by its square root.
 ///
 /// # Returns
 ///
-/// The Sharpe ratio; `±∞` when volatility is zero with a non-zero excess
-/// return, `0.0` when both are zero, and `NaN` when `periods_per_year` is
-/// not a positive finite number, an input is non-finite, or fewer than two
-/// observations are available.
+/// Decimal annualized sample volatility; NaN when fewer than two observations exist.
 ///
-/// # References
+/// # Errors
 ///
-/// - Sharpe (1966): see docs/REFERENCES.md#sharpe1966
-#[must_use]
-pub fn sharpe(returns: &[f64], risk_free_rate: f64, periods_per_year: f64) -> f64 {
+/// Returns an input error for invalid history/frequency and a calculation error
+/// when a positive requested risk cannot be represented.
+pub fn volatility(returns: &[f64], periods_per_year: f64) -> Result<f64> {
+    validate_history(returns)?;
+    validate_frequency(periods_per_year)?;
     if returns.len() < 2 {
-        return f64::NAN;
+        return Ok(f64::NAN);
     }
-    let (ann_return, ann_vol) = mean_vol_annualized(returns, periods_per_year);
-    if !ann_return.is_finite() || !ann_vol.is_finite() {
-        return f64::NAN;
-    }
-    let excess =
-        crate::returns::annualized_excess_return(ann_return, risk_free_rate, periods_per_year);
-    super::ratio_or_sign_infinity(excess, ann_vol)
+    let moments = ScaledMoments::new(returns)?;
+    scaled_product(
+        moments.scale,
+        moments.sd,
+        periods_per_year.sqrt(),
+        "volatility",
+    )
 }
 
-/// Maximum peak-to-trough drawdown of one return series.
-///
-/// Compounds the returns into a wealth path and reports the deepest
-/// fractional decline from a running peak.
+/// Represent a mean difference without materializing a potentially overflowing sum.
+fn scaled_mean_difference(values: &[f64], reference: f64) -> (f64, f64, f64) {
+    let scale = values
+        .iter()
+        .map(|&x| (x - reference).abs())
+        .fold(0.0_f64, f64::max);
+    let scale = if scale.is_finite() && scale > 0.0 {
+        scale
+    } else {
+        values
+            .iter()
+            .fold(reference.abs(), |s, x| s.max(x.abs()))
+            .max(f64::MIN_POSITIVE)
+    };
+    let mean = neumaier_sum(values.iter().map(|&x| {
+        let difference = x - reference;
+        if difference.is_finite() {
+            difference / scale
+        } else {
+            x / scale - reference / scale
+        }
+    }));
+    (scale, mean, values.len() as f64)
+}
+
+fn scaled_product(scale: f64, value: f64, multiplier: f64, metric: &str) -> Result<f64> {
+    if value == 0.0 {
+        return Ok(0.0);
+    }
+    let first = value * multiplier;
+    let second = scale * multiplier;
+    let direct = if first.is_finite() && first.abs() >= f64::MIN_POSITIVE {
+        scale * first
+    } else if second.is_finite() && second >= f64::MIN_POSITIVE {
+        value * second
+    } else {
+        f64::NAN
+    };
+    let output = if direct.is_finite() && direct != 0.0 {
+        direct
+    } else {
+        (scale.ln() + value.abs().ln() + multiplier.ln())
+            .exp()
+            .copysign(value)
+    };
+    if output == 0.0 {
+        return Err(Error::Internal(format!("{metric} underflowed")));
+    }
+    finite_result(output, metric)
+}
+
+fn scaled_ratio(ns: f64, n: f64, ds: f64, d: f64, multiplier: f64, metric: &str) -> Result<f64> {
+    if d == 0.0 {
+        return Ok(super::ratio_or_sign_infinity(n, 0.0));
+    }
+    if n == 0.0 {
+        return Ok(0.0);
+    }
+    let reward = n * multiplier;
+    let period_ratio = reward / d;
+    let relative_scale = ns / ds;
+    let direct = period_ratio * relative_scale;
+    let value = if reward.is_finite()
+        && reward.abs() >= f64::MIN_POSITIVE
+        && period_ratio.is_finite()
+        && period_ratio.abs() >= f64::MIN_POSITIVE
+        && relative_scale.is_finite()
+        && relative_scale >= f64::MIN_POSITIVE
+        && direct.is_finite()
+        && direct != 0.0
+    {
+        direct
+    } else {
+        (n.abs().ln() - d.ln() + ns.ln() - ds.ln() + multiplier.ln())
+            .exp()
+            .copysign(n)
+    };
+    if value == 0.0 {
+        return Err(Error::Internal(format!("{metric} underflowed")));
+    }
+    finite_result(value, metric)
+}
+
+/// Annualized arithmetic excess return per unit of centered sample risk.
 ///
 /// # Arguments
 ///
-/// * `returns` - Per-period simple decimal returns in date order.
+/// * `returns` - Chronological finite decimal investment returns, allowing a final terminal -1; at least two are needed for a ratio.
+/// * `risk_free_rate` - Explicit finite annual-effective decimal cash return strictly greater than -1; converted geometrically to one observation period.
+/// * `periods_per_year` - Explicit positive finite observations per year used for cash conversion and square-root scaling.
 ///
 /// # Returns
 ///
-/// A non-positive fraction (`-0.25` for a 25% loss); `0.0` when the series
-/// never falls below its running peak or is empty. Returns `NaN` if the
-/// return or reconstructed drawdown path contains a non-finite value.
-#[must_use]
-pub fn max_drawdown(returns: &[f64]) -> f64 {
-    crate::drawdown::deepest(&crate::drawdown::to_drawdown_series(returns))
+/// Dimensionless Sharpe, NaN for insufficient history or zero-over-zero;
+/// signed infinity for a genuine constant sample with nonzero excess reward.
+///
+/// # Errors
+///
+/// Invalid history, cash or frequency is rejected before sample availability;
+/// unrepresentable finite calculations return a calculation error.
+pub fn sharpe(returns: &[f64], risk_free_rate: f64, periods_per_year: f64) -> Result<f64> {
+    validate_history(returns)?;
+    let cash = periodic_risk_free_rate(risk_free_rate, periods_per_year)?;
+    if returns.len() < 2 {
+        return Ok(f64::NAN);
+    }
+    let moments = ScaledMoments::new(returns)?;
+    let (scale, excess, count) = scaled_mean_difference(returns, cash);
+    scaled_ratio(
+        scale,
+        excess,
+        moments.scale,
+        moments.sd,
+        periods_per_year.sqrt() / count,
+        "Sharpe",
+    )
 }
 
-/// Downside deviation: semi-standard deviation below a minimum acceptable return.
-///
-/// Computes the root-mean-square of returns falling below `mar`, using
-/// the full series length as the denominator (population convention),
-/// consistent with Sortino & van der Meer (1991):
-///
-/// ```text
-/// DD = sqrt( (1/n) × Σ min(r_i − MAR, 0)² )
-/// ```
+/// Maximum loss from a running unit-wealth peak, including exact terminal zero.
 ///
 /// # Arguments
 ///
-/// * `returns`    - Slice of period simple returns.
-/// * `mar`        - Minimum acceptable return (threshold). Use `0.0` for
-///   the standard Sortino definition.
-/// * `annualize`  - Whether to scale by `sqrt(ann_factor)`.
-/// * `ann_factor` - Number of periods per year.
+/// * `returns` - Finite chronological decimal investment returns, with one -1 allowed only as the final observation.
 ///
 /// # Returns
 ///
-/// The downside deviation (non-negative). Returns `0.0` for an empty
-/// slice or when no returns fall below `mar`, and [`f64::NAN`] when `mar`
-/// or any return is non-finite.
+/// A nonpositive decimal depth, exactly -1 after a terminal loss; NaN for empty history.
 ///
-/// # References
+/// # Errors
 ///
-/// - Sortino & van der Meer (1991): see docs/REFERENCES.md#sortinoVanDerMeer1991
-#[must_use]
+/// Rejects invalid financial histories and unresolved numerical drawdown paths.
+pub fn max_drawdown(returns: &[f64]) -> Result<f64> {
+    validate_history(returns)?;
+    if returns.is_empty() {
+        return Ok(f64::NAN);
+    }
+    Ok(crate::drawdown::deepest(
+        &crate::drawdown::to_drawdown_series(returns)?,
+    ))
+}
+
+fn downside_scaled(returns: &[f64], mar: f64) -> Result<(f64, f64)> {
+    if !mar.is_finite() {
+        return Err(Error::Validation("MAR must be finite".into()));
+    }
+    let scale = returns
+        .iter()
+        .filter(|&&x| x < mar)
+        .map(|&x| (mar - x).abs())
+        .fold(0.0_f64, f64::max);
+    if scale == 0.0 {
+        return Ok((1.0, 0.0));
+    }
+    let scale = if scale.is_finite() {
+        scale
+    } else {
+        returns.iter().fold(mar.abs(), |s, x| s.max(x.abs()))
+    };
+    let ss = neumaier_sum(returns.iter().filter(|&&x| x < mar).map(|&x| {
+        let difference = mar - x;
+        let d = if difference.is_finite() {
+            difference / scale
+        } else {
+            mar / scale - x / scale
+        };
+        d * d / returns.len() as f64
+    }));
+    let rms = ss.sqrt();
+    if rms == 0.0 {
+        return Err(Error::Internal(
+            "positive downside risk was lost numerically".into(),
+        ));
+    }
+    Ok((scale, rms))
+}
+
+/// All-observation shortfall RMS; explicit MAR is in observation-period units.
 pub(crate) fn downside_deviation(
     returns: &[f64],
     mar: f64,
     annualize: bool,
     ann_factor: f64,
-) -> f64 {
-    if returns.is_empty() {
-        return 0.0;
-    }
-    if !mar.is_finite() || returns.iter().any(|r| !r.is_finite()) {
-        return f64::NAN;
-    }
-    let downside_sq = kahan_sum(returns.iter().filter(|&&r| r < mar).map(|&r| {
-        let d = r - mar;
-        d * d
-    }));
-    let dd = (downside_sq / returns.len() as f64).sqrt();
+) -> Result<f64> {
+    validate_history(returns)?;
     if annualize {
-        dd * ann_factor.sqrt()
-    } else {
-        dd
+        validate_frequency(ann_factor)?;
     }
+    let (scale, rms) = downside_scaled(returns, mar)?;
+    if returns.is_empty() {
+        return Ok(f64::NAN);
+    }
+    scaled_product(
+        scale,
+        rms,
+        if annualize { ann_factor.sqrt() } else { 1.0 },
+        "downside deviation",
+    )
 }
 
-/// Annualized Sortino ratio of one return series.
-///
-/// Unlike the Sharpe ratio, the Sortino ratio uses the **downside deviation**
-/// (semi-standard deviation of returns below `mar`) as the risk denominator,
-/// leaving upside volatility unpenalized:
-///
-/// ```text
-/// Sortino = ((mean(r) − mar) × N) / (DD × √N)
-/// ```
-///
-/// Downside deviation is computed over the full return series (denominator
-/// is `n`, not the number of negative observations), consistent with the
-/// Sortino & van der Meer (1991) definition.
+/// Annualized mean reward above MAR per unit of full-sample shortfall RMS.
 ///
 /// # Arguments
 ///
-/// * `returns` - Per-period simple decimal returns in date order.
-/// * `mar` - Minimum acceptable return **per period** as a decimal (not
-///   annualized), matching [`crate::Performance::sortino`].
-/// * `periods_per_year` - Observations per year used to annualize.
+/// * `returns` - Chronological finite decimal investment returns, with one final -1 permitted; fewer than two observations produce an undefined ratio.
+/// * `mar` - Explicit finite minimum acceptable return per observation, in decimal units; every finite real hurdle is allowed.
+/// * `periods_per_year` - Positive finite observations per year used for square-root scaling.
 ///
 /// # Returns
 ///
-/// The annualized Sortino ratio; `±∞` when there is no downside deviation but
-/// a non-zero excess mean, `0.0` when both are zero, and `NaN` for non-finite
-/// inputs, invalid `periods_per_year`, or fewer than two observations.
+/// Dimensionless Sortino; NaN for insufficient history or all-at-MAR returns,
+/// and positive infinity when reward is positive with genuinely no shortfall.
 ///
-/// # References
+/// # Errors
 ///
-/// - Sortino & van der Meer (1991): see docs/REFERENCES.md#sortinoVanDerMeer1991
-#[must_use]
-pub fn sortino(returns: &[f64], mar: f64, periods_per_year: f64) -> f64 {
-    if returns.len() < 2 || invalid_annualization_factor(periods_per_year) {
-        return f64::NAN;
+/// Returns input errors for invalid history, MAR or frequency, and calculation
+/// errors when positive finite risk or the requested finite ratio is unrepresentable.
+pub fn sortino(returns: &[f64], mar: f64, periods_per_year: f64) -> Result<f64> {
+    validate_history(returns)?;
+    validate_frequency(periods_per_year)?;
+    let (den_scale, denominator) = downside_scaled(returns, mar)?;
+    if returns.len() < 2 {
+        return Ok(f64::NAN);
     }
-    let excess_mean = mean(returns) - mar;
-    let dd = downside_deviation(returns, mar, false, periods_per_year);
-    super::annualized_ratio_or_sign_infinity(excess_mean, dd, periods_per_year)
+    let (num_scale, numerator, count) = scaled_mean_difference(returns, mar);
+    scaled_ratio(
+        num_scale,
+        numerator,
+        den_scale,
+        denominator,
+        periods_per_year.sqrt() / count,
+        "Sortino",
+    )
 }
-/// Geometric mean return per period.
-///
-/// The compound-average return: the constant per-period return that
-/// would produce the same terminal wealth as the actual series.
-///
-/// ```text
-/// geo_mean = (Π(1 + r_i))^(1/n) − 1
-/// ```
-///
-/// Computed in log-space with compensated summation for numerical stability.
-///
-/// # Arguments
-///
-/// * `returns` - Slice of period simple returns.
-///
-/// # Returns
-///
-/// The geometric mean return. Returns [`f64::NAN`] for an empty slice or
-/// non-finite return data.
-#[must_use]
-pub(crate) fn geometric_mean(returns: &[f64]) -> f64 {
+
+/// Observation-period geometric mean on the validated investment domain.
+pub(crate) fn geometric_mean(returns: &[f64]) -> Result<f64> {
+    validate_history(returns)?;
     if returns.is_empty() {
-        return f64::NAN;
+        return Ok(f64::NAN);
     }
     let mut engine = crate::returns::WealthEngine::new();
     for &r in returns {
         engine.step(r);
     }
-    let n = returns.len() as f64;
-    (engine.log_growth() / n).exp_m1()
+    let log_growth = engine.log_growth();
+    let value = finite_result(
+        (log_growth / returns.len() as f64).exp_m1(),
+        "geometric mean",
+    )?;
+    if value == 0.0 && log_growth != 0.0 {
+        return Err(Error::Internal("nonzero geometric mean underflowed".into()));
+    }
+    if value <= -1.0 && returns.last().is_none_or(|&r| r > -1.0) {
+        return Err(Error::Internal(
+            "positive geometric growth collapsed to terminal zero".into(),
+        ));
+    }
+    Ok(value)
 }
 
-/// Omega ratio: probability-weighted gain-to-loss ratio above a threshold.
-///
-/// ```text
-/// Ω(L) = Σ max(r_i − L, 0) / Σ max(L − r_i, 0)
-/// ```
-///
-/// Unlike the Sharpe ratio (which uses only mean and variance), the Omega
-/// ratio incorporates the full return distribution.
-///
-/// # Arguments
-///
-/// * `returns`   - Slice of period simple returns.
-/// * `threshold` - Return threshold (typically `0.0`).
-///
-/// # Returns
-///
-/// The Omega ratio. Returns `f64::INFINITY` if gains exist but no losses,
-/// `1.0` if all returns equal the threshold (neutral outcome per
-/// Keating-Shadwick), and [`f64::NAN`] for an empty slice.
-///
-/// # References
-///
-/// - Keating & Shadwick (2002): see docs/REFERENCES.md#keatingShadwick2002
-#[must_use]
-pub(crate) fn omega_ratio(returns: &[f64], threshold: f64) -> f64 {
-    if returns.is_empty() {
-        return f64::NAN;
+/// Empirical unannualized gain/shortfall ratio above an explicit finite threshold.
+pub(crate) fn omega_ratio(returns: &[f64], threshold: f64) -> Result<f64> {
+    validate_history(returns)?;
+    if !threshold.is_finite() {
+        return Err(Error::Validation("Omega threshold must be finite".into()));
     }
-    let mut gains = 0.0_f64;
-    let mut losses = 0.0_f64;
+    if returns.is_empty() {
+        return Ok(f64::NAN);
+    }
+    let scale = returns
+        .iter()
+        .fold(threshold.abs(), |s, x| s.max(x.abs()))
+        .max(f64::MIN_POSITIVE);
+    let mut gains = NeumaierAccumulator::new();
+    let mut losses = NeumaierAccumulator::new();
     for &r in returns {
-        if r > threshold {
-            gains += r - threshold;
+        let d = r - threshold;
+        let d = if d.is_finite() {
+            d / scale
         } else {
-            losses += threshold - r;
+            r / scale - threshold / scale
+        };
+        if r > threshold {
+            gains.add(d);
+        } else if r < threshold {
+            losses.add(-d);
         }
     }
+    let gains = gains.total();
+    let losses = losses.total();
+    if (gains == 0.0 && returns.iter().any(|&r| r > threshold))
+        || (losses == 0.0 && returns.iter().any(|&r| r < threshold))
+    {
+        return Err(Error::Internal(
+            "Omega gain or shortfall was lost numerically".into(),
+        ));
+    }
     if losses == 0.0 {
-        return if gains > 0.0 { f64::INFINITY } else { 1.0 };
+        return Ok(super::ratio_or_sign_infinity(gains, losses));
     }
-    gains / losses
+    scaled_ratio(1.0, gains, 1.0, losses, 1.0, "Omega")
 }
 
-/// Gain-to-pain ratio: total return divided by total losses.
-///
-/// ```text
-/// GtP = Σ r_i / Σ |r_i| for r_i < 0
-/// ```
-///
-/// Popular among CTA and systematic macro managers as a simple
-/// measure of return efficiency relative to the pain of drawdowns.
-///
-/// # Arguments
-///
-/// * `returns` - Slice of period simple returns.
-///
-/// # Returns
-///
-/// The gain-to-pain ratio. Returns `f64::INFINITY` when total return is
-/// positive but there are no losses, and [`f64::NAN`] for an empty slice.
-///
-/// # References
-///
-/// - Schwager (2012): see docs/REFERENCES.md#schwager2012
-#[must_use]
-pub(crate) fn gain_to_pain(returns: &[f64]) -> f64 {
+/// Arithmetic net-return sum per unit of negative-return magnitude, without annualization.
+pub(crate) fn gain_to_pain(returns: &[f64]) -> Result<f64> {
+    validate_history(returns)?;
     if returns.is_empty() {
-        return f64::NAN;
+        return Ok(f64::NAN);
     }
-    let total: f64 = kahan_sum(returns.iter().copied());
-    let abs_losses: f64 = kahan_sum(returns.iter().filter(|&&r| r < 0.0).map(|&r| r.abs()));
-    super::ratio_or_sign_infinity(total, abs_losses)
+    let scale = returns
+        .iter()
+        .fold(0.0_f64, |s, x| s.max(x.abs()))
+        .max(f64::MIN_POSITIVE);
+    let net = neumaier_sum(returns.iter().map(|r| r / scale));
+    let losses = neumaier_sum(returns.iter().filter(|&&r| r < 0.0).map(|r| -r / scale));
+    if losses == 0.0 {
+        if returns.iter().any(|&r| r < 0.0) {
+            return Err(Error::Internal(
+                "positive loss magnitude was lost numerically".into(),
+            ));
+        }
+        return Ok(super::ratio_or_sign_infinity(net, losses));
+    }
+    scaled_ratio(1.0, net, 1.0, losses, 1.0, "gain-to-pain")
 }
 
-/// Modified Sharpe ratio: excess return divided by corresponding-horizon
-/// Cornish-Fisher VaR.
-///
-/// Replaces the standard deviation in the Sharpe denominator with the
-/// Cornish-Fisher adjusted VaR, accounting for skewness and kurtosis. Both
-/// numerator and denominator are measured at the annual horizon implied by
-/// `ann_factor`. Excess return uses the same geometric rf decompounding as
-/// [`sharpe`]:
-///
-/// ```text
-/// Modified Sharpe = ((μ − rf_period) × N) / |CF-VaR_N|
-/// ```
-///
-/// Passing `Some(ann_factor)` to [`cornish_fisher_var`] is intentional:
-/// it scales the mean and volatility and applies the i.i.d. horizon decay to
-/// skewness and excess kurtosis. A one-period VaR denominator would be
-/// inconsistent with the annualized numerator.
-///
-/// # Arguments
-///
-/// * `returns`        - Slice of period simple returns.
-/// * `risk_free_rate` - Annualized risk-free rate in decimal form.
-/// * `confidence`     - VaR confidence level (e.g., `0.95`).
-/// * `ann_factor`     - Number of periods per year used to decompound
-///   `risk_free_rate` and to put both the excess-return numerator and
-///   Cornish-Fisher VaR denominator on the annual horizon.
-///
-/// # Returns
-///
-/// The Modified Sharpe ratio. Returns [`f64::NAN`] for fewer than two
-/// observations, zero volatility, or when the Cornish-Fisher VaR is
-/// unexpectedly non-negative.
-///
-/// # References
-///
-/// - Gregoriou & Gueyie (2003): see docs/REFERENCES.md#gregoriou2003
-#[must_use]
+/// Observation-period excess mean over the independently valid negative CF quantile.
 pub(crate) fn modified_sharpe(
     returns: &[f64],
     risk_free_rate: f64,
     confidence: f64,
     ann_factor: f64,
-) -> f64 {
-    if returns.len() < 2 {
-        return f64::NAN;
+) -> Result<f64> {
+    validate_history(returns)?;
+    validate_cash(risk_free_rate)?;
+    let cash = periodic_risk_free_rate(risk_free_rate, ann_factor)?;
+    let cf = super::tail_risk::cornish_fisher_var(returns, confidence, None)?;
+    if returns.len() < 4 || cf.is_nan() || cf >= 0.0 {
+        return Ok(f64::NAN);
     }
-    let (ann_return, ann_vol) = mean_vol_annualized(returns, ann_factor);
-    if !ann_return.is_finite() || !ann_vol.is_finite() || ann_vol == 0.0 {
-        return f64::NAN;
-    }
-    let excess_return =
-        crate::returns::annualized_excess_return(ann_return, risk_free_rate, ann_factor);
-    let cf_var = cornish_fisher_var(returns, confidence, Some(ann_factor));
-    if cf_var >= 0.0 {
-        return f64::NAN;
-    }
-    excess_return / cf_var.abs()
+    let (scale, numerator, count) = scaled_mean_difference(returns, cash);
+    scaled_ratio(
+        scale,
+        numerator,
+        cf.abs(),
+        1.0,
+        1.0 / count,
+        "modified Sharpe",
+    )
 }
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn cagr_day_count_rejects_noncanonical_labels() {
-        assert_eq!(
-            "act365_25"
-                .parse::<super::CagrDayCount>()
-                .expect("canonical"),
-            super::CagrDayCount::Act365_25
-        );
-        for label in [
-            "act_365_25",
-            "act/365.25",
-            "Act365_25",
-            " act365_25",
-            "ACT/365F",
-            "act_365_fixed",
-            "",
-        ] {
-            assert!(label.parse::<super::CagrDayCount>().is_err(), "{label}");
-        }
-    }
-
     use super::*;
-    use finstack_quant_core::math::stats::{mean, variance};
     use time::Month;
 
-    fn jan1(year: i32) -> finstack_quant_core::dates::Date {
-        finstack_quant_core::dates::Date::from_calendar_date(year, Month::January, 1)
-            .expect("valid date")
+    #[test]
+    fn request_errors_are_not_hidden_by_insufficient_samples() {
+        assert!(volatility(&[], 0.0).is_err());
+        assert!(sharpe(&[], f64::NAN, 12.0).is_err());
+        assert!(sortino(&[], f64::INFINITY, 12.0).is_err());
+        assert!(volatility(&[f64::NAN], 12.0).is_err());
+        assert!(volatility(&[-1.0, 0.0], 12.0).is_err());
+        assert!(volatility(&[0.1], 12.0).unwrap().is_nan());
+        assert!(volatility(&[], 12.0).unwrap().is_nan());
     }
 
     #[test]
-    fn cagr_basic() {
-        let r = [0.10];
-        let c =
-            cagr(&r, jan1(2024), jan1(2025), CagrDayCount::default(), None).expect("valid CAGR");
-        assert!((c - 0.10).abs() < 0.01);
+    fn independent_extreme_scale_reference_values() {
+        let tiny = volatility(&[1e-200, -1e-200], 1.0).unwrap();
+        assert!((tiny / 1e-200 - 2.0_f64.sqrt()).abs() < 1e-14);
+        assert!((sharpe(&[0.0, 1e308], 0.0, 12.0).unwrap() - 6.0_f64.sqrt()).abs() < 1e-14);
+        assert!(volatility(&[0.0, 1e308], 12.0).is_err());
+        assert!(mean_return(&[0.0, 1e308], true, 12.0).is_err());
+        assert_eq!(mean_return(&[1e308, 1e308], false, 1.0).unwrap(), 1e308);
+        let smallest = f64::from_bits(1);
+        let scaled_mean = mean_return(&[smallest, 0.0], true, 1e308).unwrap();
+        assert!((scaled_mean / (smallest * 1e308) - 0.5).abs() < 1e-14);
     }
 
     #[test]
-    fn cagr_with_act_365_fixed() {
-        let r = [0.10];
+    fn signed_cancellation_preserves_a_resolved_nonzero_reward() {
+        let returns = [1.0, 1e-20, -1.0];
+        let expected_mean = 1e-20 / 3.0;
+        assert!((mean_return(&returns, false, 1.0).unwrap() / expected_mean - 1.0).abs() < 1e-14);
+        assert!((sharpe(&returns, 0.0, 1.0).unwrap() / expected_mean - 1.0).abs() < 1e-14);
+        assert!((gain_to_pain(&returns).unwrap() / 1e-20 - 1.0).abs() < 1e-14);
+    }
+
+    #[test]
+    fn cancelled_subnormal_reward_survives_requested_annual_scaling() {
+        let smallest = f64::from_bits(1);
+        let returns = [1.0, smallest, -1.0];
+        assert!(mean_return(&returns, false, 1.0).is_err());
+        let expected_mean = smallest * (1e308 / 3.0);
+        let actual_mean = mean_return(&returns, true, 1e308).unwrap();
+        assert!((actual_mean / expected_mean - 1.0).abs() < 1e-14);
+        assert!(sharpe(&returns, 0.0, 1.0).is_err());
+        let expected_sharpe = smallest * (1e154 / 3.0);
+        let actual_sharpe = sharpe(&returns, 0.0, 1e308).unwrap();
+        assert!((actual_sharpe / expected_sharpe - 1.0).abs() < 1e-14);
+        let expected_sortino = smallest * (1e154 / 3.0_f64.sqrt());
+        let actual_sortino = sortino(&returns, 0.0, 1e308).unwrap();
+        assert!((actual_sortino / expected_sortino - 1.0).abs() < 1e-14);
+    }
+
+    #[test]
+    fn accepted_zero_risk_and_unavailable_outcomes() {
+        assert_eq!(volatility(&[0.1, 0.1], 12.0).unwrap(), 0.0);
+        assert!(sharpe(&[0.0, 0.0], 0.0, 12.0).unwrap().is_nan());
+        assert_eq!(sharpe(&[0.1, 0.1], 0.0, 12.0).unwrap(), f64::INFINITY);
+        assert!(sortino(&[0.0, 0.0], 0.0, 12.0).unwrap().is_nan());
+        assert!(omega_ratio(&[0.0, 0.0], 0.0).unwrap().is_nan());
+        assert!(gain_to_pain(&[0.0, 0.0]).unwrap().is_nan());
+        assert!(downside_deviation(&[], 0.0, true, 12.0).unwrap().is_nan());
+    }
+
+    #[test]
+    fn downside_all_observation_denominator_and_any_finite_mar() {
+        let returns = [0.02, 0.0, -0.01];
+        assert!((downside_deviation(&returns, 0.0, true, 12.0).unwrap() - 0.02).abs() < 1e-15);
+        assert!((sortino(&returns, 0.0, 12.0).unwrap() - 2.0).abs() < 1e-14);
+        assert_eq!(downside_deviation(&returns, -2.0, true, 12.0).unwrap(), 0.0);
+        assert_eq!(sortino(&returns, -2.0, 12.0).unwrap(), f64::INFINITY);
+    }
+
+    #[test]
+    fn underflow_cannot_manufacture_zero_in_a_positive_ratio() {
+        let smallest = f64::from_bits(1);
+        assert!(omega_ratio(&[-0.75, -0.75, -0.75, smallest], 0.0).is_err());
+    }
+
+    #[test]
+    fn empty_history_does_not_hide_invalid_coupon_context() {
+        let context = DayCountContext {
+            frequency: Some(finstack_quant_core::dates::Tenor::new(1, TenorUnit::Days).unwrap()),
+            ..DayCountContext::default()
+        };
+        assert!(
+            validate_cagr_context(CagrDayCount::DayCount(DayCount::ActActIsma), context).is_err()
+        );
+        assert!(geometric_mean(&[f64::from_bits(1), 0.0]).is_err());
+    }
+
+    #[test]
+    fn dated_cagr_default_is_fixed_365_and_terminal_is_exact() {
+        let start = Date::from_calendar_date(2024, Month::January, 1).unwrap();
+        let end = Date::from_calendar_date(2025, Month::January, 1).unwrap();
         let c = cagr(
-            &r,
-            jan1(2024),
-            jan1(2025),
-            CagrDayCount::DayCount(DayCount::Act365F),
-            None,
+            &[0.1],
+            start,
+            end,
+            CagrDayCount::default(),
+            DayCountContext::default(),
         )
-        .expect("valid CAGR");
-        assert!((c - 0.09971358593414137).abs() < 1.0e-12);
-    }
-
-    #[test]
-    fn cagr_default_convention_is_act_365_25() {
-        let r = [0.10];
-        let c_default =
-            cagr(&r, jan1(2024), jan1(2025), CagrDayCount::default(), None).expect("valid CAGR");
-        let c_fixed = cagr(
-            &r,
-            jan1(2024),
-            jan1(2025),
-            CagrDayCount::DayCount(DayCount::Act365F),
-            None,
-        )
-        .expect("valid CAGR");
-        assert!(c_default > c_fixed);
-        assert!((c_default - 0.09978518245839707).abs() < 1.0e-12);
-    }
-
-    #[test]
-    fn cagr_bus252_without_calendar_is_err() {
-        let r = [0.10];
-        let err = cagr(
-            &r,
-            jan1(2024),
-            jan1(2025),
-            CagrDayCount::DayCount(DayCount::Bus252),
-            None,
-        )
-        .expect_err("Bus252 requires a calendar");
-        let msg = err.to_string();
-        assert!(
-            msg.to_lowercase().contains("calendar") || msg.to_lowercase().contains("bus"),
-            "unexpected error: {msg}"
-        );
-    }
-
-    #[test]
-    fn free_functions_agree_with_daily_panel() {
-        let returns = [0.01, -0.02, 0.015, 0.003, -0.01, 0.02];
-        let dates: Vec<finstack_quant_core::dates::Date> = (1..=6)
-            .map(|d| {
-                finstack_quant_core::dates::Date::from_calendar_date(2025, Month::January, d)
-                    .unwrap()
-            })
-            .collect();
-        let perf = crate::Performance::new(&crate::performance::returns_panel(
-            dates,
-            vec![returns.to_vec()],
-            vec!["A".into()],
-            None,
-            finstack_quant_core::dates::PeriodKind::Daily,
-        ))
         .unwrap();
-        assert!((sharpe(&returns, 0.02, 252.0) - perf.sharpe(0.02)[0]).abs() < 1e-12);
-        assert!((sortino(&returns, 0.0, 252.0) - perf.sortino(0.0)[0]).abs() < 1e-12);
-        assert!((volatility(&returns, 252.0) - perf.volatility(true)[0]).abs() < 1e-12);
-        assert!((max_drawdown(&returns) - perf.max_drawdown()[0]).abs() < 1e-12);
-    }
-
-    #[test]
-    fn invalid_periods_per_year_is_nan() {
-        let returns = [0.01, -0.02, 0.015, 0.003, -0.01, 0.02];
-        assert!(sharpe(&returns, 0.0, 0.0).is_nan());
-        assert!(volatility(&returns, f64::NAN).is_nan());
-        assert!(volatility(&returns, 0.0).is_nan());
-        assert!(volatility(&returns, f64::INFINITY).is_nan());
-        assert!(sortino(&returns, 0.0, 0.0).is_nan());
-        assert_eq!(max_drawdown(&[]), 0.0);
-    }
-
-    #[test]
-    fn factor_cagr_rejects_bad_ann_factor() {
-        assert!(cagr_from_factor(&[0.01, 0.02], 0.0).is_err());
-        assert!(cagr_from_factor(&[0.01, 0.02], -1.0).is_err());
-        assert!(cagr_from_factor(&[0.01, 0.02], f64::NAN).is_err());
-    }
-
-    #[test]
-    fn factor_cagr_accepts_single_period() {
-        assert!((cagr_from_factor(&[0.10], 1.0).expect("valid CAGR") - 0.10).abs() < 1.0e-12);
-    }
-
-    #[test]
-    fn date_cagr_rejects_non_positive_spans() {
-        let returns = [0.10];
-
+        assert!((c - 0.09971358593414137).abs() < 1e-14);
+        assert_eq!(
+            cagr(
+                &[-1.0],
+                start,
+                end,
+                CagrDayCount::default(),
+                DayCountContext::default()
+            )
+            .unwrap(),
+            -1.0
+        );
+        assert_eq!(geometric_mean(&[0.1, -1.0]).unwrap(), -1.0);
         assert!(
             cagr(
-                &returns,
-                jan1(2024),
-                jan1(2024),
-                CagrDayCount::default(),
-                None,
+                &[],
+                start,
+                end,
+                CagrDayCount::DayCount(DayCount::Bus252),
+                DayCountContext::default()
             )
             .is_err()
         );
-        assert!(
-            cagr(
-                &returns,
-                jan1(2025),
-                jan1(2024),
-                CagrDayCount::default(),
-                None,
-            )
-            .is_err()
-        );
-    }
-
-    #[test]
-    fn mean_return_annualized_scales_linearly_not_compounded() {
-        let r = [0.01, 0.02, 0.03];
-        let m_ann = mean_return(&r, true, 252.0);
-        let mean_p = mean(&r);
-        assert!((m_ann - mean_p * 252.0).abs() < 1e-10);
-        let cagr_ann = cagr_from_factor(&r, 252.0).expect("valid CAGR");
-        assert!(
-            cagr_ann.is_finite() && (m_ann - cagr_ann).abs() > 1e-6,
-            "arithmetic annualized mean should differ from compounded cagr"
-        );
-    }
-
-    #[test]
-    fn sharpe_basic() {
-        let d = 0.15 / 2.0_f64.sqrt();
-        let r = [0.10 - d, 0.10 + d];
-        assert!((sharpe(&r, 0.0, 1.0) - 0.6666).abs() < 0.01);
-        assert_eq!(sharpe(&[0.10, 0.10], 0.0, 1.0), f64::INFINITY);
-        assert_eq!(sharpe(&[-0.05, -0.05], 0.0, 1.0), f64::NEG_INFINITY);
-        assert_eq!(sharpe(&[0.02, 0.02], 0.02, 1.0), 0.0);
-    }
-
-    #[test]
-    fn sharpe_with_risk_free_rate() {
-        let d = 0.15 / 2.0_f64.sqrt();
-        let r = [0.10 - d, 0.10 + d];
-        assert!((sharpe(&r, 0.02, 1.0) - 0.5333).abs() < 0.01);
-    }
-
-    #[test]
-    fn sharpe_daily_excess_uses_geometric_rf() {
-        let mu = 0.0004_f64;
-        let ann_factor = 252.0;
-        let rf_annual = 0.02;
-        let ann_return = mu * ann_factor;
-        let ann_vol = 0.15;
-        let period_vol = ann_vol / ann_factor.sqrt();
-        let d = period_vol / 2.0_f64.sqrt();
-        let r = [mu - d, mu + d];
-        let rf_period = 1.02_f64.powf(1.0 / ann_factor) - 1.0;
-        let expected_excess = (mu - rf_period) * ann_factor;
-        let linear_excess = ann_return - rf_annual;
-        assert!(
-            (expected_excess - linear_excess).abs() > 1e-6,
-            "geometric and linear rf subtraction must differ at daily frequency"
-        );
-        let s = sharpe(&r, rf_annual, ann_factor);
-        assert!((s * ann_vol - expected_excess).abs() < 1e-12);
-        assert!((s * ann_vol - linear_excess).abs() > 1e-6);
-    }
-
-    #[test]
-    fn sortino_positive_returns() {
-        let r = [0.01, 0.02, 0.03, -0.005, 0.01];
-        let s = sortino(&r, 0.0, 1.0);
-        assert!(s > 0.0);
-    }
-
-    #[test]
-    fn downside_deviation_hand_calc() {
-        let r = [0.01, -0.02, 0.03, -0.01, 0.005];
-        let dd = downside_deviation(&r, 0.0, false, 252.0);
-        assert!((dd - 0.01).abs() < 1e-14);
-    }
-
-    #[test]
-    fn downside_deviation_annualized() {
-        let r = [0.01, -0.02, 0.03, -0.01, 0.005];
-        let dd_raw = downside_deviation(&r, 0.0, false, 252.0);
-        let dd_ann = downside_deviation(&r, 0.0, true, 252.0);
-        assert!((dd_ann - dd_raw * 252.0_f64.sqrt()).abs() < 1e-12);
-    }
-
-    #[test]
-    fn downside_deviation_all_positive() {
-        let dd = downside_deviation(&[0.01, 0.02, 0.03], 0.0, false, 252.0);
-        assert_eq!(dd, 0.0);
-    }
-
-    #[test]
-    fn downside_deviation_empty() {
-        assert_eq!(downside_deviation(&[], 0.0, false, 252.0), 0.0);
-    }
-
-    #[test]
-    fn downside_deviation_with_mar() {
-        let r = [0.01, 0.02, 0.03, 0.005];
-        let dd = downside_deviation(&r, 0.02, false, 252.0);
-        let expected = (0.000325_f64 / 4.0).sqrt();
-        assert!((dd - expected).abs() < 1e-14);
-    }
-
-    #[test]
-    fn sortino_consistent_with_downside_deviation() {
-        let r = [0.01, 0.02, 0.03, -0.005, 0.01];
-        let m = mean(&r);
-        let dd = downside_deviation(&r, 0.0, false, 252.0);
-        let s = sortino(&r, 0.0, 1.0);
-        assert!((s - m / dd).abs() < 1e-12);
-    }
-
-    #[test]
-    fn sortino_respects_mar_in_numerator_and_denominator() {
-        let r = [0.01, 0.02, 0.03, 0.04];
-        let mar = 0.02;
-        let expected = (mean(&r) - mar) / downside_deviation(&r, mar, false, 252.0);
-        let actual = sortino(&r, mar, 1.0);
-        assert!((actual - expected).abs() < 1e-12);
-    }
-
-    #[test]
-    fn geometric_mean_constant() {
-        let gm = geometric_mean(&[0.05, 0.05, 0.05]);
-        assert!((gm - 0.05).abs() < 1e-12);
-    }
-
-    #[test]
-    fn geometric_mean_volatility_drag_exact() {
-        let gm = geometric_mean(&[0.10, -0.10]);
-        let expected = 0.99_f64.sqrt() - 1.0;
-        assert!((gm - expected).abs() < 1e-12);
-    }
-
-    #[test]
-    fn geometric_mean_empty() {
-        assert!(geometric_mean(&[]).is_nan());
-    }
-
-    #[test]
-    fn geometric_mean_less_than_arithmetic() {
-        let r = [0.05, 0.10, -0.03, 0.08];
-        let gm = geometric_mean(&r);
-        let am = mean(&r);
-        assert!(gm < am);
-    }
-
-    #[test]
-    fn omega_ratio_hand_calc() {
-        let r = [0.05, -0.02, 0.03, -0.01, 0.04];
-        let omega = omega_ratio(&r, 0.0);
-        assert!((omega - 4.0).abs() < 1e-12);
-    }
-
-    #[test]
-    fn omega_ratio_no_losses() {
-        assert_eq!(omega_ratio(&[0.01, 0.02, 0.03], 0.0), f64::INFINITY);
-    }
-
-    #[test]
-    fn omega_ratio_empty() {
-        assert!(omega_ratio(&[], 0.0).is_nan());
-    }
-
-    #[test]
-    fn gain_to_pain_hand_calc() {
-        let r = [0.05, -0.02, 0.03, -0.01, 0.04];
-        let gtp = gain_to_pain(&r);
-        assert!((gtp - 3.0).abs() < 1e-12);
-    }
-
-    #[test]
-    fn gain_to_pain_no_losses() {
-        assert_eq!(gain_to_pain(&[0.01, 0.02]), f64::INFINITY);
-    }
-
-    #[test]
-    fn gain_to_pain_empty() {
-        assert!(gain_to_pain(&[]).is_nan());
-    }
-
-    #[test]
-    fn gain_to_pain_without_gains_or_losses_is_zero() {
-        assert_eq!(gain_to_pain(&[0.0, 0.0]), 0.0);
-    }
-
-    #[test]
-    fn modified_sharpe_is_finite_when_cf_var_is_a_loss() {
-        let r = [-0.06, -0.03, -0.02, 0.01, 0.02, 0.025, 0.03, 0.04];
-        let ms = modified_sharpe(&r, 0.02, 0.95, 252.0);
-        assert!(ms.is_finite());
-    }
-
-    #[test]
-    fn modified_sharpe_uses_annual_excess_over_annual_cf_var() {
-        let returns = [-0.06, -0.03, -0.02, 0.01, 0.02, 0.025, 0.03, 0.04];
-        let risk_free_rate = 0.02;
-        let confidence = 0.95;
-        let ann_factor = 12.0;
-
-        let period_mean = mean(&returns);
-        let period_vol = variance(&returns).sqrt();
-        let rf_period = (1.0_f64 + risk_free_rate).powf(1.0 / ann_factor) - 1.0;
-        let annual_excess = (period_mean - rf_period) * ann_factor;
-
-        let annual_skew = crate::risk_metrics::skewness(&returns) / ann_factor.sqrt();
-        let annual_kurt = crate::risk_metrics::kurtosis(&returns) / ann_factor;
-        let z =
-            finstack_quant_core::math::special_functions::standard_normal_inv_cdf(1.0 - confidence);
-        let z2 = z * z;
-        let z3 = z2 * z;
-        let annual_z_cf = z + (z2 - 1.0) * annual_skew / 6.0 + (z3 - 3.0 * z) * annual_kurt / 24.0
-            - (2.0 * z3 - 5.0 * z) * annual_skew * annual_skew / 36.0;
-        let annual_cf_var = period_mean * ann_factor + annual_z_cf * period_vol * ann_factor.sqrt();
-        assert!(annual_cf_var < 0.0);
-
-        let expected = annual_excess / annual_cf_var.abs();
-        let actual = modified_sharpe(&returns, risk_free_rate, confidence, ann_factor);
-        assert!(
-            (actual - expected).abs() < 1.0e-12,
-            "{actual} vs {expected}"
-        );
-    }
-
-    #[test]
-    fn modified_sharpe_differs_from_one_period_var_denominator() {
-        let returns = [-0.06, -0.03, -0.02, 0.01, 0.02, 0.025, 0.03, 0.04];
-        let risk_free_rate = 0.02;
-        let confidence = 0.95;
-        let ann_factor = 12.0;
-
-        let period_mean = mean(&returns);
-        let rf_period = (1.0_f64 + risk_free_rate).powf(1.0 / ann_factor) - 1.0;
-        let annual_excess = (period_mean - rf_period) * ann_factor;
-        let one_period_cf_var = cornish_fisher_var(&returns, confidence, None);
-        assert!(one_period_cf_var < 0.0);
-
-        let inconsistent = annual_excess / one_period_cf_var.abs();
-        let actual = modified_sharpe(&returns, risk_free_rate, confidence, ann_factor);
-        assert!(
-            (actual - inconsistent).abs() > 1.0e-6,
-            "annual-horizon and one-period denominators must not be interchangeable"
-        );
-    }
-
-    #[test]
-    fn modified_sharpe_empty() {
-        assert!(modified_sharpe(&[], 0.02, 0.95, 252.0).is_nan());
-        assert!(modified_sharpe(&[-0.01], 0.0, 0.95, 252.0).is_nan());
-        assert!(modified_sharpe(&[-0.01; 12], 0.0, 0.95, 12.0).is_nan());
-    }
-
-    #[test]
-    fn modified_sharpe_positive_cf_var_returns_nan() {
-        let r = [0.03; 12];
-        let ms = modified_sharpe(&r, 0.0, 0.95, 12.0);
-        assert!(ms.is_nan());
-    }
-
-    #[test]
-    fn cagr_empty_is_err() {
-        assert!(cagr(&[], jan1(2024), jan1(2025), CagrDayCount::default(), None,).is_err());
-        assert!(cagr_from_factor(&[], 252.0).is_err());
-    }
-
-    #[test]
-    fn parametric_var_scales_mean_and_vol_by_horizon() {
-        let returns = [0.01, -0.02, 0.03, -0.01, 0.02, -0.005];
-        let ann_factor = 12.0;
-        let m = mean(&returns);
-        let vol = variance(&returns).sqrt();
-        let z = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(0.05);
-        let expected = m * ann_factor + z * vol * ann_factor.sqrt();
-        let actual = crate::risk_metrics::parametric_var(&returns, 0.95, Some(ann_factor));
-        assert!((actual - expected).abs() < 1e-14, "{actual} vs {expected}");
-    }
-
-    /// Test-only CAGR from a fixed annualisation factor (no calendar dates).
-    fn cagr_from_factor(returns: &[f64], ann_factor: f64) -> finstack_quant_core::Result<f64> {
-        if returns.is_empty() {
-            tracing::debug!(reason = "empty_returns", "invalid CAGR input");
-            return Err(finstack_quant_core::Error::Validation(
-                "invalid CAGR input".to_string(),
-            ));
-        }
-        if !ann_factor.is_finite() || ann_factor <= 0.0 {
-            tracing::debug!(
-                ann_factor,
-                reason = "invalid_annualization_factor",
-                "invalid CAGR input"
-            );
-            return Err(finstack_quant_core::Error::Validation(
-                "invalid CAGR input".to_string(),
-            ));
-        }
-        let years = returns.len() as f64 / ann_factor;
-        if years > 0.0 {
-            let mut engine = crate::returns::WealthEngine::new();
-            for &r in returns {
-                engine.step(r);
-            }
-            Ok((engine.log_growth() / years).exp_m1())
-        } else {
-            Err(finstack_quant_core::Error::Validation(
-                "invalid CAGR input".to_string(),
-            ))
-        }
-    }
-
-    /// Numeric fixture pinning freestanding building-block outputs.
-    ///
-    /// Lives in `src/` (rather than `tests/`) so it can reach `pub(crate)`
-    /// building-block functions directly. Public-API consumers should go
-    /// through [`crate::performance::Performance`].
-    mod fixture_tests {
-        use super::{cagr_from_factor, sharpe, sortino};
-        use crate::benchmark::rolling_greeks;
-        use crate::multi_factor::{ReturnKind, multi_factor_greeks};
-        use crate::risk_metrics::{expected_shortfall, value_at_risk};
-        use finstack_quant_core::dates::Date;
-        use serde::Deserialize;
-
-        const API_INVARIANTS_FIXTURE: &str =
-            include_str!("../../tests/data/api_invariants_data.json");
-
-        #[derive(Deserialize)]
-        struct Fixture {
-            returns: Vec<f64>,
-            benchmark: Vec<f64>,
-            factors: Vec<Vec<f64>>,
-            dates: Vec<Date>,
-            expected: Expected,
-        }
-
-        #[derive(Deserialize)]
-        struct Expected {
-            cagr_factor: f64,
-            sharpe: f64,
-            sortino: f64,
-            value_at_risk: f64,
-            expected_shortfall: f64,
-            rolling_greeks: ExpectedRollingGreeks,
-            multi_factor_greeks: ExpectedMultiFactorGreeks,
-        }
-
-        #[derive(Deserialize)]
-        struct ExpectedRollingGreeks {
-            alphas: Vec<f64>,
-            betas: Vec<f64>,
-        }
-
-        #[derive(Deserialize)]
-        struct ExpectedMultiFactorGreeks {
-            alpha: f64,
-            betas: Vec<f64>,
-            r_squared: f64,
-            adjusted_r_squared: f64,
-            residual_vol: f64,
-        }
-
-        fn fixture() -> Fixture {
-            serde_json::from_str(API_INVARIANTS_FIXTURE)
-                .expect("API invariants fixture should parse")
-        }
-
-        fn assert_close(actual: f64, expected: f64) {
-            assert!(
-                (actual - expected).abs() < 1.0e-12,
-                "actual={actual}, expected={expected}"
-            );
-        }
-
-        fn assert_vec_close(actual: &[f64], expected: &[f64]) {
-            assert_eq!(actual.len(), expected.len());
-            for (&actual, &expected) in actual.iter().zip(expected.iter()) {
-                assert_close(actual, expected);
-            }
-        }
-
-        #[test]
-        fn rust_core_matches_api_invariants_fixture() {
-            let fixture = fixture();
-            let expected = &fixture.expected;
-
-            assert_close(
-                cagr_from_factor(&fixture.returns, 252.0).expect("valid fixture CAGR"),
-                expected.cagr_factor,
-            );
-            let d = 0.18 / 2.0_f64.sqrt();
-            assert_close(sharpe(&[0.12 - d, 0.12 + d], 0.02, 1.0), expected.sharpe);
-            assert_close(sortino(&fixture.returns, 0.0, 252.0), expected.sortino);
-            assert_close(
-                value_at_risk(&fixture.returns, 0.95),
-                expected.value_at_risk,
-            );
-            assert_close(
-                expected_shortfall(&fixture.returns, 0.95),
-                expected.expected_shortfall,
-            );
-
-            let rolling = rolling_greeks(
-                &fixture.returns,
-                &fixture.benchmark,
-                &fixture.dates,
-                5,
-                252.0,
-                0.0,
-            );
-            assert_vec_close(&rolling.alphas, &expected.rolling_greeks.alphas);
-            assert_vec_close(&rolling.betas, &expected.rolling_greeks.betas);
-
-            let factor_refs: Vec<&[f64]> = fixture.factors.iter().map(Vec::as_slice).collect();
-            let multi =
-                multi_factor_greeks(&fixture.returns, &factor_refs, 252.0, ReturnKind::Excess)
-                    .expect("valid fixture multi-factor regression");
-            assert_close(multi.alpha, expected.multi_factor_greeks.alpha);
-            assert_vec_close(&multi.betas, &expected.multi_factor_greeks.betas);
-            assert_close(multi.r_squared, expected.multi_factor_greeks.r_squared);
-            assert_close(
-                multi.adjusted_r_squared,
-                expected.multi_factor_greeks.adjusted_r_squared,
-            );
-            assert_close(
-                multi.residual_vol,
-                expected.multi_factor_greeks.residual_vol,
-            );
-        }
     }
 }

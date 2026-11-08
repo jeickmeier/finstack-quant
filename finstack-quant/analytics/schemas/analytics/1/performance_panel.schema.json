@@ -10,12 +10,12 @@
       "oneOf": [
         {
           "const": "prices",
-          "description": "Strictly positive prices, one per date; returns are derived pairwise,\nso the first date anchors the first return.",
+          "description": "Positive price or wealth levels with an allowed final zero at wipeout;\none per actual valuation date, with interval returns derived pairwise.",
           "type": "string"
         },
         {
           "const": "returns",
-          "description": "Simple decimal returns, one per return-aligned date; a synthetic prior\ndate one frequency step before the first anchors the holding period.",
+          "description": "Simple decimal returns on adjacent actual valuation intervals;\neach column has exactly one fewer observation than the valuation grid.",
           "type": "string"
         }
       ]
@@ -62,14 +62,12 @@
   "description": "Dated price or return panel, one series per ticker, that a Performance is built from.",
   "properties": {
     "benchmark_ticker": {
-      "description": "Benchmark ticker; omitted uses the first ticker.",
       "type": [
         "string",
         "null"
       ]
     },
     "dates": {
-      "description": "Strictly ascending observation dates, one per value of every series.",
       "items": {
         "$ref": "#/$defs/DateWire"
       },
@@ -83,15 +81,12 @@
         {
           "type": "null"
         }
-      ],
-      "description": "Observation frequency used for annualization; omitted uses\n[`crate::DEFAULT_FREQUENCY`]."
+      ]
     },
     "kind": {
-      "$ref": "#/$defs/PanelSeriesKind",
-      "description": "Whether `series` holds prices or simple returns."
+      "$ref": "#/$defs/PanelSeriesKind"
     },
     "series": {
-      "description": "Ticker-major series: `series[i][t]` is ticker `i` at `dates[t]`. A\nticker may have leading or trailing gaps (`NaN`, `null` on the wire)\nbut its observed span must be contiguous.",
       "items": {
         "items": {
           "format": "double",
@@ -105,7 +100,6 @@
       "type": "array"
     },
     "ticker_names": {
-      "description": "Unique ticker names, one per series.",
       "items": {
         "type": "string"
       },

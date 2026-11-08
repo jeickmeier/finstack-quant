@@ -2,6 +2,16 @@
 // JSON wire shape only; runtime constraints remain in the schema.
 
 /**
+ * An `f64` in the [`non_finite_f64`] wire form: a JSON number when finite,
+ * otherwise one of the strings `"inf"`, `"-inf"` or `"nan"`.
+ *
+ * Contract types store plain `f64` fields with
+ * `#[serde(with = "finstack_quant_core::wire::non_finite_f64")]` and name this
+ * type in `#[schemars(with = ...)]`, so the generated schema describes the
+ * sentinel strings the serializer actually writes.
+ */
+export type D_5B5465B41B06Bb451742 = number | ("inf" | "-inf" | "nan");
+/**
  * Optional semantic hint for a column.
  */
 export type DBc00F88F44950A08D00D = "dimension" | "index" | "measure" | "attribute";
@@ -24,7 +34,6 @@ export interface TableEnvelopeWire {
    * Number of rows in the table.
    */
   row_count: number;
-  [k: string]: unknown;
 }
 /**
  * A single named column in a [`TableEnvelope`].
@@ -37,47 +46,38 @@ export interface D_29B848Ae6D2C610B175E {
     | {
         type: "string";
         values: string[];
-        [k: string]: unknown;
       }
     | {
         type: "nullable_string";
         values: (string | null)[];
-        [k: string]: unknown;
       }
     | {
         type: "float64";
-        values: number[];
-        [k: string]: unknown;
+        values: D_5B5465B41B06Bb451742[];
       }
     | {
         type: "nullable_float64";
         values: (number | null)[];
-        [k: string]: unknown;
       }
     | {
         type: "u_int32";
         values: number[];
-        [k: string]: unknown;
       }
     | {
         type: "nullable_u_int32";
         values: (number | null)[];
-        [k: string]: unknown;
       }
     | {
         type: "int64";
         values: number[];
-        [k: string]: unknown;
       }
     | {
         type: "nullable_int64";
         values: (number | null)[];
-        [k: string]: unknown;
       }
     | {
         type: "boolean";
         values: boolean[];
-        [k: string]: unknown;
       };
   /**
    * Optional per-column metadata.
@@ -93,5 +93,4 @@ export interface D_29B848Ae6D2C610B175E {
    * Optional semantic hint for bindings and consumers.
    */
   role?: DBc00F88F44950A08D00D | null;
-  [k: string]: unknown;
 }

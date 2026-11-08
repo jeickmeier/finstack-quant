@@ -16,6 +16,7 @@ from finstack_quant.analytics import (
     sharpe,
     sortino,
 )
+from tests.analytics_helpers import valuation_grid
 
 
 def dates(n: int) -> list[date]:
@@ -25,7 +26,12 @@ def dates(n: int) -> list[date]:
 def panel(values: list[float], frequency: str = "daily") -> Performance:
     return Performance.from_panel(
         PerformancePanel(
-            dates=dates(len(values)), series=[values], kind="returns", ticker_names=["A"], frequency=frequency
+            dates=valuation_grid(dates(len(values))),
+            series=[values],
+            kind="returns",
+            ticker_names=["A"],
+            frequency=frequency,
+            benchmark_ticker="A",
         )
     )
 
@@ -34,66 +40,67 @@ def test_empirical_tail_mass_is_preserved_in_metrics_and_summary() -> None:
     values = [-0.2] + [0.0] * 99
     perf = panel(values)
     assert perf.expected_shortfall(0.95).iloc[0] == pytest.approx(-0.04)
-    assert perf.to_dataframe().loc["A", "expected_shortfall"] == pytest.approx(-0.04)
+    assert perf.to_dataframe(risk_free_rate=0.0, mar=0.0, omega_threshold=0.0, confidence=0.95).loc[
+        "A", "expected_shortfall"
+    ] == pytest.approx(-0.04)
     values[1] = 0.25
     assert panel(values).cdar(0.95).iloc[0] == pytest.approx(-0.04)
     assert panel([-0.2, -0.1, 0.1, 0.2]).expected_shortfall(0.625).iloc[0] == pytest.approx(-0.25 / 1.5)
 
 
 @pytest.mark.parametrize("invalid", [math.nan, math.inf, -math.inf])
-def test_invalid_scalar_inputs_preserve_undefined_risk(invalid: float) -> None:
-    assert math.isnan(max_drawdown([invalid, -0.2]))
-    assert math.isnan(sortino([invalid, 0.01]))
-    assert math.isnan(sortino([0.0, 0.0], mar=invalid))
-    assert math.isnan(sharpe([0.0, 0.0], risk_free_rate=invalid))
+def test_invalid_scalar_inputs_raise_validation_errors(invalid: float) -> None:
+    for call in (
+        lambda: max_drawdown([invalid, -0.2]),
+        lambda: sortino([invalid, 0.01], 0.0, 252.0),
+        lambda: sortino([0.0, 0.0], invalid, 252.0),
+        lambda: sharpe([0.0, 0.0], invalid, 252.0),
+    ):
+        with pytest.raises(AnalyticsError):
+            call()
 
 
 def test_singleton_sharpe_agrees_with_panel_and_rolling() -> None:
-    assert math.isnan(sharpe([0.01]))
-    assert math.isnan(sortino([0.01]))
-    assert math.isnan(panel([0.01]).sharpe().iloc[0])
-    assert all(math.isnan(v) for v in panel([0.01, 0.02]).rolling_sharpe(0, window=1).values)
+    assert math.isnan(sharpe([0.01], 0.0, 252.0))
+    assert math.isnan(sortino([0.01], 0.0, 252.0))
+    assert math.isnan(panel([0.01]).sharpe(risk_free_rate=0.0).iloc[0])
+    assert all(math.isnan(v) for v in panel([0.01, 0.02]).rolling_sharpe(0, window=1, risk_free_rate=0.0).values)
 
 
-def test_zero_drawdown_ratios_preserve_infinity_and_zero() -> None:
-    for metric in ("calmar", "martin_ratio"):
-        assert getattr(panel([0.0, 0.0, 0.0]), metric)().iloc[0] == 0.0
-        ratio = getattr(panel([0.01, 0.01, 0.01]), metric)().iloc[0]
-        assert math.isinf(ratio)
-        assert ratio > 0.0
+def test_zero_drawdown_ratios_distinguish_undefined_and_infinite() -> None:
+    for metric, args in (("calmar", ()), ("martin_ratio", (0.0,))):
+        assert math.isnan(getattr(panel([0.0, 0.0, 0.0]), metric)(*args).iloc[0])
+        ratio = getattr(panel([0.01, 0.01, 0.01]), metric)(*args).iloc[0]
+        assert ratio == math.inf
 
 
 @pytest.mark.parametrize("invalid", [math.nan, math.inf, -math.inf])
-def test_drawdown_ratios_preserve_non_finite_cash_rates(invalid: float) -> None:
-    for values in ([0.0, 0.0, 0.0], [0.01, 0.01, 0.01], [-0.01, 0.0, 0.02]):
-        perf = panel(values)
-        for metric in ("sterling_ratio", "burke_ratio", "pain_ratio"):
-            assert math.isnan(getattr(perf, metric)(invalid).iloc[0])
-
-
-def test_treynor_preserves_non_finite_cash_rates_with_zero_beta() -> None:
-    for portfolio_return in (0.01, 0.0):
-        perf = Performance.from_panel(
-            PerformancePanel(
-                dates=dates(3),
-                series=[[-0.01, 0.01, 0.02], [portfolio_return] * 3],
-                kind="returns",
-                ticker_names=["BENCH", "PORT"],
-            )
-        )
-        for invalid in (math.nan, math.inf, -math.inf):
-            assert math.isnan(perf.treynor(invalid).loc["PORT"])
-        expected = math.inf if portfolio_return > 0.0 else 0.0
-        assert perf.treynor(0.0).loc["PORT"] == expected
+def test_drawdown_and_benchmark_ratios_reject_invalid_cash_rates(invalid: float) -> None:
+    perf = panel([-0.01, 0.0, 0.02])
+    for metric, args in (
+        ("sterling_ratio", (invalid, 5)),
+        ("burke_ratio", (invalid,)),
+        ("pain_ratio", (invalid,)),
+        ("treynor", (invalid,)),
+    ):
+        with pytest.raises(AnalyticsError):
+            getattr(perf, metric)(*args)
 
 
 def test_extreme_wealth_preserves_annualized_growth_and_relative_drawdowns() -> None:
     for grid, values, expected in (
-        ([date(year, 1, 1) for year in range(2001, 2021)], [-0.9] * 20, 0.1 ** (20 / (7305 / 365.25)) - 1),
-        ([date(2021, 1, 1), date(2022, 1, 1)], [1e200] * 2, 1e200 ** (2 / (731 / 365.25))),
+        ([date(year, 1, 1) for year in range(2001, 2021)], [-0.9] * 20, 0.1 ** (20 / (7305 / 365.0)) - 1),
+        ([date(2021, 1, 1), date(2022, 1, 1)], [1e200] * 2, 1e200 ** (2 / (731 / 365.0))),
     ):
         perf = Performance.from_panel(
-            PerformancePanel(dates=grid, series=[values], kind="returns", ticker_names=["A"], frequency="annual")
+            PerformancePanel(
+                dates=[date(grid[0].year - 1, 1, 1), *grid],
+                series=[values],
+                kind="returns",
+                ticker_names=["A"],
+                frequency="annual",
+                benchmark_ticker="A",
+            )
         )
         result = perf.cagr().iloc[0]
         assert math.isfinite(result)
@@ -102,7 +109,12 @@ def test_extreme_wealth_preserves_annualized_growth_and_relative_drawdowns() -> 
     for values in ([-0.9] * 20, [1e300] * 4):
         perf = Performance.from_panel(
             PerformancePanel(
-                dates=dates(len(values)), series=[values, values], kind="returns", ticker_names=["BENCH", "A"]
+                dates=valuation_grid(dates(len(values))),
+                series=[values, values],
+                kind="returns",
+                ticker_names=["BENCH", "A"],
+                frequency="daily",
+                benchmark_ticker="BENCH",
             )
         )
         assert all(value == 0.0 for series in perf.cumulative_returns_outperformance() for value in series)
@@ -110,7 +122,7 @@ def test_extreme_wealth_preserves_annualized_growth_and_relative_drawdowns() -> 
     perf = panel([1e300, 1e300, -0.5, 0.0])
     assert perf.get_drawdown_series()[0] == pytest.approx([0.0, 0.0, -0.5, -0.5])
     assert perf.max_drawdown().iloc[0] == pytest.approx(-0.5)
-    assert perf.drawdown_details(0)[0].max_drawdown == pytest.approx(-0.5)
+    assert perf.drawdown_details(0, n=5)[0].max_drawdown == pytest.approx(-0.5)
     assert panel([1e-18, 1e-18]).cumulative_returns()[0][-1] == pytest.approx(2e-18, rel=1e-12, abs=0.0)
     near_wipeout = -0.9999999999999999
     mean = panel([near_wipeout] + [0.0] * 7).geometric_mean().iloc[0]
@@ -121,7 +133,12 @@ def test_extreme_wealth_preserves_annualized_growth_and_relative_drawdowns() -> 
 def test_lookback_returns_accepts_maximum_calendar_date() -> None:
     perf = Performance.from_panel(
         PerformancePanel(
-            dates=[date(9999, 12, 30), date.max], series=[[100.0, 110.0]], kind="prices", ticker_names=["A"]
+            dates=[date(9999, 12, 30), date.max],
+            series=[[100.0, 110.0]],
+            kind="prices",
+            ticker_names=["A"],
+            frequency="daily",
+            benchmark_ticker="A",
         )
     )
     lookback = perf.lookback_returns(date.max)
@@ -142,7 +159,7 @@ def test_rolling_returns_preserve_tiny_windows_after_positive_outlier() -> None:
 def test_multi_factor_extremes_return_finite_statistics_or_analytics_error() -> None:
     scale = 1e200
     factors = [[-0.2, -0.1, 0.0, 0.1, 0.2]]
-    fit = panel([3 * scale, scale, 3 * scale, scale, 3 * scale]).multi_factor_greeks(0, factors)
+    fit = panel([3 * scale, scale, 3 * scale, scale, 3 * scale]).multi_factor_greeks(0, factors, risk_free_rate=0.0)
     assert fit.alpha / scale == pytest.approx(2.2 * 252, rel=1e-12)
     assert abs(float(fit.betas[0])) / scale < 1e-12
     assert fit.r_squared == pytest.approx(0.0, abs=1e-12)
@@ -153,17 +170,17 @@ def test_multi_factor_extremes_return_finite_statistics_or_analytics_error() -> 
         ([1e307] * 5, factors),
         ([2e199, 4e199, 6e199, 8e199, 1e200], [[2e-151, 4e-151, 6e-151, 8e-151, 1e-150]]),
     ):
-        with pytest.raises(AnalyticsError, match="finite"):
-            panel(values).multi_factor_greeks(0, factor_values)
+        with pytest.raises(RuntimeError):
+            panel(values).multi_factor_greeks(0, factor_values, risk_free_rate=0.0)
 
 
 @pytest.mark.parametrize("tail", [1e-12, 1e-18])
 def test_rolling_sortino_preserves_small_returns_after_positive_outlier(tail: float) -> None:
     for values in ([0.1, tail, -tail, tail, -tail, tail], [0.1, tail, tail, -tail, tail, -tail]):
-        rolling = panel(values).rolling_sortino(0, window=3)
+        rolling = panel(values).rolling_sortino(0, window=3, mar=0.0)
         assert rolling.dates == dates(len(values))[2:]
         for start, actual in enumerate(rolling.values):
-            expected = sortino(values[start : start + 3])
+            expected = sortino(values[start : start + 3], 0.0, 252.0)
             assert actual == pytest.approx(expected, rel=1e-12, abs=1e-12)
 
 
@@ -171,12 +188,24 @@ def test_constructors_reject_duplicate_tickers_and_derived_nan() -> None:
     with pytest.raises(AnalyticsError, match="duplicate ticker"):
         Performance.from_panel(
             PerformancePanel(
-                dates=dates(2), series=[[0.01, 0.02], [0.03, 0.04]], kind="returns", ticker_names=["A", "A"]
+                dates=valuation_grid(dates(2)),
+                series=[[0.01, 0.02], [0.03, 0.04]],
+                kind="returns",
+                ticker_names=["A", "A"],
+                frequency="daily",
+                benchmark_ticker="A",
             )
         )
-    with pytest.raises(AnalyticsError):
+    with pytest.raises(RuntimeError):
         Performance.from_panel(
-            PerformancePanel(dates=dates(2), series=[[1e-300, 1e300]], kind="prices", ticker_names=["A"])
+            PerformancePanel(
+                dates=dates(2),
+                series=[[1e-300, 1e300]],
+                kind="prices",
+                ticker_names=["A"],
+                frequency="daily",
+                benchmark_ticker="A",
+            )
         )
 
 
@@ -197,19 +226,26 @@ def test_restoration_validates_state_and_rebuilds_caches() -> None:
 
 def test_initial_drawdown_and_performance_conventions() -> None:
     perf = Performance.from_panel(
-        PerformancePanel(dates=dates(3), series=[[100.0, 90.0, 100.0]], kind="prices", ticker_names=["A"])
+        PerformancePanel(
+            dates=dates(3),
+            series=[[100.0, 90.0, 100.0]],
+            kind="prices",
+            ticker_names=["A"],
+            frequency="daily",
+            benchmark_ticker="A",
+        )
     )
-    episode = perf.drawdown_details(0)[0]
+    episode = perf.drawdown_details(0, n=5)[0]
     assert episode.start == dates(3)[0]
     assert episode.duration_days == 2
-    assert not episode.truncated_at_start
+    assert not hasattr(episode, "truncated_at_start")
     assert panel([0.01, -0.02, 0.03, 0.01], "monthly").m_squared(0.12).iloc[0] == pytest.approx(0.09)
-    assert panel([0.02, 0.02, -0.01, 0.0]).period_stats(0, "daily").kelly_criterion == pytest.approx(0.5)
+    assert panel([0.02, 0.02, -0.01, 0.0]).period_stats(0, "daily").kelly_risk_fraction == pytest.approx(0.5)
 
 
 @pytest.mark.parametrize("n", [5, 29, 57, 58])
 def test_constant_response_fit_preserves_nan_in_json(n: int) -> None:
-    fit = panel([0.01] * n).multi_factor_greeks(0, [[0.001 * i for i in range(n)]])
+    fit = panel([0.01] * n).multi_factor_greeks(0, [[0.001 * i for i in range(n)]], risk_free_rate=0.0)
     assert math.isnan(fit.r_squared)
     restored = MultiFactorResult.from_json(fit.to_json())
     assert math.isnan(restored.r_squared)

@@ -9,6 +9,7 @@ import pytest
 
 from finstack_quant.analytics import AnalyticsError, Performance, PerformancePanel
 from finstack_quant.core.dates import FiscalConfig
+from tests.analytics_helpers import valuation_grid
 
 CASES = json.loads(
     (Path(__file__).resolve().parents[2] / "finstack-quant/analytics/tests/data/fiscal_buckets.json").read_text()
@@ -19,10 +20,12 @@ CASES = json.loads(
 def test_fiscal_period_stats_matches_boundary_groups(case: dict) -> None:
     perf = Performance.from_panel(
         PerformancePanel(
-            dates=[date.fromisoformat(value) for value in case["dates"]],
+            dates=valuation_grid([date.fromisoformat(value) for value in case["dates"]]),
             series=[case["returns"]],
             kind="returns",
             ticker_names=["FUND"],
+            frequency="daily",
+            benchmark_ticker="FUND",
         )
     )
     for frequency, groups in case["groups"].items():
@@ -36,7 +39,12 @@ def test_fiscal_period_stats_matches_boundary_groups(case: dict) -> None:
 def test_unrepresentable_calendar_boundaries_raise_analytics_error() -> None:
     perf = Performance.from_panel(
         PerformancePanel(
-            dates=[date(9999, 12, 30), date.max], series=[[0.01, 0.02]], kind="returns", ticker_names=["FUND"]
+            dates=valuation_grid([date(9999, 12, 30), date.max]),
+            series=[[0.01, 0.02]],
+            kind="returns",
+            ticker_names=["FUND"],
+            frequency="daily",
+            benchmark_ticker="FUND",
         )
     )
     for frequency in ["daily", "weekly", "monthly", "quarterly", "semi_annual", "annual"]:
@@ -54,7 +62,14 @@ def test_fiscal_period_stats_preserves_ragged_active_alignment() -> None:
     returns = case["returns"]
     ragged = [float("nan"), *returns[1:-1], float("nan")]
     perf = Performance.from_panel(
-        PerformancePanel(dates=dates, series=[returns, ragged], kind="returns", ticker_names=["BENCH", "FUND"])
+        PerformancePanel(
+            dates=valuation_grid(dates),
+            series=[returns, ragged],
+            kind="returns",
+            ticker_names=["BENCH", "FUND"],
+            frequency="daily",
+            benchmark_ticker="BENCH",
+        )
     )
     perf.reset_date_range(dates[1], dates[-2])
     assert perf.get_active_dates_for_ticker("FUND") == dates[1:-1]
@@ -67,7 +82,14 @@ def test_omitted_fiscal_config_buckets_iso_weeks() -> None:
     dates = [date(2024, 12, 30) + timedelta(days=offset) for offset in range(9)]
     returns = [0.01, -0.02, 0.03, 0.01, -0.01, 0.02, 0.01, -0.03, 0.02]
     perf = Performance.from_panel(
-        PerformancePanel(dates=dates, series=[returns], kind="returns", ticker_names=["FUND"])
+        PerformancePanel(
+            dates=valuation_grid(dates),
+            series=[returns],
+            kind="returns",
+            ticker_names=["FUND"],
+            frequency="daily",
+            benchmark_ticker="FUND",
+        )
     )
     omitted = perf.period_stats(0, "weekly").to_json()
     assert omitted == perf.period_stats(0, "weekly", None).to_json()

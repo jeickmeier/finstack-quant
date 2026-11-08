@@ -12,13 +12,17 @@ const cases = JSON.parse(
     'utf8'
   )
 );
+const valuationGrid = (endpoints) => [
+  new Date(Date.parse(endpoints[0]) - 86400000).toISOString().slice(0, 10),
+  ...endpoints,
+];
 const close = (actual, expected) =>
   assert.ok(Math.abs(actual - expected) < 1e-12, `${actual} != ${expected}`);
 
 for (const example of cases) {
   test(`fiscal aggregation matches boundary groups: ${example.name}`, () => {
     const perf = new analytics.Performance({
-      dates: example.dates,
+      dates: [example.initial_date, ...example.dates],
       series: [example.returns],
       kind: 'returns',
       ticker_names: ['FUND'],
@@ -40,7 +44,7 @@ for (const example of cases) {
 
 test('aggregation rejects unrepresentable calendar and fiscal boundaries', () => {
   const perf = new analytics.Performance({
-    dates: ['9999-12-30', '9999-12-31'],
+    dates: ['9999-12-29', '9999-12-30', '9999-12-31'],
     series: [[0.01, 0.02]],
     kind: 'returns',
     ticker_names: ['FUND'],
@@ -61,7 +65,7 @@ test('fiscal aggregation preserves ragged active-window alignment', () => {
   // A gap is null on the wire.
   const ragged = [null, ...example.returns.slice(1, -1), null];
   const perf = new analytics.Performance({
-    dates: example.dates,
+    dates: [example.initial_date, ...example.dates],
     series: [example.returns, ragged],
     kind: 'returns',
     ticker_names: ['BENCH', 'FUND'],
@@ -90,7 +94,7 @@ test('an omitted fiscalConfig buckets weekly periods with ISO weeks', () => {
   ];
   const returns = [0.01, -0.02, 0.03, 0.01, -0.01, 0.02, 0.01, -0.03, 0.02];
   const perf = new analytics.Performance({
-    dates,
+    dates: valuationGrid(dates),
     series: [returns],
     kind: 'returns',
     ticker_names: ['FUND'],

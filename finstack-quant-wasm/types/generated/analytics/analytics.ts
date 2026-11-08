@@ -150,6 +150,10 @@ export type DayCount =
   | "act_act_afb"
   | "bus_252";
 /**
+ * Finite JSON number in the closed interval `[0, 1]`.
+ */
+export type ClosedUnitIntervalF64Wire = number;
+/**
  * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
  */
 export type DateWire = string;
@@ -160,6 +164,38 @@ export type DateWire = string;
  * `"sharpe"`, `"return"`), which hosts also use as the value-column label.
  */
 export type RollingMetric = "volatility" | "sortino" | "sharpe" | "return";
+/**
+ * A finite numeric representation or the undefined-result sentinel `"nan"`.
+ *
+ * Use `f64` for an unrestricted JSON number, or a validated numeric wire type
+ * such as [`super::ClosedUnitIntervalF64Wire`] to retain its range constraints.
+ * Unlike [`NonFiniteF64Wire`], its JSON contract excludes infinity sentinel strings.
+ */
+export type FiniteOrNanWireForClosedUnitIntervalF64Wire = ClosedUnitIntervalF64Wire | NanSentinel;
+/**
+ * The undefined-result token accepted by [`FiniteOrNanWire`].
+ */
+export type NanSentinel = "nan";
+/**
+ * A finite numeric representation or the undefined-result sentinel `"nan"`.
+ *
+ * Use `f64` for an unrestricted JSON number, or a validated numeric wire type
+ * such as [`super::ClosedUnitIntervalF64Wire`] to retain its range constraints.
+ * Unlike [`NonFiniteF64Wire`], its JSON contract excludes infinity sentinel strings.
+ */
+export type FiniteOrNanWireForNonNegativeF64Wire = NonNegativeF64Wire | NanSentinel;
+/**
+ * Finite JSON number greater than or equal to zero.
+ */
+export type NonNegativeF64Wire = number;
+/**
+ * A finite numeric representation or the undefined-result sentinel `"nan"`.
+ *
+ * Use `f64` for an unrestricted JSON number, or a validated numeric wire type
+ * such as [`super::ClosedUnitIntervalF64Wire`] to retain its range constraints.
+ * Unlike [`NonFiniteF64Wire`], its JSON contract excludes infinity sentinel strings.
+ */
+export type FiniteOrNanWireFordouble = number | NanSentinel;
 /**
  * Whether a panel's series are prices or simple returns.
  */
@@ -189,7 +225,8 @@ export type ReturnKind =
   | {
       total: {
         /**
-         * Annualized risk-free rate in decimal form (e.g. `0.02` for 2%).
+         * Finite annual-effective decimal cash rate above `-1`, including
+         * explicit zero (for example, `0.02` for 2% effective per year).
          */
         risk_free_rate: number;
         [k: string]: unknown;
@@ -201,8 +238,7 @@ export type ReturnKind =
  */
 export interface BetaResult {
   /**
-   * Estimated beta coefficient, or [`f64::NAN`] when it is not estimable
-   * together with the confidence interval.
+   * Estimated beta coefficient, or [`f64::NAN`] when fewer than two pairs or a constant benchmark makes it unidentified.
    */
   beta: NonFiniteF64Wire;
   /**
@@ -222,8 +258,7 @@ export interface BetaResult {
    */
   confidence_level: number;
   /**
-   * Number of paired observations the regression used: the overlap after
-   * truncating both series to the shorter length. Reported even when the
+   * Number of paired observations the regression used: the exact equal-length position-paired sample. Reported even when the
    * estimates are [`f64::NAN`]. Required in the serialized result.
    */
   n_obs: number;
@@ -231,6 +266,31 @@ export interface BetaResult {
    * Standard error of the beta estimate, or [`f64::NAN`] when undefined.
    */
   std_err: NonFiniteF64Wire;
+}
+/**
+ * Common-sample Pearson correlation with ticker and sample provenance.
+ */
+export interface CorrelationResult {
+  /**
+   * Last included return-ending date.
+   */
+  end_date: DateWire;
+  /**
+   * Symmetric positive-semidefinite Pearson matrix, with exact unit diagonal.
+   */
+  matrix: number[][];
+  /**
+   * Number of shared return observations used for every entry.
+   */
+  n_obs: number;
+  /**
+   * First included return-ending date, excluding the initial wealth date.
+   */
+  start_date: DateWire;
+  /**
+   * Ordered unique ticker labels for both matrix axes.
+   */
+  tickers: string[];
 }
 /**
  * A dated time-series column: scalar values aligned with window-end dates.
@@ -245,9 +305,10 @@ export interface DatedSeries {
    */
   value_column: RollingMetric;
   /**
-   * Computed metric values, one per completed rolling window. An undefined
-   * window (e.g. a zero-volatility Sharpe) is `NaN`; JSON carries it as the
-   * `"nan"` sentinel so the series round-trips.
+   * Computed metric values, one per completed rolling window. Undefined
+   * estimates (singleton sample risk or a zero-over-zero ratio) are `NaN`;
+   * genuine zero-risk ratios can be signed infinity. JSON preserves each
+   * nonfinite value with the corresponding string sentinel.
    */
   values: NonFiniteF64Wire[];
 }
@@ -256,39 +317,35 @@ export interface DatedSeries {
  */
 export interface DrawdownEpisode {
   /**
-   * Calendar days from start to end (or last observation).
+   * Calendar days from peak to recovery, or last observation when open.
    */
   duration_days: number;
   /**
-   * Date when wealth recovered to the prior peak (None if still in drawdown).
+   * First observed recovery to zero drawdown; absent for an open episode.
    */
   end?: DateWire | null;
   /**
-   * Maximum drawdown depth (negative fraction, e.g. −0.25 for a 25% loss).
+   * Signed decimal peak-to-valley loss in the closed interval `[-1, 0)`.
    */
   max_drawdown: number;
   /**
-   * Near-recovery threshold: the drawdown level at which 99% of the
-   * peak-to-trough loss has been recovered (i.e. `max_drawdown * 0.01`,
-   * a value slightly below zero). Useful for identifying "almost recovered"
-   * drawdowns where the series is within 1% of the prior peak.
-   */
-  near_recovery_threshold: number;
-  /**
-   * Date when the drawdown began (peak date).
+   * Actual valuation date of the peak immediately preceding the decline.
    */
   start: DateWire;
   /**
-   * `true` when the series began already in drawdown (no observed prior
-   * peak), so `start` is the first observation rather than a true peak.
-   * Survival / duration analytics should treat such episodes as
-   * left-censored.
-   */
-  truncated_at_start: boolean;
-  /**
-   * Date of the maximum drawdown depth.
+   * First actual observation attaining the deepest loss in the episode.
    */
   valley: DateWire;
+}
+/**
+ * Configuration for fiscal year periods.
+ *
+ * Always holds a start month in `1..=12` and a start day in `1..=31`;
+ * deserialization applies the same validation as [`FiscalConfig::new`].
+ */
+export interface FiscalConfig {
+  start_day: number;
+  start_month: number;
 }
 /**
  * Greeks (alpha, beta, R-squared, adjusted R-squared) from a single-factor regression.
@@ -308,8 +365,7 @@ export interface GreeksResult {
    */
   beta: NonFiniteF64Wire;
   /**
-   * Number of paired observations the regression used: the overlap after
-   * truncating both series to the shorter length. Reported even when the
+   * Number of paired observations the regression used: the exact equal-length position-paired sample. Reported even when the
    * estimates are [`f64::NAN`]. Required in the serialized result.
    */
   n_obs: number;
@@ -323,17 +379,33 @@ export interface GreeksResult {
  */
 export interface LookbackReturns {
   /**
+   * Explicit fiscal partition used for fiscal-year-to-date selection.
+   */
+  fiscal_config: FiscalConfig;
+  /**
    * Fiscal-year-to-date compounded return per ticker.
    */
-  fytd: number[];
+  fytd: NonFiniteF64Wire[];
+  /**
+   * Observation count and actual holding boundaries for each fiscal-year-to-date value.
+   */
+  fytd_samples: LookbackSample[];
   /**
    * Month-to-date compounded return per ticker.
    */
-  mtd: number[];
+  mtd: NonFiniteF64Wire[];
+  /**
+   * Observation count and actual holding boundaries for each month-to-date value.
+   */
+  mtd_samples: LookbackSample[];
   /**
    * Quarter-to-date compounded return per ticker.
    */
-  qtd: number[];
+  qtd: NonFiniteF64Wire[];
+  /**
+   * Observation count and actual holding boundaries for each quarter-to-date value.
+   */
+  qtd_samples: LookbackSample[];
   /**
    * Date on which every lookback window ended: the requested date, else the
    * last active date of the panel.
@@ -346,7 +418,28 @@ export interface LookbackReturns {
   /**
    * Year-to-date compounded return per ticker.
    */
-  ytd: number[];
+  ytd: NonFiniteF64Wire[];
+  /**
+   * Observation count and actual holding boundaries for each year-to-date value.
+   */
+  ytd_samples: LookbackSample[];
+}
+/**
+ * Compact actual holding coverage for one selected lookback sample.
+ */
+export interface LookbackSample {
+  /**
+   * Actual final selected return endpoint; absent when empty.
+   */
+  holding_end?: DateWire | null;
+  /**
+   * Actual valuation immediately before the first selected return; absent when empty.
+   */
+  holding_start?: DateWire | null;
+  /**
+   * Number of original return intervals selected, rather than calendar buckets.
+   */
+  n_obs: number;
 }
 /**
  * Result of a multi-factor regression.
@@ -359,15 +452,17 @@ export interface MultiFactorResult {
    * adj_R² = 1 − (1 − R²) × (n − 1) / (n − k − 1)
    * ```
    */
-  adjusted_r_squared: NonFiniteF64Wire;
+  adjusted_r_squared: FiniteOrNanWireFordouble;
   /**
    * Annualized OLS intercept of the (possibly rf-adjusted) dependent series.
    */
   alpha: number;
   /**
    * Regression coefficients, one per factor.
+   *
+   * @minItems 1
    */
-  betas: number[];
+  betas: [number, ...number[]];
   /**
    * Number of observations the regression used: the common length of the
    * dependent series and every factor series. Residual degrees of freedom
@@ -377,19 +472,19 @@ export interface MultiFactorResult {
   /**
    * Fraction of variance explained; NaN for a constant dependent series.
    */
-  r_squared: NonFiniteF64Wire;
+  r_squared: FiniteOrNanWireForClosedUnitIntervalF64Wire;
   /**
-   * Annualized residual volatility.
+   * Annualized residual-df-adjusted volatility; NaN for a saturated fit.
    */
-  residual_vol: number;
+  residual_vol: FiniteOrNanWireForNonNegativeF64Wire;
 }
 /**
  * Central performance analytics engine.
  */
 export interface Performance {
-  benchmark_idx: number;
+  benchmark_idx?: number | null;
   end_idx: number;
-  frequency: PeriodKind;
+  frequency?: PeriodKind | null;
   price_dates: DateWire[];
   return_spans: TickerSpan[];
   returns: number[][];
@@ -399,38 +494,16 @@ export interface Performance {
 export interface TickerSpan {
   end: number;
   start: number;
-  [k: string]: unknown;
 }
 /**
  * Dated price or return panel, one series per ticker, that a Performance is built from.
  */
 export interface PerformancePanel {
-  /**
-   * Benchmark ticker; omitted uses the first ticker.
-   */
   benchmark_ticker?: string | null;
-  /**
-   * Strictly ascending observation dates, one per value of every series.
-   */
   dates: DateWire[];
-  /**
-   * Observation frequency used for annualization; omitted uses
-   * [`crate::DEFAULT_FREQUENCY`].
-   */
   frequency?: PeriodKind | null;
-  /**
-   * Whether `series` holds prices or simple returns.
-   */
   kind: PanelSeriesKind;
-  /**
-   * Ticker-major series: `series[i][t]` is ticker `i` at `dates[t]`. A
-   * ticker may have leading or trailing gaps (`NaN`, `null` on the wire)
-   * but its observed span must be contiguous.
-   */
   series: (number | null)[][];
-  /**
-   * Unique ticker names, one per series.
-   */
   ticker_names: string[];
 }
 /**
@@ -438,72 +511,76 @@ export interface PerformancePanel {
  */
 export interface PeriodStats {
   /**
-   * Mean of negative-return periods.
+   * Conditional negative-return mean, retaining its negative sign; undefined when absent.
    */
-  avg_loss: number;
+  avg_loss: NonFiniteF64Wire;
   /**
-   * Mean return across all periods.
+   * Arithmetic mean over all occupied bucket returns; undefined when empty.
    */
-  avg_return: number;
+  avg_return: NonFiniteF64Wire;
   /**
-   * Mean of positive-return periods.
+   * Conditional positive-return mean; undefined when no positive bucket exists.
    */
-  avg_win: number;
+  avg_win: NonFiniteF64Wire;
   /**
-   * Best single-period return.
+   * Largest bucket return, or undefined for no buckets.
    */
-  best: number;
+  best: NonFiniteF64Wire;
   /**
-   * Longest streak of negative-return periods.
+   * Longest strictly negative run among successive occupied buckets; observed zero interrupts it.
    */
   consecutive_losses: number;
   /**
-   * Longest streak of positive-return periods.
+   * Longest strictly positive run among successive occupied buckets; missing buckets do not interrupt it.
    */
   consecutive_wins: number;
   /**
-   * CPC index: `profit_factor × win_rate × payoff_ratio`.
-   *
-   * Not to be confused with the Common Sense Ratio
-   * (`profit_factor × tail_ratio`), which is a different metric.
+   * Cardinal Profitability Construct adaptation `profit_factor * win_rate * payoff_ratio`; requires both groups.
    */
-  cpc_ratio: NonFiniteF64Wire;
+  cpc_index: NonFiniteF64Wire;
   /**
-   * Binary Kelly fraction: `p_win − p_loss / payoff_ratio`, with both
-   * probabilities conditional on nonzero returns. Zero-return periods
-   * do not affect this payoff approximation; `win_rate` uses all periods.
+   * Signed loss-normalized binary risk fraction `p - q/payoff`, with decisive-bucket probabilities; requires both groups.
    */
-  kelly_criterion: NonFiniteF64Wire;
+  kelly_risk_fraction: NonFiniteF64Wire;
   /**
-   * `avg_win / |avg_loss|`. `0.0` when there are no wins; `+∞` when wins
-   * exist but there are no losses.
+   * Number of strictly negative bucket returns.
+   */
+  losses: number;
+  /**
+   * Number of occupied aggregation buckets, including neutral returns.
+   */
+  n_obs: number;
+  /**
+   * Conditional mean gain divided by mean loss magnitude; undefined unless both groups exist.
    */
   payoff_ratio: NonFiniteF64Wire;
   /**
-   * Sum of wins / sum of |losses| (gross profit / gross loss).
-   * `0.0` when there are no wins; `+∞` when wins exist but there are no
-   * losses.
+   * Sum of gains divided by loss magnitudes; positive infinity for gains without losses.
    */
   profit_factor: NonFiniteF64Wire;
   /**
-   * Fraction of periods with positive returns.
+   * Positive bucket count divided by all occupied buckets; undefined when empty.
    */
-  win_rate: number;
+  win_rate: NonFiniteF64Wire;
   /**
-   * Worst single-period return.
+   * Number of strictly positive bucket returns.
    */
-  worst: number;
+  wins: number;
+  /**
+   * Smallest bucket return, or undefined for no buckets.
+   */
+  worst: NonFiniteF64Wire;
 }
 /**
  * One calendar bucket of a periodic-return series.
  */
 export interface PeriodicReturn {
   /**
-   * Date of the last observation in the bucket (the period end).
+   * Last actual observed return endpoint in this bucket.
    */
   date: DateWire;
   /**
-   * Compounded simple return over the bucket as a decimal (`0.01` is 1%).
+   * Finite compounded decimal simple return, at least `-1`.
    */
   value: number;
 }
@@ -512,15 +589,15 @@ export interface PeriodicReturn {
  */
 export interface RollingGreeks {
   /**
-   * Rolling alpha values.
+   * Annual arithmetic Jensen alpha; undefined windows serialize as `"nan"`.
    */
-  alphas: number[];
+  alphas: FiniteOrNanWireFordouble[];
   /**
-   * Rolling beta values.
+   * Dimensionless OLS beta; unavailability matches alpha at every date.
    */
-  betas: number[];
+  betas: FiniteOrNanWireFordouble[];
   /**
-   * End dates for each rolling window.
+   * Strictly increasing return-ending dates, one per completed window.
    */
   dates: DateWire[];
 }

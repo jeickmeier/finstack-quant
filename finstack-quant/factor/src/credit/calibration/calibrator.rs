@@ -166,7 +166,7 @@ impl CreditCalibrator {
             &inventory.bucket_paths,
             &folded,
             &peel_weights,
-        );
+        )?;
 
         // All variance/correlation estimation operates on factor and adder
         // *moves*. In `Returns` space the peeled series already are moves; a

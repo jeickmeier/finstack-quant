@@ -41,65 +41,80 @@
   "description": "Period-level aggregate statistics.",
   "properties": {
     "avg_loss": {
-      "description": "Mean of negative-return periods.",
-      "format": "double",
-      "type": "number"
+      "$ref": "#/$defs/NonFiniteF64Wire",
+      "description": "Conditional negative-return mean, retaining its negative sign; undefined when absent."
     },
     "avg_return": {
-      "description": "Mean return across all periods.",
-      "format": "double",
-      "type": "number"
+      "$ref": "#/$defs/NonFiniteF64Wire",
+      "description": "Arithmetic mean over all occupied bucket returns; undefined when empty."
     },
     "avg_win": {
-      "description": "Mean of positive-return periods.",
-      "format": "double",
-      "type": "number"
+      "$ref": "#/$defs/NonFiniteF64Wire",
+      "description": "Conditional positive-return mean; undefined when no positive bucket exists."
     },
     "best": {
-      "description": "Best single-period return.",
-      "format": "double",
-      "type": "number"
+      "$ref": "#/$defs/NonFiniteF64Wire",
+      "description": "Largest bucket return, or undefined for no buckets."
     },
     "consecutive_losses": {
-      "description": "Longest streak of negative-return periods.",
+      "description": "Longest strictly negative run among successive occupied buckets; observed zero interrupts it.",
       "format": "uint",
       "minimum": 0,
       "type": "integer"
     },
     "consecutive_wins": {
-      "description": "Longest streak of positive-return periods.",
+      "description": "Longest strictly positive run among successive occupied buckets; missing buckets do not interrupt it.",
       "format": "uint",
       "minimum": 0,
       "type": "integer"
     },
-    "cpc_ratio": {
+    "cpc_index": {
       "$ref": "#/$defs/NonFiniteF64Wire",
-      "description": "CPC index: `profit_factor × win_rate × payoff_ratio`.\n\nNot to be confused with the Common Sense Ratio\n(`profit_factor × tail_ratio`), which is a different metric."
+      "description": "Cardinal Profitability Construct adaptation `profit_factor * win_rate * payoff_ratio`; requires both groups."
     },
-    "kelly_criterion": {
+    "kelly_risk_fraction": {
       "$ref": "#/$defs/NonFiniteF64Wire",
-      "description": "Binary Kelly fraction: `p_win − p_loss / payoff_ratio`, with both\nprobabilities conditional on nonzero returns. Zero-return periods\ndo not affect this payoff approximation; `win_rate` uses all periods."
+      "description": "Signed loss-normalized binary risk fraction `p - q/payoff`, with decisive-bucket probabilities; requires both groups."
+    },
+    "losses": {
+      "description": "Number of strictly negative bucket returns.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "n_obs": {
+      "description": "Number of occupied aggregation buckets, including neutral returns.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
     },
     "payoff_ratio": {
       "$ref": "#/$defs/NonFiniteF64Wire",
-      "description": "`avg_win / |avg_loss|`. `0.0` when there are no wins; `+∞` when wins\nexist but there are no losses."
+      "description": "Conditional mean gain divided by mean loss magnitude; undefined unless both groups exist."
     },
     "profit_factor": {
       "$ref": "#/$defs/NonFiniteF64Wire",
-      "description": "Sum of wins / sum of |losses| (gross profit / gross loss).\n`0.0` when there are no wins; `+∞` when wins exist but there are no\nlosses."
+      "description": "Sum of gains divided by loss magnitudes; positive infinity for gains without losses."
     },
     "win_rate": {
-      "description": "Fraction of periods with positive returns.",
-      "format": "double",
-      "type": "number"
+      "$ref": "#/$defs/NonFiniteF64Wire",
+      "description": "Positive bucket count divided by all occupied buckets; undefined when empty."
+    },
+    "wins": {
+      "description": "Number of strictly positive bucket returns.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
     },
     "worst": {
-      "description": "Worst single-period return.",
-      "format": "double",
-      "type": "number"
+      "$ref": "#/$defs/NonFiniteF64Wire",
+      "description": "Smallest bucket return, or undefined for no buckets."
     }
   },
   "required": [
+    "n_obs",
+    "wins",
+    "losses",
     "best",
     "worst",
     "consecutive_wins",
@@ -110,8 +125,8 @@
     "avg_loss",
     "payoff_ratio",
     "profit_factor",
-    "cpc_ratio",
-    "kelly_criterion"
+    "cpc_index",
+    "kelly_risk_fraction"
   ],
   "title": "PeriodStats",
   "type": "object"

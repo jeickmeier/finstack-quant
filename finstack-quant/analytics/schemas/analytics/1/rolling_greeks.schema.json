@@ -4,6 +4,25 @@
       "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
       "format": "date",
       "type": "string"
+    },
+    "FiniteOrNanWireFordouble": {
+      "anyOf": [
+        {
+          "description": "A JSON number in the domain of the selected numeric representation.",
+          "format": "double",
+          "type": "number"
+        },
+        {
+          "$ref": "#/$defs/NanSentinel",
+          "description": "An unavailable result, written as `\"nan\"`."
+        }
+      ],
+      "description": "A finite numeric representation or the undefined-result sentinel `\"nan\"`.\n\nUse `f64` for an unrestricted JSON number, or a validated numeric wire type\nsuch as [`super::ClosedUnitIntervalF64Wire`] to retain its range constraints.\nUnlike [`NonFiniteF64Wire`], its JSON contract excludes infinity sentinel strings."
+    },
+    "NanSentinel": {
+      "const": "nan",
+      "description": "The undefined-result token accepted by [`FiniteOrNanWire`].",
+      "type": "string"
     }
   },
   "$id": "https://finstack_quant.dev/schemas/analytics/1/rolling_greeks.schema.json",
@@ -12,23 +31,21 @@
   "description": "Rolling greeks output.",
   "properties": {
     "alphas": {
-      "description": "Rolling alpha values.",
+      "description": "Annual arithmetic Jensen alpha; undefined windows serialize as `\"nan\"`.",
       "items": {
-        "format": "double",
-        "type": "number"
+        "$ref": "#/$defs/FiniteOrNanWireFordouble"
       },
       "type": "array"
     },
     "betas": {
-      "description": "Rolling beta values.",
+      "description": "Dimensionless OLS beta; unavailability matches alpha at every date.",
       "items": {
-        "format": "double",
-        "type": "number"
+        "$ref": "#/$defs/FiniteOrNanWireFordouble"
       },
       "type": "array"
     },
     "dates": {
-      "description": "End dates for each rolling window.",
+      "description": "Strictly increasing return-ending dates, one per completed window.",
       "items": {
         "$ref": "#/$defs/DateWire"
       },

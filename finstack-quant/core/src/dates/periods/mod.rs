@@ -568,6 +568,7 @@ impl PeriodId {
 /// deserialization applies the same validation as [`FiscalConfig::new`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(try_from = "FiscalConfigFields", into = "FiscalConfigFields")]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct FiscalConfig {
     /// The month when the fiscal year starts.
     start_month: Month,
@@ -577,9 +578,12 @@ pub struct FiscalConfig {
 
 /// Wire shape of [`FiscalConfig`]: plain month and day numbers.
 #[derive(serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 struct FiscalConfigFields {
+    #[cfg_attr(feature = "json-schema", schemars(range(min = 1, max = 12)))]
     start_month: u8,
+    #[cfg_attr(feature = "json-schema", schemars(range(min = 1, max = 31)))]
     start_day: u8,
 }
 

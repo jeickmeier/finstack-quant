@@ -214,5 +214,5 @@ pub fn relative_value_report_table(
     report: JsValue,
 ) -> Result<JsValue, JsValue> {
     let report: fc::RelativeValueReport = from_js_json(&report, "report")?;
-    to_js_value(&report.to_table().map_err(to_js_err)?)
+    crate::utils::to_js_table_numeric(&report.to_table().map_err(to_js_err)?)
 }

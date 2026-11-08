@@ -47,10 +47,10 @@ fn bench_tail_risk(c: &mut Criterion) {
 fn bench_return_based(c: &mut Criterion) {
     let perf = perf_from_returns(2_500, 7);
     c.bench_function("Performance::volatility 2.5k", |b| {
-        b.iter(|| black_box(perf.volatility(true)));
+        b.iter(|| black_box(perf.volatility(true).expect("valid volatility")));
     });
     c.bench_function("Performance::sharpe 2.5k", |b| {
-        b.iter(|| black_box(perf.sharpe(0.02)));
+        b.iter(|| black_box(perf.sharpe(0.02).expect("valid Sharpe")));
     });
 }
 
@@ -91,7 +91,7 @@ fn bench_performance(c: &mut Criterion) {
     ))
     .expect("perf");
     c.bench_function("Performance::sharpe 750x2", |b| {
-        b.iter(|| black_box(perf.sharpe(0.02)));
+        b.iter(|| black_box(perf.sharpe(0.02).expect("valid Sharpe")));
     });
     c.bench_function("Performance::value_at_risk 750x2", |b| {
         b.iter(|| black_box(perf.value_at_risk(0.95).expect("valid confidence")));
@@ -123,7 +123,7 @@ fn bench_multi_factor_greeks(c: &mut Criterion) {
         b.iter(|| {
             let factors: [&[f64]; 3] = [&factor_a, &factor_b, &factor_c];
             black_box(
-                perf.multi_factor_greeks(3, &factors, finstack_quant_analytics::ReturnKind::Excess)
+                perf.multi_factor_greeks(3, &factors, 0.0)
                     .expect("multi factor regression"),
             )
         });
@@ -133,7 +133,12 @@ fn bench_multi_factor_greeks(c: &mut Criterion) {
 fn bench_correlation_matrix(c: &mut Criterion) {
     let perf = perf_panel(1_000, 50, 31);
     c.bench_function("Performance::correlation_matrix 1k x 50", |b| {
-        b.iter(|| black_box(perf.correlation_matrix()));
+        b.iter(|| {
+            black_box(
+                perf.correlation_matrix()
+                    .expect("valid common-sample correlation"),
+            )
+        });
     });
 }
 

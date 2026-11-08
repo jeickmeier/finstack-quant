@@ -19,8 +19,10 @@ import json
 import pytest
 
 from finstack_quant import analytics, models, portfolio, statements, statements_analytics
+from finstack_quant.core.dates import DayCountContext
 from finstack_quant.core.market_data import invert_fx_rate
 from finstack_quant.models.factor.credit import CreditCalibrator, decompose_levels
+from tests.analytics_helpers import valuation_grid
 
 
 def _evaluate(*formulas: tuple[str, str]) -> None:
@@ -59,7 +61,14 @@ def _performance() -> analytics.Performance:
     dates = [f"2024-01-{day:02d}" for day in range(1, 11)]
     returns = [0.01, -0.01, 0.02, 0.0, 0.01, -0.02, 0.01, 0.0, 0.01, 0.01]
     return analytics.Performance.from_panel(
-        analytics.PerformancePanel(dates=dates, series=[returns], kind="returns", ticker_names=["A"])
+        analytics.PerformancePanel(
+            dates=valuation_grid(dates),
+            series=[returns],
+            kind="returns",
+            ticker_names=["A"],
+            frequency="daily",
+            benchmark_ticker="A",
+        )
     )
 
 
@@ -191,10 +200,10 @@ class TestCoreAndAnalytics:
 
     def test_an_unknown_calendar_is_not_found(self) -> None:
         with pytest.raises(KeyError, match="nope_cal"):
-            _performance().cagr("bus_252", "nope_cal")
+            _performance().cagr("bus_252", DayCountContext(calendar_id="nope_cal"))
 
     def test_a_calendar_union_resolves(self) -> None:
-        assert _performance().cagr("bus_252", "nyse+gblo")["A"] > 0.0
+        assert _performance().cagr("bus_252", DayCountContext(calendar_id="nyse+gblo"))["A"] > 0.0
 
     def test_an_unknown_benchmark_ticker_is_not_found(self) -> None:
         dates = [date(2024, 1, 1), date(2024, 1, 2), date(2024, 1, 3)]
@@ -202,11 +211,23 @@ class TestCoreAndAnalytics:
         with pytest.raises(KeyError, match="NOPE"):
             analytics.Performance.from_panel(
                 analytics.PerformancePanel(
-                    dates=dates, series=returns, kind="returns", ticker_names=["A", "B"], benchmark_ticker="NOPE"
+                    dates=valuation_grid(dates),
+                    series=returns,
+                    kind="returns",
+                    ticker_names=["A", "B"],
+                    benchmark_ticker="NOPE",
+                    frequency="daily",
                 )
             )
         perf = analytics.Performance.from_panel(
-            analytics.PerformancePanel(dates=dates, series=returns, kind="returns", ticker_names=["A", "B"])
+            analytics.PerformancePanel(
+                dates=valuation_grid(dates),
+                series=returns,
+                kind="returns",
+                ticker_names=["A", "B"],
+                frequency="daily",
+                benchmark_ticker="A",
+            )
         )
         with pytest.raises(KeyError, match="NOPE"):
             perf.reset_bench_ticker("NOPE")

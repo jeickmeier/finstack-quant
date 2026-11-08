@@ -53,7 +53,7 @@
       "description": "Beta (slope) of portfolio vs benchmark, or [`f64::NAN`] when undefined."
     },
     "n_obs": {
-      "description": "Number of paired observations the regression used: the overlap after\ntruncating both series to the shorter length. Reported even when the\nestimates are [`f64::NAN`]. Required in the serialized result.",
+      "description": "Number of paired observations the regression used: the exact equal-length position-paired sample. Reported even when the\nestimates are [`f64::NAN`]. Required in the serialized result.",
       "format": "uint",
       "minimum": 0,
       "type": "integer"

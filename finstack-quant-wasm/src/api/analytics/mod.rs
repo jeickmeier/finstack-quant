@@ -5,7 +5,8 @@
 //! metrics, benchmark comparisons, basic factor models — are reachable as
 //! `Performance` methods, including the ticker-major periodic-return panel.
 //! The free functions are `constrained_least_squares` (exported as
-//! `constrainedLeastSquares`), a standalone numeric regression building
+//! `constrainedLeastSquares`), the raw `multi_factor_greeks` regression
+//! (`multiFactorGreeks`), a standalone numeric regression building
 //! block for factor-Brinson attribution, and the scalar metrics `sharpe`,
 //! `sortino`, `volatility` and `max_drawdown` (`maxDrawdown`) over one
 //! return series; none depends on `Performance`.
@@ -13,5 +14,6 @@
 mod performance;
 mod regression;
 mod scalar;
+mod summary;
 
 pub use performance::JsPerformance;

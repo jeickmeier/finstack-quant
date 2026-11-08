@@ -1,24 +1,16 @@
 # ANALYTICS-014: Normalized SVD least squares and single-equality factor-return correction
 
-**Decision status:** Accepted for the complete normalized full-rank SVD and single-equality constrained-regression package below (2026-11-07). Implementation reconciliation and independent qualification remain open; downstream financial policies retain their own scope.
+**Decision status:** Accepted for the complete normalized full-rank SVD and single-equality constrained-regression package below (2026-11-07).
 
-**Implementation status:** Observed in the source paths below, including the stated discrepancies and fallback behavior.
+**Implementation status:** Implemented in the analytics decision reconciliation dated 2026-11-08. The accepted sections below define the current contract.
 
-**Validation status:** Source inspected; test evidence inspected or located as identified below, not executed. No financial accuracy certification or runtime change is implied.
+**Validation status:** Scoped implementation checks and their limits are recorded in the [analytics inventory](README.md#implementation-evidence). A passing numerical fixture establishes its stated case; it does not certify a population estimator or every supported input.
 
-**Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See the [scope and exact source manifest](README.md).
-
-## Choice, domain and rationale
-
-The shared numerical solver uses column-normalized nalgebra SVD and rejects rank deficiency. It serves multifactor time-series OLS and a public cross-sectional constrained least-squares function for factor-Brinson attribution. The constrained objective is **unweighted** residual least squares subject to one holdings-weighted return identity `w'Xf=w'r`; the `weights` argument is not a weighted-least-squares loss matrix. Exposures are a row-major assets×factors matrix, returns/holdings aligned per asset; dimensions must be nonzero and finite. Negative or unnormalized holdings are allowed.
+**Audit provenance:** The original source audit was performed on 2026-11-05 at `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. Its historical discrepancies are superseded by the accepted contracts and this implementation. The [source ledger](coverage.json) retains source ownership and dated inspection fingerprints.
 
 ## Accepted decision: normalized SVD and constrained regression
 
-**Accepted:** 2026-11-07. **Implementation:** Partial; selected source
-inspected at `827ebb75b9`. Roundoff rank detection, target/subnormal scaling,
-bounded decomposition, removal of the projection cutoff, weighted-gross
-closure and final equality/optimality checks require reconciliation. No
-runtime solver checks or benchmarks were executed.
+**Accepted:** 2026-11-07.
 
 This package covers the shared full-rank solve, exact numerical
 rank policy, constrained objective, input/units, scaling, redundant/infeasible
@@ -74,12 +66,11 @@ Use the library's fallible bounded SVD with convergence tolerance
 `5 * epsilon` and a maximum of 1,000 total internal iterations. Exhaustion
 or decomposition failure is a calculation error, not a rank classification,
 panic or an unbounded retry. These internal operating controls require
-independent convergence/performance qualification and may be revised without
+convergence/performance evidence for the intended sizes and may be revised without
 changing the model or exposing public tuning. The [nalgebra SVD API](https://docs.rs/nalgebra/0.35.0/nalgebra/linalg/struct.SVD.html)
-already supports this bounded calculation; the current convenience call uses
-an unlimited iteration budget.
+supports this bounded calculation.
 
-Replace the current fixed `1e-10 * max(sigma_max, 1)` cutoff with:
+Use the roundoff-based rank cutoff:
 
 ```text
 epsilon = f64 machine epsilon
@@ -152,10 +143,9 @@ abs(w' * (r - y)) <= eta * gross
 
 Evaluate it with separately scaled data and compensated products/sums;
 do not permit an overflowing bound to make an invalid result pass. A zero
-scale passes only for zero mismatch. Replace the current global
-`||w|| * (||r|| + ||y||)` equality scale: returns on zero-weight assets must
-not loosen this particular identity check, while those assets still enter
-the unweighted objective. The budget concerns gross weighted return amounts,
+scale passes only for zero mismatch. Returns on zero-weight assets do not
+loosen this identity check, while those assets still enter the unweighted
+objective. The budget concerns gross weighted return amounts,
 not exact algebraic equality, accuracy relative to a possibly cancelling net
 return, or a portfolio basis-point/materiality threshold. If OLS already
 passes, its constrained approximation needs no
@@ -225,9 +215,9 @@ host error mapping; success contains no undefined coefficients. There is no
 new configuration, compatibility path or serialized status model.
 
 The equality/optimality budgets and bounded convergence controls are explicit internal numerical acceptance
-choices requiring independent qualification. Passing them gives neither a
+choices whose accuracy is limited to the stated numerical evidence. Passing them gives neither a
 forward coefficient-error bound nor a guarantee of meaningful exposures in
-ill-conditioned models. Qualification must cover rank boundaries, column/
+ill-conditioned models. Relevant numerical boundary cases include rank boundaries, column/
 target/holdings scaling, signed and zero holdings, exact/redundant/infeasible
 constraints, resolved tiny projections, cancellation, auxiliary overflow,
 zero targets, final feasibility/optimality and Rust/Python/WASM agreement.
@@ -243,47 +233,6 @@ authenticated in this review. Keep local derivations labelled as such.
 Multiple equalities/inequalities, regularization, weighted loss and broader
 factor-Brinson economic conventions remain separately scoped.
 
-## Normalized SVD algorithm
+## Implementation evidence
 
-**Observed implementation:** the current fixed cutoff and unbounded
-decomposition below differ from the accepted package above.
-
-1. For each nonzero design column, find maximum absolute entry. Split its scale into an exact binary exponent scale and a bounded norm calculated with Neumaier sums. Prefer a single full norm if representable; otherwise retain the two-stage scale/norm to avoid squared overflow/underflow.
-2. Divide each column by its scale and norm. SVD the normalized matrix with singular vectors.
-3. Set tolerance `1e−10*max(largest_singular_value,1)`. Count singular values strictly above it and error if rank is less than the number of columns. No zero-column repair, ridge term or dropped-column fallback occurs.
-4. Solve all right-hand sides using that factorization/tolerance, reverse column scaling in coefficient rows, and reject nonfinite coefficients. The helper validates matrix shapes; public callers own input-finiteness boundaries.
-
-## Constrained correction algorithm
-
-**Observed implementation:** the current global equality scale, fixed
-projection cutoff and missing final gates below require the accepted changes.
-
-Normalize holdings w by their largest absolute value; all-zero w stays zero. Use one SVD for two right-hand sides to compute `f_hat=argmin ||r−Xf||²` and `g=argmin ||w−Xg||²`. Compute OLS fitted values and residuals. First determine whether the equality is already satisfied using a separately response-scaled bound `abs(w'(r−Xf_hat)) <= 1e−12*||w||*(||r||+||Xf_hat||)`. This calculation is performed in normalized return units to avoid a spurious infinite tolerance. All-zero holdings or all-zero returns/fits need no correction.
-
-If unsatisfied, form Xg and denominator D=w'Xg. Reject nonfinite D or `abs(D)<=1e−10*||w||*||Xg||` as unreachable. Otherwise λ=`w'(r−Xf_hat)/D` and f=f_hat+λg; reject nonfinite λ or coefficients. This restores the single identity algebraically when represented accurately. There is no post-correction residual/constraint-tolerance check; numerical satisfaction relies on the formulation and existing tests, not an extra runtime certificate.
-
-## Selection, limits and alternatives
-
-No intercept is inserted by the public constrained function; callers include one only as an exposure column. Multifactor OLS inserts its own intercept before the shared solver. Normalizing holdings preserves the identity under uniform nonzero rescaling, but extreme nonuniform/ill-conditioned designs can still exceed representable precision. The fixed rank, satisfaction and degeneracy tolerances are internal numerical policies.
-
-QR/KKT or null-space constrained solves, regularization and multiple equality/inequality constraints are unimplemented alternatives. A minimum-norm solution would change the current fail-closed rank contract. Existing architecture uses this small numerical function without portfolio-specific conventions; downstream attribution owns exposures/holdings and reconciliation meaning.
-
-## Implementation and validation evidence
-
-- [Owning implementation](../../../../finstack-quant/analytics/src/regression.rs) and [multifactor caller](../../../../finstack-quant/analytics/src/multi_factor.rs). The cited formula rationale is [Jeet–Partani](../../../REFERENCES.md#jeet-partani-2023); [matrix computations](../../../REFERENCES.md#golub-van-loan-matrix-computations) is numerical context.
-- Inspected inline `binary_factor_case_matches_hand_closed_form` and `continuous_case_satisfies_constraint_and_matches_hand_derivation` use hand-derived coefficients/weighted identities. The latter explicitly says its expected values are a local derivation, **not** the paper's unreproducible Exhibit 8. Located scale/overflow/orthogonal-weight/rank tests qualify specific numerical cases; none was executed.
-
-The absent post-correction residual gate is a qualification gap, not a reproduced numerical failure.
-
-The accepted package requires replacing both fixed `1e-10` policies and the global
-normwise equality scale, adding independent target scaling, bounded convergence
-and mandatory final equality/optimality checks, and distinguishing
-infeasible models from unresolved arithmetic. The observed original-unit
-auxiliary/fitted products and pre-correction-only equality check do not yet
-meet that contract. These source observations do not establish an executed
-failure or numerical certification.
-
-## Follow-up tracking
-
-Implementation reconciliation and missing evidence are tracked in the
-[normalized SVD/constrained-regression follow-up](../FOLLOW_UPS.md#analytics-svd-and-constrained-regression).
+[regression.rs](../../../../finstack-quant/analytics/src/regression.rs). The [crate integration tests](../../../../finstack-quant/analytics/tests/main.rs), inline numerical regressions and [schema contracts](../../../../finstack-quant/analytics/tests/schema_contract.rs) exercise this scope. See the [inventory validation record](README.md#implementation-evidence) for executed checks and evidence limits.

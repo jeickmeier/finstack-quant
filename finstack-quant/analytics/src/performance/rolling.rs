@@ -17,12 +17,14 @@ impl Performance {
     /// # Arguments
     ///
     /// * `ticker_idx` - Zero-based column index of the ticker.
-    /// * `window`     - Look-back window length in periods (e.g. 252 for 1Y daily).
+    /// * `window` - Explicit positive observation count. Only complete trailing
+    ///   windows within the active ticker span are emitted; an oversized count
+    ///   produces an empty series.
     ///
     /// # Errors
     ///
-    /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when
-    /// `ticker_idx` is outside the loaded ticker columns.
+    /// Returns an input error for an invalid ticker or zero window, and a
+    /// calculation error if a requested compounded return cannot be represented.
     pub fn rolling_returns(
         &self,
         ticker_idx: usize,
@@ -30,11 +32,11 @@ impl Performance {
     ) -> finstack_quant_core::Result<DatedSeries> {
         self.ensure_ticker_idx(ticker_idx)?;
         Self::ensure_window(window)?;
-        Ok(rolling_returns(
+        rolling_returns(
             self.active_returns(ticker_idx),
             self.active_dates_for_ticker_unchecked(ticker_idx),
             window,
-        ))
+        )
     }
 
     /// Rolling annualized volatility for a specific ticker.
@@ -42,12 +44,14 @@ impl Performance {
     /// # Arguments
     ///
     /// * `ticker_idx` - Zero-based column index of the ticker.
-    /// * `window`     - Look-back window length in periods.
+    /// * `window` - Explicit positive number of observations per complete
+    ///   trailing window. A singleton window emits aligned undefined values.
     ///
     /// # Errors
     ///
-    /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when
-    /// `ticker_idx` is outside the loaded ticker columns.
+    /// Returns an input error for an invalid ticker, zero window or missing
+    /// observation frequency. Numerical evaluation or output-range failure
+    /// returns a calculation error.
     pub fn rolling_volatility(
         &self,
         ticker_idx: usize,
@@ -55,12 +59,12 @@ impl Performance {
     ) -> finstack_quant_core::Result<DatedSeries> {
         self.ensure_ticker_idx(ticker_idx)?;
         Self::ensure_window(window)?;
-        Ok(rolling_volatility(
+        rolling_volatility(
             self.active_returns(ticker_idx),
             self.active_dates_for_ticker_unchecked(ticker_idx),
             window,
-            self.ann(),
-        ))
+            self.ann()?,
+        )
     }
 
     /// Rolling Sortino ratio for a specific ticker.
@@ -68,15 +72,17 @@ impl Performance {
     /// # Arguments
     ///
     /// * `ticker_idx` - Zero-based column index of the ticker.
-    /// * `window`     - Look-back window length in periods.
+    /// * `window` - Explicit positive number of observations per complete
+    ///   trailing window. A singleton window emits aligned undefined values.
     /// * `mar`        - Minimum acceptable per-period return (decimal). Pass
     ///   `0.0` for the conventional zero-MAR Sortino, or e.g. a risk-free or
     ///   target rate scaled to the observation frequency.
     ///
     /// # Errors
     ///
-    /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when
-    /// `ticker_idx` is outside the loaded ticker columns.
+    /// Returns an input error for an invalid ticker, zero window, nonfinite
+    /// `mar` or missing observation frequency. Numerical evaluation or
+    /// output-range failure returns a calculation error.
     pub fn rolling_sortino(
         &self,
         ticker_idx: usize,
@@ -85,13 +91,13 @@ impl Performance {
     ) -> finstack_quant_core::Result<DatedSeries> {
         self.ensure_ticker_idx(ticker_idx)?;
         Self::ensure_window(window)?;
-        Ok(rolling_sortino(
+        rolling_sortino(
             self.active_returns(ticker_idx),
             self.active_dates_for_ticker_unchecked(ticker_idx),
             window,
-            self.ann(),
+            self.ann()?,
             mar,
-        ))
+        )
     }
 
     /// Rolling Sharpe ratio for a specific ticker.
@@ -99,9 +105,11 @@ impl Performance {
     /// # Arguments
     ///
     /// * `ticker_idx`     - Zero-based column index of the ticker.
-    /// * `window`         - Look-back window length in periods.
-    /// * `risk_free_rate` - Annualized risk-free rate, geometrically
-    ///   decompounded to the panel frequency before subtraction.
+    /// * `window` - Explicit positive number of observations per complete
+    ///   trailing window. A singleton window emits aligned undefined values.
+    /// * `risk_free_rate` - Explicit finite annual-effective decimal cash
+    ///   return strictly greater than -1, geometrically decompounded to the
+    ///   declared observation frequency before subtraction.
     ///
     /// # Returns
     ///
@@ -109,8 +117,9 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when
-    /// `ticker_idx` is outside the loaded ticker columns.
+    /// Returns an input error for an invalid ticker, zero window, invalid
+    /// cash return or missing observation frequency. Numerical evaluation or
+    /// output-range failure returns a calculation error.
     pub fn rolling_sharpe(
         &self,
         ticker_idx: usize,
@@ -119,12 +128,12 @@ impl Performance {
     ) -> finstack_quant_core::Result<DatedSeries> {
         self.ensure_ticker_idx(ticker_idx)?;
         Self::ensure_window(window)?;
-        Ok(rolling_sharpe(
+        rolling_sharpe(
             self.active_returns(ticker_idx),
             self.active_dates_for_ticker_unchecked(ticker_idx),
             window,
-            self.ann(),
+            self.ann()?,
             risk_free_rate,
-        ))
+        )
     }
 }

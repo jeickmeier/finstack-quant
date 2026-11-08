@@ -27,7 +27,7 @@ const { analytics } = facade;
 await init({ module_or_path: readFileSync(WASM_BG) });
 
 test('periodicReturns exposes ticker-major dated points that reconcile', () => {
-  const dates = ['2025-01-30', '2025-01-31', '2025-02-03'];
+  const dates = ['2025-01-29', '2025-01-30', '2025-01-31', '2025-02-03'];
   const returns = [
     [0.01, 0.02, -0.01],
     [0.005, -0.002, 0.015],
@@ -42,7 +42,7 @@ test('periodicReturns exposes ticker-major dated points that reconcile', () => {
   });
 
   assert.equal(typeof perf.periodicReturns, 'function');
-  const panel = perf.periodicReturns();
+  const panel = perf.periodicReturns('monthly');
   assert.equal(panel.length, 2);
 
   const cumulative = perf.cumulativeReturns();
@@ -62,7 +62,7 @@ test('periodicReturns exposes ticker-major dated points that reconcile', () => {
 
 test('periodicReturns rejects unsupported frequency tokens', () => {
   const perf = new analytics.Performance({
-    dates: ['2025-01-30', '2025-01-31'],
+    dates: ['2025-01-29', '2025-01-30', '2025-01-31'],
     series: [[0.01, 0.02]],
     kind: 'returns',
     ticker_names: ['FUND'],

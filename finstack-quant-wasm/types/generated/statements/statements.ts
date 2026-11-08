@@ -2051,48 +2051,53 @@ export type TableColumnData =
   | {
       type: "string";
       values: string[];
-      [k: string]: unknown;
     }
   | {
       type: "nullable_string";
       values: (string | null)[];
-      [k: string]: unknown;
     }
   | {
       type: "float64";
-      values: number[];
-      [k: string]: unknown;
+      values: NonFiniteF64Wire[];
     }
   | {
       type: "nullable_float64";
       values: (number | null)[];
-      [k: string]: unknown;
     }
   | {
       type: "u_int32";
       values: number[];
-      [k: string]: unknown;
     }
   | {
       type: "nullable_u_int32";
       values: (number | null)[];
-      [k: string]: unknown;
     }
   | {
       type: "int64";
       values: number[];
-      [k: string]: unknown;
     }
   | {
       type: "nullable_int64";
       values: (number | null)[];
-      [k: string]: unknown;
     }
   | {
       type: "boolean";
       values: boolean[];
-      [k: string]: unknown;
     };
+/**
+ * An `f64` in the [`non_finite_f64`] wire form: a JSON number when finite,
+ * otherwise one of the strings `"inf"`, `"-inf"` or `"nan"`.
+ *
+ * Contract types store plain `f64` fields with
+ * `#[serde(with = "finstack_quant_core::wire::non_finite_f64")]` and name this
+ * type in `#[schemars(with = ...)]`, so the generated schema describes the
+ * sentinel strings the serializer actually writes.
+ */
+export type NonFiniteF64Wire = number | NonFiniteSentinel;
+/**
+ * Sentinel string the [`non_finite_f64`] adapter writes for a non-finite `f64`.
+ */
+export type NonFiniteSentinel = "inf" | "-inf" | "nan";
 /**
  * Optional semantic hint for a column.
  */
@@ -7489,7 +7494,6 @@ export interface TableEnvelope {
    * Number of rows in the table.
    */
   row_count: number;
-  [k: string]: unknown;
 }
 /**
  * A single named column in a [`TableEnvelope`].
@@ -7513,7 +7517,6 @@ export interface TableColumn {
    * Optional semantic hint for bindings and consumers.
    */
   role?: TableColumnRole | null;
-  [k: string]: unknown;
 }
 /**
  * Per-metric percentile time series.

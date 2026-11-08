@@ -14,8 +14,11 @@ export interface CorrelationMatrixData {
   readonly tickerNames: readonly string[];
   /** Pearson correlations, one row per ticker. */
   readonly matrix: readonly (readonly number[])[];
-  /** Rust's flag: true when the raw estimate was projected to the nearest valid correlation matrix. */
-  readonly repaired: boolean;
+  /** Number of return intervals shared by every ticker. */
+  readonly nObs: number;
+  /** First and last shared return-ending dates, as reported by Rust. */
+  readonly startDate: string;
+  readonly endDate: string;
 }
 export interface CorrelationHeatmapProps {
   /** The native matrix; null while none is available. */
@@ -42,8 +45,8 @@ const colors: HeatmapColors = { palette: "diverging", domain: [-1, 0, 1] };
 /**
  * Draws a native Pearson correlation matrix (analytics.Performance
  * correlationMatrix) as a heatmap and a table, in the returned ticker order,
- * with Rust's repaired stamp: whether Rust projected the estimate to the
- * nearest valid correlation matrix. Every coefficient is drawn as returned.
+ * with the common sample count and return-ending bounds supplied by Rust.
+ * Every coefficient is drawn as returned.
  */
 export function CorrelationHeatmap({
   report,
@@ -119,20 +122,10 @@ export function CorrelationHeatmap({
     >
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="text-sm font-medium">Return correlation</h3>
-        {report.repaired ? (
-          <span
-            role="note"
-            aria-label="Repaired"
-            className="rounded-sm border border-border bg-muted px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-foreground"
-          >
-            Repaired
-          </span>
-        ) : null}
       </div>
       <p className="text-xs text-muted-foreground">
-        {report.repaired
-          ? "Rust's pairwise estimate was not a valid correlation matrix and was projected to the nearest valid one (Higham); the coefficients below are the repaired matrix."
-          : "Pearson correlations of each pair of tickers over their common active dates, as Rust estimated them; Rust did not need to repair the matrix."}
+        Pearson correlations over {report.nObs} common observations from{" "}
+        {report.startDate} to {report.endDate}.
       </p>
       <figure className="min-w-0">
         <FinstackChart

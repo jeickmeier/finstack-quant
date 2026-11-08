@@ -23,7 +23,8 @@ import { PerformanceReport } from "@/components/finstack/analytics/components/pe
 import { unwrap } from "@/workers/finstack-contract";
 import { useWorkerHarness } from "../shared/worker/use-worker-harness";
 import { budget } from "../shared/budget";
-import defaults from "./defaults.json";
+import { fixtureNumber } from "./fixture-numbers";
+import baseline from "./baseline.json";
 import explicitCase from "./explicit.json";
 const native = createRequire(import.meta.url)(
   "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
@@ -57,15 +58,31 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
 });
-const cases = { defaults, explicit: explicitCase };
+const cases = { baseline, explicit: explicitCase };
 const entry = (name: keyof typeof cases) => ({
   request: cases[name].request as PerformanceReportRequest,
-  report: cases[name].report as unknown as Report,
+  report: {
+    ...cases[name].report,
+    summary: {
+      ...cases[name].report.summary,
+      columns: cases[name].report.summary.columns.map((column) =>
+        column.data.type === "float64"
+          ? {
+              ...column,
+              data: {
+                ...column.data,
+                values: column.data.values.map(fixtureNumber),
+              },
+            }
+          : column,
+      ),
+    },
+  } as unknown as Report,
 });
-const { panel } = entry("defaults").request;
+const { panel } = entry("baseline").request;
 // Reports are regenerated and compared by `mise run ui-fixtures --check`
 // (tests/analytics/generate.mjs).
-it.each(["defaults", "explicit"] as const)(
+it.each(["baseline", "explicit"] as const)(
   "returns the %s native report through the real worker and frees every handle",
   async (name) => {
     const { request, report } = entry(name);
@@ -87,41 +104,51 @@ it.each(["defaults", "explicit"] as const)(
   },
   budget(15000),
 );
-it("leaves omitted options to Rust and honours an explicit fiscal year", () => {
-  const defaults = entry("defaults").report;
+it("uses explicit baseline assumptions and honours the selected fiscal year", () => {
+  const baseline = entry("baseline").report;
   const explicit = entry("explicit").report;
-  // Rust's default rolling window (63) and episode count (up to five).
-  const [fund] = defaults.tickers;
+  // The baseline explicitly selects 63 observations and up to five episodes.
+  const [fund] = baseline.tickers;
   expect(fund!.rollingSharpe.values).toHaveLength(
     fund!.activeDates.length - 62,
   );
   expect(fund!.drawdownEpisodes.length).toBeLessThanOrEqual(5);
   expect(explicit.tickers[0]!.drawdownEpisodes).toHaveLength(3);
   // The lookback ends on the last active date unless one is requested.
-  expect(defaults.lookback.refDate).toBe(defaults.activeDates.at(-1));
+  expect(baseline.lookback.refDate).toBe(baseline.activeDates.at(-1));
   expect(explicit.lookback.refDate).toBe("2025-06-30");
   // Calendar-year FYTD by default; the April fiscal year changes it.
-  expect(defaults.lookback.returns.fytd).toEqual(defaults.lookback.returns.ytd);
+  expect(baseline.lookback.returns.fytd).toEqual(baseline.lookback.returns.ytd);
   expect(explicit.lookback.returns.fytd[0]).not.toBe(
     explicit.lookback.returns.ytd[0],
   );
-  expect(defaults.benchmarkIdx).toBe(1);
+  expect(baseline.benchmarkIdx).toBe(1);
 });
-it("builds a price panel with the native constructor and reports no benchmark when none is named", async () => {
+it("builds a price panel with explicit benchmark and observation frequency", async () => {
   const dates = panel.dates.slice(0, 260);
   const prices = [dates.map((_, i) => 100 + 10 * Math.sin(i / 20) + i / 20)];
   const request: PerformanceReportRequest = {
+    ...entry("baseline").request,
     panel: {
       dates,
       series: prices,
       kind: "prices",
       ticker_names: ["Prices"],
+      benchmark_ticker: "Prices",
+      frequency: "daily",
     },
   };
   const report = unwrap(await harness.proxy.performanceReport(request));
   const direct = new native.Performance(request.panel);
   try {
-    expect(report.summary).toEqual(direct.summary());
+    expect(report.summary).toEqual(
+      direct.summary(
+        request.riskFreeRate,
+        request.mar,
+        request.omegaThreshold,
+        request.confidence,
+      ),
+    );
     expect(report.tickers[0]!.cumulativeReturns).toEqual(
       Array.from(direct.cumulativeReturns()[0]),
     );
@@ -129,8 +156,23 @@ it("builds a price panel with the native constructor and reports no benchmark wh
   } finally {
     direct.free();
   }
-  expect(report.benchmarkIdx).toBeNull();
+  expect(report.benchmarkIdx).toBe(0);
 });
+it.each(["frequency", "benchmark_ticker"] as const)(
+  "rejects a fixed summary without explicit %s context",
+  async (field) => {
+    const { request } = entry("baseline");
+    const panel = { ...request.panel };
+    delete panel[field];
+    const result = await harness.proxy.performanceReport({ ...request, panel });
+    expect(result.ok).toBe(false);
+    if (!result.ok)
+      expect(result.error.message).toContain(
+        field === "frequency" ? "frequency" : "benchmark",
+      );
+  },
+  budget(15000),
+);
 it("returns the native error and still frees the panel when a later call fails", async () => {
   const { request } = entry("explicit");
   const before = await resources();
@@ -152,7 +194,10 @@ it("returns the native error and still frees the panel when a later call fails",
     panel: { ...request.panel, benchmark_ticker: "Missing" },
   });
   expect(unknown.ok).toBe(false);
-  if (!unknown.ok) expect(unknown.error.kind).toBe("not_found");
+  if (!unknown.ok) {
+    expect(unknown.error.kind).toBe("validation");
+    expect(unknown.error.message).toContain("Missing");
+  }
 });
 it("keys the query on the worker session and the complete snapshotted request", () => {
   const { request } = entry("explicit");
@@ -171,7 +216,7 @@ it("isolates non-finite inputs and sessions while reusing identical requests", a
   const client = { call } as unknown as FinstackClient;
   const queries = new QueryClient();
   try {
-    for (const riskFreeRate of [null, Number.NaN, Infinity, -Infinity]) {
+    for (const riskFreeRate of [0, Number.NaN, Infinity, -Infinity]) {
       const input = { ...request, riskFreeRate };
       const options = performanceReportOptions(client, 2, input);
       await queries.query(options);
@@ -181,7 +226,7 @@ it("isolates non-finite inputs and sessions while reusing identical requests", a
     }
     expect(call).toHaveBeenCalledTimes(4);
     await queries.query(
-      performanceReportOptions(client, 3, { ...request, riskFreeRate: null }),
+      performanceReportOptions(client, 3, { ...request, riskFreeRate: 0 }),
     );
     expect(call).toHaveBeenCalledTimes(5);
   } finally {
@@ -318,7 +363,7 @@ function Connected({ request }: { request: PerformanceReportRequest }) {
   );
 }
 it("renders the worker report through the hook, then the native error", async () => {
-  const { request } = entry("defaults");
+  const { request } = entry("baseline");
   const { unmount } = render(
     <FinstackQueryProvider>
       <Connected request={request} />

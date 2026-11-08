@@ -1,58 +1,14 @@
-//! Rolling metrics: compounded return, Sharpe, Sortino, and volatility over a sliding window.
+//! Compact right-labelled observation-count rolling return and risk metrics.
 //!
-//! Crate-internal except for [`DatedSeries`] and [`RollingMetric`] (re-exported
-//! at the crate root).
-//! All rolling functions use incremental kernels with periodic full-window
-//! rebuilds and return a [`DatedSeries`] aligned to window-end dates. With
-//! rebuild interval `k`, scheduled rebuilds cost `O(n + n * window / k)`;
-//! numerical recovery can trigger additional rebuilds.
+//! Centered/scaled incremental states rebuild after 1,024 slides or earlier
+//! cancellation. Scalar same-estimator recovery handles inadequate intermediate
+//! scales without converting positive risk to measured zero.
 
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
-use finstack_quant_core::math::summation::neumaier_sum;
+use finstack_quant_core::{Error, Result};
 
-use super::{annualized_ratio_or_sign_infinity, ratio_or_sign_infinity};
-
-/// Number of slide steps before the incremental rolling kernel fully
-/// recomputes its running moments from the current window.
-///
-/// The rolling kernels update their moments incrementally on each slide,
-/// which accumulates floating-point drift over time. Every
-/// `ROLLING_KERNEL_RECOMPUTE_INTERVAL` steps we recompute those values
-/// over the full window to restore precision. Risk kernels also rebuild
-/// earlier when the risk sum collapses relative to its scale since the last
-/// rebuild, because removing an outlier can expose accumulated roundoff.
 const ROLLING_KERNEL_RECOMPUTE_INTERVAL: usize = 1024;
-
-#[inline]
-fn recompute_mean_m2(window: &[f64]) -> (f64, f64) {
-    let mut mean = 0.0_f64;
-    let mut m2 = 0.0_f64;
-    let mut count = 0.0_f64;
-    for &value in window {
-        count += 1.0;
-        let delta = value - mean;
-        mean += delta / count;
-        let delta2 = value - mean;
-        m2 += delta * delta2;
-    }
-    (mean, m2)
-}
-
-#[inline]
-fn recompute_sum_sum_ds(window: &[f64], mar: f64) -> (NeumaierAccumulator, f64) {
-    let mut sum = NeumaierAccumulator::new();
-    for &value in window {
-        sum.add(value);
-    }
-    (
-        sum,
-        neumaier_sum(window.iter().filter(|&&r| r < mar).map(|&r| {
-            let d = mar - r;
-            d * d
-        })),
-    )
-}
 
 /// The metric a rolling [`DatedSeries`] carries.
 ///
@@ -101,13 +57,14 @@ impl std::fmt::Display for RollingMetric {
 /// (rolling Sharpe, Sortino, volatility, returns) reuse this struct so they
 /// share field names, serde shape, and helper methods; `value_column` names
 /// the metric that produced the values.
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct DatedSeries {
-    /// Computed metric values, one per completed rolling window. An undefined
-    /// window (e.g. a zero-volatility Sharpe) is `NaN`; JSON carries it as the
-    /// `"nan"` sentinel so the series round-trips.
+    /// Computed metric values, one per completed rolling window. Undefined
+    /// estimates (singleton sample risk or a zero-over-zero ratio) are `NaN`;
+    /// genuine zero-risk ratios can be signed infinity. JSON preserves each
+    /// nonfinite value with the corresponding string sentinel.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64_seq")]
     #[cfg_attr(
         feature = "json-schema",
@@ -137,474 +94,540 @@ impl DatedSeries {
     }
 }
 
-fn nan_series(metric: RollingMetric, dates: &[Date], start: usize, len: usize) -> DatedSeries {
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DatedSeriesWire {
+    #[serde(with = "finstack_quant_core::wire::non_finite_f64_seq")]
+    values: Vec<f64>,
+    dates: Vec<Date>,
+    value_column: RollingMetric,
+}
+
+impl<'de> serde::Deserialize<'de> for DatedSeries {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        let wire = DatedSeriesWire::deserialize(deserializer)?;
+        validate_alignment(&wire.values, &wire.dates).map_err(serde::de::Error::custom)?;
+        Ok(Self {
+            values: wire.values,
+            dates: wire.dates,
+            value_column: wire.value_column,
+        })
+    }
+}
+
+fn validate_alignment(values: &[f64], dates: &[Date]) -> Result<()> {
+    if values.len() != dates.len() {
+        return Err(Error::Validation(
+            "Rolling values and dates must have equal lengths".into(),
+        ));
+    }
+    if dates.windows(2).any(|pair| pair[0] >= pair[1]) {
+        return Err(Error::Validation(
+            "Rolling dates must be strictly increasing".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_request(returns: &[f64], dates: &[Date], window: usize) -> Result<()> {
+    validate_alignment(returns, dates)?;
+    if window == 0 {
+        return Err(Error::Validation("Rolling window must be positive".into()));
+    }
+    crate::returns::validate_history(returns)
+}
+
+fn unavailable(metric: RollingMetric, dates: &[Date]) -> DatedSeries {
     DatedSeries {
-        values: vec![f64::NAN; len],
-        dates: dates[start..start + len].to_vec(),
+        values: vec![f64::NAN; dates.len()],
+        dates: dates.to_vec(),
         value_column: metric,
     }
 }
 
-/// Rolling Sharpe ratio over a sliding window.
-///
-/// Computes the Sharpe ratio independently for each `window`-length sub-slice
-/// of `returns`, advancing one period at a time. Produces `n - window + 1`
-/// values where `n = min(returns.len(), dates.len())`.
-///
-/// # Arguments
-///
-/// * `returns` - Slice of period simple returns.
-/// * `dates` - Date vector aligned with `returns`. Used only for labelling
-///   output; must be at least as long as `returns`.
-/// * `window` - Look-back window length in periods.
-/// * `ann_factor` - Number of periods per year for annualization.
-/// * `risk_free_rate` - Annualized risk-free rate, geometrically
-///   decompounded to the observation frequency before subtraction.
-///
-/// # Returns
-///
-/// A [`DatedSeries`] with `values` and `dates` of equal length. Returns
-/// empty vectors if `window` is larger than the series length; callers
-/// guarantee `window >= 1` (`Performance::ensure_window`).
+/// Welford state in coordinates anchored on an actual return. Scaling the
+/// dispersion, rather than the return level, retains high-offset small risk.
+struct RollingMoments {
+    anchor: f64,
+    scale: f64,
+    mean: f64,
+    m2: f64,
+    peak: f64,
+}
+
+impl RollingMoments {
+    fn rebuild(window: &[f64]) -> Self {
+        let anchor = window[0];
+        let scale = window
+            .iter()
+            .map(|&value| (value - anchor).abs())
+            .fold(0.0_f64, f64::max);
+        let mut mean = 0.0;
+        let mut m2 = 0.0;
+        if scale > 0.0 {
+            for (idx, &value) in window.iter().enumerate() {
+                let value = (value - anchor) / scale;
+                let delta = value - mean;
+                mean += delta / (idx + 1) as f64;
+                m2 += delta * (value - mean);
+            }
+        }
+        Self {
+            anchor,
+            scale,
+            mean,
+            m2,
+            peak: m2,
+        }
+    }
+
+    fn slide(&mut self, outgoing: f64, incoming: f64, window: usize) -> bool {
+        let new_delta = incoming - self.anchor;
+        if self.scale == 0.0 && new_delta == 0.0 {
+            return true;
+        }
+        if new_delta.abs() > self.scale {
+            // Rescale the existing Welford state in constant work when a new
+            // level expands its coordinate range. A trending series must not
+            // rebuild its entire window for every new maximum.
+            let ratio = self.scale / new_delta.abs();
+            self.mean *= ratio;
+            self.m2 *= ratio * ratio;
+            self.peak *= ratio * ratio;
+            self.scale = new_delta.abs();
+        }
+        let outgoing = (outgoing - self.anchor) / self.scale;
+        let incoming = new_delta / self.scale;
+        let count = window as f64;
+        let keep_mean = self.mean - (outgoing - self.mean) / (count - 1.0);
+        let keep_m2 = self.m2 - (outgoing - self.mean) * (outgoing - keep_mean);
+        let delta = incoming - keep_mean;
+        self.mean = keep_mean + delta / count;
+        self.m2 = keep_m2 + delta * (incoming - self.mean);
+        self.peak = self.peak.max(self.m2);
+        self.valid() && !(self.peak > 0.0 && self.m2 <= f64::EPSILON.sqrt() * self.peak)
+    }
+
+    fn valid(&self) -> bool {
+        self.mean.is_finite() && self.m2.is_finite() && self.m2 >= 0.0
+    }
+
+    fn mean(&self) -> f64 {
+        self.anchor + self.scale * self.mean
+    }
+    fn sd(&self, window: usize) -> f64 {
+        self.scale * (self.m2 / (window - 1) as f64).sqrt()
+    }
+}
+
+fn moment_series<F>(
+    returns: &[f64],
+    dates: &[Date],
+    window: usize,
+    metric: RollingMetric,
+    mut evaluate: F,
+) -> Result<DatedSeries>
+where
+    F: FnMut(&[f64], &RollingMoments) -> Result<f64>,
+{
+    let n = returns.len();
+    if n < window {
+        return Ok(DatedSeries::with_capacity(metric, 0));
+    }
+    if window == 1 {
+        return Ok(unavailable(metric, dates));
+    }
+    let mut output = DatedSeries::with_capacity(metric, n - window + 1);
+    let mut state = RollingMoments::rebuild(&returns[..window]);
+    let mut slides = 0;
+    for end in window..=n {
+        let current = &returns[end - window..end];
+        if end > window {
+            slides += 1;
+            if !state.slide(returns[end - window - 1], returns[end - 1], window)
+                || slides >= ROLLING_KERNEL_RECOMPUTE_INTERVAL
+            {
+                state = RollingMoments::rebuild(current);
+                slides = 0;
+            }
+        }
+        output.values.push(evaluate(current, &state)?);
+        output.dates.push(dates[end - 1]);
+    }
+    Ok(output)
+}
+
+/// Frequency-annualized sample SD of each complete trailing window.
+pub(crate) fn rolling_volatility(
+    returns: &[f64],
+    dates: &[Date],
+    window: usize,
+    ann_factor: f64,
+) -> Result<DatedSeries> {
+    validate_request(returns, dates, window)?;
+    crate::returns::validate_frequency(ann_factor)?;
+    moment_series(
+        returns,
+        dates,
+        window,
+        RollingMetric::Volatility,
+        |values, state| {
+            let value = state.sd(window) * ann_factor.sqrt();
+            if !state.valid() || !value.is_finite() || (value == 0.0 && state.scale > 0.0) {
+                super::return_based::volatility(values, ann_factor)
+            } else {
+                Ok(value)
+            }
+        },
+    )
+}
+
+/// Arithmetic excess-return Sharpe with explicit annual-effective cash.
 pub(crate) fn rolling_sharpe(
     returns: &[f64],
     dates: &[Date],
     window: usize,
     ann_factor: f64,
     risk_free_rate: f64,
-) -> DatedSeries {
-    let n = returns.len().min(dates.len());
-    if n < window {
-        return DatedSeries::with_capacity(RollingMetric::Sharpe, 0);
-    }
-    if window < 2 {
-        return nan_series(RollingMetric::Sharpe, dates, window - 1, n - window + 1);
-    }
-    let w = window as f64;
-    let mut out = DatedSeries::with_capacity(RollingMetric::Sharpe, n - window + 1);
-    let mut date_idx = window - 1;
-    rolling_mean_m2_kernel(returns, n, window, |mean, m2| {
-        let ann_mean = mean * ann_factor;
-        let var = (m2 / (w - 1.0)).max(0.0);
-        let ann_vol = var.sqrt() * ann_factor.sqrt();
-        let excess = crate::returns::annualized_excess_return(ann_mean, risk_free_rate, ann_factor);
-        out.values.push(ratio_or_sign_infinity(excess, ann_vol));
-        out.dates.push(dates[date_idx]);
-        date_idx += 1;
-    });
-    out
+) -> Result<DatedSeries> {
+    validate_request(returns, dates, window)?;
+    let cash = crate::returns::periodic_risk_free_rate(risk_free_rate, ann_factor)?;
+    moment_series(
+        returns,
+        dates,
+        window,
+        RollingMetric::Sharpe,
+        |values, state| {
+            if state.scale == 0.0 {
+                return Ok(super::ratio_or_sign_infinity(state.anchor - cash, 0.0));
+            }
+            let sd = state.sd(window);
+            let value = ((state.mean() - cash) / sd) * ann_factor.sqrt();
+            if !state.valid() || sd == 0.0 || !value.is_finite() || value == 0.0 {
+                super::return_based::sharpe(values, risk_free_rate, ann_factor)
+            } else {
+                Ok(value)
+            }
+        },
+    )
 }
 
-/// Rolling annualized volatility over a sliding window.
-///
-/// Computes annualized volatility independently for each `window`-length
-/// sub-slice, advancing one period at a time.
-///
-/// # Arguments
-///
-/// * `returns`    - Slice of period simple returns.
-/// * `dates`      - Date vector aligned with `returns`.
-/// * `window`     - Look-back window length in periods.
-/// * `ann_factor` - Number of periods per year for annualization.
-///
-/// # Returns
-///
-/// A [`DatedSeries`] with `n - window + 1` values. Returns empty
-/// vectors if `window` is larger than the series length; callers guarantee
-/// `window >= 1` (`Performance::ensure_window`).
-pub(crate) fn rolling_volatility(
-    returns: &[f64],
-    dates: &[Date],
-    window: usize,
-    ann_factor: f64,
-) -> DatedSeries {
-    let n = returns.len().min(dates.len());
-    if n < window {
-        return DatedSeries::with_capacity(RollingMetric::Volatility, 0);
-    }
-    if window < 2 {
-        return nan_series(RollingMetric::Volatility, dates, window - 1, n - window + 1);
-    }
-    let w = window as f64;
-    let mut out = DatedSeries::with_capacity(RollingMetric::Volatility, n - window + 1);
-    let mut date_idx = window - 1;
-    rolling_mean_m2_kernel(returns, n, window, |_, m2| {
-        let var = (m2 / (w - 1.0)).max(0.0);
-        out.values.push(var.sqrt() * ann_factor.sqrt());
-        out.dates.push(dates[date_idx]);
-        date_idx += 1;
-    });
-    out
+struct RollingDownside {
+    scale: f64,
+    sum: NeumaierAccumulator,
+    downside: NeumaierAccumulator,
+    peak: f64,
+    below: usize,
+    above: usize,
 }
 
-/// Rolling Sortino ratio over a sliding window.
-///
-/// Computes the Sortino ratio independently for each `window`-length
-/// sub-slice, advancing one period at a time.
-///
-/// # Arguments
-///
-/// * `returns`    - Slice of period simple returns.
-/// * `dates`      - Date vector aligned with `returns`.
-/// * `window`     - Look-back window length in periods.
-/// * `ann_factor` - Number of periods per year for annualization.
-/// * `mar`        - Minimum acceptable per-period return. Downside is
-///   measured as `Σ max(mar − r, 0)²` within each window.
-///
-/// # Returns
-///
-/// A [`DatedSeries`] with `n - window + 1` values. Returns empty
-/// vectors if `window` is larger than the series length; callers guarantee
-/// `window >= 1` (`Performance::ensure_window`).
+impl RollingDownside {
+    fn rebuild(window: &[f64], mar: f64) -> Self {
+        let scale = window
+            .iter()
+            .fold(mar.abs(), |scale, value| scale.max(value.abs()));
+        // Reserve scale headroom so a gradual trend does not require a full
+        // rebuild at every observation. The finite cap still admits f64::MAX.
+        let scale = if scale <= f64::MAX / 2.0 {
+            scale * 2.0
+        } else {
+            f64::MAX
+        };
+        let mut state = Self {
+            scale,
+            sum: NeumaierAccumulator::new(),
+            downside: NeumaierAccumulator::new(),
+            peak: 0.0,
+            below: 0,
+            above: 0,
+        };
+        if scale > 0.0 {
+            for &value in window {
+                state.update(value, mar, 1.0);
+            }
+        }
+        state.peak = state.downside.total();
+        state
+    }
+
+    fn update(&mut self, value: f64, mar: f64, sign: f64) {
+        // Sum observation-level differences directly. Subtracting MAR from
+        // an already averaged return loses a small but representable reward
+        // when every observation lies only a few ulps below a large hurdle.
+        let difference = value - mar;
+        let excess = if difference.is_finite() {
+            difference / self.scale
+        } else {
+            value / self.scale - mar / self.scale
+        };
+        self.sum.add(sign * excess);
+        if value > mar {
+            if sign > 0.0 {
+                self.above += 1;
+            } else {
+                self.above -= 1;
+            }
+        }
+        if value < mar {
+            if sign > 0.0 {
+                self.below += 1;
+            } else {
+                self.below -= 1;
+            }
+            let shortfall = -excess;
+            self.downside.add(sign * shortfall * shortfall);
+        }
+    }
+
+    fn valid(&self) -> bool {
+        let downside = self.downside.total();
+        self.sum.total().is_finite() && downside.is_finite() && downside >= 0.0
+    }
+
+    fn slide(&mut self, outgoing: f64, incoming: f64, mar: f64) -> bool {
+        if self.scale == 0.0 && incoming == 0.0 {
+            return true;
+        }
+        if incoming.abs() > self.scale {
+            return false;
+        }
+        self.update(incoming, mar, 1.0);
+        self.peak = self.peak.max(self.downside.total());
+        self.update(outgoing, mar, -1.0);
+        self.valid()
+            && !(self.peak > 0.0 && self.downside.total() <= f64::EPSILON.sqrt() * self.peak)
+    }
+}
+
+/// Full-observation downside Sortino with explicit per-observation MAR.
 pub(crate) fn rolling_sortino(
     returns: &[f64],
     dates: &[Date],
     window: usize,
     ann_factor: f64,
     mar: f64,
-) -> DatedSeries {
-    let n = returns.len().min(dates.len());
-    if n < window {
-        return DatedSeries::with_capacity(RollingMetric::Sortino, 0);
+) -> Result<DatedSeries> {
+    validate_request(returns, dates, window)?;
+    crate::returns::validate_frequency(ann_factor)?;
+    if !mar.is_finite() {
+        return Err(Error::Validation(
+            "Rolling Sortino MAR must be finite".into(),
+        ));
     }
-    if window < 2 || !mar.is_finite() {
-        return nan_series(RollingMetric::Sortino, dates, window - 1, n - window + 1);
+    if returns.len() < window {
+        return Ok(DatedSeries::with_capacity(RollingMetric::Sortino, 0));
     }
-    let w = window as f64;
-    let mut out = DatedSeries::with_capacity(RollingMetric::Sortino, n - window + 1);
-    let (mut sum, mut sum_ds) = recompute_sum_sum_ds(&returns[..window], mar);
-    let mut downside_scale = sum_ds;
-    let mut steps_since_recompute = 0_usize;
-    for i in window - 1..n {
-        if i >= window {
-            let add = returns[i];
-            let rem = returns[i - window];
-            // Keep insertion and removal separate so a departing positive outlier
-            // cannot erase the small returns retained in the compensation term.
-            sum.add(add);
-            sum.add(-rem);
-            if add < mar {
-                let d = mar - add;
-                sum_ds += d * d;
-            }
-            downside_scale = downside_scale.max(sum_ds);
-            if rem < mar {
-                let d = mar - rem;
-                sum_ds -= d * d;
-            }
-            steps_since_recompute += 1;
-            if !sum.total().is_finite()
-                || !sum_ds.is_finite()
-                || sum_ds < 0.0
-                || (downside_scale > 0.0 && sum_ds <= f64::EPSILON.sqrt() * downside_scale)
-                || steps_since_recompute >= ROLLING_KERNEL_RECOMPUTE_INTERVAL
+    if window == 1 {
+        return Ok(unavailable(RollingMetric::Sortino, dates));
+    }
+    let mut output = DatedSeries::with_capacity(RollingMetric::Sortino, returns.len() - window + 1);
+    let mut state = RollingDownside::rebuild(&returns[..window], mar);
+    let mut slides = 0;
+    for end in window..=returns.len() {
+        let current = &returns[end - window..end];
+        if end > window {
+            slides += 1;
+            if !state.slide(returns[end - window - 1], returns[end - 1], mar)
+                || slides >= ROLLING_KERNEL_RECOMPUTE_INTERVAL
             {
-                let start = i + 1 - window;
-                (sum, sum_ds) = recompute_sum_sum_ds(&returns[start..=i], mar);
-                downside_scale = sum_ds;
-                steps_since_recompute = 0;
+                state = RollingDownside::rebuild(current, mar);
+                slides = 0;
             }
         }
-        let m = sum.total() / w - mar;
-        let dd = (sum_ds / w).sqrt();
-        out.values
-            .push(annualized_ratio_or_sign_infinity(m, dd, ann_factor));
-        out.dates.push(dates[i]);
-    }
-    out
-}
-
-fn recompute_log_sum(window: &[f64]) -> NeumaierAccumulator {
-    let mut acc = NeumaierAccumulator::new();
-    for &r in window {
-        acc.add(r.ln_1p());
-    }
-    acc
-}
-
-/// Rolling compounded returns over a sliding window.
-///
-/// Computes the total compounded return over each `window`-length sub-slice
-/// of `returns`, right-labelled by the window-end date. Returns an empty
-/// series when `window` exceeds the series length; callers guarantee
-/// `window >= 1` (`Performance::ensure_window`).
-pub(crate) fn rolling_returns(returns: &[f64], dates: &[Date], window: usize) -> DatedSeries {
-    let n = returns.len().min(dates.len());
-    if n < window {
-        return DatedSeries::with_capacity(RollingMetric::Return, 0);
-    }
-    let count = n - window + 1;
-    let mut values = Vec::with_capacity(count);
-    let mut out_dates = Vec::with_capacity(count);
-
-    let mut log_sum = recompute_log_sum(&returns[..window]);
-    let total = log_sum.total();
-    values.push(if total.is_finite() {
-        total.exp_m1()
-    } else {
-        f64::NAN
-    });
-    out_dates.push(dates[window - 1]);
-
-    let mut steps_since_recompute = 0_usize;
-    for end in (window + 1)..=n {
-        let add = returns[end - 1];
-        let rem = returns[end - 1 - window];
-        log_sum.add(add.ln_1p());
-        log_sum.add(-rem.ln_1p());
-        steps_since_recompute += 1;
-        if !log_sum.total().is_finite()
-            || steps_since_recompute >= ROLLING_KERNEL_RECOMPUTE_INTERVAL
-        {
-            let start = end - window;
-            log_sum = recompute_log_sum(&returns[start..end]);
-            steps_since_recompute = 0;
+        if state.below == 0 {
+            output.values.push(if state.above == 0 {
+                f64::NAN
+            } else {
+                f64::INFINITY
+            });
+            output.dates.push(dates[end - 1]);
+            continue;
         }
-        let total = log_sum.total();
-        values.push(if total.is_finite() {
-            total.exp_m1()
+        let downside = (state.downside.total() / window as f64).sqrt();
+        let reward = state.sum.total() / window as f64;
+        let value = (reward / downside) * ann_factor.sqrt();
+        let value = if !state.valid() || downside == 0.0 || !value.is_finite() || value == 0.0 {
+            super::return_based::sortino(current, mar, ann_factor)?
         } else {
-            f64::NAN
-        });
-        out_dates.push(dates[end - 1]);
+            value
+        };
+        output.values.push(value);
+        output.dates.push(dates[end - 1]);
     }
-    DatedSeries {
-        values,
-        dates: out_dates,
-        value_column: RollingMetric::Return,
-    }
+    Ok(output)
 }
 
-// Each kernel advances a sliding window over `returns[..n]` and calls
-// `emit` once per completed window. The metric functions assemble those
-// values and their window-end dates into a `DatedSeries`.
-
-/// Shared kernel for rolling metrics that only need window mean and M2.
-///
-/// Maintains `(mean, m2)` accumulators and calls `emit(mean, m2)` for every
-/// completed window starting at index `window-1`.
-fn rolling_mean_m2_kernel<F>(returns: &[f64], n: usize, window: usize, mut emit: F)
-where
-    F: FnMut(f64, f64),
-{
-    let window_n = window as f64;
-    let (mut mean, mut m2) = recompute_mean_m2(&returns[..window]);
-    let mut m2_scale = m2;
-    emit(mean, m2);
-    let mut steps_since_recompute = 0_usize;
-    for i in window..n {
-        let add = returns[i];
-        let rem = returns[i - window];
-
-        let keep_n = window_n - 1.0;
-        let mean_after_rem = mean - (rem - mean) / keep_n;
-        let m2_after_rem = m2 - (rem - mean) * (rem - mean_after_rem);
-
-        let delta = add - mean_after_rem;
-        mean = mean_after_rem + delta / window_n;
-        m2 = m2_after_rem + delta * (add - mean);
-        m2_scale = m2_scale.max(m2);
-
-        steps_since_recompute += 1;
-        if !mean.is_finite()
-            || !m2.is_finite()
-            || m2 < 0.0
-            || (m2_scale > 0.0 && m2 <= f64::EPSILON.sqrt() * m2_scale)
-            || steps_since_recompute >= ROLLING_KERNEL_RECOMPUTE_INTERVAL
-        {
-            let start = i + 1 - window;
-            (mean, m2) = recompute_mean_m2(&returns[start..=i]);
-            m2_scale = m2;
-            steps_since_recompute = 0;
+fn log_sum(window: &[f64]) -> (NeumaierAccumulator, usize) {
+    let mut sum = NeumaierAccumulator::new();
+    let mut terminals = 0;
+    for &value in window {
+        if value <= -1.0 {
+            terminals += 1;
+        } else {
+            sum.add(value.ln_1p());
         }
-        emit(mean, m2);
     }
+    (sum, terminals)
+}
+
+/// Compounded return from each trailing window's own unit baseline.
+pub(crate) fn rolling_returns(
+    returns: &[f64],
+    dates: &[Date],
+    window: usize,
+) -> Result<DatedSeries> {
+    validate_request(returns, dates, window)?;
+    if returns.len() < window {
+        return Ok(DatedSeries::with_capacity(RollingMetric::Return, 0));
+    }
+    let mut output = DatedSeries::with_capacity(RollingMetric::Return, returns.len() - window + 1);
+    let (mut state, mut terminals) = log_sum(&returns[..window]);
+    let mut slides = 0;
+    for end in window..=returns.len() {
+        if end > window {
+            let incoming = returns[end - 1];
+            let outgoing = returns[end - window - 1];
+            if incoming <= -1.0 {
+                terminals += 1;
+            } else {
+                state.add(incoming.ln_1p());
+            }
+            if outgoing <= -1.0 {
+                terminals -= 1;
+            } else {
+                state.add(-outgoing.ln_1p());
+            }
+            slides += 1;
+            if !state.total().is_finite() || slides >= ROLLING_KERNEL_RECOMPUTE_INTERVAL {
+                (state, terminals) = log_sum(&returns[end - window..end]);
+                slides = 0;
+            }
+        }
+        let value = if terminals > 0 {
+            -1.0
+        } else {
+            crate::returns::finite_result(state.total().exp_m1(), "rolling compounded return")?
+        };
+        output.values.push(value);
+        output.dates.push(dates[end - 1]);
+    }
+    Ok(output)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::risk_metrics::return_based::{sortino, volatility};
     use time::{Duration, Month};
-    fn jan1(year: i32) -> Date {
-        Date::from_calendar_date(year, Month::January, 1).expect("valid date")
+    fn dates(count: usize) -> Vec<Date> {
+        let start = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+        (0..count)
+            .map(|i| start + Duration::days(i as i64))
+            .collect()
     }
 
     #[test]
-    fn rolling_series_carry_their_metric_label() {
-        let returns: Vec<f64> = (0..20).map(|i| (i as f64 - 10.0) * 0.001).collect();
-        let dates: Vec<Date> = (0..20).map(|i| jan1(2025) + Duration::days(i)).collect();
-        let cases = [
-            (rolling_sharpe(&returns, &dates, 5, 252.0, 0.0), "sharpe"),
-            (rolling_volatility(&returns, &dates, 5, 252.0), "volatility"),
-            (rolling_sortino(&returns, &dates, 5, 252.0, 0.0), "sortino"),
-            // Empty and all-NaN early exits keep the label too.
-            (rolling_sharpe(&returns, &dates, 50, 252.0, 0.0), "sharpe"),
-            (rolling_volatility(&returns, &dates, 1, 252.0), "volatility"),
-        ];
-        for (series, label) in cases {
-            assert_eq!(series.value_column.as_str(), label);
-            let json = serde_json::to_value(&series).expect("serialize");
-            assert_eq!(json["value_column"], label);
+    fn terminal_return_and_compact_labels() {
+        let dates = dates(3);
+        let output = rolling_returns(&[0.01, 0.02, -1.0], &dates, 2).expect("valid");
+        assert!((output.values[0] - 0.0302).abs() < 1e-15);
+        assert_eq!(output.values[1], -1.0);
+        assert_eq!(output.dates, dates[1..]);
+        assert_eq!(output.value_column, RollingMetric::Return);
+        assert!(rolling_returns(&[-1.0, 0.0], &dates[..2], 3).is_err());
+        assert!(rolling_returns(&[0.01], &dates[..1], 0).is_err());
+        assert!(rolling_returns(&[1.0e308; 2], &dates[..2], 2).is_err());
+    }
+
+    #[test]
+    fn validation_precedes_empty_and_singleton_outputs() {
+        let dates = dates(2);
+        assert!(rolling_volatility(&[0.1], &dates, 5, 252.0).is_err());
+        assert!(rolling_volatility(&[0.1, 0.2], &[dates[0]; 2], 5, 252.0).is_err());
+        assert!(rolling_volatility(&[], &[], 5, 0.0).is_err());
+        assert!(rolling_sharpe(&[], &[], 5, 252.0, -1.0).is_err());
+        assert!(rolling_sortino(&[], &[], 5, 252.0, f64::NAN).is_err());
+        let series = rolling_sharpe(&[0.01, 0.02], &dates, 1, 252.0, 0.0).expect("valid");
+        assert_eq!(series.values.len(), 2);
+        assert!(series.values.iter().all(|value| value.is_nan()));
+        let empty = rolling_sortino(&[], &[], 5, 252.0, 0.0).expect("empty");
+        assert!(empty.values.is_empty());
+        assert_eq!(empty.value_column, RollingMetric::Sortino);
+    }
+
+    #[test]
+    fn scaled_risk_survives_underflow_and_outlier_departure() {
+        let tiny = 1.0e-200;
+        let returns = [0.1, tiny, 0.0, tiny, 0.0];
+        let output = rolling_volatility(&returns, &dates(5), 2, 1.0).expect("scaled risk");
+        let expected = tiny / 2.0_f64.sqrt();
+        for &value in &output.values[1..] {
+            assert!((value / expected - 1.0).abs() < 1e-12, "{value}");
         }
-        let series = rolling_sharpe(&returns, &dates, 5, 252.0, 0.0);
-        let back: DatedSeries =
-            serde_json::from_value(serde_json::to_value(&series).expect("serialize"))
-                .expect("round trip");
-        assert_eq!(back, series);
-        let bogus = serde_json::json!({"values": [], "dates": [], "value_column": "alpha"});
-        assert!(serde_json::from_value::<DatedSeries>(bogus).is_err());
-    }
+        let output =
+            rolling_sortino(&[-tiny, tiny], &dates(2), 2, 1.0, 0.0).expect("scaled downside");
+        assert_eq!(output.values[0], 0.0);
+        let output =
+            rolling_sortino(&[-tiny, 3.0 * tiny], &dates(2), 2, 1.0, 0.0).expect("scaled ratio");
+        assert!((output.values[0] - 2.0_f64.sqrt()).abs() < 1e-12);
 
-    #[test]
-    fn undefined_windows_round_trip_through_json() {
-        let returns: Vec<f64> = (0..6).map(|i| (i as f64 - 3.0) * 0.001).collect();
-        let dates: Vec<Date> = (0..6).map(|i| jan1(2025) + Duration::days(i)).collect();
-        // A one-point window has zero volatility, so every Sharpe is undefined.
-        let series = rolling_sharpe(&returns, &dates, 1, 252.0, 0.0);
-        assert!(series.values.iter().any(|value| !value.is_finite()));
-        let json = serde_json::to_string(&series).expect("serialize");
-        assert!(!json.contains("null"), "{json}");
-        let back: DatedSeries = serde_json::from_str(&json).expect("round trip");
-        assert_eq!(back.values.len(), series.values.len());
-        for (after, before) in back.values.iter().zip(&series.values) {
-            assert!(after == before || (after.is_nan() && before.is_nan()));
-        }
-    }
-
-    #[test]
-    fn rolling_sharpe_window() {
-        let returns: Vec<f64> = (0..20).map(|i| (i as f64 - 10.0) * 0.001).collect();
-        let dates: Vec<Date> = (0..20).map(|i| jan1(2025) + Duration::days(i)).collect();
-        let rs = rolling_sharpe(&returns, &dates, 5, 252.0, 0.0);
-        assert_eq!(rs.values.len(), 16);
-    }
-
-    #[test]
-    fn rolling_volatility_window_count() {
-        let returns: Vec<f64> = (0..20).map(|i| (i as f64 - 10.0) * 0.001).collect();
-        let dates: Vec<Date> = (0..20).map(|i| jan1(2025) + Duration::days(i)).collect();
-        let rv = rolling_volatility(&returns, &dates, 5, 252.0);
-        assert_eq!(rv.values.len(), 16);
-        assert_eq!(rv.dates.len(), 16);
-        assert!(rv.values.iter().all(|&v| v > 0.0));
-    }
-
-    #[test]
-    fn rolling_volatility_matches_pointwise() {
-        let returns: Vec<f64> = (0..10).map(|i| (i as f64 - 5.0) * 0.01).collect();
-        let dates: Vec<Date> = (0..10).map(|i| jan1(2025) + Duration::days(i)).collect();
-        let rv = rolling_volatility(&returns, &dates, 5, 252.0);
-        let first_window = volatility(&returns[0..5], 252.0);
-        assert!((rv.values[0] - first_window).abs() < 1e-12);
-    }
-
-    #[test]
-    fn rolling_volatility_empty_window() {
-        let rv = rolling_volatility(&[0.01], &[jan1(2025)], 5, 252.0);
-        assert!(rv.values.is_empty());
-    }
-
-    #[test]
-    fn rolling_sortino_window_count() {
-        let returns: Vec<f64> = (0..20).map(|i| (i as f64 - 10.0) * 0.001).collect();
-        let dates: Vec<Date> = (0..20).map(|i| jan1(2025) + Duration::days(i)).collect();
-        let rs = rolling_sortino(&returns, &dates, 5, 252.0, 0.0);
-        assert_eq!(rs.values.len(), 16);
-        assert_eq!(rs.dates.len(), 16);
-    }
-
-    #[test]
-    fn rolling_sortino_matches_pointwise() {
-        let returns: Vec<f64> = (0..10).map(|i| (i as f64 - 5.0) * 0.01).collect();
-        let dates: Vec<Date> = (0..10).map(|i| jan1(2025) + Duration::days(i)).collect();
-        let rs = rolling_sortino(&returns, &dates, 5, 252.0, 0.0);
-        let first_window = sortino(&returns[0..5], 0.0, 252.0);
-        assert!((rs.values[0] - first_window).abs() < 1e-12);
-    }
-
-    #[test]
-    fn rolling_sortino_mar_matches_pointwise() {
-        // Oscillating returns so every 5-window contains values below MAR.
-        let returns: Vec<f64> = (0..12)
-            .map(|i: usize| if i.is_multiple_of(2) { -0.01 } else { 0.015 })
-            .collect();
-        let dates: Vec<Date> = (0..12).map(|i| jan1(2025) + Duration::days(i)).collect();
         let mar = 0.005;
-        let rs = rolling_sortino(&returns, &dates, 5, 252.0, mar);
-        for window_start in 0..=returns.len() - 5 {
-            let expected = sortino(&returns[window_start..window_start + 5], mar, 252.0);
-            let got = rs.values[window_start];
-            assert!(
-                (got - expected).abs() < 1e-10,
-                "window {window_start}: got {got}, expected {expected}",
-            );
+        let returns = [mar - 0.03, mar - 0.01, mar - 1e-18, mar - 1e-18];
+        let output = rolling_sortino(&returns, &dates(4), 2, 252.0, mar)
+            .expect("small reward relative to MAR");
+        // A constant observation below MAR has equal-magnitude reward and
+        // downside, however small its difference from the hurdle.
+        assert!((output.values[2] + 252.0_f64.sqrt()).abs() < 1e-12);
+    }
+
+    #[test]
+    fn requested_ratios_survive_unrequested_annual_mean_overflow() {
+        let output =
+            rolling_sharpe(&[0.0, 1.0e308], &dates(2), 2, 12.0, 0.0).expect("representable Sharpe");
+        assert!((output.values[0] - 6.0_f64.sqrt()).abs() < 1e-12);
+        let constant =
+            rolling_sharpe(&[1.0e308; 2], &dates(2), 2, 12.0, 0.0).expect("genuine zero risk");
+        assert_eq!(constant.values[0], f64::INFINITY);
+        let flat = rolling_sortino(&[0.0; 2], &dates(2), 2, 12.0, 0.0).expect("zero-over-zero");
+        assert!(flat.values[0].is_nan());
+        assert!(rolling_volatility(&[0.0, 1.0e308], &dates(2), 2, 12.0).is_err());
+    }
+
+    #[test]
+    fn high_offset_and_rebuild_boundary_have_independent_sample_sd() {
+        let center = 1.0e8;
+        let step = 1.0e-3;
+        let returns: Vec<f64> = (0..2100).map(|i| center + (i % 3) as f64 * step).collect();
+        let output = rolling_volatility(&returns, &dates(returns.len()), 3, 1.0).expect("rolling");
+        let a = center;
+        let b = center + step;
+        let c = center + 2.0 * step;
+        let mean_offset = ((b - a) + (c - a)) / 3.0;
+        let expected =
+            ((mean_offset.powi(2) + (b - a - mean_offset).powi(2) + (c - a - mean_offset).powi(2))
+                / 2.0)
+                .sqrt();
+        for value in output.values {
+            assert!((value / expected - 1.0).abs() < 1e-10);
         }
     }
 
     #[test]
-    fn rolling_sortino_preserves_small_returns_after_positive_outlier_leaves() {
-        for tail in [1.0e-12, 1.0e-18] {
-            for returns in [
-                vec![0.1, tail, -tail, tail, -tail, tail],
-                vec![0.1, tail, tail, -tail, tail, -tail],
-            ] {
-                let dates: Vec<Date> = (0..returns.len())
-                    .map(|i| jan1(2025) + Duration::days(i as i64))
-                    .collect();
-                let rolling = rolling_sortino(&returns, &dates, 3, 252.0, 0.0);
-                for (start, window) in returns.windows(3).enumerate() {
-                    let expected = sortino(window, 0.0, 252.0);
-                    let actual = rolling.values[start];
-                    if expected.is_infinite() {
-                        assert_eq!(actual, expected);
-                    } else {
-                        assert!(
-                            (actual - expected).abs() <= 1.0e-12 * expected.abs().max(1.0),
-                            "tail={tail}, window={window:?}: got {actual}, expected {expected}"
-                        );
-                    }
-                    assert_eq!(rolling.dates[start], dates[start + 2]);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn rolling_sortino_preserves_non_finite_statistics_before_zero_risk_sentinels() {
-        let returns = [1.0e308, 1.0e308, 0.0, 0.0];
-        let dates: Vec<Date> = (0..returns.len())
-            .map(|i| jan1(2025) + Duration::days(i as i64))
-            .collect();
-        let rolling = rolling_sortino(&returns, &dates, 2, 252.0, 0.0);
-        assert!(rolling.values[0].is_nan());
-        assert!(sortino(&returns[..2], 0.0, 252.0).is_nan());
-        assert_eq!(rolling.values[1], f64::INFINITY);
-        assert_eq!(rolling.values[2], 0.0);
-    }
-
-    #[test]
-    fn rolling_volatility_stays_stable_under_large_offset() {
-        let mean = 1.0e8;
-        let sigma = 1.0e-3;
-        let returns: Vec<f64> = (0..300)
-            .map(|i| match i % 3 {
-                0 => mean - sigma,
-                1 => mean,
-                _ => mean + sigma,
-            })
-            .collect();
-        let dates: Vec<Date> = (0..returns.len())
-            .map(|i| jan1(2025) + Duration::days(i as i64))
-            .collect();
-
-        let rv = rolling_volatility(&returns, &dates, 3, 1.0);
-        assert!(!rv.values.is_empty());
-        for &value in &rv.values {
-            assert!(
-                (value - sigma).abs() < 1.0e-6,
-                "expected rolling volatility near {sigma}, got {value}"
-            );
-        }
+    fn restoration_checks_shape_dates_and_preserves_sentinels() {
+        let output = rolling_sharpe(&[0.0, 0.0], &dates(2), 1, 252.0, 0.0).expect("singleton");
+        let json = serde_json::to_value(&output).expect("serialize");
+        assert_eq!(json["values"][0], "nan");
+        let restored: DatedSeries = serde_json::from_value(json.clone()).expect("restore");
+        assert!(restored.values.iter().all(|value| value.is_nan()));
+        let mut invalid = json.clone();
+        invalid["dates"] = serde_json::json!([]);
+        assert!(serde_json::from_value::<DatedSeries>(invalid).is_err());
+        let mut invalid = json;
+        invalid["dates"][1] = invalid["dates"][0].clone();
+        assert!(serde_json::from_value::<DatedSeries>(invalid).is_err());
+        let json = serde_json::json!({"values":["inf","-inf"],"dates":["2025-01-01","2025-01-02"],"value_column":"sortino"});
+        let restored: DatedSeries = serde_json::from_value(json).expect("infinite ratios");
+        assert_eq!(restored.values, [f64::INFINITY, f64::NEG_INFINITY]);
     }
 }

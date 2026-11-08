@@ -12,7 +12,7 @@ Examples:
 >>> from datetime import date
 >>> from finstack_quant.analytics import Performance, PerformancePanel
 >>> panel = PerformancePanel(
-...     dates=[date(2024, 1, 1), date(2024, 1, 2)], series=[[0.01, 0.02]], kind="returns", ticker_names=["FUND"]
+...     dates=[date(2024, 1, 1), date(2024, 1, 2)], series=[[0.01]], kind="returns", ticker_names=["FUND"]
 ... )
 >>> perf = Performance.from_panel(panel)
 >>> perf.get_ticker_names()
@@ -29,6 +29,8 @@ PerformancePanel = _analytics.PerformancePanel
 LookbackReturns = _analytics.LookbackReturns
 PeriodStats = _analytics.PeriodStats
 BetaResult = _analytics.BetaResult
+LookbackSample = _analytics.LookbackSample
+CorrelationResult = _analytics.CorrelationResult
 GreeksResult = _analytics.GreeksResult
 RollingGreeks = _analytics.RollingGreeks
 MultiFactorResult = _analytics.MultiFactorResult
@@ -37,17 +39,21 @@ DatedSeries = _analytics.DatedSeries
 
 constrained_least_squares = _analytics.constrained_least_squares
 max_drawdown = _analytics.max_drawdown
+multi_factor_greeks = _analytics.multi_factor_greeks
 sharpe = _analytics.sharpe
 sortino = _analytics.sortino
 volatility = _analytics.volatility
+validate_summary = _analytics.validate_summary
 
 __all__: list[str] = [
     "AnalyticsError",
     "BetaResult",
+    "CorrelationResult",
     "DatedSeries",
     "DrawdownEpisode",
     "GreeksResult",
     "LookbackReturns",
+    "LookbackSample",
     "MultiFactorResult",
     "Performance",
     "PerformancePanel",
@@ -55,7 +61,9 @@ __all__: list[str] = [
     "RollingGreeks",
     "constrained_least_squares",
     "max_drawdown",
+    "multi_factor_greeks",
     "sharpe",
     "sortino",
+    "validate_summary",
     "volatility",
 ]

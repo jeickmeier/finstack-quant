@@ -14,9 +14,12 @@ Examples:
 >>> fund = [0.001 if i % 2 else -0.0004 for i in range(80)]
 >>> bench = [0.0008 if i % 3 else -0.0003 for i in range(80)]
 >>> perf = Performance.from_returns(
-...     pd.DataFrame({"Fund": fund, "Benchmark": bench}, index=dates), benchmark_ticker="Benchmark"
+...     pd.DataFrame({"Fund": fund, "Benchmark": bench}, index=dates),
+...     initial_date="2024-12-31",
+...     frequency="daily",
+...     benchmark_ticker="Benchmark",
 ... )
->>> benchmark_tearsheet(perf, sections=[]).title
+>>> benchmark_tearsheet(perf, risk_free_rate=0.0, window=20, sections=[]).title
 'Fund'
 """
 
@@ -76,14 +79,12 @@ def _section_summary(perf: Any, t: int, rf: float) -> Section:
 
 
 def _section_relative(perf: Any, t: int, theme: Theme) -> Section:
-    dates = perf.get_active_dates()
+    dates = perf.get_paired_dates(t)
     op = perf.cumulative_returns_outperformance()[t]
     dd = perf.drawdown_difference()[t]
-    n_op = min(len(dates), len(op))
-    n_dd = min(len(dates), len(dd))
     op_svg = charts.line_chart(
-        dates[:n_op],
-        [v * 100.0 for v in op[:n_op]],
+        dates,
+        [v * 100.0 for v in op],
         theme=theme,
         area=True,
         y_pct=True,
@@ -93,8 +94,8 @@ def _section_relative(perf: Any, t: int, theme: Theme) -> Section:
         height=190,
     )
     dd_svg = charts.line_chart(
-        dates[:n_dd],
-        [v * 100.0 for v in dd[:n_dd]],
+        dates,
+        [v * 100.0 for v in dd],
         theme=theme,
         area=True,
         y_pct=True,
@@ -110,8 +111,8 @@ def _section_relative(perf: Any, t: int, theme: Theme) -> Section:
     )
 
 
-def _section_rolling(perf: Any, t: int, window: int, theme: Theme) -> Section | None:
-    rg = perf.rolling_greeks(t, window=window)
+def _section_rolling(perf: Any, t: int, window: int, risk_free_rate: float, theme: Theme) -> Section | None:
+    rg = perf.rolling_greeks(t, window=window, risk_free_rate=risk_free_rate)
     if len(rg.dates) == 0:
         return None
     dates = list(rg.dates)
@@ -155,8 +156,8 @@ def benchmark_tearsheet(
     perf: Any,
     *,
     ticker: int | None = None,
-    risk_free_rate: float = 0.0,
-    window: int = 63,
+    risk_free_rate: float,
+    window: int,
     multi_factor: Any = None,
     factor_names: list[str] | None = None,
     title: str | None = None,
@@ -173,10 +174,11 @@ def benchmark_tearsheet(
         A performance engine built with a benchmark column (``benchmark_ticker=``).
     ticker : int, optional
         Zero-based column index of the fund (default: the first non-benchmark column).
-    risk_free_rate : float, default 0.0
-        Used for ``greeks``/``treynor``/``m_squared``.
-    window : int, default 63
-        Rolling window (periods) for ``rolling_greeks``.
+    risk_free_rate : float
+        Explicit annual-effective decimal cash, finite and greater than -1,
+        used for ``greeks``/``treynor``/``m_squared`` and rolling alpha.
+    window : int
+        Explicit positive observation count for ``rolling_greeks``.
     multi_factor : MultiFactorResult | dict, optional
         A pre-computed ``multi_factor_greeks`` result; enables the multi-factor section.
     factor_names : list[str], optional
@@ -195,7 +197,7 @@ def benchmark_tearsheet(
     Raises:
     ------
     ValueError
-        If ``sections`` contains an unknown section name.
+        If sections are unknown, benchmark selection is absent, or analytics inputs are invalid.
 
     Returns:
     -------
@@ -211,15 +213,20 @@ def benchmark_tearsheet(
     >>> fund = [0.001 if i % 2 else -0.0004 for i in range(80)]
     >>> bench = [0.0008 if i % 3 else -0.0003 for i in range(80)]
     >>> perf = Performance.from_returns(
-    ...     pd.DataFrame({"Fund": fund, "Benchmark": bench}, index=dates), benchmark_ticker="Benchmark"
+    ...     pd.DataFrame({"Fund": fund, "Benchmark": bench}, index=dates),
+    ...     initial_date="2024-12-31",
+    ...     frequency="daily",
+    ...     benchmark_ticker="Benchmark",
     ... )
-    >>> benchmark_tearsheet(perf, sections=[]).title
+    >>> benchmark_tearsheet(perf, risk_free_rate=0.0, window=20, sections=[]).title
     'Fund'
     """
     wanted = _resolve_sections(sections, ALL_SECTIONS)
 
     names = list(perf.get_ticker_names())
     bench_idx = perf.get_benchmark_idx()
+    if bench_idx is None:
+        raise ValueError("benchmark report requires an explicitly selected benchmark")
     t = ticker if ticker is not None else next((i for i in range(len(names)) if i != bench_idx), 0)
 
     secs: list[Section] = []
@@ -227,7 +234,7 @@ def benchmark_tearsheet(
         secs.append(_section_summary(perf, t, risk_free_rate))
     if "relative" in wanted:
         secs.append(_section_relative(perf, t, theme))
-    if "rolling" in wanted and (s := _section_rolling(perf, t, window, theme)) is not None:
+    if "rolling" in wanted and (s := _section_rolling(perf, t, window, risk_free_rate, theme)) is not None:
         secs.append(s)
     if "multifactor" in wanted and (s := _section_multifactor(multi_factor, factor_names)) is not None:
         secs.append(s)

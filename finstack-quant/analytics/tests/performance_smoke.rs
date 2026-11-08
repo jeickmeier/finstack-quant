@@ -5,7 +5,7 @@
 
 use finstack_quant_analytics::Performance;
 use finstack_quant_core::ErrorKind;
-use finstack_quant_core::dates::{Date, FiscalConfig, PeriodKind};
+use finstack_quant_core::dates::{Date, DayCountContext, FiscalConfig, PeriodKind};
 use time::Month;
 
 fn calendar_days(start: Date, n: usize) -> Vec<Date> {
@@ -74,8 +74,8 @@ fn performance_facade_exercises_broad_api_surface() {
     ))
     .expect("perf");
 
-    assert_eq!(perf.get_benchmark_idx(), 1);
-    assert_eq!(perf.get_frequency(), PeriodKind::Daily);
+    assert_eq!(perf.get_benchmark_idx(), Some(1));
+    assert_eq!(perf.get_frequency(), Some(PeriodKind::Daily));
     let ticker_count = perf.get_ticker_names().len();
     let active_lens: Vec<usize> = (0..ticker_count)
         .map(|idx| {
@@ -88,16 +88,19 @@ fn performance_facade_exercises_broad_api_surface() {
     for (label, values) in [
         (
             "cagr",
-            perf.cagr(finstack_quant_analytics::CagrDayCount::default(), None)
-                .expect("valid performance CAGR"),
+            perf.cagr(
+                finstack_quant_analytics::CagrDayCount::default(),
+                DayCountContext::default(),
+            )
+            .expect("valid performance CAGR"),
         ),
-        ("annual mean", perf.mean_return(true)),
-        ("period mean", perf.mean_return(false)),
-        ("volatility", perf.volatility(true)),
-        ("sharpe", perf.sharpe(0.02)),
-        ("sortino", perf.sortino(0.0)),
+        ("annual mean", perf.mean_return(true).unwrap()),
+        ("period mean", perf.mean_return(false).unwrap()),
+        ("volatility", perf.volatility(true).unwrap()),
+        ("sharpe", perf.sharpe(0.02).unwrap()),
+        ("sortino", perf.sortino(0.0).unwrap()),
         ("calmar", perf.calmar().expect("valid Calmar ratios")),
-        ("max drawdown", perf.max_drawdown()),
+        ("max drawdown", perf.max_drawdown().unwrap()),
         (
             "value at risk",
             perf.value_at_risk(0.95).expect("valid confidence"),
@@ -110,40 +113,35 @@ fn performance_facade_exercises_broad_api_surface() {
             "tail ratio",
             perf.tail_ratio(0.95).expect("valid confidence"),
         ),
-        ("ulcer index", perf.ulcer_index()),
-        ("skewness", perf.skewness()),
-        ("kurtosis", perf.kurtosis()),
-        ("geometric mean", perf.geometric_mean()),
-        ("downside deviation", perf.downside_deviation(0.0)),
-        ("up capture", perf.up_capture()),
-        ("down capture", perf.down_capture()),
-        ("capture ratio", perf.capture_ratio()),
-        ("omega ratio", perf.omega_ratio(0.0)),
-        ("treynor", perf.treynor(0.02)),
-        ("gain to pain", perf.gain_to_pain()),
+        ("ulcer index", perf.ulcer_index().unwrap()),
+        ("skewness", perf.skewness().unwrap()),
+        ("kurtosis", perf.kurtosis().unwrap()),
+        ("geometric mean", perf.geometric_mean().unwrap()),
+        ("downside deviation", perf.downside_deviation(0.0).unwrap()),
+        ("up capture", perf.up_capture().unwrap()),
+        ("down capture", perf.down_capture().unwrap()),
+        ("capture ratio", perf.capture_ratio().unwrap()),
+        ("omega ratio", perf.omega_ratio(0.0).unwrap()),
+        ("treynor", perf.treynor(0.02).unwrap()),
+        ("gain to pain", perf.gain_to_pain().unwrap()),
         (
             "martin ratio",
-            perf.martin_ratio().expect("valid Martin ratios"),
+            perf.martin_ratio(0.0).expect("valid Martin ratios"),
         ),
         (
             "parametric var",
             perf.parametric_var(0.95, None).expect("valid confidence"),
         ),
-        (
-            "cornish-fisher var",
-            perf.cornish_fisher_var(0.95, None)
-                .expect("valid confidence"),
-        ),
-        ("recovery factor", perf.recovery_factor()),
+        ("recovery factor", perf.recovery_factor().unwrap()),
         (
             "sterling ratio",
             perf.sterling_ratio(0.02, 3).expect("valid Sterling ratios"),
         ),
         (
             "burke ratio",
-            perf.burke_ratio(0.02, 3).expect("valid Burke ratios"),
+            perf.burke_ratio(0.02).expect("valid Burke ratios"),
         ),
-        ("pain index", perf.pain_index()),
+        ("pain index", perf.pain_index().unwrap()),
         (
             "pain ratio",
             perf.pain_ratio(0.02).expect("valid Pain ratios"),
@@ -152,22 +150,28 @@ fn performance_facade_exercises_broad_api_surface() {
             "conditional drawdown at risk",
             perf.cdar(0.95).expect("valid confidence"),
         ),
-        ("tracking error", perf.tracking_error()),
-        ("information ratio", perf.information_ratio()),
-        ("r squared", perf.r_squared()),
-        ("batting average", perf.batting_average()),
-        ("m squared", perf.m_squared(0.02)),
-        (
-            "modified sharpe",
-            perf.modified_sharpe(0.02, 0.95).expect("valid confidence"),
-        ),
+        ("tracking error", perf.tracking_error().unwrap()),
+        ("r squared", perf.r_squared().unwrap()),
+        ("batting average", perf.batting_average().unwrap()),
+        ("m squared", perf.m_squared(0.02).unwrap()),
     ] {
         assert_finite_metric(label, &values, ticker_count);
     }
 
-    let durations = perf.max_drawdown_duration();
+    let information_ratio = perf.information_ratio().unwrap();
+    assert!(information_ratio[0].is_finite());
+    assert!(information_ratio[1].is_nan()); // The benchmark has zero active reward and risk.
+
+    assert!(perf.cornish_fisher_var(0.95, None).is_err());
+    assert!(perf.modified_sharpe(0.02, 0.95).is_err());
+
+    let durations = perf.max_drawdown_duration().unwrap();
     assert_eq!(durations.len(), ticker_count);
-    assert!(durations.iter().all(|duration| *duration >= 0));
+    assert!(
+        durations
+            .iter()
+            .all(|duration| duration.is_some_and(|days| days >= 0))
+    );
 
     let rolling_volatility = perf.rolling_volatility(0, 20).expect("rolling volatility");
     assert_eq!(rolling_volatility.values.len(), active_lens[0] - 20 + 1);
@@ -188,14 +192,10 @@ fn performance_facade_exercises_broad_api_surface() {
     assert!(rolling_sortino.values.iter().all(|value| value.is_finite()));
 
     let bench_series = perf
-        .get_returns_for_ticker(perf.get_benchmark_idx())
+        .get_returns_for_ticker(perf.get_benchmark_idx().unwrap())
         .expect("benchmark returns");
     let multi_factor = perf
-        .multi_factor_greeks(
-            0,
-            &[&bench_series],
-            finstack_quant_analytics::ReturnKind::Excess,
-        )
+        .multi_factor_greeks(0, &[&bench_series], 0.0)
         .expect("multi-factor regression");
     assert_eq!(multi_factor.betas.len(), 1);
     assert!(multi_factor.alpha.is_finite());
@@ -204,7 +204,7 @@ fn performance_facade_exercises_broad_api_surface() {
     assert!(multi_factor.adjusted_r_squared.is_finite());
     assert!(multi_factor.residual_vol.is_finite());
 
-    let cumulative = perf.cumulative_returns();
+    let cumulative = perf.cumulative_returns().unwrap();
     assert_finite_panel("cumulative returns", &cumulative, &active_lens);
     let drawdowns = perf.get_drawdown_series();
     assert_finite_panel("drawdown series", &drawdowns, &active_lens);
@@ -223,7 +223,7 @@ fn performance_facade_exercises_broad_api_surface() {
             .all(|episode| episode.max_drawdown.is_finite() && episode.max_drawdown <= 0.0)
     );
 
-    let betas = perf.beta();
+    let betas = perf.beta().unwrap();
     assert_eq!(betas.len(), ticker_count);
     assert!(betas.iter().all(|result| {
         result.beta.is_finite()
@@ -232,7 +232,7 @@ fn performance_facade_exercises_broad_api_surface() {
             && result.ci_upper.is_finite()
     }));
 
-    let greeks = perf.greeks(0.0);
+    let greeks = perf.greeks(0.0).unwrap();
     assert_eq!(greeks.len(), ticker_count);
     assert!(greeks.iter().all(|result| {
         result.alpha.is_finite()
@@ -275,7 +275,7 @@ fn performance_facade_exercises_broad_api_surface() {
     assert!(period_stats.avg_return.is_finite());
     assert!((0.0..=1.0).contains(&period_stats.win_rate));
 
-    let (correlation, _) = perf.correlation_matrix().expect("psd correlation");
+    let correlation = perf.correlation_matrix().expect("psd correlation").matrix;
     assert_eq!(correlation.len(), ticker_count);
     for (i, row) in correlation.iter().enumerate() {
         assert_eq!(row.len(), ticker_count);
@@ -286,42 +286,40 @@ fn performance_facade_exercises_broad_api_surface() {
         }
     }
 
-    let outperformance = perf.cumulative_returns_outperformance();
+    let outperformance = perf.cumulative_returns_outperformance().unwrap();
     assert_finite_panel("cumulative outperformance", &outperformance, &active_lens);
-    let drawdown_difference = perf.drawdown_difference();
+    let drawdown_difference = perf.drawdown_difference().unwrap();
     assert_finite_panel("drawdown difference", &drawdown_difference, &active_lens);
 
     let benchmark_drawdowns = perf
-        .drawdown_details(perf.get_benchmark_idx(), 2)
+        .drawdown_details(perf.get_benchmark_idx().unwrap(), 2)
         .expect("benchmark drawdown details");
     assert!(benchmark_drawdowns.len() <= 2);
 
     let rf = vec![0.0; perf.get_active_dates().len()];
-    let excess = perf
-        .excess_returns(&rf, Some(252.0))
-        .expect("aligned zero rf");
+    let excess = perf.excess_returns(&rf).expect("aligned zero rf");
     assert_finite_panel("excess returns", &excess, &active_lens);
 
     let d = perf.get_dates().to_vec();
-    let baseline_cumulative = perf.cumulative_returns();
-    perf.reset_date_range(d[15], d[d.len() - 1]);
-    let windowed_cumulative = perf.cumulative_returns();
+    let baseline_cumulative = perf.cumulative_returns().unwrap();
+    perf.reset_date_range(d[15], d[d.len() - 1]).unwrap();
+    let windowed_cumulative = perf.cumulative_returns().unwrap();
     assert_ne!(windowed_cumulative, baseline_cumulative);
     assert!(
         windowed_cumulative
             .iter()
             .all(|column| column.len() < active_lens[0])
     );
-    perf.reset_date_range(d[0], d[d.len() - 1]);
-    assert_eq!(perf.cumulative_returns(), baseline_cumulative);
+    perf.reset_date_range(d[0], d[d.len() - 1]).unwrap();
+    assert_eq!(perf.cumulative_returns().unwrap(), baseline_cumulative);
 
-    let baseline_tracking_error = perf.tracking_error();
+    let baseline_tracking_error = perf.tracking_error().unwrap();
     perf.reset_bench_ticker("AAA").expect("bench switch");
-    assert_eq!(perf.get_benchmark_idx(), 0);
-    assert_ne!(perf.tracking_error(), baseline_tracking_error);
+    assert_eq!(perf.get_benchmark_idx(), Some(0));
+    assert_ne!(perf.tracking_error().unwrap(), baseline_tracking_error);
     perf.reset_bench_ticker("BBB").expect("restore bench");
-    assert_eq!(perf.get_benchmark_idx(), 1);
-    assert_eq!(perf.tracking_error(), baseline_tracking_error);
+    assert_eq!(perf.get_benchmark_idx(), Some(1));
+    assert_eq!(perf.tracking_error().unwrap(), baseline_tracking_error);
 
     let missing = Performance::new(&crate::support::prices_panel(
         dates.clone(),
@@ -333,11 +331,11 @@ fn performance_facade_exercises_broad_api_surface() {
     assert_eq!(missing.err().map(|e| e.kind()), Some(ErrorKind::NotFound));
     let unknown = perf.reset_bench_ticker("missing");
     assert_eq!(unknown.err().map(|e| e.kind()), Some(ErrorKind::NotFound));
-    assert_eq!(perf.get_benchmark_idx(), 1);
+    assert_eq!(perf.get_benchmark_idx(), Some(1));
 }
 
 #[test]
-fn performance_lookback_returns_clamps_pre_start_reference_date() {
+fn performance_lookback_returns_retains_empty_pre_start_reference_date() {
     let dates = calendar_days(
         Date::from_calendar_date(2025, Month::June, 1).expect("d0"),
         40,
@@ -356,10 +354,14 @@ fn performance_lookback_returns_clamps_pre_start_reference_date() {
     let lookbacks = perf
         .lookback_returns(Some(ref_date), Some(FiscalConfig::us_federal()))
         .expect("lookback");
-    assert_eq!(lookbacks.mtd, vec![0.0]);
-    assert_eq!(lookbacks.qtd, vec![0.0]);
-    assert_eq!(lookbacks.ytd, vec![0.0]);
-    assert_eq!(lookbacks.fytd, vec![0.0]);
+    assert!(lookbacks.mtd[0].is_nan());
+    assert_eq!(lookbacks.mtd_samples[0].n_obs, 0);
+    assert!(lookbacks.qtd[0].is_nan());
+    assert_eq!(lookbacks.qtd_samples[0].n_obs, 0);
+    assert!(lookbacks.ytd[0].is_nan());
+    assert_eq!(lookbacks.ytd_samples[0].n_obs, 0);
+    assert!(lookbacks.fytd[0].is_nan());
+    assert_eq!(lookbacks.fytd_samples[0].n_obs, 0);
 }
 
 #[test]
@@ -377,8 +379,8 @@ fn performance_smoke_asserts_fiscal_lookback_and_zero_variance_invariants() {
     ))
     .expect("flat performance");
 
-    assert_eq!(flat_perf.sharpe(0.0), vec![0.0]);
-    assert_eq!(flat_perf.max_drawdown(), vec![0.0]);
+    assert!(flat_perf.sharpe(0.0).unwrap()[0].is_nan());
+    assert_eq!(flat_perf.max_drawdown().unwrap(), vec![0.0]);
     assert!(
         flat_perf
             .drawdown_details(0, 3)
@@ -442,7 +444,7 @@ fn returns_accessors_reproduce_cumulative_returns_and_zero_rf_excess_returns() {
     }
 
     // Compounding the raw returns reproduces the cumulative return series.
-    let cumulative = perf.cumulative_returns();
+    let cumulative = perf.cumulative_returns().unwrap();
     for (series, cum) in panel.iter().zip(cumulative.iter()) {
         assert_eq!(series.len(), cum.len());
         let mut growth = 1.0_f64;
@@ -458,10 +460,7 @@ fn returns_accessors_reproduce_cumulative_returns_and_zero_rf_excess_returns() {
     // The `excess_returns(zeros)` workaround is now unnecessary: it is exactly
     // what `returns()` yields.
     let rf = vec![0.0; perf.get_active_dates().len()];
-    assert_eq!(
-        perf.excess_returns(&rf, None).expect("aligned zero rf"),
-        panel
-    );
+    assert_eq!(perf.excess_returns(&rf).expect("aligned zero rf"), panel);
 
     // Out-of-range indices are rejected rather than silently returning empty.
     assert!(

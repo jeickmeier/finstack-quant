@@ -1773,7 +1773,7 @@
       "id": "performance-report",
       "route": "returned-analytics",
       "deferred": "machine-readable-units",
-      "convention": "Returned analytics.Performance results of a host-supplied panel: the summary TableEnvelope, per-ticker series against each ticker's own active dates, rolling series, monthly and annual periodic returns, drawdown episodes and lookback returns (FYTD from a core.FiscalConfig only when a fiscal-year start is supplied). Decimal fractions and ratios as returned, no unit inferred; omitted options are left to Rust; non-finite values are left out of figures. The monthly heatmap colour domain is the caller's or the returned values' extent (presentation only).",
+      "convention": "Returned analytics.Performance results of a host-supplied panel: the summary TableEnvelope, per-ticker series against each ticker's own active dates, rolling series, monthly and annual periodic returns, drawdown episodes and lookback returns (FYTD from a core.FiscalConfig only when a fiscal-year start is supplied). Decimal fractions and ratios as returned, no unit inferred; required financial inputs and units are explicit; non-finite values are left out of figures. The monthly heatmap colour domain is the caller's or the returned values' extent (presentation only).",
       "api": {
         "name": "analytics.Performance#summary",
         "source": "finstack-quant-wasm/pkg/finstack_quant_wasm.d.ts",
@@ -1782,40 +1782,50 @@
         "inputs": [
           {
             "name": "riskFreeRate",
-            "type": "number | null",
-            "optional": true
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "mar",
+            "type": "number",
+            "optional": false
+          },
+          {
+            "name": "omegaThreshold",
+            "type": "number",
+            "optional": false
           },
           {
             "name": "confidence",
-            "type": "number | null",
-            "optional": true
+            "type": "number",
+            "optional": false
           }
         ],
         "returns": "TableEnvelope",
-        "declaration": "/**\n     * The standard per-ticker summary as a table envelope.\n     *\n     * One row per ticker with 22 metric columns (`cagr`, `mean_return`,\n     * `volatility`, `sharpe`, `sortino`, `calmar`, `max_drawdown`,\n     * `value_at_risk`, `expected_shortfall`, `tracking_error`,\n     * `information_ratio`, `skewness`, `kurtosis`, `geometric_mean`,\n     * `downside_deviation`, `omega_ratio`, `gain_to_pain`, `ulcer_index`,\n     * `pain_index`, `recovery_factor`, `tail_ratio`, `r_squared`) plus a\n     * leading `ticker` dimension column. Same rows as the Python\n     * `Performance.to_dataframe`.\n     *\n     * # Errors\n     *\n     * Throws a JavaScript exception if the panel is too short to annualize\n     * (`cagr` / `calmar`) or the table cannot be converted.\n     * @param riskFreeRate - Annualized risk-free rate as a decimal (0.02 = 2%); affects only `sharpe`. Defaults to 0.0.\n     * @param confidence - Tail confidence as a decimal probability applied to VaR, ES and tail ratio; defaults to 0.95.\n     * @returns Column-oriented table envelope of the summary metrics.\n     */\n    summary(riskFreeRate?: number | null, confidence?: number | null): TableEnvelope;",
-        "sha256": "365c3cb3cc6634bff301dca2e98657faf23e6350f205e0db592ec9040bd91f83"
+        "declaration": "/**\n     * Fixed 22-metric report using owner calculations, historical VaR/ES and explicit policy inputs.\n     * @param riskFreeRate - Required annual-effective decimal cash rate greater than -1; converted geometrically where periodic cash is used.\n     * @param mar - Required finite per-observation minimum acceptable return, in the same units and periodicity as the returns.\n     * @param omegaThreshold - Required finite per-observation Omega hurdle, independent of MAR and cash.\n     * @param confidence - Required finite tail confidence strictly between 0.5 and 1.\n     * @returns Column-oriented TableEnvelope with numeric NaN/infinity values and metadata describing inputs and row samples.\n     * @throws Error - Rejects missing explicit frequency/benchmark, invalid cash/MAR/Omega/confidence inputs, invalid report structure/provenance or any metric calculation failure. Field-specific unavailable estimates remain native numeric NaN.\n     */\n    summary(riskFreeRate: number, mar: number, omegaThreshold: number, confidence: number): TableEnvelope;",
+        "sha256": "ca326258f6ea37862172e4307974e6c8b3cca4a62db88f9c2b7ae0ec992ceb71"
       }
     },
     {
       "id": "correlation-heatmap",
       "route": "returned-analytics",
-      "convention": "Returned analytics.Performance correlationMatrix of a host-supplied panel: Pearson coefficients in Rust's ticker order as a diverging heatmap over the fixed correlation range [-1, 0, 1] (presentation only) and a table, with the Repaired stamp shown only when Rust's repaired flag is true. Nothing is estimated, clamped, reordered or inferred here; Rust returns a unit diagonal and every coefficient inside [-1, 1].",
+      "convention": "Returned analytics.Performance correlationMatrix of a host-supplied panel: Pearson coefficients in Rust's ticker order as a diverging heatmap over the fixed correlation range [-1, 0, 1] (presentation only) and a table, with the shared observation count and return-ending date bounds supplied by Rust. Nothing is estimated, clamped, reordered or inferred here; Rust returns a unit diagonal and every coefficient inside [-1, 1].",
       "api": {
         "name": "analytics.Performance#correlationMatrix",
         "source": "finstack-quant-wasm/pkg/finstack_quant_wasm.d.ts",
         "owner": "Performance",
         "member": "correlationMatrix",
         "inputs": [],
-        "returns": "{ matrix: Float64Array[]; repaired: boolean }",
-        "declaration": "/**\n     * Return the correlation matrix across assets and whether it was repaired.\n     *\n     * Uses the complete-case common window when every ticker has at least\n     * two overlapping points; otherwise pairwise intersecting spans. A raw\n     * estimate that is not a valid correlation matrix (ragged panels can\n     * yield one that is not positive semi-definite) is Higham-repaired to\n     * the nearest valid correlation matrix.\n     *\n     * # Errors\n     *\n     * Rejects a degenerate pair or a matrix that cannot be repaired to a\n     * valid correlation matrix.\n     * @returns `{ matrix, repaired }`: the square correlation matrix as nested Float64Array rows in `getTickerNames()` order, with a diagonal of exactly 1 and every coefficient inside [-1, 1], and `true` when Higham repair was applied.\n     */\n    correlationMatrix(): { matrix: Float64Array[]; repaired: boolean };",
-        "sha256": "59ca8a63068c5f1673777ab5b6a5b3e4e0049c1290e73d43e4a4400865573b20"
+        "returns": "CorrelationResult",
+        "declaration": "/**\n     * Common-sample Pearson correlation without pairwise fallback or automatic repair.\n     * @returns CorrelationResult containing ticker identities, matrix, common observation count and return-ending bounds.\n     * @throws Error - Rejects fewer than two all-ticker common observations, any constant common-sample column, materially invalid normalized coefficients/PSD admission, or unrepresentable calculations. There is no pairwise fallback or repair.\n     */\n    correlationMatrix(): CorrelationResult;",
+        "sha256": "a608bd594d22d026abe49ddd0825f79081aae871678cabcdc63eca9e45639578"
       }
     },
     {
       "id": "benchmark-report",
       "route": "returned-analytics",
       "deferred": "machine-readable-units",
-      "convention": "Returned analytics.Performance benchmark-relative results of a host-supplied panel against a named benchmark: greeks, beta with its confidence bounds, tracking error, information ratio, Treynor, M squared, captures and batting average per ticker; outperformance and drawdown difference against each ticker's own active dates; rollingGreeks against the returned window ends; multiFactorGreeks per ticker (or that ticker's native error) only when a factor panel is supplied. Decimal fractions and ratios as returned, alphas annualized by Rust, no unit inferred; omitted options are left to Rust; non-finite values are left out of figures. The default fund is the first ticker that is not the benchmark (presentation only).",
+      "convention": "Returned analytics.Performance benchmark-relative results of a host-supplied panel against a named benchmark: greeks, beta with its confidence bounds, tracking error, information ratio, Treynor, M squared, captures and batting average per ticker; outperformance and drawdown difference against each ticker's paired benchmark dates; rollingGreeks against the returned window ends; multiFactorGreeks per ticker (or that ticker's native error) only when a factor panel is supplied. Decimal fractions and ratios as returned, alphas annualized by Rust, no unit inferred; required financial inputs and units are explicit; non-finite values are left out of figures. The default fund is the first ticker that is not the benchmark (presentation only).",
       "api": {
         "name": "analytics.Performance#greeks",
         "source": "finstack-quant-wasm/pkg/finstack_quant_wasm.d.ts",
@@ -1825,12 +1835,12 @@
           {
             "name": "riskFreeRate",
             "type": "number",
-            "optional": true
+            "optional": false
           }
         ],
         "returns": "GreeksResult[]",
-        "declaration": "/**\n     * Benchmark regression annualized Jensen alpha/beta statistics per asset.\n     *\n     * # Errors\n     *\n     * Rejects if the regression results cannot be serialized to JavaScript.\n     * @param riskFreeRate - Annualized decimal risk-free rate; defaults to 0.0.\n     * @returns Per-ticker `{ alpha, beta, r_squared, adjusted_r_squared, n_obs }` objects in `getTickerNames()` order; `n_obs` is the paired-observation count.\n     */\n    greeks(riskFreeRate?: number): GreeksResult[];",
-        "sha256": "0af2355b18e0c480d6b2ffb8cdc624013f86cb0d89ef4c9fc391a695f49acfe2"
+        "declaration": "/**\n     * Paired intercept OLS beta, annualized Jensen alpha and fit statistics.\n     * @param riskFreeRate - Required annual-effective decimal cash rate greater than -1; converted geometrically where periodic cash is used.\n     * @returns GreeksResult objects in ticker order with exact paired sample counts.\n     * @throws Error - Rejects missing benchmark/frequency, absent/invalid annual-effective cash or unrepresentable OLS/Jensen calculations. Insufficient/constant benchmark samples retain field-specific NaNs.\n     */\n    greeks(riskFreeRate: number): GreeksResult[];",
+        "sha256": "ba9b3fe9915dd8613d7bbf3ab14341e0dc3d60d6184537b3ab485e88fbf76211"
       }
     },
     {
@@ -2247,8 +2257,8 @@
           }
         ],
         "returns": "TableEnvelope",
-        "declaration": "/**\n * Export a statement result as a wide-format table.\n *\n * Free-function twin of Python `StatementResult.to_arrow_wide`\n * (Rust `StatementResult::to_table_wide`): one row per period in\n * chronological order and one column per node in declaration order.\n * @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).\n * @returns `TableEnvelope` with a `period_id` column followed by one value column per node; a node with no value in a period holds `NaN` (serialized as `null`), not zero.\n *\n * # Errors\n *\n * Throws with kind `validation` if the result input is malformed or table\n * construction fails.\n */\nexport function statementResultToTableWide(resultJson: StatementResult | string): TableEnvelope;",
-        "sha256": "da888c67b2847ae92d9a227df4c779a26881e84d41dc985934a15e1604188197"
+        "declaration": "/**\n * Export a statement result as a wide-format table.\n *\n * Free-function twin of Python `StatementResult.to_arrow_wide`\n * (Rust `StatementResult::to_table_wide`): one row per period in\n * chronological order and one column per node in declaration order.\n * @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).\n * @returns `TableEnvelope` with a `period_id` column followed by one value column per node; a node with no value in a period holds native numeric `NaN`, not zero. Canonical table JSON retains the established `\"nan\"` sentinel.\n *\n * # Errors\n *\n * Throws with kind `validation` if the result input is malformed or table\n * construction fails.\n */\nexport function statementResultToTableWide(resultJson: StatementResult | string): TableEnvelope;",
+        "sha256": "b7f6b35affc2e150968d26dfe02d0fa6dd20a6650088744a07d5a3e6bd7a1ced"
       }
     },
     {

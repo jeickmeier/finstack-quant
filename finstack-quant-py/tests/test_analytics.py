@@ -27,11 +27,11 @@ from finstack_quant.analytics import (
     PerformancePanel,
     PeriodStats,
     RollingGreeks,
+    multi_factor_greeks,
 )
-from finstack_quant.core.dates import FiscalConfig
+from finstack_quant.core.dates import DayCountContext, FiscalConfig
+from tests.analytics_helpers import valuation_grid
 from tests.stub_helpers import stub_text as read_stub_text
-
-# Fixtures
 
 
 def _daily_dates(n: int, start: date = date(2024, 1, 1)) -> list[date]:
@@ -60,11 +60,12 @@ def test_beta_confidence_interval_uses_actual_degrees_of_freedom() -> None:
     fund = [1.4 * value + (0.002 if i % 2 == 0 else -0.0015) for i, value in enumerate(benchmark)]
     perf = Performance.from_panel(
         PerformancePanel(
-            dates=_daily_dates(42),
+            dates=valuation_grid(_daily_dates(42)),
             series=[fund, benchmark],
             kind="returns",
             ticker_names=["FUND", "BENCH"],
             benchmark_ticker="BENCH",
+            frequency="daily",
         )
     )
     result = perf.beta()[0]
@@ -74,13 +75,19 @@ def test_beta_confidence_interval_uses_actual_degrees_of_freedom() -> None:
 def test_native_frames_preserve_infinite_period_statistics() -> None:
     perf = Performance.from_panel(
         PerformancePanel(
-            dates=_daily_dates(4), series=[[0.01, 0.02, 0.03, 0.04]], kind="returns", ticker_names=["FUND"]
+            dates=valuation_grid(_daily_dates(4)),
+            series=[[0.01, 0.02, 0.03, 0.04]],
+            kind="returns",
+            ticker_names=["FUND"],
+            frequency="daily",
+            benchmark_ticker="FUND",
         )
     )
     stats = perf.period_stats(0, aggregation_frequency="daily")
     frame = stats.to_dataframe()
-    for name in ("payoff_ratio", "profit_factor", "cpc_ratio"):
-        assert math.isinf(frame[name].iloc[0])
+    assert math.isinf(frame["profit_factor"].iloc[0])
+    for name in ("payoff_ratio", "cpc_index"):
+        assert math.isnan(frame[name].iloc[0])
         assert frame[name].dtype == "float64"
     assert frame["consecutive_wins"].dtype == "int64"
     assert frame["consecutive_losses"].dtype == "int64"
@@ -90,16 +97,17 @@ def test_native_frames_preserve_infinite_period_statistics() -> None:
 def test_degenerate_regression_frames_keep_numeric_nan_columns() -> None:
     perf = Performance.from_panel(
         PerformancePanel(
-            dates=_daily_dates(4),
+            dates=valuation_grid(_daily_dates(4)),
             series=[[0.01, -0.02, 0.03, 0.04], [0.01] * 4],
             kind="returns",
             ticker_names=["FUND", "BENCH"],
             benchmark_ticker="BENCH",
+            frequency="daily",
         )
     )
     for frame in (
         perf.beta()[0].to_dataframe(),
-        perf.greeks()[0].to_dataframe(),
+        perf.greeks(risk_free_rate=0.0)[0].to_dataframe(),
     ):
         # The estimates are NaN; the sample description is always reported.
         described = {"n_obs", "confidence_level"}
@@ -112,22 +120,29 @@ def test_degenerate_regression_frames_keep_numeric_nan_columns() -> None:
 def test_drawdown_episode_frame_retains_populated_dtypes() -> None:
     perf = Performance.from_panel(
         PerformancePanel(
-            dates=_daily_dates(4), series=[[100.0, 90.0, 100.0, 110.0]], kind="prices", ticker_names=["FUND"]
+            dates=_daily_dates(4),
+            series=[[100.0, 90.0, 100.0, 110.0]],
+            kind="prices",
+            ticker_names=["FUND"],
+            frequency="daily",
+            benchmark_ticker="FUND",
         )
     )
-    frame = perf.drawdown_details(0)[0].to_dataframe()
+    frame = perf.drawdown_details(0, n=5)[0].to_dataframe()
     assert frame["duration_days"].dtype == "int64"
-    assert frame["truncated_at_start"].dtype == "bool"
+    assert "truncated_at_start" not in frame
     assert frame["max_drawdown"].iloc[0] == pytest.approx(-0.10)
 
 
 def test_lookback_frame_preserves_ticker_and_metric_labels() -> None:
     perf = Performance.from_panel(
         PerformancePanel(
-            dates=_daily_dates(4),
+            dates=valuation_grid(_daily_dates(4)),
             series=[[0.01, 0.02, 0.03, 0.04], [-0.01, 0.03, 0.02, 0.01]],
             kind="returns",
             ticker_names=["A", "B"],
+            frequency="daily",
+            benchmark_ticker="A",
         )
     )
     frame = perf.lookback_returns(_daily_dates(4)[-1]).to_dataframe()
@@ -146,6 +161,7 @@ def perf_returns() -> Performance:
         _returns_panel(_prices_panel()),
         benchmark_ticker="BENCH",
         frequency="daily",
+        initial_date=(_returns_panel(_prices_panel())).index[0].date() - timedelta(days=1),
     )
 
 
@@ -165,9 +181,9 @@ class TestConstruction:
 
     def test_from_prices_series(self) -> None:
         prices = _prices_panel()["ACME"]
-        perf_named = Performance(prices)
+        perf_named = Performance(prices, frequency="daily")
         assert perf_named.get_ticker_names() == ["ACME"]
-        perf_unnamed = Performance(prices.rename(None))
+        perf_unnamed = Performance(prices.rename(None), frequency="daily")
         assert perf_unnamed.get_ticker_names() == ["asset"]
 
     def test_from_returns_dataframe(self, perf_returns: Performance) -> None:
@@ -185,7 +201,7 @@ class TestConstruction:
             index=dates,
         )
 
-        perf = Performance(prices, benchmark_ticker="BENCH")
+        perf = Performance(prices, benchmark_ticker="BENCH", frequency="daily")
         assert perf.get_active_dates_for_ticker(1) == [date(2024, 1, 4), date(2024, 1, 5)]
         assert perf.cumulative_returns()[1] == pytest.approx([0.10, 0.21])
 
@@ -193,7 +209,14 @@ class TestConstruction:
         dates = _daily_dates(5)
         prices = [[100.0, 101.0, 102.0, 103.0, 104.0], [50.0, 50.5, 51.0, 51.5, 52.0]]
         perf = Performance.from_panel(
-            PerformancePanel(dates=dates, series=prices, kind="prices", ticker_names=["A", "B"])
+            PerformancePanel(
+                dates=dates,
+                series=prices,
+                kind="prices",
+                ticker_names=["A", "B"],
+                frequency="daily",
+                benchmark_ticker="A",
+            )
         )
         assert perf.get_ticker_names() == ["A", "B"]
         assert list(perf.cagr().index) == ["A", "B"]
@@ -202,7 +225,14 @@ class TestConstruction:
         dates = _daily_dates(4)
         returns = [[0.01, -0.02, 0.015, 0.0], [0.005, -0.01, 0.0, 0.005]]
         perf = Performance.from_panel(
-            PerformancePanel(dates=dates, series=returns, kind="returns", ticker_names=["A", "B"], benchmark_ticker="B")
+            PerformancePanel(
+                dates=valuation_grid(dates),
+                series=returns,
+                kind="returns",
+                ticker_names=["A", "B"],
+                benchmark_ticker="B",
+                frequency="daily",
+            )
         )
         assert perf.get_benchmark_idx() == 1
         assert list(perf.cagr().index) == ["A", "B"]
@@ -219,10 +249,14 @@ class TestConstruction:
         # Drop the leading synthetic zero so the active windows match exactly.
         returns_no_lead = returns.iloc[1:]
 
-        perf_p = Performance(prices, benchmark_ticker="BENCH")
+        perf_p = Performance(prices, benchmark_ticker="BENCH", frequency="daily")
         perf_p.reset_date_range(returns_no_lead.index[0].date(), prices.index[-1].date())
 
-        perf_r = Performance.from_returns(returns_no_lead, benchmark_ticker="BENCH")
+        perf_r = Performance.from_returns(
+            returns_no_lead,
+            benchmark_ticker="BENCH",
+            initial_date=(returns_no_lead).index[0].date() - timedelta(days=1),
+        )
 
         vol_p = perf_p.volatility(annualize=False)
         vol_r = perf_r.volatility(annualize=False)
@@ -239,22 +273,22 @@ class TestReturnRiskMetrics:
         assert list(values.index) == ["ACME", "BENCH"]
         assert all(isinstance(v, float) for v in values)
 
-    def test_cagr_act365_25_label_matches_default(self, perf_prices: Performance) -> None:
+    def test_cagr_act365f_label_matches_default(self, perf_prices: Performance) -> None:
         default = perf_prices.cagr()
-        labeled = perf_prices.cagr(day_count="act365_25")
+        labeled = perf_prices.cagr(day_count="act_365f")
         assert default["ACME"] == pytest.approx(labeled["ACME"])
         assert default["BENCH"] == pytest.approx(labeled["BENCH"])
 
     def test_cagr_bus252_requires_calendar(self, perf_prices: Performance) -> None:
         with pytest.raises(AnalyticsError):
             perf_prices.cagr(day_count="bus_252")
-        values = perf_prices.cagr(day_count="bus_252", calendar_id="nyse")
+        values = perf_prices.cagr(day_count="bus_252", ctx=DayCountContext(calendar_id="nyse"))
         assert list(values.index) == ["ACME", "BENCH"]
         assert not math.isnan(values["ACME"])
 
     def test_parametric_var_horizon_changes_result(self, perf_prices: Performance) -> None:
         one = perf_prices.parametric_var(0.95)
-        ten = perf_prices.parametric_var(0.95, horizon_periods=10.0)
+        ten = perf_prices.parametric_var(0.95, horizon_periods=10)
         assert list(one.index) == ["ACME", "BENCH"]
         assert one["ACME"] != pytest.approx(ten["ACME"])
 
@@ -264,7 +298,7 @@ class TestReturnRiskMetrics:
 
     def test_excess_returns_zero_rf_matches_returns(self, perf_prices: Performance) -> None:
         rf = [0.0] * len(perf_prices.get_active_dates())
-        excess = perf_prices.excess_returns(rf, nperiods=1.0)
+        excess = perf_prices.excess_returns(rf)
         raw = perf_prices.get_returns()
         assert excess[0] == pytest.approx(raw[0])
 
@@ -275,10 +309,19 @@ class TestReturnRiskMetrics:
             [0.005, -0.01, 0.0, 0.005, 0.02, -0.015],
         ]
         perf = Performance.from_panel(
-            PerformancePanel(dates=dates, series=returns, kind="returns", ticker_names=["A", "B"])
+            PerformancePanel(
+                dates=valuation_grid(dates),
+                series=returns,
+                kind="returns",
+                ticker_names=["A", "B"],
+                frequency="daily",
+                benchmark_ticker="A",
+            )
         )
-        corr, repaired = perf.correlation_matrix()
-        assert repaired is False
+        result = perf.correlation_matrix()
+        corr = result.matrix
+        assert result.n_obs == 6
+        assert result.tickers == ["A", "B"]
         assert len(corr) == 2
         assert len(corr[0]) == 2
         assert corr[0][0] == pytest.approx(1.0)
@@ -312,12 +355,12 @@ class TestReturnRiskMetrics:
             assert not values.isna().any()
 
     def test_to_dataframe_has_one_row_per_ticker(self, perf_prices: Performance) -> None:
-        summary = perf_prices.to_dataframe()
+        summary = perf_prices.to_dataframe(risk_free_rate=0.0, mar=0.0, omega_threshold=0.0, confidence=0.95)
         assert list(summary.index) == ["ACME", "BENCH"]
         assert "cagr" in summary.columns
         assert "sharpe" in summary.columns
         assert "max_drawdown" in summary.columns
-        custom = perf_prices.to_dataframe(risk_free_rate=0.02, confidence=0.99)
+        custom = perf_prices.to_dataframe(risk_free_rate=0.02, confidence=0.99, mar=0.0, omega_threshold=0.0)
         assert custom.loc["ACME", "sharpe"] != pytest.approx(summary.loc["ACME", "sharpe"])
 
 
@@ -328,23 +371,26 @@ class TestScalarMetricSeries:
     """Per-ticker scalar metrics are ticker-labelled `pd.Series`, not lists."""
 
     def test_metric_returns_series(self, perf_prices: Performance) -> None:
-        assert isinstance(perf_prices.sharpe(), pd.Series)
+        assert isinstance(perf_prices.sharpe(risk_free_rate=0.0), pd.Series)
         assert isinstance(perf_prices.max_drawdown_duration(), pd.Series)
 
     def test_metric_index_equals_ticker_names(self, perf_prices: Performance) -> None:
-        assert list(perf_prices.volatility().index) == perf_prices.get_ticker_names()
+        assert list(perf_prices.volatility(annualize=True).index) == perf_prices.get_ticker_names()
 
     def test_metric_series_name_is_metric_name(self, perf_prices: Performance) -> None:
         for metric in ("cagr", "sharpe", "max_drawdown", "tail_ratio", "max_drawdown_duration"):
-            assert getattr(perf_prices, metric)().name == metric
+            assert (
+                getattr(perf_prices, metric)(*({"sharpe": (0.0,), "tail_ratio": (0.95,)}.get(metric, ()))).name
+                == metric
+            )
 
     def test_label_access_matches_positional(self, perf_prices: Performance) -> None:
-        vols = perf_prices.volatility()
+        vols = perf_prices.volatility(annualize=True)
         assert vols["ACME"] == vols.iloc[0]
         assert vols["BENCH"] == vols.iloc[1]
 
     def test_concat_yields_metric_named_columns(self, perf_prices: Performance) -> None:
-        df = pd.concat([perf_prices.sharpe(), perf_prices.sortino()], axis=1)
+        df = pd.concat([perf_prices.sharpe(risk_free_rate=0.0), perf_prices.sortino(mar=0.0)], axis=1)
         assert list(df.columns) == ["sharpe", "sortino"]
         assert list(df.index) == ["ACME", "BENCH"]
 
@@ -411,18 +457,19 @@ class TestBenchmark:
         assert all(isinstance(r, BetaResult) for r in results)
 
     def test_greeks_returns_per_ticker(self, perf_prices: Performance) -> None:
-        results = perf_prices.greeks()
+        results = perf_prices.greeks(risk_free_rate=0.0)
         assert len(results) == 2
         assert all(isinstance(r, GreeksResult) for r in results)
 
     def test_degenerate_beta_and_greeks_wire_round_trips_preserve_nan(self) -> None:
         perf = Performance.from_panel(
             PerformancePanel(
-                dates=[date(2024, 1, 1)],
+                dates=valuation_grid([date(2024, 1, 1)]),
                 series=[[0.01], [0.01]],
                 kind="returns",
                 ticker_names=["TARGET", "BENCH"],
                 benchmark_ticker="BENCH",
+                frequency="daily",
             )
         )
 
@@ -437,7 +484,7 @@ class TestBenchmark:
             assert math.isnan(result.ci_lower)
             assert math.isnan(result.ci_upper)
 
-        greeks_result = perf.greeks()[0]
+        greeks_result = perf.greeks(risk_free_rate=0.0)[0]
         greeks_from_json = GreeksResult.from_json(greeks_result.to_json())
         greeks_from_pickle = pickle.loads(  # noqa: S301 - trusted in-process round trip
             pickle.dumps(greeks_result)
@@ -454,7 +501,7 @@ class TestBenchmark:
         target = [2.0 * value for value in benchmark]
         perf = Performance.from_panel(
             PerformancePanel(
-                dates=dates,
+                dates=valuation_grid(dates),
                 series=[target, benchmark],
                 kind="returns",
                 ticker_names=["TARGET", "BENCH"],
@@ -463,14 +510,14 @@ class TestBenchmark:
             )
         )
 
-        zero_rf = perf.greeks()[0]
+        zero_rf = perf.greeks(risk_free_rate=0.0)[0]
         nonzero_rf = perf.greeks(risk_free_rate=0.12)[0]
 
         assert zero_rf.alpha == pytest.approx(0.0, abs=1e-12)
         assert nonzero_rf.alpha > zero_rf.alpha
 
     def test_rolling_greeks(self, perf_prices: Performance) -> None:
-        rg = perf_prices.rolling_greeks(0, window=10)
+        rg = perf_prices.rolling_greeks(0, window=10, risk_free_rate=0.0)
         assert isinstance(rg, RollingGreeks)
         assert len(rg.alphas) == len(rg.betas)
         assert len(rg.dates) == len(rg.alphas)
@@ -481,7 +528,7 @@ class TestBenchmark:
         target = [1.5 * value for value in benchmark]
         perf = Performance.from_panel(
             PerformancePanel(
-                dates=dates,
+                dates=valuation_grid(dates),
                 series=[target, benchmark],
                 kind="returns",
                 ticker_names=["TARGET", "BENCH"],
@@ -490,15 +537,15 @@ class TestBenchmark:
             )
         )
 
-        zero_rf = perf.rolling_greeks(0, window=5)
+        zero_rf = perf.rolling_greeks(0, window=5, risk_free_rate=0.0)
         nonzero_rf = perf.rolling_greeks(0, window=5, risk_free_rate=0.12)
 
         assert list(zero_rf.alphas) == pytest.approx([0.0] * len(zero_rf.alphas), abs=1e-12)
         assert all(actual > base for actual, base in zip(nonzero_rf.alphas, zero_rf.alphas, strict=True))
 
     def test_rolling_window_metrics(self, perf_prices: Performance) -> None:
-        rs = perf_prices.rolling_sharpe(0, window=10)
-        rso = perf_prices.rolling_sortino(0, window=10)
+        rs = perf_prices.rolling_sharpe(0, window=10, risk_free_rate=0.0)
+        rso = perf_prices.rolling_sortino(0, window=10, mar=0.0)
         rv = perf_prices.rolling_volatility(0, window=10)
         assert isinstance(rs, DatedSeries)
         assert isinstance(rso, DatedSeries)
@@ -525,7 +572,7 @@ class TestMultiFactor:
         n = len(perf_prices.get_dates())
         factor1 = [0.001 * (i % 5) for i in range(n)]
         factor2 = [0.002 if i % 3 == 0 else -0.001 for i in range(n)]
-        result = perf_prices.multi_factor_greeks(0, [factor1, factor2])
+        result = perf_prices.multi_factor_greeks(0, [factor1, factor2], risk_free_rate=0.0)
         assert isinstance(result, MultiFactorResult)
         assert len(result.betas) == 2
         assert 0.0 <= result.r_squared <= 1.0
@@ -534,13 +581,13 @@ class TestMultiFactor:
         n = len(perf_prices.get_dates())
         bad = [float("nan")] + [0.001] * (n - 1)
         with pytest.raises(AnalyticsError):
-            perf_prices.multi_factor_greeks(0, [bad])
+            perf_prices.multi_factor_greeks(0, [bad], risk_free_rate=0.0)
 
     def test_multi_factor_total_zero_matches_excess(self, perf_prices: Performance) -> None:
         n = len(perf_prices.get_dates())
         factor = [0.001 * (i % 5) for i in range(n)]
-        excess = perf_prices.multi_factor_greeks(0, [factor], return_kind="excess")
-        total = perf_prices.multi_factor_greeks(0, [factor], return_kind="total", risk_free_rate=0.0)
+        excess = multi_factor_greeks(perf_prices.get_returns_for_ticker(0), [factor], 252.0, "excess")
+        total = perf_prices.multi_factor_greeks(0, [factor], risk_free_rate=0.0)
         assert excess.alpha == pytest.approx(total.alpha)
         assert float(excess.betas[0]) == pytest.approx(float(total.betas[0]))
 
@@ -548,11 +595,11 @@ class TestMultiFactor:
         n = len(perf_prices.get_dates())
         factor = [0.001] * n
         with pytest.raises(ValueError, match="return_kind"):
-            perf_prices.multi_factor_greeks(0, [factor], return_kind="jensen")
+            multi_factor_greeks(perf_prices.get_returns_for_ticker(0), [factor], 252.0, "jensen")
         with pytest.raises(ValueError, match="risk_free_rate"):
-            perf_prices.multi_factor_greeks(0, [factor], return_kind="excess", risk_free_rate=0.02)
+            multi_factor_greeks(perf_prices.get_returns_for_ticker(0), [factor], 252.0, "excess", 0.02)
         with pytest.raises(ValueError, match="risk_free_rate"):
-            perf_prices.multi_factor_greeks(0, [factor], risk_free_rate=0.02)
+            multi_factor_greeks(perf_prices.get_returns_for_ticker(0), [factor], 252.0, "total")
 
 
 # Date window mutation

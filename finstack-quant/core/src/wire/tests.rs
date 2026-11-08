@@ -231,3 +231,164 @@ fn serde_tag_rejects_untagged_forms() {
     assert!(serde_tag(&json!({})).is_err());
     assert!(serde_tag(&json!({"a": 1, "b": 2})).is_err());
 }
+
+#[test]
+fn finite_or_nan_json_round_trips_exactly_numbers_and_lowercase_nan() {
+    for value in [
+        json!(-f64::MAX),
+        json!(-1.0),
+        json!(0.0),
+        json!(f64::from_bits(1)),
+        json!(f64::MAX),
+        json!("nan"),
+    ] {
+        let decoded: FiniteOrNanWire =
+            serde_json::from_value(value.clone()).expect("admitted wire value");
+        assert_eq!(
+            serde_json::to_value(decoded).expect("wire round trip"),
+            value
+        );
+    }
+    assert_eq!(
+        serde_json::to_value(NanSentinel::Nan).expect("undefined sentinel"),
+        json!("nan")
+    );
+    for value in [
+        json!("inf"),
+        json!("-inf"),
+        json!("NaN"),
+        json!(" nan "),
+        json!("infinity"),
+        json!("undefined"),
+        json!("0.5"),
+        json!(null),
+        json!(true),
+        json!([]),
+        json!({}),
+    ] {
+        assert!(
+            serde_json::from_value::<FiniteOrNanWire>(value.clone()).is_err(),
+            "rejected wire value: {value}"
+        );
+    }
+    assert!(serde_json::from_str::<FiniteOrNanWire>("1e999").is_err());
+}
+
+#[cfg(feature = "jsonschema-validate")]
+fn assert_finite_or_nan_schema<T>(accepted: &[serde_json::Value], rejected: &[serde_json::Value])
+where
+    T: serde::Serialize + serde::de::DeserializeOwned + schemars::JsonSchema,
+{
+    let schema = serde_json::to_value(schemars::schema_for!(T)).expect("derived schema");
+    let validator = jsonschema::validator_for(&schema).expect("valid derived schema");
+    for value in accepted {
+        assert!(validator.is_valid(value), "schema admits {value}");
+        let decoded: T = serde_json::from_value(value.clone()).expect("serde agrees with schema");
+        assert_eq!(
+            serde_json::to_value(decoded).expect("wire round trip"),
+            *value
+        );
+    }
+    for value in rejected {
+        assert!(!validator.is_valid(value), "schema rejects {value}");
+        assert!(
+            serde_json::from_value::<T>(value.clone()).is_err(),
+            "serde rejects {value}"
+        );
+    }
+}
+
+#[test]
+#[cfg(feature = "jsonschema-validate")]
+fn finite_or_nan_schema_preserves_bounded_numeric_domains() {
+    let invalid_sentinels = [
+        json!("inf"),
+        json!("-inf"),
+        json!(null),
+        json!("NaN"),
+        json!("missing"),
+    ];
+    assert_finite_or_nan_schema::<FiniteOrNanWire>(
+        &[
+            json!(-f64::MAX),
+            json!(0.0),
+            json!(f64::from_bits(1)),
+            json!(f64::MAX),
+            json!("nan"),
+        ],
+        &invalid_sentinels,
+    );
+    let mut outside_probability = invalid_sentinels.to_vec();
+    outside_probability.extend([json!(-f64::EPSILON), json!(1.0 + f64::EPSILON)]);
+    assert_finite_or_nan_schema::<FiniteOrNanWire<ClosedUnitIntervalF64Wire>>(
+        &[json!(0.0), json!(0.5), json!(1.0), json!("nan")],
+        &outside_probability,
+    );
+    let mut outside_nonnegative = invalid_sentinels.to_vec();
+    outside_nonnegative.push(json!(-f64::from_bits(1)));
+    assert_finite_or_nan_schema::<FiniteOrNanWire<NonNegativeF64Wire>>(
+        &[
+            json!(0.0),
+            json!(f64::from_bits(1)),
+            json!(f64::MAX),
+            json!("nan"),
+        ],
+        &outside_nonnegative,
+    );
+    for value in [f64::INFINITY, f64::NEG_INFINITY, f64::NAN] {
+        assert!(ClosedUnitIntervalF64Wire::try_from(value).is_err());
+        assert!(NonNegativeF64Wire::try_from(value).is_err());
+    }
+}
+
+#[test]
+#[cfg(feature = "jsonschema-validate")]
+fn finite_or_nan_sequence_schema_applies_the_item_contract() {
+    assert_finite_or_nan_schema::<Vec<FiniteOrNanWire>>(
+        &[json!([]), json!([0.0, "nan", -3.0])],
+        &[
+            json!(["inf"]),
+            json!(["-inf"]),
+            json!([null]),
+            json!([["nan"]]),
+            json!("nan"),
+        ],
+    );
+}
+
+#[test]
+fn finite_or_nan_generic_schema_names_are_independent_of_registration_order() {
+    use schemars::{JsonSchema, SchemaGenerator};
+
+    type Probability = FiniteOrNanWire<ClosedUnitIntervalF64Wire>;
+    type Nonnegative = FiniteOrNanWire<NonNegativeF64Wire>;
+
+    assert_eq!(
+        Probability::schema_name(),
+        "FiniteOrNanWireForClosedUnitIntervalF64Wire"
+    );
+    assert_eq!(
+        Nonnegative::schema_name(),
+        "FiniteOrNanWireForNonNegativeF64Wire"
+    );
+    assert_ne!(
+        Probability::schema_name(),
+        FiniteOrNanWire::<f64>::schema_name()
+    );
+
+    let mut forward = SchemaGenerator::default();
+    let probability_forward = forward.subschema_for::<Probability>();
+    let nonnegative_forward = forward.subschema_for::<Nonnegative>();
+    let unrestricted_forward = forward.subschema_for::<FiniteOrNanWire>();
+
+    let mut reverse = SchemaGenerator::default();
+    let unrestricted_reverse = reverse.subschema_for::<FiniteOrNanWire>();
+    let nonnegative_reverse = reverse.subschema_for::<Nonnegative>();
+    let probability_reverse = reverse.subschema_for::<Probability>();
+
+    assert_ne!(probability_forward, nonnegative_forward);
+    assert_eq!(probability_forward, probability_reverse);
+    assert_eq!(nonnegative_forward, nonnegative_reverse);
+    assert_eq!(unrestricted_forward, unrestricted_reverse);
+    assert_eq!(forward.definitions(), reverse.definitions());
+}

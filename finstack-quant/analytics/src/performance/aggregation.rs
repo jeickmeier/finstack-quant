@@ -2,14 +2,12 @@
 //! [`Performance`].
 
 use super::{LookbackReturns, Performance, invalid_return_series};
-use crate::aggregation::{PeriodStats, PeriodicReturn, group_period_buckets, period_stats_inner};
-use crate::drawdown::{DrawdownEpisode, drawdown_details, to_drawdown_series};
-use crate::returns::{comp_sum, comp_total, excess_returns};
-use finstack_quant_core::dates::{Date, DateExt, FiscalConfig, PeriodKind};
-use finstack_quant_core::math::linalg::{
-    NearestCorrelationOpts, nearest_correlation, unflatten_square, validate_correlation_matrix,
+use crate::aggregation::{
+    LookbackSample, PeriodStats, PeriodicReturn, group_period_buckets, period_stats_inner,
 };
-use finstack_quant_core::math::stats::{correlation, mean_var};
+use crate::drawdown::{DrawdownEpisode, drawdown_details, to_drawdown_series};
+use crate::returns::{comp_sum, comp_total, excess_returns, finite_result, validate_cash};
+use finstack_quant_core::dates::{Date, DateExt, FiscalConfig, PeriodKind};
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use time::Month;
 
@@ -38,8 +36,10 @@ impl Performance {
     }
 
     /// Cumulative compounded returns for each ticker.
-    pub fn cumulative_returns(&self) -> Vec<Vec<f64>> {
-        self.map_tickers(|i| comp_sum(self.active_returns(i)))
+    pub fn cumulative_returns(&self) -> finstack_quant_core::Result<Vec<Vec<f64>>> {
+        (0..self.ticker_names.len())
+            .map(|i| comp_sum(self.active_returns(i)))
+            .collect()
     }
 
     /// Drawdown series for each ticker.
@@ -67,61 +67,31 @@ impl Performance {
     ) -> finstack_quant_core::Result<Vec<DrawdownEpisode>> {
         self.ensure_ticker_idx(ticker_idx)?;
         let (dd, dates) = self.active_drawdown_path(ticker_idx);
-        Ok(drawdown_details(&dd, dates, n))
+        drawdown_details(&dd, dates, n)
     }
 
-    /// Pearson correlation matrix of all tickers, repaired to a valid
-    /// correlation matrix when needed, plus a flag saying whether it was.
+    /// Common-sample Pearson correlation matrix with shared observation provenance.
     ///
-    /// Uses the complete-case common window when every ticker has at least
-    /// two observations on the intersection of all active spans. Otherwise
-    /// uses pairwise intersecting spans. Any non-finite off-diagonal or
-    /// zero-variance pair is an error (no silent `NaN` display matrix).
-    /// The flattened matrix is then checked with
-    /// [`finstack_quant_core::math::linalg::validate_correlation_matrix`]; on failure it
-    /// is repaired with Higham's nearest-correlation projection.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when a pair
-    /// is degenerate, an off-diagonal is non-finite, or Higham repair fails.
+    /// Every entry uses the exact intersection of all loaded ticker spans and
+    /// the active date range. No pairwise fallback or numerical repair is applied.
+    /// Correlation is dimensionless and needs no observation frequency.
     ///
     /// # Returns
     ///
-    /// `(matrix, repaired)`. `matrix` is `n × n` in [`Self::get_ticker_names`]
-    /// order with a diagonal of exactly `1.0`, every off-diagonal inside
-    /// `[-1, 1]`, and passes
-    /// [`finstack_quant_core::math::linalg::validate_correlation_matrix`]. The
-    /// validator accepts off-diagonals up to `1e-12` outside `[-1, 1]`, from
-    /// rounding in the Pearson estimate or the repair; those are clamped to the
-    /// bound before return, so a reader can rely on the closed interval. `repaired` is
-    /// `true` when the raw pairwise matrix failed that validation and was
-    /// projected to the nearest valid correlation matrix, so a reader can
-    /// tell a clean estimate from a repaired one.
-    pub fn correlation_matrix(&self) -> finstack_quant_core::Result<(Vec<Vec<f64>>, bool)> {
-        let n = self.get_ticker_names().len();
-        let mut matrix = vec![vec![0.0; n]; n];
-
+    /// A complete matrix in loaded ticker order, its common observation count,
+    /// and the first/last included return-ending dates.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for fewer than two common observations or
+    /// a constant common-sample column, and a calculation error if stable
+    /// evaluation cannot produce a valid finite PSD Pearson matrix.
+    pub fn correlation_matrix(&self) -> finstack_quant_core::Result<crate::CorrelationResult> {
         let common = self.common_active_span();
-        let complete_case = common.len() >= 2;
-
-        for (i, row) in matrix.iter_mut().enumerate() {
-            row[i] = 1.0;
-        }
-        for (i, j) in (0..n).flat_map(|i| (i + 1..n).map(move |j| (i, j))) {
-            let (lhs, rhs) = if complete_case {
-                (
-                    self.returns_for_span(i, common),
-                    self.returns_for_span(j, common),
-                )
-            } else {
-                self.active_two_ticker_returns(i, j)
-            };
-            let corr = pair_correlation(lhs, rhs, i, j)?;
-            matrix[i][j] = corr;
-            matrix[j][i] = corr;
-        }
-        finalize_correlation_matrix(matrix)
+        let columns: Vec<_> = (0..self.ticker_names.len())
+            .map(|i| self.returns_for_span(i, common))
+            .collect();
+        crate::correlation::estimate(&self.ticker_names, &columns, self.dates_for_span(common))
     }
 
     /// Cumulative relative wealth versus the active benchmark.
@@ -130,69 +100,73 @@ impl Performance {
     /// overlapping dates. Log-growth differences are accumulated directly,
     /// so identical paths remain zero even when absolute wealth would
     /// overflow or round to zero.
-    pub fn cumulative_returns_outperformance(&self) -> Vec<Vec<f64>> {
+    pub fn cumulative_returns_outperformance(&self) -> finstack_quant_core::Result<Vec<Vec<f64>>> {
         self.map_pair_returns(|port, bench| {
             let mut relative_log_growth = NeumaierAccumulator::new();
             port.iter()
-                .zip(bench.iter())
+                .zip(bench)
                 .map(|(&p, &b)| {
-                    relative_log_growth.add(p.ln_1p());
-                    relative_log_growth.add(-b.ln_1p());
-                    relative_log_growth.total().exp_m1()
+                    if b <= -1.0 {
+                        return Ok(f64::NAN);
+                    }
+                    if p <= -1.0 {
+                        return Ok(-1.0);
+                    }
+                    // Preserve adjacent large growth factors before taking logarithms.
+                    let relative_move = (p - b) / (1.0 + b);
+                    let log_ratio = if relative_move.is_finite() && relative_move > -1.0 {
+                        relative_move.ln_1p()
+                    } else {
+                        p.ln_1p() - b.ln_1p()
+                    };
+                    relative_log_growth.add(log_ratio);
+                    finite_result(
+                        relative_log_growth.total().exp_m1(),
+                        "cumulative relative wealth",
+                    )
                 })
                 .collect()
         })
     }
 
-    /// Drawdown difference versus the active benchmark.
-    pub fn drawdown_difference(&self) -> Vec<Vec<f64>> {
-        self.map_pair_returns(|port, bench| {
-            let port_dd = to_drawdown_series(port);
-            let bench_dd = to_drawdown_series(bench);
-            port_dd
-                .iter()
-                .zip(bench_dd.iter())
-                .map(|(p, b)| p - b)
-                .collect()
-        })
-    }
-
-    /// Excess returns (portfolio minus risk-free) for each ticker.
-    ///
-    /// `rf` is aligned to [`Self::get_active_dates`] (the panel grid), not to
-    /// each ticker's possibly shorter active span. A ticker that starts
-    /// later subtracts `rf[panel_index]` for the dates it actually
-    /// observes.
-    ///
-    /// When `nperiods` is `None`, the risk-free series is treated as
-    /// annualized and geometrically decompounded with the panel
-    /// annualization factor. Pass `Some(1.0)` to treat `rf` as already
-    /// periodic.
-    ///
-    /// # Arguments
-    ///
-    /// * `rf` - Risk-free rate per panel date. Length must equal
-    ///   [`Self::get_active_dates`]. Values are annualized decimal rates when
-    ///   `nperiods` is `None` or greater than `1`; already-periodic simple
-    ///   rates when `nperiods` is `Some(1.0)`.
-    /// * `nperiods` - Optional compounding periods per year used to
-    ///   decompound `rf`. `None` uses the panel frequency (e.g. `252` for
-    ///   daily). `Some(1.0)` leaves `rf` unadjusted.
+    /// Paired portfolio drawdown minus benchmark drawdown, rebased on the shared actual opening.
     ///
     /// # Errors
     ///
-    /// Returns [`finstack_quant_core::InputError::InvalidReturnSeries`] when
-    /// `rf.len()` does not equal the active panel date count.
+    /// Returns a validation error when no benchmark is selected, or a calculation
+    /// error when a requested drawdown cannot be represented.
+    pub fn drawdown_difference(&self) -> finstack_quant_core::Result<Vec<Vec<f64>>> {
+        self.map_pair_returns(|port, bench| {
+            let port_dd = to_drawdown_series(port)?;
+            let bench_dd = to_drawdown_series(bench)?;
+            Ok(port_dd
+                .iter()
+                .zip(bench_dd.iter())
+                .map(|(p, b)| p - b)
+                .collect())
+        })
+    }
+
+    /// Arithmetic differential returns against explicitly aligned annual-effective cash.
+    ///
+    /// # Arguments
+    ///
+    /// * `rf` - Finite annual-effective decimal cash assumptions, each greater than
+    ///   `-1`, assigned positionally to every active global return endpoint. For
+    ///   example, `0.02` means 2% annual effective cash for that interval.
     ///
     /// # Returns
     ///
-    /// One excess-return vector per ticker, each aligned to that ticker's
-    /// active span.
-    pub fn excess_returns(
-        &self,
-        rf: &[f64],
-        nperiods: Option<f64>,
-    ) -> finstack_quant_core::Result<Vec<Vec<f64>>> {
+    /// Ticker-major arithmetic excess observations on each ticker's own active
+    /// endpoints. Differential returns may be below `-1` and are not investment wealth.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for missing observation frequency, invalid cash
+    /// anywhere in the supplied grid or an inexact grid length; calculation failures
+    /// propagate without partial output.
+    pub fn excess_returns(&self, rf: &[f64]) -> finstack_quant_core::Result<Vec<Vec<f64>>> {
+        let ann = self.ann()?;
         let panel_len = self.get_active_dates().len();
         if rf.len() != panel_len {
             return Err(invalid_return_series(
@@ -206,16 +180,19 @@ impl Performance {
             )
             .into());
         }
-        let nperiods = nperiods.unwrap_or(self.ann());
-        Ok(self.map_tickers(|i| {
-            let span = self.active_span_for_ticker(i);
-            let returns = self.active_returns(i);
-            let offset = span.start.saturating_sub(self.start_idx);
-            let rf_aligned = rf
-                .get(offset..offset.saturating_add(returns.len()))
-                .unwrap_or(&[]);
-            excess_returns(returns, rf_aligned, nperiods)
-        }))
+        for &cash in rf {
+            validate_cash(cash)?;
+        }
+        (0..self.ticker_names.len())
+            .map(|i| {
+                let span = self.active_span_for_ticker(i);
+                let returns = self.active_returns(i);
+                let offset = span.start.saturating_sub(self.start_idx);
+                let rf_aligned =
+                    &rf[offset.min(rf.len())..offset.saturating_add(returns.len()).min(rf.len())];
+                excess_returns(returns, rf_aligned, ann)
+            })
+            .collect()
     }
 
     /// Compounded returns for each lookback period (MTD, QTD, YTD, FYTD) at `ref_date`.
@@ -232,7 +209,7 @@ impl Performance {
     /// * `ref_date` - Inclusive end of each lookback window; `None` uses the last
     ///   date of [`Self::get_active_dates`].
     /// * `fiscal_config` - Fiscal year start month and day for FYTD; `None`
-    ///   uses [`FiscalConfig::default`], the calendar year (January 1).
+    ///   uses the calendar year (January 1).
     ///
     /// # Returns
     ///
@@ -256,37 +233,62 @@ impl Performance {
                 )
             })?,
         };
-        // MTD/QTD/YTD starts are total over the representable range; FYTD falls
-        // back to ref_date only when its fiscal start precedes Date::MIN.
-        let month_start =
-            |month: Month| Date::from_calendar_date(ref_date.year(), month, 1).unwrap_or(ref_date);
-        let fiscal_start = |config: FiscalConfig| {
-            config
-                .year_start(ref_date.fiscal_year(config))
-                .unwrap_or(ref_date)
+        let fiscal_config = fiscal_config.unwrap_or_else(FiscalConfig::calendar_year);
+        let month_start = |month: Month| {
+            Date::from_calendar_date(ref_date.year(), month, 1)
+                .map_err(|err| finstack_quant_core::Error::Validation(err.to_string()))
         };
-        let compute = |period_start: Date| -> Vec<f64> {
-            self.map_tickers(|i| {
-                let dates = self.active_dates_for_ticker_unchecked(i);
-                let r = self.active_returns(i);
-                let start = dates.partition_point(|&d| d < period_start).min(r.len());
-                let end = dates
-                    .partition_point(|&d| d <= ref_date)
-                    .min(r.len())
-                    .max(start);
-                comp_total(&r[start..end])
-            })
-        };
-
+        // Construct every requested boundary before inspecting sample availability.
+        let mtd_start = month_start(ref_date.month())?;
+        let qtd_start = month_start(Month::January.nth_next((ref_date.quarter() - 1) * 3))?;
+        let ytd_start = month_start(Month::January)?;
+        let fytd_start = fiscal_config.year_start(ref_date.fiscal_year(fiscal_config))?;
+        let compute =
+            |period_start: Date| -> finstack_quant_core::Result<(Vec<f64>, Vec<LookbackSample>)> {
+                let mut values = Vec::with_capacity(self.ticker_names.len());
+                let mut samples = Vec::with_capacity(self.ticker_names.len());
+                for i in 0..self.ticker_names.len() {
+                    let dates = self.active_dates_for_ticker_unchecked(i);
+                    let returns = self.active_returns(i);
+                    let start = dates.partition_point(|&d| d < period_start);
+                    let end = dates.partition_point(|&d| d <= ref_date).max(start);
+                    if start == end {
+                        values.push(f64::NAN);
+                        samples.push(LookbackSample {
+                            n_obs: 0,
+                            holding_start: None,
+                            holding_end: None,
+                        });
+                    } else {
+                        let span = self.active_span_for_ticker(i);
+                        values.push(comp_total(&returns[start..end])?);
+                        let sample = LookbackSample {
+                            n_obs: end - start,
+                            holding_start: Some(self.price_dates[span.start + start]),
+                            holding_end: Some(self.price_dates[span.start + end]),
+                        };
+                        sample.validate()?;
+                        samples.push(sample);
+                    }
+                }
+                Ok((values, samples))
+            };
+        let (mtd, mtd_samples) = compute(mtd_start)?;
+        let (qtd, qtd_samples) = compute(qtd_start)?;
+        let (ytd, ytd_samples) = compute(ytd_start)?;
+        let (fytd, fytd_samples) = compute(fytd_start)?;
         Ok(LookbackReturns {
             ref_date,
             ticker_names: self.get_ticker_names().to_vec(),
-            mtd: compute(month_start(ref_date.month())),
-            qtd: compute(month_start(
-                Month::January.nth_next((ref_date.quarter() - 1) * 3),
-            )),
-            ytd: compute(fiscal_start(FiscalConfig::calendar_year())),
-            fytd: compute(fiscal_start(fiscal_config.unwrap_or_default())),
+            fiscal_config,
+            mtd,
+            qtd,
+            ytd,
+            fytd,
+            mtd_samples,
+            qtd_samples,
+            ytd_samples,
+            fytd_samples,
         })
     }
 
@@ -318,16 +320,14 @@ impl Performance {
             aggregation_frequency,
             fiscal_config,
         )?;
-        Ok(period_stats_inner(
-            grouped.into_iter().map(|point| point.value),
-        ))
+        period_stats_inner(grouped.into_iter().map(|point| point.value))
     }
 
     /// Calendar-bucketed compounded returns per ticker.
     ///
     /// Returns one `Vec<PeriodicReturn>` per ticker — each entry is the
-    /// period-end date and compounded return of one calendar bucket of `frequency`.
-    /// Buckets compound via the shared kernel, so they reconcile exactly with
+    /// last actual observed endpoint and compounded return of one calendar bucket of `frequency`.
+    /// Buckets compound original observations via the shared kernel, so their unrounded wealth reconciles with
     /// [`Performance::cumulative_returns`]. Returns are simple decimal fractions
     /// (`0.01` means 1%), ticker series follow [`Performance::get_ticker_names`] order,
     /// and points within each series are chronological. Calendar bucketing only.
@@ -363,85 +363,11 @@ impl Performance {
     }
 }
 
-fn pair_correlation(
-    lhs: &[f64],
-    rhs: &[f64],
-    i: usize,
-    j: usize,
-) -> finstack_quant_core::Result<f64> {
-    if lhs.len() < 2 || rhs.len() < 2 {
-        return Err(invalid_return_series(
-            format!("<{i},{j}>"),
-            lhs.len().min(rhs.len()),
-            format!("correlation pair ({i}, {j}) has fewer than 2 overlapping observations"),
-        )
-        .into());
-    }
-    let (_, var_l) = mean_var(lhs);
-    let (_, var_r) = mean_var(rhs);
-    if var_l == 0.0 || var_r == 0.0 {
-        return Err(invalid_return_series(
-            format!("<{i},{j}>"),
-            0,
-            format!("correlation pair ({i}, {j}) has a zero-variance series"),
-        )
-        .into());
-    }
-    let corr = correlation(lhs, rhs);
-    if !corr.is_finite() {
-        return Err(invalid_return_series(
-            format!("<{i},{j}>"),
-            0,
-            format!("correlation pair ({i}, {j}) produced a non-finite coefficient"),
-        )
-        .into());
-    }
-    Ok(corr)
-}
-
-/// Set the diagonal to exactly `1.0` and clamp every off-diagonal to
-/// `[-1, 1]`. Applied to a matrix that already passed
-/// [`validate_correlation_matrix`], whose tolerances (`1e-10` on the diagonal,
-/// `1e-12` past each bound) allow values a correlation cannot take.
-fn clamp_to_correlation_bounds(matrix: &mut [Vec<f64>]) {
-    for (i, row) in matrix.iter_mut().enumerate() {
-        for (j, value) in row.iter_mut().enumerate() {
-            *value = if i == j { 1.0 } else { value.clamp(-1.0, 1.0) };
-        }
-    }
-}
-
-fn finalize_correlation_matrix(
-    mut matrix: Vec<Vec<f64>>,
-) -> finstack_quant_core::Result<(Vec<Vec<f64>>, bool)> {
-    let n = matrix.len();
-    let flat: Vec<f64> = matrix.iter().flatten().copied().collect();
-    if validate_correlation_matrix(&flat, n).is_ok() {
-        clamp_to_correlation_bounds(&mut matrix);
-        return Ok((matrix, false));
-    }
-    let repaired = nearest_correlation(&flat, n, NearestCorrelationOpts::default())
-        .map_err(|err| invalid_return_series("<correlation>", 0, err.to_string()))?;
-    if validate_correlation_matrix(&repaired, n).is_err() {
-        return Err(invalid_return_series(
-            "<correlation>",
-            0,
-            "Higham repair did not produce a valid correlation matrix",
-        )
-        .into());
-    }
-    let mut repaired = unflatten_square(&repaired, n)
-        .map_err(|err| invalid_return_series("<correlation>", 0, err.to_string()))?;
-    clamp_to_correlation_bounds(&mut repaired);
-    Ok((repaired, true))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::Performance;
     use finstack_quant_core::dates::PeriodKind;
-    use finstack_quant_core::math::linalg::validate_correlation_matrix;
     use time::Month;
 
     fn jan(day: u8) -> Date {
@@ -465,7 +391,11 @@ mod tests {
         let returns = vec![vec![0.001_f64; n]];
 
         Performance::new(&crate::performance::returns_panel(
-            dates,
+            {
+                let mut grid = vec![Date::from_calendar_date(2021, Month::January, 1).unwrap()];
+                grid.extend(dates);
+                grid
+            },
             returns,
             vec!["TEST".to_string()],
             None,
@@ -477,7 +407,11 @@ mod tests {
     fn rectangular_perf() -> Performance {
         let dates = vec![jan(2), jan(3), jan(4), jan(5)];
         Performance::new(&crate::performance::returns_panel(
-            dates,
+            {
+                let mut grid = vec![jan(1)];
+                grid.extend(dates);
+                grid
+            },
             vec![vec![0.01, 0.02, 0.03, 0.04], vec![0.05, 0.06, 0.07, 0.08]],
             vec!["A".into(), "B".into()],
             None,
@@ -489,7 +423,11 @@ mod tests {
     fn ragged_perf() -> Performance {
         let dates = vec![jan(2), jan(3), jan(4), jan(5)];
         Performance::new(&crate::performance::returns_panel(
-            dates,
+            {
+                let mut grid = vec![jan(1)];
+                grid.extend(dates);
+                grid
+            },
             vec![
                 vec![0.01, 0.02, 0.03, 0.04],
                 vec![f64::NAN, f64::NAN, 0.10, 0.20],
@@ -522,7 +460,11 @@ mod tests {
             0.01, 0.02, -0.03, 0.04, 0.05, -0.06, 0.07, 0.08, -0.09, 0.10,
         ];
         let perf = Performance::new(&crate::performance::returns_panel(
-            dates,
+            {
+                let mut grid = vec![on(2024, Month::December, 30)];
+                grid.extend(dates);
+                grid
+            },
             vec![r.to_vec()],
             vec!["A".to_string()],
             None,
@@ -534,10 +476,10 @@ mod tests {
         let us_federal = perf
             .lookback_returns(Some(ref_date), Some(FiscalConfig::us_federal()))
             .expect("lookback");
-        assert_eq!(us_federal.mtd, vec![comp_total(&r[7..9])]);
-        assert_eq!(us_federal.qtd, vec![comp_total(&r[5..9])]);
-        assert_eq!(us_federal.ytd, vec![comp_total(&r[1..9])]);
-        assert_eq!(us_federal.fytd, vec![comp_total(&r[0..9])]);
+        assert_eq!(us_federal.mtd, vec![comp_total(&r[7..9]).unwrap()]);
+        assert_eq!(us_federal.qtd, vec![comp_total(&r[5..9]).unwrap()]);
+        assert_eq!(us_federal.ytd, vec![comp_total(&r[1..9]).unwrap()]);
+        assert_eq!(us_federal.fytd, vec![comp_total(&r[0..9]).unwrap()]);
 
         let clamped = perf
             .lookback_returns(
@@ -545,7 +487,7 @@ mod tests {
                 Some(FiscalConfig::new(2, 30).expect("day 30 clamps")),
             )
             .expect("lookback");
-        assert_eq!(clamped.fytd, vec![comp_total(&r[3..9])]);
+        assert_eq!(clamped.fytd, vec![comp_total(&r[3..9]).unwrap()]);
     }
 
     #[test]
@@ -567,7 +509,7 @@ mod tests {
         let mut perf = sample_two_month_daily_performance();
         let dates = perf.get_dates().to_vec();
         let window_end = dates[dates.len() / 2];
-        perf.reset_date_range(dates[0], window_end);
+        perf.reset_date_range(dates[0], window_end).unwrap();
 
         let omitted = perf.lookback_returns(None, None).expect("lookback");
         assert_eq!(Some(&omitted.ref_date), perf.get_active_dates().last());
@@ -587,7 +529,8 @@ mod tests {
     fn lookback_returns_rejects_no_date_over_an_empty_active_range() {
         let mut perf = sample_two_month_daily_performance();
         let dates = perf.get_dates().to_vec();
-        perf.reset_date_range(dates[dates.len() - 1], dates[0]);
+        let after = dates[dates.len() - 1].next_day().unwrap();
+        perf.reset_date_range(after, after).unwrap();
         assert!(perf.get_active_dates().is_empty());
         let error = perf
             .lookback_returns(None, None)
@@ -605,17 +548,62 @@ mod tests {
         assert_eq!(periodic[0].len(), 2);
         assert_eq!(periodic[0][0].date.month(), Month::January);
         assert_eq!(periodic[0][1].date.month(), Month::February);
-        let cum = perf.cumulative_returns();
+        let cum = perf.cumulative_returns().unwrap();
         let total = *cum[0].last().unwrap();
         let chained = (1.0 + periodic[0][0].value) * (1.0 + periodic[0][1].value) - 1.0;
         assert!((chained - total).abs() < 1e-12);
     }
 
     #[test]
+    fn lookback_cutoff_retains_actual_partial_holding_coverage() {
+        let perf = Performance::new(&crate::performance::returns_panel(
+            vec![jan(1), jan(2), jan(5)],
+            vec![vec![0.01, 0.02]],
+            vec!["A".into()],
+            None,
+            PeriodKind::Daily,
+        ))
+        .unwrap();
+        let result = perf.lookback_returns(Some(jan(4)), None).unwrap();
+        assert_eq!(result.ref_date, jan(4));
+        assert!((result.mtd[0] - 0.01).abs() < 1e-16);
+        assert_eq!(
+            result.mtd_samples[0],
+            LookbackSample {
+                n_obs: 1,
+                holding_start: Some(jan(1)),
+                holding_end: Some(jan(2)),
+            }
+        );
+        assert_eq!(result.fiscal_config, FiscalConfig::calendar_year());
+        let mut wire = serde_json::to_value(&result).unwrap();
+        wire["mtd_samples"][0]["holding_end"] = serde_json::json!("2024-01-05");
+        assert!(serde_json::from_value::<LookbackReturns>(wire).is_err());
+    }
+
+    #[test]
+    fn empty_lookback_preserves_undefined_values_and_validated_wire_coverage() {
+        let perf = rectangular_perf();
+        let before = jan(1);
+        let result = perf.lookback_returns(Some(before), None).unwrap();
+        assert!(result.mtd.iter().all(|value| value.is_nan()));
+        assert!(result.mtd_samples.iter().all(|sample| sample.n_obs == 0
+            && sample.holding_start.is_none()
+            && sample.holding_end.is_none()));
+        let wire = serde_json::to_value(&result).unwrap();
+        assert_eq!(wire["mtd"][0], "nan");
+        let restored: LookbackReturns = serde_json::from_value(wire.clone()).unwrap();
+        assert!(restored.mtd[0].is_nan());
+        let mut invalid = wire;
+        invalid["mtd"][0] = serde_json::json!(0.0);
+        assert!(serde_json::from_value::<LookbackReturns>(invalid).is_err());
+    }
+
+    #[test]
     fn excess_returns_rectangular_identity_with_zero_rf() {
         let perf = rectangular_perf();
         let rf = vec![0.0; perf.get_active_dates().len()];
-        let excess = perf.excess_returns(&rf, None).expect("aligned rf");
+        let excess = perf.excess_returns(&rf).expect("aligned rf");
         assert_eq!(excess, perf.get_returns());
     }
 
@@ -623,26 +611,25 @@ mod tests {
     fn excess_returns_ragged_uses_panel_index_not_series_head() {
         let perf = ragged_perf();
         let rf = vec![0.001, 0.002, 0.003, 0.004];
-        let excess = perf
-            .excess_returns(&rf, Some(1.0))
-            .expect("aligned periodic rf");
+        let excess = perf.excess_returns(&rf).expect("aligned periodic rf");
         assert_eq!(excess[0].len(), 4);
-        assert!((excess[0][0] - (0.01 - 0.001)).abs() < 1e-15);
+        let q = |cash: f64| (cash.ln_1p() / 252.0).exp_m1();
+        assert!((excess[0][0] - (0.01 - q(0.001))).abs() < 1e-15);
         assert_eq!(excess[1].len(), 2);
         assert!(
-            (excess[1][0] - (0.10 - 0.003)).abs() < 1e-15,
+            (excess[1][0] - (0.10 - q(0.003))).abs() < 1e-15,
             "ticker B must subtract rf[2], not rf[0]; got {}",
             excess[1][0]
         );
-        assert!((excess[1][1] - (0.20 - 0.004)).abs() < 1e-15);
-        assert!((excess[1][0] - (0.10 - 0.001)).abs() > 1e-6);
+        assert!((excess[1][1] - (0.20 - q(0.004))).abs() < 1e-15);
+        assert!((excess[1][0] - (0.10 - q(0.001))).abs() > 1e-6);
     }
 
     #[test]
     fn excess_returns_length_mismatch_is_error() {
         let perf = rectangular_perf();
         let err = perf
-            .excess_returns(&[0.0, 0.0], None)
+            .excess_returns(&[0.0, 0.0])
             .expect_err("length mismatch");
         let msg = err.to_string();
         assert!(
@@ -653,7 +640,7 @@ mod tests {
 
     #[test]
     fn correlation_matrix_two_asset_rectangular_identity() {
-        let dates = vec![jan(2), jan(3), jan(4), jan(5)];
+        let dates = vec![jan(1), jan(2), jan(3), jan(4), jan(5)];
         let r = vec![0.01, 0.02, -0.01, 0.03];
         let perf = Performance::new(&crate::performance::returns_panel(
             dates,
@@ -663,71 +650,17 @@ mod tests {
             PeriodKind::Daily,
         ))
         .expect("panel");
-        let (m, repaired) = perf.correlation_matrix().expect("psd correlation");
-        assert!(!repaired);
+        let result = perf.correlation_matrix().expect("psd correlation");
+        let m = result.matrix;
         assert_eq!(m[0][0], 1.0);
         assert_eq!(m[1][1], 1.0);
         assert!((m[0][1] - 1.0).abs() < 1e-12 && m[0][1] <= 1.0);
         assert!((m[1][0] - 1.0).abs() < 1e-12 && m[1][0] <= 1.0);
     }
 
-    /// Values the validator tolerates but a correlation cannot take are
-    /// brought onto the bound, on the clean path as on the repaired one.
-    #[test]
-    fn correlation_matrix_is_clamped_to_unit_bounds() {
-        let mut clamped = vec![
-            vec![1.0 + 1e-11, 1.0 + 1e-13, -1.0 - 1e-13],
-            vec![1.0 + 1e-13, 1.0 - 1e-11, -1.0],
-            vec![-1.0 - 1e-13, -1.0, 1.0],
-        ];
-        clamp_to_correlation_bounds(&mut clamped);
-        assert_eq!(
-            clamped,
-            vec![
-                vec![1.0, 1.0, -1.0],
-                vec![1.0, 1.0, -1.0],
-                vec![-1.0, -1.0, 1.0],
-            ]
-        );
-
-        let indefinite = vec![
-            vec![1.0, -0.55, -0.55],
-            vec![-0.55, 1.0, -0.55],
-            vec![-0.55, -0.55, 1.0],
-        ];
-        let (repaired, was_repaired) =
-            finalize_correlation_matrix(indefinite).expect("Higham repair");
-        assert!(was_repaired);
-        for (i, row) in repaired.iter().enumerate() {
-            for (j, value) in row.iter().enumerate() {
-                if i == j {
-                    assert_eq!(*value, 1.0);
-                } else {
-                    assert!((-1.0..=1.0).contains(value), "({i}, {j}) = {value}");
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn correlation_matrix_repairs_indefinite_pairwise_fixture() {
-        let indefinite = vec![
-            vec![1.0, -0.55, -0.55],
-            vec![-0.55, 1.0, -0.55],
-            vec![-0.55, -0.55, 1.0],
-        ];
-        let flat: Vec<f64> = indefinite.iter().flatten().copied().collect();
-        assert!(validate_correlation_matrix(&flat, 3).is_err());
-        let (repaired, was_repaired) =
-            finalize_correlation_matrix(indefinite).expect("Higham repair");
-        assert!(was_repaired);
-        let repaired_flat: Vec<f64> = repaired.iter().flatten().copied().collect();
-        validate_correlation_matrix(&repaired_flat, 3).expect("repaired matrix is valid");
-    }
-
     #[test]
     fn correlation_matrix_zero_variance_pair_is_error() {
-        let dates = vec![jan(2), jan(3), jan(4), jan(5)];
+        let dates = vec![jan(1), jan(2), jan(3), jan(4), jan(5)];
         let perf = Performance::new(&crate::performance::returns_panel(
             dates,
             vec![vec![0.01, 0.02, -0.01, 0.03], vec![0.05, 0.05, 0.05, 0.05]],

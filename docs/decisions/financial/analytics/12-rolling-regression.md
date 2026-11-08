@@ -1,24 +1,16 @@
 # ANALYTICS-012: Sliding-window alpha and beta with recentered compensated sums
 
-**Decision status:** Accepted for the complete rolling alpha/beta package below (2026-11-07). Implementation reconciliation and independent qualification remain open; other records retain their own scopes.
+**Decision status:** Accepted for the complete rolling alpha/beta package below (2026-11-07).
 
-**Implementation status:** Observed in the source paths below, including the stated discrepancies and fallback behavior.
+**Implementation status:** Implemented in the analytics decision reconciliation dated 2026-11-08. The accepted sections below define the current contract.
 
-**Validation status:** Source inspected; test evidence inspected or located as identified below, not executed. No financial accuracy certification or runtime change is implied.
+**Validation status:** Scoped implementation checks and their limits are recorded in the [analytics inventory](README.md#implementation-evidence). A passing numerical fixture establishes its stated case; it does not certify a population estimator or every supported input.
 
-**Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See the [scope and exact source manifest](README.md).
-
-## Choice and domain
-
-Rolling alpha/beta are observation-window OLS point estimates over benchmark/ticker overlap, using the same Jensen cash convention as batch regression. Window zero errors publicly; oversized windows yield empty vectors; one-point/constant-benchmark windows yield NaN. Dates label window ends. There are no rolling confidence intervals, R² or adaptive bandwidths.
+**Audit provenance:** The original source audit was performed on 2026-11-05 at `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. Its historical discrepancies are superseded by the accepted contracts and this implementation. The [source ledger](coverage.json) retains source ownership and dated inspection fingerprints.
 
 ## Accepted decision: rolling alpha and beta
 
-**Accepted:** 2026-11-07. **Implementation:** Partial; selected source
-inspected at `827ebb75b9`. Explicit host inputs, exact alignment, scaled
-reconstruction and both-mean protection, emitted-coefficient validation,
-calculation errors and result restoration require reconciliation. No runtime
-estimator or wire checks were executed.
+**Accepted:** 2026-11-07.
 
 This package covers the complete window, point-estimator,
 availability, terminal-history, numerical-control, error and result-carrier
@@ -172,42 +164,6 @@ missing-value handling, output padding and inference surface are not adopted
 by this package. These references do not qualify the internal 64-step controls,
 error budget or wire restoration.
 
-## Algorithm and controls
+## Implementation evidence
 
-For each window of w points, recenter portfolio and benchmark observations around shift_r/shift_b, initially the window's first values. Maintain Neumaier sums Sr, Sb, Srb and Sb² of shifted returns and products. Compute denominator `D=w*Sb²−Sb*Sb` and slope `(w*Srb−Sb*Sr)/D`; reconstruct unshifted means and annualized Jensen alpha. A window with w<2 or nonpositive/nonfinite D yields NaN for both alpha and beta.
-
-Sliding updates subtract outgoing shifted values/products and add incoming ones. The implementation tracks maximum variance, covariance and return-sum scales since the last rebuild. It fully recenters/recomputes when denominator, covariance numerator, shifted return sum or recovered mean suffers the configured sqrt(machine epsilon) relative cancellation test; when any sum is nonfinite; or after 64 updates. This trigger rebuilds an estimate; it does not classify every tiny positive benchmark variance as zero. Nonfinite input in private callers can affect its windows and recover once it exits; public Performance normally prevents such inputs.
-
-The 64-update interval is justified in source as a drift/performance tradeoff for four cross-term sums and compared with the 1,024-step scalar rolling kernels. The decision is internal and not user-tunable. Typical updates are constant work, but recurring cancellation triggers can force full-window work for many points.
-
-The accepted package requires removing private shortest-prefix truncation, distinguishing
-true constant-benchmark unavailability from numerical denominator collapse,
-protecting both reconstructed means and validating final coefficients. Current
-nonfinite-input recovery is not an accepted missing-data policy. Source
-comments claiming shift reconstruction cannot cancel need correction.
-
-## Conventions, wire limitations and alternatives
-
-Alpha is annual arithmetic excess return, beta dimensionless, cash an annual effective rate converted to per-observation q. Frequency and cash do not determine the rolling dates or ensure equal elapsed intervals. Full-window independent recomputation is a numerical alternative; exponentially weighted regression or robust covariance estimates are different unimplemented methods.
-
-`RollingGreeks` derives serde on plain `Vec<f64>` alphas/betas, unlike `DatedSeries`' explicit nonfinite sequence adapter and batch regression's explicit nonfinite fields. The kernel intentionally produces NaN at undefined windows. Therefore lossless roundtrip/host representation of those values is not established by this output type; the adapter discrepancy is statically confirmed, while a complete wire failure was not executed. This wire boundary remains unqualified under [ADR 0009](../conventions/0009-missing-and-invalid-data.md); that does not permit silent substitution of zero.
-
-Native Python NumPy getters and WASM typed-array output already preserve NaN;
-the identified serialization/restoration discrepancy does not establish a
-native-array failure. Python/WASM still default the window to 63 and cash to
-zero, contrary to the explicit-input contract accepted here and the already
-accepted cash convention.
-
-## Implementation and validation evidence
-
-- [Rolling implementation and output type](../../../../finstack-quant/analytics/src/benchmark.rs) and [public overlap/window guard](../../../../finstack-quant/analytics/src/performance/benchmark.rs).
-- Host defaults and native output conversion are in the [Python Performance bindings](../../../../finstack-quant-py/src/bindings/analytics/performance.rs) and [WASM Performance bindings](../../../../finstack-quant-wasm/src/api/analytics/performance.rs); the [existing core wire adapters](../../../../finstack-quant/core/src/wire/non_finite.rs) own sentinel spelling.
-- Located inline `rolling_greeks_stays_close_to_exact_recomputation_on_long_series`, constant-window and NaN-exit tests compare to fresh OLS windows. [Audit regressions](../../../../finstack-quant/analytics/tests/audit_regressions.rs) cover outlier/constant spans and tiny nonzero benchmark variance. They are numerical consistency cases, not independent regression-oracle validation or wire roundtrips for RollingGreeks.
-- [Accuracy/stability reference](../../../REFERENCES.md#higham-accuracy-and-stability) is context, not provenance for the exact 64-step/relative-trigger settings.
-
-No tests, serialization experiments or benchmarks were run.
-
-## Follow-up tracking
-
-Implementation reconciliation and missing evidence are tracked in the
-[rolling alpha/beta follow-up](../FOLLOW_UPS.md#analytics-rolling-regression).
+[benchmark.rs](../../../../finstack-quant/analytics/src/benchmark.rs), [performance/benchmark.rs](../../../../finstack-quant/analytics/src/performance/benchmark.rs). The [crate integration tests](../../../../finstack-quant/analytics/tests/main.rs), inline numerical regressions and [schema contracts](../../../../finstack-quant/analytics/tests/schema_contract.rs) exercise this scope. See the [inventory validation record](README.md#implementation-evidence) for executed checks and evidence limits.

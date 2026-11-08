@@ -1,8 +1,9 @@
 {
-  "description": "Native analytics.Performance correlation matrix of a host panel of four sleeves' daily decimal returns over 60 business days from 2024-01-02 (tests/analytics/correlation/panels.mjs), with Rust's repaired flag, and the native errors of a zero-variance series, an interior missing return and two series with no overlapping observations. Gaps are null; the panels live in panels.mjs and only the valid one is stored.",
+  "description": "Native analytics.Performance correlation matrix of a host panel of four sleeves' daily decimal returns over 60 business days from 2024-01-02 (tests/analytics/correlation/panels.mjs), with the shared sample count and return-ending bounds, and the native errors of a zero-variance series, an interior missing return and two series with no overlapping observations. Gaps are null; the panels live in panels.mjs and only the valid one is stored.",
   "request": {
     "panel": {
       "dates": [
+        "2023-12-29",
         "2024-01-02",
         "2024-01-03",
         "2024-01-04",
@@ -121,28 +122,30 @@
   "result": {
     "tickerNames": ["Rates carry", "Credit", "Equity", "Gold"],
     "matrix": [
-      [1, 0.7876145234589598, -0.891043840174331, 0.8021068533159883],
-      [0.7876145234589598, 1, -0.7134021138596204, 0.7322050406903554],
-      [-0.891043840174331, -0.7134021138596204, 1, -0.5846128203879013],
-      [0.8021068533159883, 0.7322050406903554, -0.5846128203879013, 1]
+      [1, 0.7876145234589594, -0.891043840174331, 0.8021068533159882],
+      [0.7876145234589594, 1, -0.7134021138596204, 0.7322050406903554],
+      [-0.891043840174331, -0.7134021138596204, 1, -0.5846128203879016],
+      [0.8021068533159882, 0.7322050406903554, -0.5846128203879016, 1]
     ],
-    "repaired": false
+    "nObs": 60,
+    "startDate": "2024-01-02",
+    "endDate": "2024-03-25"
   },
   "errors": {
     "zeroVariance": {
       "name": "FinstackError",
       "kind": "validation",
-      "message": "Invalid return series for ticker \"<0,3>\" at row 0: correlation pair (0, 3) has a zero-variance series"
+      "message": "Validation error: correlation is undefined for a constant common-sample column"
     },
     "interiorGap": {
       "name": "FinstackError",
       "kind": "validation",
-      "message": "Invalid return series for ticker \"Credit\" at row 30: interior non-finite return (NaN)"
+      "message": "Validation error: panel: Invalid return series for ticker \"Credit\" at row 30: returns must be finite and at least -1, with wipeout allowed only as the final observation"
     },
     "noOverlap": {
       "name": "FinstackError",
       "kind": "validation",
-      "message": "Invalid return series for ticker \"<0,3>\" at row 0: correlation pair (0, 3) has fewer than 2 overlapping observations"
+      "message": "Validation error: correlation requires at least two common observations and one ticker"
     }
   }
 }

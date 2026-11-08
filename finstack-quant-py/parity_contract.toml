@@ -239,20 +239,22 @@ status = "exists"
 aggregation  = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via Performance.period_stats; freestanding bindings removed in paredown" }
 benchmark    = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via Performance.beta / .greeks / .rolling_greeks; freestanding bindings removed" }
 drawdown     = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via Performance.max_drawdown / .mean_drawdown / .get_drawdown_series / .drawdown_details" }
-multi_factor  = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via Performance.multi_factor_greeks; MultiFactorResult and ReturnKind are re-exported at the crate root. ReturnKind is built by Rust ReturnKind::from_label(label, risk_free_rate) (excess / total; a non-zero rate with excess is rejected) — no binding-side parse tables." }
-performance  = { python = "finstack_quant.analytics", status = "flattened", note = "Performance class is the panel entry point on finstack_quant.analytics. Rust/Python accessors use callable get_* names, including get_ticker_index; WASM uses the corresponding get* camelCase methods. Result-object fields remain properties. Canonical Rust Performance::periodic_returns is shared as Python Performance.periodic_returns and WASM Performance.periodicReturns. Rust returns PeriodicReturn {date, value} points: WASM emits them as plain `{date, value}` objects (TS `PeriodicReturn`), Python as `(date, value)` tuples. Rolling methods return Rust DatedSeries {values, dates, value_column} (value_column = Rust RollingMetric name): Python wraps it as the DatedSeries class (to_json is the same object), WASM returns it as a plain object with values as a Float64Array. Rust Performance::correlation_matrix returns (matrix, repaired): Python returns the same `(matrix, repaired)` tuple, WASM the plain object `{matrix, repaired}`. Omitted arguments on both hosts resolve to the Rust `finstack_quant_analytics::DEFAULT_*` constants (DEFAULT_FREQUENCY, DEFAULT_PERIODIC_FREQUENCY, DEFAULT_ROLLING_WINDOW, DEFAULT_CONFIDENCE, DEFAULT_DRAWDOWN_COUNT, DEFAULT_ANNUALIZE, DEFAULT_RISK_FREE_RATE, DEFAULT_MAR — also the omega threshold), ReturnKind::from_label(None, ..) (excess), CagrDayCount::default() (act365_25) and FiscalConfig::default() (calendar year). Both hosts take the core FiscalConfig handle (Python fiscal_config, WASM fiscalConfig); omitted, None or null passes Rust None, so FYTD uses the calendar year and period_stats uses Gregorian periods with ISO weeks. WASM joins lookbackReturns and periodStats with raw *WithFiscalConfig twins in exports/analytics.js because wasm-bindgen cannot borrow an optional handle. Rust, Python, and WASM always expose LookbackReturns.fytd as a non-null per-ticker vector; the serialized field name is fytd." }
+multi_factor  = { python = "finstack_quant.analytics", status = "flattened", note = "Raw multi_factor_greeks requires explicit excess/total interpretation and observation factor; the Performance adapter accepts total investment returns and explicit annual effective cash. ReturnKind::from_label owns interpretation validation." }
+performance  = { python = "finstack_quant.analytics", status = "flattened", note = "Performance validates actual valuation grids (L dates, L prices or L-1 returns), optional declared frequency and benchmark. Numerical assumptions (annualize, cash, MAR, confidence, windows, episode counts and grouping frequency) are explicit. CorrelationResult carries common-sample matrix provenance and has no repair flag. CAGR defaults to ACT/365F and accepts core DayCountContext. LookbackReturns retains resolved fiscal context and actual per-ticker sample coverage. All calculation errors propagate atomically through the shared Rust owner." }
 regression   = { python = "finstack_quant.analytics", status = "flattened", note = "constrained_least_squares (Jeet & Partani 2023, Appendix A) exposed flat on finstack_quant.analytics; plain numeric list[float] API, no JSON envelope" }
-returns      = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via the one Rust constructor Performance::new(&PerformancePanel), whose panel kind (prices or returns) selects the price-to-return or return-span path. Python Performance(prices) and Performance.from_returns(returns) are pandas host adapters (DataFrame or single-asset Series; row index = dates, column headings = ticker names) that build the PerformancePanel; Performance.from_panel(PerformancePanel(...)) is the Rust-shaped path and maps to the WASM constructor `new Performance(panel)`. `to_json` / `from_json` (WASM `toJson` / `fromJson`) are the serde round trip of the Rust Performance panel in both hosts." }
-risk_metrics = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via Performance scalar methods (CAGR/Sharpe/Sortino/VaR/etc.) plus the four freestanding single-series functions analytics.sharpe / sortino / volatility / max_drawdown (WASM camelCase twins). CagrDayCount parses via Rust FromStr (labels act365_25 / DayCount names); ReturnKind is built by Rust ReturnKind::from_label(label, risk_free_rate) (excess / total; a non-zero rate with excess is rejected) — no binding-side parse tables. Python Performance.cagr(day_count=...) additionally accepts a core DayCount object; WASM Performance.cagr(dayCount) accepts labels only (pass dayCount.toString() to reuse a core.DayCount handle). Both resolve through Rust CagrDayCount (FromStr, or the DayCount variant directly)." }
+returns      = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via the one Rust constructor Performance::new(&PerformancePanel), whose panel kind (prices or returns) selects the price-to-return or return-span path. Python Performance(prices) and Performance.from_returns(returns, initial_date) are pandas host adapters (DataFrame or single-asset Series; row index = dates, column headings = ticker names) that build the PerformancePanel; Performance.from_panel(PerformancePanel(...)) is the Rust-shaped path and maps to the WASM constructor `new Performance(panel)`. `to_json` / `from_json` (WASM `toJson` / `fromJson`) are the serde round trip of the Rust Performance panel in both hosts." }
+risk_metrics = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via Performance scalar methods (CAGR/Sharpe/Sortino/VaR/etc.) plus the four freestanding single-series functions analytics.sharpe / sortino / volatility / max_drawdown (WASM camelCase twins). CagrDayCount parses via Rust FromStr (labels act365_25 / DayCount names); ReturnKind is built by Rust ReturnKind::from_label(label, risk_free_rate) (explicit excess / total; any supplied cash with excess is rejected) — no binding-side parse tables. Python Performance.cagr(day_count=...) additionally accepts a core DayCount object; WASM Performance.cagr(dayCount) accepts labels only (pass dayCount.toString() to reuse a core.DayCount handle). Both resolve through Rust CagrDayCount (FromStr, or the DayCount variant directly)." }
 
 [crates.analytics.symbols]
 public = [
     "AnalyticsError",
     "BetaResult",
+    "CorrelationResult",
     "DatedSeries",
     "DrawdownEpisode",
     "GreeksResult",
     "LookbackReturns",
+    "LookbackSample",
     "MultiFactorResult",
     "Performance",
     "PerformancePanel",
@@ -260,8 +262,10 @@ public = [
     "RollingGreeks",
     "constrained_least_squares",
     "max_drawdown",
+    "multi_factor_greeks",
     "sharpe",
     "sortino",
+    "validate_summary",
     "volatility",
 ]
 
@@ -2000,7 +2004,7 @@ excluded = { "__version__" = "dunder" }
 
 [parity.modules."finstack_quant.analytics"]
 js = "analytics"
-types = { AnalyticsError = "FinstackError", BetaResult = "BetaResult", DatedSeries = "DatedSeries", DrawdownEpisode = "DrawdownEpisode", GreeksResult = "GreeksResult", LookbackReturns = "LookbackReturns", MultiFactorResult = "MultiFactorResult", PerformancePanel = "PerformancePanel", PeriodStats = "PeriodStats", RollingGreeks = "RollingGreeks" }
+types = { AnalyticsError = "FinstackError", BetaResult = "BetaResult", CorrelationResult = "CorrelationResult", DatedSeries = "DatedSeries", DrawdownEpisode = "DrawdownEpisode", GreeksResult = "GreeksResult", LookbackReturns = "LookbackReturns", LookbackSample = "LookbackSample", MultiFactorResult = "MultiFactorResult", PerformancePanel = "PerformancePanel", PeriodStats = "PeriodStats", RollingGreeks = "RollingGreeks" }
 
 [parity.modules."finstack_quant.attribution"]
 js = "attribution"

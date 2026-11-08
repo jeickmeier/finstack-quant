@@ -17,11 +17,11 @@ def _perf() -> Performance:
     bench = [random.gauss(0.0004, 0.01) for _ in range(160)]
     fund = [0.00025 + 0.9 * bench[i] + random.gauss(0.0, 0.004) for i in range(160)]
     df = pd.DataFrame({"FUND": fund, "BENCH": bench}, index=dates)
-    return Performance.from_returns(df, benchmark_ticker="BENCH", frequency="daily")
+    return Performance.from_returns(df, initial_date=dt.date(2023, 12, 29), benchmark_ticker="BENCH", frequency="daily")
 
 
 def test_benchmark_tearsheet_renders_sections_and_kpis() -> None:
-    ts = benchmark_tearsheet(_perf(), generated=dt.date(2026, 6, 23))
+    ts = benchmark_tearsheet(_perf(), risk_free_rate=0.0, window=63, generated=dt.date(2026, 6, 23))
     assert isinstance(ts, TearSheet)
     html = ts.to_html()
     assert "Benchmark-Relative Statistics" in html
@@ -38,7 +38,7 @@ def test_benchmark_tearsheet_renders_sections_and_kpis() -> None:
 
 def test_benchmark_tearsheet_default_ticker_is_non_benchmark() -> None:
     # BENCH is benchmark_idx=1; default ticker must be the FUND (idx 0).
-    ts = benchmark_tearsheet(_perf(), generated=dt.date(2026, 6, 23))
+    ts = benchmark_tearsheet(_perf(), risk_free_rate=0.0, window=63, generated=dt.date(2026, 6, 23))
     assert ts.title == "FUND"
 
 
@@ -52,6 +52,8 @@ def test_benchmark_tearsheet_multifactor_section() -> None:
     }
     html = benchmark_tearsheet(
         _perf(),
+        risk_free_rate=0.0,
+        window=63,
         multi_factor=mf,
         factor_names=["Market", "Size", "Value"],
         sections=["multifactor"],
@@ -63,21 +65,25 @@ def test_benchmark_tearsheet_multifactor_section() -> None:
 
 
 def test_benchmark_tearsheet_multifactor_absent_omitted() -> None:
-    html = benchmark_tearsheet(_perf(), sections=["multifactor"], generated=dt.date(2026, 6, 23)).to_html()
+    html = benchmark_tearsheet(
+        _perf(), risk_free_rate=0.0, window=63, sections=["multifactor"], generated=dt.date(2026, 6, 23)
+    ).to_html()
     assert "Multi-Factor Attribution" not in html
 
 
 def test_benchmark_tearsheet_section_selection() -> None:
-    ts = benchmark_tearsheet(_perf(), sections=["summary"], generated=dt.date(2026, 6, 23))
+    ts = benchmark_tearsheet(
+        _perf(), risk_free_rate=0.0, window=63, sections=["summary"], generated=dt.date(2026, 6, 23)
+    )
     assert [s.title for s in ts.sections] == ["Benchmark-Relative Statistics"]
 
 
 def test_benchmark_tearsheet_rejects_unknown_section() -> None:
     with pytest.raises(ValueError, match="unknown section"):
-        benchmark_tearsheet(_perf(), sections=["summary", "nope"])
+        benchmark_tearsheet(_perf(), risk_free_rate=0.0, window=63, sections=["summary", "nope"])
 
 
 def test_benchmark_tearsheet_deterministic() -> None:
-    a = benchmark_tearsheet(_perf(), generated=dt.date(2026, 6, 23)).to_html()
-    b = benchmark_tearsheet(_perf(), generated=dt.date(2026, 6, 23)).to_html()
+    a = benchmark_tearsheet(_perf(), risk_free_rate=0.0, window=63, generated=dt.date(2026, 6, 23)).to_html()
+    b = benchmark_tearsheet(_perf(), risk_free_rate=0.0, window=63, generated=dt.date(2026, 6, 23)).to_html()
     assert a == b

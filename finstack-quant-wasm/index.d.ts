@@ -6,7 +6,7 @@
 
 import type * as wasm from './pkg/finstack_quant_wasm.js';
 import type * as generated from './types/generated/index.js';
-import type { CashFlowBuilder, CashFlowSchedule, CreditIndexData, DiscountCurve, FiscalConfig, FxMatrix, HazardCurve, HullWhiteParams, ImProfile, InflationIndex, JsonInput, LookbackReturns, MarketContext, MarketContextCurve, MoneyValue, MvaResult, Performance, PeriodStats, ScalarTimeSeries, ScheduleBuilder, SifmaSettlementClass, endOfMonth, start } from './pkg/finstack_quant_wasm.js';
+import type { CashFlowBuilder, CashFlowSchedule, CreditIndexData, DayCountContext, DiscountCurve, FiscalConfig, FxMatrix, HazardCurve, HullWhiteParams, ImProfile, InflationIndex, JsonInput, LookbackReturns, MarketContext, MarketContextCurve, MoneyValue, MvaResult, Performance, PeriodStats, ScalarTimeSeries, ScheduleBuilder, SifmaSettlementClass, endOfMonth, start } from './pkg/finstack_quant_wasm.js';
 
 export { default } from './pkg/finstack_quant_wasm.js';
 export type * from './pkg/finstack_quant_wasm.js';
@@ -271,7 +271,7 @@ declare module './pkg/finstack_quant_wasm.js' {
      * skipped. The first included simple return still spans the prior close.
      * @param refDate - ISO-8601 date on which MTD, QTD, YTD, and FYTD windows end. Omitted or `null` is the last active date; the result's `ref_date` states the date used.
      * @param fiscalConfig - Optional `FiscalConfig` handle for FYTD. Omitted or `null` is the calendar year (`FiscalConfig::default`).
-     * @returns The window end `ref_date` and per-ticker `{ mtd, qtd, ytd, fytd }` numeric arrays of lookback returns as decimal fractions; `fytd` is never null.
+     * @returns LookbackReturns with return estimates, fiscal context and per-ticker counts and actual holding bounds for each selected window; unavailable numeric results remain NaN.
      * @throws Error - Rejects an invalid ISO `ref_date`, an omitted one while no dates are active, or a result that cannot be serialized to JavaScript.
      */
     lookbackReturns(refDate?: string | null, fiscalConfig?: FiscalConfig | null): LookbackReturns;
@@ -279,12 +279,20 @@ declare module './pkg/finstack_quant_wasm.js' {
      * Aggregated period statistics for one asset at the given frequency. Without
      * a fiscal calendar, Gregorian periods are bucketed with ISO weeks.
      * @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
-     * @param aggregationFrequency - Optional aggregation frequency token; defaults to monthly.
+     * @param aggregationFrequency - Required explicit grouping frequency token; no inference from observation frequency.
      * @param fiscalConfig - Optional FiscalConfig handle; omitted or null buckets Gregorian periods with ISO weeks.
      * @returns Period statistics object for the selected ticker at the requested frequency.
      * @throws Error - Rejects an unsupported `aggregation_frequency`, an out-of-range `ticker_idx`, an unrepresentable period boundary, or period statistics that cannot be serialized to JavaScript.
      */
-    periodStats(tickerIdx: number, aggregationFrequency?: string, fiscalConfig?: FiscalConfig | null): PeriodStats;
+    periodStats(tickerIdx: number, aggregationFrequency: string, fiscalConfig?: FiscalConfig | null): PeriodStats;
+    /**
+     * Actual-date compound annual growth using ACT/365F unless another clock is selected.
+     * @param dayCount - Optional day-count label; default act_365f. Explicit act365_25 selects actual-days/365.25.
+     * @param ctx - Optional validated DayCountContext; omission supplies the empty context. Required calendar/coupon inputs must be explicitly populated for clocks that use them.
+     * @returns Per-ticker Float64Array with NaN for unavailable history or zero year fraction.
+     * @throws Error - Rejects unknown clocks, missing/incompatible context, invalid actual spans or unrepresentable requested results.
+     */
+    cagr(dayCount?: string, ctx?: DayCountContext): Float64Array;
   }
   /** Members the facade adds to `ScheduleBuilder` (exports/core.js). */
   interface ScheduleBuilder {
@@ -1746,44 +1754,109 @@ export interface AnalyticsNamespace {
    * @param weights - Holding weights whose weighted return `w'r` must be fully reproduced by `w'Xf` (e.g. benchmark weights for a benchmark-return attribution).
    * @returns Constrained factor returns `f`, one per factor, satisfying `w'Xf = w'r` to numerical precision.
    * @throws Error - A `TypeError` (kind `invalid_type`) if `nFactors` is not a finite, non-negative whole number within the WebAssembly `usize` range. A validation error from Rust if `nFactors` is zero or `returns` is empty; if vector dimensions are inconsistent (including an overflowing `n_assets * n_factors`); if any vector value is non-finite; if the design matrix is rank-deficient; if coefficient rescaling or the constraint correction produces a non-finite value; or if the correction direction is degenerate and OLS does not already satisfy the constraint.
+   * @example
+   * ```typescript
+   * import init, { analytics } from "finstack-quant-wasm";
+   * await init();
+   * console.log(analytics.constrainedLeastSquares([1, 2], 1, [0.01, 0.02], [0.5, 0.5])[0]); // 0.01
+   * ```
    */
   readonly constrainedLeastSquares: typeof wasm.constrainedLeastSquares;
   /**
-   * Maximum peak-to-trough drawdown of one return series.
+   * Equal-weight raw multifactor intercept OLS with explicit response interpretation.
    *
-   * @param returns - Per-period simple decimal returns in date order; they are compounded into a wealth path before the running-peak decline is measured.
-   * @returns Non-positive fraction (`-0.25` is a 25% loss); `0` when the series never falls below its running peak or is empty. Non-finite returns or reconstructed drawdowns yield `NaN`.
-   * @throws Error - Rejects a `returns` value that is not a numeric array.
+   * Factors remain caller-prepared and are never automatically cash-adjusted.
+   * This raw API accepts finite statistical responses, including already-excess
+   * returns below -1, whereas the Performance adapter owns total-investment panels.
+   * @param returns - Finite response observations in exact caller-aligned order.
+   * @param factorReturns - One finite row per already-prepared factor, each with exactly the response observation count.
+   * @param periodsPerYear - Required finite positive observation frequency for annualized intercept and residual sample risk.
+   * @param returnKind - Required exact label `"excess"` or `"total"`; excess leaves response unchanged and total subtracts geometric periodic cash from response only.
+   * @param riskFreeRate - Annual-effective decimal cash rate greater than -1, required for total and forbidden for excess; omit for excess.
+   * @returns MultiFactorResult with annualized alpha, raw factor slopes, R-squared, adjusted R-squared, residual sample volatility and observation count; undefined field-specific estimates are numeric NaN.
+   * @throws Error - Rejects invalid labels/cash/frequency, misaligned or nonfinite samples, empty factors, deficient normalized numerical rank, or unrepresentable requested results.
+   * @example
+   * ```typescript
+   * import init, { analytics } from "finstack-quant-wasm";
+   * await init();
+   * const result = analytics.multiFactorGreeks([0.03, 0.01, 0.05], [[0.01, 0, 0.02]], 12, "excess");
+   * console.log(result.betas[0]); // 2
+   * ```
+   */
+  readonly multiFactorGreeks: typeof wasm.multiFactorGreeks;
+  /**
+   * Validate that a table satisfies the canonical fixed analytics summary contract.
+   *
+   * Structural table validity does not establish the summary's financial metadata.
+   * This checks identities, units, required policy inputs, field-specific result
+   * availability and sample provenance; it does not recalculate the underlying data.
+   * @param table - Native TableEnvelope object preserving numeric NaN/infinity, or canonical JSON text using the established nan/inf/-inf numeric-result sentinels. Unknown fields, inappropriate nulls and inconsistent metadata are rejected.
+   * @throws Error - Rejects malformed generic envelopes or an invalid analytics summary shape, column order, required inputs, sample provenance or result domain.
+   * @example
+   * ```typescript
+   * import init, { analytics } from "finstack-quant-wasm";
+   * await init();
+   * const p = new analytics.Performance({ dates: ["2025-01-01", "2025-01-02"], series: [[0]], kind: "returns", ticker_names: ["A"], benchmark_ticker: "A", frequency: "daily" });
+   * analytics.validateSummary(p.summary(0, 0, 0, 0.95));
+   * p.free();
+   * ```
+   */
+  readonly validateSummary: typeof wasm.validateSummary;
+  /**
+   * Maximum geometric peak-to-trough percentage decline from initial unit wealth.
+   * @param returns - Ordered finite simple investment returns at least -1; exact terminal -1 is allowed only at the end and yields complete drawdown.
+   * @returns Nonpositive decimal depth, such as -0.25 for a 25% loss; NaN for empty history and zero for an observed path without decline.
+   * @throws Error - Rejects malformed investment-return histories and unrepresentable numerical results.
+   * @example
+   * ```typescript
+   * import init, { analytics } from "finstack-quant-wasm";
+   * await init();
+   * console.log(analytics.maxDrawdown([0.1, -1])); // -1
+   * ```
    */
   readonly maxDrawdown: typeof wasm.maxDrawdown;
   /**
-   * Sharpe ratio of one return series (annualized excess mean over
-   * annualized sample volatility; the same kernel as `Performance.sharpe`).
-   *
-   * @param returns - Per-period simple decimal returns in date order.
-   * @param riskFreeRate - Annualized risk-free rate as a decimal (`0.02` for 2%); defaults to `0`.
-   * @param periodsPerYear - Observations per year used to annualize; defaults to `252`.
-   * @returns The Sharpe ratio; `±Infinity` when volatility is zero with a non-zero excess return, `NaN` for fewer than two observations, non-finite inputs, or an invalid `periodsPerYear`.
-   * @throws Error - Rejects a `returns` value that is not a numeric array.
+   * Arithmetic cash-excess mean divided by sample risk, scaled by square-root frequency.
+   * @param returns - Ordered finite simple investment returns at least -1; a terminal -1 is allowed only at the end.
+   * @param riskFreeRate - Required annual-effective decimal cash rate greater than -1; geometrically converted to an observation-period rate.
+   * @param periodsPerYear - Required finite positive observation frequency; dates are not inferred.
+   * @returns Annualized Sharpe ratio; NaN for fewer than two observations or zero over zero, and signed infinity for genuine zero risk with nonzero excess.
+   * @throws Error - Rejects invalid return/cash/frequency domains and unrepresentable numerical results.
+   * @example
+   * ```typescript
+   * import init, { analytics } from "finstack-quant-wasm";
+   * await init();
+   * console.log(analytics.sharpe([0.02, 0, -0.01], 0, 12));
+   * ```
    */
   readonly sharpe: typeof wasm.sharpe;
   /**
-   * Annualized Sortino ratio of one return series.
-   *
-   * @param returns - Per-period simple decimal returns in date order.
-   * @param mar - Minimum acceptable return per period as a decimal (not annualized); defaults to `0`.
-   * @param periodsPerYear - Observations per year used to annualize; defaults to `252`.
-   * @returns The Sortino ratio; `±Infinity` with no downside deviation but a non-zero excess mean, `NaN` for fewer than two observations, non-finite inputs, or an invalid `periodsPerYear`.
-   * @throws Error - Rejects a `returns` value that is not a numeric array.
+   * All-observation downside Sortino ratio using an explicit per-observation hurdle.
+   * @param returns - Ordered finite simple investment returns at least -1; a terminal -1 is allowed only at the end.
+   * @param mar - Required finite per-observation decimal minimum acceptable return; no annual cash reinterpretation.
+   * @param periodsPerYear - Required finite positive observation frequency used for square-root scaling.
+   * @returns Annualized Sortino; NaN with fewer than two observations or zero over zero, and positive infinity with nonzero excess and genuine zero downside.
+   * @throws Error - Rejects invalid return/frequency/MAR domains and unrepresentable numerical results.
+   * @example
+   * ```typescript
+   * import init, { analytics } from "finstack-quant-wasm";
+   * await init();
+   * console.log(analytics.sortino([0.02, 0, -0.01], 0, 12)); // 2
+   * ```
    */
   readonly sortino: typeof wasm.sortino;
   /**
-   * Annualized sample volatility (n−1 denominator) of one return series.
-   *
-   * @param returns - Per-period simple decimal returns in date order.
-   * @param periodsPerYear - Observations per year; the per-period standard deviation is scaled by its square root. Defaults to `252`.
-   * @returns Annualized volatility as a decimal; `0` for an empty array, `NaN` for non-finite inputs or an invalid `periodsPerYear`.
-   * @throws Error - Rejects a `returns` value that is not a numeric array.
+   * Sample standard deviation with an n-1 denominator and square-root frequency scaling.
+   * @param returns - Ordered finite simple investment returns at least -1; a terminal -1 is allowed only at the end.
+   * @param periodsPerYear - Required finite positive number of observations per year.
+   * @returns Annualized decimal sample volatility; NaN with fewer than two observations and zero for a sufficiently observed constant series.
+   * @throws Error - Rejects invalid return/frequency domains and unrepresentable numerical results.
+   * @example
+   * ```typescript
+   * import init, { analytics } from "finstack-quant-wasm";
+   * await init();
+   * console.log(analytics.volatility([0.01, -0.01], 12));
+   * ```
    */
   readonly volatility: typeof wasm.volatility;
 }
@@ -9576,7 +9649,7 @@ export interface StatementsNamespace {
    * (Rust `StatementResult::to_table_wide`): one row per period in
    * chronological order and one column per node in declaration order.
    * @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
-   * @returns `TableEnvelope` with a `period_id` column followed by one value column per node; a node with no value in a period holds `NaN` (serialized as `null`), not zero.
+   * @returns `TableEnvelope` with a `period_id` column followed by one value column per node; a node with no value in a period holds native numeric `NaN`, not zero. Canonical table JSON retains the established `"nan"` sentinel.
    *
    * # Errors
    *

@@ -40,13 +40,11 @@ import type {
   ScheduleSpec,
   ScheduleWarning,
   ScorecardScale,
-  TableColumn,
-  TableColumnData,
-  TableEnvelope,
 } from '../types/generated/core/index.js';
 import type {
   DrawdownEpisode,
-  LookbackReturns,
+  LookbackSample,
+  CorrelationResult,
   PerformancePanel,
   PeriodicReturn,
 } from '../types/generated/analytics/index.js';
@@ -171,7 +169,6 @@ import type {
   CheckSeverity,
   CheckSummary,
   Materiality,
-  MonteCarloResults,
   StatementResult,
 } from '../types/generated/statements/index.js';
 import type {
@@ -290,13 +287,16 @@ export type {
   ScheduleSpec,
   ScheduleWarning,
   ScorecardScale,
-  TableColumn,
-  TableColumnData,
-  TableEnvelope,
   ToleranceConfig,
 };
 export type { Period, RatingLevel } from '../types/generated/core/index.js';
-export type { DrawdownEpisode, LookbackReturns, PerformancePanel, PeriodicReturn };
+export type {
+  DrawdownEpisode,
+  LookbackSample,
+  CorrelationResult,
+  PerformancePanel,
+  PeriodicReturn,
+};
 export type { CovenantReport };
 export type {
   CrossSectionalOp,
@@ -417,7 +417,6 @@ export type {
   CheckSeverity,
   CheckSummary,
   Materiality,
-  MonteCarloResults,
   StatementResult,
 };
 export type {
@@ -512,6 +511,48 @@ export type WithFields<T, R> = { [K in keyof T]: K extends keyof R ? R[K] : T[K]
  * Named `MoneyValue` in JavaScript because `Money` is the wasm-bindgen class.
  */
 export type MoneyValue = generated.core.Money;
+
+/**
+ * Native table columns retain numeric NaN/infinity in non-null float64 storage.
+ * Canonical JSON wire columns remain available under generated.core.TableColumnData.
+ */
+export type TableColumnData =
+  | Exclude<generated.core.TableColumnData, { type: 'float64' }>
+  | {
+      /** Non-null floating-point storage; unavailable results remain numeric NaN. */
+      type: 'float64';
+      /** Native numeric values, including permitted NaN and signed infinities. */
+      values: number[];
+    };
+
+/** A native typed table column, preserving literal string values and metadata. */
+export type TableColumn = WithFields<generated.core.TableColumn, { data: TableColumnData }>;
+
+/** A native column-oriented table with numeric float64 results and shared row count. */
+export type TableEnvelope = WithFields<generated.core.TableEnvelope, { columns: TableColumn[] }>;
+
+/** Monte Carlo output with its optional nested path table in native numeric form. */
+export type MonteCarloResults = WithFields<
+  generated.statements.MonteCarloResults,
+  { path_data: TableEnvelope | null }
+>;
+
+/**
+ * Lookback return estimates with native numeric columns and canonical sample coverage.
+ */
+export type LookbackReturns = WithFields<
+  generated.analytics.LookbackReturns,
+  {
+    /** Calendar month-to-date estimates in ticker order. */
+    mtd: number[];
+    /** Calendar quarter-to-date estimates in ticker order. */
+    qtd: number[];
+    /** Calendar year-to-date estimates in ticker order. */
+    ytd: number[];
+    /** Fiscal year-to-date estimates in ticker order. */
+    fytd: number[];
+  }
+>;
 
 /**
  * Aggregate statistics for grouped periodic returns (Rust `PeriodStats`); non-finite ratios are numbers.

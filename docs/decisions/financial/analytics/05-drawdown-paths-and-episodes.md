@@ -4,29 +4,15 @@
 episode, output and failure package below (2026-11-07). Other panel, wealth
 and summary policies retain the scope of their owning records.
 
-**Implementation status:** Observed in the source paths below, including the stated discrepancies and fallback behavior.
+**Implementation status:** Implemented in the analytics decision reconciliation dated 2026-11-08. The accepted sections below define the current contract.
 
-**Validation status:** Source inspected; test evidence inspected or located as identified below, not executed. No financial accuracy certification or runtime change is implied.
+**Validation status:** Scoped implementation checks and their limits are recorded in the [analytics inventory](README.md#implementation-evidence). A passing numerical fixture establishes its stated case; it does not certify a population estimator or every supported input.
 
-**Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See the [scope and exact source manifest](README.md).
-
-## Choice and input domain
-
-The [accepted record-06 package](06-drawdown-reward-and-cdar.md#accepted-decision-drawdown-reward-and-cdar)
-constrains its metric aggregations: equal return-endpoint weights, observed
-zero drawdowns included, no extra baseline observation in moment/tail
-denominators, open episode valleys included, and explicit Sterling count.
-The path, window, episode, date, duration and standalone measure contracts
-are separately accepted in this record below.
-
-Drawdowns are measured relative to an initial wealth peak of one and subsequent observed peaks, using log wealth so absolute wealth need not be representable. Each observation receives equal weight in path averages; actual dates matter for episode durations. Performance windows are independently rebased. This is observed-window drawdown, not a continuous-time maximum between observations.
+**Audit provenance:** The original source audit was performed on 2026-11-05 at `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. Its historical discrepancies are superseded by the accepted contracts and this implementation. The [source ledger](coverage.json) retains source ownership and dated inspection fingerprints.
 
 ## Accepted decision: drawdown paths and episodes
 
-**Accepted:** 2026-11-07. **Implementation:** Partial; selected source
-inspected at `5140b499cc`. Recovery cutoff, exact alignment, missing-history
-outcomes, display-count defaults, episode metadata and error propagation
-require reconciliation. No runtime estimator checks were executed.
+**Accepted:** 2026-11-07.
 
 This package covers path, window, scalar-measure, episode, output and failure
 choices in this record. Accepted terminal-loss/actual-date requirements and
@@ -95,7 +81,7 @@ immediate loss is not missing-peak censoring. Also remove the fixed
 `near_recovery_threshold = 0.01 * valley_depth` field. It is a derived 99%-
 recovery alert threshold rather than an observed recovery event. This package
 adds no alert configuration. Binding/schema and existing UI episode-table
-columns must be reconciled with both removals when implemented.
+columns follow both removals.
 
 ### Benchmark comparison, errors and qualification
 
@@ -126,44 +112,6 @@ supports RMS percentage drawdowns and explains the limits of sparse
 observations. These references do not establish identical date/ranking/
 duration conventions or qualify extreme-scale and near-recovery arithmetic.
 
-For daily dates January 1–6 with baseline-inclusive drawdowns
-`[0, -10%, -20%, -20%, 0, -5%]`, the first episode starts January 1, has its
-first deepest valley January 3, recovers January 5 and lasts four days. The
-second starts January 5, has its observed valley January 6, has no recovery
-date and has elapsed duration one day. The initial zero is excluded from the
-five endpoint observations used by scalar measures.
-Reconciliation and independent qualification are owned by the
-[record-05 follow-up](../FOLLOW_UPS.md#analytics-drawdown-paths-and-episodes).
+## Implementation evidence
 
-## Algorithm and controls
-
-1. Accumulate log wealth L with the shared engine; update running peak H=max(H,L), initialized to zero; emit `expm1(L−H)`. Drawdowns are signed fractions at or below zero for valid inputs. Empty input emits an empty series; shared invalid/wipeout behavior is in [record 02](02-wealth-and-annualization.md).
-2. Episode segmentation enters when `d < −1e−15`, starts at the prior observation if available, and records the first strictly deepest valley. A drawdown at the first available element marks `truncated_at_start=true`. The next value at/above the threshold closes the episode; an unclosed episode has no recovery date.
-3. Dates/values are aligned to their shorter length inside the private episode helper. Duration is calendar days from start to recovery, or to the last observed date for an open episode. Reported `near_recovery_threshold` is valley depth × .01; it is metadata, not the actual episode-closing rule.
-4. `drawdown_details(n)` sorts episode valleys deepest first and truncates to n, including open episodes. `worst_episode_depths(n)` supplies the same ordered depths without dates. Mean selected-episode drawdown divides by the number retained and returns zero if none.
-5. Maximum drawdown is the minimum path value with zero baseline; any nonfinite path value yields NaN. Ulcer index is root mean square drawdown; Pain index is mean absolute drawdown; ordinary mean drawdown keeps the negative sign. Empty paths return zero for these measures. Maximum duration searches all detected episodes, not only the deepest n.
-
-`Performance` prepends a zero drawdown with the known initial price date when calculating detailed episodes/durations. This preserves the prior peak date for an immediate loss; a return-only panel still relies on its synthesized initial date. Scalar path measures omit that extra zero so their denominator is the number of returns.
-
-The observed path must be reconciled with the
-[accepted terminal-loss decision](02-wealth-and-annualization.md#accepted-decision-terminal-investment-losses).
-The complete accepted package above governs episode, duration, weighting,
-selection and availability behavior; conflicting observed branches remain
-implementation discrepancies.
-
-## Selection, limitations and alternatives
-
-Date-range reset rebuilds drawdowns from the selected return stream, discarding earlier peaks. Benchmark drawdown difference independently constructs the two overlapping return paths then subtracts portfolio-minus-benchmark drawdown pointwise. This is not drawdown of relative wealth. The −1e−15 recovery tolerance is internal, unconfigurable; no trading-day duration option or interpolation between observed peaks exists.
-
-The accepted analysis-window contract independently rebases each window. Carrying prior peaks into it, reporting durations in observation counts, relative-wealth drawdown and continuous high/low drawdown are different unselected methods. The current recovery cutoff, silent alignment truncation, metadata and empty-result substitutions conflict with the accepted package and require reconciliation.
-
-## Implementation and validation evidence
-
-- [Path/episode kernels](../../../../finstack-quant/analytics/src/drawdown.rs), [window/cache and leading-peak handling](../../../../finstack-quant/analytics/src/performance/mod.rs), [detail/benchmark difference dispatch](../../../../finstack-quant/analytics/src/performance/aggregation.rs), and [scalar measures](../../../../finstack-quant/analytics/src/performance/scalar.rs).
-- Located inline tests cover recovered/open episodes, aligned date bounds, hand Pain calculations and shared-wealth consistency. Inspected [audit regressions](../../../../finstack-quant/analytics/tests/audit_regressions.rs) include initial known peak dates and finite relative drawdowns despite absolute wealth overflow; [correctness regressions](../../../../finstack-quant/analytics/tests/correctness_regressions.rs) cover repeated window rebasing. These are local path/algebra tests.
-- [Ulcer reference](../../../REFERENCES.md#martinUlcer1987) supplies historical context, not validation of the internal threshold or sampling choice.
-
-## Follow-up tracking
-
-Implementation reconciliation and missing evidence are tracked in the
-[analytics follow-ups](../FOLLOW_UPS.md#analytics).
+[drawdown.rs](../../../../finstack-quant/analytics/src/drawdown.rs), [performance/aggregation.rs](../../../../finstack-quant/analytics/src/performance/aggregation.rs), [performance/scalar.rs](../../../../finstack-quant/analytics/src/performance/scalar.rs). The [crate integration tests](../../../../finstack-quant/analytics/tests/main.rs), inline numerical regressions and [schema contracts](../../../../finstack-quant/analytics/tests/schema_contract.rs) exercise this scope. See the [inventory validation record](README.md#implementation-evidence) for executed checks and evidence limits.

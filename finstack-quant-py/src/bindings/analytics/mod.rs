@@ -36,10 +36,12 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         [
             "AnalyticsError",
             "BetaResult",
+            "CorrelationResult",
             "DatedSeries",
             "DrawdownEpisode",
             "GreeksResult",
             "LookbackReturns",
+            "LookbackSample",
             "MultiFactorResult",
             "Performance",
             "PerformancePanel",
@@ -47,8 +49,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "RollingGreeks",
             "constrained_least_squares",
             "max_drawdown",
+            "multi_factor_greeks",
             "sharpe",
             "sortino",
+            "validate_summary",
             "volatility",
         ],
     )?;

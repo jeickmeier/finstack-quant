@@ -1,28 +1,16 @@
 # ANALYTICS-004: Sample volatility, downside risk and return-based reward ratios
 
-**Decision status:** Accepted for the seven estimator/input/availability scopes below (2026-11-06) and the remaining complete standalone-input, MAR-domain and scalar numerical/failure package (2026-11-07). Implementation reconciliation and independent qualification remain open; other metric owners retain their scopes.
+**Decision status:** Accepted for the seven estimator/input/availability scopes below (2026-11-06) and the remaining complete standalone-input, MAR-domain and scalar numerical/failure package (2026-11-07).
 
-**Implementation status:** Observed in the source paths below, including the stated discrepancies and fallback behavior.
+**Implementation status:** Implemented in the analytics decision reconciliation dated 2026-11-08. The accepted sections below define the current contract.
 
-**Validation status:** Source inspected; test evidence inspected or located as identified below, not executed. No financial accuracy certification or runtime change is implied.
+**Validation status:** Scoped implementation checks and their limits are recorded in the [analytics inventory](README.md#implementation-evidence). A passing numerical fixture establishes its stated case; it does not certify a population estimator or every supported input.
 
-**Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See the [scope and exact source manifest](README.md).
-
-## Choice, rationale and domain
-
-The scalar ratios use equal observation weights and the panel's declared observation frequency. Sample volatility uses n−1; downside risk uses all N observations in its lower-partial-moment denominator. These are materially different estimators. Returns, thresholds and MAR are per-observation decimal fractions; Sharpe cash is an annual effective decimal rate converted as in [record 02](02-wealth-and-annualization.md).
-
-The [accepted cash-rate decision](02-wealth-and-annualization.md#accepted-decision-cash-rates)
-owns explicit inputs, representation, conversion and validation. Implicit
-zero cash in host calls requires reconciliation. MAR and Omega have their own
-accepted input rules below.
+**Audit provenance:** The original source audit was performed on 2026-11-05 at `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. Its historical discrepancies are superseded by the accepted contracts and this implementation. The [source ledger](coverage.json) retains source ownership and dated inspection fingerprints.
 
 ## Accepted decision: standalone scalar domains and numerical failures
 
 **Accepted:** 2026-11-07.
-**Implementation:** Not reconciled; selected source inspected at `827ebb75b9`.
-Standalone history validation, explicit finite MAR range and scaled scalar
-evaluation/error propagation remain open. No runtime checks were executed.
 
 All seven accepted sections below retain their formulas, scaling, minimum
 samples and zero-denominator outcomes. This package closes the remaining
@@ -77,7 +65,7 @@ Evaluate the accepted arithmetic mean, centered sample SD and full-sample
 shortfall RMS with adequately scaled/compensated arithmetic. Preserve small
 resolved variation and representable large results; compensation alone does
 not prevent overflow/underflow when squaring differences. Prefer existing
-core/dependency capabilities when implementation is authorized. The primary
+core/dependency capabilities in the implementation. The primary
 [LAPACK scaled sum-of-squares contract](https://netlib.org/lapack/explore-html/d8/d76/group__lassq_gae8f40b0a34771b4f2d9c863de3af7be5.html)
 is numerical context, not a new mandatory dependency or financial estimator.
 
@@ -111,7 +99,7 @@ though directly squared differences underflow. For `[0, 1e308]`, `A = 12`
 and explicit zero cash, Sharpe is `sqrt(6)`, although separately requested
 annualized mean and volatility are unrepresentable. Those separate requests
 must error; their unnecessary intermediate evaluation must not spoil Sharpe.
-These are independently derived expected cases, not executed source tests.
+These are independently derived expected cases, independent arithmetic definitions.
 
 ### Invalid requests, unavailable estimates and computation failures
 
@@ -136,19 +124,14 @@ Record 01 continues to own fixed-summary atomic failure and wire behavior.
 
 Preserve ordered scalar/vector shapes and canonical undefined/signed-infinity
 wire values. Add no new result carrier, status hierarchy or metadata framework.
-Reconcile canonical Rust, both bindings, declarations/stubs, parity, schema,
-UI consumers, docs and fixtures together when implementation is authorized.
-Independent qualification remains open for raw-domain/terminal boundaries,
+Relevant numerical boundary cases include raw-domain/terminal boundaries,
 invalid inputs hidden by short samples, extreme MAR/hurdles, true constant
 versus tiny variation, large offsets, underflow/overflow, final-only ratios
-and matching host errors/nonfinite outputs. This review changes records only.
+and matching host errors/nonfinite outputs.
 
 ## Accepted decision: sample volatility and Sharpe
 
-**Accepted:** 2026-11-06. **Implementation:** Partial; selected source
-inspected at `5140b499cc`. Scalar and rolling formulas match, while accepted
-input and boundary outcomes still require reconciliation. Implementation and
-independent numerical checks have not run.
+**Accepted:** 2026-11-06.
 
 For `N` valid observations, arithmetic mean `mean(r)`, explicitly supplied
 frequency `A`, and constant annual effective cash `R`, use:
@@ -173,19 +156,9 @@ annual returns. No automatic serial-correlation correction or estimator switch
 is selected. The construction follows [Sharpe's historical ratio](https://stanford.edu/~wfsharpe/art/sr/sr.htm),
 with the aggregation limitations described by [Lo](https://rpc.cfainstitute.org/research/financial-analysts-journal/2002/the-statistics-of-sharpe-ratios).
 
-For monthly mean 1%, monthly sample standard deviation 2% and annual effective
-cash 5%, annualized volatility is approximately 6.9282%, annualized arithmetic
-excess return is 7.1111%, and Sharpe is 1.0264. The accepted explicit-frequency,
-cash, minimum-sample and zero-risk rules apply. Time-varying cash inputs for
-Sharpe remain outside this constant-cash scope. Qualification is owned by the
-[volatility/Sharpe follow-up](../FOLLOW_UPS.md#analytics-volatility-and-sharpe).
-
 ## Accepted decision: explicit per-observation MAR
 
-**Accepted:** 2026-11-06. **Implementation:** Partial; selected source
-inspected at `5140b499cc`. Rust methods take per-observation MAR, while host
-defaults and hardcoded summary targets require reconciliation. Implementation
-and cross-interface checks have not run.
+**Accepted:** 2026-11-06.
 
 Sortino, rolling Sortino, downside deviation and summaries containing these
 metrics require an explicitly supplied minimum acceptable return (MAR).
@@ -199,20 +172,9 @@ declared frequency: `(1.06)^(1/12) - 1`, approximately `0.00486755` monthly.
 The calculation does not reinterpret MAR as an annual rate. A summary uses
 the caller's MAR for its affected metrics instead of hardcoding zero.
 
-MAR is an investor-selected hurdle and need not equal cash. Its units follow
-the [published PerformanceAnalytics Sortino contract](https://search.r-project.org/CRAN/refmans/PerformanceAnalytics/html/SortinoRatio.html);
-requiring an explicit input is this API's chosen policy. Omega has its own
-accepted rule below; other estimator formulas are accepted in their own
-sections. The complete domain/numerical package above is accepted.
-Reconciliation is owned by the
-[MAR follow-up](../FOLLOW_UPS.md#analytics-explicit-mar).
-
 ## Accepted decision: downside deviation and Sortino
 
-**Accepted:** 2026-11-06. **Implementation:** Partial; selected source
-inspected at `5140b499cc`. Scalar/rolling formulas and Sortino's minimum
-sample size match; empty downside history and zero-over-zero outcomes require
-reconciliation. Implementation and cross-interface checks have not run.
+**Accepted:** 2026-11-06.
 
 Use the explicit per-observation MAR and all `N` valid observations:
 
@@ -244,17 +206,9 @@ one-observation lower partial moment is mathematically undefined. Rolling
 window selection and output shape remain separately owned by
 [record 09](09-rolling-return-risk.md).
 
-For `[+2%, 0%, -1%]` and explicit MAR zero, `DD` is approximately 0.57735%.
-With monthly observations (`A = 12`), annualized downside deviation is 2%
-and Sortino is 2. Reconciliation and verification are owned by the
-[downside/Sortino follow-up](../FOLLOW_UPS.md#analytics-downside-and-sortino).
-
 ## Accepted decision: empirical Omega and explicit threshold
 
-**Accepted:** 2026-11-06. **Implementation:** Partial; selected source
-inspected at `5140b499cc`. The empirical sum formula is implemented, but host
-defaults, summary inputs, threshold validation and the all-at-threshold result
-require reconciliation. Implementation and cross-interface checks have not run.
+**Accepted:** 2026-11-06.
 
 Omega and summaries containing it require an explicit finite decimal threshold
 per observation, matching the return periodicity. An explicit zero is valid;
@@ -283,19 +237,12 @@ establish a reliable distribution estimate. Omega is dimensionless and is not
 annualized. It uses observed empirical sums without distribution fitting or
 interpolation. The formula matches the empirical method in the
 [PerformanceAnalytics implementation](https://raw.githubusercontent.com/braverock/PerformanceAnalytics/master/R/Omega.R).
-The undefined degenerate result is this API's accepted convention; the current
-source attribution does not establish a contrary original-paper requirement.
-
-Gain-to-pain has its own accepted rule below; other gain/loss metrics retain
-their separate adoption status.
-Reconciliation is owned by the [Omega follow-up](../FOLLOW_UPS.md#analytics-omega).
+The undefined degenerate result is this API's accepted convention rather than
+a claim that every original-paper or library variant uses this outcome.
 
 ## Accepted decision: arithmetic gain-to-pain
 
-**Accepted:** 2026-11-06. **Implementation:** Partial; selected source
-inspected at `5140b499cc`. The arithmetic formula and empty-history outcome
-are implemented; the all-zero result requires reconciliation. Implementation
-and cross-interface checks have not run.
+**Accepted:** 2026-11-06.
 
 For valid period returns, calculate:
 
@@ -318,18 +265,9 @@ observation frequencies.
 | Positive gains and no losses | Positive infinity. |
 | All zero, or empty history | Undefined. |
 
-One valid observation suffices for this descriptive calculation. For a
-positive loss sum, divide the net sum by that loss sum; the finite result is
-at least -1. This does not adopt profit-factor, Kelly or other gain/loss
-conventions. Reconciliation is owned by the
-[gain-to-pain follow-up](../FOLLOW_UPS.md#analytics-gain-to-pain).
-
 ## Accepted decision: observation-period modified Sharpe
 
-**Accepted:** 2026-11-06. **Implementation:** Not reconciled; selected source
-inspected at `5140b499cc`. The current annual horizon, two-observation minimum
-and inherited Gaussian substitution conflict with the accepted scope.
-Implementation and independent numerical checks have not run.
+**Accepted:** 2026-11-06.
 
 Use a corresponding-observation-period excess numerator and a Cornish–Fisher
 loss denominator calculated from total returns:
@@ -364,19 +302,14 @@ Four observations establish moment availability, not reliability.
 [Record 08](08-moments-gaussian-and-cornish-fisher.md) owns the accepted
 classical plug-in estimator and global ordering. Confidence follows the
 [accepted explicit-input contract](01-panels-windows-and-wire.md#accepted-decision-explicit-tail-confidence);
-accuracy qualification remains open.
+numerical evidence is limited to its stated cases.
 The undefined availability outcomes above must not be replaced with ordinary
 Sharpe's zero-risk limit. Invalid cash/frequency requests retain their accepted
 validation errors.
 
-For monthly mean return 1%, monthly cash 0.4% and a valid monthly CF loss VaR
-of 4%, modified Sharpe is 0.15. Reconciliation is owned by the
-[modified-Sharpe follow-up](../FOLLOW_UPS.md#analytics-modified-sharpe).
-
 ## Accepted decision: insufficient history and zero risk
 
-**Accepted:** 2026-11-06. **Implementation:** Not reconciled; selected source
-inspected at `5140b499cc`, with no implementation checks executed.
+**Accepted:** 2026-11-06.
 
 | Situation | Required outcome |
 | --- | --- |
@@ -400,61 +333,6 @@ Gaussian VaR now follows its separately
 including its two-return minimum and valid constant-history quantile. CF
 retains its own four-observation and positive-variance requirements.
 
-Rust, Python, WASM and serialization must distinguish finite zero, undefined
-and signed infinity, preserving unaffected tickers where supported. Invalid
-requests retain validation errors. Invalid Cornish–Fisher estimates retain
-their explicit-error requirement. Omega and gain-to-pain are governed by their
-accepted rules above. Capture follows the [accepted record-11 package](11-benchmark-relative-metrics.md#accepted-decision-benchmark-relative-metrics),
-and Kelly/CPC follow the [accepted record-03 package](03-periods-lookbacks-and-win-loss.md#accepted-decision-calendar-grouping-lookbacks-and-win-loss-statistics).
-The complete scalar-domain/numerical controls are accepted above. Reconciliation is
-owned by the [zero-risk follow-up](../FOLLOW_UPS.md#analytics-insufficient-history-and-zero-risk).
+## Implementation evidence
 
-## Algorithm and selection
-
-Scalar and rolling volatility use the accepted sample estimator, with Welford
-moments supplied by core. Core variance is zero for fewer than two observations,
-so scalar volatility still returns zero there; that boundary requires
-reconciliation. Nonpositive/nonfinite A currently returns NaN.
-
-Scalar and rolling Sharpe use the accepted arithmetic formula and require at
-least two observations. Nonfinite annual moments currently return NaN. Scalar
-and rolling Sortino use their accepted formula and sample minimum above.
-Public downside deviation is annualized, but empty input still returns zero
-instead of the accepted undefined result. Nonfinite input or MAR returns NaN.
-
-The common ratio helper first returns NaN for any nonfinite operand; finite nonzero numerator/zero denominator yields signed infinity; finite 0/0 yields zero. This differs from insufficient-sample NaN and from Omega's all-neutral result. Sortino/Sharpe use the helper, preserving finite constant positive/negative excess signs when risk is zero.
-
-Zero substitutions for insufficient sample volatility and reward/risk `0/0`
-conflict with the accepted outcomes above and require reconciliation.
-
-The observed Omega kernel matches the accepted empirical sum formula, using
-ordinary addition, but its all-at-threshold output of one requires
-reconciliation. Gain-to-pain uses the accepted arithmetic formula with Kahan
-sums and empty NaN, but inherits the common helper's all-zero result of zero;
-that result requires reconciliation with the accepted undefined outcome.
-
-The observed modified-Sharpe kernel uses annual arithmetic excess return and
-an annual-horizon CF quantile, with a two-observation minimum. These choices
-require reconciliation with the accepted observation-period formulation and
-four-observation availability minimum. Its inherited Gaussian substitution is
-the separately tracked CF discrepancy in [record 08](08-moments-gaussian-and-cornish-fisher.md).
-
-## Controls, failures and alternatives
-
-Sharpe/Sortino free functions accept A explicitly; `Performance` obtains A from frequency. Scalar threshold/MAR/cash inputs do not share a single `Result`-based validator: invalid numerical inputs usually propagate NaN, while tail confidence is checked at the public boundary. The summary uses zero MAR and zero Omega threshold. It does not estimate cash from a curve or apply serial-correlation corrections.
-
-Host zero-MAR and zero-Omega-threshold defaults, and the summary's hardcoded
-targets, conflict with the corresponding accepted input decisions above.
-
-Population risk, downside-only denominators, geometric excess-growth numerators, HAC-adjusted risk and time-weighted irregular observations are unimplemented alternatives here. Choice must match use; current tests alone are not adoption.
-
-## Implementation and validation evidence
-
-- [Return-risk implementations](../../../../finstack-quant/analytics/src/risk_metrics/return_based.rs), [ratio helper](../../../../finstack-quant/analytics/src/risk_metrics/mod.rs), [public dispatch](../../../../finstack-quant/analytics/src/performance/scalar.rs), and [sample moments](../../../../finstack-quant/core/src/math/stats.rs).
-- Located inline hand calculations cover downside denominators, threshold Omega, gain-to-pain and MAR consistency. Modified-Sharpe formula comparisons reuse production CF/moment kernels. [Audit regressions](../../../../finstack-quant/analytics/tests/audit_regressions.rs) cover singleton/invalid scalar behavior and are boundary/invariant evidence, not distribution calibration.
-- Canonical context: [Sharpe](../../../REFERENCES.md#sharpe1966), [Sortino](../../../REFERENCES.md#sortinoVanDerMeer1991), [Omega](../../../REFERENCES.md#keatingShadwick2002), [gain-to-pain](../../../REFERENCES.md#schwager2012), [modified Sharpe](../../../REFERENCES.md#gregoriou2003). Exact source-to-formula reconciliation and tolerances remain open.
-
-## Follow-up tracking
-
-Implementation reconciliation and missing evidence are tracked in the
-[analytics follow-ups](../FOLLOW_UPS.md#analytics).
+[risk_metrics/return_based.rs](../../../../finstack-quant/analytics/src/risk_metrics/return_based.rs), [risk_metrics/mod.rs](../../../../finstack-quant/analytics/src/risk_metrics/mod.rs), [performance/scalar.rs](../../../../finstack-quant/analytics/src/performance/scalar.rs). The [crate integration tests](../../../../finstack-quant/analytics/tests/main.rs), inline numerical regressions and [schema contracts](../../../../finstack-quant/analytics/tests/schema_contract.rs) exercise this scope. See the [inventory validation record](README.md#implementation-evidence) for executed checks and evidence limits.

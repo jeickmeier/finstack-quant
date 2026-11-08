@@ -233,6 +233,39 @@ pub fn to_js_value<T: serde::Serialize>(value: &T) -> Result<JsValue, JsValue> {
         .map_err(to_js_err)
 }
 
+/// Serialize a validated table while keeping nonfinite float64 results numeric.
+///
+/// # Arguments
+///
+/// * `table` - Typed table whose float64 columns may contain intentional
+///   unavailable or zero-risk values; string columns retain their exact text.
+///
+/// # Errors
+///
+/// Returns a structured JavaScript error for invalid shape or failed property access.
+pub(crate) fn to_js_table_numeric(
+    table: &finstack_quant_core::table::TableEnvelope,
+) -> Result<JsValue, JsValue> {
+    use finstack_quant_core::table::TableColumnData;
+
+    table.validate().map_err(to_js_err)?;
+    let js = to_js_value(table)?;
+    let columns = js_sys::Reflect::get(&js, &JsValue::from_str("columns"))?;
+    let columns = js_sys::Array::from(&columns);
+    for (index, column) in table.columns.iter().enumerate() {
+        if let TableColumnData::Float64(values) = &column.data {
+            let host_column = columns.get(index as u32);
+            let data = js_sys::Reflect::get(&host_column, &JsValue::from_str("data"))?;
+            let host_values = js_sys::Array::new_with_length(values.len() as u32);
+            for (row, value) in values.iter().enumerate() {
+                host_values.set(row as u32, JsValue::from_f64(*value));
+            }
+            js_sys::Reflect::set(&data, &JsValue::from_str("values"), &host_values)?;
+        }
+    }
+    Ok(js)
+}
+
 /// Serialize a result whose Rust type names its non-finite fields, returning
 /// those fields as JavaScript numbers.
 ///

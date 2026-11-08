@@ -77,12 +77,12 @@
   "oneOf": [
     {
       "const": "act365_25",
-      "description": "Actual calendar days divided by 365.25 (default).",
+      "description": "Actual elapsed calendar days divided by 365.25, selected explicitly.",
       "type": "string"
     },
     {
       "additionalProperties": false,
-      "description": "Any core day-count convention.",
+      "description": "A core convention evaluated with the caller's complete context.",
       "properties": {
         "day_count": {
           "$ref": "#/$defs/DayCount"

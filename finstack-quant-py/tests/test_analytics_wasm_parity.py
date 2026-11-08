@@ -37,7 +37,7 @@ def price_panel() -> Performance:
 
 
 def test_price_panel_matches_the_shared_golden() -> None:
-    assert list(price_panel().sharpe()) == pytest.approx(GOLDEN["prices"]["sharpe"], rel=1e-12)
+    assert list(price_panel().sharpe(risk_free_rate=0.0)) == pytest.approx(GOLDEN["prices"]["sharpe"], rel=1e-12)
     with pytest.raises(KeyError, match="missing"):
         Performance.from_panel(
             PerformancePanel(
@@ -46,6 +46,7 @@ def test_price_panel_matches_the_shared_golden() -> None:
                 kind="prices",
                 ticker_names=NAMES,
                 benchmark_ticker="missing",
+                frequency="daily",
             )
         )
 
@@ -53,9 +54,16 @@ def test_price_panel_matches_the_shared_golden() -> None:
 def test_return_panel_matches_the_shared_golden() -> None:
     returns = GOLDEN["returns"]
     panel = Performance.from_panel(
-        PerformancePanel(dates=returns["dates"], series=returns["values"], kind="returns", ticker_names=NAMES)
+        PerformancePanel(
+            dates=returns["dates"],
+            series=returns["values"],
+            kind="returns",
+            ticker_names=NAMES,
+            frequency="daily",
+            benchmark_ticker=(NAMES)[0],
+        )
     )
-    assert list(panel.volatility()) == pytest.approx(returns["volatility"], rel=1e-12)
+    assert list(panel.volatility(annualize=True)) == pytest.approx(returns["volatility"], rel=1e-12)
 
 
 def test_json_round_trip_matches_the_shared_golden() -> None:
@@ -63,6 +71,6 @@ def test_json_round_trip_matches_the_shared_golden() -> None:
     assert json.loads(panel.to_json()) == GOLDEN["prices"]["json"]
     rebuilt = Performance.from_json(panel.to_json())
     assert rebuilt.to_json() == panel.to_json()
-    assert list(rebuilt.sharpe()) == list(panel.sharpe())
+    assert list(rebuilt.sharpe(risk_free_rate=0.0)) == list(panel.sharpe(risk_free_rate=0.0))
     with pytest.raises(ValueError, match="invalid Performance JSON"):
         Performance.from_json("{ not json")

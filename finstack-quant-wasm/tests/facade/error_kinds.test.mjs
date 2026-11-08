@@ -74,7 +74,7 @@ function performance() {
   const dates = Array.from({ length: 10 }, (_, i) => `2024-01-${String(i + 1).padStart(2, '0')}`);
   const returns = [0.01, -0.01, 0.02, 0.0, 0.01, -0.02, 0.01, 0.0, 0.01, 0.01];
   return new analytics.Performance({
-    dates,
+    dates: ['2023-12-31', ...dates],
     series: [returns],
     kind: 'returns',
     ticker_names: ['A'],
@@ -228,12 +228,17 @@ test('inverting a zero FX rate is a validation failure', () => {
 
 test('an unknown calendar is not found and a calendar union resolves', () => {
   const perf = performance();
-  assert.throws(() => perf.cagr('bus_252', 'nope_cal'), kind('not_found', /nope_cal/));
-  assert.ok(perf.cagr('bus_252', 'nyse+gblo')[0] > 0);
+  const unknown = new core.DayCountContext('nope_cal');
+  assert.throws(() => perf.cagr('bus_252', unknown), kind('not_found', /nope_cal/));
+  unknown.free();
+  const context = new core.DayCountContext('nyse+gblo');
+  assert.ok(perf.cagr('bus_252', context)[0] > 0);
+  context.free();
+  perf.free();
 });
 
-test('an unknown benchmark ticker is not found', () => {
-  const dates = ['2024-01-01', '2024-01-02', '2024-01-03'];
+test('unknown constructor benchmarks fail validation and explicit selection is not found', () => {
+  const dates = ['2023-12-31', '2024-01-01', '2024-01-02', '2024-01-03'];
   const returns = [
     [0.01, 0.02, 0],
     [0, 0.01, 0.02],
@@ -247,7 +252,7 @@ test('an unknown benchmark ticker is not found', () => {
         ticker_names: ['A', 'B'],
         benchmark_ticker: 'NOPE',
       }),
-    kind('not_found', /NOPE/)
+    kind('validation', /NOPE/)
   );
   const panel = new analytics.Performance({
     dates,
@@ -256,7 +261,7 @@ test('an unknown benchmark ticker is not found', () => {
     ticker_names: ['A', 'B'],
   });
   assert.throws(() => panel.resetBenchTicker('NOPE'), kind('not_found', /NOPE/));
-  assert.equal(panel.getBenchmarkIdx(), 0);
+  assert.equal(panel.getBenchmarkIdx(), undefined);
   panel.free();
 });
 

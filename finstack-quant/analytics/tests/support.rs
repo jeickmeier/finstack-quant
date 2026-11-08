@@ -42,12 +42,15 @@ pub fn prices_panel(
 
 /// A simple-return panel.
 pub fn returns_panel(
+    initial_date: Date,
     dates: Vec<Date>,
     series: Vec<Vec<f64>>,
     ticker_names: Vec<String>,
     benchmark_ticker: Option<&str>,
     frequency: PeriodKind,
 ) -> PerformancePanel {
+    let mut dates = dates;
+    dates.insert(0, initial_date);
     panel(
         PanelSeriesKind::Returns,
         dates,

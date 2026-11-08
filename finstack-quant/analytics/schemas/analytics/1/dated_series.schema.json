@@ -82,7 +82,7 @@
       "description": "Metric carried by `values`; hosts use its name as the value-column label."
     },
     "values": {
-      "description": "Computed metric values, one per completed rolling window. An undefined\nwindow (e.g. a zero-volatility Sharpe) is `NaN`; JSON carries it as the\n`\"nan\"` sentinel so the series round-trips.",
+      "description": "Computed metric values, one per completed rolling window. Undefined\nestimates (singleton sample risk or a zero-over-zero ratio) are `NaN`;\ngenuine zero-risk ratios can be signed infinity. JSON preserves each\nnonfinite value with the corresponding string sentinel.",
       "items": {
         "$ref": "#/$defs/NonFiniteF64Wire"
       },

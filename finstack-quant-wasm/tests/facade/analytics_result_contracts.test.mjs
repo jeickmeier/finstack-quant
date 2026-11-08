@@ -36,10 +36,11 @@ const fixtures = {
     end: null,
     duration_days: 2,
     max_drawdown: -0.1,
-    near_recovery_threshold: -0.001,
-    truncated_at_start: true,
   },
   'period_stats.schema.json': {
+    n_obs: 2,
+    wins: 1,
+    losses: 1,
     best: 0.01,
     worst: -0.01,
     consecutive_wins: 1,
@@ -50,8 +51,8 @@ const fixtures = {
     avg_loss: -0.01,
     payoff_ratio: 1.0,
     profit_factor: 1.0,
-    cpc_ratio: 0.5,
-    kelly_criterion: 0.0,
+    cpc_index: 0.5,
+    kelly_risk_fraction: 0.0,
   },
   'rolling_greeks.schema.json': { dates: ['2025-01-02'], alphas: [0.0], betas: [1.0] },
   'lookback_returns.schema.json': {
@@ -67,7 +68,7 @@ const required = {
   'beta_result.schema.json': ['n_obs', 'confidence_level'],
   'greeks_result.schema.json': ['n_obs'],
   'multi_factor_result.schema.json': ['n_obs'],
-  'drawdown_episode.schema.json': ['truncated_at_start'],
+  'drawdown_episode.schema.json': ['duration_days'],
 };
 
 const contract = (selector) =>
@@ -96,14 +97,16 @@ test('optional recovery dates and numeric nonfinite host outputs are preserved',
   const document = contract('drawdown_episode.schema.json');
   assert.equal(document.required.includes('end'), false);
   const perf = new analytics.Performance({
-    dates: ['2025-01-01', '2025-01-02'],
+    dates: ['2024-12-31', '2025-01-01', '2025-01-02'],
     series: [[0.01, 0.02]],
     kind: 'returns',
     ticker_names: ['FUND'],
+    benchmark_ticker: 'FUND',
   });
   const beta = perf.beta()[0];
   assert.equal(beta.n_obs, 2);
   assert.equal(beta.confidence_level, 0.95);
-  assert.ok(Number.isNaN(beta.beta));
+  assert.equal(beta.beta, 1);
+  assert.ok(Number.isNaN(beta.std_err));
   perf.free();
 });

@@ -124,6 +124,31 @@ pub enum NonFiniteF64Wire {
     NonFinite(NonFiniteSentinel),
 }
 
+/// A finite numeric representation or the undefined-result sentinel `"nan"`.
+///
+/// Use `f64` for an unrestricted JSON number, or a validated numeric wire type
+/// such as [`super::ClosedUnitIntervalF64Wire`] to retain its range constraints.
+/// Unlike [`NonFiniteF64Wire`], its JSON contract excludes infinity sentinel strings.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "json-schema", schemars(rename = "FiniteOrNanWireFor{T}"))]
+#[serde(untagged)]
+pub enum FiniteOrNanWire<T = f64> {
+    /// A JSON number in the domain of the selected numeric representation.
+    Finite(T),
+    /// An unavailable result, written as `"nan"`.
+    Undefined(NanSentinel),
+}
+
+/// The undefined-result token accepted by [`FiniteOrNanWire`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum NanSentinel {
+    /// An undefined result, written as `"nan"`.
+    Nan,
+}
+
 /// Sentinel string the [`non_finite_f64`] adapter writes for a non-finite `f64`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]

@@ -113,7 +113,8 @@ export default [
   {
     "path": "#/$defs/d_090e21e61cdf3e0563e2/oneOf/2/properties/values/items",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/TableColumnData/oneOf/2/properties/values/items",
-    "format": "double"
+    "ref": "#/$defs/NonFiniteF64Wire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/NonFiniteF64Wire"
   },
   {
     "path": "#/$defs/d_090e21e61cdf3e0563e2/oneOf/3",
@@ -266,6 +267,29 @@ export default [
   {
     "path": "#/$defs/d_2f3bf3b3f13fb41b2ca2/properties/role/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/TableColumn/properties/role/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_2f44e69fe77b00d952fa",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/NonFiniteSentinel",
+    "description": "Sentinel string the [`non_finite_f64`] adapter writes for a non-finite `f64`."
+  },
+  {
+    "path": "#/$defs/d_2f44e69fe77b00d952fa/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/NonFiniteSentinel/oneOf/0",
+    "const": "inf",
+    "description": "`+∞`, written as `\"inf\"`."
+  },
+  {
+    "path": "#/$defs/d_2f44e69fe77b00d952fa/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/NonFiniteSentinel/oneOf/1",
+    "const": "-inf",
+    "description": "`-∞`, written as `\"-inf\"`."
+  },
+  {
+    "path": "#/$defs/d_2f44e69fe77b00d952fa/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/NonFiniteSentinel/oneOf/2",
+    "const": "nan",
+    "description": "`NaN`, written as `\"nan\"`."
   },
   {
     "path": "#/$defs/d_3c19fd4ab208f14be2b5",
@@ -510,6 +534,24 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_a176fd07772b7dfa6e59",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/NonFiniteF64Wire",
+    "description": "An `f64` in the [`non_finite_f64`] wire form: a JSON number when finite,\notherwise one of the strings `\"inf\"`, `\"-inf\"` or `\"nan\"`.\n\nContract types store plain `f64` fields with\n`#[serde(with = \"finstack_quant_core::wire::non_finite_f64\")]` and name this\ntype in `#[schemars(with = ...)]`, so the generated schema describes the\nsentinel strings the serializer actually writes."
+  },
+  {
+    "path": "#/$defs/d_a176fd07772b7dfa6e59/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/NonFiniteF64Wire/anyOf/0",
+    "description": "A finite value, written as a JSON number.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_a176fd07772b7dfa6e59/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/NonFiniteF64Wire/anyOf/1",
+    "description": "A non-finite value, written as its sentinel string.",
+    "ref": "#/$defs/NonFiniteSentinel",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/NonFiniteSentinel"
+  },
+  {
     "path": "#/$defs/d_b888a5be75073df7b251",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/PeriodId",
     "description": "Identifier for a Gregorian period like `2025Q1` or a fiscal period like\n`FY2025W53`."
@@ -533,6 +575,7 @@ export default [
   {
     "path": "#/$defs/d_ce059e1e5fd8531c74da/properties/metadata",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/TableEnvelope/properties/metadata",
+    "default": {},
     "description": "Table-level metadata for downstream bindings and documentation."
   },
   {

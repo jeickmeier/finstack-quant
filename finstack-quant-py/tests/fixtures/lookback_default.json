@@ -1,5 +1,6 @@
 {
   "dates": [
+    "2025-01-29",
     "2025-01-30",
     "2025-01-31",
     "2025-02-03",
@@ -31,6 +32,38 @@
     ],
     "fytd": [
       0.02459147
+    ],
+    "fiscal_config": {
+      "start_month": 1,
+      "start_day": 1
+    },
+    "mtd_samples": [
+      {
+        "n_obs": 3,
+        "holding_start": "2025-01-31",
+        "holding_end": "2025-02-05"
+      }
+    ],
+    "qtd_samples": [
+      {
+        "n_obs": 5,
+        "holding_start": "2025-01-29",
+        "holding_end": "2025-02-05"
+      }
+    ],
+    "ytd_samples": [
+      {
+        "n_obs": 5,
+        "holding_start": "2025-01-29",
+        "holding_end": "2025-02-05"
+      }
+    ],
+    "fytd_samples": [
+      {
+        "n_obs": 5,
+        "holding_start": "2025-01-29",
+        "holding_end": "2025-02-05"
+      }
     ]
   }
 }

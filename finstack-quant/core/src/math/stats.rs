@@ -46,6 +46,9 @@
 
 use super::special_functions::student_t_inv_cdf;
 use super::summation::kahan_sum;
+use num_bigint::BigInt;
+use num_rational::BigRational;
+use num_traits::{One, Signed, ToPrimitive, Zero};
 
 /// Arithmetic mean.
 ///
@@ -377,18 +380,18 @@ pub fn quantile(data: &mut [f64], p: f64) -> f64 {
     if data.iter().any(|x| !x.is_finite()) {
         return f64::NAN;
     }
-    let (lo, frac) = r7_rank(n, p);
-    data.select_nth_unstable_by(lo, |a, b| {
-        a.partial_cmp(b).unwrap_or(core::cmp::Ordering::Equal)
-    });
+    let Ok((lo, frac)) = r7_rank(n, p) else {
+        return f64::NAN;
+    };
+    data.select_nth_unstable_by(lo, f64::total_cmp);
     let v_lo = data[lo];
-    if frac == 0.0 {
+    if frac.is_zero() {
         return v_lo;
     }
-    data[lo + 1..].select_nth_unstable_by(0, |a, b| {
-        a.partial_cmp(b).unwrap_or(core::cmp::Ordering::Equal)
-    });
-    v_lo + frac * (data[lo + 1] - v_lo)
+    data[lo + 1..].select_nth_unstable_by(0, f64::total_cmp);
+    interpolate_r7(v_lo, data[lo + 1], &frac)
+        .and_then(|value| rational_to_f64(&value, false))
+        .unwrap_or(f64::NAN)
 }
 
 /// Empirical R-7 quantile of data that is already sorted ascending.
@@ -424,20 +427,213 @@ pub fn quantile_sorted(sorted: &[f64], p: f64) -> f64 {
     if n == 0 || !(0.0..=1.0).contains(&p) {
         return f64::NAN;
     }
-    let (lo, frac) = r7_rank(n, p);
-    if frac == 0.0 {
-        return sorted[lo];
-    }
-    sorted[lo] + frac * (sorted[lo + 1] - sorted[lo])
+    quantile_rational(sorted, p)
+        .and_then(|value| rational_to_f64(&value, false))
+        .unwrap_or(f64::NAN)
 }
 
-/// R-7 rank split for `n ≥ 1` observations and `p ∈ [0, 1]`: the lower
-/// order-statistic index and the interpolation weight toward the next one
-/// (`0.0` whenever the rank lands on an order statistic, including `p = 1`).
-fn r7_rank(n: usize, p: f64) -> (usize, f64) {
-    let h = (n - 1) as f64 * p;
-    let lo = h.floor() as usize;
-    (lo, h - lo as f64)
+/// Magnitude ratio of two R-7 quantiles, rounded only after division.
+///
+/// Both quantiles retain their exact binary-rational rank weights and
+/// interpolation values until their magnitude ratio is formed. Individually
+/// unrepresentable component quantiles therefore do not prevent a
+/// representable requested ratio. This also preserves consequential residuals
+/// at the final ratio's rounding boundary. A genuinely zero denominator gives
+/// positive infinity for a nonzero numerator, or NaN for two zero quantiles.
+///
+/// # Arguments
+///
+/// * `sorted` - Nonempty finite observations in ascending order. Their
+///   order is validated, and the slice is not modified.
+/// * `numerator_p` - Numerator quantile probability in the inclusive
+///   `0.0..=1.0` range, interpreted as its supplied binary64 value.
+/// * `denominator_p` - Denominator quantile probability in the inclusive
+///   `0.0..=1.0` range, interpreted as its supplied binary64 value.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Validation`] for empty, nonfinite or unordered
+/// observations, or an invalid probability. Returns
+/// [`crate::Error::Internal`] for an unrepresentable requested nonzero finite
+/// ratio; arithmetic underflow never creates an observed zero ratio.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_core::math::stats::quantile_ratio;
+/// let tiny = f64::from_bits(1);
+/// assert_eq!(quantile_ratio(&[0.0, tiny], 0.75, 0.25)?, 3.0);
+/// # Ok::<(), finstack_quant_core::Error>(())
+/// ```
+pub fn quantile_ratio(sorted: &[f64], numerator_p: f64, denominator_p: f64) -> crate::Result<f64> {
+    validate_sorted_sample(sorted)?;
+    let numerator = quantile_rational(sorted, numerator_p)?.abs();
+    let denominator = quantile_rational(sorted, denominator_p)?.abs();
+    if denominator.is_zero() {
+        return Ok(if numerator.is_zero() {
+            f64::NAN
+        } else {
+            f64::INFINITY
+        });
+    }
+    rational_to_f64(&(numerator / denominator), true)
+}
+
+/// Checked R-7 quantile with exact rank weights and one final output rounding.
+///
+/// This evaluates the same estimator as [`quantile_sorted`] while rejecting
+/// a nonzero mathematical result that would round to zero. Use
+/// [`quantile_ratio`] when a ratio is requested jointly instead of
+/// independently requested scalar quantiles.
+///
+/// # Arguments
+///
+/// * `sorted` - Nonempty finite observations in ascending order. The slice
+///   and its ordering are validated and are not modified.
+/// * `p` - Probability in the inclusive `0.0..=1.0` range, interpreted as
+///   its supplied binary64 value when forming the R-7 rank and weights.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Validation`] for invalid observations or
+/// probability, or [`crate::Error::Internal`] when a nonzero quantile
+/// cannot be represented as a nonzero finite binary64 result.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_core::math::stats::quantile_checked;
+/// assert_eq!(quantile_checked(&[1.0, 2.0, 3.0, 4.0], 0.5)?, 2.5);
+/// assert!(quantile_checked(&[0.0, f64::from_bits(1)], 0.25).is_err());
+/// # Ok::<(), finstack_quant_core::Error>(())
+/// ```
+pub fn quantile_checked(sorted: &[f64], p: f64) -> crate::Result<f64> {
+    validate_sorted_sample(sorted)?;
+    rational_to_f64(&quantile_rational(sorted, p)?, true)
+}
+
+/// Mean of exactly the lowest `p` mass of an equal-weight empirical sample.
+///
+/// With `mass = p * sorted.len()`, the calculation includes every observation
+/// below `floor(mass)` and exactly the required fraction of the next one.
+/// Ties do not expand the tail. Integer counts and supplied binary64 values
+/// are evaluated exactly before the final rounding, preserving consequential
+/// near-integer mass residuals, cancellation and subnormal observations.
+/// This is an empirical tail mean, not an integral of the R-7 quantile curve.
+///
+/// # Arguments
+///
+/// * `sorted` - Nonempty finite observations in ascending order. The slice
+///   is validated and is not modified; values can be positive or negative.
+/// * `p` - Strictly positive selected probability mass, at most `1.0`.
+///   A mass smaller than one observation returns the smallest observation.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Validation`] for an empty, nonfinite or unordered
+/// sample or a probability outside `(0, 1]`. Returns
+/// [`crate::Error::Internal`] for an unrepresentable nonzero requested mean.
+/// Genuine zero means remain valid; no floor or clipping is applied.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_core::math::stats::empirical_tail_mean;
+/// assert!((empirical_tail_mean(&[-0.2, -0.1, 0.0], 0.5)? + 1.0 / 6.0).abs() < 1e-15);
+/// let tiny = f64::from_bits(1);
+/// assert_eq!(empirical_tail_mean(&[tiny; 5], 0.4)?, tiny);
+/// # Ok::<(), finstack_quant_core::Error>(())
+/// ```
+pub fn empirical_tail_mean(sorted: &[f64], p: f64) -> crate::Result<f64> {
+    validate_sorted_sample(sorted)?;
+    if !(p > 0.0 && p <= 1.0) {
+        return Err(crate::Error::Validation(
+            "Empirical tail probability must be in (0, 1]".into(),
+        ));
+    }
+    let (whole, fraction) = split_mass(sorted.len(), p)?;
+    if whole == 0 {
+        return Ok(sorted[0]);
+    }
+    let mut total = BigRational::zero();
+    for &value in &sorted[..whole] {
+        total += binary_rational(value)?;
+    }
+    if !fraction.is_zero() {
+        total += binary_rational(sorted[whole])? * &fraction;
+    }
+    let mass = BigRational::from_integer(BigInt::from(whole)) + fraction;
+    rational_to_f64(&(total / mass), true)
+}
+
+fn validate_sorted_sample(sorted: &[f64]) -> crate::Result<()> {
+    if sorted.is_empty()
+        || sorted.iter().any(|value| !value.is_finite())
+        || sorted.windows(2).any(|pair| pair[0] > pair[1])
+    {
+        return Err(crate::Error::Validation(
+            "A nonempty finite ascending sample is required".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn binary_rational(value: f64) -> crate::Result<BigRational> {
+    BigRational::from_float(value).ok_or_else(|| {
+        crate::Error::Validation("Exact statistical weights require finite values".into())
+    })
+}
+
+/// Keep the integer rank and its fractional remainder separate and exact.
+fn r7_rank(n: usize, p: f64) -> crate::Result<(usize, BigRational)> {
+    if n == 0 || !(0.0..=1.0).contains(&p) {
+        return Err(crate::Error::Validation(
+            "R-7 requires observations and a probability in [0, 1]".into(),
+        ));
+    }
+    split_mass(n - 1, p)
+}
+
+fn split_mass(count: usize, p: f64) -> crate::Result<(usize, BigRational)> {
+    let mass = binary_rational(p)? * BigInt::from(count);
+    let whole = mass.to_integer().to_usize().ok_or_else(|| {
+        crate::Error::Internal("Statistical rank does not fit an observation index".into())
+    })?;
+    let fraction = mass - BigRational::from_integer(BigInt::from(whole));
+    Ok((whole, fraction))
+}
+
+fn interpolate_r7(lower: f64, upper: f64, fraction: &BigRational) -> crate::Result<BigRational> {
+    if lower.to_bits() == upper.to_bits() || fraction.is_zero() {
+        return binary_rational(lower);
+    }
+    Ok(binary_rational(lower)? * (BigRational::one() - fraction)
+        + binary_rational(upper)? * fraction)
+}
+
+fn quantile_rational(sorted: &[f64], p: f64) -> crate::Result<BigRational> {
+    let (lo, fraction) = r7_rank(sorted.len(), p)?;
+    let lower = sorted[lo];
+    if fraction.is_zero() {
+        return binary_rational(lower);
+    }
+    interpolate_r7(lower, sorted[lo + 1], &fraction)
+}
+
+fn rational_to_f64(value: &BigRational, reject_zero_underflow: bool) -> crate::Result<f64> {
+    let rounded = value.to_f64().ok_or_else(|| {
+        crate::Error::Internal("Statistical result could not be reconstructed".into())
+    })?;
+    if !rounded.is_finite()
+        || (reject_zero_underflow
+            && rounded.classify() == std::num::FpCategory::Zero
+            && !value.is_zero())
+    {
+        return Err(crate::Error::Internal(
+            "Statistical result is outside the nonzero finite binary64 range".into(),
+        ));
+    }
+    Ok(rounded)
 }
 
 /// Calculate annualized close-to-close realized variance from a close price series.
@@ -1472,6 +1668,80 @@ mod tests {
     fn quantile_matches_r7_interpolation() {
         let mut values = [1.0, 2.0, 3.0, 4.0];
         assert!((super::quantile(&mut values, 0.5) - 2.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn quantile_preserves_a_rank_residual_rounded_away_by_multiplication() {
+        // Binary64 1/3 is below its mathematical value: 3*p = 1 - 2^-54.
+        // The small remaining weight on -2^53 contributes exactly -1/2.
+        let sorted = [-2.0_f64.powi(53), 0.0, 1.0, 2.0];
+        assert_eq!(super::quantile_sorted(&sorted, 1.0 / 3.0), -0.5);
+        let mut data = sorted;
+        assert_eq!(super::quantile(&mut data, 1.0 / 3.0), -0.5);
+    }
+
+    #[test]
+    fn quantile_interpolates_opposite_extremes_without_overflow() {
+        let sorted = [-f64::MAX, f64::MAX];
+        assert_eq!(super::quantile_sorted(&sorted, 0.5), 0.0);
+        let p = 0.5 + f64::EPSILON;
+        assert_eq!(
+            super::quantile_sorted(&sorted, p),
+            f64::MAX * (2.0 * p - 1.0)
+        );
+    }
+
+    #[test]
+    fn quantile_ratio_preserves_unrepresentable_components_and_rounding_residuals() {
+        let tiny = f64::from_bits(1);
+        assert_eq!(
+            super::quantile_ratio(&[0.0, tiny], 0.75, 0.25).expect("joint ratio"),
+            3.0
+        );
+        // The lower magnitude is .75 - 2^-57, while the upper is .375*tiny.
+        // The exact ratio is just above tiny/2 and rounds to tiny; rounding
+        // the lower quantile first would give the tie tiny/2 and erase it.
+        assert_eq!(
+            super::quantile_ratio(&[-1.0, -1.0 / 3.0, -tiny, 0.0], 0.875, 0.125)
+                .expect("ratio above underflow midpoint"),
+            tiny
+        );
+        assert!(super::quantile_checked(&[0.0, tiny], 0.25).is_err());
+        assert_eq!(
+            super::quantile_checked(&[0.0, tiny], 0.75).expect("rounded nonzero"),
+            tiny
+        );
+    }
+
+    #[test]
+    fn empirical_tail_mean_preserves_fractional_mass_and_subnormal_constants() {
+        // Binary64 .1 is above 1/10: 10*p = 1 + 2^-54. The boundary
+        // weight on 2^53 contributes 1/2, even though ordinary 10*p is 1.
+        let mut sorted = [2.0_f64.powi(53); 10];
+        sorted[0] = 0.0;
+        assert_eq!(super::empirical_tail_mean(&sorted, 0.1).expect("tail"), 0.5);
+        let tiny = f64::from_bits(1);
+        assert_eq!(
+            super::empirical_tail_mean(&[tiny; 5], 0.4).expect("tiny constant"),
+            tiny
+        );
+        assert!(super::empirical_tail_mean(&[0.0, tiny], 1.0).is_err());
+    }
+
+    #[test]
+    fn checked_quantiles_and_tail_means_reject_invalid_requests_and_samples() {
+        for sorted in [&[][..], &[1.0, 0.0], &[0.0, f64::INFINITY]] {
+            assert!(super::quantile_ratio(sorted, 0.75, 0.25).is_err());
+            assert!(super::quantile_checked(sorted, 0.5).is_err());
+            assert!(super::empirical_tail_mean(sorted, 0.5).is_err());
+        }
+        for p in [f64::NAN, -0.1, 1.1] {
+            assert!(super::quantile_ratio(&[0.0, 1.0], p, 0.25).is_err());
+            assert!(super::quantile_ratio(&[0.0, 1.0], 0.75, p).is_err());
+            assert!(super::quantile_checked(&[0.0, 1.0], p).is_err());
+            assert!(super::empirical_tail_mean(&[0.0, 1.0], p).is_err());
+        }
+        assert!(super::empirical_tail_mean(&[0.0, 1.0], 0.0).is_err());
     }
 
     // ── RealizedVarMethod FromStr / Display roundtrip ──
