@@ -4,11 +4,10 @@ Checked-in performance *records* — not benchmark code. The measurement
 harnesses live with the code they measure (Criterion benches under
 `finstack-quant/*/benches/`, pytest-benchmark under
 `finstack-quant-py/benchmarks/`, and `finstack-quant-wasm/benchmarks/bench.mjs`).
-This directory contains the portfolio-materialization acceptance record and
-the valuation benchmark validity/performance record. Materialization has
-immutable baselines and gated comparison results; the valuation record states
-which validity checks, numerical references and performance measurements are
-complete.
+This directory contains the portfolio-materialization acceptance record, the
+completed valuation validity/performance record, and the core/cashflows/models
+review and completed performance campaign. Materialization has immutable baselines and gated comparison results;
+the other records identify their workload, validation and measurement scope.
 
 Other benchmarks remain discovery-oriented unless a specific record states
 otherwise. Benchmark availability does not create a library-wide performance
@@ -18,8 +17,11 @@ gate.
 
 | Path | What it is |
 | --- | --- |
-| [`VALUATION_PERFORMANCE.md`](VALUATION_PERFORMANCE.md) | Valuation validity, numerical evidence and the six scoped performance investigations. Currently a pre-timing checkpoint; no performance gain or final acceptance is claimed. |
-| [`valuation-performance-results.json`](valuation-performance-results.json) | Compact valuation status, evidence paths/hashes and per-investigation summaries; comparative measurement rows are pending. |
+| [`VALUATION_PERFORMANCE.md`](VALUATION_PERFORMANCE.md) | Completed valuation validity, six investigations and the final 111-case cumulative comparison, including numerical bounds and tradeoffs. |
+| [`valuation-performance-results.json`](valuation-performance-results.json) | Compact completed valuation measurements, process uncertainty, memory and hash-pinned evidence. |
+| [`CORE_CASHFLOW_MODEL_PERFORMANCE.md`](CORE_CASHFLOW_MODEL_PERFORMANCE.md) | Completed benchmark repairs and six investigations: three retained changes, 23 qualifying latency cases, three RSS reductions and the explicit typed-volatility control cost. |
+| [`core-cashflow-model-performance-results.json`](core-cashflow-model-performance-results.json) | Compact incremental and cumulative measurements, uncertainty, rejected LMM history, numerical validation and separate measured/delivered source identities. |
+| [`CORE_CASHFLOW_MODEL_PERFORMANCE_REVIEW.md`](CORE_CASHFLOW_MODEL_PERFORMANCE_REVIEW.md) | Initial 21-target core/cashflows/models audit, validity findings and six planned investigations. Its initial smoke evidence is separate from the subsequent implementation and baseline. |
 | [`MATERIALIZATION_BENCHMARKS.md`](MATERIALIZATION_BENCHMARKS.md) | The procedure and the human-readable reference result: fixture definitions, timing boundaries, gates, profiling recipe, and hardware/toolchain provenance. |
 | `materialization/materialization-rust-baseline.json` | Immutable Rust baseline `materialization-v1`. Median-per-case for `cold_a_5000_unique`, `cold_b_5000_50`, `warm_b_5000_50`, `validation_b_5000_50`, plus tree revision and fixture digest. |
 | `materialization/materialization-python-baseline.json` | Immutable Python baseline `python-materialization-v1`. Same three timed cases minus validation-only. |
@@ -95,10 +97,16 @@ Nothing below writes to this directory.
 
 | Where | Harness | Run with |
 | --- | --- | --- |
-| `finstack-quant/{analytics,attribution,cashflows,core,factor-model,monte_carlo,portfolio,scenarios,statements,valuations}/benches/` | Criterion | `mise run rust-bench`, or `mise run rust-bench-crate -- <package> <bench>` for one target |
+| Manifest-declared targets under `finstack-quant/*/benches/` | Criterion | `mise run rust-bench`, or `mise run rust-bench-crate -- <package> <bench>` for one target |
 | `finstack-quant-py/benchmarks/bench_bindings.py` | pytest-benchmark | `mise run python-bench` (all), `scripts/materialization_bench.sh python` (portfolio only) |
 | `finstack-quant-wasm/benchmarks/bench.mjs` | Node | `npm --prefix finstack-quant-wasm run bench` |
 
 Criterion timing is deliberately short by default; override with
 `FQ_BENCH_SAMPLE_SIZE`, `FQ_BENCH_WARM_UP_TIME`, `FQ_BENCH_MEASUREMENT_TIME`,
 and `FQ_BENCH_NRESAMPLES`. CI does not run benchmarks.
+
+The scoped task supports `--filter <regex>`, `--test`,
+`--save-baseline <name>` and `--baseline <name>`. Smoke mode checks execution;
+it records no timing baseline. Named Criterion output is mutable, so recorded
+campaigns retain separate raw process archives. There are no separate
+`rust-bench-baseline` or `rust-bench-compare` tasks.
