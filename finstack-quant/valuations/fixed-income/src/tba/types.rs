@@ -79,6 +79,7 @@ impl TbaTerm {
 ///     .agency(AgencyProgram::Fnma)
 ///     .coupon(0.04)
 ///     .term(TbaTerm::ThirtyYear)
+///     .settlement_class(finstack_quant_core::dates::SifmaSettlementClass::A)
 ///     .settlement_year(2027)
 ///     .settlement_month(3)
 ///     .notional(Money::from((10_000_000_i64, Currency::USD)))
@@ -110,12 +111,11 @@ pub struct AgencyTba {
     pub settlement_year: i32,
     /// Settlement month (1-12).
     pub settlement_month: u8,
-    /// SIFMA settlement class override.
+    /// SIFMA settlement class of the deliverable pools (A/B/C/D).
     ///
-    /// When `None`, inferred from agency + term using
-    /// [`SifmaSettlementClass::from_agency_term`].
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub settlement_class: Option<SifmaSettlementClass>,
+    /// Required: it is never inferred from agency or term, because those
+    /// labels do not establish security eligibility for a class.
+    pub settlement_class: SifmaSettlementClass,
     /// Explicit settlement date override.
     ///
     /// When set, bypasses the SIFMA calendar lookup for
@@ -263,6 +263,7 @@ impl AgencyTba {
             .agency(AgencyProgram::Fnma)
             .coupon(0.04)
             .term(TbaTerm::ThirtyYear)
+            .settlement_class(finstack_quant_core::dates::SifmaSettlementClass::A)
             .settlement_year(2027)
             .settlement_month(3)
             .notional(Money::from((10_000_000_i64, Currency::USD)))
@@ -280,9 +281,8 @@ impl AgencyTba {
     /// Resolve the effective settlement date.
     ///
     /// Returns the explicit `settlement_date` override when set. Otherwise
-    /// resolves the date from the SIFMA calendar, using the explicit
-    /// `settlement_class` if set or inferring the class from `agency` and
-    /// `term`.
+    /// returns the published SIFMA settlement date for `settlement_class` in
+    /// `settlement_year`/`settlement_month`.
     pub fn effective_settlement_date(&self) -> finstack_quant_core::Result<Date> {
         if let Some(date) = self.settlement_date {
             return Ok(date);
@@ -290,25 +290,9 @@ impl AgencyTba {
         sifma_settlement(
             self.settlement_year,
             self.settlement_month,
-            self.effective_settlement_class(),
+            self.settlement_class,
         )
     }
-
-    /// Effective settlement class (explicit or inferred from agency + term).
-    pub fn effective_settlement_class(&self) -> SifmaSettlementClass {
-        settlement_class(self.settlement_class, self.agency, self.term)
-    }
-}
-
-/// Settlement class `explicit` when set, else inferred from `agency` and
-/// `term`.
-pub(crate) fn settlement_class(
-    explicit: Option<SifmaSettlementClass>,
-    agency: AgencyProgram,
-    term: TbaTerm,
-) -> SifmaSettlementClass {
-    explicit
-        .unwrap_or_else(|| SifmaSettlementClass::from_agency_term(agency.as_str(), term.years()))
 }
 
 /// Published SIFMA settlement date of `class` for the `year`/`month` TBA
@@ -488,19 +472,14 @@ mod tests {
     }
 
     #[test]
-    fn agency_conventions_drive_tba_settlement_class() {
-        let cases = [
-            (AgencyProgram::Fnma, SifmaSettlementClass::A),
-            (AgencyProgram::Fhlmc, SifmaSettlementClass::A),
-            (AgencyProgram::GnmaI, SifmaSettlementClass::C),
-            (AgencyProgram::GnmaII, SifmaSettlementClass::C),
-        ];
-
-        for (agency, settlement_class) in cases {
-            let mut tba = AgencyTba::example().expect("AgencyTba example is valid");
-            tba.agency = agency;
-            assert_eq!(tba.effective_settlement_class(), settlement_class);
-        }
+    fn settlement_class_is_required_on_the_wire() {
+        let mut value = serde_json::to_value(AgencyTba::example().expect("example")).expect("json");
+        value
+            .as_object_mut()
+            .expect("object")
+            .remove("settlement_class");
+        let error = serde_json::from_value::<AgencyTba>(value).expect_err("class is required");
+        assert!(error.to_string().contains("settlement_class"), "{error}");
     }
 
     #[test]

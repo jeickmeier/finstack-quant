@@ -31,6 +31,7 @@ export default [
               "amount": "10000000",
               "currency": "USD"
             },
+            "settlement_class": "a",
             "term": "thirty_year"
           },
           "type": "dollar_roll"
@@ -181,7 +182,7 @@ export default [
   {
     "path": "#/$defs/d_05625cf1aa46e3810fc5",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/dollar_roll.schema.json#/$defs/DollarRoll",
-    "description": "Dollar roll - simultaneous sale and purchase of TBAs for different months.\n\nA dollar roll involves:\n1. Selling TBA for near-month settlement\n2. Buying TBA for far-month settlement\n\nThe price difference between the two legs represents the \"drop\" and\nimplies a financing rate.\n\n# Financing and Carry\n\nDollar rolls are used for:\n- **Financing**: Implied repo rate is often cheaper than repo\n- **Carry trades**: Profit from drop vs. expected prepayment\n- **Roll specialness**: When roll drops exceed fair value\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_fixed_income::dollar_roll::DollarRoll;\nuse finstack_quant_valuations_fixed_income::tba::TbaTerm;\nuse finstack_quant_valuations_fixed_income::mbs_passthrough::AgencyProgram;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\nlet roll = DollarRoll::builder()\n    .id(InstrumentId::new(\"FN30-4.0-ROLL-0326-0426\"))\n    .agency(AgencyProgram::Fnma)\n    .coupon(0.04)\n    .term(TbaTerm::ThirtyYear)\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .front_settlement_year(2026)\n    .front_settlement_month(3)\n    .back_settlement_year(2026)\n    .back_settlement_month(4)\n    .front_price(98.5)\n    .back_price(98.0)\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid dollar roll\");\n```"
+    "description": "Dollar roll - simultaneous sale and purchase of TBAs for different months.\n\nA dollar roll involves:\n1. Selling TBA for near-month settlement\n2. Buying TBA for far-month settlement\n\nThe price difference between the two legs represents the \"drop\" and\nimplies a financing rate.\n\n# Financing and Carry\n\nDollar rolls are used for:\n- **Financing**: Implied repo rate is often cheaper than repo\n- **Carry trades**: Profit from drop vs. expected prepayment\n- **Roll specialness**: When roll drops exceed fair value\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_fixed_income::dollar_roll::DollarRoll;\nuse finstack_quant_valuations_fixed_income::tba::TbaTerm;\nuse finstack_quant_valuations_fixed_income::mbs_passthrough::AgencyProgram;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\nlet roll = DollarRoll::builder()\n    .id(InstrumentId::new(\"FN30-4.0-ROLL-0326-0426\"))\n    .agency(AgencyProgram::Fnma)\n    .coupon(0.04)\n    .term(TbaTerm::ThirtyYear)\n    .settlement_class(finstack_quant_core::dates::SifmaSettlementClass::A)\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .front_settlement_year(2026)\n    .front_settlement_month(3)\n    .back_settlement_year(2026)\n    .back_settlement_month(4)\n    .front_price(98.5)\n    .back_price(98.0)\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid dollar roll\");\n```"
   },
   {
     "path": "#/$defs/d_05625cf1aa46e3810fc5/properties/agency",
@@ -349,17 +350,9 @@ export default [
   {
     "path": "#/$defs/d_05625cf1aa46e3810fc5/properties/settlement_class",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/dollar_roll.schema.json#/$defs/DollarRoll/properties/settlement_class",
-    "description": "SIFMA settlement class override.\n\nWhen `None`, inferred from agency + term."
-  },
-  {
-    "path": "#/$defs/d_05625cf1aa46e3810fc5/properties/settlement_class/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/dollar_roll.schema.json#/$defs/DollarRoll/properties/settlement_class/anyOf/0",
+    "description": "SIFMA settlement class of the deliverable pools (A/B/C/D), used for\nboth legs. Required: never inferred from agency or term.",
     "ref": "#/$defs/SifmaSettlementClass",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/dollar_roll.schema.json#/$defs/SifmaSettlementClass"
-  },
-  {
-    "path": "#/$defs/d_05625cf1aa46e3810fc5/properties/settlement_class/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/dollar_roll.schema.json#/$defs/DollarRoll/properties/settlement_class/anyOf/1"
   },
   {
     "path": "#/$defs/d_05625cf1aa46e3810fc5/properties/term",

@@ -8,11 +8,14 @@ class SifmaSettlementClass:
     """
     SIFMA good-delivery settlement class.
 
+    The class is a property of the deliverable securities and is always
+    selected explicitly; it is never inferred from an agency label or term.
+
     Examples
     --------
     >>> from finstack_quant.core.dates import SifmaSettlementClass
-    >>> SifmaSettlementClass.from_agency_term("FNMA", 30) == SifmaSettlementClass.A
-    True
+    >>> str(SifmaSettlementClass.B)
+    'b'
 
     """
 
@@ -24,36 +27,6 @@ class SifmaSettlementClass:
     """Class C: 30-year GNMA single-family pools."""
     D: SifmaSettlementClass
     """Class D: balloons, ARMs, multifamily and other non-standard programs."""
-
-    @classmethod
-    def from_agency_term(cls, agency: str, term_years: int) -> SifmaSettlementClass:
-        """
-        Infer the SIFMA good-delivery class from an agency and term.
-
-        Parameters
-        ----------
-        agency : str
-            Agency or program label, such as ``"FNMA"``, ``"FHLMC"``, or
-            ``"GNMA"``, interpreted using the library's settlement table.
-        term_years : int
-            Original mortgage term in whole years, normally ``15`` or ``30``.
-
-        Returns
-        -------
-        SifmaSettlementClass
-            Settlement class used to select the monthly SIFMA delivery date.
-
-        Notes
-        -----
-        This method does not raise; it returns a fixed instance.
-
-        Examples
-        --------
-        >>> from finstack_quant.core.dates import SifmaSettlementClass
-        >>> SifmaSettlementClass.from_agency_term("FNMA", 30) == SifmaSettlementClass.A
-        True
-        """
-        ...
 
 def sifma_settlement_date(month: int, year: int, settlement_class: SifmaSettlementClass) -> datetime.date:
     """

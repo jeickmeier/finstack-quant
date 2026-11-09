@@ -18,8 +18,8 @@ import { byCodeUnit } from "./order.mjs";
  *   (`::new`, `from_str`, `parse`), or is a handle class whose members beyond
  *   its constructors only read back what it was built from (stored-field
  *   getters, a constant, the lengths of stored arrays, `toJson`). A member
- *   that classifies, derives or presets a value (`fromAgencyTerm`,
- *   `totalRate`, `standard`) keeps the class counted.
+ *   that classifies, derives or presets a value (`totalRate`,
+ *   `standard`) keeps the class counted.
  * - `schema-form`: an enum-variant or preset value a schema form builds.
  * - `setter`: returns a copy of its input with fields set (`with_*`, `add_*`).
  * - `getter`: reads one stored field, row or entry of a value (`get_*`,

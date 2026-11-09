@@ -510,17 +510,6 @@ export type PrepaymentModelSpec1 =
       monthly_cpr: number[];
     };
 /**
- * SIFMA MBS settlement class.
- *
- * SIFMA publishes distinct settlement dates for four classes of agency MBS.
- * The class determines which specific settlement date applies within a given
- * month. There is no default class: every lookup selects one explicitly. See <https://www.sifma.org/resources/general/mbs-notification-and-settlement-dates/>.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "SifmaSettlementClass".
- */
-export type SifmaSettlementClass = "a" | "b" | "c" | "d";
-/**
  * Allocation mode within a tier
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
@@ -15223,6 +15212,17 @@ export type SettlementType = "physical" | "cash";
  */
 export type ShiftMode = "shift_of_subordinate" | "senior_share";
 /**
+ * SIFMA MBS settlement class.
+ *
+ * SIFMA publishes distinct settlement dates for four classes of agency MBS.
+ * The class determines which specific settlement date applies within a given
+ * month. There is no default class: every lookup selects one explicitly. See <https://www.sifma.org/resources/general/mbs-notification-and-settlement-dates/>.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "SifmaSettlementClass".
+ */
+export type SifmaSettlementClass = "a" | "b" | "c" | "d";
+/**
  * SIMM credit sector for bucket assignment.
  *
  * Maps reference entities to ISDA SIMM credit qualifying buckets.
@@ -19019,6 +19019,7 @@ export interface PacPayment {
  *     .agency(AgencyProgram::Fnma)
  *     .coupon(0.04)
  *     .term(TbaTerm::ThirtyYear)
+ *     .settlement_class(finstack_quant_core::dates::SifmaSettlementClass::A)
  *     .settlement_year(2027)
  *     .settlement_month(3)
  *     .notional(Money::from((10_000_000_i64, Currency::USD)))
@@ -19081,12 +19082,12 @@ export interface AgencyTba {
   prepayment_spec?: PrepaymentModelSpec1 | null;
   scenario_pricing_overrides?: ScenarioPricingOverrides2;
   /**
-   * SIFMA settlement class override.
+   * SIFMA settlement class of the deliverable pools (A/B/C/D).
    *
-   * When `None`, inferred from agency + term using
-   * [`SifmaSettlementClass::from_agency_term`].
+   * Required: it is never inferred from agency or term, because those
+   * labels do not establish security eligibility for a class.
    */
-  settlement_class?: SifmaSettlementClass | null;
+  settlement_class: "a" | "b" | "c" | "d";
   /**
    * Explicit settlement date override.
    *
@@ -31295,6 +31296,7 @@ export interface ScenarioPricingOverrides12 {
  *     .agency(AgencyProgram::Fnma)
  *     .coupon(0.04)
  *     .term(TbaTerm::ThirtyYear)
+ *     .settlement_class(finstack_quant_core::dates::SifmaSettlementClass::A)
  *     .notional(Money::from((10_000_000_i64, Currency::USD)))
  *     .front_settlement_year(2026)
  *     .front_settlement_month(3)
@@ -31397,11 +31399,10 @@ export interface DollarRoll {
   repo_curve_id?: Id9 | null;
   scenario_pricing_overrides?: ScenarioPricingOverrides13;
   /**
-   * SIFMA settlement class override.
-   *
-   * When `None`, inferred from agency + term.
+   * SIFMA settlement class of the deliverable pools (A/B/C/D), used for
+   * both legs. Required: never inferred from agency or term.
    */
-  settlement_class?: SifmaSettlementClass | null;
+  settlement_class: "a" | "b" | "c" | "d";
   /**
    * Original loan term.
    */

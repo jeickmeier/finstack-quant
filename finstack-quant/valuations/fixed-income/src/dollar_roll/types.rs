@@ -46,6 +46,7 @@ use finstack_quant_valuations_core::impl_instrument_base;
 ///     .agency(AgencyProgram::Fnma)
 ///     .coupon(0.04)
 ///     .term(TbaTerm::ThirtyYear)
+///     .settlement_class(finstack_quant_core::dates::SifmaSettlementClass::A)
 ///     .notional(Money::from((10_000_000_i64, Currency::USD)))
 ///     .front_settlement_year(2026)
 ///     .front_settlement_month(3)
@@ -86,11 +87,9 @@ pub struct DollarRoll {
     pub back_settlement_year: i32,
     /// Back-month settlement month (1-12).
     pub back_settlement_month: u8,
-    /// SIFMA settlement class override.
-    ///
-    /// When `None`, inferred from agency + term.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub settlement_class: Option<SifmaSettlementClass>,
+    /// SIFMA settlement class of the deliverable pools (A/B/C/D), used for
+    /// both legs. Required: never inferred from agency or term.
+    pub settlement_class: SifmaSettlementClass,
     /// Explicit front-month settlement date override.
     ///
     /// When set, bypasses the SIFMA calendar lookup for the front leg.
@@ -248,6 +247,7 @@ impl DollarRoll {
             .agency(AgencyProgram::Fnma)
             .coupon(0.04)
             .term(TbaTerm::ThirtyYear)
+            .settlement_class(finstack_quant_core::dates::SifmaSettlementClass::A)
             .notional(Money::from((10_000_000_i64, Currency::USD)))
             .front_settlement_year(2026)
             .front_settlement_month(3)
@@ -272,11 +272,6 @@ impl DollarRoll {
         self.front_price - self.back_price
     }
 
-    /// Effective settlement class (explicit or inferred from agency + term).
-    pub fn effective_settlement_class(&self) -> SifmaSettlementClass {
-        crate::tba::settlement_class(self.settlement_class, self.agency, self.term)
-    }
-
     /// Resolve the front-month settlement date.
     pub fn effective_front_settlement_date(&self) -> finstack_quant_core::Result<Date> {
         if let Some(d) = self.front_settlement_date {
@@ -285,7 +280,7 @@ impl DollarRoll {
         crate::tba::sifma_settlement(
             self.front_settlement_year,
             self.front_settlement_month,
-            self.effective_settlement_class(),
+            self.settlement_class,
         )
     }
 
@@ -297,7 +292,7 @@ impl DollarRoll {
         crate::tba::sifma_settlement(
             self.back_settlement_year,
             self.back_settlement_month,
-            self.effective_settlement_class(),
+            self.settlement_class,
         )
     }
 
@@ -345,7 +340,7 @@ impl DollarRoll {
             .term(self.term)
             .settlement_year(year)
             .settlement_month(month)
-            .settlement_class_opt(Some(self.effective_settlement_class()))
+            .settlement_class(self.settlement_class)
             .settlement_date_opt(settlement_date)
             .notional(self.notional)
             .trade_price(price)

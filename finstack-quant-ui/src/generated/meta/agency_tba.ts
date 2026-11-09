@@ -25,6 +25,7 @@ export default [
               "amount": "10000000",
               "currency": "USD"
             },
+            "settlement_class": "a",
             "settlement_month": 3,
             "settlement_year": 2027,
             "term": "thirty_year",
@@ -950,7 +951,7 @@ export default [
   {
     "path": "#/$defs/d_54049d1588e6ed129bca",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_tba.schema.json#/$defs/AgencyTba",
-    "description": "TBA (To-Be-Announced) forward trade.\n\nRepresents a forward contract to buy or sell agency MBS at a specified\nprice for a future settlement date. The specific pools delivered are\nnot known at trade time.\n\n# Good Delivery Standards\n\nTBA trades must meet SIFMA good delivery guidelines:\n- Pool must be from the specified agency program\n- Pool coupon must match the TBA coupon\n- Pool term must match the TBA term\n- Variance rules for face amount (±0.01% of trade amount)\n\n# Pricing\n\nTBA value is calculated as the difference between the forward value\nof assumed pool characteristics and the trade price, discounted to\nthe valuation date.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_fixed_income::tba::{AgencyTba, TbaTerm};\nuse finstack_quant_valuations_fixed_income::mbs_passthrough::AgencyProgram;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet tba = AgencyTba::builder()\n    .id(InstrumentId::new(\"FN30-4.0-202703\"))\n    .agency(AgencyProgram::Fnma)\n    .coupon(0.04)\n    .term(TbaTerm::ThirtyYear)\n    .settlement_year(2027)\n    .settlement_month(3)\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .trade_price(98.5)\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid TBA\");\n```"
+    "description": "TBA (To-Be-Announced) forward trade.\n\nRepresents a forward contract to buy or sell agency MBS at a specified\nprice for a future settlement date. The specific pools delivered are\nnot known at trade time.\n\n# Good Delivery Standards\n\nTBA trades must meet SIFMA good delivery guidelines:\n- Pool must be from the specified agency program\n- Pool coupon must match the TBA coupon\n- Pool term must match the TBA term\n- Variance rules for face amount (±0.01% of trade amount)\n\n# Pricing\n\nTBA value is calculated as the difference between the forward value\nof assumed pool characteristics and the trade price, discounted to\nthe valuation date.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_fixed_income::tba::{AgencyTba, TbaTerm};\nuse finstack_quant_valuations_fixed_income::mbs_passthrough::AgencyProgram;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet tba = AgencyTba::builder()\n    .id(InstrumentId::new(\"FN30-4.0-202703\"))\n    .agency(AgencyProgram::Fnma)\n    .coupon(0.04)\n    .term(TbaTerm::ThirtyYear)\n    .settlement_class(finstack_quant_core::dates::SifmaSettlementClass::A)\n    .settlement_year(2027)\n    .settlement_month(3)\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .trade_price(98.5)\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid TBA\");\n```"
   },
   {
     "path": "#/$defs/d_54049d1588e6ed129bca/properties/agency",
@@ -1054,17 +1055,9 @@ export default [
   {
     "path": "#/$defs/d_54049d1588e6ed129bca/properties/settlement_class",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_tba.schema.json#/$defs/AgencyTba/properties/settlement_class",
-    "description": "SIFMA settlement class override.\n\nWhen `None`, inferred from agency + term using\n[`SifmaSettlementClass::from_agency_term`]."
-  },
-  {
-    "path": "#/$defs/d_54049d1588e6ed129bca/properties/settlement_class/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_tba.schema.json#/$defs/AgencyTba/properties/settlement_class/anyOf/0",
+    "description": "SIFMA settlement class of the deliverable pools (A/B/C/D).\n\nRequired: it is never inferred from agency or term, because those\nlabels do not establish security eligibility for a class.",
     "ref": "#/$defs/SifmaSettlementClass",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_tba.schema.json#/$defs/SifmaSettlementClass"
-  },
-  {
-    "path": "#/$defs/d_54049d1588e6ed129bca/properties/settlement_class/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_tba.schema.json#/$defs/AgencyTba/properties/settlement_class/anyOf/1"
   },
   {
     "path": "#/$defs/d_54049d1588e6ed129bca/properties/settlement_date",

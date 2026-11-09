@@ -1,7 +1,7 @@
 # CORE-CONVENTIONS-010: Published TBA settlement dates and explicit class selection
 
 - Decision status: **Accepted — complete published-settlement package, 2026-11-07**.
-- Implementation status: **Partly reconciled 2026-11-08**: items 1, 2, 4, 6, 10 (fixed-date tests) and 11 landed; items 7 (agency/term classification), 8 and 9 (data pin and admission) remain. Scoped to SIFMA functions in `dates/imm.rs` and `generated/sifma_settlements_generated.rs`.
+- Implementation status: **Partly reconciled 2026-11-08**: items 1, 2, 4, 6, 7, 10 (fixed-date tests) and 11 landed, and TBA/dollar-roll require an explicit class (12, per owner resolution O2); items 8 and 9 (data pin and admission) remain. Scoped to SIFMA functions in `dates/imm.rs` and `generated/sifma_settlements_generated.rs`.
 - Validation status: **Evidence inspected/located; independent qualification pending**. Documentation, source-date spot-checks and independent CSV/search/calendar examples passed; production Rust/host tests and full source-table qualification were not executed for this review.
 - Audit date: **2026-11-05**. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; see [scope and inventory](README.md).
 
@@ -185,7 +185,7 @@ execute production Rust/host tests or qualify an operational settlement workflow
 
 ## Observed algorithm, selection and conventions
 
-`SifmaSettlementClass` has A/B/C/D and no default; every lookup takes an explicit class. `from_agency_term` uppercases agency text and treats any string containing `GN` as GNMA: GN +30Y -> C; any 15Y -> B; non-GN +30Y -> A; all other combinations -> D. This is a string/term heuristic, not validated agency reference data.
+`SifmaSettlementClass` has A/B/C/D and no default; every lookup takes an explicit class. The former `from_agency_term` string/term heuristic was removed on 2026-11-08; the class is never inferred from agency text or term.
 
 `sifma_settlement_date` rejects an out-of-range year, then linearly finds `(year,month)` in the generated table, selects the class column and constructs the date. A missing row or class cell is an `InputError::NotFound` naming the class, month and the class's maintained coverage; an invalid stored day is a validation error. The table contains Class A for 2025 and all four classes for 2026–2027. `next_sifma_settlement(date, class)` returns the current month's cell when it is later than `date`, otherwise the following month's cell. Equality advances, a required missing cell errors rather than being skipped, the current cell is not consulted on a month's last day, and `Date::MAX` errors without a lookup.
 
@@ -199,7 +199,7 @@ Exact local data coverage is finite and includes unmaintained class cells in 202
 
 [Lookup/classification/estimate](../../../../finstack-quant/core/src/dates/imm.rs), [generated table](../../../../finstack-quant/core/src/generated/sifma_settlements_generated.rs), [maintained CSV](../../../../finstack-quant/core/data/sifma_settlements.csv). Inline tests `sifma_published_cells_are_returned_unchanged`, `sifma_missing_cells_are_not_found_errors`, `sifma_next_is_strict_and_class_specific`, `sifma_next_errors_on_required_gaps_without_skipping`, `sifma_next_at_date_max_errors_without_lookup` and `sifma_class_a_2025_uses_published_dates` are fixed-date stored-value and algorithm examples with no wall-clock dependence. The generator consistency check passed; Rust tests and external publication refresh were not run. [SIFMA TBA Good Delivery](../../../REFERENCES.md#sifma-tba-good-delivery) is the canonical reference entry.
 
-The [reference-data generator](../../../../finstack-quant/core/build/generate_reference_data.py) validates CSV shape, unique keys and calendar month/day values, but does not establish the imported source edition, class-coverage record or canonical Date year range. The separate [TBA resolver](../../../../finstack-quant/valuations/fixed-income/src/tba/types.rs) uses inferred agency/term class when no override is supplied, then requires a maintained published date; that product boundary needs reconciliation rather than blanket adoption.
+The [reference-data generator](../../../../finstack-quant/core/build/generate_reference_data.py) validates CSV shape, unique keys and calendar month/day values, but does not establish the imported source edition, class-coverage record or canonical Date year range. The separate [TBA resolver](../../../../finstack-quant/valuations/fixed-income/src/tba/types.rs) and the dollar roll require an explicit `settlement_class` and propagate the core lookup error for a missing published date.
 
 On 2026-11-07, spot-checks of January 2026, January 2027 and March 2027
 matched all four maintained Settlement cells to the official page. Independent

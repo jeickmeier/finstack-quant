@@ -1329,7 +1329,7 @@
   "core.SifmaSettlementClass": {
     "kind": "class",
     "constructor": false,
-    "statics": ["a", "b", "c", "d", "fromAgencyTerm"],
+    "statics": ["a", "b", "c", "d"],
     "methods": ["free", "toString"],
     "getters": []
   },

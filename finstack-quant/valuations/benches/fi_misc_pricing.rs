@@ -953,6 +953,7 @@ fn bench_dollar_roll_pv(c: &mut Criterion) {
                     .agency(AgencyProgram::Fnma)
                     .coupon(0.04)
                     .term(TbaTerm::ThirtyYear)
+                    .settlement_class(finstack_quant_core::dates::SifmaSettlementClass::A)
                     .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
                     .front_settlement_year(2025)
                     .front_settlement_month(3)

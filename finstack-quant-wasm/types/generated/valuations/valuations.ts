@@ -5519,12 +5519,12 @@ export interface AgencyTba {
    */
   scenario_pricing_overrides?: ScenarioPricingOverrides;
   /**
-   * SIFMA settlement class override.
+   * SIFMA settlement class of the deliverable pools (A/B/C/D).
    *
-   * When `None`, inferred from agency + term using
-   * [`SifmaSettlementClass::from_agency_term`].
+   * Required: it is never inferred from agency or term, because those
+   * labels do not establish security eligibility for a class.
    */
-  settlement_class?: SifmaSettlementClass | null;
+  settlement_class: SifmaSettlementClass;
   /**
    * Explicit settlement date override.
    *
@@ -9388,11 +9388,10 @@ export interface DollarRoll {
    */
   scenario_pricing_overrides?: ScenarioPricingOverrides;
   /**
-   * SIFMA settlement class override.
-   *
-   * When `None`, inferred from agency + term.
+   * SIFMA settlement class of the deliverable pools (A/B/C/D), used for
+   * both legs. Required: never inferred from agency or term.
    */
-  settlement_class?: SifmaSettlementClass | null;
+  settlement_class: SifmaSettlementClass;
   /**
    * Original loan term.
    */

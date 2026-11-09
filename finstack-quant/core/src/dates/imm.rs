@@ -434,26 +434,6 @@ impl std::str::FromStr for SifmaSettlementClass {
     }
 }
 
-impl SifmaSettlementClass {
-    /// Infer the standard settlement class from agency program and original term.
-    ///
-    /// # Arguments
-    ///
-    /// * `agency` - Agency program label. Values containing `GN` (so also
-    ///   `GNMA`) are treated as Ginnie Mae for the 30-year Class C convention.
-    /// * `term_years` - Original mortgage term in whole years. Fifteen-year
-    ///   pools map to Class B and conventional 30-year pools map to Class A.
-    pub fn from_agency_term(agency: &str, term_years: u32) -> Self {
-        let is_gnma = agency.to_uppercase().contains("GN");
-        match (is_gnma, term_years) {
-            (true, 30) => Self::C,
-            (_, 15) => Self::B,
-            (false, 30) => Self::A,
-            _ => Self::D,
-        }
-    }
-}
-
 // Generated from `data/sifma_settlements.csv`. Rows may contain a subset of
 // classes where SIFMA has published only partial coverage.
 include!("../generated/sifma_settlements_generated.rs");
@@ -1014,30 +994,6 @@ mod tests {
         }
         assert!("e".parse::<SifmaSettlementClass>().is_err());
         assert!("".parse::<SifmaSettlementClass>().is_err());
-    }
-
-    #[test]
-    fn sifma_from_agency_term() {
-        assert_eq!(
-            SifmaSettlementClass::from_agency_term("Fnma", 30),
-            SifmaSettlementClass::A
-        );
-        assert_eq!(
-            SifmaSettlementClass::from_agency_term("Gnma", 30),
-            SifmaSettlementClass::C
-        );
-        assert_eq!(
-            SifmaSettlementClass::from_agency_term("Fnma", 15),
-            SifmaSettlementClass::B
-        );
-        assert_eq!(
-            SifmaSettlementClass::from_agency_term("GnmaII", 15),
-            SifmaSettlementClass::B
-        );
-        assert_eq!(
-            SifmaSettlementClass::from_agency_term("Fnma", 20),
-            SifmaSettlementClass::D
-        );
     }
 
     #[test]

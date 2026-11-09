@@ -1173,10 +1173,6 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/d_54049d1588e6ed129bca/properties/settlement_class",
-            "keyword": "anyOf"
-          },
-          {
             "pointer": "#/$defs/d_54049d1588e6ed129bca/properties/settlement_date",
             "keyword": "anyOf"
           },
@@ -5866,10 +5862,6 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/AgencyTba/properties/settlement_class",
-            "keyword": "anyOf"
-          },
-          {
             "pointer": "#/$defs/AgencyTba/properties/settlement_date",
             "keyword": "anyOf"
           },
@@ -5899,10 +5891,6 @@
           },
           {
             "pointer": "#/$defs/DollarRoll/properties/repo_curve_id",
-            "keyword": "anyOf"
-          },
-          {
-            "pointer": "#/$defs/DollarRoll/properties/settlement_class",
             "keyword": "anyOf"
           },
           {
@@ -17584,10 +17572,6 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/AgencyTba/properties/settlement_class",
-            "keyword": "anyOf"
-          },
-          {
             "pointer": "#/$defs/AgencyTba/properties/settlement_date",
             "keyword": "anyOf"
           },
@@ -17617,10 +17601,6 @@
           },
           {
             "pointer": "#/$defs/DollarRoll/properties/repo_curve_id",
-            "keyword": "anyOf"
-          },
-          {
-            "pointer": "#/$defs/DollarRoll/properties/settlement_class",
             "keyword": "anyOf"
           },
           {
@@ -21160,10 +21140,6 @@
           },
           {
             "pointer": "#/$defs/d_05625cf1aa46e3810fc5/properties/repo_curve_id",
-            "keyword": "anyOf"
-          },
-          {
-            "pointer": "#/$defs/d_05625cf1aa46e3810fc5/properties/settlement_class",
             "keyword": "anyOf"
           },
           {

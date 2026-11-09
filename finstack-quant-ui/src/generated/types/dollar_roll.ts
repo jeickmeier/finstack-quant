@@ -329,14 +329,6 @@ export type PrepaymentModelSpec =
  */
 export type Id2 = string;
 /**
- * SIFMA MBS settlement class.
- *
- * SIFMA publishes distinct settlement dates for four classes of agency MBS.
- * The class determines which specific settlement date applies within a given
- * month. There is no default class: every lookup selects one explicitly. See <https://www.sifma.org/resources/general/mbs-notification-and-settlement-dates/>.
- */
-export type D_027D1Db6Ec8C2Ea89A5B = "a" | "b" | "c" | "d";
-/**
  * Canonical schema marker for persisted instrument envelopes.
  */
 export type DD0Ef2C67Ad49284C4845 = "finstack_quant.instrument/1";
@@ -384,6 +376,7 @@ export interface D_118A287E0C7Ff970F2Af {
  *     .agency(AgencyProgram::Fnma)
  *     .coupon(0.04)
  *     .term(TbaTerm::ThirtyYear)
+ *     .settlement_class(finstack_quant_core::dates::SifmaSettlementClass::A)
  *     .notional(Money::from((10_000_000_i64, Currency::USD)))
  *     .front_settlement_year(2026)
  *     .front_settlement_month(3)
@@ -471,11 +464,10 @@ export interface D_05625Cf1Aa46E3810Fc5 {
   repo_curve_id?: Id2 | null;
   scenario_pricing_overrides?: ScenarioPricingOverrides;
   /**
-   * SIFMA settlement class override.
-   *
-   * When `None`, inferred from agency + term.
+   * SIFMA settlement class of the deliverable pools (A/B/C/D), used for
+   * both legs. Required: never inferred from agency or term.
    */
-  settlement_class?: D_027D1Db6Ec8C2Ea89A5B | null;
+  settlement_class: "a" | "b" | "c" | "d";
   /**
    * Original loan term.
    */

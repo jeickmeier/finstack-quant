@@ -421,7 +421,7 @@ export default [
   {
     "path": "#/$defs/AgencyTba",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AgencyTba",
-    "description": "TBA (To-Be-Announced) forward trade.\n\nRepresents a forward contract to buy or sell agency MBS at a specified\nprice for a future settlement date. The specific pools delivered are\nnot known at trade time.\n\n# Good Delivery Standards\n\nTBA trades must meet SIFMA good delivery guidelines:\n- Pool must be from the specified agency program\n- Pool coupon must match the TBA coupon\n- Pool term must match the TBA term\n- Variance rules for face amount (±0.01% of trade amount)\n\n# Pricing\n\nTBA value is calculated as the difference between the forward value\nof assumed pool characteristics and the trade price, discounted to\nthe valuation date.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_fixed_income::tba::{AgencyTba, TbaTerm};\nuse finstack_quant_valuations_fixed_income::mbs_passthrough::AgencyProgram;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet tba = AgencyTba::builder()\n    .id(InstrumentId::new(\"FN30-4.0-202703\"))\n    .agency(AgencyProgram::Fnma)\n    .coupon(0.04)\n    .term(TbaTerm::ThirtyYear)\n    .settlement_year(2027)\n    .settlement_month(3)\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .trade_price(98.5)\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid TBA\");\n```"
+    "description": "TBA (To-Be-Announced) forward trade.\n\nRepresents a forward contract to buy or sell agency MBS at a specified\nprice for a future settlement date. The specific pools delivered are\nnot known at trade time.\n\n# Good Delivery Standards\n\nTBA trades must meet SIFMA good delivery guidelines:\n- Pool must be from the specified agency program\n- Pool coupon must match the TBA coupon\n- Pool term must match the TBA term\n- Variance rules for face amount (±0.01% of trade amount)\n\n# Pricing\n\nTBA value is calculated as the difference between the forward value\nof assumed pool characteristics and the trade price, discounted to\nthe valuation date.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_fixed_income::tba::{AgencyTba, TbaTerm};\nuse finstack_quant_valuations_fixed_income::mbs_passthrough::AgencyProgram;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet tba = AgencyTba::builder()\n    .id(InstrumentId::new(\"FN30-4.0-202703\"))\n    .agency(AgencyProgram::Fnma)\n    .coupon(0.04)\n    .term(TbaTerm::ThirtyYear)\n    .settlement_class(finstack_quant_core::dates::SifmaSettlementClass::A)\n    .settlement_year(2027)\n    .settlement_month(3)\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .trade_price(98.5)\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid TBA\");\n```"
   },
   {
     "path": "#/$defs/AgencyTba/properties/agency",
@@ -525,17 +525,9 @@ export default [
   {
     "path": "#/$defs/AgencyTba/properties/settlement_class",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AgencyTba/properties/settlement_class",
-    "description": "SIFMA settlement class override.\n\nWhen `None`, inferred from agency + term using\n[`SifmaSettlementClass::from_agency_term`]."
-  },
-  {
-    "path": "#/$defs/AgencyTba/properties/settlement_class/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AgencyTba/properties/settlement_class/anyOf/0",
+    "description": "SIFMA settlement class of the deliverable pools (A/B/C/D).\n\nRequired: it is never inferred from agency or term, because those\nlabels do not establish security eligibility for a class.",
     "ref": "#/$defs/SifmaSettlementClass",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SifmaSettlementClass"
-  },
-  {
-    "path": "#/$defs/AgencyTba/properties/settlement_class/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AgencyTba/properties/settlement_class/anyOf/1"
   },
   {
     "path": "#/$defs/AgencyTba/properties/settlement_date",
@@ -15313,7 +15305,7 @@ export default [
   {
     "path": "#/$defs/DollarRoll",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DollarRoll",
-    "description": "Dollar roll - simultaneous sale and purchase of TBAs for different months.\n\nA dollar roll involves:\n1. Selling TBA for near-month settlement\n2. Buying TBA for far-month settlement\n\nThe price difference between the two legs represents the \"drop\" and\nimplies a financing rate.\n\n# Financing and Carry\n\nDollar rolls are used for:\n- **Financing**: Implied repo rate is often cheaper than repo\n- **Carry trades**: Profit from drop vs. expected prepayment\n- **Roll specialness**: When roll drops exceed fair value\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_fixed_income::dollar_roll::DollarRoll;\nuse finstack_quant_valuations_fixed_income::tba::TbaTerm;\nuse finstack_quant_valuations_fixed_income::mbs_passthrough::AgencyProgram;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\nlet roll = DollarRoll::builder()\n    .id(InstrumentId::new(\"FN30-4.0-ROLL-0326-0426\"))\n    .agency(AgencyProgram::Fnma)\n    .coupon(0.04)\n    .term(TbaTerm::ThirtyYear)\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .front_settlement_year(2026)\n    .front_settlement_month(3)\n    .back_settlement_year(2026)\n    .back_settlement_month(4)\n    .front_price(98.5)\n    .back_price(98.0)\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid dollar roll\");\n```"
+    "description": "Dollar roll - simultaneous sale and purchase of TBAs for different months.\n\nA dollar roll involves:\n1. Selling TBA for near-month settlement\n2. Buying TBA for far-month settlement\n\nThe price difference between the two legs represents the \"drop\" and\nimplies a financing rate.\n\n# Financing and Carry\n\nDollar rolls are used for:\n- **Financing**: Implied repo rate is often cheaper than repo\n- **Carry trades**: Profit from drop vs. expected prepayment\n- **Roll specialness**: When roll drops exceed fair value\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_fixed_income::dollar_roll::DollarRoll;\nuse finstack_quant_valuations_fixed_income::tba::TbaTerm;\nuse finstack_quant_valuations_fixed_income::mbs_passthrough::AgencyProgram;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\nlet roll = DollarRoll::builder()\n    .id(InstrumentId::new(\"FN30-4.0-ROLL-0326-0426\"))\n    .agency(AgencyProgram::Fnma)\n    .coupon(0.04)\n    .term(TbaTerm::ThirtyYear)\n    .settlement_class(finstack_quant_core::dates::SifmaSettlementClass::A)\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .front_settlement_year(2026)\n    .front_settlement_month(3)\n    .back_settlement_year(2026)\n    .back_settlement_month(4)\n    .front_price(98.5)\n    .back_price(98.0)\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid dollar roll\");\n```"
   },
   {
     "path": "#/$defs/DollarRoll/properties/agency",
@@ -15481,17 +15473,9 @@ export default [
   {
     "path": "#/$defs/DollarRoll/properties/settlement_class",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DollarRoll/properties/settlement_class",
-    "description": "SIFMA settlement class override.\n\nWhen `None`, inferred from agency + term."
-  },
-  {
-    "path": "#/$defs/DollarRoll/properties/settlement_class/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DollarRoll/properties/settlement_class/anyOf/0",
+    "description": "SIFMA settlement class of the deliverable pools (A/B/C/D), used for\nboth legs. Required: never inferred from agency or term.",
     "ref": "#/$defs/SifmaSettlementClass",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SifmaSettlementClass"
-  },
-  {
-    "path": "#/$defs/DollarRoll/properties/settlement_class/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DollarRoll/properties/settlement_class/anyOf/1"
   },
   {
     "path": "#/$defs/DollarRoll/properties/term",

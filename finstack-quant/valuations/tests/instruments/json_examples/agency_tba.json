@@ -18,6 +18,7 @@
         "amount": "10000000",
         "currency": "USD"
       },
+      "settlement_class": "a",
       "settlement_month": 3,
       "settlement_year": 2027,
       "term": "thirty_year",

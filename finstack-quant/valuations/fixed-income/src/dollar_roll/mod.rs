@@ -33,6 +33,7 @@
 //!     .agency(AgencyProgram::Fnma)
 //!     .coupon(0.04)
 //!     .term(TbaTerm::ThirtyYear)
+//!     .settlement_class(finstack_quant_core::dates::SifmaSettlementClass::A)
 //!     .notional(Money::from((10_000_000_i64, Currency::USD)))
 //!     .front_settlement_year(2024)
 //!     .front_settlement_month(3)

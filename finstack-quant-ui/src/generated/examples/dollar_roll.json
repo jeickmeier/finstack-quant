@@ -24,6 +24,7 @@
         "amount": "10000000",
         "currency": "USD"
       },
+      "settlement_class": "a",
       "term": "thirty_year"
     },
     "type": "dollar_roll"

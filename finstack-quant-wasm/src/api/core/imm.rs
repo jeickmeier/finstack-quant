@@ -231,7 +231,7 @@ pub fn next_third_friday(
 /// ```typescript
 /// import init, { core } from "finstack-quant-wasm";
 /// await init();
-/// const cls = core.SifmaSettlementClass.fromAgencyTerm("FNMA", 15);
+/// const cls = core.SifmaSettlementClass.b();
 /// cls.toString(); // "b"
 /// core.sifmaSettlementDate(1, 2026, cls); // epoch days; throws when not maintained
 /// ```
@@ -279,33 +279,6 @@ impl JsSifmaSettlementClass {
     #[wasm_bindgen(js_name = d)]
     pub fn d() -> Self {
         Self::from_inner(SifmaSettlementClass::D)
-    }
-
-    /// Infer the settlement class from the agency program and original term
-    /// (Rust `SifmaSettlementClass::from_agency_term`).
-    ///
-    /// # Arguments
-    ///
-    /// * `agency` - Agency program label; a value containing `GNMA` or `GN`
-    ///   (any case) is treated as Ginnie Mae.
-    /// * `term_years` - Original mortgage term in whole years: 15-year pools
-    ///   are class B, conventional 30-year pools class A, GNMA 30-year pools
-    ///   class C, anything else class D.
-    ///
-    /// @returns The inferred `SifmaSettlementClass`.
-    /// @throws `TypeError` if `agency` is not a string or `termYears` is not a
-    /// non-negative integer.
-    /// @param agency - Agency program label; a value containing `GNMA` or `GN` (any case) is treated as Ginnie Mae.
-    /// @param termYears - Original mortgage term in whole years: 15-year pools are class B, conventional 30-year pools class A, GNMA 30-year pools class C, anything else class D.
-    #[wasm_bindgen(js_name = fromAgencyTerm)]
-    pub fn from_agency_term(
-        #[wasm_bindgen(unchecked_param_type = "string")] agency: JsValue,
-        #[wasm_bindgen(js_name = "termYears", unchecked_param_type = "number")] term_years: JsValue,
-    ) -> Result<JsSifmaSettlementClass, JsValue> {
-        Ok(Self::from_inner(SifmaSettlementClass::from_agency_term(
-            &js_string(&agency, "agency")?,
-            js_uint(&term_years, "termYears")?,
-        )))
     }
 
     /// Lower-case class letter (`"a"` through `"d"`), the JSON wire label.

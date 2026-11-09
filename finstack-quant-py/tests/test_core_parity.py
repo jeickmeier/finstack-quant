@@ -417,9 +417,7 @@ class TestPeriodParity:
 
 
 def test_sifma_settlement_classes_are_explicit() -> None:
-    assert SifmaSettlementClass.from_agency_term("FNMA", 30) == SifmaSettlementClass.A
-    assert SifmaSettlementClass.from_agency_term("GNMA", 30) == SifmaSettlementClass.C
-    assert SifmaSettlementClass.from_agency_term("FNMA", 15) == SifmaSettlementClass.B
+    assert not hasattr(SifmaSettlementClass, "from_agency_term")
     assert sifma_settlement_date(1, 2026, SifmaSettlementClass.A) == date(2026, 1, 14)
     assert sifma_settlement_date(1, 2026, SifmaSettlementClass.B) == date(2026, 1, 20)
 

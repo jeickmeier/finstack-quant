@@ -19,15 +19,16 @@ pub const EXPORTS: &[&str] = &[
 
 /// SIFMA good-delivery settlement class for agency MBS TBA trades.
 ///
-/// SIFMA publishes one settlement date per month for each class; the class
-/// is determined by the agency program and original term. Immutable,
-/// hashable enum-style type.
+/// SIFMA publishes one settlement date per month for each class. The class
+/// is a property of the deliverable securities and is always selected
+/// explicitly; it is never inferred from an agency label or term.
+/// Immutable, hashable enum-style type.
 ///
 /// Examples
 /// --------
 /// >>> from finstack_quant.core.dates import SifmaSettlementClass
-/// >>> SifmaSettlementClass.from_agency_term("FNMA", 30) == SifmaSettlementClass.A
-/// True
+/// >>> str(SifmaSettlementClass.B)
+/// 'b'
 #[pyclass(
     name = "SifmaSettlementClass",
     module = "finstack_quant.core.dates",
@@ -51,36 +52,6 @@ label_enum!(PySifmaSettlementClass, SifmaSettlementClass, "SifmaSettlementClass"
     /// Class D: balloon, ARM and other non-standard programs.
     D => D,
 });
-
-#[pymethods]
-impl PySifmaSettlementClass {
-    /// Infer the settlement class from an agency label and original term in years.
-    ///
-    /// Parameters
-    /// ----------
-    /// agency : str
-    ///     Agency or program label such as ``"FNMA"``, ``"FHLMC"``, ``"UMBS"``
-    ///     or ``"GNMA"`` (case-insensitive).
-    /// term_years : int
-    ///     Original mortgage term in whole years, normally ``15`` or ``30``.
-    ///
-    /// Returns
-    /// -------
-    /// SifmaSettlementClass
-    ///     Class used to select the monthly SIFMA delivery date; unknown
-    ///     combinations fall into class ``D``. This method does not raise.
-    #[classmethod]
-    #[pyo3(text_signature = "(cls, agency, term_years)")]
-    fn from_agency_term(
-        _cls: &Bound<'_, pyo3::types::PyType>,
-        agency: &str,
-        term_years: u32,
-    ) -> Self {
-        Self {
-            inner: SifmaSettlementClass::from_agency_term(agency, term_years),
-        }
-    }
-}
 
 /// Published SIFMA settlement date for a delivery month and settlement class.
 ///

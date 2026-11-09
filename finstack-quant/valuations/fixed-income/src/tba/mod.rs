@@ -32,6 +32,7 @@
 //!     .agency(AgencyProgram::Fnma)
 //!     .coupon(0.04)
 //!     .term(TbaTerm::ThirtyYear)
+//!     .settlement_class(finstack_quant_core::dates::SifmaSettlementClass::A)
 //!     .settlement_year(2024)
 //!     .settlement_month(3)
 //!     .notional(Money::from((10_000_000_i64, Currency::USD)))
@@ -45,5 +46,5 @@ pub(crate) mod metrics;
 pub(crate) mod pricer;
 mod types;
 
+pub(crate) use types::sifma_settlement;
 pub use types::{AgencyTba, TbaTerm};
-pub(crate) use types::{settlement_class, sifma_settlement};
