@@ -43,11 +43,15 @@ class DayCount:
     """NL/365 (Actual/365 No Leap): actual days excluding every February 29
     in ``(start, end]``, divided by 365."""
     THIRTY_360: DayCount
-    """30/360 US (Bond Basis)."""
+    """Fixed US 30U/360 EOM (QuantLib ``Thirty360.USA``); not 30/360 PSA."""
+    THIRTY_360_ISDA: DayCount
+    """30/360 ISDA bond basis, ISDA 2006 section 4.16(f) (QuantLib
+    ``Thirty360.BondBasis``); no February rule."""
     THIRTY_E_360: DayCount
-    """30E/360 (Eurobond Basis)."""
+    """30E/360 (Eurobond Basis), ISDA 2006 section 4.16(g)."""
     THIRTY_E_360_ISDA: DayCount
-    """30E/360 ISDA."""
+    """30E/360 ISDA, ISDA 2006 section 4.16(h). Requires an explicit
+    ``end_is_termination_date`` in ``DayCountContext``."""
     ACT_ACT: DayCount
     """Actual/Actual (ISDA)."""
     ACT_ACT_ISMA: DayCount
@@ -65,7 +69,7 @@ class DayCount:
     """30/360 Italian.
 
     Day 31 becomes 30, and any February day after the 27th becomes 30
-    (QuantLib ``Thirty360::Italian``). Distinct from US SIA and 30E/360.
+    (QuantLib ``Thirty360::Italian``). Distinct from US 30U/360 EOM and 30E/360.
     """
     BUS_252: DayCount
     """Business/252 (Brazilian market convention)."""
@@ -210,8 +214,8 @@ class DayCountContext:
       ``coupon_period``.
     - **Act/365L** requires the full enclosing contractual ``coupon_period``,
       including for partial accrual.
-    - **30E/360 ISDA** uses ``end_is_termination_date`` for its
-      end-of-February rule.
+    - **30E/360 ISDA** requires an explicit ``end_is_termination_date``
+      (``True`` or ``False``) for its end-of-February rule.
 
     Equality is structural, and instances round-trip through
     :meth:`to_json` / :meth:`from_json` and ``pickle``.
@@ -231,8 +235,10 @@ class DayCountContext:
         contractual coupon ``(start, end)``; ``start`` must precede ``end``.
         ICMA endpoints must share the contractual nominal month grid,
         rather than business-day-adjusted payment dates.
-    end_is_termination_date : bool
-        Whether the accrual end is the instrument termination date.
+    end_is_termination_date : bool | None
+        Whether the chronologically later accrual endpoint is the contractual
+        termination date. ``None`` (the default) means unspecified, which
+        30E/360 ISDA rejects; other conventions ignore it.
 
     Examples
     --------
@@ -249,7 +255,7 @@ class DayCountContext:
         frequency: Union[Tenor, str, None] = None,
         bus_basis: Optional[int] = None,
         coupon_period: Optional[tuple[datetime.date | str, datetime.date | str]] = None,
-        end_is_termination_date: bool = False,
+        end_is_termination_date: Optional[bool] = None,
     ) -> None:
         """
         Create a day-count context.
@@ -266,8 +272,10 @@ class DayCountContext:
             Unadjusted regular ICMA reference period or ACT/365L enclosing
             contractual coupon ``(start, end)``. ICMA validates that both
             endpoints share one nominal month grid at calculation time.
-        end_is_termination_date : bool
-            Whether the accrual end is the instrument termination date.
+        end_is_termination_date : bool | None
+            Whether the later accrual endpoint is the contractual termination
+            date; ``None`` means unspecified (30E/360 ISDA then raises
+            ``ValueError`` at calculation time).
 
         Raises
         ------
@@ -288,7 +296,7 @@ class DayCountContext:
         str
             JSON object with ``calendar_id``, ``frequency``, ``bus_basis``,
             ``coupon_period`` (ISO date pair or ``null``) and
-            ``end_is_termination_date``.
+            ``end_is_termination_date`` (``true``, ``false`` or ``null``).
 
         Raises
         ------
@@ -399,14 +407,14 @@ class DayCountContext:
         ...
 
     @property
-    def end_is_termination_date(self) -> bool:
+    def end_is_termination_date(self) -> Optional[bool]:
         """
-        Whether the accrual end is the instrument termination date.
+        Whether the later accrual endpoint is the termination date.
 
         Returns
         -------
-        bool
-            Whether the accrual end is the instrument termination date.
+        bool | None
+            ``True`` or ``False`` when supplied; ``None`` when unspecified.
 
         Notes
         -----
@@ -415,139 +423,3 @@ class DayCountContext:
         ...
 
     def __repr__(self) -> str: ...
-
-class Thirty360Convention:
-    """
-    30/360 sub-convention (US SIA / Bond Basis, ISDA, or European).
-
-    Immutable, hashable enum-style type.
-
-    Examples
-    --------
-    >>> from finstack_quant.core.dates import Thirty360Convention
-    >>> str(Thirty360Convention.US_SIA)
-    'us_sia'
-
-    """
-
-    US_SIA: Thirty360Convention
-    """US 30/360 SIA / Bond Basis convention."""
-    ISDA: Thirty360Convention
-    """30/360 ISDA convention."""
-    EUROPEAN: Thirty360Convention
-    """European 30E/360 convention."""
-    ITALIAN: Thirty360Convention
-    """30/360 Italian convention (31→30 and February day after 27→30)."""
-
-    @classmethod
-    def from_name(cls, name: str) -> Thirty360Convention:
-        """
-        Parse this variant from its snake_case name, case-insensitively.
-
-        Parameters
-        ----------
-        name : str
-            One of ``"us_sia"``, ``"isda"``, ``"european"``, ``"italian"``.
-
-        Returns
-        -------
-        Thirty360Convention
-            The matching variant.
-
-        Raises
-        ------
-        ValueError
-            If *name* is not one of the four variant names.
-
-        Examples
-        --------
-        >>> from finstack_quant.core.dates import Thirty360Convention
-        >>> Thirty360Convention.from_name("ISDA") == Thirty360Convention.ISDA
-        True
-
-        """
-        ...
-
-    def __repr__(self) -> str: ...
-    def __str__(self) -> str: ...
-    def __hash__(self) -> int: ...
-    def __eq__(self, other: object) -> bool: ...
-    def __ne__(self, other: object) -> bool: ...
-
-def days_30_360(
-    start: datetime.date | str,
-    end: datetime.date | str,
-    convention: Union[Thirty360Convention, str],
-) -> int:
-    """
-    30/360 day count between *start* (inclusive) and *end* (exclusive).
-
-    Parameters
-    ----------
-    start : datetime.date | str
-        Accrual start.
-    end : datetime.date | str
-        Accrual end; an earlier *end* gives a negative count.
-    convention : Thirty360Convention | str
-        Variant governing the month-end and February rules
-        (``"us_sia"``, ``"isda"``, ``"european"``, ``"italian"``).
-
-    Returns
-    -------
-    int
-        Signed 30/360 day count (divide by 360 for the year fraction).
-
-    Raises
-    ------
-    ValueError
-        If a date or the convention name is invalid.
-    TypeError
-        If an argument has an unsupported type.
-
-    Examples
-    --------
-    >>> from finstack_quant.core.dates import days_30_360
-    >>> days_30_360("2025-01-31", "2025-03-31", "isda")
-    60
-
-    """
-    ...
-
-def days_30e_360_isda(
-    start: datetime.date | str,
-    end: datetime.date | str,
-    end_is_termination_date: bool,
-) -> int:
-    """
-    30E/360 ISDA day count between *start* (inclusive) and *end* (exclusive).
-
-    Parameters
-    ----------
-    start : datetime.date | str
-        Accrual start.
-    end : datetime.date | str
-        Accrual end; an earlier *end* gives a negative count.
-    end_is_termination_date : bool
-        Whether *end* is the instrument termination date, which keeps a
-        February month-end at its actual day (ISDA 2006 §4.16(h)).
-
-    Returns
-    -------
-    int
-        Signed 30E/360 ISDA day count.
-
-    Raises
-    ------
-    ValueError
-        If a date is invalid.
-    TypeError
-        If a date argument has an unsupported type.
-
-    Examples
-    --------
-    >>> from finstack_quant.core.dates import days_30e_360_isda
-    >>> days_30e_360_isda("2024-01-31", "2024-02-29", False)
-    30
-
-    """
-    ...

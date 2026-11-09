@@ -189,12 +189,18 @@ const CASES = {
   ],
   months_until: () => core.monthsUntil(ep('2020-01-15'), ep('2022-03-10')),
   days_since_epoch: () => core.daysSinceEpoch('2025-01-02'),
-  days_30_360: () =>
-    ['us_sia', 'isda', 'european', 'italian'].map((name) =>
-      core.days30360(ep('2025-01-31'), ep('2025-03-31'), name)
+  thirty_360_day_counts: () => [
+    ...['30_360', '30_360_isda', '30e_360', '30_360_it'].map((name) =>
+      core.DayCount.fromName(name).yearFraction(ep('2025-01-31'), ep('2025-03-31'))
     ),
-  days_30e_360_isda: () =>
-    [false, true].map((flag) => core.days30e360Isda(ep('2025-01-31'), ep('2025-02-28'), flag)),
+    ...[false, true].map((flag) =>
+      core.DayCount.thirtyE360Isda().yearFraction(
+        ep('2025-01-31'),
+        ep('2025-02-28'),
+        new core.DayCountContext(null, null, null, null, flag)
+      )
+    ),
+  ],
   holiday_calendar: () => ({
     code: new core.HolidayCalendar('NYSE + gblo').toString(),
     is_holiday: nyse.isHoliday(ep('2025-01-01')),

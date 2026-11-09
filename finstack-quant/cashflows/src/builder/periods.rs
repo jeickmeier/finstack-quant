@@ -258,7 +258,7 @@ pub(crate) fn period_day_count_context<'a>(
         frequency: Some(frequency),
         bus_basis: None,
         coupon_period,
-        end_is_termination_date,
+        end_is_termination_date: Some(end_is_termination_date),
     }
 }
 
@@ -358,7 +358,9 @@ pub(crate) fn contractual_accrual(
         context.coupon_period = Some(full_period);
         day_count.year_fraction(start, end, context)
     } else {
-        context.end_is_termination_date &= end == full_period.1;
+        context.end_is_termination_date = context
+            .end_is_termination_date
+            .map(|terminal| terminal && end == full_period.1);
         day_count.year_fraction(start, end, context)
     }
 }

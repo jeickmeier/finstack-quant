@@ -59,7 +59,7 @@ fn daycount_ctx_state_roundtrip() {
         frequency: Some(Tenor::quarterly()),
         bus_basis: Some(260),
         coupon_period: None,
-        end_is_termination_date: false,
+        end_is_termination_date: Some(false),
     };
     let ctx = state.to_ctx().expect("calendar state hydrates");
     let start = Date::from_calendar_date(2025, Month::January, 2).unwrap();

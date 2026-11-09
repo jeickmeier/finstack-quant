@@ -834,7 +834,7 @@ fn actact_isma_requires_frequency() {
         frequency: Some(Tenor::new(6, TenorUnit::Months).expect("valid tenor fixture")),
         bus_basis: None,
         coupon_period: None,
-        end_is_termination_date: false,
+        end_is_termination_date: None,
     };
     let yf = DayCount::ActActIsma.year_fraction(start, end, ctx).unwrap();
     assert!(yf > 0.0);
@@ -850,7 +850,7 @@ fn actact_isma_full_coupon_period() {
         frequency: Some(Tenor::new(6, TenorUnit::Months).expect("valid tenor fixture")),
         bus_basis: None,
         coupon_period: None,
-        end_is_termination_date: false,
+        end_is_termination_date: None,
     };
 
     let yf = DayCount::ActActIsma.year_fraction(start, end, ctx).unwrap();
@@ -870,7 +870,7 @@ fn actact_isma_multiple_frequencies() {
         frequency: Some(Tenor::new(3, TenorUnit::Months).expect("valid tenor fixture")),
         bus_basis: None,
         coupon_period: None,
-        end_is_termination_date: false,
+        end_is_termination_date: None,
     };
     let yf_q = DayCount::ActActIsma
         .year_fraction(start, end, ctx_q)
@@ -882,7 +882,7 @@ fn actact_isma_multiple_frequencies() {
         frequency: Some(Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture")),
         bus_basis: None,
         coupon_period: None,
-        end_is_termination_date: false,
+        end_is_termination_date: None,
     };
     let yf_m = DayCount::ActActIsma
         .year_fraction(start, end, ctx_m)
@@ -916,7 +916,7 @@ fn actact_isma_eom_regular_period_is_exactly_half() {
         frequency: Some(Tenor::new(6, TenorUnit::Months).expect("valid tenor fixture")),
         bus_basis: None,
         coupon_period: None,
-        end_is_termination_date: false,
+        end_is_termination_date: None,
     };
 
     // [2025-08-31, 2026-02-28): Aug 31 + 6M (clamped) = Feb 28 → one full period.
@@ -942,7 +942,7 @@ fn actact_isma_eom_grid_preserves_roll_day_across_short_month() {
         frequency: Some(Tenor::new(6, TenorUnit::Months).expect("valid tenor fixture")),
         bus_basis: None,
         coupon_period: None,
-        end_is_termination_date: false,
+        end_is_termination_date: None,
     };
     let yf = DayCount::ActActIsma
         .year_fraction(make_date(2025, 8, 31), make_date(2026, 8, 31), ctx)
@@ -1013,7 +1013,7 @@ fn actact_isma_partial_period() {
         frequency: Some(Tenor::new(6, TenorUnit::Months).expect("valid tenor fixture")),
         bus_basis: None,
         coupon_period: None,
-        end_is_termination_date: false,
+        end_is_termination_date: None,
     };
 
     let yf = DayCount::ActActIsma
@@ -1039,7 +1039,7 @@ fn actact_vs_actact_isma_comparison() {
         frequency: Some(Tenor::new(12, TenorUnit::Months).expect("valid tenor fixture")),
         bus_basis: None,
         coupon_period: None,
-        end_is_termination_date: false,
+        end_is_termination_date: None,
     };
     let yf_isma = DayCount::ActActIsma
         .year_fraction(start, end, ctx_isma)
@@ -1301,7 +1301,7 @@ fn bus252_requires_calendar() {
         frequency: None,
         bus_basis: None,
         coupon_period: None,
-        end_is_termination_date: false,
+        end_is_termination_date: None,
     };
     let yf = DayCount::Bus252.year_fraction(start, end, ctx).unwrap();
     assert!(yf > 0.0);
@@ -1315,7 +1315,7 @@ fn bus252_rejects_zero_basis() {
         frequency: None,
         bus_basis: Some(0),
         coupon_period: None,
-        end_is_termination_date: false,
+        end_is_termination_date: None,
     };
 
     assert!(
@@ -1336,7 +1336,7 @@ fn bus252_counts_only_business_days() {
         frequency: None,
         bus_basis: None,
         coupon_period: None,
-        end_is_termination_date: false,
+        end_is_termination_date: None,
     };
 
     let yf = DayCount::Bus252.year_fraction(start, end, ctx).unwrap();
@@ -1363,7 +1363,7 @@ fn bus252_full_year_is_deterministic() {
         frequency: None,
         bus_basis: None,
         coupon_period: None,
-        end_is_termination_date: false,
+        end_is_termination_date: None,
     };
 
     let yf = DayCount::Bus252.year_fraction(start, end, ctx).unwrap();
@@ -1410,7 +1410,7 @@ fn bus252_excludes_holidays() {
         frequency: None,
         bus_basis: None,
         coupon_period: None,
-        end_is_termination_date: false,
+        end_is_termination_date: None,
     };
 
     let yf = DayCount::Bus252.year_fraction(start, end, ctx).unwrap();

@@ -123,9 +123,7 @@
       "finstack_quant.core.dates.DayCountContext",
       "finstack_quant.core.dates.Schedule",
       "finstack_quant.core.dates.StubKind",
-      "finstack_quant.core.dates.Thirty360Convention",
       "finstack_quant.core.dates.adjust",
-      "finstack_quant.core.dates.days_30_360",
       "finstack_quant.core.dates.next_cds_date",
       "finstack_quant.core.dates.next_imm",
       "finstack_quant.core.dates.third_friday"

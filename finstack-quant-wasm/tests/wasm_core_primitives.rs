@@ -40,9 +40,20 @@ fn thirty_e_360_isda_uses_termination_context() {
         .year_fraction(
             JsValue::from(start),
             JsValue::from(end),
-            &JsDayCountContext::new(None, None, None, None, None).expect("empty context"),
+            &JsDayCountContext::new(None, None, None, None, Some(JsValue::from(false)))
+                .expect("ordinary context"),
         )
         .expect("regular period");
+    // An unspecified termination status is rejected rather than read as false.
+    assert!(
+        day_count
+            .year_fraction(
+                JsValue::from(start),
+                JsValue::from(end),
+                &JsDayCountContext::new(None, None, None, None, None).expect("empty context"),
+            )
+            .is_err()
+    );
     let terminal_ctx =
         JsDayCountContext::new(None, None, None, None, Some(JsValue::from(true))).expect("context");
     let terminal = day_count

@@ -670,7 +670,7 @@ impl ReplayTemplate {
                     frequency: Some(spec.schedule.frequency),
                     bus_basis: None,
                     coupon_period: accrual.coupon_period,
-                    end_is_termination_date: accrual.end_is_termination_date,
+                    end_is_termination_date: Some(accrual.end_is_termination_date),
                 });
                 entry.accrual = flow.accrual_factor;
                 entry.base_index_rate = accrual.projected_index_rate;
@@ -1155,7 +1155,7 @@ impl ReplayTemplate {
                         frequency: Some(bond.cashflow_spec.schedule().frequency),
                         bus_basis: None,
                         coupon_period: accrual.coupon_period,
-                        end_is_termination_date: accrual.end_is_termination_date,
+                        end_is_termination_date: Some(accrual.end_is_termination_date),
                     },
                     amount: flow.amount.amount(),
                     pik: flow.kind == CFKind::Pik,
@@ -1446,7 +1446,9 @@ impl ReplayTemplate {
                 )
             } else {
                 let mut elapsed_context = claim.day_count_context;
-                elapsed_context.end_is_termination_date &= elapsed_end == claim.end;
+                elapsed_context.end_is_termination_date = elapsed_context
+                    .end_is_termination_date
+                    .map(|terminal| terminal && elapsed_end == claim.end);
                 let elapsed =
                     claim
                         .day_count

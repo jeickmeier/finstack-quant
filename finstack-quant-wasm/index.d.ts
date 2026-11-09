@@ -626,44 +626,6 @@ export interface CoreNamespace {
   readonly ratingScalesExtensionKey: typeof wasm.ratingScalesExtensionKey;
   readonly DayCount: typeof wasm.DayCount;
   readonly DayCountContext: typeof wasm.DayCountContext;
-  /**
-   * Day count between two dates under a 30/360 variant (Rust `days_30_360`).
-   *
-   * # Arguments
-   *
-   * * `start` - Inclusive accrual start as days since 1970-01-01.
-   * * `end` - Exclusive accrual end as days since 1970-01-01; an earlier end
-   *   gives a negative count rather than an error.
-   * * `convention` - Variant name: `"us_sia"`, `"isda"`, `"european"` or
-   *   `"italian"`, in any ASCII case.
-   *
-   * @returns The 30/360 day count.
-   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind
-   * `validation`) for an unknown variant or a date outside the supported range.
-   * @param start - Inclusive accrual start as days since 1970-01-01.
-   * @param end - Exclusive accrual end as days since 1970-01-01; an earlier end gives a negative count rather than an error.
-   * @param convention - Variant name: `"us_sia"`, `"isda"`, `"european"` or `"italian"`, in any ASCII case.
-   */
-  readonly days30360: typeof wasm.days30360;
-  /**
-   * Day count under 30E/360 ISDA (Rust `days_30e_360_isda`).
-   *
-   * # Arguments
-   *
-   * * `start` - Inclusive accrual start as days since 1970-01-01.
-   * * `end` - Exclusive accrual end as days since 1970-01-01; an earlier end
-   *   gives a negative count rather than an error.
-   * * `end_is_termination_date` - Whether `end` is the instrument's final
-   *   maturity, which keeps a February month-end day unadjusted.
-   *
-   * @returns The 30E/360 ISDA day count.
-   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind
-   * `validation`) for a date outside the supported range.
-   * @param start - Inclusive accrual start as days since 1970-01-01.
-   * @param end - Exclusive accrual end as days since 1970-01-01; an earlier end gives a negative count rather than an error.
-   * @param endIsTerminationDate - Whether `end` is the instrument's final maturity, which keeps a February month-end day unadjusted.
-   */
-  readonly days30e360Isda: typeof wasm.days30e360Isda;
   readonly Tenor: typeof wasm.Tenor;
   readonly TenorUnit: typeof wasm.TenorUnit;
   /**

@@ -220,7 +220,6 @@ def test_dates_pickle_round_trips() -> None:
         HolidayCalendar,
         Tenor,
         TenorUnit,
-        Thirty360Convention,
         build_periods,
     )
 
@@ -235,7 +234,7 @@ def test_dates_pickle_round_trips() -> None:
         StubKind.LONG_BACK,
         BusinessDayConvention.MODIFIED_PRECEDING,
         ScheduleErrorPolicy.GRACEFUL_EMPTY,
-        Thirty360Convention.ITALIAN,
+        DayCount.THIRTY_360_ISDA,
         FiscalConfig.uk(),
         build_periods("2024Q1..Q4", "2024Q2"),
         Schedule.builder("2025-01-15", "2026-01-15").frequency("6M").build(),
@@ -298,12 +297,11 @@ def test_tenor_constructor_forms_and_context_helpers() -> None:
 
 def test_thirty360_and_date_extension_free_functions() -> None:
     from finstack_quant.core.dates import (
-        Thirty360Convention,
+        DayCount,
+        DayCountContext,
         add_business_days,
         add_months,
         add_weekdays,
-        days_30_360,
-        days_30e_360_isda,
         end_of_month,
         fiscal_year,
         is_weekend,
@@ -311,10 +309,15 @@ def test_thirty360_and_date_extension_free_functions() -> None:
         quarter,
     )
 
-    assert days_30_360("2025-01-31", "2025-03-31", "isda") == 60
-    assert days_30_360("2025-01-31", "2025-03-31", Thirty360Convention.US_SIA) == 60
-    assert days_30e_360_isda("2024-01-31", "2024-02-29", False) == 30
-    assert Thirty360Convention.from_name("ISDA") == Thirty360Convention.ISDA
+    # The 30/360 family is selected through DayCount; 30E/360 ISDA needs an
+    # explicit termination status for its later endpoint.
+    assert DayCount.from_name("30_360_isda") == DayCount.THIRTY_360_ISDA
+    assert DayCount.THIRTY_360_ISDA.year_fraction("2025-02-28", "2025-03-31") * 360 == pytest.approx(33)
+    ordinary = DayCountContext(end_is_termination_date=False)
+    assert DayCount.THIRTY_E_360_ISDA.year_fraction("2024-01-31", "2024-02-29", ordinary) * 360 == pytest.approx(30)
+    with pytest.raises(ValueError, match="end_is_termination_date"):
+        DayCount.THIRTY_E_360_ISDA.year_fraction("2024-01-31", "2024-01-31")
+    assert DayCountContext().end_is_termination_date is None
     assert add_business_days(date(2025, 6, 27), 3, "target2") == date(2025, 7, 2)
     assert add_weekdays("2025-01-03", 1) == date(2025, 1, 6)
     assert add_months("2024-01-31", 1) == date(2024, 2, 29)

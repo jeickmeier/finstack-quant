@@ -44,6 +44,10 @@ pub struct OvernightCouponProjectionInput<'a> {
     pub accrual_start: Date,
     /// Contractual accrual end.
     pub accrual_end: Date,
+    /// Whether `accrual_end` is the instrument's contractual termination date;
+    /// `None` when the caller has no schedule fact, which 30E/360 ISDA rejects.
+    /// Only an interval ending on `accrual_end` inherits this status.
+    pub end_is_termination_date: Option<bool>,
     /// Day-count basis for each overnight observation.
     pub day_count: DayCount,
     /// Coupon frequency required by context-sensitive day-count conventions.
@@ -124,6 +128,10 @@ pub struct OvernightArithmeticProjectionInput<'a> {
     pub accrual_start: Date,
     /// Contractual averaging-period end.
     pub accrual_end: Date,
+    /// Whether `accrual_end` is the instrument's contractual termination date;
+    /// `None` when the caller has no schedule fact, which 30E/360 ISDA rejects.
+    /// Only an interval ending on `accrual_end` inherits this status.
+    pub end_is_termination_date: Option<bool>,
     /// Day-count basis used for the published overnight rate.
     pub day_count: DayCount,
     /// Resolved fixing calendar.
@@ -317,9 +325,11 @@ fn project_overnight_coupon_discount_identity(
             .add_business_days(1, input.fixing_calendar)?
             .min(input.accrual_end);
         if date < input.as_of {
-            let dcf = input
-                .day_count
-                .year_fraction(date, step_end, day_count_context)?;
+            let dcf = input.day_count.year_fraction(
+                date,
+                step_end,
+                interval_context(day_count_context, step_end, input.accrual_end),
+            )?;
             if !dcf.is_finite() || dcf <= 0.0 {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "Overnight observation has non-positive day-count fraction for \
@@ -366,13 +376,32 @@ fn project_overnight_coupon_discount_identity(
     )
 }
 
+/// The day-count context for one interval of a coupon accruing to
+/// `accrual_end`: only an interval ending there inherits the coupon's
+/// termination status; every other interval end is ordinary.
+fn interval_context<'a>(
+    context: DayCountContext<'a>,
+    interval_end: Date,
+    accrual_end: Date,
+) -> DayCountContext<'a> {
+    DayCountContext {
+        end_is_termination_date: context
+            .end_is_termination_date
+            .map(|terminal| terminal && interval_end == accrual_end),
+        ..context
+    }
+}
+
 fn projected_rate(
     curve: OvernightProjectionCurve<'_>,
     obs_start: Date,
     obs_end: Date,
     day_count: DayCount,
     day_count_context: DayCountContext<'_>,
+    accrual_end: Date,
 ) -> Result<f64> {
+    let to_start = interval_context(day_count_context, obs_start, accrual_end);
+    let to_end = interval_context(day_count_context, obs_end, accrual_end);
     match curve {
         OvernightProjectionCurve::Forward(forward) => {
             if obs_start < forward.base_date() {
@@ -385,22 +414,18 @@ fn projected_rate(
             let t0 = if obs_start <= forward.base_date() {
                 0.0
             } else {
-                forward.day_count().year_fraction(
-                    forward.base_date(),
-                    obs_start,
-                    day_count_context,
-                )?
+                forward
+                    .day_count()
+                    .year_fraction(forward.base_date(), obs_start, to_start)?
             };
             let t1 = if obs_end <= forward.base_date() {
                 0.0
             } else {
-                forward.day_count().year_fraction(
-                    forward.base_date(),
-                    obs_end,
-                    day_count_context,
-                )?
+                forward
+                    .day_count()
+                    .year_fraction(forward.base_date(), obs_end, to_end)?
             };
-            let rate_accrual = day_count.year_fraction(obs_start, obs_end, day_count_context)?;
+            let rate_accrual = day_count.year_fraction(obs_start, obs_end, to_end)?;
             if !rate_accrual.is_finite() || rate_accrual <= 0.0 || t1 <= t0 {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "Overnight projection requires positive curve time and index accrual for {obs_start} -> {obs_end}"
@@ -411,7 +436,7 @@ fn projected_rate(
             Ok(forward.rate_period(t0, t1)? * ((t1 - t0) / rate_accrual))
         }
         OvernightProjectionCurve::Discount(discount) => {
-            let dcf = day_count.year_fraction(obs_start, obs_end, day_count_context)?;
+            let dcf = day_count.year_fraction(obs_start, obs_end, to_end)?;
             if dcf <= 0.0 {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "Overnight projection has non-positive observation accrual for \
@@ -435,6 +460,7 @@ pub fn project_arithmetic_overnight_rate(
     let day_count_context = DayCountContext {
         calendar: Some(input.fixing_calendar),
         coupon_period: Some((input.accrual_start, input.accrual_end)),
+        end_is_termination_date: input.end_is_termination_date,
         ..DayCountContext::default()
     };
     let total_accrual =
@@ -464,9 +490,11 @@ pub fn project_arithmetic_overnight_rate(
     while date < input.accrual_end {
         let next_observation_date = observation_date.add_business_days(1, input.fixing_calendar)?;
         let step_end = next_observation_date.min(input.accrual_end);
-        let accrual = input
-            .day_count
-            .year_fraction(date, step_end, day_count_context)?;
+        let accrual = input.day_count.year_fraction(
+            date,
+            step_end,
+            interval_context(day_count_context, step_end, input.accrual_end),
+        )?;
         if !accrual.is_finite() || accrual <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Arithmetic overnight observation has non-positive accrual for {date} -> \
@@ -491,6 +519,7 @@ pub fn project_arithmetic_overnight_rate(
                     next_observation_date,
                     input.day_count,
                     day_count_context,
+                    input.accrual_end,
                 )?,
                 1.0,
             )
@@ -549,6 +578,7 @@ pub fn project_overnight_coupon(
         calendar: Some(input.fixing_calendar),
         frequency: input.coupon_frequency,
         coupon_period: Some(input.coupon_period),
+        end_is_termination_date: input.end_is_termination_date,
         ..DayCountContext::default()
     };
     let accrual_year_fraction =
@@ -618,19 +648,22 @@ pub fn project_overnight_coupon(
         } else {
             (date, step_end)
         };
-        let dcf = input
-            .day_count
-            .year_fraction(dcf_start, dcf_end, day_count_context)?;
+        let dcf = input.day_count.year_fraction(
+            dcf_start,
+            dcf_end,
+            interval_context(day_count_context, dcf_end, input.accrual_end),
+        )?;
         if !dcf.is_finite() || dcf <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Overnight observation has non-positive day-count fraction for \
                  {dcf_start} -> {dcf_end}"
             )));
         }
-        let rate_accrual_year_fraction =
-            input
-                .day_count
-                .year_fraction(obs_start, obs_end, day_count_context)?;
+        let rate_accrual_year_fraction = input.day_count.year_fraction(
+            obs_start,
+            obs_end,
+            interval_context(day_count_context, obs_end, input.accrual_end),
+        )?;
         if !rate_accrual_year_fraction.is_finite() || rate_accrual_year_fraction <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Overnight rate interval has non-positive day-count fraction for \
@@ -657,6 +690,7 @@ pub fn project_overnight_coupon(
                     obs_end,
                     input.day_count,
                     day_count_context,
+                    input.accrual_end,
                 )?,
                 1.0,
             )
@@ -824,6 +858,7 @@ mod tests {
                     as_of: start,
                     accrual_start: start,
                     accrual_end: end,
+                    end_is_termination_date: None,
                     day_count: DayCount::Act360,
                     coupon_frequency: None,
                     coupon_period: (start, end),
@@ -900,6 +935,7 @@ mod tests {
             as_of: base_date,
             accrual_start,
             accrual_end,
+            end_is_termination_date: None,
             day_count: DayCount::Act360,
             coupon_frequency: None,
             coupon_period: (accrual_start, accrual_end),
@@ -966,6 +1002,7 @@ mod tests {
                 as_of: base_date,
                 accrual_start,
                 accrual_end,
+                end_is_termination_date: None,
                 day_count: DayCount::Act360,
                 coupon_frequency: None,
                 coupon_period: (accrual_start, accrual_end),
@@ -1062,6 +1099,7 @@ mod tests {
                 as_of: base_date,
                 accrual_start: date!(2025 - 01 - 02),
                 accrual_end: date!(2025 - 04 - 02),
+                end_is_termination_date: None,
                 day_count: DayCount::Act360,
                 coupon_frequency: None,
                 coupon_period: (date!(2025 - 01 - 02), date!(2025 - 04 - 02)),
@@ -1137,6 +1175,7 @@ mod tests {
             as_of,
             accrual_start,
             accrual_end,
+            end_is_termination_date: None,
             day_count: DayCount::Act360,
             coupon_frequency: None,
             coupon_period: (accrual_start, accrual_end),
@@ -1178,6 +1217,7 @@ mod tests {
             as_of,
             accrual_start: as_of,
             accrual_end: date!(2025 - 01 - 03),
+            end_is_termination_date: None,
             day_count: DayCount::Act360,
             coupon_frequency: None,
             coupon_period: (as_of, date!(2025 - 01 - 03)),
@@ -1214,6 +1254,7 @@ mod tests {
             as_of,
             accrual_start: as_of,
             accrual_end: date!(2025 - 01 - 07),
+            end_is_termination_date: None,
             day_count: DayCount::Act360,
             coupon_frequency: None,
             coupon_period: (as_of, date!(2025 - 01 - 07)),
@@ -1245,6 +1286,7 @@ mod tests {
             date!(2027 - 01 - 04),
             DayCount::Act360,
             DayCountContext::default(),
+            date!(2027 - 01 - 04),
         );
 
         assert!(
@@ -1274,6 +1316,7 @@ mod tests {
             as_of,
             accrual_start: as_of,
             accrual_end: date!(2025 - 01 - 10),
+            end_is_termination_date: None,
             day_count: DayCount::Bus252,
             coupon_frequency: None,
             coupon_period: (as_of, date!(2025 - 01 - 10)),
@@ -1318,6 +1361,7 @@ mod tests {
             as_of,
             accrual_start: as_of,
             accrual_end: date!(2025 - 07 - 01),
+            end_is_termination_date: None,
             day_count: DayCount::ActActIsma,
             coupon_frequency: Some(Tenor::semi_annual()),
             coupon_period: (as_of, date!(2025 - 07 - 01)),

@@ -660,7 +660,7 @@ impl Tenor {
             frequency: Some(*self),
             bus_basis: None,
             coupon_period,
-            end_is_termination_date: false,
+            end_is_termination_date: None,
         };
 
         day_count.year_fraction(as_of, end_date, ctx)

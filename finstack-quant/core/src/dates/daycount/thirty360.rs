@@ -1,86 +1,45 @@
-//! 30/360 convention implementations.
+//! 30/360 synthetic-day kernels behind [`super::DayCount`].
+//!
+//! Every variant counts `N = 360(Y₂-Y₁) + 30(M₂-M₁) + D₂' - D₁'` exactly in
+//! `i64` (it cannot overflow over the supported `Date` range) and differs only
+//! in the day adjustments. These are implementation details: the public
+//! interval semantics (validation, equal dates, reversal) belong to
+//! [`super::DayCount::year_fraction`] and
+//! [`super::DayCount::signed_year_fraction`].
 
 use time::{Date, Month};
 
 use crate::dates::date_extensions::DateExt;
 
-// 30/360 generalized helper
-/// 30/360 day-count variants.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Thirty360Convention {
-    /// 30U/360 (US SIA / Bond Basis).
-    UsSia,
-    /// 30/360 ISDA bond basis (ISDA 2006 §4.16(f); no February EOM rule).
-    ///
-    /// Reachable via the public [`days_30_360`] helper; the
-    /// [`DayCount`](super::DayCount) enum exposes the SIA/PSA
-    /// ([`DayCount::Thirty360`](super::DayCount::Thirty360)) and 30E/360 variants
-    /// instead.
-    Isda,
-    /// 30E/360 (European).
+/// Day adjustments of the 30/360 conventions without a termination input.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Thirty360Variant {
+    /// Fixed US 30U/360 EOM: paired February month-end adjustment.
+    UsEom,
+    /// ISDA 2006 §4.16(f) bond basis: no February month-end rule.
+    IsdaBondBasis,
+    /// ISDA 2006 §4.16(g) 30E/360 (European).
     European,
-    /// 30/360 Italian (QuantLib `Thirty360::Italian`).
-    ///
-    /// Day 31 becomes 30, and any February day after the 27th becomes 30.
-    /// Distinct from US SIA (February EOM only when both ends are February
-    /// EOM) and 30E/360 (no February-after-27 rule).
+    /// QuantLib `Thirty360::Italian`.
     Italian,
 }
 
-impl std::fmt::Display for Thirty360Convention {
-    /// Writes the serde label (`us_sia`, `isda`, `european`, `italian`).
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&crate::wire::serde_label(self).map_err(|_| std::fmt::Error)?)
-    }
+/// `N = 360(Y₂-Y₁) + 30(M₂-M₁) + (D₂' - D₁')` over the original years and
+/// months of a forward interval.
+fn synthetic_days(start: Date, end: Date, d1_adj: u8, d2_adj: u8) -> i64 {
+    360 * (i64::from(end.year()) - i64::from(start.year()))
+        + 30 * (i64::from(end.month() as u8) - i64::from(start.month() as u8))
+        + (i64::from(d2_adj) - i64::from(d1_adj))
 }
 
-impl std::str::FromStr for Thirty360Convention {
-    type Err = crate::Error;
-
-    /// Parses the serde label, ignoring surrounding whitespace and ASCII case.
-    fn from_str(s: &str) -> crate::Result<Self> {
-        crate::wire::serde_parse(&s.trim().to_ascii_lowercase())
-    }
-}
-
-/// Compute day count between `start` (inclusive) and `end` (exclusive) under a 30/360 convention.
-///
-/// Precondition: `start <= end`. If violated, the returned value will be negative.
-/// This helper is panic-free and allocation-free.
-///
-/// # Examples
-///
-/// ```rust
-/// use finstack_quant_core::dates::{days_30_360, Thirty360Convention};
-/// use time::{Date, Month};
-///
-/// let start = Date::from_calendar_date(2025, Month::January, 31).expect("Valid date");
-/// let end = Date::from_calendar_date(2025, Month::March, 31).expect("Valid date");
-///
-/// // ISDA 2006 §4.16(f): D1 31 → 30, then D2 31 → 30.
-/// assert_eq!(days_30_360(start, end, Thirty360Convention::Isda), 60);
-/// ```
-///
-/// # Arguments
-///
-/// * `start` - Inclusive accrual-period start date.
-/// * `end` - Exclusive accrual-period end date. Earlier values produce a
-///   negative count rather than an error.
-/// * `convention` - 30/360 variant that determines February and month-end
-///   adjustments.
-#[inline]
-pub fn days_30_360(start: Date, end: Date, convention: Thirty360Convention) -> i32 {
-    let (y1, m1, d1) = (start.year(), start.month() as i32, start.day() as i32);
-    let (y2, m2, d2) = (end.year(), end.month() as i32, end.day() as i32);
-
-    let (d1_adj, d2_adj) = match convention {
-        Thirty360Convention::UsSia => {
-            // SIA/PSA 30/360 US Bond Basis:
-            // - If D1 is 31 or last day of February, change D1 to 30
-            // - If D2 is 31 and D1 was adjusted to 30, change D2 to 30
-            // - If D2 is last day of Feb AND D1 was last day of Feb, change D2 to 30
-            // (The Feb-EOM rule is SIA/PSA-specific; ISDA 2006 §4.16(f) omits it.)
+/// Synthetic day count of the forward interval `[start, end)` under `variant`.
+pub(super) fn thirty_360_days(start: Date, end: Date, variant: Thirty360Variant) -> i64 {
+    let (d1, d2) = (start.day(), end.day());
+    let (d1_adj, d2_adj) = match variant {
+        Thirty360Variant::UsEom => {
+            // Day 31 or February month-end start becomes 30; day 31 end becomes
+            // 30 after an adjusted-30 start; February month-end end becomes 30
+            // when the start is also February month-end.
             let d1_adj = if d1 == 31 || is_last_day_of_february(start) {
                 30
             } else {
@@ -95,107 +54,48 @@ pub fn days_30_360(start: Date, end: Date, convention: Thirty360Convention) -> i
             };
             (d1_adj, d2_adj)
         }
-        Thirty360Convention::Isda => {
-            let d1_adj = if d1 == 31 { 30 } else { d1 };
+        Thirty360Variant::IsdaBondBasis => {
+            let d1_adj = d1.min(30);
             let d2_adj = if d2 == 31 && d1_adj == 30 { 30 } else { d2 };
             (d1_adj, d2_adj)
         }
-        Thirty360Convention::European => {
-            // ISDA 2006 §4.16(g) - 30E/360:
-            // - If D1 is 31, change D1 to 30
-            // - If D2 is 31, change D2 to 30
-            // Note: NO February EOM rule for European convention
-            let d1_adj = if d1 == 31 { 30 } else { d1 };
-            let d2_adj = if d2 == 31 { 30 } else { d2 };
-            (d1_adj, d2_adj)
-        }
-        Thirty360Convention::Italian => {
-            // QuantLib Thirty360::Italian:
-            // D' = 30 if D == 31 or (month == February and D > 27)
-            let d1_adj = if d1 == 31 || (start.month() == Month::February && d1 > 27) {
-                30
-            } else {
-                d1
+        Thirty360Variant::European => (d1.min(30), d2.min(30)),
+        Thirty360Variant::Italian => {
+            let italian = |date: Date, day: u8| {
+                if day == 31 || (date.month() == Month::February && day > 27) {
+                    30
+                } else {
+                    day
+                }
             };
-            let d2_adj = if d2 == 31 || (end.month() == Month::February && d2 > 27) {
-                30
-            } else {
-                d2
-            };
-            (d1_adj, d2_adj)
+            (italian(start, d1), italian(end, d2))
         }
     };
-
-    (y2 - y1) * 360 + (m2 - m1) * 30 + (d2_adj - d1_adj)
+    synthetic_days(start, end, d1_adj, d2_adj)
 }
 
-/// Check if date is the last day of February (28 or 29 depending on leap year).
+/// Synthetic day count of the forward interval `[start, end)` under 30E/360
+/// ISDA (ISDA 2006 §4.16(h)).
 ///
-/// Per SIA/PSA Standard Formulas, the last day of February receives special
-/// treatment in 30/360 US Bond Basis calculations.
-#[inline]
-fn is_last_day_of_february(date: Date) -> bool {
-    date.month() == Month::February && date == date.end_of_month()
-}
-
-/// Compute the 30E/360 (ISDA) day count per ISDA 2006 §4.16(h).
-///
-/// Adjustment rules:
-/// - D₁ becomes 30 when `start` is the last day of its month (including the
-///   last day of February).
-/// - D₂ becomes 30 when `end` is day 31, or when `end` is the last day of
-///   February **and** `end_is_termination_date` is `false`.
-///
-/// The termination-date exception means the final accrual period of an
-/// instrument maturing on the last day of February keeps the actual day
-/// number (28/29); pass `end_is_termination_date = true` for that period.
-/// [`DayCount::ThirtyE360Isda`](super::DayCount::ThirtyE360Isda) receives this flag from
-/// [`DayCountContext::end_is_termination_date`](super::DayCountContext::end_is_termination_date).
-///
-/// Precondition: `start <= end`. If violated, the returned value will be
-/// negative. This helper is panic-free and allocation-free.
-///
-/// # Examples
-///
-/// ```rust
-/// use finstack_quant_core::dates::days_30e_360_isda;
-/// use time::{Date, Month};
-///
-/// let start = Date::from_calendar_date(2012, Month::January, 28).expect("Valid date");
-/// let end = Date::from_calendar_date(2012, Month::February, 29).expect("Valid date");
-///
-/// // Intermediate coupon: end-of-Feb → 30; 30 + (30 - 28) = 32
-/// assert_eq!(days_30e_360_isda(start, end, false), 32);
-/// // Final period to maturity: Feb 29 kept; 30 + (29 - 28) = 31
-/// assert_eq!(days_30e_360_isda(start, end, true), 31);
-/// ```
-///
-/// # References
-///
-/// - ISDA (2006). "2006 ISDA Definitions." Section 4.16(h). `docs/REFERENCES.md#isda-2006-definitions`
-///
-/// # Arguments
-///
-/// * `start` - Inclusive accrual-period start date.
-/// * `end` - Exclusive accrual-period end date. Earlier values produce a
-///   negative count rather than an error.
-/// * `end_is_termination_date` - Whether `end` is the instrument's final
-///   maturity date, which preserves a February month-end under the ISDA rule.
-#[inline]
-pub fn days_30e_360_isda(start: Date, end: Date, end_is_termination_date: bool) -> i32 {
-    let (y1, m1, d1) = (start.year(), start.month() as i32, start.day() as i32);
-    let (y2, m2, d2) = (end.year(), end.month() as i32, end.day() as i32);
-
+/// The start becomes 30 when it is the last day of its month. The end becomes
+/// 30 when it is day 31, or the last day of February unless
+/// `end_is_termination_date` (the end is the contractual termination date).
+pub(super) fn thirty_e_360_isda_days(start: Date, end: Date, end_is_termination_date: bool) -> i64 {
     let d1_adj = if start == start.end_of_month() {
         30
     } else {
-        d1
+        start.day()
     };
+    let d2 = end.day();
     let d2_adj = if d2 == 31 || (is_last_day_of_february(end) && !end_is_termination_date) {
         30
     } else {
         d2
     };
+    synthetic_days(start, end, d1_adj, d2_adj)
+}
 
-    (y2 - y1) * 360 + (m2 - m1) * 30 + (d2_adj - d1_adj)
+/// Whether `date` is the last day of February (28 or 29).
+fn is_last_day_of_february(date: Date) -> bool {
+    date.month() == Month::February && date == date.end_of_month()
 }

@@ -53,9 +53,10 @@ impl JsDayCountContext {
     ///   or the full enclosing contractual coupon for Act/365L; the start must
     ///   precede the end. ICMA endpoints must share the contractual nominal
     ///   month grid, rather than adjusted payment dates.
-    /// * `end_is_termination_date` - Whether the accrual end is the
-    ///   instrument's termination date (30E/360 ISDA February-end handling);
-    ///   omitted means `false`.
+    /// * `end_is_termination_date` - Whether the chronologically later accrual
+    ///   endpoint is the contractual termination date (30E/360 ISDA
+    ///   February-end handling); omitted or `null` means unspecified, which
+    ///   30E/360 ISDA rejects.
     ///
     /// @returns A new `DayCountContext`.
     /// @throws `TypeError` (kind `invalid_type`) for a mistyped argument or a
@@ -66,7 +67,7 @@ impl JsDayCountContext {
     /// @param frequency - Coupon frequency as tenor text (for example `"6M"`; use `tenor.toString()` for a `Tenor`), required by Act/Act ICMA.
     /// @param busBasis - Business-day denominator for Bus/252 (an integer in `1..=65535`, normally `252`).
     /// @param couponPeriod - `[startEpochDays, endEpochDays]` (days since 1970-01-01): the unadjusted regular reference period for Act/Act ICMA, or the full enclosing contractual coupon for Act/365L; the start must precede the end. ICMA endpoints must share the contractual nominal month grid, rather than adjusted payment dates.
-    /// @param endIsTerminationDate - Whether the accrual end is the instrument's termination date (30E/360 ISDA February-end handling); omitted means `false`.
+    /// @param endIsTerminationDate - Whether the chronologically later accrual endpoint is the contractual termination date (30E/360 ISDA February-end handling); omitted or `null` means unspecified, which 30E/360 ISDA rejects.
     ///
     /// @example
     /// ```javascript
@@ -108,8 +109,7 @@ impl JsDayCountContext {
             _ => None,
         };
         let end_is_termination_date =
-            js_opt_bool(end_is_termination_date.as_ref(), "endIsTerminationDate")?
-                .unwrap_or_default();
+            js_opt_bool(end_is_termination_date.as_ref(), "endIsTerminationDate")?;
         DayCountContextState::try_new(
             calendar_id,
             frequency,
@@ -150,9 +150,9 @@ impl JsDayCountContext {
         })
     }
 
-    /// Whether the accrual end is the instrument termination date.
+    /// Whether the later accrual endpoint is the termination date, or `undefined` if unspecified.
     #[wasm_bindgen(getter, js_name = endIsTerminationDate)]
-    pub fn end_is_termination_date(&self) -> bool {
+    pub fn end_is_termination_date(&self) -> Option<bool> {
         self.inner.end_is_termination_date
     }
 
@@ -219,6 +219,7 @@ fn epoch_day_pair(value: &JsValue, label: &str) -> Result<(Date, Date), JsValue>
 /// - `act_365l` → `DayCount.act365l`
 /// - `nl_365` (No-Leap/365) → `DayCount.nl365`
 /// - `30_360` → `DayCount.thirty360`
+/// - `30_360_isda` (bond basis) → `DayCount.thirty360Isda`
 /// - `30e_360` → `DayCount.thirtyE360`
 /// - `30e_360_isda` → `DayCount.thirtyE360Isda`
 /// - `act_act` (ISDA) → `DayCount.actAct`
@@ -320,12 +321,22 @@ impl JsDayCount {
         }
     }
 
-    /// 30/360 US (Bond Basis).
+    /// Fixed US 30U/360 EOM (QuantLib `Thirty360::USA`); not 30/360 PSA.
     /// @returns A `DayCount` handle for this convention.
     #[wasm_bindgen(js_name = thirty360)]
     pub fn thirty360() -> JsDayCount {
         JsDayCount {
             inner: RustDayCount::Thirty360,
+        }
+    }
+
+    /// 30/360 ISDA bond basis (2006 ISDA Definitions, Section 4.16(f); QuantLib
+    /// `Thirty360::BondBasis`), with no February rule.
+    /// @returns A `DayCount` handle for this convention.
+    #[wasm_bindgen(js_name = thirty360Isda)]
+    pub fn thirty360_isda() -> JsDayCount {
+        JsDayCount {
+            inner: RustDayCount::Thirty360Isda,
         }
     }
 
@@ -338,7 +349,8 @@ impl JsDayCount {
         }
     }
 
-    /// 30E/360 ISDA day count (2006 ISDA Definitions, Section 4.16(h)).
+    /// 30E/360 ISDA day count (2006 ISDA Definitions, Section 4.16(h)). Requires
+    /// a context with an explicit `endIsTerminationDate`.
     /// @returns A `DayCount` handle for this convention.
     #[wasm_bindgen(js_name = thirtyE360Isda)]
     pub fn thirty_e360_isda() -> JsDayCount {
@@ -1117,7 +1129,7 @@ mod tests {
                 Some(RustTenor::semi_annual()),
                 Some(252),
                 Some((start, end)),
-                true,
+                Some(true),
             )
             .expect("state"),
         };
@@ -1136,7 +1148,7 @@ mod tests {
                 ][..]
             )
         );
-        assert!(ctx.end_is_termination_date());
+        assert_eq!(ctx.end_is_termination_date(), Some(true));
         let back: DayCountContextState =
             serde_json::from_str(&ctx.to_json().expect("json")).expect("parse");
         assert_eq!(back, ctx.inner);

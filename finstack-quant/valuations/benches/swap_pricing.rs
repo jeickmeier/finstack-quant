@@ -448,6 +448,7 @@ fn capture_swap(
                         as_of,
                         accrual_start: start,
                         accrual_end: end,
+                        end_is_termination_date: None,
                         day_count: float.day_count,
                         coupon_frequency: Some(float.frequency),
                         coupon_period: if float.day_count == DayCount::Act365L {
@@ -855,6 +856,7 @@ fn bench_overnight_projection_controls(c: &mut Criterion) {
                     as_of,
                     accrual_start,
                     accrual_end,
+                    end_is_termination_date: None,
                     day_count: swap.float_leg.day_count,
                     coupon_frequency: Some(swap.float_leg.frequency),
                     coupon_period: (accrual_start, accrual_end),

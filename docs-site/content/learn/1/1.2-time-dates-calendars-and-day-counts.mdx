@@ -14,9 +14,7 @@ api:
 - finstack_quant.core.dates.DayCountContext
 - finstack_quant.core.dates.Schedule
 - finstack_quant.core.dates.StubKind
-- finstack_quant.core.dates.Thirty360Convention
 - finstack_quant.core.dates.adjust
-- finstack_quant.core.dates.days_30_360
 - finstack_quant.core.dates.next_cds_date
 - finstack_quant.core.dates.next_imm
 - finstack_quant.core.dates.third_friday
@@ -100,13 +98,14 @@ Supply the ICMA reference coupon explicitly. The ACT/ACT cross-year calculation 
 {/* notebook-block notebook="01_foundations/dates/schedule_building.ipynb" cell="date-reference-periods" role="build" */}
 ```python exec id=date-reference-periods role=build
 from datetime import date
-from finstack_quant.core.dates import DayCount,DayCountContext,Thirty360Convention,days_30_360,adjust,BusinessDayConvention
+from finstack_quant.core.dates import DayCount,DayCountContext,adjust,BusinessDayConvention
 reference_start,reference_end=date(2024,1,15),date(2024,7,15)
 partial=date(2024,3,15)
 ctx=DayCountContext(frequency='6M',coupon_period=(reference_start,reference_end))
 icma=DayCount.ACT_ACT_ISMA.year_fraction(reference_start,partial,ctx)
 cross_year=DayCount.ACT_ACT.year_fraction(date(2023,12,15),date(2024,1,15))
-variants={str(c):days_30_360(date(2025,2,28),date(2025,3,31),c) for c in (Thirty360Convention.US_SIA,Thirty360Convention.ISDA,Thirty360Convention.EUROPEAN,Thirty360Convention.ITALIAN)}
+ordinary=DayCountContext(end_is_termination_date=False)
+variants={str(c):round(c.year_fraction(date(2025,2,28),date(2025,3,31),ordinary)*360) for c in (DayCount.THIRTY_360,DayCount.THIRTY_360_ISDA,DayCount.THIRTY_E_360,DayCount.THIRTY_E_360_ISDA,DayCount.THIRTY_360_IT)}
 adjusted={str(c):adjust(date(2025,5,31),c,'usny') for c in (BusinessDayConvention.FOLLOWING,BusinessDayConvention.MODIFIED_FOLLOWING,BusinessDayConvention.PRECEDING)}
 print({'ICMA_partial':icma,'ISDA_cross_year':cross_year,'30_360_days':variants,'adjusted_dates':adjusted})
 ```

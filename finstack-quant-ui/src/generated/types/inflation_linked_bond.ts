@@ -23,6 +23,7 @@ export type DayCount =
   | "act_365f"
   | "act_365l"
   | "30_360"
+  | "30_360_isda"
   | "30e_360"
   | "30e_360_isda"
   | "30_360_it"

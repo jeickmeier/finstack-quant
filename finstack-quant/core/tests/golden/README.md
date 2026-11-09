@@ -17,7 +17,7 @@ golden/
 ├── daycount_quantlib_tests.rs
 ├── variance_tests.rs
 └── data/
-    ├── daycount_quantlib.json      23 cases
+    ├── daycount_quantlib.json      37 cases
     └── realized_variance.json       4 cases
 ```
 
@@ -26,44 +26,52 @@ golden/
 
 ## Suites
 
-### `daycount_quantlib.json` — 23 cases
+### `daycount_quantlib.json` — 37 cases
 
-Day-count year fractions and 30/360 day counts against QuantLib 1.32, driven by
-`daycount_quantlib_tests.rs`. Cases by `convention` tag:
+Day-count year fractions and 30/360 synthetic day counts, driven by
+`daycount_quantlib_tests.rs` through the public `DayCount::year_fraction`.
+Regenerate with
+`uv run --no-sync python finstack-quant/core/tests/golden/generate_daycount_quantlib.py`,
+which runs QuantLib (1.43 at the last
+generation). Cases by `convention` tag:
 
-| Tag | `DayCount` | Cases |
-|-----|------------|-------|
-| `act_act_isma` | `ActActIsma` | 7 |
-| `30_360` | `Thirty360` | 6 |
-| `act_act` | `ActAct` | 3 |
-| `act_365l` | `Act365L` | 3 |
-| `30e_360` | `ThirtyE360` | 1 |
-| `act_360` | `Act360` | 1 |
-| `act_365f` | `Act365F` | 1 |
-| `comparison` | US vs Euro 30/360 side by side | 1 |
+| Tag | `DayCount` | Source | Cases |
+|-----|------------|--------|-------|
+| `30_360` | `Thirty360` | quantlib | 7 |
+| `act_act_isma` | `ActActIsma` | hand | 7 |
+| `30e_360_isda` | `ThirtyE360Isda` | quantlib | 4 |
+| `act_365l` | `Act365L` | hand | 4 |
+| `30_360_isda` | `Thirty360Isda` | quantlib | 3 |
+| `act_act` | `ActAct` | quantlib | 3 |
+| `act_act_afb` | `ActActAfb` | quantlib | 3 |
+| `30_360_it` | `Thirty360It` | quantlib | 2 |
+| `30e_360` | `ThirtyE360` | quantlib | 2 |
+| `act_360` | `Act360` | quantlib | 1 |
+| `act_365f` | `Act365F` | quantlib | 1 |
+
+`source: "quantlib"` cases are QuantLib output; `quantlib_convention` names the
+exact day counter, because vendor enum names are not portable identities
+(QuantLib `BondBasis` is `Thirty360Isda`, QuantLib `ISDA` is `ThirtyE360Isda`).
+30E/360 ISDA cases record `end_is_termination_date`, passed to QuantLib as its
+termination date. `source: "hand"` cases (ACT/ACT ICMA, which QuantLib computes
+from a schedule, and ACT/365L, which QuantLib lacks) are hand-computed from the
+accepted formulas, not vendor output; the suite status is therefore
+`provisional`.
 
 Convention notes that matter when reading a failure:
 
-- 30/360 US (Bond Basis / SIA-NASD PSA) — QuantLib `Thirty360::USA` sets Feb EOM
-  `D1 = 30`. This is **not** ISDA 2006 §4.16(f), which leaves February `D1`
-  unadjusted.
-- 30E/360 (Eurobond) — ISDA 2006 §4.16(g).
+- `30_360` is fixed US 30U/360 EOM (QuantLib `Thirty360::USA`), not 30/360 PSA.
+  `30_360_isda` is ISDA 2006 §4.16(f) bond basis, with no February rule.
+- 30E/360 is ISDA 2006 §4.16(g); 30E/360 ISDA is §4.16(h).
 - Act/Act ISDA — year-boundary splitting, ISDA 2006 §4.16(b).
 - Act/Act ICMA — coupon-period basis, ICMA Rule 251. Every case carries a
-  `frequency` field (`1M`/`3M`/`6M`/`1Y`); a case whose `[start, end)` is not an
-  integer number of those coupons also carries an explicit `coupon_period`
-  `[start, end]` pair. Both feed `DayCountContext`, and `DayCount::ActActIsma`
-  returns `MissingCouponPeriodForActActIsma` for an irregular span given
-  frequency alone rather than re-anchoring it — so the pair is not optional
-  there.
-- Act/365L — ICMA Rule 251 leap-year denominator, **not** ACT/ACT AFB.
+  `frequency`; an irregular span also carries its regular `coupon_period`.
+- Act/365L — ISDA coupon-end-year rule (366 when the period ends in a leap
+  year), **not** ACT/ACT AFB.
 
-This suite predates the shared `Expectation` shape: each case carries its own
-`expected` object (`year_fraction`, `days_30_360`, a plain `tolerance` float, and
-the US/Euro comparison fields) and the test asserts against it directly.
-
-References: QuantLib 1.32; ISDA (2006) 2006 ISDA Definitions §4.16(b), (d)-(g);
-ICMA Rule Book Rule 251.
+Each case's `expected` object holds `year_fraction`, a plain `tolerance`, and
+either `days` (30/360 family, checked as `year_fraction * 360`) or
+`actual_days` (documentation).
 
 ### `realized_variance.json` — 4 cases
 

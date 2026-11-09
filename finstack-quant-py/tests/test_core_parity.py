@@ -317,7 +317,9 @@ class TestDayCountParity:
 
     def test_thirty_e_360_isda_termination_context(self) -> None:
         start, end = date(2025, 1, 31), date(2025, 2, 28)
-        regular = DayCount.THIRTY_E_360_ISDA.year_fraction(start, end)
+        regular = DayCount.THIRTY_E_360_ISDA.year_fraction(start, end, DayCountContext(end_is_termination_date=False))
+        with pytest.raises(ValueError, match="end_is_termination_date"):
+            DayCount.THIRTY_E_360_ISDA.year_fraction(start, end)
         terminal = DayCount.THIRTY_E_360_ISDA.year_fraction(start, end, DayCountContext(end_is_termination_date=True))
         assert regular == pytest.approx(30.0 / 360.0)
         assert terminal == pytest.approx(28.0 / 360.0)

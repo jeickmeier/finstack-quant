@@ -531,7 +531,9 @@ impl CompiledFloatingCoupon {
         })?;
         let elapsed_end = date.min(self.period.accrual_end);
         let mut context = self.period.day_count_context;
-        context.end_is_termination_date &= elapsed_end == self.period.accrual_end;
+        context.end_is_termination_date = context
+            .end_is_termination_date
+            .map(|terminal| terminal && elapsed_end == self.period.accrual_end);
         let elapsed = if self.period.day_count == DayCount::Act365L {
             // ACT/365L chooses its 365/366 denominator from the full coupon
             // period, including a future leap day or the contractual end year.

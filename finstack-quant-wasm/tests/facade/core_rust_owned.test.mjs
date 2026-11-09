@@ -180,7 +180,7 @@ test('DayCountContext is built by DayCountContextState::try_new', () => {
   assert.equal(empty.calendarId, undefined);
   assert.equal(empty.frequency, undefined);
   assert.equal(empty.couponPeriod, undefined);
-  assert.equal(empty.endIsTerminationDate, false);
+  assert.equal(empty.endIsTerminationDate, undefined);
   for (const legacy of ['withCalendar', 'withFrequency', 'withBusBasis', 'withCouponPeriod']) {
     assert.equal(legacy in empty, false, legacy);
   }

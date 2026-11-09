@@ -126,10 +126,7 @@ pub use date_extensions::DateExt;
 
 mod daycount;
 
-pub use daycount::{
-    DayCount, DayCountContext, DayCountContextState, Thirty360Convention, days_30_360,
-    days_30e_360_isda,
-};
+pub use daycount::{DayCount, DayCountContext, DayCountContextState};
 
 pub use calendar::business_days::canonical_calendar_id;
 pub use calendar::business_days::{

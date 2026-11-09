@@ -227,6 +227,8 @@ pub(crate) fn projected_compounded_float_leg_schedule(
 
     let mut flows = Vec::with_capacity(periods.len());
     let mut projected_fixings = Vec::new();
+    // The final period ends on the leg's termination date (30E/360 ISDA).
+    let final_period_end = periods.last().map(|period| period.accrual_end);
     for period in periods {
         if period.payment_date <= as_of {
             continue;
@@ -257,6 +259,9 @@ pub(crate) fn projected_compounded_float_leg_schedule(
                     as_of,
                     accrual_start,
                     accrual_end,
+                    end_is_termination_date: Some(
+                        Some(period.accrual_end) == final_period_end,
+                    ),
                     day_count: float.day_count,
                     coupon_frequency: Some(float.frequency),
                     coupon_period: if float.day_count == finstack_quant_core::dates::DayCount::Act365L { (period.accrual_start, period.accrual_end) } else { (accrual_start, accrual_end) },

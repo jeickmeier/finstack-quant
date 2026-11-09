@@ -214,10 +214,18 @@ CASES: dict[str, Callable[[], Any]] = {
     "fiscal_year": lambda: [dates.fiscal_year("2024-11-15", US_FEDERAL), dates.fiscal_year("2024-09-30", US_FEDERAL)],
     "months_until": lambda: dates.months_until("2020-01-15", "2022-03-10"),
     "days_since_epoch": lambda: dates.days_since_epoch("2025-01-02"),
-    "days_30_360": lambda: [
-        dates.days_30_360("2025-01-31", "2025-03-31", name) for name in ("us_sia", "isda", "european", "italian")
-    ],
-    "days_30e_360_isda": lambda: [dates.days_30e_360_isda("2025-01-31", "2025-02-28", flag) for flag in (False, True)],
+    "thirty_360_day_counts": lambda: (
+        [
+            dates.DayCount.from_name(name).year_fraction("2025-01-31", "2025-03-31")
+            for name in ("30_360", "30_360_isda", "30e_360", "30_360_it")
+        ]
+        + [
+            dates.DayCount.THIRTY_E_360_ISDA.year_fraction(
+                "2025-01-31", "2025-02-28", dates.DayCountContext(end_is_termination_date=flag)
+            )
+            for flag in (False, True)
+        ]
+    ),
     "holiday_calendar": lambda: {
         "code": str(dates.HolidayCalendar("NYSE + gblo")),
         "is_holiday": NYSE.is_holiday("2025-01-01"),

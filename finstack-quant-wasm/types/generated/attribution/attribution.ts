@@ -270,10 +270,14 @@ export type Currency =
  * Days = 360(Y₂ - Y₁) + 30(M₂ - M₁) + (D₂' - D₁')
  * year_fraction = Days / 360
  *
- * Thirty360 (SIA/PSA):
+ * Thirty360 (fixed US 30U/360 EOM):
  *   D₁' = 30   if D₁ is 31 or last day of February
  *   D₂' = 30   if D₂ is 31 and D₁' = 30
  *   D₂' = 30   if D₂ is last day of Feb and D₁ is last day of Feb
+ *
+ * Thirty360Isda (ISDA bond basis, §4.16(f)):
+ *   D₁' = min(D₁, 30)
+ *   D₂' = 30   if D₂ is 31 and D₁' = 30
  *
  * ThirtyE360 (ISDA §4.16(g)):
  *   D₁' = min(D₁, 30)
@@ -289,17 +293,19 @@ export type Currency =
  *   D₂' = 30   if D₂ is 31 or (month is February and D₂ > 27)
  * ```
  *
- * - **`Thirty360`, SIA/PSA versus ISDA**: this implementation follows the
- *   SIA/PSA convention, which includes a February end-of-month rule. ISDA 2006
- *   §4.16(f) specifies a slightly different set of adjustments that omit it.
- *   Both are commonly called "30/360 US", but they can produce different day
- *   counts for periods that start or end on the last day of February.
+ * - **`Thirty360` versus `Thirty360Isda`**: `Thirty360` is the fixed US
+ *   30U/360 EOM algorithm with its paired February month-end rule (QuantLib
+ *   `Thirty360::USA`); it is not `30/360 PSA`, which lacks the paired end
+ *   adjustment. `Thirty360Isda` is ISDA 2006 §4.16(f) bond basis without any
+ *   February rule (QuantLib `Thirty360::BondBasis`). They differ for periods
+ *   that start or end on the last day of February.
  * - **`ThirtyE360Isda` termination-date exception**: ISDA §4.16(h) keeps D₂
  *   unadjusted when the period ends on the termination date and that date is
- *   the last day of February. Set
- *   [`DayCountContext::end_is_termination_date`] for the final period to
- *   maturity; ordinary coupon periods leave it false.
- * - **`Thirty360It`** is distinct from US SIA (February EOM only when both
+ *   the last day of February. [`DayCountContext::end_is_termination_date`]
+ *   must be explicit for this convention: `Some(true)` when the
+ *   chronologically later endpoint is the contractual termination date,
+ *   `Some(false)` otherwise. QuantLib's `Thirty360::ISDA` is this convention.
+ * - **`Thirty360It`** is distinct from US 30U/360 EOM (February EOM only when both
  *   ends are February EOM) and from 30E/360 (no February-after-27 rule).
  *
  * The actual-day conventions:
@@ -358,6 +364,7 @@ export type DayCount =
   | "act_365f"
   | "act_365l"
   | "30_360"
+  | "30_360_isda"
   | "30e_360"
   | "30e_360_isda"
   | "30_360_it"

@@ -215,7 +215,6 @@ def _label_enum_classes() -> list[type]:
         SifmaSettlementClass,
         StubKind,
         TenorUnit,
-        Thirty360Convention,
     )
     from finstack_quant.core.market_data import FxConversionPolicy, FxQuoteConvention
     from finstack_quant.core.rating_scales import UnknownScalePolicy
@@ -223,7 +222,6 @@ def _label_enum_classes() -> list[type]:
     return [
         RoundingMode,
         DayCount,
-        Thirty360Convention,
         TenorUnit,
         BusinessDayConvention,
         StubKind,

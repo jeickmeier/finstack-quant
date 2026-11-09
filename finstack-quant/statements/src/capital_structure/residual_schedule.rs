@@ -191,7 +191,7 @@ pub(crate) fn rebuild_residual_interest(
                     .map(finstack_quant_core::dates::calendar_by_id_strict)
                     .transpose()?,
                 coupon_period: accrual.coupon_period.or(Some((accrual.start, accrual.end))),
-                end_is_termination_date: accrual.end_is_termination_date,
+                end_is_termination_date: Some(accrual.end_is_termination_date),
                 ..Default::default()
             };
             let total = accrual
@@ -238,8 +238,9 @@ pub(crate) fn rebuild_residual_interest(
                     bounds[0],
                     bounds[1],
                     DayCountContext {
-                        end_is_termination_date: accrual.end_is_termination_date
-                            && bounds[1] == accrual.end,
+                        end_is_termination_date: Some(
+                            accrual.end_is_termination_date && bounds[1] == accrual.end,
+                        ),
                         ..context
                     },
                 )? / total;

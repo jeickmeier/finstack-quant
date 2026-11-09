@@ -23,7 +23,7 @@ def test_canonical_parsers_normalize_case_and_outer_whitespace() -> None:
     assert str(Tenor.parse(" 3m ")) == "3M"
 
 
-@pytest.mark.parametrize("name", ["ACT/360", "act-360", "act_365", "act_act_icma", "30_360_isda"])
+@pytest.mark.parametrize("name", ["ACT/360", "act-360", "act_365", "act_act_icma", "30_360_us"])
 def test_daycount_rejects_retired_labels(name: str) -> None:
     with pytest.raises(ValueError, match="day-count"):
         DayCount.from_name(name)

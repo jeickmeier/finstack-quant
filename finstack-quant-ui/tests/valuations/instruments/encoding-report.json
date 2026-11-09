@@ -29,7 +29,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "double": [
           "#/$defs/d_91fef53f78d7c50653a0/properties/coupon",
@@ -442,7 +443,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "double": [
           "#/$defs/d_24b4bd8fabf71247af0b/properties/coupon",
@@ -833,7 +835,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "double": [
           "#/$defs/d_038bf279beea6aa9cf48/properties/coupon",
@@ -1411,7 +1414,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "double": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -1825,6 +1829,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
           "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13",
           "#/$defs/ReturnFloorSpec/properties/day_count/anyOf/1"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
@@ -2922,7 +2927,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "double": [
           "#/$defs/d_090a2e8da3e1c2418317/properties/autocall_barriers/items",
@@ -3471,7 +3477,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "double": [
           "#/$defs/d_95df9e3f9fb8d601ef0b/properties/barrier",
@@ -3877,7 +3884,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
@@ -4568,6 +4576,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
           "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13",
           "#/$defs/ReturnFloorSpec/properties/day_count/anyOf/1",
           "#/$defs/PaymentCalculation/oneOf/1/properties/percentage_of_collateral/properties/day_count/anyOf/1",
           "#/$defs/PaymentCalculation/oneOf/2/properties/percentage_of_special_serviced/properties/day_count/anyOf/1"
@@ -7182,7 +7191,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
@@ -7608,6 +7618,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
           "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13",
           "#/$defs/d_e19dd3057abfdc658580/properties/day_count/anyOf/1"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
@@ -8325,6 +8336,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
           "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13",
           "#/$defs/d_7c31ba12f69da3273650/properties/day_count/anyOf/1"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
@@ -9064,7 +9076,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "double": [
           "#/$defs/d_db20612dc309c7165418/properties/price_pct_of_par",
@@ -9492,7 +9505,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
@@ -10075,7 +10089,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
@@ -10913,7 +10928,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "double": [
           "#/$defs/d_acd6c3d775d926e416ed/properties/attach_pct",
@@ -11309,7 +11325,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "double": [
           "#/$defs/d_e106c3fc700775eb2266/properties/global_cap",
@@ -11691,7 +11708,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
@@ -12090,7 +12108,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
@@ -12492,7 +12511,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
@@ -13071,7 +13091,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "double": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -14200,7 +14221,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "double": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -14590,7 +14612,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "double": [
           "#/$defs/d_26775289dc7630c4c860/properties/spot",
@@ -14970,7 +14993,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "double": [
           "#/$defs/d_cf4054b0aca6386a82f3",
@@ -15731,7 +15755,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "double": [
           "#/$defs/d_f60432bfc91ccf4df8b7",
@@ -16245,6 +16270,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
           "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13",
           "#/$defs/ReturnFloorSpec/properties/day_count/anyOf/1",
           "#/$defs/PaymentCalculation/oneOf/1/properties/percentage_of_collateral/properties/day_count/anyOf/1",
           "#/$defs/PaymentCalculation/oneOf/2/properties/percentage_of_special_serviced/properties/day_count/anyOf/1"
@@ -18859,7 +18885,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
@@ -19531,7 +19558,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
@@ -19995,7 +20023,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
@@ -22061,7 +22090,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "double": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -22452,7 +22482,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "double": [
           "#/$defs/d_2f5d441d7c3b7cd29f67/properties/discrete_dividends/items/prefixItems/1",
@@ -22835,7 +22866,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "double": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -23063,7 +23095,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
@@ -23609,7 +23642,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "double": [
           "#/$defs/d_9f54e6f1a3c511f443a0/properties/barrier",
@@ -24165,7 +24199,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "double": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -25584,7 +25619,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "double": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -25973,7 +26009,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "double": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -27573,7 +27610,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "double": [
           "#/$defs/d_8ae84003bc844cfaf045/properties/barrier",
@@ -28118,7 +28156,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "double": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -28523,7 +28562,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
@@ -28932,7 +28972,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
@@ -29337,7 +29378,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
@@ -29888,7 +29930,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "double": [
           "#/$defs/d_546d6c19e94fe5cda260/properties/convexity_adjustment",
@@ -30299,7 +30342,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "double": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -30703,7 +30747,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
@@ -31351,6 +31396,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
           "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13",
           "#/$defs/d_f6867bdc53b436c37092/properties/day_count/anyOf/1"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
@@ -32255,7 +32301,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "double": [
           "#/$defs/d_0aba764a7404d42b3615/properties/expiry_fixing",
@@ -33180,7 +33227,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "double": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -33733,7 +33781,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "double": [
           "#/$defs/d_e896827d9ebec6b04130/properties/correlation",
@@ -34280,7 +34329,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "double": [
           "#/$defs/d_c3cfabdd5d36e6a2dfa1/properties/coupon_rate",
@@ -34853,7 +34903,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "double": [
           "#/$defs/d_f056a252f953016e9606/properties/cap_rate",
@@ -35277,7 +35328,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
@@ -35703,7 +35755,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
@@ -36205,7 +36258,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
@@ -36810,6 +36864,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
           "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13",
           "#/$defs/ReturnFloorSpec/properties/day_count/anyOf/1",
           "#/$defs/PaymentCalculation/oneOf/1/properties/percentage_of_collateral/properties/day_count/anyOf/1",
           "#/$defs/PaymentCalculation/oneOf/2/properties/percentage_of_special_serviced/properties/day_count/anyOf/1"
@@ -38213,7 +38268,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
@@ -38630,7 +38686,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
@@ -39191,7 +39248,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
@@ -39847,7 +39905,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
@@ -40471,7 +40530,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
@@ -40927,7 +40987,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "double": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -41843,7 +41904,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "double": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -42245,7 +42307,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
@@ -42656,7 +42719,8 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/9",
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/12"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/12",
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],

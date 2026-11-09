@@ -731,8 +731,6 @@
       "covariance",
       "createDate",
       "dateFromEpochDays",
-      "days30360",
-      "days30e360Isda",
       "daysSinceEpoch",
       "embeddedRegistry",
       "endOfMonth",
@@ -1139,6 +1137,7 @@
       "nl365",
       "oneOne",
       "thirty360",
+      "thirty360Isda",
       "thirty360It",
       "thirtyE360",
       "thirtyE360Isda"
@@ -1152,12 +1151,6 @@
     "statics": ["fromJson"],
     "methods": ["free", "toJson"],
     "getters": ["busBasis", "calendarId", "couponPeriod", "endIsTerminationDate", "frequency"]
-  },
-  "core.days30360": {
-    "kind": "function"
-  },
-  "core.days30e360Isda": {
-    "kind": "function"
   },
   "core.Tenor": {
     "kind": "class",

@@ -32,9 +32,6 @@ from finstack_quant.core.dates._sifma import (
 from finstack_quant.core.dates._daycount import (
     DayCount as DayCount,
     DayCountContext as DayCountContext,
-    Thirty360Convention as Thirty360Convention,
-    days_30_360 as days_30_360,
-    days_30e_360_isda as days_30e_360_isda,
 )
 from finstack_quant.core.dates._tenor import Tenor as Tenor, TenorUnit as TenorUnit
 from finstack_quant.core.dates._periods import (
@@ -88,9 +85,6 @@ __all__ = [
     # day-count
     "DayCount",
     "DayCountContext",
-    "Thirty360Convention",
-    "days_30_360",
-    "days_30e_360_isda",
     # tenor
     "TenorUnit",
     "Tenor",

@@ -816,12 +816,6 @@ export interface WasmOwned {
 }
 
 /**
- * 30/360 day-count variant label accepted by `core.days30360` (Rust
- * `Thirty360Convention`; parsing is ASCII case-insensitive).
- */
-export type Thirty360Convention = 'us_sia' | 'isda' | 'european' | 'italian';
-
-/**
  * Discount-curve validation policy: market-standard or negative-rate-friendly.
  */
 export type DiscountCurveValidationMode = 'market_standard' | 'negative_rate_friendly';

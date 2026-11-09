@@ -29,10 +29,14 @@ pub struct DayCountContext<'a> {
     /// ACT/365L requires the actual enclosing coupon boundaries for both
     /// full and partial accrual, keeping its 365/366 denominator constant.
     pub coupon_period: Option<(Date, Date)>,
-    /// Whether `end` is the instrument termination date.
+    /// Whether the chronologically later accrual endpoint is the
+    /// contractual termination date; `None` means unspecified.
     ///
-    /// Required by 30E/360 ISDA for its end-of-February termination exception.
-    pub end_is_termination_date: bool,
+    /// 30E/360 ISDA requires an explicit `Some(true)` or `Some(false)` for
+    /// its end-of-February termination exception (including for equal
+    /// dates); other conventions ignore it. The signed API applies it to the
+    /// later endpoint whatever the argument order.
+    pub end_is_termination_date: Option<bool>,
 }
 
 /// Reject a zero business-day basis and coupon boundaries unless
@@ -82,8 +86,8 @@ impl<'a> std::fmt::Debug for DayCountContext<'a> {
 ///
 /// This struct captures the optional context parameters (calendar, frequency, business-day basis)
 /// needed to reconstruct a [`DayCountContext`] at runtime using the built-in calendar lookup.
-/// `Default` is the empty context (no calendar, frequency, basis or coupon
-/// period; `end_is_termination_date = false`), the snapshot of
+/// `Default` is the empty context (no calendar, frequency, basis, coupon
+/// period or termination status), the snapshot of
 /// [`DayCountContext::default`].
 pub struct DayCountContextState {
     /// Optional calendar code (e.g. "target2").
@@ -103,8 +107,11 @@ pub struct DayCountContextState {
         schemars(with = "Option<(crate::wire::DateWire, crate::wire::DateWire)>")
     )]
     pub coupon_period: Option<(Date, Date)>,
-    /// Whether the accrual end is the instrument termination date.
-    pub end_is_termination_date: bool,
+    /// Whether the later accrual endpoint is the contractual termination
+    /// date; `None` (omitted or `null` on the wire) means unspecified, which
+    /// 30E/360 ISDA rejects.
+    #[serde(default)]
+    pub end_is_termination_date: Option<bool>,
 }
 
 /// Wire fields of [`DayCountContextState`]; deserialization validates them
@@ -117,7 +124,8 @@ struct DayCountContextStateFields {
     bus_basis: Option<u16>,
     #[serde(default)]
     coupon_period: Option<(Date, Date)>,
-    end_is_termination_date: bool,
+    #[serde(default)]
+    end_is_termination_date: Option<bool>,
 }
 
 impl TryFrom<DayCountContextStateFields> for DayCountContextState {
@@ -153,8 +161,9 @@ impl DayCountContextState {
     /// * `coupon_period` - Optional `(start, end)` unadjusted regular ACT/ACT ICMA
     ///   reference period or ACT/365L enclosing coupon; `start` must precede
     ///   `end`. ICMA validates the nominal month grid at calculation time.
-    /// * `end_is_termination_date` - Whether the accrual end is the
-    ///   instrument termination date (30E/360 ISDA February rule).
+    /// * `end_is_termination_date` - Whether the later accrual endpoint is the
+    ///   contractual termination date (30E/360 ISDA February rule); `None`
+    ///   means unspecified, which 30E/360 ISDA rejects at calculation time.
     ///
     /// # Errors
     ///
@@ -165,7 +174,7 @@ impl DayCountContextState {
         frequency: Option<Tenor>,
         bus_basis: Option<u16>,
         coupon_period: Option<(Date, Date)>,
-        end_is_termination_date: bool,
+        end_is_termination_date: Option<bool>,
     ) -> crate::Result<Self> {
         validate_fields(bus_basis, coupon_period)?;
         Ok(Self {
@@ -288,7 +297,7 @@ mod tests {
             None,
             None,
             Some((date!(2025 - 07 - 01), date!(2025 - 01 - 01))),
-            false,
+            None,
         )
         .expect_err("inverted");
         assert!(
@@ -302,7 +311,7 @@ mod tests {
                 None,
                 None,
                 Some((date!(2025 - 01 - 01), date!(2025 - 07 - 01))),
-                false,
+                None,
             )
             .is_ok()
         );
@@ -310,10 +319,10 @@ mod tests {
 
     #[test]
     fn try_new_rejects_a_zero_bus_basis() {
-        let err = DayCountContextState::try_new(None, None, Some(0), None, false)
+        let err = DayCountContextState::try_new(None, None, Some(0), None, None)
             .expect_err("a zero Bus/252 divisor must be rejected at construction");
         assert!(err.to_string().contains("Invalid Bus/252 basis"), "{err}");
-        assert!(DayCountContextState::try_new(None, None, Some(252), None, false).is_ok());
+        assert!(DayCountContextState::try_new(None, None, Some(252), None, None).is_ok());
     }
 
     #[test]
@@ -323,7 +332,7 @@ mod tests {
             None,
             None,
             Some((date!(2025 - 01 - 01), date!(2025 - 07 - 01))),
-            false,
+            None,
         )
         .expect("valid state");
         let mut json = serde_json::to_value(&valid).expect("serializable");

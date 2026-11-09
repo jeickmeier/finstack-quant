@@ -103,6 +103,7 @@ pub(crate) fn resolve_optioned_coupon(
             as_of,
             accrual_start: period.accrual_start,
             accrual_end: period.accrual_end,
+            end_is_termination_date: None,
             day_count: cap_floor.day_count,
             coupon_frequency: Some(cap_floor.frequency),
             coupon_period: (period.accrual_start, period.accrual_end),

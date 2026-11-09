@@ -961,6 +961,7 @@ fn ois_control_compounded_spread_stays_on_daily_projection() {
             as_of,
             accrual_start: grid.start,
             accrual_end: grid.end,
+            end_is_termination_date: None,
             day_count: DayCount::Act360,
             coupon_frequency: Some(Tenor::annual()),
             coupon_period: (grid.start, grid.end),
@@ -1289,6 +1290,7 @@ fn ois_control_nonpositive_daily_accrual_preserves_errors() {
             calendar: Some(calendar),
             frequency: Some(Tenor::annual()),
             coupon_period: Some((start, end)),
+            end_is_termination_date: Some(false),
             ..DayCountContext::default()
         };
         let full_alpha = day_count.year_fraction(start, end, context).unwrap();

@@ -125,7 +125,6 @@ mod other;
 mod thirty360;
 
 pub use context::{DayCountContext, DayCountContextState};
-pub use thirty360::{Thirty360Convention, days_30_360, days_30e_360_isda};
 
 use time::Date;
 
@@ -138,6 +137,7 @@ use other::{
     validate_act_365l_context, validate_act_365l_interval, year_fraction_act_365l,
     year_fraction_bus252, year_fraction_nl_365,
 };
+use thirty360::{Thirty360Variant, thirty_360_days, thirty_e_360_isda_days};
 
 #[cfg(test)]
 use crate::dates::Tenor;
@@ -173,10 +173,14 @@ use crate::dates::Tenor;
 /// Days = 360(Y₂ - Y₁) + 30(M₂ - M₁) + (D₂' - D₁')
 /// year_fraction = Days / 360
 ///
-/// Thirty360 (SIA/PSA):
+/// Thirty360 (fixed US 30U/360 EOM):
 ///   D₁' = 30   if D₁ is 31 or last day of February
 ///   D₂' = 30   if D₂ is 31 and D₁' = 30
 ///   D₂' = 30   if D₂ is last day of Feb and D₁ is last day of Feb
+///
+/// Thirty360Isda (ISDA bond basis, §4.16(f)):
+///   D₁' = min(D₁, 30)
+///   D₂' = 30   if D₂ is 31 and D₁' = 30
 ///
 /// ThirtyE360 (ISDA §4.16(g)):
 ///   D₁' = min(D₁, 30)
@@ -192,17 +196,19 @@ use crate::dates::Tenor;
 ///   D₂' = 30   if D₂ is 31 or (month is February and D₂ > 27)
 /// ```
 ///
-/// - **`Thirty360`, SIA/PSA versus ISDA**: this implementation follows the
-///   SIA/PSA convention, which includes a February end-of-month rule. ISDA 2006
-///   §4.16(f) specifies a slightly different set of adjustments that omit it.
-///   Both are commonly called "30/360 US", but they can produce different day
-///   counts for periods that start or end on the last day of February.
+/// - **`Thirty360` versus `Thirty360Isda`**: `Thirty360` is the fixed US
+///   30U/360 EOM algorithm with its paired February month-end rule (QuantLib
+///   `Thirty360::USA`); it is not `30/360 PSA`, which lacks the paired end
+///   adjustment. `Thirty360Isda` is ISDA 2006 §4.16(f) bond basis without any
+///   February rule (QuantLib `Thirty360::BondBasis`). They differ for periods
+///   that start or end on the last day of February.
 /// - **`ThirtyE360Isda` termination-date exception**: ISDA §4.16(h) keeps D₂
 ///   unadjusted when the period ends on the termination date and that date is
-///   the last day of February. Set
-///   [`DayCountContext::end_is_termination_date`] for the final period to
-///   maturity; ordinary coupon periods leave it false.
-/// - **`Thirty360It`** is distinct from US SIA (February EOM only when both
+///   the last day of February. [`DayCountContext::end_is_termination_date`]
+///   must be explicit for this convention: `Some(true)` when the
+///   chronologically later endpoint is the contractual termination date,
+///   `Some(false)` otherwise. QuantLib's `Thirty360::ISDA` is this convention.
+/// - **`Thirty360It`** is distinct from US 30U/360 EOM (February EOM only when both
 ///   ends are February EOM) and from 30E/360 (no February-after-27 rule).
 ///
 /// The actual-day conventions:
@@ -296,9 +302,11 @@ use crate::dates::Tenor;
 /// let (start, end) = (date(2025, Month::January, 31), date(2025, Month::March, 31));
 /// assert_eq!(yf(DayCount::ThirtyE360, start, end, none()), 60.0 / 360.0);
 ///
-/// // 30E/360 (ISDA): both end-of-Feb and Aug 31 count as day 30
+/// // 30E/360 (ISDA): both end-of-Feb and Aug 31 count as day 30 for an
+/// // ordinary (non-termination) end; the termination status is required
 /// let (start, end) = (date(2011, Month::August, 31), date(2012, Month::February, 29));
-/// assert_eq!(yf(DayCount::ThirtyE360Isda, start, end, none()), 180.0 / 360.0);
+/// let ordinary = DayCountContext { end_is_termination_date: Some(false), ..Default::default() };
+/// assert_eq!(yf(DayCount::ThirtyE360Isda, start, end, ordinary), 180.0 / 360.0);
 ///
 /// // NL/365: full leap year, Feb 29 excluded → 365/365
 /// let (start, end) = (date(2024, Month::January, 1), date(2025, Month::January, 1));
@@ -374,18 +382,31 @@ pub enum DayCount {
     #[serde(rename = "act_365l")]
     Act365L,
 
-    /// 30/360 US (Bond Basis) day count convention.
+    /// Fixed US 30U/360 EOM day count convention.
     ///
-    /// 30-day months over a 360-day year with the SIA/PSA adjustments,
-    /// including the February end-of-month rule that ISDA §4.16(f) omits.
+    /// 30-day months over a 360-day year; a day-31 or February month-end
+    /// start becomes 30, and the end's February month-end becomes 30 only
+    /// when the start is also February month-end. Not `30/360 PSA`.
     ///
     /// # Standards Reference
     ///
-    /// - **SIA/PSA**: Standard Securities Calculation Methods
-    /// - **ISO 20022**: Day Count Fraction Code "30/360" (A001)
-    /// - **Also known as**: 30U/360, 30/360 US, Bond Basis, 30/360 PSA
+    /// - **QuantLib**: `Thirty360::USA`
+    /// - **Also known as**: 30U/360 EOM
     #[serde(rename = "30_360")]
     Thirty360,
+
+    /// 30/360 ISDA bond basis day count convention.
+    ///
+    /// 30-day months over a 360-day year; a day-31 start becomes 30, and a
+    /// day-31 end becomes 30 when the adjusted start is 30. No February rule.
+    ///
+    /// # Standards Reference
+    ///
+    /// - **ISDA**: 2006 ISDA Definitions, Section 4.16(f) - "30/360"
+    /// - **QuantLib**: `Thirty360::BondBasis` (also `Thirty360::ISMA`)
+    /// - **Also known as**: 30/360 bond basis
+    #[serde(rename = "30_360_isda")]
+    Thirty360Isda,
 
     /// 30E/360 (Eurobond Basis) day count convention.
     ///
@@ -395,20 +416,22 @@ pub enum DayCount {
     /// # Standards Reference
     ///
     /// - **ISDA**: 2006 ISDA Definitions, Section 4.16(g) - "30E/360"
-    /// - **ISO 20022**: Day Count Fraction Code "30E/360" (A002)
-    /// - **Also known as**: 30/360 ISDA, 30/360 European, Eurobond Basis
+    /// - **QuantLib**: `Thirty360::European`
+    /// - **Also known as**: 30/360 European, Eurobond Basis
     #[serde(rename = "30e_360")]
     ThirtyE360,
 
     /// 30E/360 (ISDA) day count convention.
     ///
     /// 30-day months over a 360-day year; the last day of any month, including
-    /// February, becomes 30, except an end date that is the termination date.
+    /// February, becomes 30, except a February month-end end date that is the
+    /// termination date. Requires an explicit `end_is_termination_date`.
     ///
     /// # Standards Reference
     ///
     /// - **ISDA**: 2006 ISDA Definitions, Section 4.16(h) - "30E/360 (ISDA)"
-    /// - **Also known as**: 30E/360 ISDA, German, Eurobond Basis (ISDA 2006)
+    /// - **QuantLib**: `Thirty360::ISDA` (with its termination date)
+    /// - **Also known as**: 30E/360 ISDA, German
     #[serde(rename = "30e_360_isda")]
     ThirtyE360Isda,
 
@@ -591,6 +614,8 @@ impl DayCount {
     ///   `ActActIsma` without a frequency
     /// - [`InputError::ActActIsmaUnsupportedFrequency`](crate::InputError::ActActIsmaUnsupportedFrequency):
     ///   `ActActIsma` with a Day or Week frequency and no `coupon_period`
+    /// - `Error::Validation`: `ThirtyE360Isda` without an explicit
+    ///   `end_is_termination_date`
     ///
     /// # Examples
     ///
@@ -609,6 +634,10 @@ impl DayCount {
             }
             DayCount::ActActIsma => validate_act_act_isma_context(ctx),
             DayCount::Act365L => validate_act_365l_context(ctx),
+            DayCount::ThirtyE360Isda => ctx
+                .end_is_termination_date
+                .map(|_| ())
+                .ok_or_else(missing_termination_status),
             _ => Ok(()),
         }
     }
@@ -629,18 +658,32 @@ impl DayCount {
             DayCount::Act360 => Ok(days / 360.0),
             DayCount::Act365F => Ok(days / 365.0),
             DayCount::Act365L => year_fraction_act_365l(start, end, ctx),
-            DayCount::Thirty360 => {
-                Ok(days_30_360(start, end, Thirty360Convention::UsSia) as f64 / 360.0)
-            }
-            DayCount::ThirtyE360 => {
-                Ok(days_30_360(start, end, Thirty360Convention::European) as f64 / 360.0)
-            }
+            DayCount::Thirty360 => Ok(synthetic(thirty_360_days(
+                start,
+                end,
+                Thirty360Variant::UsEom,
+            ))),
+            DayCount::Thirty360Isda => Ok(synthetic(thirty_360_days(
+                start,
+                end,
+                Thirty360Variant::IsdaBondBasis,
+            ))),
+            DayCount::ThirtyE360 => Ok(synthetic(thirty_360_days(
+                start,
+                end,
+                Thirty360Variant::European,
+            ))),
             DayCount::ThirtyE360Isda => {
-                Ok(f64::from(days_30e_360_isda(start, end, ctx.end_is_termination_date)) / 360.0)
+                let terminal = ctx
+                    .end_is_termination_date
+                    .ok_or_else(missing_termination_status)?;
+                Ok(synthetic(thirty_e_360_isda_days(start, end, terminal)))
             }
-            DayCount::Thirty360It => {
-                Ok(days_30_360(start, end, Thirty360Convention::Italian) as f64 / 360.0)
-            }
+            DayCount::Thirty360It => Ok(synthetic(thirty_360_days(
+                start,
+                end,
+                Thirty360Variant::Italian,
+            ))),
             DayCount::Nl365 => Ok(year_fraction_nl_365(start, end)),
             DayCount::ActAct => Ok(year_fraction_act_act_isda(start, end)),
             DayCount::ActActIsma => year_fraction_act_act_isma_with_ctx(start, end, ctx),
@@ -695,19 +738,27 @@ impl DayCount {
         end: Date,
         ctx: DayCountContext<'_>,
     ) -> crate::Result<f64> {
+        // The context (including the termination status of the
+        // chronologically later endpoint) applies unchanged to the forward
+        // span, which is then negated.
         if end >= start {
             self.year_fraction(start, end, ctx)
         } else {
-            Ok(-self.year_fraction(
-                end,
-                start,
-                DayCountContext {
-                    end_is_termination_date: false,
-                    ..ctx
-                },
-            )?)
+            Ok(-self.year_fraction(end, start, ctx)?)
         }
     }
+}
+
+/// `N / 360` for an exact synthetic day count.
+fn synthetic(days: i64) -> f64 {
+    days as f64 / 360.0
+}
+
+/// 30E/360 ISDA needs the termination status of its later endpoint.
+fn missing_termination_status() -> crate::Error {
+    crate::Error::Validation(
+        "30E/360 ISDA requires an explicit end_is_termination_date in DayCountContext".into(),
+    )
 }
 
 impl std::fmt::Display for DayCount {
@@ -741,6 +792,7 @@ mod parse_tests {
         "act_365f",
         "act_365l",
         "30_360",
+        "30_360_isda",
         "30e_360",
         "30e_360_isda",
         "30_360_it",
@@ -916,6 +968,7 @@ mod tests {
             super::DayCount::Act365L,
             super::DayCount::Nl365,
             super::DayCount::Thirty360,
+            super::DayCount::Thirty360Isda,
             super::DayCount::ThirtyE360,
             super::DayCount::ThirtyE360Isda,
             super::DayCount::Thirty360It,
@@ -952,7 +1005,6 @@ mod tests {
             "30_360_us",
             "30_360_bond",
             "30u_360",
-            "30_360_isda",
             "30_360_eurobond",
             "30_360_italian",
             "30E/360",
@@ -976,24 +1028,28 @@ mod tests {
     }
 
     #[test]
-    fn rejected_30_360_isda_alias_cannot_select_30e_360_isda() {
+    fn thirty_360_isda_selects_bond_basis_not_30e_360_isda() {
         let start = time::macros::date!(2025 - 02 - 28);
         let end = time::macros::date!(2025 - 03 - 31);
+        let bond_basis: DayCount = "30_360_isda".parse().expect("canonical");
+        assert_eq!(bond_basis, DayCount::Thirty360Isda);
+        let ordinary = DayCountContext {
+            end_is_termination_date: Some(false),
+            ..DayCountContext::default()
+        };
         assert_eq!(
-            super::days_30_360(start, end, super::Thirty360Convention::Isda),
-            33
+            bond_basis
+                .year_fraction(start, end, DayCountContext::default())
+                .expect("bond basis needs no termination status"),
+            33.0 / 360.0
         );
         let european_isda: DayCount = "30e_360_isda".parse().expect("canonical");
-        assert!(
-            (european_isda
-                .year_fraction(start, end, Default::default())
-                .expect("fraction")
-                * 360.0
-                - 30.0)
-                .abs()
-                < 1e-12
+        assert_eq!(
+            european_isda
+                .year_fraction(start, end, ordinary)
+                .expect("fraction"),
+            30.0 / 360.0
         );
-        assert!("30_360_isda".parse::<DayCount>().is_err());
     }
 
     #[test]
@@ -1051,7 +1107,8 @@ mod tests {
 
     #[test]
     fn thirty_e_360_isda_last_day_of_month_rules() {
-        use super::{DayCount, DayCountContext, days_30e_360_isda};
+        use super::thirty360::thirty_e_360_isda_days as days_30e_360_isda;
+        use super::{DayCount, DayCountContext};
 
         // Aug 31 → 30 (last day of month), Feb 29 → 30 (last day of Feb,
         // not termination): 360 + 30·(2-8) + (30-30) = 180.
@@ -1075,57 +1132,71 @@ mod tests {
         assert_eq!(days_30e_360_isda(start, end, false), 32);
         assert_eq!(days_30e_360_isda(start, end, true), 30);
 
-        // The enum variant routes through context for the termination form.
+        // The enum variant routes through context for the termination form,
+        // which must be explicit, including for equal dates.
         let start = date!(2011 - 08 - 31);
         let end = date!(2012 - 02 - 29);
+        let status = |terminal| DayCountContext {
+            end_is_termination_date: Some(terminal),
+            ..DayCountContext::default()
+        };
         let yf = DayCount::ThirtyE360Isda
-            .year_fraction(start, end, DayCountContext::default())
+            .year_fraction(start, end, status(false))
             .expect("should succeed");
         assert_eq!(yf, 180.0 / 360.0);
-
         let terminal_yf = DayCount::ThirtyE360Isda
-            .year_fraction(
-                start,
-                end,
-                DayCountContext {
-                    end_is_termination_date: true,
-                    ..DayCountContext::default()
-                },
-            )
+            .year_fraction(start, end, status(true))
             .expect("termination-period day count should succeed");
         assert_eq!(terminal_yf, 179.0 / 360.0);
+        for (a, b) in [(start, end), (end, end)] {
+            assert!(
+                DayCount::ThirtyE360Isda
+                    .year_fraction(a, b, DayCountContext::default())
+                    .is_err()
+            );
+        }
+        // Signed reversal keeps the later endpoint's termination status.
+        assert_eq!(
+            DayCount::ThirtyE360Isda
+                .signed_year_fraction(end, start, status(true))
+                .expect("signed"),
+            -179.0 / 360.0
+        );
     }
 
     #[test]
     fn thirty_e_360_isda_differs_from_european_on_end_of_february() {
-        use super::{Thirty360Convention, days_30_360, days_30e_360_isda};
+        use super::thirty360::{
+            Thirty360Variant, thirty_360_days as days_30_360,
+            thirty_e_360_isda_days as days_30e_360_isda,
+        };
 
         // 30E/360 (European, §4.16(g)) has NO end-of-February rule;
         // 30E/360 (ISDA, §4.16(h)) adjusts end-of-Feb to 30.
         let start = date!(2012 - 02 - 29);
         let end = date!(2012 - 03 - 31);
         // European: D1=29 kept, D2=31→30: 30 + (30-29) = 31.
-        assert_eq!(days_30_360(start, end, Thirty360Convention::European), 31);
+        assert_eq!(days_30_360(start, end, Thirty360Variant::European), 31);
         // ISDA: D1=29→30 (last day of Feb), D2=31→30: 30 + (30-30) = 30.
         assert_eq!(days_30e_360_isda(start, end, false), 30);
     }
 
     #[test]
     fn thirty_360_italian_feb_after_27_and_day_31() {
-        use super::{Thirty360Convention, days_30_360};
+        use super::thirty360::{Thirty360Variant, thirty_360_days as days_30_360};
 
         // Jan 31 → Feb 28 2025: Italian D1=30, D2=30 → 30.
         // European D2 stays 28; US SIA D2 stays 28 (not both Feb EOM).
         let start = date!(2025 - 01 - 31);
         let end = date!(2025 - 02 - 28);
-        assert_eq!(days_30_360(start, end, Thirty360Convention::Italian), 30);
-        assert_eq!(days_30_360(start, end, Thirty360Convention::European), 28);
-        assert_eq!(days_30_360(start, end, Thirty360Convention::UsSia), 28);
+        assert_eq!(days_30_360(start, end, Thirty360Variant::Italian), 30);
+        assert_eq!(days_30_360(start, end, Thirty360Variant::European), 28);
+        assert_eq!(days_30_360(start, end, Thirty360Variant::UsEom), 28);
 
         // Leap: Feb 29 → Mar 31 2024: Italian D1=30 (Feb>27), D2=30 → 30.
         let start = date!(2024 - 02 - 29);
         let end = date!(2024 - 03 - 31);
-        assert_eq!(days_30_360(start, end, Thirty360Convention::Italian), 30);
+        assert_eq!(days_30_360(start, end, Thirty360Variant::Italian), 30);
     }
 
     // NL/365
@@ -1212,11 +1283,17 @@ mod tests {
         let restored_ctx = restored.to_ctx().expect("calendar state hydrates");
         assert_eq!(restored_ctx.coupon_period, Some(coupon));
 
-        let missing_required =
+        // An omitted termination status is unspecified, not false: 30E/360
+        // ISDA rejects it, including for equal dates.
+        let omitted =
             r#"{"calendar_id":null,"frequency":null,"bus_basis":null,"coupon_period":null}"#;
+        let state: DayCountContextState = serde_json::from_str(omitted).expect("omission is valid");
+        assert_eq!(state.end_is_termination_date, None);
+        let day = date!(2025 - 02 - 28);
         assert!(
-            serde_json::from_str::<DayCountContextState>(missing_required).is_err(),
-            "the canonical state requires end_is_termination_date"
+            super::DayCount::ThirtyE360Isda
+                .year_fraction(day, day, state.to_ctx().expect("context"))
+                .is_err()
         );
     }
 
@@ -1227,7 +1304,7 @@ mod tests {
             frequency: None,
             bus_basis: None,
             coupon_period: None,
-            end_is_termination_date: false,
+            end_is_termination_date: None,
         };
 
         let error = state

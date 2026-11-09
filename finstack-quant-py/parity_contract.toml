@@ -100,8 +100,7 @@ note = "Subset scope: 11 Rust-only math submodules are deliberately unbound (dis
 [crates.core.module_symbols.dates]
 python_package = "finstack_quant.core.dates"
 public = [
-    "DayCount", "DayCountContext", "Thirty360Convention",
-    "days_30_360", "days_30e_360_isda",
+    "DayCount", "DayCountContext",
     "TenorUnit", "Tenor",
     "PeriodKind", "PeriodId", "Period", "PeriodPlan", "FiscalConfig",
     "build_periods", "build_fiscal_periods",
@@ -2072,12 +2071,12 @@ types = { CFKind = "CFKind", CashFlow = "CashFlow", CashFlowAccrual = "CashFlowA
 
 [parity.modules."finstack_quant.core.dates"]
 js = "core"
-# BusinessDayConvention, StubKind, ScheduleErrorPolicy and Thirty360Convention
-# cross WASM as their snake_case labels: every WASM consumer (`adjust`,
-# `Tenor.addToDate`, `ScheduleBuilder.adjustWith/stubRule/errorPolicy`,
-# `days30360`) takes the label and parses it with the Rust `FromStr`, so the
-# TypeScript literal type is the twin of the Python enum class.
-types = { BusinessDayConvention = "BusinessDayConvention", CalendarMetadata = "CalendarMetadata", Period = "Period", PeriodPlan = "PeriodPlan", ScheduleErrorPolicy = "ScheduleErrorPolicy", StubKind = "StubKind", Thirty360Convention = "Thirty360Convention" }
+# BusinessDayConvention, StubKind and ScheduleErrorPolicy cross WASM as their
+# snake_case labels: every WASM consumer (`adjust`, `Tenor.addToDate`,
+# `ScheduleBuilder.adjustWith/stubRule/errorPolicy`) takes the label and parses
+# it with the Rust `FromStr`, so the TypeScript literal type is the twin of the
+# Python enum class.
+types = { BusinessDayConvention = "BusinessDayConvention", CalendarMetadata = "CalendarMetadata", Period = "Period", PeriodPlan = "PeriodPlan", ScheduleErrorPolicy = "ScheduleErrorPolicy", StubKind = "StubKind" }
 
 [parity.modules."finstack_quant.core.market_data"]
 # HazardCurve.conditional_default_prob maps by the snake_case/camelCase rule
@@ -2425,9 +2424,6 @@ excluded = { from_name = "literal" }
 excluded = { from_name = "literal" }
 
 [parity.members."finstack_quant.core.dates.StubKind"]
-excluded = { from_name = "literal" }
-
-[parity.members."finstack_quant.core.dates.Thirty360Convention"]
 excluded = { from_name = "literal" }
 
 [parity.members."finstack_quant.core.market_data.MarketContext"]

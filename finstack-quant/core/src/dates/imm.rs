@@ -587,7 +587,7 @@ mod tests {
 
     #[test]
     fn unit_enum_labels_round_trip_and_parse_leniently() {
-        use crate::dates::{ScheduleErrorPolicy, Thirty360Convention};
+        use crate::dates::ScheduleErrorPolicy;
 
         assert_eq!(SifmaSettlementClass::C.to_string(), "c");
         assert_eq!(
@@ -602,12 +602,6 @@ mod tests {
             "STRICT".parse::<ScheduleErrorPolicy>().unwrap(),
             ScheduleErrorPolicy::Strict
         );
-        assert_eq!(Thirty360Convention::UsSia.to_string(), "us_sia");
-        assert_eq!(
-            "ISDA".parse::<Thirty360Convention>().unwrap(),
-            Thirty360Convention::Isda
-        );
-        assert!("isda2006".parse::<Thirty360Convention>().is_err());
     }
 
     #[test]

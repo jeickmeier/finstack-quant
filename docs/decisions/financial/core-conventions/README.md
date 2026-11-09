@@ -28,7 +28,7 @@ and [020](020-barrier-classification.md#accepted-decision-barrier-classification
 are **Accepted on 2026-11-07**. This completes methodology adoption for all
 20 core-conventions records. Implementation status is Observed for
 each stated scope, except where a record's status line says Reconciled
-(018 and 020, 2026-11-08); reconciliation and independent qualification
+(018 and 020, 2026-11-08; 003, 2026-11-09); reconciliation and independent qualification
 otherwise remain open.
 Financial unit/integration/golden tests were read or located, but no Rust test,
 lint or build pass was run. Documentation and independent formula/rule/date
@@ -182,10 +182,10 @@ observation, window and settlement qualification at each consumer remains pendin
 | Regular ICMA coupon accrual | Exact month/year grid hit, <=512 steps | Frequency required without reference period | [CORE-CONVENTIONS-002](002-coupon-context-day-counts.md) | Regular/stub tests located |
 | Irregular ICMA/quasi-coupons | Nominal months inferred from reference days; anchored overlap weighting | Explicit coupon_period | [CORE-CONVENTIONS-002](002-coupon-context-day-counts.md) | EOM and reference-grid tests |
 | ACT/365L annual/nonannual | Annual coupon leap-day test; otherwise coupon-end leap year | Frequency and enclosing coupon required | [CORE-CONVENTIONS-002](002-coupon-context-day-counts.md) | Partial-accrual denominator tests |
-| US fixed 30U/360 EOM | February EOM and conditional ending31 adjustment; source's PSA equivalence needs correction | Thirty360 enum | [CORE-CONVENTIONS-003](003-thirty360.md) | Formula fixtures/edge cases |
-| ISDA bond-basis 30/360 | 31 adjustments without February EOM rule | Raw helper only | [CORE-CONVENTIONS-003](003-thirty360.md) | Raw kernel inspected |
-| European/Italian 30/360 | Independent31 clamp; Italian also February >27 | Separate enum/helper variants | [CORE-CONVENTIONS-003](003-thirty360.md) | Stored expected fractions |
-| 30E/360 ISDA | EOM start; February termination-end exception | Context flag default false | [CORE-CONVENTIONS-003](003-thirty360.md) | Termination boundary tests |
+| US fixed 30U/360 EOM | February EOM and conditional ending31 adjustment; not 30/360 PSA | Thirty360 enum | [CORE-CONVENTIONS-003](003-thirty360.md) | Formula fixtures/edge cases |
+| ISDA bond-basis 30/360 | 31 adjustments without February EOM rule | Thirty360Isda enum | [CORE-CONVENTIONS-003](003-thirty360.md) | QuantLib-regenerated fixture |
+| European/Italian 30/360 | Independent31 clamp; Italian also February >27 | Separate enum variants | [CORE-CONVENTIONS-003](003-thirty360.md) | Stored expected fractions |
+| 30E/360 ISDA | EOM start; February termination-end exception | Explicit context status required | [CORE-CONVENTIONS-003](003-thirty360.md) | Termination boundary tests |
 | Fixed/nth/shift/Easter holidays | Five observation modes; inclusive shifts; Gregorian computus | Compiled rule enum | [CORE-CONVENTIONS-004](004-holiday-engine.md) | Rule examples; Meeus reference |
 | Effective/span/China bridge holidays | Year-gated neighboring-year expansion and weekday bridge blocks | JSON rules compiled at build | [CORE-CONVENTIONS-004](004-holiday-engine.md) | Rule materialization tests |
 | Lunar/equinox dates | Eight generated tables, 1970–2150; missing->None | Tabulated rule selection | [CORE-CONVENTIONS-004](004-holiday-engine.md) | Generator consistency check passed |

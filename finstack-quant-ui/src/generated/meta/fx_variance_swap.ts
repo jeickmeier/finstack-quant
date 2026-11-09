@@ -4616,18 +4616,24 @@ export default [
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/10",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/10",
-    "const": "act_act_isma",
-    "description": "Actual/Actual (ICMA) day count convention.\n\nActual days over (actual days in the coupon period × coupons per year).\nRequires a coupon frequency. Explicit reference coupon boundaries must\nbe unadjusted regular dates from the contractual nominal month grid,\nnot payment dates.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251 - \"Actual/Actual (ICMA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ICMA\" (A007)\n- **Also known as**: Act/Act (ICMA), Act/Act (ISMA), ISMA-99"
+    "const": "act_act",
+    "description": "Actual/Actual (ISDA) day count convention.\n\nActual days over the actual days in the containing calendar year,\nsplit and summed across year boundaries.\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(b) - \"Actual/Actual (ISDA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ISDA\" (A006)\n- **Also known as**: Act/Act (ISDA), Actual/Actual, Act/Act"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/11",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/11",
-    "const": "act_act_afb",
-    "description": "Actual/Actual AFB day count convention.\n\nWhole years counted backwards from the end date, plus a residual of\nactual days over 366 if it contains February 29, else 365.\n\n# Standards Reference\n\n- **QuantLib**: `ActualActual::AFB`\n- **AFB**: Association Française des Banques master agreement definitions\n- **Also known as**: Actual/Actual Euro, Act/Act AFB"
+    "const": "act_act_isma",
+    "description": "Actual/Actual (ICMA) day count convention.\n\nActual days over (actual days in the coupon period × coupons per year).\nRequires a coupon frequency. Explicit reference coupon boundaries must\nbe unadjusted regular dates from the contractual nominal month grid,\nnot payment dates.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251 - \"Actual/Actual (ICMA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ICMA\" (A007)\n- **Also known as**: Act/Act (ICMA), Act/Act (ISMA), ISMA-99"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/12",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/12",
+    "const": "act_act_afb",
+    "description": "Actual/Actual AFB day count convention.\n\nWhole years counted backwards from the end date, plus a residual of\nactual days over 366 if it contains February 29, else 365.\n\n# Standards Reference\n\n- **QuantLib**: `ActualActual::AFB`\n- **AFB**: Association Française des Banques master agreement definitions\n- **Also known as**: Actual/Actual Euro, Act/Act AFB"
+  },
+  {
+    "path": "#/$defs/d_c0401254ec268b317b65/oneOf/13",
+    "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/13",
     "const": "bus_252",
     "description": "Business/252 day count convention.\n\nYear fraction = (business days between dates) / 252. Requires a holiday\ncalendar.\n\n# Standards Reference\n\n- **ANBIMA**: standard for BRL-denominated instruments\n- **Also known as**: BUS/252, Business/252"
   },
@@ -4647,37 +4653,37 @@ export default [
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/4",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/4",
     "const": "30_360",
-    "description": "30/360 US (Bond Basis) day count convention.\n\n30-day months over a 360-day year with the SIA/PSA adjustments,\nincluding the February end-of-month rule that ISDA §4.16(f) omits.\n\n# Standards Reference\n\n- **SIA/PSA**: Standard Securities Calculation Methods\n- **ISO 20022**: Day Count Fraction Code \"30/360\" (A001)\n- **Also known as**: 30U/360, 30/360 US, Bond Basis, 30/360 PSA"
+    "description": "Fixed US 30U/360 EOM day count convention.\n\n30-day months over a 360-day year; a day-31 or February month-end\nstart becomes 30, and the end's February month-end becomes 30 only\nwhen the start is also February month-end. Not `30/360 PSA`.\n\n# Standards Reference\n\n- **QuantLib**: `Thirty360::USA`\n- **Also known as**: 30U/360 EOM"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/5",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/5",
-    "const": "30e_360",
-    "description": "30E/360 (Eurobond Basis) day count convention.\n\n30-day months over a 360-day year; day 31 becomes 30 at both ends, with\nno February adjustment.\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(g) - \"30E/360\"\n- **ISO 20022**: Day Count Fraction Code \"30E/360\" (A002)\n- **Also known as**: 30/360 ISDA, 30/360 European, Eurobond Basis"
+    "const": "30_360_isda",
+    "description": "30/360 ISDA bond basis day count convention.\n\n30-day months over a 360-day year; a day-31 start becomes 30, and a\nday-31 end becomes 30 when the adjusted start is 30. No February rule.\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(f) - \"30/360\"\n- **QuantLib**: `Thirty360::BondBasis` (also `Thirty360::ISMA`)\n- **Also known as**: 30/360 bond basis"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/6",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/6",
-    "const": "30e_360_isda",
-    "description": "30E/360 (ISDA) day count convention.\n\n30-day months over a 360-day year; the last day of any month, including\nFebruary, becomes 30, except an end date that is the termination date.\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(h) - \"30E/360 (ISDA)\"\n- **Also known as**: 30E/360 ISDA, German, Eurobond Basis (ISDA 2006)"
+    "const": "30e_360",
+    "description": "30E/360 (Eurobond Basis) day count convention.\n\n30-day months over a 360-day year; day 31 becomes 30 at both ends, with\nno February adjustment.\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(g) - \"30E/360\"\n- **QuantLib**: `Thirty360::European`\n- **Also known as**: 30/360 European, Eurobond Basis"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/7",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/7",
-    "const": "30_360_it",
-    "description": "30/360 Italian day count convention.\n\n30-day months over a 360-day year; day 31 becomes 30, and any February\nday after the 27th becomes 30.\n\n# Standards Reference\n\n- **QuantLib**: `Thirty360::Italian`\n- **Also known as**: 30/360 Italian"
+    "const": "30e_360_isda",
+    "description": "30E/360 (ISDA) day count convention.\n\n30-day months over a 360-day year; the last day of any month, including\nFebruary, becomes 30, except a February month-end end date that is the\ntermination date. Requires an explicit `end_is_termination_date`.\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(h) - \"30E/360 (ISDA)\"\n- **QuantLib**: `Thirty360::ISDA` (with its termination date)\n- **Also known as**: 30E/360 ISDA, German"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/8",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/8",
-    "const": "nl_365",
-    "description": "NL/365 (Actual/365 No Leap) day count convention.\n\nYear fraction = (actual days excluding any February 29) / 365\n\n# Standards Reference\n\n- **Also known as**: Act/365 No Leap, NL365, Actual/365NL"
+    "const": "30_360_it",
+    "description": "30/360 Italian day count convention.\n\n30-day months over a 360-day year; day 31 becomes 30, and any February\nday after the 27th becomes 30.\n\n# Standards Reference\n\n- **QuantLib**: `Thirty360::Italian`\n- **Also known as**: 30/360 Italian"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/9",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/9",
-    "const": "act_act",
-    "description": "Actual/Actual (ISDA) day count convention.\n\nActual days over the actual days in the containing calendar year,\nsplit and summed across year boundaries.\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(b) - \"Actual/Actual (ISDA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ISDA\" (A006)\n- **Also known as**: Act/Act (ISDA), Actual/Actual, Act/Act"
+    "const": "nl_365",
+    "description": "NL/365 (Actual/365 No Leap) day count convention.\n\nYear fraction = (actual days excluding any February 29) / 365\n\n# Standards Reference\n\n- **Also known as**: Act/365 No Leap, NL365, Actual/365NL"
   },
   {
     "path": "#/$defs/d_c08279a20372931820e0",

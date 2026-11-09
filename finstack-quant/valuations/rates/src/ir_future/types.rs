@@ -479,6 +479,7 @@ impl InterestRateFuture {
                         as_of,
                         accrual_start: period_start,
                         accrual_end: period_end,
+                        end_is_termination_date: None,
                         day_count: self.day_count,
                         fixing_calendar: calendar,
                     })?;
@@ -500,6 +501,7 @@ impl InterestRateFuture {
                     as_of,
                     accrual_start: period_start,
                     accrual_end: period_end,
+                    end_is_termination_date: None,
                     day_count: self.day_count,
                     coupon_frequency: None,
                     coupon_period: (period_start, period_end),
@@ -611,6 +613,7 @@ impl InterestRateFuture {
             as_of,
             accrual_start: start,
             accrual_end: end,
+            end_is_termination_date: None,
             day_count: self.day_count,
             coupon_frequency: None,
             coupon_period: (start, end),

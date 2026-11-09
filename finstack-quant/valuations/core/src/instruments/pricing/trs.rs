@@ -235,6 +235,7 @@ fn financing_period_projection(
                 as_of,
                 accrual_start,
                 accrual_end,
+                end_is_termination_date: None,
                 day_count: financing.day_count,
                 coupon_frequency: Some(coupon_frequency),
                 coupon_period: if financing.day_count
@@ -1700,6 +1701,7 @@ mod tests {
             as_of: start,
             accrual_start: start,
             accrual_end: end,
+            end_is_termination_date: None,
             day_count: DayCount::Act360,
             coupon_frequency: None,
             coupon_period: (start, end),

@@ -2616,8 +2616,9 @@ adds explicit contained ICMA reference periods and composition, end-year
 ACT/365L and caller-supplied tenor context. The [accepted synthetic contract](docs/decisions/financial/core-conventions/003-thirty360.md#accepted-decision-synthetic-day-count-conventions)
 adds five explicit 30/360 variants, required termination status and one public
 interval API with consistent signed/zero semantics. These kernels do not select an
-instrument's contractual basis. Runtime reconciliation and independent
-qualification remain open.
+instrument's contractual basis. The 003 runtime contract was reconciled on
+2026-11-09; other runtime reconciliation and independent qualification remain
+open.
 
 The [accepted holiday-engine contract](docs/decisions/financial/core-conventions/004-holiday-engine.md#accepted-decision-holiday-engine-and-data-boundaries)
 defines nominal-year rule semantics, full-day/weekend scope, fallible required-data

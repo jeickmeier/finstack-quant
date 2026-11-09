@@ -137,8 +137,6 @@ export const core = {
   ratingScalesExtensionKey: wasm.ratingScalesExtensionKey,
   DayCount: wasm.DayCount,
   DayCountContext: wasm.DayCountContext,
-  days30360: wasm.days30360,
-  days30e360Isda: wasm.days30e360Isda,
   Tenor: wasm.Tenor,
   TenorUnit: wasm.TenorUnit,
   fxStandardSettlementDays: wasm.fxStandardSettlementDays,

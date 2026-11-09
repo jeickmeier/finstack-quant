@@ -434,7 +434,7 @@ fn coupon_day_count_context(
         calendar: calendar_id.map(calendar_by_id_strict).transpose()?,
         frequency,
         coupon_period,
-        end_is_termination_date,
+        end_is_termination_date: Some(end_is_termination_date),
         ..Default::default()
     })
 }
@@ -701,7 +701,9 @@ fn find_active_periods_and_elapsed<'a>(
                 inputs.end_is_termination_date,
             )?;
             let elapsed_context = DayCountContext {
-                end_is_termination_date: inputs.end_is_termination_date && as_of >= inputs.end,
+                end_is_termination_date: Some(
+                    inputs.end_is_termination_date && as_of >= inputs.end,
+                ),
                 ..day_count_context
             };
             let elapsed_end = as_of.clamp(inputs.start, inputs.end);

@@ -92,16 +92,6 @@
     0,
     949
   ],
-  "days_30_360": [
-    60,
-    60,
-    60,
-    60
-  ],
-  "days_30e_360_isda": [
-    30,
-    28
-  ],
   "days_since_epoch": 20090,
   "discount_curve": {
     "allow_non_monotonic": false,
@@ -937,6 +927,14 @@
   ],
   "third_friday": "2025-03-21",
   "third_wednesday": "2025-03-19",
+  "thirty_360_day_counts": [
+    0.16666666666666666,
+    0.16666666666666666,
+    0.16666666666666666,
+    0.16666666666666666,
+    0.08333333333333333,
+    0.07777777777777778
+  ],
   "tolerance_config_new": [
     {
       "generic_epsilon": 1e-10

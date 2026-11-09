@@ -22,7 +22,7 @@ test('canonical parsers reject retired aliases', () => {
   for (const [parse, inputs] of [
     [
       (name) => core.DayCount.fromName(name),
-      ['ACT/360', 'act-360', 'act_365', 'act_act_icma', '30_360_isda'],
+      ['ACT/360', 'act-360', 'act_365', 'act_act_icma', '30_360_us'],
     ],
     [
       (name) => core.adjust(core.createDate(2025, 1, 4), name, 'weekends_only'),

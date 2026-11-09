@@ -1,14 +1,12 @@
 //! WASM bindings for market date rules from [`finstack_quant_core::dates`]:
-//! IMM and CDS roll dates, third-Friday lattice dates, published SIFMA settlement dates and
-//! the 30/360 day counts.
+//! IMM and CDS roll dates, third-Friday lattice dates and published SIFMA settlement dates.
 //!
 //! Dates are **epoch days** (`i32`, days since 1970-01-01).
 
-use crate::utils::input::{js_bool, js_epoch_days, js_int, js_string, js_uint};
+use crate::utils::input::{js_epoch_days, js_int, js_string, js_uint};
 use crate::utils::to_js_err;
 use finstack_quant_core::dates::{
-    self as rust_dates, Date, SifmaSettlementClass, TenorUnit, Thirty360Convention,
-    days_since_epoch,
+    self as rust_dates, Date, SifmaSettlementClass, TenorUnit, days_since_epoch,
 };
 use time::Month;
 use wasm_bindgen::prelude::*;
@@ -348,68 +346,6 @@ pub fn next_sifma_settlement(
     rust_dates::next_sifma_settlement(js_epoch_days(&date, "date")?, settlement_class.inner)
         .map(days_since_epoch)
         .map_err(to_js_err)
-}
-
-/// Day count between two dates under a 30/360 variant (Rust `days_30_360`).
-///
-/// # Arguments
-///
-/// * `start` - Inclusive accrual start as days since 1970-01-01.
-/// * `end` - Exclusive accrual end as days since 1970-01-01; an earlier end
-///   gives a negative count rather than an error.
-/// * `convention` - Variant name: `"us_sia"`, `"isda"`, `"european"` or
-///   `"italian"`, in any ASCII case.
-///
-/// @returns The 30/360 day count.
-/// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
-/// `validation`) for an unknown variant or a date outside the supported range.
-/// @param start - Inclusive accrual start as days since 1970-01-01.
-/// @param end - Exclusive accrual end as days since 1970-01-01; an earlier end gives a negative count rather than an error.
-/// @param convention - Variant name: `"us_sia"`, `"isda"`, `"european"` or `"italian"`, in any ASCII case.
-#[wasm_bindgen(js_name = days30360)]
-pub fn days_30_360(
-    #[wasm_bindgen(unchecked_param_type = "number")] start: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] end: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "string")] convention: JsValue,
-) -> Result<i32, JsValue> {
-    let convention: Thirty360Convention = js_string(&convention, "convention")?
-        .parse()
-        .map_err(to_js_err)?;
-    Ok(rust_dates::days_30_360(
-        js_epoch_days(&start, "start")?,
-        js_epoch_days(&end, "end")?,
-        convention,
-    ))
-}
-
-/// Day count under 30E/360 ISDA (Rust `days_30e_360_isda`).
-///
-/// # Arguments
-///
-/// * `start` - Inclusive accrual start as days since 1970-01-01.
-/// * `end` - Exclusive accrual end as days since 1970-01-01; an earlier end
-///   gives a negative count rather than an error.
-/// * `end_is_termination_date` - Whether `end` is the instrument's final
-///   maturity, which keeps a February month-end day unadjusted.
-///
-/// @returns The 30E/360 ISDA day count.
-/// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
-/// `validation`) for a date outside the supported range.
-/// @param start - Inclusive accrual start as days since 1970-01-01.
-/// @param end - Exclusive accrual end as days since 1970-01-01; an earlier end gives a negative count rather than an error.
-/// @param endIsTerminationDate - Whether `end` is the instrument's final maturity, which keeps a February month-end day unadjusted.
-#[wasm_bindgen(js_name = days30e360Isda)]
-pub fn days_30e_360_isda(
-    #[wasm_bindgen(unchecked_param_type = "number")] start: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] end: JsValue,
-    #[wasm_bindgen(js_name = "endIsTerminationDate", unchecked_param_type = "boolean")]
-    end_is_termination_date: JsValue,
-) -> Result<i32, JsValue> {
-    Ok(rust_dates::days_30e_360_isda(
-        js_epoch_days(&start, "start")?,
-        js_epoch_days(&end, "end")?,
-        js_bool(&end_is_termination_date, "endIsTerminationDate")?,
-    ))
 }
 
 /// Unit of a tenor: days, weeks, months or years.

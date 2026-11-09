@@ -3421,17 +3421,22 @@
         },
         {
           "const": "30_360",
-          "description": "30/360 US (Bond Basis) day count convention.\n\n30-day months over a 360-day year with the SIA/PSA adjustments,\nincluding the February end-of-month rule that ISDA §4.16(f) omits.\n\n# Standards Reference\n\n- **SIA/PSA**: Standard Securities Calculation Methods\n- **ISO 20022**: Day Count Fraction Code \"30/360\" (A001)\n- **Also known as**: 30U/360, 30/360 US, Bond Basis, 30/360 PSA",
+          "description": "Fixed US 30U/360 EOM day count convention.\n\n30-day months over a 360-day year; a day-31 or February month-end\nstart becomes 30, and the end's February month-end becomes 30 only\nwhen the start is also February month-end. Not `30/360 PSA`.\n\n# Standards Reference\n\n- **QuantLib**: `Thirty360::USA`\n- **Also known as**: 30U/360 EOM",
+          "type": "string"
+        },
+        {
+          "const": "30_360_isda",
+          "description": "30/360 ISDA bond basis day count convention.\n\n30-day months over a 360-day year; a day-31 start becomes 30, and a\nday-31 end becomes 30 when the adjusted start is 30. No February rule.\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(f) - \"30/360\"\n- **QuantLib**: `Thirty360::BondBasis` (also `Thirty360::ISMA`)\n- **Also known as**: 30/360 bond basis",
           "type": "string"
         },
         {
           "const": "30e_360",
-          "description": "30E/360 (Eurobond Basis) day count convention.\n\n30-day months over a 360-day year; day 31 becomes 30 at both ends, with\nno February adjustment.\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(g) - \"30E/360\"\n- **ISO 20022**: Day Count Fraction Code \"30E/360\" (A002)\n- **Also known as**: 30/360 ISDA, 30/360 European, Eurobond Basis",
+          "description": "30E/360 (Eurobond Basis) day count convention.\n\n30-day months over a 360-day year; day 31 becomes 30 at both ends, with\nno February adjustment.\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(g) - \"30E/360\"\n- **QuantLib**: `Thirty360::European`\n- **Also known as**: 30/360 European, Eurobond Basis",
           "type": "string"
         },
         {
           "const": "30e_360_isda",
-          "description": "30E/360 (ISDA) day count convention.\n\n30-day months over a 360-day year; the last day of any month, including\nFebruary, becomes 30, except an end date that is the termination date.\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(h) - \"30E/360 (ISDA)\"\n- **Also known as**: 30E/360 ISDA, German, Eurobond Basis (ISDA 2006)",
+          "description": "30E/360 (ISDA) day count convention.\n\n30-day months over a 360-day year; the last day of any month, including\nFebruary, becomes 30, except a February month-end end date that is the\ntermination date. Requires an explicit `end_is_termination_date`.\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(h) - \"30E/360 (ISDA)\"\n- **QuantLib**: `Thirty360::ISDA` (with its termination date)\n- **Also known as**: 30E/360 ISDA, German",
           "type": "string"
         },
         {
