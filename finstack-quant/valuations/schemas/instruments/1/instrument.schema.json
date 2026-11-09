@@ -5902,7 +5902,7 @@
               "type": "null"
             }
           ],
-          "description": "Calendar ID for settlement date adjustments.\n\nUsed for business day adjustment of the settlement date. If `convention`\nis set, uses the convention's calendar unless explicitly overridden."
+          "description": "The contract's settlement calendar ID.\n\nRequired whenever the settlement (payment) date is calculated: no\ncalendar is inferred from `convention` or defaulted to weekends only.\n`nerc` is a power-market label calendar, not a settlement calendar,\nand is rejected."
         },
         "settlement_days": {
           "description": "Settlement lag in business days (T+N).\n\nDefaults to 2 for most commodity markets (T+2). If `convention` is set,\nuses the convention's default unless explicitly overridden here.\n\n# Market Standards\n\n| Market | Settlement |\n|--------|------------|\n| Energy (WTI, Brent, NG) | T+2 |\n| Precious metals | T+2 |\n| Base metals (LME) | T+2 |\n| Power | T+1 |",
@@ -25267,6 +25267,7 @@
           "position": "long",
           "quantity": 1000.0,
           "settlement": "cash",
+          "settlement_calendar_id": "usny",
           "underlying_ticker": "CL",
           "unit": "BBL"
         },

@@ -29,6 +29,7 @@ export default [
             "position": "long",
             "quantity": 1000,
             "settlement": "cash",
+            "settlement_calendar_id": "usny",
             "underlying_ticker": "CL",
             "unit": "BBL"
           },
@@ -3720,7 +3721,7 @@ export default [
   {
     "path": "#/$defs/d_d34fe8d294aafaa3e650/properties/settlement_calendar_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_forward.schema.json#/$defs/CommodityForward/properties/settlement_calendar_id",
-    "description": "Calendar ID for settlement date adjustments.\n\nUsed for business day adjustment of the settlement date. If `convention`\nis set, uses the convention's calendar unless explicitly overridden."
+    "description": "The contract's settlement calendar ID.\n\nRequired whenever the settlement (payment) date is calculated: no\ncalendar is inferred from `convention` or defaulted to weekends only.\n`nerc` is a power-market label calendar, not a settlement calendar,\nand is rejected."
   },
   {
     "path": "#/$defs/d_d34fe8d294aafaa3e650/properties/settlement_calendar_id/anyOf/0",

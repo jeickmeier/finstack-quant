@@ -33,7 +33,7 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 10 | B5 | skipped (dep B4) | | | |
 | 11 | C1 | **C1a and C1b committed** (`C1a:`, `C1b:` in git log) | C1a: workspace rust-lint; rust-test 16346; core doctests 286; gen-write; python-test 14003; wasm-test 1086 | 004 entry: fallible membership/counting recorded | C1 split: C1a = fallible `HolidayCalendar` trait + propagation; C1b = engine semantics (nominal-year gating, reach, checked arithmetic, ordinals, missing-table errors, cache) |
 | 12 | C2 | committed (`C2:` in git log); partial | core lint; core tests 2226; gen-write; gen-check; py test_core_parity 134, parity 6067 | Calendar-input admission entry rewritten to the remaining work | Done: strict JSON admission + explicit controls (28 files) + ID validation + CSV widths. Not done: `CalendarMetadata` purpose/ranges/edition extension (004 #8), generator-level semantic checks, independent table ranges |
-| 13 | H2 | pending | | | |
+| 13 | H2 | committed (`H2:` in git log) | workspace lint; rust-test (9 fixture fixes re-run: exotics 314, core count test); gen-write; python-test 14003; wasm-test 1086; ui-check | 004/005 entry updated (cme/cnbe removed; NERC settlement use rejected); record 005 partly reconciled | Commodity example uses `usny` as an illustrative contract calendar; NERC purpose restriction is enforced at the commodity forward only (metadata purposes pending) |
 | 14 | C3 | pending | | | |
 | 15 | C4 | pending | | | |
 | 16 | D1 | pending | | | |

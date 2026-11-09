@@ -65,6 +65,7 @@ fn test_commodity_forward_pricing_with_quoted_forward() {
         .quoted_forward_opt(Some(75.0)) // Quoted market price at $75/BBL
         .forward_curve_id(CurveId::new("WTI-FORWARD"))
         .discount_curve_id(CurveId::new("USD-OIS"))
+        .settlement_calendar_id_opt(Some("usny".into()))
         .attributes(Attributes::new())
         .build()
         .expect("should build");
@@ -113,6 +114,7 @@ fn test_commodity_forward_pricing_expired() {
         .quoted_forward_opt(Some(75.0))
         .forward_curve_id(CurveId::new("WTI-FORWARD"))
         .discount_curve_id(CurveId::new("USD-OIS"))
+        .settlement_calendar_id_opt(Some("usny".into()))
         .attributes(Attributes::new())
         .build()
         .expect("should build");
@@ -145,6 +147,7 @@ fn test_commodity_forward_forward_price_from_curve() {
         // No quoted_forward - should use PriceCurve
         .forward_curve_id(CurveId::new("WTI-FORWARD"))
         .discount_curve_id(CurveId::new("USD-OIS"))
+        .settlement_calendar_id_opt(Some("usny".into()))
         .attributes(Attributes::new())
         .build()
         .expect("should build");
@@ -184,6 +187,7 @@ fn test_commodity_forward_at_market_npv_zero() {
         // No contract_price → at-market
         .forward_curve_id(CurveId::new("WTI-FORWARD"))
         .discount_curve_id(CurveId::new("USD-OIS"))
+        .settlement_calendar_id_opt(Some("usny".into()))
         .attributes(Attributes::new())
         .build()
         .expect("should build");
@@ -220,6 +224,7 @@ fn test_commodity_forward_long_short_symmetry() {
         .contract_price_opt(Some(72.0))
         .forward_curve_id(CurveId::new("WTI-FORWARD"))
         .discount_curve_id(CurveId::new("USD-OIS"))
+        .settlement_calendar_id_opt(Some("usny".into()))
         .build()
         .expect("should build");
 
@@ -238,6 +243,7 @@ fn test_commodity_forward_long_short_symmetry() {
         .contract_price_opt(Some(72.0))
         .forward_curve_id(CurveId::new("WTI-FORWARD"))
         .discount_curve_id(CurveId::new("USD-OIS"))
+        .settlement_calendar_id_opt(Some("usny".into()))
         .build()
         .expect("should build");
 
@@ -280,6 +286,7 @@ fn test_commodity_forward_round_trip_at_market() {
         .position(Position::Long)
         .forward_curve_id(CurveId::new("WTI-FORWARD"))
         .discount_curve_id(CurveId::new("USD-OIS"))
+        .settlement_calendar_id_opt(Some("usny".into()))
         .build()
         .expect("should build");
 
@@ -303,6 +310,7 @@ fn test_commodity_forward_round_trip_at_market() {
         .contract_price_opt(Some(market_fwd_price)) // Enter at market price
         .forward_curve_id(CurveId::new("WTI-FORWARD"))
         .discount_curve_id(CurveId::new("USD-OIS"))
+        .settlement_calendar_id_opt(Some("usny".into()))
         .build()
         .expect("should build");
 
@@ -350,6 +358,7 @@ fn test_commodity_forward_analytical_parity() {
         .quoted_forward_opt(Some(forward_price))
         .forward_curve_id(CurveId::new("WTI-FORWARD"))
         .discount_curve_id(CurveId::new("USD-OIS"))
+        .settlement_calendar_id_opt(Some("usny".into()))
         .build()
         .expect("should build");
 
@@ -407,6 +416,7 @@ fn test_commodity_forward_delta_analytical() {
         .contract_price_opt(Some(72.0))
         .forward_curve_id(CurveId::new("WTI-FORWARD"))
         .discount_curve_id(CurveId::new("USD-OIS"))
+        .settlement_calendar_id_opt(Some("usny".into()))
         .build()
         .expect("should build");
 

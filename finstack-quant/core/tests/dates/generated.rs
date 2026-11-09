@@ -152,44 +152,12 @@ fn sifma_cme_respect_effective_year_for_new_holidays() {
         "SIFMA Columbus Day present from 1971"
     );
 
-    // CME: Juneteenth from 2022, MLK from 1998.
-    assert!(
-        !by_id("cme")
-            .is_holiday(make_date(2021, 6, 18))
-            .expect("calendar lookup"),
-        "CME Juneteenth must be absent before 2022"
-    );
-    assert!(
-        by_id("cme")
-            .is_holiday(make_date(2022, 6, 20))
-            .expect("calendar lookup"),
-        "CME Juneteenth observed 2022-06-20"
-    );
-    assert!(
-        !by_id("cme")
-            .is_holiday(make_date(1997, 1, 20))
-            .expect("calendar lookup"),
-        "CME MLK Day must be absent before 1998"
-    );
-    assert!(
-        by_id("cme")
-            .is_holiday(make_date(1998, 1, 19))
-            .expect("calendar lookup"),
-        "CME MLK Day present from 1998"
-    );
-
     // Sanity: an un-gated holiday is present historically on both calendars.
     assert!(
         by_id("sifma")
             .is_holiday(make_date(1990, 7, 4))
             .expect("calendar lookup"),
         "Independence Day is always a SIFMA holiday"
-    );
-    assert!(
-        by_id("cme")
-            .is_holiday(make_date(1990, 12, 25))
-            .expect("calendar lookup"),
-        "Christmas is always a CME holiday"
     );
 }
 

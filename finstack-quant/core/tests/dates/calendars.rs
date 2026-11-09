@@ -530,22 +530,6 @@ const CASES: &[CalendarCase] = &[
         ],
     },
     CalendarCase {
-        name: "CME",
-        cal: "cme",
-        checks: &[
-            YearCheck {
-                year: 2024,
-                expected_count: None,
-                must_have: &[(2024, 3, 29), (2024, 7, 4)],
-            },
-            YearCheck {
-                year: 2025,
-                expected_count: None,
-                must_have: &[(2025, 4, 18), (2025, 11, 27)],
-            },
-        ],
-    },
-    CalendarCase {
         name: "SIFMA",
         cal: "sifma",
         checks: &[
@@ -654,22 +638,6 @@ const CASES: &[CalendarCase] = &[
                 year: 2025,
                 expected_count: Some(17),
                 must_have: &[(2025, 1, 29), (2025, 10, 1)],
-            },
-        ],
-    },
-    CalendarCase {
-        name: "CNBE",
-        cal: "cnbe",
-        checks: &[
-            YearCheck {
-                year: 2024,
-                expected_count: Some(27),
-                must_have: &[(2024, 2, 10), (2024, 5, 1), (2024, 10, 1), (2024, 6, 10)],
-            },
-            YearCheck {
-                year: 2025,
-                expected_count: Some(24),
-                must_have: &[(2025, 1, 29), (2025, 5, 1), (2025, 10, 1), (2025, 6, 2)],
             },
         ],
     },
@@ -1006,7 +974,7 @@ fn test_calendar_weekend_behavior() {
 
 fn check_cny_dates(dates: &[(i32, u8, u8)]) {
     // Check multiple calendars that observe CNY
-    let calendars = [by_id("cnbe"), by_id("hkhk"), by_id("sgsi")];
+    let calendars = [by_id("hkhk"), by_id("sgsi")];
 
     for &(y, m, d) in dates {
         let date = make_date(y, m, d);
@@ -1023,14 +991,13 @@ fn check_cny_dates(dates: &[(i32, u8, u8)]) {
     }
 }
 
-// Mainland China (SSE / CNBE) closure notices
+// Mainland China (SSE) closure notices
 
 /// Every date SSE officially announced as closed for 2024-2026 must be a
 /// non-business day, and each post-holiday reopen weekday must be a business
 /// day. Ranges transcribed from the SSE 休市安排 notices (2023-12, 2024-12,
-/// 2025-12). CNBE mirrors the same national arrangement.
 #[test]
-fn sse_cnbe_match_official_closure_notices_2024_2026() {
+fn sse_matches_official_closure_notices_2024_2026() {
     // Inclusive (start, end) closed ranges per SSE notices.
     type Ymd = (i32, u8, u8);
     let closed: &[(Ymd, Ymd)] = &[
@@ -1076,7 +1043,8 @@ fn sse_cnbe_match_official_closure_notices_2024_2026() {
         (2026, 10, 8),
     ];
 
-    for cal in [by_id("sse") as &dyn HolidayCalendar, by_id("cnbe")] {
+    {
+        let cal = by_id("sse") as &dyn HolidayCalendar;
         let id = cal.metadata().unwrap().id;
         for &((sy, sm, sd), (ey, em, ed)) in closed {
             let mut d = make_date(sy, sm, sd);
@@ -1155,10 +1123,8 @@ fn sse_lunar_festivals_and_bridges_present() {
 
 #[test]
 fn mainland_calendars_use_published_2022_closure_boundaries() {
-    for (name, calendar) in [
-        ("sse", by_id("sse") as &dyn HolidayCalendar),
-        ("cnbe", by_id("cnbe") as &dyn HolidayCalendar),
-    ] {
+    {
+        let (name, calendar) = ("sse", by_id("sse") as &dyn HolidayCalendar);
         assert!(
             calendar
                 .is_holiday(make_date(2022, 1, 31))
@@ -1207,10 +1173,8 @@ fn mainland_calendars_include_historical_official_one_off_closures() {
         make_date(2015, 9, 7),
     ];
 
-    for (name, calendar) in [
-        ("sse", by_id("sse") as &dyn HolidayCalendar),
-        ("cnbe", by_id("cnbe") as &dyn HolidayCalendar),
-    ] {
+    {
+        let (name, calendar) = ("sse", by_id("sse") as &dyn HolidayCalendar);
         for date in closures {
             assert!(
                 calendar.is_holiday(date).expect("calendar lookup"),

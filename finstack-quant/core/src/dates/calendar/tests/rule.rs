@@ -1011,8 +1011,6 @@ fn builtin_holiday_tables_match_the_golden_digest() {
         ("bse", 344, 0x4f6940e3aeb6d601),
         ("cato", 563, 0x84a81d6ece4493e3),
         ("chzh", 509, 0x69249a421ace77c3),
-        ("cme", 470, 0x81d6ac8cc43219e3),
-        ("cnbe", 1192, 0x83dae9caa3d8dc08),
         ("defr", 306, 0xf4652cf9740900e2),
         ("eurex", 408, 0x9a43f685f48d4bd9),
         ("gblo", 412, 0x20ad8d358e2c4db6),

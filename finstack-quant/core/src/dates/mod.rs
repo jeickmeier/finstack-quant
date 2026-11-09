@@ -41,7 +41,7 @@
 //!
 //! ## Features
 //!
-//! - **28 built-in market calendars**: major exchanges, central banks, and
+//! - **26 built-in market calendars**: major exchanges, central banks, and
 //!   settlement systems, generated at build time from `data/calendars/*.json`
 //!   (see [`available_calendars`](crate::dates::available_calendars) for the exact identifier list)
 //! - **Rule-based definitions**: JSON-defined rules for transparency and auditability

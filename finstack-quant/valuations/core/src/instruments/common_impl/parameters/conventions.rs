@@ -322,33 +322,6 @@ impl CommodityConvention {
         }
     }
 
-    /// Registered holiday calendar for this commodity market.
-    ///
-    /// | Market | Exchange | Calendar |
-    /// |--------|----------|----------|
-    /// | WTI, natural gas | NYMEX | `cme` |
-    /// | Gold, silver | COMEX | `cme` |
-    /// | Agricultural | CBOT | `cme` |
-    /// | Brent | ICE Futures Europe | `gblo` |
-    /// | Copper | LME | `gblo` |
-    /// | Power | NERC | `nerc` |
-    ///
-    /// NYMEX, COMEX and CBOT are CME Group exchanges and share its holiday
-    /// calendar; ICE Futures Europe and the LME close on UK bank holidays;
-    /// power uses the NERC off-peak holidays. Every id resolves through
-    /// [`finstack_quant_core::dates::calendar_by_id_strict`].
-    pub fn calendar_id(&self) -> &'static str {
-        match self {
-            CommodityConvention::WtiCrude
-            | CommodityConvention::NaturalGas
-            | CommodityConvention::Gold
-            | CommodityConvention::Silver
-            | CommodityConvention::Agricultural => "cme",
-            CommodityConvention::BrentCrude | CommodityConvention::Copper => "gblo",
-            CommodityConvention::Power => "nerc",
-        }
-    }
-
     /// Primary currency for this commodity.
     pub fn currency(&self) -> finstack_quant_core::currency::Currency {
         use finstack_quant_core::currency::Currency;
@@ -723,27 +696,6 @@ mod tests {
             CommodityConvention::Power.business_day_convention(),
             BusinessDayConvention::ModifiedFollowing
         );
-    }
-
-    #[test]
-    fn commodity_convention_calendar_ids() {
-        use CommodityConvention::*;
-        for (convention, id) in [
-            (WtiCrude, "cme"),
-            (NaturalGas, "cme"),
-            (BrentCrude, "gblo"),
-            (Gold, "cme"),
-            (Silver, "cme"),
-            (Copper, "gblo"),
-            (Agricultural, "cme"),
-            (Power, "nerc"),
-        ] {
-            assert_eq!(convention.calendar_id(), id);
-            assert!(
-                finstack_quant_core::dates::calendar_by_id_strict(id).is_ok(),
-                "{id}"
-            );
-        }
     }
 
     #[test]

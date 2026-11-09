@@ -9,7 +9,7 @@ use finstack_quant_core::dates::{DateExt, HolidayCalendar, calendar_by_id_strict
 use std::hint::black_box;
 use time::{Date, Month};
 
-const CALENDARS: &[&str] = &["asx", "nyse", "jpx", "bse", "cnbe"];
+const CALENDARS: &[&str] = &["asx", "nyse", "jpx", "bse", "sse"];
 
 fn checked_fixture(id: &str) -> (&'static dyn HolidayCalendar, Vec<Date>) {
     let cal = calendar_by_id_strict(id).expect("registered benchmark calendar");
@@ -21,7 +21,7 @@ fn checked_fixture(id: &str) -> (&'static dyn HolidayCalendar, Vec<Date>) {
     // Published fixed-date closures independent of the full-year count.
     let holiday = match id {
         "bse" => Date::from_calendar_date(2025, Month::August, 15),
-        "cnbe" => Date::from_calendar_date(2025, Month::October, 1),
+        "sse" => Date::from_calendar_date(2025, Month::October, 1),
         _ => Date::from_calendar_date(2025, Month::January, 1),
     }
     .expect("valid closure date");

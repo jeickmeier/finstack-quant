@@ -22,6 +22,7 @@
       "position": "long",
       "quantity": 1000.0,
       "settlement": "cash",
+      "settlement_calendar_id": "usny",
       "underlying_ticker": "CL",
       "unit": "BBL"
     },

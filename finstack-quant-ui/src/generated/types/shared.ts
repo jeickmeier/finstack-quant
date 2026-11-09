@@ -45613,10 +45613,12 @@ export interface CommodityForward {
    */
   settlement_business_day_convention?: BusinessDayConvention11 | null;
   /**
-   * Calendar ID for settlement date adjustments.
+   * The contract's settlement calendar ID.
    *
-   * Used for business day adjustment of the settlement date. If `convention`
-   * is set, uses the convention's calendar unless explicitly overridden.
+   * Required whenever the settlement (payment) date is calculated: no
+   * calendar is inferred from `convention` or defaulted to weekends only.
+   * `nerc` is a power-market label calendar, not a settlement calendar,
+   * and is rejected.
    */
   settlement_calendar_id?: Id9 | null;
   /**

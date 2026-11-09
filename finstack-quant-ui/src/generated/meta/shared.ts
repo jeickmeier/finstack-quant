@@ -6725,7 +6725,7 @@ export default [
   {
     "path": "#/$defs/CommodityForward/properties/settlement_calendar_id",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CommodityForward/properties/settlement_calendar_id",
-    "description": "Calendar ID for settlement date adjustments.\n\nUsed for business day adjustment of the settlement date. If `convention`\nis set, uses the convention's calendar unless explicitly overridden."
+    "description": "The contract's settlement calendar ID.\n\nRequired whenever the settlement (payment) date is calculated: no\ncalendar is inferred from `convention` or defaulted to weekends only.\n`nerc` is a power-market label calendar, not a settlement calendar,\nand is rejected."
   },
   {
     "path": "#/$defs/CommodityForward/properties/settlement_calendar_id/anyOf/0",

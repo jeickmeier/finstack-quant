@@ -199,10 +199,12 @@ pub struct CommodityForward {
     /// | Power | T+1 |
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub settlement_days: Option<u32>,
-    /// Calendar ID for settlement date adjustments.
+    /// The contract's settlement calendar ID.
     ///
-    /// Used for business day adjustment of the settlement date. If `convention`
-    /// is set, uses the convention's calendar unless explicitly overridden.
+    /// Required whenever the settlement (payment) date is calculated: no
+    /// calendar is inferred from `convention` or defaulted to weekends only.
+    /// `nerc` is a power-market label calendar, not a settlement calendar,
+    /// and is rejected.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub settlement_calendar_id: Option<finstack_quant_core::types::CalendarId>,
     /// Business day convention for settlement date adjustment.
@@ -279,6 +281,17 @@ impl CommodityForward {
                     .to_string(),
             ));
         }
+        if self
+            .settlement_calendar_id
+            .as_deref()
+            .is_some_and(|id| id.eq_ignore_ascii_case("nerc"))
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "CommodityForward settlement_calendar_id 'nerc' is a power-market label \
+                 calendar, not a settlement calendar"
+                    .to_string(),
+            ));
+        }
         self.payment_date()?;
         Ok(())
     }
@@ -305,6 +318,8 @@ impl CommodityForward {
             .exchange_opt(Some("NYMEX".to_string()))
             .contract_month_opt(Some("2025M03".to_string()))
             .convention_opt(Some(CommodityConvention::WtiCrude)) // Use WTI convention
+            // Illustrative contract settlement calendar; real contracts state theirs.
+            .settlement_calendar_id_opt(Some("usny".into()))
             .attributes(
                 Attributes::new()
                     .with_tag("energy")
@@ -382,18 +397,6 @@ impl CommodityForward {
             .unwrap_or(2)
     }
 
-    /// Get the effective settlement calendar ID.
-    ///
-    /// Resolution order:
-    /// 1. `settlement_calendar_id` if explicitly set
-    /// 2. `convention.calendar_id()` if convention is set
-    /// 3. `None` (no calendar adjustment)
-    pub fn effective_settlement_calendar(&self) -> Option<&str> {
-        self.settlement_calendar_id
-            .as_deref()
-            .or_else(|| self.convention.map(|c| c.calendar_id()))
-    }
-
     /// Get the effective business day convention for settlement.
     ///
     /// Resolution order:
@@ -408,21 +411,27 @@ impl CommodityForward {
 
     /// Date on which the forward's settlement amount is paid.
     ///
-    /// `maturity` plus [`Self::effective_settlement_days`] business days on
-    /// [`Self::effective_settlement_calendar`] (weekends only when no calendar
-    /// is set), adjusted by [`Self::effective_settlement_business_day_convention`].
+    /// `maturity` plus [`Self::effective_settlement_days`] business days on the
+    /// contract's `settlement_calendar_id`, adjusted by
+    /// [`Self::effective_settlement_business_day_convention`].
     /// The forward price is still observed at `maturity`; only discounting and
     /// the cashflow date use the payment date.
     ///
     /// # Errors
     ///
-    /// Returns `InputError::CalendarNotFound` when the effective calendar id
-    /// is not registered, and a validation error when the lag exceeds the
-    /// supported range or no business day is found while adjusting.
+    /// Returns a validation error when `settlement_calendar_id` is absent,
+    /// `InputError::CalendarNotFound` when it is not registered, and a
+    /// validation error when the lag exceeds the supported range or no
+    /// business day is found while adjusting.
     pub fn payment_date(&self) -> Result<Date> {
         use finstack_quant_core::dates::DateExt;
-        let calendar =
-            finstack_quant_core::dates::resolve_calendar(self.effective_settlement_calendar())?;
+        let id = self.settlement_calendar_id.as_deref().ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "CommodityForward '{}' requires the contract's settlement_calendar_id to compute its payment date",
+                self.id.as_str()
+            ))
+        })?;
+        let calendar = finstack_quant_core::dates::calendar_by_id_strict(id)?;
         let lag = i32::try_from(self.effective_settlement_days()).map_err(|_| {
             finstack_quant_core::Error::Validation(
                 "CommodityForward settlement_days exceeds the supported range".to_string(),
@@ -600,6 +609,7 @@ mod tests {
             .position(Position::Long)
             .forward_curve_id(CurveId::new("CL-FWD"))
             .discount_curve_id(CurveId::new("USD-OIS"))
+            .settlement_calendar_id_opt(Some("usny".into()))
             .attributes(Attributes::new())
             .build()
             .expect("should build");
@@ -653,6 +663,7 @@ mod tests {
             .quoted_forward_opt(Some(2000.0))
             .forward_curve_id(CurveId::new("GC-FWD"))
             .discount_curve_id(CurveId::new("USD-OIS"))
+            .settlement_calendar_id_opt(Some("usny".into()))
             .attributes(Attributes::new())
             .build()
             .expect("should build");
@@ -688,6 +699,7 @@ mod tests {
             .position(Position::Long)
             .forward_curve_id(CurveId::new("WTI-FORWARD"))
             .discount_curve_id(CurveId::new("USD-OIS"))
+            .settlement_calendar_id_opt(Some("usny".into()))
             .build()
             .expect("should build");
 
@@ -721,6 +733,7 @@ mod tests {
             .contract_price_opt(Some(72.0)) // Bought at $72, market is ~$76
             .forward_curve_id(CurveId::new("WTI-FORWARD"))
             .discount_curve_id(CurveId::new("USD-OIS"))
+            .settlement_calendar_id_opt(Some("usny".into()))
             .build()
             .expect("should build");
 
@@ -754,6 +767,7 @@ mod tests {
             .contract_price_opt(Some(72.0)) // Sold at $72, market is ~$76
             .forward_curve_id(CurveId::new("WTI-FORWARD"))
             .discount_curve_id(CurveId::new("USD-OIS"))
+            .settlement_calendar_id_opt(Some("usny".into()))
             .build()
             .expect("should build");
 
@@ -783,6 +797,7 @@ mod tests {
             .contract_price_opt(Some(72.0))
             .forward_curve_id(CurveId::new("WTI-FORWARD"))
             .discount_curve_id(CurveId::new("USD-OIS"))
+            .settlement_calendar_id_opt(Some("usny".into()))
             .build()
             .expect("should build");
 
@@ -796,6 +811,7 @@ mod tests {
             .contract_price_opt(Some(72.0))
             .forward_curve_id(CurveId::new("WTI-FORWARD"))
             .discount_curve_id(CurveId::new("USD-OIS"))
+            .settlement_calendar_id_opt(Some("usny".into()))
             .build()
             .expect("should build");
 
@@ -856,13 +872,14 @@ mod tests {
             .position(Position::Long)
             .forward_curve_id(CurveId::new("WTI-FORWARD"))
             .discount_curve_id(CurveId::new("USD-OIS"))
+            .settlement_calendar_id_opt(Some("usny".into()))
             .convention_opt(Some(CommodityConvention::WtiCrude))
             .build()
             .expect("should build");
 
         // WTI convention: T+2, Following, CME calendar (NYMEX)
         assert_eq!(forward.effective_settlement_days(), 2);
-        assert_eq!(forward.effective_settlement_calendar(), Some("cme"));
+        assert_eq!(forward.settlement_calendar_id.as_deref(), Some("usny"));
         assert_eq!(
             forward.effective_settlement_business_day_convention(),
             BusinessDayConvention::Following
@@ -883,12 +900,13 @@ mod tests {
             .position(Position::Long)
             .forward_curve_id(CurveId::new("GC-FORWARD"))
             .discount_curve_id(CurveId::new("USD-OIS"))
+            .settlement_calendar_id_opt(Some("usny".into()))
             .convention_opt(Some(CommodityConvention::Gold))
             .build()
             .expect("should build");
 
         assert_eq!(gold_forward.effective_settlement_days(), 2);
-        assert_eq!(gold_forward.effective_settlement_calendar(), Some("cme"));
+        assert_eq!(gold_forward.settlement_calendar_id.as_deref(), Some("usny"));
         assert_eq!(
             gold_forward.effective_settlement_business_day_convention(),
             BusinessDayConvention::ModifiedFollowing
@@ -914,6 +932,7 @@ mod tests {
             .position(Position::Long)
             .forward_curve_id(CurveId::new("WTI-FORWARD"))
             .discount_curve_id(CurveId::new("USD-OIS"))
+            .settlement_calendar_id_opt(Some("usny".into()))
             .convention_opt(Some(CommodityConvention::WtiCrude)) // T+2, Following
             .settlement_days_opt(Some(1)) // Override to T+1
             .settlement_business_day_convention_opt(Some(BusinessDayConvention::ModifiedFollowing)) // Override BDC
@@ -927,7 +946,7 @@ mod tests {
             BusinessDayConvention::ModifiedFollowing
         );
         // Calendar still comes from convention
-        assert_eq!(forward.effective_settlement_calendar(), Some("cme"));
+        assert_eq!(forward.settlement_calendar_id.as_deref(), Some("usny"));
     }
 
     #[test]
@@ -949,12 +968,13 @@ mod tests {
             .position(Position::Long)
             .forward_curve_id(CurveId::new("WTI-FORWARD"))
             .discount_curve_id(CurveId::new("USD-OIS"))
+            .settlement_calendar_id_opt(Some("usny".into()))
             .build()
             .expect("should build");
 
         // Defaults: T+2, Following, no calendar
         assert_eq!(forward.effective_settlement_days(), 2);
-        assert_eq!(forward.effective_settlement_calendar(), None);
+        assert_eq!(forward.settlement_calendar_id.as_deref(), Some("usny"));
         assert_eq!(
             forward.effective_settlement_business_day_convention(),
             BusinessDayConvention::Following
@@ -997,6 +1017,7 @@ mod tests {
             .contract_price_opt(Some(72.0))
             .forward_curve_id(CurveId::new("WTI-FORWARD"))
             .discount_curve_id(CurveId::new("USD-OIS"))
+            .settlement_calendar_id_opt(Some("usny".into()))
             .build()
             .expect("should build");
 
@@ -1118,14 +1139,12 @@ mod tests {
             forward.payment_date().expect("override"),
             date!(2025 - 07 - 04)
         );
-        // No convention: T+2 on weekends only.
-        forward.convention = None;
-        forward.settlement_days = None;
+        // No contract calendar: the payment date cannot be computed.
         forward.settlement_calendar_id = None;
-        assert_eq!(
-            forward.payment_date().expect("default"),
-            date!(2025 - 07 - 07)
-        );
+        assert!(forward.payment_date().is_err());
+        // NERC is a label calendar, never a settlement calendar.
+        forward.settlement_calendar_id = Some("nerc".into());
+        assert!(forward.validate_invariants().is_err());
     }
 
     #[test]

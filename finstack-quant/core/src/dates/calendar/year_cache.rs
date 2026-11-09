@@ -188,7 +188,7 @@ mod tests {
     use crate::dates::HolidayCalendar;
     use crate::dates::calendar::rule::Rule;
     use crate::dates::calendar::types::Calendar;
-    use crate::dates::calendar::{BSE, CNBE, NYSE, TARGET2};
+    use crate::dates::calendar::{BSE, NYSE, SSE, TARGET2};
     use time::Month;
 
     fn date(year: i32, month: Month, day: u8) -> Date {
@@ -235,7 +235,7 @@ mod tests {
 
     #[test]
     fn year_bits_match_rule_scan_for_high_rule_calendars() {
-        for cal in [&CNBE, &BSE, &NYSE, &TARGET2] {
+        for cal in [&SSE, &BSE, &NYSE, &TARGET2] {
             for year in [2024, 2025, 2028] {
                 for ordinal in 1_u16..=366 {
                     let Some(d) = Date::from_ordinal_date(year, ordinal).ok() else {
