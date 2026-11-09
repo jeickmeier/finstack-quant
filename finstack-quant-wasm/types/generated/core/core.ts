@@ -584,10 +584,12 @@ export type DateWire = string;
  *   leap year is bumped to 29 February. The residual fraction is
  *   `days(start, residual_end) / den`, where `den` is 366 if 29 February lies
  *   in `[start, residual_end)`, else 365. No [`DayCountContext`] is required.
- * - **`Bus252`**: requires `calendar` in [`DayCountContext`]. It iterates each
- *   calendar day in the range to check business-day status, giving O(n) cost
- *   in the number of calendar days between the dates (about 11,000 iterations
- *   for a 30Y instrument).
+ * - **`Bus252`**: requires `calendar` in [`DayCountContext`] and counts its
+ *   business days in `[start, end)` through
+ *   [`HolidayCalendar::count_business_days`](crate::dates::HolidayCalendar::count_business_days).
+ *   Built-in calendars answer from a cached per-year prefix count; custom
+ *   calendars scan each calendar day unless they override the count. A count
+ *   outside `0..=elapsed days` is an error.
  * - **`OneOne`**: inflation fixed legs compound across annual periods using
  *   this convention. Empty intervals return zero and reversed intervals are
  *   rejected, as for all day counts in this API.

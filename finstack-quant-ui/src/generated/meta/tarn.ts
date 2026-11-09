@@ -3520,7 +3520,7 @@ export default [
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/1",
     "const": "act_360",
-    "description": "Actual/360 day count convention.\n\nYear fraction = (actual days between dates) / 360\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(d)\n- **ISO 20022**: Day Count Fraction Code \"Actual/360\" (A004)\n- **Also known as**: Act/360, A/360, French"
+    "description": "Actual/360 day count convention.\n\nYear fraction = (actual days between dates) / 360\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(e)\n- **ISO 20022**: Day Count Fraction Code \"Actual/360\" (A004)\n- **Also known as**: Act/360, A/360, French"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/10",
@@ -3544,7 +3544,7 @@ export default [
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/2",
     "const": "act_365f",
-    "description": "Actual/365 Fixed day count convention.\n\nYear fraction = (actual days between dates) / 365\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(e)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365 Fixed\" (A005)\n- **Also known as**: Act/365F, A/365F, English"
+    "description": "Actual/365 Fixed day count convention.\n\nYear fraction = (actual days between dates) / 365\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(d)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365 Fixed\" (A005)\n- **Also known as**: Act/365F, A/365F, English"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/3",

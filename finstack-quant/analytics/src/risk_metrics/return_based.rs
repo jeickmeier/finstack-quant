@@ -1,6 +1,6 @@
 //! Validated return means, sample risk and explicitly selected reward ratios.
 
-use finstack_quant_core::dates::{Date, DayCount, DayCountContext, TenorUnit};
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::math::summation::{NeumaierAccumulator, neumaier_sum};
 use finstack_quant_core::{Error, Result};
 
@@ -54,45 +54,17 @@ impl std::fmt::Display for CagrDayCount {
 }
 
 /// Validate clock context even when a selected ticker has no observations.
+///
+/// Delegates to the core boundary: a core convention validates its own
+/// requirements, and `act365_25`, which needs no context, still rejects
+/// structurally invalid supplied fields through a context-free convention.
 pub(crate) fn validate_cagr_context(
     day_count: CagrDayCount,
     context: DayCountContext<'_>,
 ) -> Result<()> {
-    if context.bus_basis == Some(0) || context.coupon_period.is_some_and(|(s, e)| s >= e) {
-        return Err(Error::Validation("invalid CAGR day-count context".into()));
-    }
-    if let CagrDayCount::DayCount(convention @ (DayCount::ActActIsma | DayCount::Act365L)) =
-        day_count
-    {
-        if let Some((start, end)) = context.coupon_period {
-            convention.year_fraction(start, end, context)?;
-        }
-        if convention == DayCount::ActActIsma
-            && context.coupon_period.is_none()
-            && context
-                .frequency
-                .is_some_and(|f| matches!(f.unit(), TenorUnit::Days | TenorUnit::Weeks))
-        {
-            return Err(Error::Validation(
-                "ACT/ACT ISMA requires a month or year coupon frequency".into(),
-            ));
-        }
-    }
     match day_count {
-        CagrDayCount::DayCount(DayCount::Bus252) if context.calendar.is_none() => Err(
-            Error::Validation("Bus/252 CAGR requires a holiday calendar".into()),
-        ),
-        CagrDayCount::DayCount(DayCount::ActActIsma) if context.frequency.is_none() => Err(
-            Error::Validation("ACT/ACT ISMA CAGR requires coupon frequency".into()),
-        ),
-        CagrDayCount::DayCount(DayCount::Act365L)
-            if context.frequency.is_none() || context.coupon_period.is_none() =>
-        {
-            Err(Error::Validation(
-                "ACT/365L CAGR requires coupon frequency and boundaries".into(),
-            ))
-        }
-        _ => Ok(()),
+        CagrDayCount::Act365_25 => DayCount::Act365F.validate_context(context),
+        CagrDayCount::DayCount(convention) => convention.validate_context(context),
     }
 }
 
@@ -622,6 +594,7 @@ pub(crate) fn modified_sharpe(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use finstack_quant_core::dates::TenorUnit;
     use time::Month;
 
     #[test]

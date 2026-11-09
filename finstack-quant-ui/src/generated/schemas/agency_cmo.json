@@ -3656,12 +3656,12 @@
         },
         {
           "const": "act_360",
-          "description": "Actual/360 day count convention.\n\nYear fraction = (actual days between dates) / 360\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(d)\n- **ISO 20022**: Day Count Fraction Code \"Actual/360\" (A004)\n- **Also known as**: Act/360, A/360, French",
+          "description": "Actual/360 day count convention.\n\nYear fraction = (actual days between dates) / 360\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(e)\n- **ISO 20022**: Day Count Fraction Code \"Actual/360\" (A004)\n- **Also known as**: Act/360, A/360, French",
           "type": "string"
         },
         {
           "const": "act_365f",
-          "description": "Actual/365 Fixed day count convention.\n\nYear fraction = (actual days between dates) / 365\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(e)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365 Fixed\" (A005)\n- **Also known as**: Act/365F, A/365F, English",
+          "description": "Actual/365 Fixed day count convention.\n\nYear fraction = (actual days between dates) / 365\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(d)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365 Fixed\" (A005)\n- **Also known as**: Act/365F, A/365F, English",
           "type": "string"
         },
         {

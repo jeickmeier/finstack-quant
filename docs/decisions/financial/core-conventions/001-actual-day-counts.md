@@ -1,7 +1,7 @@
 # CORE-CONVENTIONS-001: Actual-day accrual, year partitioning and business-day bases
 
 - Decision status: **Accepted — complete actual-day package, 2026-11-07**.
-- Implementation status: **Observed; reconciliation pending**, scoped to `dates/daycount/{mod,act_act,other}.rs` and the context contract.
+- Implementation status: **Reconciled 2026-11-09** (central `DayCount::validate_context` before equal-date zero, Bus252 count bound, integer ISDA/AFB year counts, corrected citations and prose); independent qualification remains, scoped to `dates/daycount/{mod,act_act,other}.rs` and the context contract.
 - Validation status: **Evidence inspected/located; independent qualification pending**. Documentation and independent formula-example checks passed; production tests and vendor fixtures were not executed or regenerated.
 - Audit date: **2026-11-05**. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; see [scope and inventory](README.md).
 

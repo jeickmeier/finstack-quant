@@ -32,7 +32,7 @@
             "$id": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
             "type_name": "MarketContextState",
             "kind": "input",
-            "bytes": 131892
+            "bytes": 132042
           },
           {
             "path": "schemas/market_data/1/vol_cube_expiry_slice.schema.json",
@@ -112,14 +112,14 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1260259
+            "bytes": 1260409
           },
           {
             "path": "schemas/attribution/1/attribution_inputs.schema.json",
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution_inputs.schema.json",
             "type_name": "AttributionInputs",
             "kind": "input",
-            "bytes": 234070
+            "bytes": 234220
           },
           {
             "path": "schemas/attribution/1/attribution_result.schema.json",
@@ -1997,7 +1997,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
             "type_name": "ApplicationEnvelope",
             "kind": "output",
-            "bytes": 1153597
+            "bytes": 1153747
           },
           {
             "path": "schemas/scenarios/1/horizon_result.schema.json",
@@ -2018,14 +2018,14 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/scenario.schema.json",
             "type_name": "ScenarioEnvelope",
             "kind": "input",
-            "bytes": 102983
+            "bytes": 103133
           },
           {
             "path": "schemas/scenarios/1/scenario_spec.schema.json",
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json",
             "type_name": "ScenarioSpec",
             "kind": "input",
-            "bytes": 100598
+            "bytes": 100748
           },
           {
             "path": "schemas/scenarios/1/template_metadata.schema.json",
@@ -2133,7 +2133,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 385897
+            "bytes": 386047
           },
           {
             "path": "schemas/statements/1/forecast_parameters.schema.json",
@@ -2196,7 +2196,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/swap_conventions.schema.json",
             "type_name": "SwapConventions",
             "kind": "input",
-            "bytes": 21500
+            "bytes": 21650
           },
           {
             "path": "schemas/statements/1/swap_params.schema.json",
@@ -3816,7 +3816,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1260259
+            "bytes": 1260409
           },
           {
             "domain": "attribution",
@@ -3824,7 +3824,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution_inputs.schema.json",
             "type_name": "AttributionInputs",
             "kind": "input",
-            "bytes": 234070
+            "bytes": 234220
           },
           {
             "domain": "attribution",
@@ -4104,7 +4104,7 @@
             "$id": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
             "type_name": "MarketContextState",
             "kind": "input",
-            "bytes": 131892
+            "bytes": 132042
           },
           {
             "domain": "core",
@@ -4712,7 +4712,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
             "type_name": "ApplicationEnvelope",
             "kind": "output",
-            "bytes": 1153597
+            "bytes": 1153747
           },
           {
             "domain": "scenarios",
@@ -4736,7 +4736,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/scenario.schema.json",
             "type_name": "ScenarioEnvelope",
             "kind": "input",
-            "bytes": 102983
+            "bytes": 103133
           },
           {
             "domain": "scenarios",
@@ -4744,7 +4744,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json",
             "type_name": "ScenarioSpec",
             "kind": "input",
-            "bytes": 100598
+            "bytes": 100748
           },
           {
             "domain": "scenarios",
@@ -4776,7 +4776,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 385897
+            "bytes": 386047
           },
           {
             "domain": "statements",
@@ -4848,7 +4848,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/swap_conventions.schema.json",
             "type_name": "SwapConventions",
             "kind": "input",
-            "bytes": 21500
+            "bytes": 21650
           },
           {
             "domain": "statements",

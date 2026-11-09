@@ -36,7 +36,7 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 13 | H2 | committed (`H2:` in git log) | workspace lint; rust-test (9 fixture fixes re-run: exotics 314, core count test); gen-write; python-test 14003; wasm-test 1086; ui-check | 004/005 entry updated (cme/cnbe removed; NERC settlement use rejected); record 005 partly reconciled | Commodity example uses `usny` as an illustrative contract calendar; NERC purpose restriction is enforced at the commodity forward only (metadata purposes pending) |
 | 14 | C3 | committed (`C3:` in git log); partial | gen-write; workspace rust-test 16350; python-test 14003; wasm-test 1086; ui-check; py test_runtime_docs 3684 | 006 entry rewritten to the remaining work; record 006 partly reconciled | Done: no `BusinessDayConvention` default (enum, cashflow schedule/fee specs, statements `SwapConventions`, Python/WASM tenor rolls), empty `+` joint members rejected, Modified rolls compare year+month. Not done: resolver fallbacks (with 011 FX callers), 100-day cap, composite coverage; product-level defaults (see Needs review) |
 | 15 | C4 | committed (`C4:` in git log) | core lint; core tests 2235 + doctests 286; gen-write; workspace rust-test 16359; python-test 14003; wasm-test 1086 | 006 entry: search items moved to reconciled | Cap and `max_days` removed; Modified forward search stays in the original year/month then reverses from the original date; Nearest alternates sides and stops on proof; `Unadjusted` returns before classifying; tests: 120-day closure, fully closed month, same month a year later, unneeded next-month/preceding data, needed missing data, `i32::MIN` |
-| 16 | D1 | pending | | | |
+| 16 | D1 | committed (`D1:` in git log) | lint core/analytics; core tests 2237 + doctests 287; analytics 262; gen-write; workspace rust-test 16361; python-test 14003; wasm-test 1086; ui-check | 001 part of the actual-day/coupon-context entry rewritten to qualification only; evidence-prose entry: Bus252 prose and 4.16(d)/(e) citations done | New public `DayCount::validate_context` (structure, then requirements) runs before every equal-date zero; analytics CAGR guard delegates to it; `to_ctx` revalidates public fields; Bus252 `0 <= B <= D` (`Error::Internal` for a defective calendar count); ISDA integer years + two partials; summation-order test replaced by validation/date-range tests |
 | 17 | D2 | pending | | | |
 | 18 | D3 | pending | | | |
 | 19 | E1 | pending | | | |
@@ -70,6 +70,11 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 
 - **Phase A** (after A3b `b7248fccbf`): `mise run all` **pass**.
 - **Phase B** (after B2a `69c2dc0d3a`; B3–B5 skipped): `mise run all` **pass**.
+- **Phase C** (after C4 `96d1d0a2ec`): `mise run all` **pass** on the second
+  run. The first run failed only
+  `test_portfolio_gil_release.py::test_sensitivity_result_conversion_and_decomposition_release_gil`
+  (a background-thread progress timing probe under full-gate load). It passed
+  3/3 in isolation and the full rerun passed (Python 14003).
 
 ## Judgement log
 
@@ -119,6 +124,14 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
   left in place and are recorded as remaining in the 006 register entry.
   The core enum, the cashflow schedule/fee specs, the statements
   `SwapConventions` and the host tenor rolls no longer default.
+- **D1 representation choices.** The equal-date requirement check covers
+  presence of required fields plus the ICMA reference-grid and frequency-unit
+  checks the analytics guard used to make; ACT/365L accrual containment in
+  its `coupon_period` stays in the kernel (002/D2 territory). A calendar
+  returning a business-day count outside `0..=elapsed days` is reported as
+  `Error::Internal` (a calendar contract violation, not a caller input). The
+  ACT/ACT ICMA kernels keep their own equal-date shortcuts until the 002
+  slices.
 - **A1 not closed.** The 020 register entry stays open as Evidence. Equality,
   adjacent and already-beyond observations, window/history behavior, and
   settlement/discount boundaries at each consumer were not independently

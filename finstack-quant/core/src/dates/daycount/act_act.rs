@@ -142,38 +142,48 @@ pub(super) fn act_act_isma_year_fraction_with_reference_period(
         period_end = boundary(index + 1)?;
     }
 }
-// ACT/ACT (ISDA) helper
-pub(super) fn year_fraction_act_act_isda(start: Date, end: Date) -> crate::Result<f64> {
-    if start == end {
-        return Ok(0.0);
-    }
-
+/// ACT/ACT (ISDA): the integer count of complete calendar years between the
+/// two partial years, plus at most two partial-year fractions (days over that
+/// year's 365 or 366). Precondition: `start < end`.
+pub(super) fn year_fraction_act_act_isda(start: Date, end: Date) -> f64 {
+    let year_days = |year: i32| f64::from(time::util::days_in_year(year));
     if start.year() == end.year() {
-        let denom = f64::from(time::util::days_in_year(start.year()));
-        let days = (end - start).whole_days() as f64;
-        return Ok(days / denom);
+        return (end - start).whole_days() as f64 / year_days(start.year());
     }
-
-    // Days from start to 31-Dec of start year (inclusive of start, exclusive of next year 1-Jan).
-    let start_year_end = crate::dates::create_date(start.year() + 1, Month::January, 1)?;
-    let days_start_year = (start_year_end - start).whole_days() as f64;
-    let mut frac = days_start_year / f64::from(time::util::days_in_year(start.year()));
-
-    // Preserve per-year addition: bulk addition differs by one ULP for some
-    // seeds because IEEE addition is not associative.
-    for _year in (start.year() + 1)..end.year() {
-        frac += 1.0; // each full year counts as exactly 1.0
-    }
-
-    // Days from 1-Jan of end year to end date
-    let start_of_end_year = crate::dates::create_date(end.year(), Month::January, 1)?;
-    let days_end_year = (end - start_of_end_year).whole_days() as f64;
-    frac += days_end_year / f64::from(time::util::days_in_year(end.year()));
-
-    Ok(frac)
+    // Days in `[start, Jan 1 of the next year)` and `[Jan 1 of end's year, end)`;
+    // the ordinal arithmetic needs no out-of-range January 1 date.
+    let start_days =
+        i32::from(time::util::days_in_year(start.year())) - i32::from(start.ordinal()) + 1;
+    let end_days = i32::from(end.ordinal()) - 1;
+    let complete_years = end.year() - start.year() - 1;
+    f64::from(complete_years)
+        + f64::from(start_days) / year_days(start.year())
+        + f64::from(end_days) / year_days(end.year())
 }
 
 // Context-aware helpers for year_fraction_impl
+
+/// Check ACT/ACT (ICMA) context: a frequency is required; an explicit
+/// reference period must reproduce one nominal month grid, and without one
+/// the frequency must be in months or years.
+pub(super) fn validate_act_act_isma_context(ctx: DayCountContext<'_>) -> crate::Result<()> {
+    let frequency = ctx
+        .frequency
+        .ok_or(InputError::MissingFrequencyForActActIsma)?;
+    match ctx.coupon_period {
+        Some((ref_start, ref_end)) => {
+            act_act_isma_year_fraction_with_reference_period(ref_start, ref_end, ref_start, ref_end)
+                .map(|_| ())
+        }
+        None if matches!(frequency.unit(), TenorUnit::Weeks | TenorUnit::Days) => {
+            Err(InputError::ActActIsmaUnsupportedFrequency {
+                frequency: frequency.to_string(),
+            }
+            .into())
+        }
+        None => Ok(()),
+    }
+}
 
 /// ACT/ACT (ISMA) with context extraction.
 ///
@@ -234,14 +244,12 @@ pub(super) fn year_fraction_act_act_isma_with_ctx(
 ///
 /// QuantLib `ActualActual::AFB`: walk whole years backwards from `end` until
 /// the candidate is before `start`, then divide the residual actual days by
-/// 366 if 29 February lies in `[start, residual_end)`, else 365.
+/// 366 if 29 February lies in `[start, residual_end)`, else 365. A backward
+/// step that cannot be represented lies before every valid `start`, so it
+/// ends the walk. Precondition: `start < end`.
 pub(super) fn year_fraction_act_act_afb(start: Date, end: Date) -> f64 {
-    if start == end {
-        return 0.0;
-    }
-
     let mut residual_end = end;
-    let mut whole_years = 0.0;
+    let mut whole_years: u32 = 0;
 
     while let Ok(mut candidate) = residual_end.add_months(-12) {
         // QuantLib leap-day alignment: a year-step that lands on 28 February
@@ -253,7 +261,7 @@ pub(super) fn year_fraction_act_act_afb(start: Date, end: Date) -> f64 {
             candidate += time::Duration::days(1);
         }
         if candidate >= start {
-            whole_years += 1.0;
+            whole_years += 1;
             residual_end = candidate;
         } else {
             break;
@@ -266,7 +274,7 @@ pub(super) fn year_fraction_act_act_afb(start: Date, end: Date) -> f64 {
     } else {
         365.0
     };
-    whole_years + days / den
+    f64::from(whole_years) + days / den
 }
 
 /// True when 29 February lies in the half-open interval `[start, end)`.

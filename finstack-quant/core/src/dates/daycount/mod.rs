@@ -20,10 +20,11 @@
 //!
 //! # Precision
 //!
-//! Year fractions are computed as `f64` with typical precision around `1e-9`
-//! for standard tenors under roughly 50 years. Precision degrades for very
-//! long tenors due to floating-point accumulation, but for most bond and swap
-//! applications this remains well within market convention tolerances.
+//! Day and complete-year counts are exact integers; the year fraction is one
+//! `f64` conversion of them (ACT/ACT ISDA adds its complete years to at most
+//! two partial-year fractions). The whole supported `Date` range is accepted;
+//! no bitwise agreement with a vendor or a particular summation order is
+//! promised.
 //!
 //! ## ISDA Standard Conventions
 //!
@@ -130,9 +131,12 @@ use time::Date;
 
 use crate::InputError;
 use act_act::{
-    year_fraction_act_act_afb, year_fraction_act_act_isda, year_fraction_act_act_isma_with_ctx,
+    validate_act_act_isma_context, year_fraction_act_act_afb, year_fraction_act_act_isda,
+    year_fraction_act_act_isma_with_ctx,
 };
-use other::{year_fraction_act_365l, year_fraction_bus252, year_fraction_nl_365};
+use other::{
+    validate_act_365l_context, year_fraction_act_365l, year_fraction_bus252, year_fraction_nl_365,
+};
 
 #[cfg(test)]
 use crate::dates::Tenor;
@@ -227,10 +231,12 @@ use crate::dates::Tenor;
 ///   leap year is bumped to 29 February. The residual fraction is
 ///   `days(start, residual_end) / den`, where `den` is 366 if 29 February lies
 ///   in `[start, residual_end)`, else 365. No [`DayCountContext`] is required.
-/// - **`Bus252`**: requires `calendar` in [`DayCountContext`]. It iterates each
-///   calendar day in the range to check business-day status, giving O(n) cost
-///   in the number of calendar days between the dates (about 11,000 iterations
-///   for a 30Y instrument).
+/// - **`Bus252`**: requires `calendar` in [`DayCountContext`] and counts its
+///   business days in `[start, end)` through
+///   [`HolidayCalendar::count_business_days`](crate::dates::HolidayCalendar::count_business_days).
+///   Built-in calendars answer from a cached per-year prefix count; custom
+///   calendars scan each calendar day unless they override the count. A count
+///   outside `0..=elapsed days` is an error.
 /// - **`OneOne`**: inflation fixed legs compound across annual periods using
 ///   this convention. Empty intervals return zero and reversed intervals are
 ///   rejected, as for all day counts in this API.
@@ -335,7 +341,7 @@ pub enum DayCount {
     ///
     /// # Standards Reference
     ///
-    /// - **ISDA**: 2006 ISDA Definitions, Section 4.16(d)
+    /// - **ISDA**: 2006 ISDA Definitions, Section 4.16(e)
     /// - **ISO 20022**: Day Count Fraction Code "Actual/360" (A004)
     /// - **Also known as**: Act/360, A/360, French
     #[serde(rename = "act_360")]
@@ -347,7 +353,7 @@ pub enum DayCount {
     ///
     /// # Standards Reference
     ///
-    /// - **ISDA**: 2006 ISDA Definitions, Section 4.16(e)
+    /// - **ISDA**: 2006 ISDA Definitions, Section 4.16(d)
     /// - **ISO 20022**: Day Count Fraction Code "Actual/365 Fixed" (A005)
     /// - **Also known as**: Act/365F, A/365F, English
     #[serde(rename = "act_365f")]
@@ -498,7 +504,8 @@ impl DayCount {
     ///
     /// # Returns
     ///
-    /// - `Ok(0.0)` if `start == end`
+    /// - `Ok(0.0)` if `start == end`, after `ctx` is validated as in
+    ///   [`validate_context`](Self::validate_context)
     /// - `Ok(year_fraction)` for the calculated year fraction (always ≥ 0)
     ///
     /// # Errors
@@ -540,16 +547,66 @@ impl DayCount {
         end: Date,
         ctx: DayCountContext<'_>,
     ) -> crate::Result<f64> {
-        // Early returns for edge cases - flattens nesting
         if start > end {
             return Err(InputError::InvalidDateRange.into());
         }
+        // Structure, then this convention's requirements, then the
+        // equal-date zero (CORE-CONVENTIONS-001).
+        self.validate_context(ctx)?;
         if start == end {
             return Ok(0.0);
         }
-
-        // Dispatch to convention-specific calculations
         self.year_fraction_impl(start, end, ctx)
+    }
+
+    /// Validate `ctx` for this convention without computing a fraction.
+    ///
+    /// Every supplied field must be structurally valid whatever the
+    /// convention: a zero `bus_basis` or a `coupon_period` whose start is not
+    /// before its end is rejected. Then the fields this convention needs must
+    /// be present; context-free conventions need none, and valid but
+    /// irrelevant fields are allowed. [`year_fraction`](Self::year_fraction)
+    /// and [`signed_year_fraction`](Self::signed_year_fraction) run this
+    /// before any equal-date zero, so empty intervals cannot bypass it.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - Calendar, coupon frequency, business-day basis, coupon
+    ///   boundaries and termination flag that the convention may use.
+    ///
+    /// # Errors
+    ///
+    /// - [`InputError::InvalidBusBasis`](crate::InputError::InvalidBusBasis):
+    ///   `bus_basis` is zero
+    /// - `Error::Validation`: `coupon_period` is empty or inverted, or an
+    ///   ACT/ACT ICMA reference period does not reproduce one nominal month
+    ///   grid, or ACT/365L lacks frequency or `coupon_period`
+    /// - [`InputError::MissingCalendarForBus252`](crate::InputError::MissingCalendarForBus252):
+    ///   `Bus252` without a calendar
+    /// - [`InputError::MissingFrequencyForActActIsma`](crate::InputError::MissingFrequencyForActActIsma):
+    ///   `ActActIsma` without a frequency
+    /// - [`InputError::ActActIsmaUnsupportedFrequency`](crate::InputError::ActActIsmaUnsupportedFrequency):
+    ///   `ActActIsma` with a Day or Week frequency and no `coupon_period`
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_core::dates::{DayCount, DayCountContext};
+    ///
+    /// assert!(DayCount::Act360.validate_context(DayCountContext::default()).is_ok());
+    /// assert!(DayCount::Bus252.validate_context(DayCountContext::default()).is_err());
+    /// ```
+    pub fn validate_context(self, ctx: DayCountContext<'_>) -> crate::Result<()> {
+        ctx.validate_structure()?;
+        match self {
+            DayCount::Bus252 => {
+                ctx.calendar.ok_or(InputError::MissingCalendarForBus252)?;
+                Ok(())
+            }
+            DayCount::ActActIsma => validate_act_act_isma_context(ctx),
+            DayCount::Act365L => validate_act_365l_context(ctx),
+            _ => Ok(()),
+        }
     }
 
     /// Internal implementation dispatching to convention-specific calculations.
@@ -581,7 +638,7 @@ impl DayCount {
                 Ok(days_30_360(start, end, Thirty360Convention::Italian) as f64 / 360.0)
             }
             DayCount::Nl365 => Ok(year_fraction_nl_365(start, end)),
-            DayCount::ActAct => year_fraction_act_act_isda(start, end),
+            DayCount::ActAct => Ok(year_fraction_act_act_isda(start, end)),
             DayCount::ActActIsma => year_fraction_act_act_isma_with_ctx(start, end, ctx),
             DayCount::ActActAfb => Ok(year_fraction_act_act_afb(start, end)),
             DayCount::Bus252 => year_fraction_bus252(start, end, ctx),
@@ -601,7 +658,8 @@ impl DayCount {
     ///
     /// # Returns
     ///
-    /// - `Ok(0.0)` if `start == end`
+    /// - `Ok(0.0)` if `start == end`, after `ctx` is validated as in
+    ///   [`validate_context`](Self::validate_context)
     /// - `Ok(positive)` if `end > start`
     /// - `Ok(negative)` if `end < start`
     ///
@@ -633,9 +691,7 @@ impl DayCount {
         end: Date,
         ctx: DayCountContext<'_>,
     ) -> crate::Result<f64> {
-        if start == end {
-            Ok(0.0)
-        } else if end > start {
+        if end >= start {
             self.year_fraction(start, end, ctx)
         } else {
             Ok(-self.year_fraction(
@@ -715,25 +771,79 @@ mod parse_tests {
 mod tests {
     use super::DayCount;
     use super::act_act::act_act_isma_year_fraction_with_reference_period;
+    use crate::InputError;
+    use crate::dates::DayCountContext;
+    use time::Date;
     use time::macros::date;
 
-    /// Per-year and bulk additions differ for a representative ISDA seed.
     #[test]
-    fn act_act_isda_per_year_loop_is_not_bulk_addable() {
-        // Seed as produced by the first term: 3 days into a 365-day year.
-        let seed = 3.0_f64 / 365.0;
-
-        let mut looped = seed;
-        looped += 1.0;
-        looped += 1.0;
-
-        let bulk = seed + 2.0;
-
-        assert_ne!(
-            looped.to_bits(),
-            bulk.to_bits(),
-            "per-year accumulation must preserve its distinct rounding"
+    fn equal_dates_validate_context_before_returning_zero() {
+        let day = Date::from_calendar_date(2025, time::Month::March, 3).expect("valid date");
+        let zero_basis = DayCountContext {
+            bus_basis: Some(0),
+            ..DayCountContext::default()
+        };
+        let inverted = DayCountContext {
+            coupon_period: Some((day, day)),
+            ..DayCountContext::default()
+        };
+        for dc in [DayCount::Act360, DayCount::OneOne, DayCount::ActAct] {
+            assert!(dc.year_fraction(day, day, zero_basis).is_err(), "{dc:?}");
+            assert!(
+                dc.signed_year_fraction(day, day, inverted).is_err(),
+                "{dc:?}"
+            );
+            assert_eq!(
+                dc.year_fraction(day, day, DayCountContext::default())
+                    .expect("context-free"),
+                0.0
+            );
+        }
+        assert!(matches!(
+            DayCount::Bus252.year_fraction(day, day, DayCountContext::default()),
+            Err(crate::Error::Input(InputError::MissingCalendarForBus252))
+        ));
+        assert!(
+            DayCount::Act365L
+                .signed_year_fraction(day, day, DayCountContext::default())
+                .is_err()
         );
+    }
+
+    #[test]
+    fn bus252_rejects_a_count_beyond_elapsed_days() {
+        struct OverCounting;
+        impl crate::dates::HolidayCalendar for OverCounting {
+            fn is_holiday(&self, _date: Date) -> crate::Result<bool> {
+                Ok(false)
+            }
+
+            fn is_business_day(&self, _date: Date) -> crate::Result<bool> {
+                Ok(true)
+            }
+
+            fn count_business_days(&self, _start: Date, _end: Date) -> crate::Result<i32> {
+                Ok(10)
+            }
+        }
+        let start = Date::from_calendar_date(2025, time::Month::March, 3).expect("valid date");
+        let end = Date::from_calendar_date(2025, time::Month::March, 5).expect("valid date");
+        let ctx = DayCountContext {
+            calendar: Some(&OverCounting),
+            ..DayCountContext::default()
+        };
+        assert!(DayCount::Bus252.year_fraction(start, end, ctx).is_err());
+    }
+
+    #[test]
+    fn act_act_isda_spans_the_supported_date_range() {
+        let start = Date::from_calendar_date(-9999, time::Month::January, 1).expect("min year");
+        let end = Date::from_calendar_date(9999, time::Month::December, 31).expect("max year");
+        let yf = DayCount::ActAct
+            .year_fraction(start, end, DayCountContext::default())
+            .expect("whole range");
+        // 19998 complete years plus 364 of 365 days in 9999.
+        assert_eq!(yf, 19_998.0 + 364.0 / 365.0);
     }
 
     #[test]

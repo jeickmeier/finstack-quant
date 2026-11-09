@@ -2,7 +2,7 @@
   "artifacts": [
     {
       "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
-      "bytes": 1153597,
+      "bytes": 1153747,
       "kind": "output",
       "path": "schemas/scenarios/1/application_envelope.schema.json",
       "summary": "Scenario application result: mutated market, model and instruments with the report.",
@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/scenarios/1/scenario.schema.json",
-      "bytes": 102983,
+      "bytes": 103133,
       "kind": "input",
       "path": "schemas/scenarios/1/scenario.schema.json",
       "summary": "Ordered shock and roll operations over market, statement and valuation targets.",
@@ -38,7 +38,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json",
-      "bytes": 100598,
+      "bytes": 100748,
       "kind": "input",
       "path": "schemas/scenarios/1/scenario_spec.schema.json",
       "summary": "Bare scenario specification: the ordered operations the scenario engine applies.",

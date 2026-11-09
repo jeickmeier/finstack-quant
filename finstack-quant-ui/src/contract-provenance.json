@@ -565,7 +565,7 @@
           "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "pointer": "#",
           "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-          "sha256": "de0f7d4475e45b6c2c70a34ec933ca44d23c99dde0fc78fd1864087db9acd617",
+          "sha256": "248412eb646b84896ad2c4ac6fdc0ebb643ad2d1c9700df9f3c3a26e59659edc",
           "description": "Canonical v1 persisted snapshot of a complete market-data context."
         }
       ]
@@ -1352,7 +1352,7 @@
           "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "pointer": "#",
           "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-          "sha256": "de0f7d4475e45b6c2c70a34ec933ca44d23c99dde0fc78fd1864087db9acd617",
+          "sha256": "248412eb646b84896ad2c4ac6fdc0ebb643ad2d1c9700df9f3c3a26e59659edc",
           "description": "Canonical v1 persisted snapshot of a complete market-data context."
         }
       ]
@@ -1419,7 +1419,7 @@
           "uri": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json",
           "pointer": "#",
           "source": "finstack-quant/scenarios/schemas/scenarios/1/scenario_spec.schema.json",
-          "sha256": "4e82c17192a03307d0baa7ff19899b77884c0751717d6db0d3789e8abdf92a0f",
+          "sha256": "1508dd2c565c867f140668ceb5ce8d62dc50106a75064e4fc4817f71c01c11b9",
           "description": "Bare scenario specification: the ordered operations the scenario engine applies."
         }
       ]

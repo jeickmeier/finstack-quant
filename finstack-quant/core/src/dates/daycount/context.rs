@@ -35,14 +35,31 @@ pub struct DayCountContext<'a> {
     pub end_is_termination_date: bool,
 }
 
-/// Reject coupon boundaries unless `start < end`.
-fn validate_coupon_period(start: Date, end: Date) -> crate::Result<()> {
-    if start >= end {
+/// Reject a zero business-day basis and coupon boundaries unless
+/// `start < end`; shared by runtime contexts and state snapshots.
+fn validate_fields(
+    bus_basis: Option<u16>,
+    coupon_period: Option<(Date, Date)>,
+) -> crate::Result<()> {
+    if bus_basis == Some(0) {
+        return Err(crate::InputError::InvalidBusBasis { basis: 0 }.into());
+    }
+    if let Some((start, end)) = coupon_period
+        && start >= end
+    {
         return Err(crate::Error::Validation(format!(
             "coupon period start must be before end, got start={start} end={end}"
         )));
     }
     Ok(())
+}
+
+impl DayCountContext<'_> {
+    /// Structural validation of every supplied field, independent of the
+    /// convention; see [`super::DayCount::validate_context`].
+    pub(super) fn validate_structure(&self) -> crate::Result<()> {
+        validate_fields(self.bus_basis, self.coupon_period)
+    }
 }
 
 impl<'a> std::fmt::Debug for DayCountContext<'a> {
@@ -150,12 +167,7 @@ impl DayCountContextState {
         coupon_period: Option<(Date, Date)>,
         end_is_termination_date: bool,
     ) -> crate::Result<Self> {
-        if let Some((start, end)) = coupon_period {
-            validate_coupon_period(start, end)?;
-        }
-        if bus_basis == Some(0) {
-            return Err(crate::InputError::InvalidBusBasis { basis: 0 }.into());
-        }
+        validate_fields(bus_basis, coupon_period)?;
         Ok(Self {
             calendar_id,
             frequency,
@@ -167,10 +179,15 @@ impl DayCountContextState {
 
     /// Build a runtime [`DayCountContext`] using the built-in calendar lookup.
     ///
+    /// The fields are revalidated first, because public fields can be set
+    /// after [`Self::try_new`].
+    ///
     /// # Errors
     ///
-    /// Returns an error when `calendar_id` names an unknown calendar.
+    /// Returns the [`Self::try_new`] errors for invalid fields, and an error
+    /// when `calendar_id` names an unknown calendar.
     pub fn to_ctx(&self) -> crate::Result<DayCountContext<'static>> {
+        validate_fields(self.bus_basis, self.coupon_period)?;
         let calendar = self
             .calendar_id
             .as_deref()
