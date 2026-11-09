@@ -473,18 +473,19 @@ test('unitless insertPrice rejects non-finite values in Rust (MarketScalar::unit
   }
 });
 
-test('Rate reports fractional basis points without binary noise', () => {
-  assert.equal(new core.Rate(0.0029).asBpF64, 29);
-  assert.equal(new core.Rate(0.00625).asBpF64, 62.5);
-  assert.equal(new core.Rate(0.00625).asBp, 63);
-  // Percent quotes shift their decimal digits, not a binary quotient.
-  assert.equal(core.Rate.fromPercent(1.1).asBpF64, 110);
-  assert.equal(core.Rate.fromPercent(0.07).asBpF64, 7);
-  assert.equal(core.Rate.fromPercent(1.1).asPercent, 1.1);
+test('Rate unit views are single binary64 scalings', () => {
+  assert.equal(new core.Rate(0.00625).asBp, 0.00625 * 10_000);
+  assert.equal(new core.Rate(0.0029).asBp, 0.0029 * 10_000);
+  assert.equal(core.Rate.fromPercent(1.1).asDecimal, 1.1 / 100);
+  assert.equal(core.Rate.fromBp(62.5).asDecimal, 62.5 / 10_000);
+  // Text quotes are converted exactly before one rounding.
+  assert.equal(core.Rate.parse('1.1%').asDecimal, 0.011);
+  assert.throws(() => core.Rate.fromBp(Number.MIN_VALUE));
+  assert.throws(() => new core.Rate(Number.MAX_VALUE).asPercent);
   for (const value of [1e-30, -1e-30, 1e-300, Number.MIN_VALUE]) {
     const rate = new core.Rate(value);
     try {
-      assert.equal(rate.asBpF64, value * 10_000);
+      assert.equal(rate.asBp, value * 10_000);
     } finally {
       rate.free();
     }

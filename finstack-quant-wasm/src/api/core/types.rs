@@ -1,7 +1,7 @@
 //! WASM bindings for [`finstack_quant_core::types`]: rate helpers (`Rate`, `Bps`),
 //! the credit-rating scale (`CreditRating`) and free-form `Attributes`.
 
-use crate::utils::input::{from_js_json, js_f64, js_int, js_string};
+use crate::utils::input::{from_js_json, js_f64, js_string};
 use crate::utils::to_js_err;
 use finstack_quant_core::types::{Attributes, Bps as RustBps, CreditRating, Rate as RustRate};
 use wasm_bindgen::prelude::*;
@@ -84,18 +84,16 @@ impl JsRate {
             .map_err(to_js_err)
     }
 
-    /// Create a rate from a whole number of basis points.
+    /// Create a rate from a basis-point quote with one binary64 `bp / 10000`.
     ///
     /// Delegates to Rust `Rate::from_bp` (the twin of Python `Rate.from_bp`).
-    /// Fractional input is rejected rather than silently rounded: a sub-bp
-    /// rate quietly rounded to whole bp is a pricing bug, not a convenience.
-    /// Use `new Rate(decimal)`, `Rate.fromPercent`, or `Rate.parse("62.5bp")`
-    /// for sub-bp rates.
+    /// Fractional quotes are accepted (`62.5` is 62.5 bp); a whole-bp integer
+    /// type is `Bps`.
     ///
-    /// @param bp - Rate in whole basis points (e.g. `500` for 5%).
+    /// @param bp - Basis-point quote (e.g. `500` for 5%, `62.5` for 62.5 bp).
     /// @returns The constructed `Rate`.
-    /// @throws `TypeError` (kind `invalid_type`) if `bp` is not a whole number
-    /// in the `i32` range.
+    /// @throws `TypeError` (kind `invalid_type`) if `bp` is not a number;
+    /// `FinstackError` if `bp` is non-finite or a nonzero quote rounds to zero.
     ///
     /// @example
     /// ```javascript
@@ -106,10 +104,10 @@ impl JsRate {
     pub fn from_bp(
         #[wasm_bindgen(unchecked_param_type = "number")] bp: JsValue,
     ) -> Result<JsRate, JsValue> {
-        let bp = js_int::<i32>(&bp, "bp")?;
-        Ok(JsRate {
-            inner: RustRate::from_bp(bp),
-        })
+        let bp = js_f64(&bp, "bp")?;
+        RustRate::from_bp(bp)
+            .map(|inner| JsRate { inner })
+            .map_err(to_js_err)
     }
 
     /// Rate as a decimal (e.g. `0.05` for 5%).
@@ -120,32 +118,22 @@ impl JsRate {
         self.inner.as_decimal()
     }
 
-    /// Rate as a percent (e.g. `5.0` for 5%).
+    /// Rate as a percent (`decimal * 100`, e.g. `5.0` for 5%).
     ///
     /// @returns Percent rate.
+    /// @throws `FinstackError` when the percent view overflows (a huge finite rate).
     #[wasm_bindgen(getter, js_name = asPercent)]
-    pub fn as_percent(&self) -> f64 {
-        self.inner.as_percent()
+    pub fn as_percent(&self) -> Result<f64, JsValue> {
+        self.inner.as_percent().map_err(to_js_err)
     }
 
-    /// Rate in basis points, rounded to the nearest integer (e.g. `500` for 5%).
-    ///
-    /// @returns Rate in bp.
-    #[wasm_bindgen(getter, js_name = asBp)]
-    pub fn as_bp(&self) -> i32 {
-        self.inner.as_bp()
-    }
-
-    /// Rate in fractional basis points, without rounding (Rust `Rate::as_bp_f64`).
-    ///
-    /// The decimal point of the rate's shortest decimal form moves four places,
-    /// so `0.0029` reports `29` rather than `28.999999999999996`, and `0.00625`
-    /// keeps its `62.5`.
+    /// Rate in fractional basis points (`decimal * 10000`), never rounded.
     ///
     /// @returns Rate in fractional bp.
-    #[wasm_bindgen(getter, js_name = asBpF64)]
-    pub fn as_bp_f64(&self) -> f64 {
-        self.inner.as_bp_f64()
+    /// @throws `FinstackError` when the basis-point view overflows.
+    #[wasm_bindgen(getter, js_name = asBp)]
+    pub fn as_bp(&self) -> Result<f64, JsValue> {
+        self.inner.as_bp().map_err(to_js_err)
     }
 
     /// Parse a rate quote through Rust `Rate::from_str` (the twin of Python `Rate(text)`).
@@ -938,7 +926,7 @@ mod tests {
             inner: "12.5bp".parse::<RustRate>().expect("fractional bp quote"),
         };
         assert!((rate.as_decimal() - 0.00125).abs() < 1e-15);
-        assert!((rate.as_percent() - 0.125).abs() < 1e-12);
+        assert!((rate.as_percent().expect("percent view") - 0.125).abs() < 1e-12);
     }
 
     #[test]

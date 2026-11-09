@@ -25,7 +25,7 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 2 | A2 | committed (`A2:` in git log) | lint core/py/wasm; core tests; gen-write; py-build + test_dates_imm 29, test_core_wasm_parity 85, parity 6071; wasm-test | Roll-date entry trimmed (option-expiry action done); record 009 item 7 marked reconciled | Removed from core, Python, stubs, WASM, facade, parity, notebook, docs-site lesson and tracks |
 | 3 | A3 | committed (`A3:` in git log) | lint core/fixed-income/py/wasm; tests core 2219, fixed-income 1252; gen-write; py test_dates_imm 30, test_core_wasm_parity 83, test_core_parity 133, test_runtime_docs 3684, parity 6069; wasm 1086 | SIFMA entry rewritten to the remaining work (A3b, data pin/admission H5, qualification); record 010 partly reconciled | Missing cells are `InputError::NotFound` (Python `KeyError`, JS `not_found`); out-of-range years are validation errors checked first |
 | 4 | A3b | committed (`A3b:` in git log) | lint core/fixed-income/valuations/py/wasm; tests core 2218, fixed-income 1252, valuations 2453 (after gen-write); py test_dates_imm, test_core_parity, test_runtime_docs, parity 6067, test_production_audit 28; wasm 1086 | SIFMA entry: agency/term classification done; remaining data pin/admission (H5) and qualification | `settlement_class` is a required field on AgencyTba and DollarRoll (O2); hand fixture production_mortgage.json given class `a` (FNMA 30Y) |
-| 5 | B1 | pending | | | |
+| 5 | B1 | committed (`B1:` in git log) | workspace rust-lint; core tests 2218 + 286 doctests; gen-write; py test_core_parity 134, members 6, ergonomics 48, calibration boundaries 45, core_wasm_parity 83, runtime_docs 3684, parity 6067; wasm 1086 | 018 entry narrowed to the term-loan step-up (B1b) | Only bindings consumed the changed API outside core; a CDS quote test now compares against the single binary64 `as_bp` view instead of noise-free decimal shifting (018 #6) |
 | 6 | B1b | pending | | | |
 | 7 | B2 | pending | | | |
 | 8 | B3 | pending | | | |
@@ -65,6 +65,10 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 42 | H4 | pending | | | |
 | 43 | H5 | pending | | | |
 | 44 | H6 | pending | | | |
+
+## Phase gates
+
+- **Phase A** (after A3b `b7248fccbf`): `mise run all` **pass**.
 
 ## Judgement log
 

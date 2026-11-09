@@ -41,7 +41,7 @@ test('realizedVariance and realizedVarianceOhlc take the Rust defaults', () => {
 test('Rate and Bps: parse, getters, conversions and JSON', () => {
   const rate = core.Rate.parse('12.5bp');
   assert.equal(rate.asDecimal, 0.00125);
-  assert.equal(core.Rate.parse('17.5bp').asBp, 18);
+  assert.equal(core.Rate.parse('17.5bp').asBp, 17.5);
   assert.equal(new core.Bps(-1995).asPercent, -19.95);
   const bps = new core.Bps(125);
   assert.equal(typeof bps.asDecimal, 'number');

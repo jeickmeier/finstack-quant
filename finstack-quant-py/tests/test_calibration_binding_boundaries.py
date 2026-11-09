@@ -268,13 +268,13 @@ def test_surface_validators_accept_a_clean_surface_and_reject_arbitrage() -> Non
     [("pct_1.1", 110.0), ("pct_0.07", 7.0), ("pct_0.29", 29.0), ("rate_0.0029", 29.0), ("rate_62.5bp", 62.5)],
 )
 def test_cds_quote_basis_points_come_from_rust_accessor(label: str, expected: float) -> None:
-    """CORE-006: Rate spreads use Rust ``as_bp_f64`` (no ``* 10_000`` noise)."""
+    """CORE-CONVENTIONS-018: a Rate spread passes through its single binary64 ``as_bp`` view."""
     from finstack_quant.calibration import CdsQuote
     from finstack_quant.core.types import Rate
 
     kind, raw = label.split("_", 1)
     value = Rate.from_percent(float(raw)) if kind == "pct" else Rate(raw if raw.endswith("bp") else float(raw))
-    assert value.as_bp_f64 == expected
+    assert value.as_bp == pytest.approx(expected, rel=1e-15, abs=0.0)
     quote = CdsQuote.par_spread(
         id="Q",
         entity="ACME",
@@ -284,7 +284,7 @@ def test_cds_quote_basis_points_come_from_rust_accessor(label: str, expected: fl
         spread_bp=value,
         recovery_rate=0.4,
     )
-    assert json.loads(quote.to_json())["spread_bp"] == expected
+    assert json.loads(quote.to_json())["spread_bp"] == value.as_bp
 
 
 def test_partial_validation_config_json_uses_canonical_rust_defaults() -> None:

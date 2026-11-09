@@ -59,6 +59,19 @@ impl PyRate {
     }
 }
 
+/// Extract a numeric rate input as `f64`, rejecting `bool` (a Python `int`
+/// subclass) so `True` never becomes a rate of one.
+fn numeric_rate_input(value: &Bound<'_, PyAny>, what: &str) -> PyResult<f64> {
+    if value.is_instance_of::<pyo3::types::PyBool>() {
+        return Err(PyTypeError::new_err(format!(
+            "{what} must be a number, not bool"
+        )));
+    }
+    value
+        .extract::<f64>()
+        .map_err(|_| PyTypeError::new_err(format!("{what} must be a number")))
+}
+
 impl Hash for PyRate {
     fn hash<H: Hasher>(&self, state: &mut H) {
         canonical_f64_bits(self.inner.as_decimal()).hash(state);
@@ -85,6 +98,11 @@ impl PyRate {
                 .map(Self::from_inner)
                 .map_err(core_to_py);
         }
+        if value.is_instance_of::<pyo3::types::PyBool>() {
+            return Err(PyTypeError::new_err(
+                "Rate value must be a float or a str quote, not bool",
+            ));
+        }
         let decimal: f64 = value
             .extract()
             .map_err(|_| PyTypeError::new_err("Rate value must be a float or a str quote"))?;
@@ -93,20 +111,23 @@ impl PyRate {
             .map_err(core_to_py)
     }
 
-    /// Build from a percent value (e.g. ``5.0`` for 5%).
+    /// Build from a percent value (e.g. ``5.0`` for 5%) with one ``percent / 100``.
     #[classmethod]
     #[pyo3(text_signature = "(cls, percent)")]
-    fn from_percent(_cls: &Bound<'_, PyType>, percent: f64) -> PyResult<Self> {
-        Rate::from_percent(percent)
+    fn from_percent(_cls: &Bound<'_, PyType>, percent: &Bound<'_, PyAny>) -> PyResult<Self> {
+        Rate::from_percent(numeric_rate_input(percent, "percent")?)
             .map(Self::from_inner)
             .map_err(core_to_py)
     }
 
-    /// Build from an integer basis-point amount (e.g. ``500`` for 5%).
+    /// Build from a basis-point quote (e.g. ``500`` for 5%, ``62.5`` for
+    /// 62.5 bp) with one ``bp / 10000``.
     #[classmethod]
     #[pyo3(text_signature = "(cls, bp)")]
-    fn from_bp(_cls: &Bound<'_, PyType>, bp: i32) -> Self {
-        Self::from_inner(Rate::from_bp(bp))
+    fn from_bp(_cls: &Bound<'_, PyType>, bp: &Bound<'_, PyAny>) -> PyResult<Self> {
+        Rate::from_bp(numeric_rate_input(bp, "bp")?)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
     }
 
     /// Rate as a decimal fraction.
@@ -115,24 +136,16 @@ impl PyRate {
         self.inner.as_decimal()
     }
 
-    /// Rate as a percent value.
+    /// Rate as a percent value (``decimal * 100``).
     #[getter]
-    fn as_percent(&self) -> f64 {
-        self.inner.as_percent()
+    fn as_percent(&self) -> PyResult<f64> {
+        self.inner.as_percent().map_err(core_to_py)
     }
 
-    /// Rate rounded to the nearest basis point.
+    /// Rate in fractional basis points (``decimal * 10000``), never rounded.
     #[getter]
-    fn as_bp(&self) -> i32 {
-        self.inner.as_bp()
-    }
-
-    /// Rate in fractional basis points, without rounding (Rust ``Rate::as_bp_f64``).
-    ///
-    /// ``Rate(0.0029).as_bp_f64 == 29.0`` and ``Rate("62.5bp").as_bp_f64 == 62.5``.
-    #[getter]
-    fn as_bp_f64(&self) -> f64 {
-        self.inner.as_bp_f64()
+    fn as_bp(&self) -> PyResult<f64> {
+        self.inner.as_bp().map_err(core_to_py)
     }
 
     /// Absolute value.

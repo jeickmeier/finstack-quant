@@ -243,6 +243,24 @@ class TestCoreTypesParity:
         assert pos_zero == neg_zero
         assert hash(pos_zero) == hash(neg_zero)
 
+    def test_rate_unit_views_and_admission(self) -> None:
+        assert Rate.from_bp(62.5).as_decimal == 62.5 / 10_000
+        assert Rate("62.5bp").as_bp == 62.5
+        assert Rate("5").as_decimal == 5.0
+        assert Rate("1e310bp").as_decimal == 1e306
+        with pytest.raises(TypeError):
+            Rate.from_bp(True)
+        with pytest.raises(TypeError):
+            Rate(True)
+        with pytest.raises(ValueError, match="rounds to zero"):
+            Rate.from_bp(5e-324)
+        with pytest.raises(ValueError, match=r"(?i)finite|infinit"):
+            _ = Rate(1.7976931348623157e308).as_percent
+        for bad in ("1_000bp", "1bps%", "nan", "1e 2%"):
+            with pytest.raises(ValueError, match="invalid rate"):
+                Rate(bad)
+        assert str(Rate(0.05)) == "0.05"
+
     def test_student_t_invalid_degrees_of_freedom_raises(self) -> None:
         from finstack_quant.core.math import special_functions
 

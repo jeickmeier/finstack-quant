@@ -472,7 +472,11 @@ pub fn extract_basis_points(obj: &Bound<'_, PyAny>, what: &str) -> PyResult<f64>
         return Ok(f64::from(bps.borrow().inner.as_bp()));
     }
     if let Ok(rate) = obj.cast::<crate::bindings::core::types::PyRate>() {
-        return Ok(rate.borrow().inner.as_bp_f64());
+        return rate
+            .borrow()
+            .inner
+            .as_bp()
+            .map_err(crate::errors::core_to_py);
     }
     obj.extract::<f64>().map_err(|_| {
         pyo3::exceptions::PyTypeError::new_err(format!(

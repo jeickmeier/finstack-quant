@@ -127,13 +127,13 @@ fn without_timestamp(result: &wasm_bindgen::JsValue) -> serde_json::Value {
     value
 }
 
-/// Fractional basis-point input must be rejected, not silently rounded:
-/// a 62.5bp FRN margin rounded to whole bp would price differently from
-/// the JSON path for the same instrument.
+/// Whole-bp `Bps` rejects fractional input instead of rounding it, while
+/// `Rate::from_bp` keeps a fractional quote such as a 62.5bp FRN margin.
 #[wasm_bindgen_test]
 fn bp_rejects_fractional_input() {
     assert!(JsBps::new(JsValue::from(62.5)).is_err());
-    assert!(JsRate::from_bp(JsValue::from(12.4)).is_err());
+    assert!(JsRate::from_bp(JsValue::from(12.4)).is_ok());
+    assert!(JsRate::from_bp(JsValue::from(true)).is_err());
     // Whole values still construct.
     assert!(JsBps::new(JsValue::from(200.0)).is_ok());
     assert!(JsRate::from_bp(JsValue::from(250.0)).is_ok());

@@ -164,8 +164,8 @@ fn to_string_format() {
 fn rate_new_roundtrip() {
     let r = JsRate::new(JsValue::from(0.05)).expect("valid");
     assert!((r.as_decimal() - 0.05).abs() < 1e-12);
-    assert!((r.as_percent() - 5.0).abs() < 1e-10);
-    assert_eq!(r.as_bp(), 500);
+    assert!((r.as_percent().expect("percent view") - 5.0).abs() < 1e-10);
+    assert!((r.as_bp().expect("bp view") - 500.0).abs() < 1e-9);
 }
 
 #[wasm_bindgen_test]
@@ -178,7 +178,9 @@ fn rate_from_percent() {
 fn rate_from_bp() {
     let r = JsRate::from_bp(JsValue::from(250.0)).expect("valid");
     assert!((r.as_decimal() - 0.025).abs() < 1e-10);
-    assert_eq!(r.as_bp(), 250);
+    assert!((r.as_bp().expect("bp view") - 250.0).abs() < 1e-9);
+    let fractional = JsRate::from_bp(JsValue::from(62.5)).expect("fractional bp");
+    assert_eq!(fractional.as_decimal(), 62.5 / 10_000.0);
 }
 
 #[wasm_bindgen_test]
@@ -192,8 +194,8 @@ fn bp_roundtrip() {
 fn rate_zero() {
     let r = JsRate::new(JsValue::from(0.0)).expect("valid");
     assert_eq!(r.as_decimal(), 0.0);
-    assert_eq!(r.as_percent(), 0.0);
-    assert_eq!(r.as_bp(), 0);
+    assert_eq!(r.as_percent().expect("percent view"), 0.0);
+    assert_eq!(r.as_bp().expect("bp view"), 0.0);
 }
 
 #[wasm_bindgen_test]

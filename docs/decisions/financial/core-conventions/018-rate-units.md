@@ -1,7 +1,7 @@
 # CORE-CONVENTIONS-018: Decimal rates, percent/basis-point scaling and integer spread arithmetic
 
 - Decision status: **Accepted — complete Rate/Bps package, 2026-11-07**.
-- Implementation status: **Observed; reconciliation pending**, scoped to `types/rates.rs`.
+- Implementation status: **Reconciled 2026-11-08** for `types/rates.rs` and the Python/WASM Rate surface; the term-loan covenant step-up consumer (item 11) is reconciled separately.
 - Validation status: **Evidence inspected; independent conversion/arithmetic examples passed; production qualification pending**. Exact unit/text grammar, numeric-versus-text rounding, normal/subnormal/MAX, integer and underflow examples passed. Linked Rust/host tests were located or inspected, not run; these checks do not certify current parser, arithmetic or host behavior.
 - Audit date: **2026-11-05**. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; see [scope and inventory](README.md).
 
@@ -192,15 +192,15 @@ observed source behavior is retained separately below.
 
 ## Observed algorithm and selection
 
-Rate constructors accept decimal, percent or integer bp; parsing also accepts decimal, `%`, `bp` or `bps` text after outer trim and case normalization, including fractional text bp. Percent/bp float scaling first parses the shortest decimal representation of the f64 into Decimal and shifts scale by two/four digits, converting back to f64. If exact Decimal parsing/scaling is unavailable, it falls back to direct float multiplication/division; signed zero directly follows float scaling. This limits visible binary scaling artifacts without making Rate a Decimal amount.
+`Rate` stores a finite binary64 decimal and normalizes signed zero at every constructor, parse, arithmetic result, negation, absolute value and serde restore. `from_decimal` stores the value unchanged; `from_percent(p)` and `from_bp(b)` (finite fractional `f64`) perform one binary64 `p/100` or `b/10000` and return `Result`. A nonzero input whose scaled result rounds to zero is a validation error; nonzero subnormals are valid. `as_percent` and `as_bp` return checked `Result<f64>` views from `r*100` and `r*10000`; there is no rounded or saturating whole-bp extraction and no `_f64` alias.
 
-`as_bp_f64` preserves fractional basis points through that scaling helper. `as_bp` instead uses `round(rate*10000) as i32`: ties follow f64 round away from zero, and the cast saturates if out of i32 range. `as_percent`/`as_bp_f64` do not return Results and can overflow to infinity for huge finite Rate values through the float fallback. Display uses four decimals in percent units.
+Text parsing trims outer whitespace, then accepts `[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?` with an optional case-insensitive `%`, `bp` or `bps` suffix, allowing whitespace only before the suffix. A bare number is a decimal Rate. The exponent must fit `i64`, the unit shift (0/-2/-4) is applied to the exact significand/exponent, and one standard binary64 parse produces the nearest-even result, so `1e310bp` is finite `1e306` while `1e310` is a non-finite error. Default Display is shortest round-trip decimal-unit text.
 
-Rate add/subtract/multiply/divide validate the resulting Rate as finite; division explicitly rejects zero. The scalar operand itself is not separately finite-validated in these arithmetic methods, so division by positive infinity yields a finite zero Rate. Bps `try_new(f64)` requires a finite whole number in i32 range; it does not round fractional bp. Bps add/subtract/multiply/divide/abs/neg use checked integer operations; integer division truncates toward zero and rejects zero/overflow. Conversion to Rate divides integer bp by 10,000; percent divides by 100.
+Checked add/sub admit finite results, including exact cancellation to zero. Multiplication and division validate the scalar as finite before any zero shortcut, reject zero divisors of either sign, and reject nonzero results that round to zero. `Bps::try_new` requires a finite whole number in `i32` range; checked Bps add/sub/mul/abs/neg reject overflow, and `checked_div` additionally rejects a nonzero remainder (`3bp/2` errors). `Bps::as_rate` is the infallible exact-integer `bp/10000` view.
 
 ## Observed conventions, limits and alternatives
 
-One bp = 0.0001 decimal = 0.01 percent. No day-count, compounding or curve role attaches to Rate; callers must carry those separately. Checked Rate arithmetic prevents nonfinite stored results but does not guarantee finite presentation conversions. Integer Bps is suitable only where truncation/whole-point bumps are intended; fractional Rate is a supported alternative.
+One bp = 0.0001 decimal = 0.01 percent. No day-count, compounding or curve role attaches to Rate; callers must carry those separately. Unit views need not round-trip bit-exactly (`Rate::from_percent(1.1).as_bp()` is `110.00000000000001`); keep the original `Bps` when integer identity matters. Python and WASM reject booleans for numeric rate inputs and raise or throw on overflowing views.
 
 ## Evidence
 

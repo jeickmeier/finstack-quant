@@ -32,7 +32,7 @@ def test_realized_variance_defaults_are_rust_owned() -> None:
 
 def test_rate_family_values_match_wasm() -> None:
     assert Rate("12.5bp").as_decimal == 0.00125
-    assert Rate("17.5bp").as_bp == 18
+    assert Rate("17.5bp").as_bp == 17.5
     assert Bps(-1995).as_percent == -19.95
     assert Rate(0.0525).to_json() == "0.0525"
     assert Bps(25).to_json() == "25"

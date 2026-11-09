@@ -997,7 +997,7 @@
     "constructor": true,
     "statics": ["fromBp", "fromJson", "fromPercent", "parse", "zero"],
     "methods": ["abs", "free", "isNegative", "isPositive", "isZero", "toJson"],
-    "getters": ["asBp", "asBpF64", "asDecimal", "asPercent"]
+    "getters": ["asBp", "asDecimal", "asPercent"]
   },
   "core.Bps": {
     "kind": "class",

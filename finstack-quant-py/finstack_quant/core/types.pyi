@@ -11,7 +11,7 @@ Example::
     >>> r.as_percent
     5.0
     >>> r.as_bp
-    500
+    500.0
     >>> Bps(250).as_decimal
     0.025
 
@@ -61,7 +61,7 @@ class Rate:
     >>> Rate("5%") == Rate(0.05)
     True
     >>> (Rate(0.05) + Bps(25)).as_bp
-    525
+    525.0
     """
 
     ZERO: Rate
@@ -116,23 +116,27 @@ class Rate:
         ...
 
     @classmethod
-    def from_bp(cls, bp: int) -> Rate:
+    def from_bp(cls, bp: float) -> Rate:
         """
-        Build from an integer basis-point amount.
+        Build from a basis-point quote with one binary64 ``bp / 10000``.
 
         Parameters
         ----------
-        bp : int
-            Basis points (e.g. ``500`` for 5%).
+        bp : float
+            Basis points (e.g. ``500`` for 5%); fractional quotes such as
+            ``62.5`` are accepted. ``bool`` is rejected.
 
         Returns
         -------
         Rate
             Rate stored as ``bp / 10_000`` in decimal-rate form.
 
-        Notes
-        -----
-        This method does not raise; it returns a fixed instance.
+        Raises
+        ------
+        TypeError
+            If *bp* is not a number, or is a ``bool``.
+        ValueError
+            If *bp* is not finite, or a nonzero quote rounds to zero.
 
         Examples
         --------
@@ -165,8 +169,8 @@ class Rate:
         Examples
         --------
         >>> from finstack_quant.core.types import Rate
-        >>> Rate.from_json(Rate(0.05).to_json()).as_bp
-        500
+        >>> Rate.from_json(Rate(0.05).to_json()).as_decimal
+        0.05
         """
         ...
 
@@ -205,61 +209,43 @@ class Rate:
     @property
     def as_percent(self) -> float:
         """
-        Rate as a percent value.
+        Rate as a percent value (``decimal * 100``).
 
         Returns
         -------
         float
-            Rate as a percent value.
+            Rate in percentage points.
 
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
+        Raises
+        ------
+        ValueError
+            If the percent view overflows (a huge finite rate).
         """
         ...
 
     @property
-    def as_bp(self) -> int:
+    def as_bp(self) -> float:
         """
-        Rate rounded to the nearest basis point.
+        Rate in fractional basis points (``decimal * 10000``), never rounded.
 
-        Returns
-        -------
-        int
-            Rate rounded to the nearest basis point.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def as_bp_f64(self) -> float:
-        """
-        Rate in fractional basis points, without rounding.
-
-        The decimal point of the rate's shortest decimal form is moved four
-        places in Rust (``Rate::as_bp_f64``), so ``0.0029`` reports ``29.0``
-        rather than the binary product ``28.999999999999996`` and a sub-bp
-        rate keeps its fraction (``as_bp`` rounds to an integer).
+        The view need not round-trip bit-exactly to a whole quote; keep the
+        original ``Bps`` when its integer identity matters.
 
         Returns
         -------
         float
             Basis points (``1.0`` = 0.01%).
 
-        Notes
-        -----
-        This accessor does not raise.
+        Raises
+        ------
+        ValueError
+            If the basis-point view overflows.
 
         Examples
         --------
         >>> from finstack_quant.core.types import Rate
-        >>> Rate(0.0029).as_bp_f64
-        29.0
-        >>> Rate("62.5bp").as_bp_f64, Rate("62.5bp").as_bp
-        (62.5, 63)
+        >>> Rate("62.5bp").as_bp
+        62.5
         """
         ...
 
