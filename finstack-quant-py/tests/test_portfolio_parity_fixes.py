@@ -234,7 +234,7 @@ class TestCashflows:
                 "EUR": {"Principal": {"amount": "invalid", "currency": "EUR"}},
             }
         }
-        with pytest.raises(PortfolioError, match='invalid value: string "invalid"'):
+        with pytest.raises(PortfolioError, match='invalid decimal "invalid"'):
             net_in_currency_by_date(json.dumps(payload), "USD")
         payload["2025-01-15"]["EUR"]["Principal"]["amount"] = "200"
         assert net_in_currency_by_date(json.dumps(payload), "USD") == [("2025-01-15", 100.0)]

@@ -15,7 +15,8 @@ use time::macros::date;
 
 const JSON_SCHEMA_2020_12: &str = "https://json-schema.org/draft/2020-12/schema";
 const ATTRIBUTION_SCHEMA_BASE: &str = "https://finstack_quant.dev/schemas/attribution/1/";
-const CANONICAL_DECIMAL_PATTERN: &str = r"^-?\d+(\.\d+)?([eE][+-]?\d+)?$";
+const CANONICAL_DECIMAL_PATTERN: &str =
+    r"^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$";
 
 fn schema_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))

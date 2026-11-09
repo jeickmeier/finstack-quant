@@ -3,8 +3,8 @@
   "floating_coupon_spec": {
     "rate_spec": {
       "forward_curve_id": "EUR-EURIBOR-6M",
-      "spread_bp": "150.0",
-      "gearing": "1.0",
+      "spread_bp": "150",
+      "gearing": "1",
       "gearing_includes_spread": true,
       "index_floor_bp": null,
       "all_in_floor_bp": null,

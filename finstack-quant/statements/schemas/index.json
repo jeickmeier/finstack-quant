@@ -2,7 +2,7 @@
   "artifacts": [
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/bond_convention_params.schema.json",
-      "bytes": 25481,
+      "bytes": 25849,
       "kind": "input",
       "path": "schemas/statements/1/bond_convention_params.schema.json",
       "summary": "Identity, notional, decimal coupon, dates, regional convention and discount curve of a capital-structure bond.",
@@ -20,7 +20,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
-      "bytes": 385561,
+      "bytes": 385929,
       "kind": "input",
       "path": "schemas/statements/1/financial_model_spec.schema.json",
       "summary": "Statement model graph: periods, nodes and the Value > Forecast > Formula precedence.",
@@ -92,7 +92,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
-      "bytes": 72475,
+      "bytes": 72843,
       "kind": "output",
       "path": "schemas/statements/1/statement_result.schema.json",
       "summary": "Evaluated node values per period, with policy stamps.",
@@ -110,7 +110,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/swap_params.schema.json",
-      "bytes": 22741,
+      "bytes": 23109,
       "kind": "input",
       "path": "schemas/statements/1/swap_params.schema.json",
       "summary": "Identity, notional, decimal fixed rate, dates and curves of a capital-structure pay-fixed swap.",

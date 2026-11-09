@@ -723,7 +723,7 @@ def test_cds_option_builder_sets_every_field_and_validates() -> None:
         .protection_start_convention("forward")
         .build()
     )
-    assert option.strike == {"clean_price_pct": "107.0"}
+    assert option.strike == {"clean_price_pct": "107"}
     assert option.coupon_bp == decimal.Decimal("500")
     assert (option.underlying_is_index, option.index_factor, option.strike_index_factor) == (True, 0.98, 1.0)
     assert option.protection_start_convention == "forward"

@@ -27,7 +27,7 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 4 | A3b | committed (`A3b:` in git log) | lint core/fixed-income/valuations/py/wasm; tests core 2218, fixed-income 1252, valuations 2453 (after gen-write); py test_dates_imm, test_core_parity, test_runtime_docs, parity 6067, test_production_audit 28; wasm 1086 | SIFMA entry: agency/term classification done; remaining data pin/admission (H5) and qualification | `settlement_class` is a required field on AgencyTba and DollarRoll (O2); hand fixture production_mortgage.json given class `a` (FNMA 30Y) |
 | 5 | B1 | committed (`B1:` in git log) | workspace rust-lint; core tests 2218 + 286 doctests; gen-write; py test_core_parity 134, members 6, ergonomics 48, calibration boundaries 45, core_wasm_parity 83, runtime_docs 3684, parity 6067; wasm 1086 | 018 entry narrowed to the term-loan step-up (B1b) | Only bindings consumed the changed API outside core; a CDS quote test now compares against the single binary64 `as_bp` view instead of noise-free decimal shifting (018 #6) |
 | 6 | B1b | committed (`B1b:` in git log) | lint fixed-income; tests fixed-income 1253, covenants 115 | **018 entry deleted**; totals 595→594, Reconciliation 58→57, Core conventions 21→20; record 018, README, INVARIANT_MAP M23–M26, INVARIANTS, financial README, central follow-ups updated | Step-up computed fully before mutation; negative/non-finite increases rejected |
-| 7 | B2 | pending | | | |
+| 7 | B2 | **B2a committed** (`B2a:` in git log); **B2b blocked (owner decision)** | B2a: workspace rust-test (16346 incl. 2 re-pins), gen-write, python-test 14003, wasm-test 1086, ui-check | 012 entry: B2a items recorded; item 4 marked blocked | B2b (shortest-text float admission) breaks 55 tests on sub-1e-28 model values; see Needs review |
 | 8 | B3 | pending | | | |
 | 9 | B4 | pending | | | |
 | 10 | B5 | pending | | | |
@@ -95,6 +95,21 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
   always-required field. Absence on the wire means "no rebate". Knock-in
   `AtHit` is rejected in product validation (O1). The analytic helpers return
   their existing NaN sentinel for it instead of repricing at expiry.
+- **B2 split; B2b blocked (owner decision needed).** Record 012 #4 requires
+  every `f64 -> Decimal` adapter to use shortest round-trip text and to
+  reject any value outside the Decimal domain, including nonzero `1e-29`.
+  Implemented as specified, it broke 55 workspace tests. Most of them are
+  pricers that place a negligible model value (deep out-of-the-money option
+  PVs, Monte Carlo/tranche expected losses, CMS replication, structured-credit
+  cash flows) into `Money` and now get `ConversionOverflow`. The rest are
+  bit-pinned values that moved: shortest-text admission differs from
+  `Decimal::try_from(f64)`. No record says what a pricer should do with a
+  sub-`1e-28` model value: error, an owner-selected financial rounding
+  stage before `Money`, or computing in `f64` until a final boundary. So the
+  converter change is held back as **B2b** and the run kept going with
+  **B2a** (exact text grammar, exact `DecimalWire`, exact Python `int`,
+  zero normalization). Slices that build on the float converter
+  (B3 named f64 adapters onward) are affected; see their rows.
 - **A1 not closed.** The 020 register entry stays open as Evidence. Equality,
   adjacent and already-beyond observations, window/history behavior, and
   settlement/discount boundaries at each consumer were not independently

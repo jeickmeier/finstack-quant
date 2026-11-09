@@ -98,7 +98,7 @@ it("pins Rust's bond figures: an all-rates parallel shock, and carry plus rates 
   expect(sameDate.attribution!.waterfall_steps).toHaveLength(9);
   const rolled = workbench("roll-1m-25bp", "waterfall");
   expect(rolled.asOfT1).toBe("2025-02-03");
-  expect(rolled.attribution!.carry.amount).toBe("4613.745264130");
+  expect(rolled.attribution!.carry.amount).toBe("4613.74526413");
   expect(rolled.attribution!.rates_curves_pnl.amount).toBe("-2238.722127162");
   // Rust chains the steps in its default order: each pv_after is the next pv_before.
   const steps = rolled.attribution!.waterfall_steps!;

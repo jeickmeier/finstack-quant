@@ -1903,7 +1903,7 @@
         "date": "2025-01-15",
         "reset_date": null,
         "amount": {
-          "amount": "250000.00",
+          "amount": "250000",
           "currency": "USD"
         },
         "kind": "notional",
@@ -1913,7 +1913,7 @@
         "date": "2025-07-15",
         "reset_date": null,
         "amount": {
-          "amount": "-7500.00",
+          "amount": "-7500",
           "currency": "USD"
         },
         "kind": "fixed",
@@ -1932,7 +1932,7 @@
         "date": "2026-01-15",
         "reset_date": null,
         "amount": {
-          "amount": "-7500.00",
+          "amount": "-7500",
           "currency": "USD"
         },
         "kind": "fixed",
@@ -1951,7 +1951,7 @@
         "date": "2026-07-15",
         "reset_date": null,
         "amount": {
-          "amount": "-7500.00",
+          "amount": "-7500",
           "currency": "USD"
         },
         "kind": "fixed",
@@ -1970,7 +1970,7 @@
         "date": "2027-01-15",
         "reset_date": null,
         "amount": {
-          "amount": "-7500.00",
+          "amount": "-7500",
           "currency": "USD"
         },
         "kind": "fixed",
@@ -1989,7 +1989,7 @@
         "date": "2027-01-15",
         "reset_date": null,
         "amount": {
-          "amount": "-250000.00",
+          "amount": "-250000",
           "currency": "USD"
         },
         "kind": "notional",

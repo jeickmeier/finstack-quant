@@ -3,7 +3,7 @@
   "sources": [
     {
       "path": "finstack-quant-ui/tests/portfolio/workbench/cases.json",
-      "sha256": "bb28cd8ca7af71c8e78e2f28a29acb0080b7a0d7771be55e9447418ac0e68d32"
+      "sha256": "0167e31074e1fc6929b7dee16bc46792b4a1bf8a41558fd47ff44df2e6f6dcd3"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
@@ -36,7 +36,7 @@
       "report": {
         "attribution": {
           "total_pnl": {
-            "amount": "2792.2634303078587500000",
+            "amount": "2792.26343030785875",
             "currency": "USD"
           },
           "carry": {
@@ -44,7 +44,7 @@
             "currency": "USD"
           },
           "rates_curves_pnl": {
-            "amount": "2792.2634303078587500000",
+            "amount": "2792.26343030785875",
             "currency": "USD"
           },
           "credit_curves_pnl": {
@@ -324,19 +324,19 @@
             },
             "DEP-1": {
               "total_pnl": {
-                "amount": "-247.9735548829012500000",
+                "amount": "-247.97355488290125",
                 "currency": "USD"
               },
               "mark_to_market_pnl": {
-                "amount": "-247.9735548829012500000",
+                "amount": "-247.97355488290125",
                 "currency": "USD"
               },
               "pv_t0": {
-                "amount": "725.2194690658727500000",
+                "amount": "725.21946906587275",
                 "currency": "USD"
               },
               "pv_t1": {
-                "amount": "477.2459141829715000000",
+                "amount": "477.2459141829715",
                 "currency": "USD"
               },
               "carry": {
@@ -344,7 +344,7 @@
                 "currency": "USD"
               },
               "rates_curves_pnl": {
-                "amount": "-247.9735548829012500000",
+                "amount": "-247.97355488290125",
                 "currency": "USD"
               },
               "credit_curves_pnl": {
@@ -460,7 +460,7 @@
           {
             "field": "rates_curves_pnl",
             "amount": {
-              "amount": "2792.2634303078587500000",
+              "amount": "2792.26343030785875",
               "currency": "USD"
             },
             "pct_of_total": 100
@@ -991,19 +991,19 @@
             "positionId": "DEP-1",
             "attribution": {
               "total_pnl": {
-                "amount": "-247.9735548829012500000",
+                "amount": "-247.97355488290125",
                 "currency": "USD"
               },
               "mark_to_market_pnl": {
-                "amount": "-247.9735548829012500000",
+                "amount": "-247.97355488290125",
                 "currency": "USD"
               },
               "pv_t0": {
-                "amount": "725.2194690658727500000",
+                "amount": "725.21946906587275",
                 "currency": "USD"
               },
               "pv_t1": {
-                "amount": "477.2459141829715000000",
+                "amount": "477.2459141829715",
                 "currency": "USD"
               },
               "carry": {
@@ -1011,7 +1011,7 @@
                 "currency": "USD"
               },
               "rates_curves_pnl": {
-                "amount": "-247.9735548829012500000",
+                "amount": "-247.97355488290125",
                 "currency": "USD"
               },
               "credit_curves_pnl": {
@@ -1120,7 +1120,7 @@
               {
                 "field": "rates_curves_pnl",
                 "amount": {
-                  "amount": "-247.9735548829012500000",
+                  "amount": "-247.97355488290125",
                   "currency": "USD"
                 },
                 "pct_of_total": 100
@@ -1230,7 +1230,7 @@
       "report": {
         "attribution": {
           "total_pnl": {
-            "amount": "2792.2634303078587500000",
+            "amount": "2792.26343030785875",
             "currency": "USD"
           },
           "carry": {
@@ -1238,7 +1238,7 @@
             "currency": "USD"
           },
           "rates_curves_pnl": {
-            "amount": "2792.2634303078587500000",
+            "amount": "2792.26343030785875",
             "currency": "USD"
           },
           "credit_curves_pnl": {
@@ -1848,19 +1848,19 @@
             },
             "DEP-1": {
               "total_pnl": {
-                "amount": "-247.9735548829012500000",
+                "amount": "-247.97355488290125",
                 "currency": "USD"
               },
               "mark_to_market_pnl": {
-                "amount": "-247.9735548829012500000",
+                "amount": "-247.97355488290125",
                 "currency": "USD"
               },
               "pv_t0": {
-                "amount": "725.2194690658727500000",
+                "amount": "725.21946906587275",
                 "currency": "USD"
               },
               "pv_t1": {
-                "amount": "477.2459141829715000000",
+                "amount": "477.2459141829715",
                 "currency": "USD"
               },
               "carry": {
@@ -1868,7 +1868,7 @@
                 "currency": "USD"
               },
               "rates_curves_pnl": {
-                "amount": "-247.9735548829012500000",
+                "amount": "-247.97355488290125",
                 "currency": "USD"
               },
               "credit_curves_pnl": {
@@ -1943,11 +1943,11 @@
                   "step_index": 0,
                   "factor": "carry",
                   "pv_before": {
-                    "amount": "725.2194690658727500000",
+                    "amount": "725.21946906587275",
                     "currency": "USD"
                   },
                   "pv_after": {
-                    "amount": "725.2194690658727500000",
+                    "amount": "725.21946906587275",
                     "currency": "USD"
                   },
                   "step_pnl": {
@@ -1959,15 +1959,15 @@
                   "step_index": 1,
                   "factor": "rates_curves",
                   "pv_before": {
-                    "amount": "725.2194690658727500000",
+                    "amount": "725.21946906587275",
                     "currency": "USD"
                   },
                   "pv_after": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "step_pnl": {
-                    "amount": "-247.9735548829012500000",
+                    "amount": "-247.97355488290125",
                     "currency": "USD"
                   }
                 },
@@ -1975,11 +1975,11 @@
                   "step_index": 2,
                   "factor": "credit_curves",
                   "pv_before": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "pv_after": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "step_pnl": {
@@ -1991,11 +1991,11 @@
                   "step_index": 3,
                   "factor": "inflation_curves",
                   "pv_before": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "pv_after": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "step_pnl": {
@@ -2007,11 +2007,11 @@
                   "step_index": 4,
                   "factor": "correlations",
                   "pv_before": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "pv_after": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "step_pnl": {
@@ -2023,11 +2023,11 @@
                   "step_index": 5,
                   "factor": "fx",
                   "pv_before": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "pv_after": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "step_pnl": {
@@ -2039,11 +2039,11 @@
                   "step_index": 6,
                   "factor": "volatility",
                   "pv_before": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "pv_after": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "step_pnl": {
@@ -2055,11 +2055,11 @@
                   "step_index": 7,
                   "factor": "model_parameters",
                   "pv_before": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "pv_after": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "step_pnl": {
@@ -2071,11 +2071,11 @@
                   "step_index": 8,
                   "factor": "market_scalars",
                   "pv_before": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "pv_after": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "step_pnl": {
@@ -2149,7 +2149,7 @@
           {
             "field": "rates_curves_pnl",
             "amount": {
-              "amount": "2792.2634303078587500000",
+              "amount": "2792.26343030785875",
               "currency": "USD"
             },
             "pct_of_total": 100
@@ -3010,19 +3010,19 @@
             "positionId": "DEP-1",
             "attribution": {
               "total_pnl": {
-                "amount": "-247.9735548829012500000",
+                "amount": "-247.97355488290125",
                 "currency": "USD"
               },
               "mark_to_market_pnl": {
-                "amount": "-247.9735548829012500000",
+                "amount": "-247.97355488290125",
                 "currency": "USD"
               },
               "pv_t0": {
-                "amount": "725.2194690658727500000",
+                "amount": "725.21946906587275",
                 "currency": "USD"
               },
               "pv_t1": {
-                "amount": "477.2459141829715000000",
+                "amount": "477.2459141829715",
                 "currency": "USD"
               },
               "carry": {
@@ -3030,7 +3030,7 @@
                 "currency": "USD"
               },
               "rates_curves_pnl": {
-                "amount": "-247.9735548829012500000",
+                "amount": "-247.97355488290125",
                 "currency": "USD"
               },
               "credit_curves_pnl": {
@@ -3105,11 +3105,11 @@
                   "step_index": 0,
                   "factor": "carry",
                   "pv_before": {
-                    "amount": "725.2194690658727500000",
+                    "amount": "725.21946906587275",
                     "currency": "USD"
                   },
                   "pv_after": {
-                    "amount": "725.2194690658727500000",
+                    "amount": "725.21946906587275",
                     "currency": "USD"
                   },
                   "step_pnl": {
@@ -3121,15 +3121,15 @@
                   "step_index": 1,
                   "factor": "rates_curves",
                   "pv_before": {
-                    "amount": "725.2194690658727500000",
+                    "amount": "725.21946906587275",
                     "currency": "USD"
                   },
                   "pv_after": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "step_pnl": {
-                    "amount": "-247.9735548829012500000",
+                    "amount": "-247.97355488290125",
                     "currency": "USD"
                   }
                 },
@@ -3137,11 +3137,11 @@
                   "step_index": 2,
                   "factor": "credit_curves",
                   "pv_before": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "pv_after": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "step_pnl": {
@@ -3153,11 +3153,11 @@
                   "step_index": 3,
                   "factor": "inflation_curves",
                   "pv_before": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "pv_after": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "step_pnl": {
@@ -3169,11 +3169,11 @@
                   "step_index": 4,
                   "factor": "correlations",
                   "pv_before": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "pv_after": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "step_pnl": {
@@ -3185,11 +3185,11 @@
                   "step_index": 5,
                   "factor": "fx",
                   "pv_before": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "pv_after": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "step_pnl": {
@@ -3201,11 +3201,11 @@
                   "step_index": 6,
                   "factor": "volatility",
                   "pv_before": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "pv_after": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "step_pnl": {
@@ -3217,11 +3217,11 @@
                   "step_index": 7,
                   "factor": "model_parameters",
                   "pv_before": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "pv_after": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "step_pnl": {
@@ -3233,11 +3233,11 @@
                   "step_index": 8,
                   "factor": "market_scalars",
                   "pv_before": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "pv_after": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "step_pnl": {
@@ -3304,7 +3304,7 @@
               {
                 "field": "rates_curves_pnl",
                 "amount": {
-                  "amount": "-247.9735548829012500000",
+                  "amount": "-247.97355488290125",
                   "currency": "USD"
                 },
                 "pct_of_total": 100
@@ -3402,7 +3402,7 @@
       "report": {
         "attribution": {
           "total_pnl": {
-            "amount": "2792.2634303078587500000",
+            "amount": "2792.26343030785875",
             "currency": "USD"
           },
           "carry": {
@@ -3450,7 +3450,7 @@
             "currency": "USD"
           },
           "residual": {
-            "amount": "-40.1568361633415500000",
+            "amount": "-40.15683616334155",
             "currency": "USD"
           },
           "by_position": {
@@ -3881,7 +3881,7 @@
                     {
                       "tenor_years": 3,
                       "sensitivity": {
-                        "amount": "-0.1380511673633010",
+                        "amount": "-0.138051167363301",
                         "currency": "USD"
                       },
                       "market_move": 49.99999999999997
@@ -3897,7 +3897,7 @@
                     {
                       "tenor_years": 7,
                       "sensitivity": {
-                        "amount": "0.8205456703435630",
+                        "amount": "0.820545670343563",
                         "currency": "USD"
                       },
                       "market_move": 50.00000000000008
@@ -4080,19 +4080,19 @@
             },
             "DEP-1": {
               "total_pnl": {
-                "amount": "-247.9735548829012500000",
+                "amount": "-247.97355488290125",
                 "currency": "USD"
               },
               "mark_to_market_pnl": {
-                "amount": "-247.9735548829012500000",
+                "amount": "-247.97355488290125",
                 "currency": "USD"
               },
               "pv_t0": {
-                "amount": "725.2194690658727500000",
+                "amount": "725.21946906587275",
                 "currency": "USD"
               },
               "pv_t1": {
-                "amount": "477.2459141829715000000",
+                "amount": "477.2459141829715",
                 "currency": "USD"
               },
               "carry": {
@@ -4140,7 +4140,7 @@
                 "currency": "USD"
               },
               "residual": {
-                "amount": "0.3261779580174500000",
+                "amount": "0.32617795801745",
                 "currency": "USD"
               },
               "carry_detail": null,
@@ -4378,7 +4378,7 @@
           {
             "field": "residual",
             "amount": {
-              "amount": "-40.1568361633415500000",
+              "amount": "-40.15683616334155",
               "currency": "USD"
             },
             "pct_of_total": -1.4381464057964648
@@ -4917,7 +4917,7 @@
                     {
                       "tenor_years": 3,
                       "sensitivity": {
-                        "amount": "-0.1380511673633010",
+                        "amount": "-0.138051167363301",
                         "currency": "USD"
                       },
                       "market_move": 49.99999999999997
@@ -4933,7 +4933,7 @@
                     {
                       "tenor_years": 7,
                       "sensitivity": {
-                        "amount": "0.8205456703435630",
+                        "amount": "0.820545670343563",
                         "currency": "USD"
                       },
                       "market_move": 50.00000000000008
@@ -5219,19 +5219,19 @@
             "positionId": "DEP-1",
             "attribution": {
               "total_pnl": {
-                "amount": "-247.9735548829012500000",
+                "amount": "-247.97355488290125",
                 "currency": "USD"
               },
               "mark_to_market_pnl": {
-                "amount": "-247.9735548829012500000",
+                "amount": "-247.97355488290125",
                 "currency": "USD"
               },
               "pv_t0": {
-                "amount": "725.2194690658727500000",
+                "amount": "725.21946906587275",
                 "currency": "USD"
               },
               "pv_t1": {
-                "amount": "477.2459141829715000000",
+                "amount": "477.2459141829715",
                 "currency": "USD"
               },
               "carry": {
@@ -5279,7 +5279,7 @@
                 "currency": "USD"
               },
               "residual": {
-                "amount": "0.3261779580174500000",
+                "amount": "0.32617795801745",
                 "currency": "USD"
               },
               "carry_detail": null,
@@ -5510,7 +5510,7 @@
               {
                 "field": "residual",
                 "amount": {
-                  "amount": "0.3261779580174500000",
+                  "amount": "0.32617795801745",
                   "currency": "USD"
                 },
                 "pct_of_total": -0.1315373964661186
@@ -5530,7 +5530,7 @@
       "report": {
         "attribution": {
           "total_pnl": {
-            "amount": "2792.2634303078587500000",
+            "amount": "2792.26343030785875",
             "currency": "USD"
           },
           "carry": {
@@ -5578,7 +5578,7 @@
             "currency": "USD"
           },
           "residual": {
-            "amount": "-40.4294303242381500000",
+            "amount": "-40.42943032423815",
             "currency": "USD"
           },
           "by_position": {
@@ -6102,7 +6102,7 @@
                     {
                       "tenor_years": 7,
                       "sensitivity": {
-                        "amount": "0.8205456703399250",
+                        "amount": "0.820545670339925",
                         "currency": "USD"
                       },
                       "market_move": 50.00000000000008
@@ -6176,7 +6176,7 @@
                     {
                       "tenor_years": 2,
                       "sensitivity": {
-                        "amount": "1868.155596461150",
+                        "amount": "1868.15559646115",
                         "currency": "USD"
                       },
                       "market_move": 0
@@ -6192,7 +6192,7 @@
                     {
                       "tenor_years": 5,
                       "sensitivity": {
-                        "amount": "1546.977075807050",
+                        "amount": "1546.97707580705",
                         "currency": "USD"
                       },
                       "market_move": 0
@@ -6328,19 +6328,19 @@
             },
             "DEP-1": {
               "total_pnl": {
-                "amount": "-247.9735548829012500000",
+                "amount": "-247.97355488290125",
                 "currency": "USD"
               },
               "mark_to_market_pnl": {
-                "amount": "-247.9735548829012500000",
+                "amount": "-247.97355488290125",
                 "currency": "USD"
               },
               "pv_t0": {
-                "amount": "725.2194690658727500000",
+                "amount": "725.21946906587275",
                 "currency": "USD"
               },
               "pv_t1": {
-                "amount": "477.2459141829715000000",
+                "amount": "477.2459141829715",
                 "currency": "USD"
               },
               "carry": {
@@ -6388,7 +6388,7 @@
                 "currency": "USD"
               },
               "residual": {
-                "amount": "0.3261779613058500000",
+                "amount": "0.32617796130585",
                 "currency": "USD"
               },
               "carry_detail": {
@@ -6520,7 +6520,7 @@
                 {
                   "factor": "Fx",
                   "repriced_pv": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "explained_pnl": {
@@ -6531,7 +6531,7 @@
                 {
                   "factor": "Inflation",
                   "repriced_pv": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "explained_pnl": {
@@ -6542,7 +6542,7 @@
                 {
                   "factor": "MarketScalars",
                   "repriced_pv": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "explained_pnl": {
@@ -6553,7 +6553,7 @@
                 {
                   "factor": "Theta",
                   "repriced_pv": {
-                    "amount": "725.2194690658727500000",
+                    "amount": "725.21946906587275",
                     "currency": "USD"
                   },
                   "explained_pnl": {
@@ -6701,7 +6701,7 @@
           {
             "field": "residual",
             "amount": {
-              "amount": "-40.4294303242381500000",
+              "amount": "-40.42943032423815",
               "currency": "USD"
             },
             "pct_of_total": -1.447908885866855
@@ -7333,7 +7333,7 @@
                     {
                       "tenor_years": 7,
                       "sensitivity": {
-                        "amount": "0.8205456703399250",
+                        "amount": "0.820545670339925",
                         "currency": "USD"
                       },
                       "market_move": 50.00000000000008
@@ -7407,7 +7407,7 @@
                     {
                       "tenor_years": 2,
                       "sensitivity": {
-                        "amount": "1868.155596461150",
+                        "amount": "1868.15559646115",
                         "currency": "USD"
                       },
                       "market_move": 0
@@ -7423,7 +7423,7 @@
                     {
                       "tenor_years": 5,
                       "sensitivity": {
-                        "amount": "1546.977075807050",
+                        "amount": "1546.97707580705",
                         "currency": "USD"
                       },
                       "market_move": 0
@@ -7662,19 +7662,19 @@
             "positionId": "DEP-1",
             "attribution": {
               "total_pnl": {
-                "amount": "-247.9735548829012500000",
+                "amount": "-247.97355488290125",
                 "currency": "USD"
               },
               "mark_to_market_pnl": {
-                "amount": "-247.9735548829012500000",
+                "amount": "-247.97355488290125",
                 "currency": "USD"
               },
               "pv_t0": {
-                "amount": "725.2194690658727500000",
+                "amount": "725.21946906587275",
                 "currency": "USD"
               },
               "pv_t1": {
-                "amount": "477.2459141829715000000",
+                "amount": "477.2459141829715",
                 "currency": "USD"
               },
               "carry": {
@@ -7722,7 +7722,7 @@
                 "currency": "USD"
               },
               "residual": {
-                "amount": "0.3261779613058500000",
+                "amount": "0.32617796130585",
                 "currency": "USD"
               },
               "carry_detail": {
@@ -7854,7 +7854,7 @@
                 {
                   "factor": "Fx",
                   "repriced_pv": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "explained_pnl": {
@@ -7865,7 +7865,7 @@
                 {
                   "factor": "Inflation",
                   "repriced_pv": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "explained_pnl": {
@@ -7876,7 +7876,7 @@
                 {
                   "factor": "MarketScalars",
                   "repriced_pv": {
-                    "amount": "477.2459141829715000000",
+                    "amount": "477.2459141829715",
                     "currency": "USD"
                   },
                   "explained_pnl": {
@@ -7887,7 +7887,7 @@
                 {
                   "factor": "Theta",
                   "repriced_pv": {
-                    "amount": "725.2194690658727500000",
+                    "amount": "725.21946906587275",
                     "currency": "USD"
                   },
                   "explained_pnl": {
@@ -8028,10 +8028,10 @@
               {
                 "field": "residual",
                 "amount": {
-                  "amount": "0.3261779613058500000",
+                  "amount": "0.32617796130585",
                   "currency": "USD"
                 },
-                "pct_of_total": -0.13153739779222778
+                "pct_of_total": -0.13153739779222776
               }
             ]
           }
@@ -8094,7 +8094,7 @@
     "report": {
       "attribution": {
         "total_pnl": {
-          "amount": "2792.2634303078587500000",
+          "amount": "2792.26343030785875",
           "currency": "USD"
         },
         "carry": {
@@ -8142,7 +8142,7 @@
           "currency": "USD"
         },
         "residual": {
-          "amount": "-40.1568361633415500000",
+          "amount": "-40.15683616334155",
           "currency": "USD"
         },
         "by_position": {
@@ -8573,7 +8573,7 @@
                   {
                     "tenor_years": 3,
                     "sensitivity": {
-                      "amount": "-0.1380511673633010",
+                      "amount": "-0.138051167363301",
                       "currency": "USD"
                     },
                     "market_move": 49.99999999999997
@@ -8589,7 +8589,7 @@
                   {
                     "tenor_years": 7,
                     "sensitivity": {
-                      "amount": "0.8205456703435630",
+                      "amount": "0.820545670343563",
                       "currency": "USD"
                     },
                     "market_move": 50.00000000000008
@@ -8772,19 +8772,19 @@
           },
           "DEP-1": {
             "total_pnl": {
-              "amount": "-247.9735548829012500000",
+              "amount": "-247.97355488290125",
               "currency": "USD"
             },
             "mark_to_market_pnl": {
-              "amount": "-247.9735548829012500000",
+              "amount": "-247.97355488290125",
               "currency": "USD"
             },
             "pv_t0": {
-              "amount": "725.2194690658727500000",
+              "amount": "725.21946906587275",
               "currency": "USD"
             },
             "pv_t1": {
-              "amount": "477.2459141829715000000",
+              "amount": "477.2459141829715",
               "currency": "USD"
             },
             "carry": {
@@ -8832,7 +8832,7 @@
               "currency": "USD"
             },
             "residual": {
-              "amount": "0.3261779580174500000",
+              "amount": "0.32617795801745",
               "currency": "USD"
             },
             "carry_detail": null,
@@ -9070,7 +9070,7 @@
         {
           "field": "residual",
           "amount": {
-            "amount": "-40.1568361633415500000",
+            "amount": "-40.15683616334155",
             "currency": "USD"
           },
           "pct_of_total": -1.4381464057964648
@@ -9609,7 +9609,7 @@
                   {
                     "tenor_years": 3,
                     "sensitivity": {
-                      "amount": "-0.1380511673633010",
+                      "amount": "-0.138051167363301",
                       "currency": "USD"
                     },
                     "market_move": 49.99999999999997
@@ -9625,7 +9625,7 @@
                   {
                     "tenor_years": 7,
                     "sensitivity": {
-                      "amount": "0.8205456703435630",
+                      "amount": "0.820545670343563",
                       "currency": "USD"
                     },
                     "market_move": 50.00000000000008
@@ -9911,19 +9911,19 @@
           "positionId": "DEP-1",
           "attribution": {
             "total_pnl": {
-              "amount": "-247.9735548829012500000",
+              "amount": "-247.97355488290125",
               "currency": "USD"
             },
             "mark_to_market_pnl": {
-              "amount": "-247.9735548829012500000",
+              "amount": "-247.97355488290125",
               "currency": "USD"
             },
             "pv_t0": {
-              "amount": "725.2194690658727500000",
+              "amount": "725.21946906587275",
               "currency": "USD"
             },
             "pv_t1": {
-              "amount": "477.2459141829715000000",
+              "amount": "477.2459141829715",
               "currency": "USD"
             },
             "carry": {
@@ -9971,7 +9971,7 @@
               "currency": "USD"
             },
             "residual": {
-              "amount": "0.3261779580174500000",
+              "amount": "0.32617795801745",
               "currency": "USD"
             },
             "carry_detail": null,
@@ -10202,7 +10202,7 @@
             {
               "field": "residual",
               "amount": {
-                "amount": "0.3261779580174500000",
+                "amount": "0.32617795801745",
                 "currency": "USD"
               },
               "pct_of_total": -0.1315373964661186

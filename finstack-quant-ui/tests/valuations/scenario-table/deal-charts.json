@@ -1039,7 +1039,7 @@
               [
                 "2024-04-01",
                 {
-                  "amount": "2399157.437939610",
+                  "amount": "2399157.43793961",
                   "currency": "USD"
                 }
               ],
@@ -1153,7 +1153,7 @@
                 "date": "2024-07-01",
                 "reset_date": null,
                 "amount": {
-                  "amount": "865581.443801350",
+                  "amount": "865581.44380135",
                   "currency": "USD"
                 },
                 "kind": "fixed",
@@ -1451,7 +1451,7 @@
                 "end": "2025-07-01",
                 "payment_date": "2025-07-01",
                 "opening_balance": {
-                  "amount": "61619311.745383730",
+                  "amount": "61619311.74538373",
                   "currency": "USD"
                 },
                 "coupon_rate": 0.05,
@@ -1535,7 +1535,7 @@
               [
                 "2024-07-01",
                 {
-                  "amount": "865581.443801350",
+                  "amount": "865581.44380135",
                   "currency": "USD"
                 }
               ],
@@ -1887,7 +1887,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -1909,7 +1909,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.0000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -1972,7 +1972,7 @@
                   "currency": "USD"
                 },
                 "remaining_interest": {
-                  "amount": "0.0000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "remaining_principal": {
@@ -1980,7 +1980,7 @@
                   "currency": "USD"
                 },
                 "principal_used_for_interest": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "had_diversions": false,
@@ -2087,7 +2087,7 @@
               "waterfall": {
                 "payment_date": "2024-07-01",
                 "total_available": {
-                  "amount": "3195673.508512130",
+                  "amount": "3195673.50851213",
                   "currency": "USD"
                 },
                 "tier_allocations": [
@@ -2151,7 +2151,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.00000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -2173,7 +2173,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.0000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -2236,7 +2236,7 @@
                   "currency": "USD"
                 },
                 "remaining_interest": {
-                  "amount": "0.0000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "remaining_principal": {
@@ -2244,7 +2244,7 @@
                   "currency": "USD"
                 },
                 "principal_used_for_interest": {
-                  "amount": "0.00000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "had_diversions": false,
@@ -2415,7 +2415,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -2459,7 +2459,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.0000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -2544,7 +2544,7 @@
                   "currency": "USD"
                 },
                 "remaining_interest": {
-                  "amount": "0.00000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "remaining_principal": {
@@ -2552,7 +2552,7 @@
                   "currency": "USD"
                 },
                 "principal_used_for_interest": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "had_diversions": true,
@@ -2742,7 +2742,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -2764,7 +2764,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.0000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -2828,7 +2828,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.0000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -2849,7 +2849,7 @@
                   "currency": "USD"
                 },
                 "remaining_interest": {
-                  "amount": "0.0000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "remaining_principal": {
@@ -2857,7 +2857,7 @@
                   "currency": "USD"
                 },
                 "principal_used_for_interest": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "had_diversions": true,
@@ -3038,7 +3038,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -3124,7 +3124,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.0000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -3145,7 +3145,7 @@
                   "currency": "USD"
                 },
                 "remaining_interest": {
-                  "amount": "0.0000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "remaining_principal": {
@@ -3153,7 +3153,7 @@
                   "currency": "USD"
                 },
                 "principal_used_for_interest": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "had_diversions": true,
@@ -3334,7 +3334,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -3356,7 +3356,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.0000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -3420,7 +3420,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.0000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -3441,7 +3441,7 @@
                   "currency": "USD"
                 },
                 "remaining_interest": {
-                  "amount": "0.0000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "remaining_principal": {
@@ -3449,7 +3449,7 @@
                   "currency": "USD"
                 },
                 "principal_used_for_interest": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "had_diversions": true,
@@ -3630,7 +3630,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -3652,7 +3652,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.0000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -3716,7 +3716,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.0000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -3737,7 +3737,7 @@
                   "currency": "USD"
                 },
                 "remaining_interest": {
-                  "amount": "0.0000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "remaining_principal": {
@@ -3745,7 +3745,7 @@
                   "currency": "USD"
                 },
                 "principal_used_for_interest": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "had_diversions": true,
@@ -3926,7 +3926,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -3948,7 +3948,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.0000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -4012,7 +4012,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.0000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -4033,7 +4033,7 @@
                   "currency": "USD"
                 },
                 "remaining_interest": {
-                  "amount": "0.0000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "remaining_principal": {
@@ -4041,7 +4041,7 @@
                   "currency": "USD"
                 },
                 "principal_used_for_interest": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "had_diversions": true,
@@ -4222,7 +4222,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -4308,7 +4308,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.0000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -4329,7 +4329,7 @@
                   "currency": "USD"
                 },
                 "remaining_interest": {
-                  "amount": "0.0000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "remaining_principal": {
@@ -4337,7 +4337,7 @@
                   "currency": "USD"
                 },
                 "principal_used_for_interest": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "had_diversions": true,
@@ -4454,7 +4454,7 @@
               "waterfall": {
                 "payment_date": "2026-07-01",
                 "total_available": {
-                  "amount": "2656816.612794950",
+                  "amount": "2656816.61279495",
                   "currency": "USD"
                 },
                 "tier_allocations": [
@@ -4511,7 +4511,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -4533,7 +4533,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.0000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -4606,7 +4606,7 @@
                   "currency": "USD"
                 },
                 "principal_used_for_interest": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "had_diversions": true,
@@ -4780,7 +4780,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -4802,7 +4802,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.0000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -4875,7 +4875,7 @@
                   "currency": "USD"
                 },
                 "principal_used_for_interest": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "had_diversions": true,
@@ -5049,7 +5049,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -5071,7 +5071,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.0000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -5144,7 +5144,7 @@
                   "currency": "USD"
                 },
                 "principal_used_for_interest": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "had_diversions": true,
@@ -5942,7 +5942,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -5984,7 +5984,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -6001,7 +6001,7 @@
                   "currency": "USD"
                 },
                 "remaining_interest": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "remaining_principal": {
@@ -6009,7 +6009,7 @@
                   "currency": "USD"
                 },
                 "principal_used_for_interest": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "had_diversions": false,
@@ -6129,7 +6129,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -6171,7 +6171,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -6188,7 +6188,7 @@
                   "currency": "USD"
                 },
                 "remaining_interest": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "remaining_principal": {
@@ -6196,7 +6196,7 @@
                   "currency": "USD"
                 },
                 "principal_used_for_interest": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "had_diversions": false,
@@ -6316,7 +6316,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -6358,7 +6358,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -6375,7 +6375,7 @@
                   "currency": "USD"
                 },
                 "remaining_interest": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "remaining_principal": {
@@ -6383,7 +6383,7 @@
                   "currency": "USD"
                 },
                 "principal_used_for_interest": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "had_diversions": false,
@@ -6503,7 +6503,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.00000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -6545,7 +6545,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -6562,7 +6562,7 @@
                   "currency": "USD"
                 },
                 "remaining_interest": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "remaining_principal": {
@@ -6570,7 +6570,7 @@
                   "currency": "USD"
                 },
                 "principal_used_for_interest": {
-                  "amount": "0.00000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "had_diversions": false,
@@ -7482,7 +7482,7 @@
               [
                 "2024-04-01",
                 {
-                  "amount": "2399157.437939610",
+                  "amount": "2399157.43793961",
                   "currency": "USD"
                 }
               ]
@@ -7734,7 +7734,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -7756,7 +7756,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.0000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -7819,7 +7819,7 @@
                   "currency": "USD"
                 },
                 "remaining_interest": {
-                  "amount": "0.0000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "remaining_principal": {
@@ -7827,7 +7827,7 @@
                   "currency": "USD"
                 },
                 "principal_used_for_interest": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "had_diversions": false,
@@ -8394,7 +8394,7 @@
               [
                 "2026-07-01",
                 {
-                  "amount": "2656816.612794950",
+                  "amount": "2656816.61279495",
                   "currency": "USD"
                 }
               ],
@@ -8588,7 +8588,7 @@
                 "date": "2026-10-01",
                 "reset_date": null,
                 "amount": {
-                  "amount": "1409244.368046960",
+                  "amount": "1409244.36804696",
                   "currency": "USD"
                 },
                 "kind": "fixed",
@@ -8707,7 +8707,7 @@
                 "end": "2025-10-01",
                 "payment_date": "2025-10-01",
                 "opening_balance": {
-                  "amount": "76416258.725912190",
+                  "amount": "76416258.72591219",
                   "currency": "USD"
                 },
                 "coupon_rate": 0.08,
@@ -8843,7 +8843,7 @@
               [
                 "2026-10-01",
                 {
-                  "amount": "1409244.368046960",
+                  "amount": "1409244.36804696",
                   "currency": "USD"
                 }
               ],
@@ -8986,7 +8986,7 @@
               "currency": "USD"
             },
             "total_interest": {
-              "amount": "18366472.709447690",
+              "amount": "18366472.70944769",
               "currency": "USD"
             },
             "total_principal": {
@@ -9159,7 +9159,7 @@
                 "end": "2025-01-01",
                 "payment_date": "2025-01-02",
                 "opening_balance": {
-                  "amount": "559580.646932570",
+                  "amount": "559580.64693257",
                   "currency": "USD"
                 },
                 "coupon_rate": 0.05,
@@ -9170,7 +9170,7 @@
                 "end": "2025-04-01",
                 "payment_date": "2025-04-01",
                 "opening_balance": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "coupon_rate": 0.05,
@@ -9326,7 +9326,7 @@
               "currency": "USD"
             },
             "total_principal": {
-              "amount": "5000000.000000000",
+              "amount": "5000000",
               "currency": "USD"
             },
             "total_pik": {
@@ -9490,7 +9490,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.0000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -9512,7 +9512,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -9554,7 +9554,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.0000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -9575,7 +9575,7 @@
                   "currency": "USD"
                 },
                 "remaining_interest": {
-                  "amount": "0.0000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "remaining_principal": {
@@ -9583,7 +9583,7 @@
                   "currency": "USD"
                 },
                 "principal_used_for_interest": {
-                  "amount": "0.0000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "had_diversions": false,
@@ -9690,7 +9690,7 @@
               "waterfall": {
                 "payment_date": "2024-07-01",
                 "total_available": {
-                  "amount": "3195673.508512130",
+                  "amount": "3195673.50851213",
                   "currency": "USD"
                 },
                 "tier_allocations": [
@@ -9754,7 +9754,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.0000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -9776,7 +9776,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -9818,7 +9818,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.0000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -9839,7 +9839,7 @@
                   "currency": "USD"
                 },
                 "remaining_interest": {
-                  "amount": "0.0000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "remaining_principal": {
@@ -9847,7 +9847,7 @@
                   "currency": "USD"
                 },
                 "principal_used_for_interest": {
-                  "amount": "0.0000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "had_diversions": false,
@@ -10018,7 +10018,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.00000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -10040,7 +10040,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -10062,7 +10062,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "559580.646932570",
+                      "amount": "559580.64693257",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -10082,7 +10082,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.00000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -10111,7 +10111,7 @@
                   "currency": "USD"
                 },
                 "principal_used_for_interest": {
-                  "amount": "0.00000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "had_diversions": false,
@@ -10282,7 +10282,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.00000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -10304,7 +10304,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -10326,7 +10326,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.00000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -10368,7 +10368,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.00000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -10389,7 +10389,7 @@
                   "currency": "USD"
                 },
                 "remaining_interest": {
-                  "amount": "0.00000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "remaining_principal": {
@@ -10397,7 +10397,7 @@
                   "currency": "USD"
                 },
                 "principal_used_for_interest": {
-                  "amount": "0.00000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "had_diversions": false,
@@ -10590,7 +10590,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -10654,7 +10654,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "0.000000000",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -10675,7 +10675,7 @@
                   "currency": "USD"
                 },
                 "remaining_interest": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "remaining_principal": {
@@ -11200,7 +11200,7 @@
                   "currency": "USD"
                 },
                 "remaining_interest": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "remaining_principal": {
@@ -11459,7 +11459,7 @@
                   "currency": "USD"
                 },
                 "remaining_interest": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "remaining_principal": {
@@ -11653,7 +11653,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "82328.544224670",
+                      "amount": "82328.54422467",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -11718,7 +11718,7 @@
                   "currency": "USD"
                 },
                 "remaining_interest": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "remaining_principal": {
@@ -11833,7 +11833,7 @@
               "waterfall": {
                 "payment_date": "2026-07-01",
                 "total_available": {
-                  "amount": "2656816.612794950",
+                  "amount": "2656816.61279495",
                   "currency": "USD"
                 },
                 "tier_allocations": [
@@ -11977,7 +11977,7 @@
                   "currency": "USD"
                 },
                 "remaining_interest": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "remaining_principal": {
@@ -12236,7 +12236,7 @@
                   "currency": "USD"
                 },
                 "remaining_interest": {
-                  "amount": "0.00000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "remaining_principal": {
@@ -12430,7 +12430,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "228253.916003440",
+                      "amount": "228253.91600344",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -12495,7 +12495,7 @@
                   "currency": "USD"
                 },
                 "remaining_interest": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "remaining_principal": {

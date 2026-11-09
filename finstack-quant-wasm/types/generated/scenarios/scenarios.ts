@@ -51,6 +51,12 @@ export type AdvancingPolicy =
 export type AgencyProgram = "fnma" | "fhlmc" | "gnma_i" | "gnma_ii";
 /**
  * Exact decimal encoded only as a JSON string.
+ *
+ * Restoration routes through [`crate::decimal::parse_decimal`], the single
+ * exact text-admission rule: JSON numbers, malformed text and inexact values
+ * are rejected rather than rounded. Serialization writes canonical
+ * fixed-point text with trailing zeros removed and signed zero normalized
+ * (`"1.5"`, `"0"`), never scientific notation.
  */
 export type DecimalWire = string;
 /**

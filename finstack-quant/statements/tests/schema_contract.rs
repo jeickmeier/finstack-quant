@@ -23,7 +23,8 @@ use indexmap::IndexMap;
 use serde_json::{Value, json};
 use time::Month;
 
-const CANONICAL_DECIMAL_PATTERN: &str = r"^-?\d+(\.\d+)?([eE][+-]?\d+)?$";
+const CANONICAL_DECIMAL_PATTERN: &str =
+    r"^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$";
 
 fn validate_fixture(schema: &Value, fixture: &Value) {
     let validator = jsonschema::validator_for(schema).expect("checked-in schema must compile");

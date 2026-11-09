@@ -1587,112 +1587,112 @@
         [
           "2024-04-01",
           {
-            "amount": "3344861.9248525840",
+            "amount": "3344861.924852584",
             "currency": "USD"
           }
         ],
         [
           "2024-07-01",
           {
-            "amount": "3232238.9906461980",
+            "amount": "3232238.990646198",
             "currency": "USD"
           }
         ],
         [
           "2024-10-01",
           {
-            "amount": "3130722.4236728250",
+            "amount": "3130722.423672825",
             "currency": "USD"
           }
         ],
         [
           "2025-01-02",
           {
-            "amount": "3024615.3784517630",
+            "amount": "3024615.378451763",
             "currency": "USD"
           }
         ],
         [
           "2025-04-01",
           {
-            "amount": "3109381.88515901840",
+            "amount": "3109381.8851590184",
             "currency": "USD"
           }
         ],
         [
           "2025-07-01",
           {
-            "amount": "3008235.56907330030",
+            "amount": "3008235.5690733003",
             "currency": "USD"
           }
         ],
         [
           "2025-10-01",
           {
-            "amount": "2909751.11735381330",
+            "amount": "2909751.1173538133",
             "currency": "USD"
           }
         ],
         [
           "2026-01-02",
           {
-            "amount": "2807897.85017496850",
+            "amount": "2807897.8501749685",
             "currency": "USD"
           }
         ],
         [
           "2026-04-01",
           {
-            "amount": "2697902.37659818490",
+            "amount": "2697902.3765981849",
             "currency": "USD"
           }
         ],
         [
           "2026-07-01",
           {
-            "amount": "2608196.07640933770",
+            "amount": "2608196.0764093377",
             "currency": "USD"
           }
         ],
         [
           "2026-10-01",
           {
-            "amount": "2520837.54059150590",
+            "amount": "2520837.5405915059",
             "currency": "USD"
           }
         ],
         [
           "2027-01-04",
           {
-            "amount": "2431002.95893976340",
+            "amount": "2431002.9589397634",
             "currency": "USD"
           }
         ],
         [
           "2027-04-01",
           {
-            "amount": "2334977.45004753170",
+            "amount": "2334977.4500475317",
             "currency": "USD"
           }
         ],
         [
           "2027-07-01",
           {
-            "amount": "2255361.24387972240",
+            "amount": "2255361.2438797224",
             "currency": "USD"
           }
         ],
         [
           "2027-10-01",
           {
-            "amount": "2177815.76588714930",
+            "amount": "2177815.7658871493",
             "currency": "USD"
           }
         ],
         [
           "2028-01-03",
           {
-            "amount": "1955905.3438492830",
+            "amount": "1955905.343849283",
             "currency": "USD"
           }
         ],
@@ -1709,7 +1709,7 @@
           "date": "2024-04-01",
           "reset_date": null,
           "amount": {
-            "amount": "758333.3333333330",
+            "amount": "758333.333333333",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1729,7 +1729,7 @@
           "date": "2024-07-01",
           "reset_date": null,
           "amount": {
-            "amount": "725642.4858571870",
+            "amount": "725642.485857187",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1749,7 +1749,7 @@
           "date": "2024-10-01",
           "reset_date": null,
           "amount": {
-            "amount": "701587.8459916170",
+            "amount": "701587.845991617",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1769,7 +1769,7 @@
           "date": "2025-01-02",
           "reset_date": null,
           "amount": {
-            "amount": "670548.9041656900",
+            "amount": "670548.90416569",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1789,7 +1789,7 @@
           "date": "2025-04-01",
           "reset_date": null,
           "amount": {
-            "amount": "626545.92314655640",
+            "amount": "626545.9231465564",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1809,7 +1809,7 @@
           "date": "2025-07-01",
           "reset_date": null,
           "amount": {
-            "amount": "602127.25666163830",
+            "amount": "602127.2566616383",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1829,7 +1829,7 @@
           "date": "2025-10-01",
           "reset_date": null,
           "amount": {
-            "amount": "577999.32237661530",
+            "amount": "577999.3223766153",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1849,7 +1849,7 @@
           "date": "2026-01-02",
           "reset_date": null,
           "amount": {
-            "amount": "548204.71610746150",
+            "amount": "548204.7161074615",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1869,7 +1869,7 @@
           "date": "2026-04-01",
           "reset_date": null,
           "amount": {
-            "amount": "508041.05810319490",
+            "amount": "508041.0581031949",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1889,7 +1889,7 @@
           "date": "2026-07-01",
           "reset_date": null,
           "amount": {
-            "amount": "486008.54486225270",
+            "amount": "486008.5448622527",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1909,7 +1909,7 @@
           "date": "2026-10-01",
           "reset_date": null,
           "amount": {
-            "amount": "464232.45742161790",
+            "amount": "464232.4574216179",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1929,7 +1929,7 @@
           "date": "2027-01-04",
           "reset_date": null,
           "amount": {
-            "amount": "437953.61469222440",
+            "amount": "437953.6146922244",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1949,7 +1949,7 @@
           "date": "2027-04-01",
           "reset_date": null,
           "amount": {
-            "amount": "403519.76713495170",
+            "amount": "403519.7671349517",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1969,7 +1969,7 @@
           "date": "2027-07-01",
           "reset_date": null,
           "amount": {
-            "amount": "383591.84105519440",
+            "amount": "383591.8410551944",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1989,7 +1989,7 @@
           "date": "2027-10-01",
           "reset_date": null,
           "amount": {
-            "amount": "363890.08253130930",
+            "amount": "363890.0825313093",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -2009,7 +2009,7 @@
           "date": "2028-01-03",
           "reset_date": null,
           "amount": {
-            "amount": "340712.1432439850",
+            "amount": "340712.143243985",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -2075,7 +2075,7 @@
           "end": "2025-01-01",
           "payment_date": "2025-01-02",
           "opening_balance": {
-            "amount": "52477740.326010530",
+            "amount": "52477740.32601053",
             "currency": "USD"
           },
           "coupon_rate": 0.05,
@@ -2218,112 +2218,112 @@
         [
           "2024-04-01",
           {
-            "amount": "758333.3333333330",
+            "amount": "758333.333333333",
             "currency": "USD"
           }
         ],
         [
           "2024-07-01",
           {
-            "amount": "725642.4858571870",
+            "amount": "725642.485857187",
             "currency": "USD"
           }
         ],
         [
           "2024-10-01",
           {
-            "amount": "701587.8459916170",
+            "amount": "701587.845991617",
             "currency": "USD"
           }
         ],
         [
           "2025-01-02",
           {
-            "amount": "670548.9041656900",
+            "amount": "670548.90416569",
             "currency": "USD"
           }
         ],
         [
           "2025-04-01",
           {
-            "amount": "626545.92314655640",
+            "amount": "626545.9231465564",
             "currency": "USD"
           }
         ],
         [
           "2025-07-01",
           {
-            "amount": "602127.25666163830",
+            "amount": "602127.2566616383",
             "currency": "USD"
           }
         ],
         [
           "2025-10-01",
           {
-            "amount": "577999.32237661530",
+            "amount": "577999.3223766153",
             "currency": "USD"
           }
         ],
         [
           "2026-01-02",
           {
-            "amount": "548204.71610746150",
+            "amount": "548204.7161074615",
             "currency": "USD"
           }
         ],
         [
           "2026-04-01",
           {
-            "amount": "508041.05810319490",
+            "amount": "508041.0581031949",
             "currency": "USD"
           }
         ],
         [
           "2026-07-01",
           {
-            "amount": "486008.54486225270",
+            "amount": "486008.5448622527",
             "currency": "USD"
           }
         ],
         [
           "2026-10-01",
           {
-            "amount": "464232.45742161790",
+            "amount": "464232.4574216179",
             "currency": "USD"
           }
         ],
         [
           "2027-01-04",
           {
-            "amount": "437953.61469222440",
+            "amount": "437953.6146922244",
             "currency": "USD"
           }
         ],
         [
           "2027-04-01",
           {
-            "amount": "403519.76713495170",
+            "amount": "403519.7671349517",
             "currency": "USD"
           }
         ],
         [
           "2027-07-01",
           {
-            "amount": "383591.84105519440",
+            "amount": "383591.8410551944",
             "currency": "USD"
           }
         ],
         [
           "2027-10-01",
           {
-            "amount": "363890.08253130930",
+            "amount": "363890.0825313093",
             "currency": "USD"
           }
         ],
         [
           "2028-01-03",
           {
-            "amount": "340712.1432439850",
+            "amount": "340712.143243985",
             "currency": "USD"
           }
         ]
@@ -2453,15 +2453,15 @@
       "deferred_flows": [],
       "writedown_flows": [],
       "final_balance": {
-        "amount": "0.000000000",
+        "amount": "0",
         "currency": "USD"
       },
       "total_interest": {
-        "amount": "8598939.29668482880",
+        "amount": "8598939.2966848288",
         "currency": "USD"
       },
       "total_principal": {
-        "amount": "60000000.000000000",
+        "amount": "60000000",
         "currency": "USD"
       },
       "total_pik": {
@@ -2557,15 +2557,15 @@
           "weighted_avg_spread_bp": null,
           "warf": 3650.000000000001,
           "interest_collections": {
-            "amount": "2017128.3014637180",
+            "amount": "2017128.301463718",
             "currency": "USD"
           },
           "principal_collections": {
-            "amount": "2586528.5915192510",
+            "amount": "2586528.591519251",
             "currency": "USD"
           },
           "defaults": {
-            "amount": "503794.3607312140",
+            "amount": "503794.360731214",
             "currency": "USD"
           },
           "recoveries": {
@@ -2613,7 +2613,7 @@
           "waterfall": {
             "payment_date": "2024-04-01",
             "total_available": {
-              "amount": "4603656.8929829690",
+              "amount": "4603656.892982969",
               "currency": "USD"
             },
             "tier_allocations": [
@@ -2641,7 +2641,7 @@
               [
                 "principal",
                 {
-                  "amount": "2586528.5915192510",
+                  "amount": "2586528.591519251",
                   "currency": "USD"
                 }
               ],
@@ -2670,7 +2670,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -2692,7 +2692,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -2710,11 +2710,11 @@
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "2586528.5915192510",
+                  "amount": "2586528.591519251",
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "57413471.4084807490",
+                  "amount": "57413471.408480749",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -2734,7 +2734,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -2751,7 +2751,7 @@
               "currency": "USD"
             },
             "remaining_interest": {
-              "amount": "0.0000000000",
+              "amount": "0",
               "currency": "USD"
             },
             "remaining_principal": {
@@ -2759,7 +2759,7 @@
               "currency": "USD"
             },
             "principal_used_for_interest": {
-              "amount": "0.000000000",
+              "amount": "0",
               "currency": "USD"
             },
             "had_diversions": false,
@@ -2796,15 +2796,15 @@
           "weighted_avg_spread_bp": null,
           "warf": 3650.000000000002,
           "interest_collections": {
-            "amount": "1954792.5225872450",
+            "amount": "1954792.522587245",
             "currency": "USD"
           },
           "principal_collections": {
-            "amount": "2506596.5047890110",
+            "amount": "2506596.504789011",
             "currency": "USD"
           },
           "defaults": {
-            "amount": "488225.4879693930",
+            "amount": "488225.487969393",
             "currency": "USD"
           },
           "recoveries": {
@@ -2852,7 +2852,7 @@
           "waterfall": {
             "payment_date": "2024-07-01",
             "total_available": {
-              "amount": "4461389.0273762560",
+              "amount": "4461389.027376256",
               "currency": "USD"
             },
             "tier_allocations": [
@@ -2880,7 +2880,7 @@
               [
                 "principal",
                 {
-                  "amount": "2506596.5047890110",
+                  "amount": "2506596.504789011",
                   "currency": "USD"
                 }
               ],
@@ -2909,7 +2909,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -2931,7 +2931,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -2949,11 +2949,11 @@
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "2506596.5047890110",
+                  "amount": "2506596.504789011",
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "54906874.9036917890",
+                  "amount": "54906874.903691789",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -2973,7 +2973,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -2990,7 +2990,7 @@
               "currency": "USD"
             },
             "remaining_interest": {
-              "amount": "0.0000000000",
+              "amount": "0",
               "currency": "USD"
             },
             "remaining_principal": {
@@ -2998,7 +2998,7 @@
               "currency": "USD"
             },
             "principal_used_for_interest": {
-              "amount": "0.000000000",
+              "amount": "0",
               "currency": "USD"
             },
             "had_diversions": false,
@@ -3035,15 +3035,15 @@
           "weighted_avg_spread_bp": null,
           "warf": 3650.000000000001,
           "interest_collections": {
-            "amount": "1915200.5175224470",
+            "amount": "1915200.517522447",
             "currency": "USD"
           },
           "principal_collections": {
-            "amount": "2429134.5776812080",
+            "amount": "2429134.577681208",
             "currency": "USD"
           },
           "defaults": {
-            "amount": "473137.7436559380",
+            "amount": "473137.743655938",
             "currency": "USD"
           },
           "recoveries": {
@@ -3091,7 +3091,7 @@
           "waterfall": {
             "payment_date": "2024-10-01",
             "total_available": {
-              "amount": "4344335.0952036550",
+              "amount": "4344335.095203655",
               "currency": "USD"
             },
             "tier_allocations": [
@@ -3119,7 +3119,7 @@
               [
                 "principal",
                 {
-                  "amount": "2429134.5776812080",
+                  "amount": "2429134.577681208",
                   "currency": "USD"
                 }
               ],
@@ -3148,7 +3148,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -3170,7 +3170,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -3188,11 +3188,11 @@
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "2429134.5776812080",
+                  "amount": "2429134.577681208",
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "52477740.3260104920",
+                  "amount": "52477740.326010492",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -3212,7 +3212,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -3229,7 +3229,7 @@
               "currency": "USD"
             },
             "remaining_interest": {
-              "amount": "0.0000000000",
+              "amount": "0",
               "currency": "USD"
             },
             "remaining_principal": {
@@ -3237,7 +3237,7 @@
               "currency": "USD"
             },
             "principal_used_for_interest": {
-              "amount": "0.000000000",
+              "amount": "0",
               "currency": "USD"
             },
             "had_diversions": false,
@@ -3274,15 +3274,15 @@
           "weighted_avg_spread_bp": null,
           "warf": 3650.0,
           "interest_collections": {
-            "amount": "1856014.6363478310",
+            "amount": "1856014.636347831",
             "currency": "USD"
           },
           "principal_collections": {
-            "amount": "2354066.4742860730",
+            "amount": "2354066.474286073",
             "currency": "USD"
           },
           "defaults": {
-            "amount": "458516.2593679790",
+            "amount": "458516.259367979",
             "currency": "USD"
           },
           "recoveries": {
@@ -3330,7 +3330,7 @@
           "waterfall": {
             "payment_date": "2025-01-02",
             "total_available": {
-              "amount": "4210081.1106339040",
+              "amount": "4210081.110633904",
               "currency": "USD"
             },
             "tier_allocations": [
@@ -3358,7 +3358,7 @@
               [
                 "principal",
                 {
-                  "amount": "2354066.4742860730",
+                  "amount": "2354066.474286073",
                   "currency": "USD"
                 }
               ],
@@ -3387,7 +3387,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.00000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -3409,7 +3409,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -3427,11 +3427,11 @@
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "2354066.4742860730",
+                  "amount": "2354066.474286073",
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "50123673.8517244270",
+                  "amount": "50123673.851724427",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -3451,7 +3451,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -3468,7 +3468,7 @@
               "currency": "USD"
             },
             "remaining_interest": {
-              "amount": "0.0000000000",
+              "amount": "0",
               "currency": "USD"
             },
             "remaining_principal": {
@@ -3476,7 +3476,7 @@
               "currency": "USD"
             },
             "principal_used_for_interest": {
-              "amount": "0.00000000",
+              "amount": "0",
               "currency": "USD"
             },
             "had_diversions": false,
@@ -3513,19 +3513,19 @@
           "weighted_avg_spread_bp": null,
           "warf": 3649.9999999999995,
           "interest_collections": {
-            "amount": "1759556.5337383490",
+            "amount": "1759556.533738349",
             "currency": "USD"
           },
           "principal_collections": {
-            "amount": "2281318.2177199770",
+            "amount": "2281318.217719977",
             "currency": "USD"
           },
           "defaults": {
-            "amount": "444346.62616492980",
+            "amount": "444346.6261649298",
             "currency": "USD"
           },
           "recoveries": {
-            "amount": "201517.74429248540",
+            "amount": "201517.7442924854",
             "currency": "USD"
           },
           "reinvested_par": {
@@ -3569,7 +3569,7 @@
           "waterfall": {
             "payment_date": "2025-04-01",
             "total_available": {
-              "amount": "4242392.49575081140",
+              "amount": "4242392.4957508114",
               "currency": "USD"
             },
             "tier_allocations": [
@@ -3597,7 +3597,7 @@
               [
                 "principal",
                 {
-                  "amount": "2482835.96201246240",
+                  "amount": "2482835.9620124624",
                   "currency": "USD"
                 }
               ],
@@ -3626,7 +3626,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -3666,11 +3666,11 @@
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "2482835.96201246240",
+                  "amount": "2482835.9620124624",
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "47640837.88971203760",
+                  "amount": "47640837.8897120376",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -3690,7 +3690,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -3707,7 +3707,7 @@
               "currency": "USD"
             },
             "remaining_interest": {
-              "amount": "0.0000000000",
+              "amount": "0",
               "currency": "USD"
             },
             "remaining_principal": {
@@ -3715,13 +3715,13 @@
               "currency": "USD"
             },
             "principal_used_for_interest": {
-              "amount": "0.000000000",
+              "amount": "0",
               "currency": "USD"
             },
             "had_diversions": false,
             "diverted_amounts": [],
             "recovery_proceeds": {
-              "amount": "201517.74429248540",
+              "amount": "201517.7442924854",
               "currency": "USD"
             }
           },
@@ -3752,19 +3752,19 @@
           "weighted_avg_spread_bp": null,
           "warf": 3650.000000000002,
           "interest_collections": {
-            "amount": "1724127.0049219480",
+            "amount": "1724127.004921948",
             "currency": "USD"
           },
           "principal_collections": {
-            "amount": "2210818.1172239050",
+            "amount": "2210818.117223905",
             "currency": "USD"
           },
           "defaults": {
-            "amount": "430614.88038900430",
+            "amount": "430614.8803890043",
             "currency": "USD"
           },
           "recoveries": {
-            "amount": "195290.19518775730",
+            "amount": "195290.1951877573",
             "currency": "USD"
           },
           "reinvested_par": {
@@ -3808,7 +3808,7 @@
           "waterfall": {
             "payment_date": "2025-07-01",
             "total_available": {
-              "amount": "4130235.31733361030",
+              "amount": "4130235.3173336103",
               "currency": "USD"
             },
             "tier_allocations": [
@@ -3836,7 +3836,7 @@
               [
                 "principal",
                 {
-                  "amount": "2406108.31241166230",
+                  "amount": "2406108.3124116623",
                   "currency": "USD"
                 }
               ],
@@ -3865,7 +3865,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -3887,7 +3887,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -3905,11 +3905,11 @@
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "2406108.31241166230",
+                  "amount": "2406108.3124116623",
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "45234729.57730033770",
+                  "amount": "45234729.5773003377",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -3929,7 +3929,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -3946,7 +3946,7 @@
               "currency": "USD"
             },
             "remaining_interest": {
-              "amount": "0.0000000000",
+              "amount": "0",
               "currency": "USD"
             },
             "remaining_principal": {
@@ -3954,13 +3954,13 @@
               "currency": "USD"
             },
             "principal_used_for_interest": {
-              "amount": "0.000000000",
+              "amount": "0",
               "currency": "USD"
             },
             "had_diversions": false,
             "diverted_amounts": [],
             "recovery_proceeds": {
-              "amount": "195290.19518775730",
+              "amount": "195290.1951877573",
               "currency": "USD"
             }
           },
@@ -3991,19 +3991,19 @@
           "weighted_avg_spread_bp": null,
           "warf": 3650.0000000000005,
           "interest_collections": {
-            "amount": "1689206.8564547960",
+            "amount": "1689206.856454796",
             "currency": "USD"
           },
           "principal_collections": {
-            "amount": "2142496.6975148230",
+            "amount": "2142496.697514823",
             "currency": "USD"
           },
           "defaults": {
-            "amount": "417307.48990453710",
+            "amount": "417307.4899045371",
             "currency": "USD"
           },
           "recoveries": {
-            "amount": "189255.09746237530",
+            "amount": "189255.0974623753",
             "currency": "USD"
           },
           "reinvested_par": {
@@ -4047,7 +4047,7 @@
           "waterfall": {
             "payment_date": "2025-10-01",
             "total_available": {
-              "amount": "4020958.65143199430",
+              "amount": "4020958.6514319943",
               "currency": "USD"
             },
             "tier_allocations": [
@@ -4075,7 +4075,7 @@
               [
                 "principal",
                 {
-                  "amount": "2331751.79497719830",
+                  "amount": "2331751.7949771983",
                   "currency": "USD"
                 }
               ],
@@ -4104,7 +4104,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -4126,7 +4126,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -4144,11 +4144,11 @@
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "2331751.79497719830",
+                  "amount": "2331751.7949771983",
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "42902977.78232310170",
+                  "amount": "42902977.7823231017",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -4168,7 +4168,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -4185,7 +4185,7 @@
               "currency": "USD"
             },
             "remaining_interest": {
-              "amount": "0.0000000000",
+              "amount": "0",
               "currency": "USD"
             },
             "remaining_principal": {
@@ -4193,13 +4193,13 @@
               "currency": "USD"
             },
             "principal_used_for_interest": {
-              "amount": "0.000000000",
+              "amount": "0",
               "currency": "USD"
             },
             "had_diversions": false,
             "diverted_amounts": [],
             "recovery_proceeds": {
-              "amount": "189255.09746237530",
+              "amount": "189255.0974623753",
               "currency": "USD"
             }
           },
@@ -4230,19 +4230,19 @@
           "weighted_avg_spread_bp": null,
           "warf": 3650.0,
           "interest_collections": {
-            "amount": "1637004.9092587850",
+            "amount": "1637004.909258785",
             "currency": "USD"
           },
           "principal_collections": {
-            "amount": "2076286.6303203150",
+            "amount": "2076286.630320315",
             "currency": "USD"
           },
           "defaults": {
-            "amount": "404411.34076255690",
+            "amount": "404411.3407625569",
             "currency": "USD"
           },
           "recoveries": {
-            "amount": "183406.50374719150",
+            "amount": "183406.5037471915",
             "currency": "USD"
           },
           "reinvested_par": {
@@ -4286,7 +4286,7 @@
           "waterfall": {
             "payment_date": "2026-01-02",
             "total_available": {
-              "amount": "3896698.04332629150",
+              "amount": "3896698.0433262915",
               "currency": "USD"
             },
             "tier_allocations": [
@@ -4314,7 +4314,7 @@
               [
                 "principal",
                 {
-                  "amount": "2259693.13406750650",
+                  "amount": "2259693.1340675065",
                   "currency": "USD"
                 }
               ],
@@ -4343,7 +4343,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -4365,7 +4365,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -4383,11 +4383,11 @@
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "2259693.13406750650",
+                  "amount": "2259693.1340675065",
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "40643284.64825563350",
+                  "amount": "40643284.6482556335",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -4407,7 +4407,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -4424,7 +4424,7 @@
               "currency": "USD"
             },
             "remaining_interest": {
-              "amount": "0.0000000000",
+              "amount": "0",
               "currency": "USD"
             },
             "remaining_principal": {
@@ -4432,13 +4432,13 @@
               "currency": "USD"
             },
             "principal_used_for_interest": {
-              "amount": "0.000000000",
+              "amount": "0",
               "currency": "USD"
             },
             "had_diversions": false,
             "diverted_amounts": [],
             "recovery_proceeds": {
-              "amount": "183406.50374719150",
+              "amount": "183406.5037471915",
               "currency": "USD"
             }
           },
@@ -4469,19 +4469,19 @@
           "weighted_avg_spread_bp": null,
           "warf": 3650.0,
           "interest_collections": {
-            "amount": "1551928.8627572220",
+            "amount": "1551928.862757222",
             "currency": "USD"
           },
           "principal_collections": {
-            "amount": "2012122.6680290180",
+            "amount": "2012122.668029018",
             "currency": "USD"
           },
           "defaults": {
-            "amount": "391913.72427746770",
+            "amount": "391913.7242774677",
             "currency": "USD"
           },
           "recoveries": {
-            "amount": "177738.65046597190",
+            "amount": "177738.6504659719",
             "currency": "USD"
           },
           "reinvested_par": {
@@ -4525,7 +4525,7 @@
           "waterfall": {
             "payment_date": "2026-04-01",
             "total_available": {
-              "amount": "3741790.18125221190",
+              "amount": "3741790.1812522119",
               "currency": "USD"
             },
             "tier_allocations": [
@@ -4553,7 +4553,7 @@
               [
                 "principal",
                 {
-                  "amount": "2189861.31849498990",
+                  "amount": "2189861.3184949899",
                   "currency": "USD"
                 }
               ],
@@ -4582,7 +4582,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -4622,11 +4622,11 @@
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "2189861.31849498990",
+                  "amount": "2189861.3184949899",
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "38453423.32976064010",
+                  "amount": "38453423.3297606401",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -4646,7 +4646,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -4663,7 +4663,7 @@
               "currency": "USD"
             },
             "remaining_interest": {
-              "amount": "0.0000000000",
+              "amount": "0",
               "currency": "USD"
             },
             "remaining_principal": {
@@ -4671,13 +4671,13 @@
               "currency": "USD"
             },
             "principal_used_for_interest": {
-              "amount": "0.000000000",
+              "amount": "0",
               "currency": "USD"
             },
             "had_diversions": false,
             "diverted_amounts": [],
             "recovery_proceeds": {
-              "amount": "177738.65046597190",
+              "amount": "177738.6504659719",
               "currency": "USD"
             }
           },
@@ -4708,19 +4708,19 @@
           "weighted_avg_spread_bp": null,
           "warf": 3650.0,
           "interest_collections": {
-            "amount": "1520680.0183411570",
+            "amount": "1520680.018341157",
             "currency": "USD"
           },
           "principal_collections": {
-            "amount": "1949941.5793914830",
+            "amount": "1949941.579391483",
             "currency": "USD"
           },
           "defaults": {
-            "amount": "379802.32450310160",
+            "amount": "379802.3245031016",
             "currency": "USD"
           },
           "recoveries": {
-            "amount": "172245.95215560170",
+            "amount": "172245.9521556017",
             "currency": "USD"
           },
           "reinvested_par": {
@@ -4764,7 +4764,7 @@
           "waterfall": {
             "payment_date": "2026-07-01",
             "total_available": {
-              "amount": "3642867.54988824170",
+              "amount": "3642867.5498882417",
               "currency": "USD"
             },
             "tier_allocations": [
@@ -4792,7 +4792,7 @@
               [
                 "principal",
                 {
-                  "amount": "2122187.53154708470",
+                  "amount": "2122187.5315470847",
                   "currency": "USD"
                 }
               ],
@@ -4821,7 +4821,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -4843,7 +4843,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -4861,11 +4861,11 @@
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "2122187.53154708470",
+                  "amount": "2122187.5315470847",
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "36331235.79821355530",
+                  "amount": "36331235.7982135553",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -4885,7 +4885,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -4902,7 +4902,7 @@
               "currency": "USD"
             },
             "remaining_interest": {
-              "amount": "0.0000000000",
+              "amount": "0",
               "currency": "USD"
             },
             "remaining_principal": {
@@ -4910,13 +4910,13 @@
               "currency": "USD"
             },
             "principal_used_for_interest": {
-              "amount": "0.000000000",
+              "amount": "0",
               "currency": "USD"
             },
             "had_diversions": false,
             "diverted_amounts": [],
             "recovery_proceeds": {
-              "amount": "172245.95215560170",
+              "amount": "172245.9521556017",
               "currency": "USD"
             }
           },
@@ -4947,19 +4947,19 @@
           "weighted_avg_spread_bp": null,
           "warf": 3650.0000000000005,
           "interest_collections": {
-            "amount": "1489880.4473931290",
+            "amount": "1489880.447393129",
             "currency": "USD"
           },
           "principal_collections": {
-            "amount": "1889682.0872080730",
+            "amount": "1889682.087208073",
             "currency": "USD"
           },
           "defaults": {
-            "amount": "368065.20609580140",
+            "amount": "368065.2060958014",
             "currency": "USD"
           },
           "recoveries": {
-            "amount": "166922.99596181490",
+            "amount": "166922.9959618149",
             "currency": "USD"
           },
           "reinvested_par": {
@@ -5003,7 +5003,7 @@
           "waterfall": {
             "payment_date": "2026-10-01",
             "total_available": {
-              "amount": "3546485.53056301690",
+              "amount": "3546485.5305630169",
               "currency": "USD"
             },
             "tier_allocations": [
@@ -5031,7 +5031,7 @@
               [
                 "principal",
                 {
-                  "amount": "2056605.08316988790",
+                  "amount": "2056605.0831698879",
                   "currency": "USD"
                 }
               ],
@@ -5060,7 +5060,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -5082,7 +5082,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -5100,11 +5100,11 @@
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "2056605.08316988790",
+                  "amount": "2056605.0831698879",
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "34274630.71504367210",
+                  "amount": "34274630.7150436721",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -5124,7 +5124,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -5141,7 +5141,7 @@
               "currency": "USD"
             },
             "remaining_interest": {
-              "amount": "0.0000000000",
+              "amount": "0",
               "currency": "USD"
             },
             "remaining_principal": {
@@ -5149,13 +5149,13 @@
               "currency": "USD"
             },
             "principal_used_for_interest": {
-              "amount": "0.000000000",
+              "amount": "0",
               "currency": "USD"
             },
             "had_diversions": false,
             "diverted_amounts": [],
             "recovery_proceeds": {
-              "amount": "166922.99596181490",
+              "amount": "166922.9959618149",
               "currency": "USD"
             }
           },
@@ -5186,19 +5186,19 @@
           "weighted_avg_spread_bp": null,
           "warf": 3649.9999999999995,
           "interest_collections": {
-            "amount": "1443838.3299662480",
+            "amount": "1443838.329966248",
             "currency": "USD"
           },
           "principal_collections": {
-            "amount": "1831284.8079425160",
+            "amount": "1831284.807942516",
             "currency": "USD"
           },
           "defaults": {
-            "amount": "356690.80255257490",
+            "amount": "356690.8025525749",
             "currency": "USD"
           },
           "recoveries": {
-            "amount": "161764.53630502280",
+            "amount": "161764.5363050228",
             "currency": "USD"
           },
           "reinvested_par": {
@@ -5242,7 +5242,7 @@
           "waterfall": {
             "payment_date": "2027-01-04",
             "total_available": {
-              "amount": "3436887.67421378680",
+              "amount": "3436887.6742137868",
               "currency": "USD"
             },
             "tier_allocations": [
@@ -5270,7 +5270,7 @@
               [
                 "principal",
                 {
-                  "amount": "1993049.34424753880",
+                  "amount": "1993049.3442475388",
                   "currency": "USD"
                 }
               ],
@@ -5299,7 +5299,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.0000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -5321,7 +5321,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -5339,11 +5339,11 @@
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "1993049.34424753880",
+                  "amount": "1993049.3442475388",
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "32281581.37079612120",
+                  "amount": "32281581.3707961212",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -5363,7 +5363,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -5388,13 +5388,13 @@
               "currency": "USD"
             },
             "principal_used_for_interest": {
-              "amount": "0.0000000000",
+              "amount": "0",
               "currency": "USD"
             },
             "had_diversions": false,
             "diverted_amounts": [],
             "recovery_proceeds": {
-              "amount": "161764.53630502280",
+              "amount": "161764.5363050228",
               "currency": "USD"
             }
           },
@@ -5425,19 +5425,19 @@
           "weighted_avg_spread_bp": null,
           "warf": 3649.999999999999,
           "interest_collections": {
-            "amount": "1368801.2569518690",
+            "amount": "1368801.256951869",
             "currency": "USD"
           },
           "principal_collections": {
-            "amount": "1774692.1932015930",
+            "amount": "1774692.193201593",
             "currency": "USD"
           },
           "defaults": {
-            "amount": "345667.90481272630",
+            "amount": "345667.9048127263",
             "currency": "USD"
           },
           "recoveries": {
-            "amount": "156765.48971098710",
+            "amount": "156765.4897109871",
             "currency": "USD"
           },
           "reinvested_par": {
@@ -5481,7 +5481,7 @@
           "waterfall": {
             "payment_date": "2027-04-01",
             "total_available": {
-              "amount": "3300258.93986444950",
+              "amount": "3300258.9398644495",
               "currency": "USD"
             },
             "tier_allocations": [
@@ -5509,7 +5509,7 @@
               [
                 "principal",
                 {
-                  "amount": "1931457.68291258010",
+                  "amount": "1931457.6829125801",
                   "currency": "USD"
                 }
               ],
@@ -5538,7 +5538,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.0000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -5578,11 +5578,11 @@
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "1931457.68291258010",
+                  "amount": "1931457.6829125801",
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "30350123.68788354990",
+                  "amount": "30350123.6878835499",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -5602,7 +5602,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.0000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -5619,7 +5619,7 @@
               "currency": "USD"
             },
             "remaining_interest": {
-              "amount": "0.0000000000",
+              "amount": "0",
               "currency": "USD"
             },
             "remaining_principal": {
@@ -5627,13 +5627,13 @@
               "currency": "USD"
             },
             "principal_used_for_interest": {
-              "amount": "0.0000000000",
+              "amount": "0",
               "currency": "USD"
             },
             "had_diversions": false,
             "diverted_amounts": [],
             "recovery_proceeds": {
-              "amount": "156765.48971098710",
+              "amount": "156765.4897109871",
               "currency": "USD"
             }
           },
@@ -5664,19 +5664,19 @@
           "weighted_avg_spread_bp": null,
           "warf": 3650.0,
           "interest_collections": {
-            "amount": "1341239.7761768990",
+            "amount": "1341239.776176899",
             "currency": "USD"
           },
           "principal_collections": {
-            "amount": "1719848.4730232870",
+            "amount": "1719848.473023287",
             "currency": "USD"
           },
           "defaults": {
-            "amount": "334985.65021173530",
+            "amount": "334985.6502117353",
             "currency": "USD"
           },
           "recoveries": {
-            "amount": "151920.92980124060",
+            "amount": "151920.9298012406",
             "currency": "USD"
           },
           "reinvested_par": {
@@ -5720,7 +5720,7 @@
           "waterfall": {
             "payment_date": "2027-07-01",
             "total_available": {
-              "amount": "3213009.17900142660",
+              "amount": "3213009.1790014266",
               "currency": "USD"
             },
             "tier_allocations": [
@@ -5748,7 +5748,7 @@
               [
                 "principal",
                 {
-                  "amount": "1871769.40282452760",
+                  "amount": "1871769.4028245276",
                   "currency": "USD"
                 }
               ],
@@ -5777,7 +5777,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.0000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -5799,7 +5799,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -5817,11 +5817,11 @@
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "1871769.40282452760",
+                  "amount": "1871769.4028245276",
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "28478354.28505902240",
+                  "amount": "28478354.2850590224",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -5841,7 +5841,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.0000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -5858,7 +5858,7 @@
               "currency": "USD"
             },
             "remaining_interest": {
-              "amount": "0.0000000000",
+              "amount": "0",
               "currency": "USD"
             },
             "remaining_principal": {
@@ -5866,13 +5866,13 @@
               "currency": "USD"
             },
             "principal_used_for_interest": {
-              "amount": "0.0000000000",
+              "amount": "0",
               "currency": "USD"
             },
             "had_diversions": false,
             "diverted_amounts": [],
             "recovery_proceeds": {
-              "amount": "151920.92980124060",
+              "amount": "151920.9298012406",
               "currency": "USD"
             }
           },
@@ -5903,19 +5903,19 @@
           "weighted_avg_spread_bp": null,
           "warf": 3649.9999999999995,
           "interest_collections": {
-            "amount": "1314074.5546007390",
+            "amount": "1314074.554600739",
             "currency": "USD"
           },
           "principal_collections": {
-            "amount": "1666699.6009175190",
+            "amount": "1666699.600917519",
             "currency": "USD"
           },
           "defaults": {
-            "amount": "324633.51177649660",
+            "amount": "324633.5117764966",
             "currency": "USD"
           },
           "recoveries": {
-            "amount": "147226.08243832060",
+            "amount": "147226.0824383206",
             "currency": "USD"
           },
           "reinvested_par": {
@@ -5959,7 +5959,7 @@
           "waterfall": {
             "payment_date": "2027-10-01",
             "total_available": {
-              "amount": "3128000.23795657860",
+              "amount": "3128000.2379565786",
               "currency": "USD"
             },
             "tier_allocations": [
@@ -5987,7 +5987,7 @@
               [
                 "principal",
                 {
-                  "amount": "1813925.68335583970",
+                  "amount": "1813925.6833558397",
                   "currency": "USD"
                 }
               ],
@@ -6016,7 +6016,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.0000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -6038,7 +6038,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -6056,11 +6056,11 @@
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "1813925.68335583970",
+                  "amount": "1813925.6833558397",
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "26664428.60170318030",
+                  "amount": "26664428.6017031803",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -6080,7 +6080,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.0000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -6097,7 +6097,7 @@
               "currency": "USD"
             },
             "remaining_interest": {
-              "amount": "0.0000000000",
+              "amount": "0",
               "currency": "USD"
             },
             "remaining_principal": {
@@ -6111,7 +6111,7 @@
             "had_diversions": false,
             "diverted_amounts": [],
             "recovery_proceeds": {
-              "amount": "147226.08243832060",
+              "amount": "147226.0824383206",
               "currency": "USD"
             }
           },
@@ -6142,15 +6142,15 @@
           "weighted_avg_spread_bp": null,
           "warf": 3649.999999999999,
           "interest_collections": {
-            "amount": "1273465.4070302290",
+            "amount": "1273465.407030229",
             "currency": "USD"
           },
           "principal_collections": {
-            "amount": "1615193.2006052980",
+            "amount": "1615193.200605298",
             "currency": "USD"
           },
           "defaults": {
-            "amount": "314601.28785137080",
+            "amount": "314601.2878513708",
             "currency": "USD"
           },
           "recoveries": {
@@ -6198,7 +6198,7 @@
           "waterfall": {
             "payment_date": "2028-01-03",
             "total_available": {
-              "amount": "2888658.6076355270",
+              "amount": "2888658.607635527",
               "currency": "USD"
             },
             "tier_allocations": [
@@ -6226,7 +6226,7 @@
               [
                 "principal",
                 {
-                  "amount": "1615193.2006052980",
+                  "amount": "1615193.200605298",
                   "currency": "USD"
                 }
               ]
@@ -6248,7 +6248,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -6270,7 +6270,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "0.000000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -6288,11 +6288,11 @@
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "1615193.2006052980",
+                  "amount": "1615193.200605298",
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "25049235.4010978820",
+                  "amount": "25049235.401097882",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -6305,11 +6305,11 @@
               "currency": "USD"
             },
             "remaining_cash": {
-              "amount": "396086.5971195770",
+              "amount": "396086.597119577",
               "currency": "USD"
             },
             "remaining_interest": {
-              "amount": "396086.5971195770",
+              "amount": "396086.597119577",
               "currency": "USD"
             },
             "remaining_principal": {
@@ -6317,7 +6317,7 @@
               "currency": "USD"
             },
             "principal_used_for_interest": {
-              "amount": "0.000000000",
+              "amount": "0",
               "currency": "USD"
             },
             "had_diversions": false,

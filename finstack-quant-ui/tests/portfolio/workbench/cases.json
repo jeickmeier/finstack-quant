@@ -224,7 +224,7 @@
             "instrument_id": "DEP-USD-6M",
             "as_of": "2023-12-28",
             "value": {
-              "amount": "725.2194690658727500000",
+              "amount": "725.21946906587275",
               "currency": "USD"
             },
             "measures": {
@@ -1166,11 +1166,11 @@
           },
           "by_position": {
             "IRS-A": {
-              "amount": "204.85235206550",
+              "amount": "204.8523520655",
               "currency": "USD"
             },
             "IRS-B": {
-              "amount": "409.70470413100",
+              "amount": "409.704704131",
               "currency": "USD"
             },
             "DEP-1": {

@@ -135,7 +135,10 @@ fn decimal_wire_is_string_only() {
 
     let schema = serde_json::to_value(schemars::schema_for!(DecimalWire)).expect("schema");
     assert_eq!(schema["type"], "string");
-    assert_eq!(schema["pattern"], r"^-?\d+(\.\d+)?([eE][+-]?\d+)?$");
+    assert_eq!(
+        schema["pattern"],
+        r"^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$"
+    );
 }
 
 #[test]

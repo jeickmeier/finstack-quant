@@ -16189,6 +16189,12 @@ export type DAe5D75Ed4E313Ae3Bc25 = "z_spread" | "ytm" | "implied_vol" | "base_c
 /**
  * Exact decimal encoded only as a JSON string.
  *
+ * Restoration routes through [`crate::decimal::parse_decimal`], the single
+ * exact text-admission rule: JSON numbers, malformed text and inexact values
+ * are rejected rather than rounded. Serialization writes canonical
+ * fixed-point text with trailing zeros removed and signed zero normalized
+ * (`"1.5"`, `"0"`), never scientific notation.
+ *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "d_bdf84b73c34f6ec51af5".
  */

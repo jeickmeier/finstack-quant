@@ -3,7 +3,7 @@
   "fee_spec": {
     "periodic_bp": {
       "base": "drawn",
-      "bp": "50.0",
+      "bp": "50",
       "frequency": {
         "count": 3,
         "unit": "months"

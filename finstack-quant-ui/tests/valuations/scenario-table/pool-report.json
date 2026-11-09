@@ -187,12 +187,12 @@
                   "coupon": {
                     "floating": {
                       "forward_curve_id": "SOFR-3M",
-                      "spread_bp": "150.0",
-                      "gearing": "1.0",
+                      "spread_bp": "150",
+                      "gearing": "1",
                       "gearing_includes_spread": true,
-                      "index_floor_bp": "0.0",
-                      "all_in_floor_bp": "25.0",
-                      "all_in_cap_bp": "1200.0",
+                      "index_floor_bp": "0",
+                      "all_in_floor_bp": "25",
+                      "all_in_cap_bp": "1200",
                       "index_cap_bp": null,
                       "reset_frequency": {
                         "count": 3,
@@ -817,12 +817,12 @@
                   "coupon": {
                     "floating": {
                       "forward_curve_id": "SOFR-3M",
-                      "spread_bp": "150.0",
-                      "gearing": "1.0",
+                      "spread_bp": "150",
+                      "gearing": "1",
                       "gearing_includes_spread": true,
-                      "index_floor_bp": "0.0",
-                      "all_in_floor_bp": "25.0",
-                      "all_in_cap_bp": "1200.0",
+                      "index_floor_bp": "0",
+                      "all_in_floor_bp": "25",
+                      "all_in_cap_bp": "1200",
                       "index_cap_bp": null,
                       "reset_frequency": {
                         "count": 3,

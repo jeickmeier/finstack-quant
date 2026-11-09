@@ -1517,7 +1517,7 @@ it("rejects scenario amounts outside the Rust decimal contract before the worker
   await userEvent.click(await screen.findByRole("option", { name: "Revenue" }));
   const amount = within(card).getByRole("textbox", { name: "Revenue" });
   expect(description(amount)).toBe("Scenario base");
-  fireEvent.change(amount, { target: { value: "1." } });
+  fireEvent.change(amount, { target: { value: "1_000" } });
   fireEvent.click(screen.getByRole("button", { name: "Run scenarios" }));
   expect(
     (
@@ -1573,7 +1573,7 @@ it("rejects grid amounts outside the Rust decimal contract before validation", a
   const exactValue = screen.getByRole("textbox", {
     name: "Revenue 2024Q1 exact value",
   });
-  fireEvent.change(exactValue, { target: { value: "+5" } });
+  fireEvent.change(exactValue, { target: { value: "5e" } });
   fireEvent.click(screen.getByRole("button", { name: "Save Revenue 2024Q1" }));
   expect(
     (
@@ -1604,7 +1604,7 @@ it("starts from the base scenario and names the failing path when the host scena
         defaultScenarioSetJson={JSON.stringify({
           scenarios: {
             downside: {
-              overrides: { revenue: { amount: "1.", currency: "USD" } },
+              overrides: { revenue: { amount: "1_000", currency: "USD" } },
             },
           },
         })}

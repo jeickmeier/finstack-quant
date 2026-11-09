@@ -473,8 +473,8 @@ export default [
   {
     "path": "#/$defs/d_48549691c341fd7f3116",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DecimalWire",
-    "description": "Exact decimal encoded only as a JSON string.",
-    "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$"
+    "description": "Exact decimal encoded only as a JSON string.\n\nRestoration routes through [`crate::decimal::parse_decimal`], the single\nexact text-admission rule: JSON numbers, malformed text and inexact values\nare rejected rather than rounded. Serialization writes canonical\nfixed-point text with trailing zeros removed and signed zero normalized\n(`\"1.5\"`, `\"0\"`), never scientific notation.",
+    "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$"
   },
   {
     "path": "#/$defs/d_48766f6cb460f23a8724",

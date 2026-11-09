@@ -63,9 +63,9 @@ test('Money text amounts are trimmed by the Rust decimal parser', () => {
 test('Money.checkedNeg is the exact Rust checked_neg and cannot throw', () => {
   const usd = new core.Currency('USD');
   const cases = [
-    [new core.Money(0, usd), '{"amount":"-0","currency":"USD"}'],
-    [core.Money.fromDecimalStr('0.00', usd), '{"amount":"-0.00","currency":"USD"}'],
-    [core.Money.fromDecimalStr('1.2500', usd), '{"amount":"-1.2500","currency":"USD"}'],
+    [new core.Money(0, usd), '{"amount":"0","currency":"USD"}'],
+    [core.Money.fromDecimalStr('0.00', usd), '{"amount":"0","currency":"USD"}'],
+    [core.Money.fromDecimalStr('1.2500', usd), '{"amount":"-1.25","currency":"USD"}'],
   ];
   for (const [money, expected] of cases) {
     const negated = money.checkedNeg();

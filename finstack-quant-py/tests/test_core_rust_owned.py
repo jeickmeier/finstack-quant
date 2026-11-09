@@ -55,9 +55,9 @@ def test_one_rust_currency_parser_names_the_code_and_does_not_trim(build: Callab
 @pytest.mark.parametrize(
     ("money", "expected"),
     [
-        (Money(0, "USD"), '{"amount":"-0","currency":"USD"}'),
-        (Money.from_decimal(Decimal("0.00"), "USD"), '{"amount":"-0.00","currency":"USD"}'),
-        (Money.from_decimal(Decimal("1.2500"), "USD"), '{"amount":"-1.2500","currency":"USD"}'),
+        (Money(0, "USD"), '{"amount":"0","currency":"USD"}'),
+        (Money.from_decimal(Decimal("0.00"), "USD"), '{"amount":"0","currency":"USD"}'),
+        (Money.from_decimal(Decimal("1.2500"), "USD"), '{"amount":"-1.25","currency":"USD"}'),
     ],
 )
 def test_negation_is_the_exact_rust_checked_neg(money: Money, expected: str) -> None:

@@ -23,7 +23,7 @@ export default [
           "as_of": "2024-01-01",
           "by_entity": {
             "ACME_CORP": {
-              "amount": "1000125.50",
+              "amount": "1000125.5",
               "currency": "USD"
             }
           },
@@ -35,17 +35,17 @@ export default [
               "position_id": "POS_001",
               "risk_metrics_complete": true,
               "value_base": {
-                "amount": "1000125.50",
+                "amount": "1000125.5",
                 "currency": "USD"
               },
               "value_native": {
-                "amount": "1000125.50",
+                "amount": "1000125.5",
                 "currency": "USD"
               }
             }
           },
           "total_base_currency": {
-            "amount": "1000125.50",
+            "amount": "1000125.5",
             "currency": "USD"
           }
         }
@@ -2577,8 +2577,8 @@ export default [
   {
     "path": "#/$defs/d_a7e13ac4f8bfd7d4f040",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/DecimalWire",
-    "description": "Exact decimal encoded only as a JSON string.",
-    "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$"
+    "description": "Exact decimal encoded only as a JSON string.\n\nRestoration routes through [`crate::decimal::parse_decimal`], the single\nexact text-admission rule: JSON numbers, malformed text and inexact values\nare rejected rather than rounded. Serialization writes canonical\nfixed-point text with trailing zeros removed and signed zero normalized\n(`\"1.5\"`, `\"0\"`), never scientific notation.",
+    "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$"
   },
   {
     "path": "#/$defs/d_a923fe11dbdde3e69fd8",
@@ -3711,8 +3711,8 @@ export default [
   {
     "path": "#/$defs/d_bdf84b73c34f6ec51af5",
     "source": "https://finstack_quant.dev/schemas/common/1/money.schema.json#/$defs/DecimalWire",
-    "description": "Exact decimal encoded only as a JSON string.",
-    "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$"
+    "description": "Exact decimal encoded only as a JSON string.\n\nRestoration routes through [`crate::decimal::parse_decimal`], the single\nexact text-admission rule: JSON numbers, malformed text and inexact values\nare rejected rather than rounded. Serialization writes canonical\nfixed-point text with trailing zeros removed and signed zero normalized\n(`\"1.5\"`, `\"0\"`), never scientific notation.",
+    "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$"
   },
   {
     "path": "#/$defs/d_be98333e68c25ab5ae57",

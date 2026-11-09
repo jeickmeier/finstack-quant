@@ -2,6 +2,6 @@
   "schema": "finstack_quant.cashflow/1",
   "fee_tier": {
     "threshold": "0.5",
-    "bp": "25.0"
+    "bp": "25"
   }
 }

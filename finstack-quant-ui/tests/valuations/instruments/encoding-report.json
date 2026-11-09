@@ -31,7 +31,6 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
-        "decimal-or-pattern-string": ["#/$defs/d_bdf84b73c34f6ec51af5"],
         "double": [
           "#/$defs/d_91fef53f78d7c50653a0/properties/coupon",
           "#/$defs/d_91fef53f78d7c50653a0/properties/guarantee_fee_bp",
@@ -445,7 +444,6 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
-        "decimal-or-pattern-string": ["#/$defs/d_bdf84b73c34f6ec51af5"],
         "double": [
           "#/$defs/d_24b4bd8fabf71247af0b/properties/coupon",
           "#/$defs/d_24b4bd8fabf71247af0b/properties/guarantee_fee_bp",
@@ -837,7 +835,6 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
-        "decimal-or-pattern-string": ["#/$defs/d_bdf84b73c34f6ec51af5"],
         "double": [
           "#/$defs/d_038bf279beea6aa9cf48/properties/coupon",
           "#/$defs/d_038bf279beea6aa9cf48/properties/guarantee_fee_bp",
@@ -1831,10 +1828,7 @@
           "#/$defs/ReturnFloorSpec/properties/day_count/anyOf/1"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_bdf84b73c34f6ec51af5",
-          "#/$defs/d_18f3ba1ec18ab2be13b2"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/AmortizationEvent/oneOf/1/properties/max_cumulative_loss",
           "#/$defs/AmortizationEvent/oneOf/2/properties/min_excess_spread_3m",
@@ -2930,7 +2924,6 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
-        "decimal-or-pattern-string": ["#/$defs/d_bdf84b73c34f6ec51af5"],
         "double": [
           "#/$defs/d_090a2e8da3e1c2418317/properties/autocall_barriers/items",
           "#/$defs/d_090a2e8da3e1c2418317/properties/cap_level",
@@ -3480,7 +3473,6 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
-        "decimal-or-pattern-string": ["#/$defs/d_bdf84b73c34f6ec51af5"],
         "double": [
           "#/$defs/d_95df9e3f9fb8d601ef0b/properties/barrier",
           "#/$defs/d_95df9e3f9fb8d601ef0b/properties/expiry_fixing",
@@ -3888,10 +3880,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_bdf84b73c34f6ec51af5",
-          "#/$defs/d_18f3ba1ec18ab2be13b2"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
           "#/$defs/d_b0a5fc543381da6a5722/properties/implied_volatility",
@@ -4584,10 +4573,7 @@
           "#/$defs/PaymentCalculation/oneOf/2/properties/percentage_of_special_serviced/properties/day_count/anyOf/1"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_18f3ba1ec18ab2be13b2",
-          "#/$defs/d_bdf84b73c34f6ec51af5"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/MakeWholeSpec/properties/spread_bp",
           "#/$defs/CallPut/properties/price_pct_of_par",
@@ -7199,10 +7185,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_bdf84b73c34f6ec51af5",
-          "#/$defs/d_18f3ba1ec18ab2be13b2"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
           "#/$defs/d_b0a5fc543381da6a5722/properties/implied_volatility",
@@ -7628,10 +7611,7 @@
           "#/$defs/d_e19dd3057abfdc658580/properties/day_count/anyOf/1"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_18f3ba1ec18ab2be13b2",
-          "#/$defs/d_bdf84b73c34f6ec51af5"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/d_2a9dd97d7e94dadcad76/properties/spread_bp",
           "#/$defs/d_672fabbbba5b6aab56ef/properties/price_pct_of_par",
@@ -8348,10 +8328,7 @@
           "#/$defs/d_7c31ba12f69da3273650/properties/day_count/anyOf/1"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_18f3ba1ec18ab2be13b2",
-          "#/$defs/d_bdf84b73c34f6ec51af5"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/d_5193595b8b998a0dc94c/properties/standard_coupon",
           "#/$defs/d_5193595b8b998a0dc94c/properties/standard_maturity_years",
@@ -9089,7 +9066,6 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
-        "decimal-or-pattern-string": ["#/$defs/d_bdf84b73c34f6ec51af5"],
         "double": [
           "#/$defs/d_db20612dc309c7165418/properties/price_pct_of_par",
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -9519,10 +9495,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_bdf84b73c34f6ec51af5",
-          "#/$defs/d_18f3ba1ec18ab2be13b2"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
           "#/$defs/d_b0a5fc543381da6a5722/properties/implied_volatility",
@@ -10105,10 +10078,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_bdf84b73c34f6ec51af5",
-          "#/$defs/d_18f3ba1ec18ab2be13b2"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/d_6565f7c25972c77d1ceb/properties/recovery_rate",
           "#/$defs/d_80e139d6f4d92c281a38/properties/weight",
@@ -10545,10 +10515,7 @@
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_18f3ba1ec18ab2be13b2",
-          "#/$defs/d_bdf84b73c34f6ec51af5"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/d_fcc5a617e836258c508e/properties/index_factor",
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -10948,7 +10915,6 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
-        "decimal-or-pattern-string": ["#/$defs/d_bdf84b73c34f6ec51af5"],
         "double": [
           "#/$defs/d_acd6c3d775d926e416ed/properties/attach_pct",
           "#/$defs/d_acd6c3d775d926e416ed/properties/coupon_bp",
@@ -11345,7 +11311,6 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
-        "decimal-or-pattern-string": ["#/$defs/d_bdf84b73c34f6ec51af5"],
         "double": [
           "#/$defs/d_e106c3fc700775eb2266/properties/global_cap",
           "#/$defs/d_e106c3fc700775eb2266/properties/global_floor",
@@ -11729,10 +11694,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_bdf84b73c34f6ec51af5",
-          "#/$defs/d_18f3ba1ec18ab2be13b2"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/d_95a946bb2f055985d90a/properties/accrual_fractions/items",
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -12131,10 +12093,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_bdf84b73c34f6ec51af5",
-          "#/$defs/d_18f3ba1ec18ab2be13b2"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/d_73d90e2fff39ad9eaf97",
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -12536,10 +12495,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_18f3ba1ec18ab2be13b2",
-          "#/$defs/d_bdf84b73c34f6ec51af5"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/d_3dbd4a1aab74e98eef06/properties/accrual_fractions/items",
           "#/$defs/d_3dbd4a1aab74e98eef06/properties/cms_cap",
@@ -16294,10 +16250,7 @@
           "#/$defs/PaymentCalculation/oneOf/2/properties/percentage_of_special_serviced/properties/day_count/anyOf/1"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_bdf84b73c34f6ec51af5",
-          "#/$defs/d_18f3ba1ec18ab2be13b2"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
           "#/$defs/d_b0a5fc543381da6a5722/properties/implied_volatility",
@@ -18909,10 +18862,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_18f3ba1ec18ab2be13b2",
-          "#/$defs/d_bdf84b73c34f6ec51af5"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/d_f949ae850ed7798d02bd/properties/spread_bp",
           "#/$defs/d_8b07d188ef24f2b5a810/properties/price_pct_of_par",
@@ -19584,10 +19534,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_bdf84b73c34f6ec51af5",
-          "#/$defs/d_18f3ba1ec18ab2be13b2"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
           "#/$defs/d_b0a5fc543381da6a5722/properties/implied_volatility",
@@ -20051,10 +19998,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_18f3ba1ec18ab2be13b2",
-          "#/$defs/d_bdf84b73c34f6ec51af5"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
           "#/$defs/d_b0a5fc543381da6a5722/properties/implied_volatility",
@@ -20806,7 +20750,6 @@
           "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/4/properties/monthly_cpr"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
-        "decimal-or-pattern-string": ["#/$defs/d_bdf84b73c34f6ec51af5"],
         "double": [
           "#/$defs/d_05625cf1aa46e3810fc5/properties/back_price",
           "#/$defs/d_05625cf1aa46e3810fc5/properties/coupon",
@@ -23123,10 +23066,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_18f3ba1ec18ab2be13b2",
-          "#/$defs/d_bdf84b73c34f6ec51af5"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
           "#/$defs/d_b0a5fc543381da6a5722/properties/implied_volatility",
@@ -23671,7 +23611,6 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
-        "decimal-or-pattern-string": ["#/$defs/d_bdf84b73c34f6ec51af5"],
         "double": [
           "#/$defs/d_9f54e6f1a3c511f443a0/properties/barrier",
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -24228,7 +24167,6 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
-        "decimal-or-pattern-string": ["#/$defs/d_bdf84b73c34f6ec51af5"],
         "double": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
           "#/$defs/d_b0a5fc543381da6a5722/properties/implied_volatility",
@@ -24747,7 +24685,6 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
-        "decimal-or-pattern-string": ["#/$defs/d_bdf84b73c34f6ec51af5"],
         "double": [
           "#/$defs/d_5f15f4bd684bc813ff88/properties/contract_rate",
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -26038,7 +25975,6 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
-        "decimal-or-pattern-string": ["#/$defs/d_bdf84b73c34f6ec51af5"],
         "double": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
           "#/$defs/d_b0a5fc543381da6a5722/properties/implied_volatility",
@@ -26566,7 +26502,6 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
-        "decimal-or-pattern-string": ["#/$defs/d_bdf84b73c34f6ec51af5"],
         "double": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
           "#/$defs/d_b0a5fc543381da6a5722/properties/implied_volatility",
@@ -27102,7 +27037,6 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
-        "decimal-or-pattern-string": ["#/$defs/d_bdf84b73c34f6ec51af5"],
         "double": [
           "#/$defs/d_17ebaf6bae7cbde5673d/properties/far_rate",
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -27641,7 +27575,6 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
-        "decimal-or-pattern-string": ["#/$defs/d_bdf84b73c34f6ec51af5"],
         "double": [
           "#/$defs/d_8ae84003bc844cfaf045/properties/barrier",
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -28187,7 +28120,6 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
-        "decimal-or-pattern-string": ["#/$defs/d_bdf84b73c34f6ec51af5"],
         "double": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
           "#/$defs/d_b0a5fc543381da6a5722/properties/implied_volatility",
@@ -28594,10 +28526,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_bdf84b73c34f6ec51af5",
-          "#/$defs/d_18f3ba1ec18ab2be13b2"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
           "#/$defs/d_b0a5fc543381da6a5722/properties/implied_volatility",
@@ -29006,10 +28935,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_bdf84b73c34f6ec51af5",
-          "#/$defs/d_18f3ba1ec18ab2be13b2"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/d_cf0ae253da617678cc3e/properties/base_cpi",
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -29414,10 +29340,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_18f3ba1ec18ab2be13b2",
-          "#/$defs/d_bdf84b73c34f6ec51af5"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/d_cf4b2b6fb1de084c8028/properties/base_cpi",
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -30783,10 +30706,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_18f3ba1ec18ab2be13b2",
-          "#/$defs/d_bdf84b73c34f6ec51af5"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
           "#/$defs/d_b0a5fc543381da6a5722/properties/implied_volatility",
@@ -31434,10 +31354,7 @@
           "#/$defs/d_f6867bdc53b436c37092/properties/day_count/anyOf/1"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_bdf84b73c34f6ec51af5",
-          "#/$defs/d_18f3ba1ec18ab2be13b2"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/d_42ef997031425d58ca65/properties/cap_rate",
           "#/$defs/d_42ef997031425d58ca65/properties/capex_schedule/items/prefixItems/1",
@@ -32712,7 +32629,6 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
-        "decimal-or-pattern-string": ["#/$defs/d_bdf84b73c34f6ec51af5"],
         "double": [
           "#/$defs/d_6737e7813812de86cf9b/properties/contract_rate",
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -33266,7 +33182,6 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
-        "decimal-or-pattern-string": ["#/$defs/d_bdf84b73c34f6ec51af5"],
         "double": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
           "#/$defs/d_b0a5fc543381da6a5722/properties/implied_volatility",
@@ -33820,7 +33735,6 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
-        "decimal-or-pattern-string": ["#/$defs/d_bdf84b73c34f6ec51af5"],
         "double": [
           "#/$defs/d_e896827d9ebec6b04130/properties/correlation",
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -34368,7 +34282,6 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
-        "decimal-or-pattern-string": ["#/$defs/d_bdf84b73c34f6ec51af5"],
         "double": [
           "#/$defs/d_c3cfabdd5d36e6a2dfa1/properties/coupon_rate",
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -34942,7 +34855,6 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
-        "decimal-or-pattern-string": ["#/$defs/d_bdf84b73c34f6ec51af5"],
         "double": [
           "#/$defs/d_f056a252f953016e9606/properties/cap_rate",
           "#/$defs/d_f056a252f953016e9606/properties/capex_schedule/items/prefixItems/1",
@@ -35368,10 +35280,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_bdf84b73c34f6ec51af5",
-          "#/$defs/d_18f3ba1ec18ab2be13b2"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/d_a90790311257fe58cf68/oneOf/1/properties/special/properties/rate_adjustment_bp",
           "#/$defs/d_994972192aa7987f8a64/properties/quantity",
@@ -35797,10 +35706,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_bdf84b73c34f6ec51af5",
-          "#/$defs/d_18f3ba1ec18ab2be13b2"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/d_672e934a739b8903870e/properties/correlation_matrix/items/items",
           "#/$defs/d_0332edef8a2151e9ffc4/oneOf/0/properties/cir/properties/initial",
@@ -36302,10 +36208,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_18f3ba1ec18ab2be13b2",
-          "#/$defs/d_bdf84b73c34f6ec51af5"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/d_97331c606d553b2e79d9/properties/price_pct_of_par",
           "#/$defs/d_34c7523897e1e79a3d8c/properties/coupon_cap",
@@ -36912,10 +36815,7 @@
           "#/$defs/PaymentCalculation/oneOf/2/properties/percentage_of_special_serviced/properties/day_count/anyOf/1"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_bdf84b73c34f6ec51af5",
-          "#/$defs/d_18f3ba1ec18ab2be13b2"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/CallAssumption/properties/price_pct",
           "#/$defs/CardPortfolioSpec/properties/charge_off_rate",
@@ -38316,10 +38216,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_bdf84b73c34f6ec51af5",
-          "#/$defs/d_18f3ba1ec18ab2be13b2"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
           "#/$defs/d_b0a5fc543381da6a5722/properties/implied_volatility",
@@ -38736,10 +38633,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_18f3ba1ec18ab2be13b2",
-          "#/$defs/d_bdf84b73c34f6ec51af5"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/d_8af284dde09995f0ad8c/properties/coupon_floor",
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -39300,10 +39194,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_bdf84b73c34f6ec51af5",
-          "#/$defs/d_18f3ba1ec18ab2be13b2"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/d_a7fceb51ed4391c22730/oneOf/3/properties/percent_of_original_per_period/properties/pct",
           "#/$defs/d_a7fceb51ed4391c22730/oneOf/4/properties/percent_of_remaining_per_period/properties/pct",
@@ -39959,10 +39850,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_18f3ba1ec18ab2be13b2",
-          "#/$defs/d_bdf84b73c34f6ec51af5"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/d_785f04c4ffd82f89f1ab/properties/discrete_dividends/items/prefixItems/1",
           "#/$defs/d_785f04c4ffd82f89f1ab/properties/dividend_tax_rate",
@@ -40586,10 +40474,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_18f3ba1ec18ab2be13b2",
-          "#/$defs/d_bdf84b73c34f6ec51af5"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/d_73fdb35378247123d02d/properties/initial_level",
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -41044,7 +40929,6 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
-        "decimal-or-pattern-string": ["#/$defs/d_bdf84b73c34f6ec51af5"],
         "double": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
           "#/$defs/d_b0a5fc543381da6a5722/properties/implied_volatility",
@@ -42364,10 +42248,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_18f3ba1ec18ab2be13b2",
-          "#/$defs/d_bdf84b73c34f6ec51af5"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
           "#/$defs/d_b0a5fc543381da6a5722/properties/implied_volatility",
@@ -42778,10 +42659,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/12"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
-        "decimal-or-pattern-string": [
-          "#/$defs/d_18f3ba1ec18ab2be13b2",
-          "#/$defs/d_bdf84b73c34f6ec51af5"
-        ],
+        "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "double": [
           "#/$defs/d_6c7cf0810b445d318ec1/properties/base_cpi",
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",

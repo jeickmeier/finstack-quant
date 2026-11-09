@@ -119,7 +119,7 @@ it("edits generated bond controls, shows decimal errors and emits native canonic
   const canonical = submit.mock.calls[0][0];
   expect(native.validateInstrumentJson(canonical)).toBe(canonical);
   expect(JSON.parse(canonical).instrument.spec.notional.amount).toBe(
-    "1234567.1234567890",
+    "1234567.123456789",
   );
   expect(JSON.parse(canonical).instrument.spec.settlement_days).toBe(1);
   expect(

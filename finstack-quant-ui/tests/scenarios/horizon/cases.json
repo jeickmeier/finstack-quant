@@ -57,7 +57,7 @@
             "currency": "USD"
           },
           "credit_curves_pnl": {
-            "amount": "0.000000000",
+            "amount": "0",
             "currency": "USD"
           },
           "inflation_curves_pnl": {
@@ -93,7 +93,7 @@
             "currency": "USD"
           },
           "residual": {
-            "amount": "0.000000000",
+            "amount": "0",
             "currency": "USD"
           },
           "carry_detail": {
@@ -266,7 +266,7 @@
         {
           "field": "credit_curves_pnl",
           "amount": {
-            "amount": "0.000000000",
+            "amount": "0",
             "currency": "USD"
           },
           "pct_of_total": 0
@@ -338,7 +338,7 @@
         {
           "field": "residual",
           "amount": {
-            "amount": "0.000000000",
+            "amount": "0",
             "currency": "USD"
           },
           "pct_of_total": 0
@@ -388,7 +388,7 @@
             "currency": "USD"
           },
           "credit_curves_pnl": {
-            "amount": "0.000000000",
+            "amount": "0",
             "currency": "USD"
           },
           "inflation_curves_pnl": {
@@ -424,7 +424,7 @@
             "currency": "USD"
           },
           "residual": {
-            "amount": "0.000000000",
+            "amount": "0",
             "currency": "USD"
           },
           "carry_detail": {
@@ -578,7 +578,7 @@
         {
           "field": "credit_curves_pnl",
           "amount": {
-            "amount": "0.000000000",
+            "amount": "0",
             "currency": "USD"
           },
           "pct_of_total": 0
@@ -650,7 +650,7 @@
         {
           "field": "residual",
           "amount": {
-            "amount": "0.000000000",
+            "amount": "0",
             "currency": "USD"
           },
           "pct_of_total": 0

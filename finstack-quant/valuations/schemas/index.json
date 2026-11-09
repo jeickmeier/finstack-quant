@@ -128,7 +128,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
-      "bytes": 361,
+      "bytes": 388,
       "kind": "component",
       "path": "schemas/common/1/decimal.schema.json",
       "summary": "Exact decimal encoded as a JSON string.",
@@ -245,7 +245,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-      "bytes": 20481,
+      "bytes": 20849,
       "kind": "component",
       "path": "schemas/common/1/money.schema.json",
       "summary": "Currency-tagged monetary amount.",

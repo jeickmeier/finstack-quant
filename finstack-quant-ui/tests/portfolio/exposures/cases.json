@@ -3,7 +3,7 @@
   "sources": [
     {
       "path": "finstack-quant-ui/tests/portfolio/workbench/cases.json",
-      "sha256": "bb28cd8ca7af71c8e78e2f28a29acb0080b7a0d7771be55e9447418ac0e68d32"
+      "sha256": "0167e31074e1fc6929b7dee16bc46792b4a1bf8a41558fd47ff44df2e6f6dcd3"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",

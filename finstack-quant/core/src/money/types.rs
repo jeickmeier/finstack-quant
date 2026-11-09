@@ -274,13 +274,12 @@ impl Money {
     /// Unlike [`Money::new`], this constructor never goes
     /// through `f64`, so it is the preferred entry point when the caller already
     /// has a high-precision value (e.g., a Python `decimal.Decimal` rendered to
-    /// a string and parsed via `Decimal::from_str`). Use this for hedge-fund
-    /// notionals where IEEE 754 rounding of the input would be unacceptable.
+    /// exact decimal text and parsed via [`crate::decimal::parse_decimal`]).
+    /// Use this for notionals where IEEE 754 rounding of the input would be
+    /// unacceptable. A negative zero is normalized to zero.
     ///
-    /// `rust_decimal::Decimal` already rejects `NaN` / `Infinity` at parse
-    /// time, so callers parsing user-supplied strings will surface those errors
-    /// before reaching this constructor. Every `Decimal` has a finite `f64`
-    /// view for [`Self::amount`], so construction cannot fail.
+    /// Every `Decimal` has a finite `f64` view for [`Self::amount`], so
+    /// construction cannot fail.
     ///
     /// # Arguments
     ///
@@ -288,6 +287,11 @@ impl Money {
     /// * `currency` - ISO-4217 currency that defines scale, rounding, and display units
     #[must_use]
     pub fn from_decimal(amount: rust_decimal::Decimal, currency: Currency) -> Self {
+        let amount = if amount.is_zero() {
+            rust_decimal::Decimal::ZERO
+        } else {
+            amount
+        };
         Self { amount, currency }
     }
 
@@ -296,18 +300,14 @@ impl Money {
     /// `amount` is parsed directly as a `rust_decimal::Decimal` — fixed-point
     /// text such as `"1234.56"` or scientific text such as `"1.2345e3"` —
     /// without converting through `f64`. The text must be exactly
-    /// representable within Decimal's 96-bit mantissa and its maximum
+    /// representable within Decimal's 96-bit coefficient and its maximum
     /// fractional scale of 28 digits; values needing more precision are
-    /// rejected rather than silently rounded. For scientific input the
-    /// mantissa itself is validated with `Decimal::from_str_exact` and the
-    /// exponent is applied exactly on the integer coefficient and scale:
-    /// excessive target scales are reduced only by removing trailing
-    /// coefficient zeroes, so no nonzero digit is ever discarded, and
-    /// results beyond the 96-bit mantissa or 28-digit scale are rejected.
+    /// rejected rather than silently rounded. The grammar and exponent rules
+    /// are those of [`crate::decimal::parse_decimal`], which also restores
+    /// Money's wire amount.
     ///
     /// The currency is a display/arithmetic tag only: no FX conversion is
-    /// performed. This constructor bypasses the general `Money` serde path,
-    /// which tolerates lossy re-rendering of over-precise amounts.
+    /// performed.
     ///
     /// # Arguments
     ///

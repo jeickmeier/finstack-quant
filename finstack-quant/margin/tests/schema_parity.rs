@@ -17,7 +17,8 @@ use serde_json::{Value, json};
 use std::fmt::Debug;
 use time::macros::date;
 
-const CANONICAL_DECIMAL_PATTERN: &str = r"^-?\d+(\.\d+)?([eE][+-]?\d+)?$";
+const CANONICAL_DECIMAL_PATTERN: &str =
+    r"^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$";
 
 fn margin_schema() -> Value {
     serde_json::from_str(include_str!("../schemas/margin/1/margin.schema.json"))

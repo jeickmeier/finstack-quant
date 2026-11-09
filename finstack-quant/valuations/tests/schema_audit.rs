@@ -96,7 +96,7 @@ mod generated_schema_contract {
 
     const JSON_SCHEMA_2020_12: &str = "https://json-schema.org/draft/2020-12/schema";
     const SCHEMA_ID_HOST: &str = "https://finstack_quant.dev/";
-    const DECIMAL_PATTERN: &str = r"^-?\d+(\.\d+)?([eE][+-]?\d+)?$";
+    const DECIMAL_PATTERN: &str = r"^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$";
     const COMMON_SCHEMA_HOST: &str = "https://finstack_quant.dev/schemas/common/1/";
     const CASHFLOW_SCHEMA_HOST: &str = "https://finstack_quant.dev/schemas/cashflow/1/";
     const COMMON_SCHEMA_FILES: &[(&str, &str)] = &[

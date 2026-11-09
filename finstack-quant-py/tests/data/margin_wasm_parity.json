@@ -1318,14 +1318,14 @@
     },
     "for_collateral": {
       "amount": {
-        "amount": "800000.00",
+        "amount": "800000",
         "currency": "USD"
       },
       "approximation": false,
       "as_of": "2025-01-15",
       "breakdown": {
         "cash": {
-          "amount": "800000.00",
+          "amount": "800000",
           "currency": "USD"
         }
       },
@@ -1402,7 +1402,7 @@
       "spread": 0.020000000000000004,
       "wire": {
         "annual_cost": {
-          "amount": "200000.00",
+          "amount": "200000",
           "currency": "USD"
         },
         "collateral_rate": 0.03,
@@ -1422,7 +1422,7 @@
         },
         "current_haircut": 0.02,
         "pv_change": {
-          "amount": "1000.0000",
+          "amount": "1000",
           "currency": "USD"
         }
       }

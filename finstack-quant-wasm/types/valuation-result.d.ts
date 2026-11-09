@@ -318,6 +318,12 @@ export type DateWire = string;
 /**
  * Exact decimal encoded only as a JSON string.
  *
+ * Restoration routes through [`crate::decimal::parse_decimal`], the single
+ * exact text-admission rule: JSON numbers, malformed text and inexact values
+ * are rejected rather than rounded. Serialization writes canonical
+ * fixed-point text with trailing zeros removed and signed zero normalized
+ * (`"1.5"`, `"0"`), never scientific notation.
+ *
  * This interface was referenced by `ValuationResult1`'s JSON-Schema
  * via the `definition` "DecimalWire".
  *

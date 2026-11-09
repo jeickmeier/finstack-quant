@@ -3,6 +3,12 @@
 
 /**
  * Exact decimal encoded only as a JSON string.
+ *
+ * Restoration routes through [`crate::decimal::parse_decimal`], the single
+ * exact text-admission rule: JSON numbers, malformed text and inexact values
+ * are rejected rather than rounded. Serialization writes canonical
+ * fixed-point text with trailing zeros removed and signed zero normalized
+ * (`"1.5"`, `"0"`), never scientific notation.
  */
 export type DB375E274438Ab847F1Fc = string;
 /**
@@ -1756,6 +1762,12 @@ export interface D_7Af15F20A258D1Def9Dd {
   forward_curve_id: string;
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   gearing?: string;
   /**
@@ -1817,6 +1829,12 @@ export interface D_7Af15F20A258D1Def9Dd {
   reset_lag_days?: number;
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   spread_bp: string;
 }
@@ -2227,6 +2245,12 @@ export interface D_78D4B16242Febe84F62B {
   frequency: DCc937Fbaa12E32D4187E4;
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   initial_rate: string;
   /**
@@ -2305,6 +2329,12 @@ export interface DCc937Fbaa12E32D4187E4 {
 export interface DD5Bd42D8B6Ec6C31D786 {
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   amount: string;
   /**
@@ -2493,6 +2523,12 @@ export interface DD5Bd42D8B6Ec6C31D786 {
 export interface DD5Bd42D8B6Ec6C31D7861 {
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   amount: string;
   /**
@@ -3202,6 +3238,12 @@ export interface D_63Aec3D47748D9F3D86A {
 export interface DD5Bd42D8B6Ec6C31D7862 {
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   amount: string;
   /**
@@ -3517,6 +3559,12 @@ export interface D_6602Ee07128Cdbd914Fe {
 export interface DD5Bd42D8B6Ec6C31D7863 {
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   amount: string;
   /**
@@ -4588,6 +4636,12 @@ export interface DBa1770Ec18C0E3F8979E {
 export interface DD5Bd42D8B6Ec6C31D7864 {
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   amount: string;
   /**
@@ -5488,6 +5542,12 @@ export interface D_3883C45B3701884Ad50B1 {
 export interface DD5Bd42D8B6Ec6C31D7865 {
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   amount: string;
   /**
@@ -5700,6 +5760,12 @@ export interface D_532D79936E466Cf90D8A {
 export interface DD5Bd42D8B6Ec6C31D7866 {
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   amount: string;
   /**
@@ -5888,6 +5954,12 @@ export interface DD5Bd42D8B6Ec6C31D7866 {
 export interface DD5Bd42D8B6Ec6C31D7867 {
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   amount: string;
   /**
@@ -6551,6 +6623,12 @@ export interface D_87642A02554Ab08B56E32 {
 export interface DD5Bd42D8B6Ec6C31D7868 {
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   amount: string;
   /**
@@ -6739,6 +6817,12 @@ export interface DCdcefb52Fec44Ed9Ad4D {
   date: string;
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   reduction_fee_bp?: string;
 }
@@ -6763,6 +6847,12 @@ export interface DCdcefb52Fec44Ed9Ad4D {
 export interface DD5Bd42D8B6Ec6C31D7869 {
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   amount: string;
   /**
@@ -6965,6 +7055,12 @@ export interface D_15F166119Ad533748A6A {
 export interface DD5Bd42D8B6Ec6C31D78610 {
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   amount: string;
   /**
@@ -7355,6 +7451,12 @@ export interface D_0Db717D28554658Ae7C4 {
 export interface DD5Bd42D8B6Ec6C31D78611 {
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   amount: string;
   /**
@@ -7568,10 +7670,22 @@ export interface D_12Fd8E2C005F5987500B {
 export interface D_743B3Dc0Bceb8C74B135 {
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   bp: string;
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   threshold: string;
 }
@@ -7716,6 +7830,12 @@ export interface D_706Cd4B04E5E632E9D55 {
 export interface DD5Bd42D8B6Ec6C31D78612 {
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   amount: string;
   /**
@@ -7904,6 +8024,12 @@ export interface DD5Bd42D8B6Ec6C31D78612 {
 export interface DD5Bd42D8B6Ec6C31D78613 {
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   amount: string;
   /**
@@ -8092,6 +8218,12 @@ export interface DD5Bd42D8B6Ec6C31D78613 {
 export interface DD5Bd42D8B6Ec6C31D78614 {
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   amount: string;
   /**
@@ -8273,6 +8405,12 @@ export interface D_540B029Baeeb4469863B {
   date: string;
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   delta_bp: string;
 }
@@ -8495,6 +8633,12 @@ export interface D_7Af15F20A258D1Def9Dd1 {
   forward_curve_id: string;
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   gearing?: string;
   /**
@@ -8556,6 +8700,12 @@ export interface D_7Af15F20A258D1Def9Dd1 {
   reset_lag_days?: number;
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   spread_bp: string;
 }
@@ -8619,6 +8769,12 @@ export interface DA34Dcb09Eabb2F8Fad88 {
 export interface DD5Bd42D8B6Ec6C31D78615 {
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   amount: string;
   /**
@@ -9583,6 +9739,12 @@ export interface D_921D6786A1Addb2Dd23C {
 export interface DD5Bd42D8B6Ec6C31D78616 {
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   amount: string;
   /**
@@ -9828,6 +9990,12 @@ export interface D_2477996Edc1959Af8D37 {
   commitment: DD5Bd42D8B6Ec6C31D78617;
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   commitment_fee_bp: string;
   /**
@@ -9851,6 +10019,12 @@ export interface D_2477996Edc1959Af8D37 {
   oid_policy?: D_369F1A09E65Be1364D06 | null;
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   usage_fee_bp: string;
 }
@@ -9875,6 +10049,12 @@ export interface D_2477996Edc1959Af8D37 {
 export interface DD5Bd42D8B6Ec6C31D78617 {
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   amount: string;
   /**
@@ -10077,6 +10257,12 @@ export interface D_15E0A0E0C92Dbbdf6D8D {
 export interface DD5Bd42D8B6Ec6C31D78618 {
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   amount: string;
   /**
@@ -10338,6 +10524,12 @@ export interface D_3883C45B3701884Ad50B3 {
 export interface DD5Bd42D8B6Ec6C31D78619 {
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   amount: string;
   /**
@@ -10948,6 +11140,12 @@ export interface DF6Da7F7Ae3129Fc74F07 {
   payment_lag_days?: number;
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   rate: string;
   /**
@@ -11397,6 +11595,12 @@ export interface D_450829Dac3A74A5C8761 {
   reset_lag_days?: number;
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   spread_bp: string;
   /**
@@ -11917,6 +12121,12 @@ export interface DD935E8Af56B4A92Db192 {
 export interface DD5Bd42D8B6Ec6C31D78620 {
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   amount: string;
   /**
@@ -12105,6 +12315,12 @@ export interface DD5Bd42D8B6Ec6C31D78620 {
 export interface DD5Bd42D8B6Ec6C31D78621 {
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   amount: string;
   /**
@@ -12316,6 +12532,12 @@ export interface D_9B513F9D33905Fc46547 {
 export interface DD5Bd42D8B6Ec6C31D78622 {
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   amount: string;
   /**
@@ -12504,6 +12726,12 @@ export interface DD5Bd42D8B6Ec6C31D78622 {
 export interface DD5Bd42D8B6Ec6C31D78623 {
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   amount: string;
   /**
@@ -12692,6 +12920,12 @@ export interface DD5Bd42D8B6Ec6C31D78623 {
 export interface DD5Bd42D8B6Ec6C31D78624 {
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   amount: string;
   /**
@@ -12880,6 +13114,12 @@ export interface DD5Bd42D8B6Ec6C31D78624 {
 export interface DD5Bd42D8B6Ec6C31D78625 {
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   amount: string;
   /**
@@ -13098,6 +13338,12 @@ export interface D_3883C45B3701884Ad50B4 {
 export interface DD5Bd42D8B6Ec6C31D78626 {
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   amount: string;
   /**
@@ -13674,6 +13920,12 @@ export interface DB925Ced0Cbd67041A76F {
   settlement?: "physical" | "cash";
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   spread_bp?: string;
   /**
@@ -13682,6 +13934,12 @@ export interface DB925Ced0Cbd67041A76F {
   start_date: string;
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   strike: string;
   /**
@@ -13866,6 +14124,12 @@ export interface D_3883C45B3701884Ad50B5 {
 export interface DD5Bd42D8B6Ec6C31D78627 {
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   amount: string;
   /**
@@ -14357,6 +14621,12 @@ export interface D_3883C45B3701884Ad50B6 {
 export interface DD5Bd42D8B6Ec6C31D78628 {
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   amount: string;
   /**
@@ -14854,6 +15124,12 @@ export interface DF6Da7F7Ae3129Fc74F071 {
   payment_lag_days?: number;
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   rate: string;
   /**
@@ -15267,6 +15543,12 @@ export interface D_450829Dac3A74A5C87611 {
   reset_lag_days?: number;
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   spread_bp: string;
   /**
@@ -15627,6 +15909,12 @@ export interface D_9699Cb3C9E4A8E981880 {
 export interface DD5Bd42D8B6Ec6C31D78629 {
   /**
    * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
    */
   amount: string;
   /**

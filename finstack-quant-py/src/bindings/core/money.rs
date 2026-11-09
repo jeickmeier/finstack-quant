@@ -110,18 +110,21 @@ pub(crate) fn is_python_decimal(obj: &Bound<'_, PyAny>) -> PyResult<bool> {
 }
 
 /// Build a [`Money`] from a Python amount that may be `float`, `int`,
-/// `decimal.Decimal` or a decimal string. `Decimal`/`str` inputs never pass
-/// through `f64` and are parsed by [`Money::from_decimal_str`], which rejects
-/// values beyond Decimal's 96-bit mantissa or 28-digit scale; numeric inputs
-/// follow IEEE 754 semantics and later ``amount`` accessors expose an ``f64``
-/// view.
+/// `decimal.Decimal` or a decimal string. `int`, `Decimal` and `str` inputs
+/// never pass through `f64`: they are parsed exactly by
+/// [`Money::from_decimal_str`], which rejects values beyond Decimal's 96-bit
+/// coefficient or 28-digit scale. A `float` is admitted through its shortest
+/// round-trip decimal text.
 pub(crate) fn money_from_amount(obj: &Bound<'_, PyAny>, ccy: Currency) -> PyResult<Money> {
     if obj.is_instance_of::<pyo3::types::PyBool>() {
         return Err(PyTypeError::new_err(
             "Money amount must be float, int, str, or decimal.Decimal",
         ));
     }
-    if !obj.is_instance_of::<PyFloat>() && !obj.is_instance_of::<PyInt>() {
+    if obj.is_instance_of::<PyInt>() {
+        return Money::from_decimal_str(obj.str()?.to_str()?, ccy).map_err(core_to_py);
+    }
+    if !obj.is_instance_of::<PyFloat>() {
         if let Ok(text) = obj.cast::<PyString>() {
             return Money::from_decimal_str(text.to_str()?, ccy).map_err(core_to_py);
         }
@@ -156,6 +159,15 @@ impl PyMoney {
             return Err(PyTypeError::new_err(
                 "Money amount must be float or int; use Money.from_decimal for an exact Decimal",
             ));
+        }
+        if amount.is_instance_of::<PyInt>() {
+            // An integer is exact: never round it through binary64.
+            let exact = finstack_quant_core::decimal::parse_decimal(amount.str()?.to_str()?)
+                .map_err(core_to_py)?;
+            return Ok(Self::from_inner(match config {
+                Some(cfg) => Money::from_decimal_with_config(exact, ccy, &cfg.inner),
+                None => Money::from_decimal(exact, ccy),
+            }));
         }
         let amount: f64 = amount.extract()?;
         match config {

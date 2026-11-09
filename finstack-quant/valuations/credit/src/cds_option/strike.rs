@@ -164,7 +164,7 @@ mod tests {
     fn clean_price_variant_round_trips_canonical_json() {
         let strike = CdsOptionStrike::CleanPricePct(Decimal::new(1070, 1));
         let json = serde_json::to_value(strike).expect("serialize");
-        assert_eq!(json, serde_json::json!({ "clean_price_pct": "107.0" }));
+        assert_eq!(json, serde_json::json!({ "clean_price_pct": "107" }));
         let back: CdsOptionStrike = serde_json::from_value(json).expect("deserialize");
         assert_eq!(back, strike);
     }

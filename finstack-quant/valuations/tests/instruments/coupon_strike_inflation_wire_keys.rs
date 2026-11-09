@@ -96,17 +96,14 @@ const PINNED_PV: &[(&str, PvReference)] = &[
     ),
     ("cms_swap", PvReference::Recorded("-99606.9359312007")),
     ("commodity_swap", PvReference::Recorded("57241.779109393")),
-    ("deposit", PvReference::Recorded("725.2194690658727500000")),
+    ("deposit", PvReference::Recorded("725.21946906587275")),
     ("forward_rate_agreement", PvReference::ContractualRate),
     (
         "inflation_cap_floor",
         PvReference::Recorded("3742.853205610149"),
     ),
     ("inflation_linked_bond", PvReference::CanonicalRoundtrip),
-    (
-        "inflation_swap",
-        PvReference::Recorded("-4080.8031999999000000"),
-    ),
+    ("inflation_swap", PvReference::Recorded("-4080.8031999999")),
     ("quanto_option", PvReference::Recorded("257243.9712687773")),
     // These wire tests check the current canonical contract exactly; model
     // discretization/RNG evolution is covered by the dedicated model tests.

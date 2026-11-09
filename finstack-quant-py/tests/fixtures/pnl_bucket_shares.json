@@ -2,7 +2,7 @@
   {
     "field": "carry",
     "amount": {
-      "amount": "25111.870112110",
+      "amount": "25111.87011211",
       "currency": "USD"
     },
     "pct_of_total": 110.46011624140002
@@ -90,7 +90,7 @@
   {
     "field": "residual",
     "amount": {
-      "amount": "0.000000000",
+      "amount": "0",
       "currency": "USD"
     },
     "pct_of_total": 0.0

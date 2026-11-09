@@ -6835,7 +6835,7 @@
           "id": "AAPL",
           "scalar": {
             "price": {
-              "amount": "175.00",
+              "amount": "175",
               "currency": "USD"
             }
           }
@@ -7022,7 +7022,7 @@
           "prices": {
             "AAPL": {
               "price": {
-                "amount": "175.00",
+                "amount": "175",
                 "currency": "USD"
               }
             }
@@ -7590,7 +7590,7 @@
           "id": "IBM-7YR-2033",
           "scalar": {
             "price": {
-              "amount": "101.250",
+              "amount": "101.25",
               "currency": "USD"
             }
           }
@@ -7600,7 +7600,7 @@
           "id": "MSFT-5YR-2031",
           "scalar": {
             "price": {
-              "amount": "103.500",
+              "amount": "103.5",
               "currency": "USD"
             }
           }
@@ -7618,13 +7618,13 @@
           "prices": {
             "IBM-7YR-2033": {
               "price": {
-                "amount": "101.250",
+                "amount": "101.25",
                 "currency": "USD"
               }
             },
             "MSFT-5YR-2031": {
               "price": {
-                "amount": "103.500",
+                "amount": "103.5",
                 "currency": "USD"
               }
             },
@@ -7787,7 +7787,7 @@
           "id": "AAPL",
           "scalar": {
             "price": {
-              "amount": "175.00",
+              "amount": "175",
               "currency": "USD"
             }
           }
@@ -7797,7 +7797,7 @@
           "id": "MSFT",
           "scalar": {
             "price": {
-              "amount": "410.00",
+              "amount": "410",
               "currency": "USD"
             }
           }
@@ -7859,13 +7859,13 @@
           "prices": {
             "AAPL": {
               "price": {
-                "amount": "175.00",
+                "amount": "175",
                 "currency": "USD"
               }
             },
             "MSFT": {
               "price": {
-                "amount": "410.00",
+                "amount": "410",
                 "currency": "USD"
               }
             }

@@ -5,7 +5,7 @@
   "examples": [
     {
       "annual_cost": {
-        "amount": "25000.000000000020000000",
+        "amount": "25000.00000000002",
         "currency": "USD"
       },
       "collateral_rate": 0.0525,

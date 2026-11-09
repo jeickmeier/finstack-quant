@@ -1,7 +1,7 @@
 # CORE-CONVENTIONS-012: Decimal monetary arithmetic, explicit boundary rounding and currency scales
 
 - Decision status: **Accepted — complete monetary/currency package, 2026-11-07**.
-- Implementation status: **Observed; reconciliation pending**, scoped to `decimal.rs`, `currency.rs`, generated currency metadata and `money/{types,rounding}.rs`.
+- Implementation status: **Partly reconciled 2026-11-08**: items 1 (zero normalization in `Money::from_decimal`), 2 (the exact text grammar in `parse_decimal`, with the final value tested after the exponent) and 3 (exact `DecimalWire` restore and canonical normalized fixed-point output, exact Python `int`) landed. Item 4 (shortest-text float admission) is held pending an owner decision on sub-`1e-28` model values; items 5–15 remain. Scoped to `decimal.rs`, `currency.rs`, generated currency metadata and `money/{types,rounding}.rs`.
 - Validation status: **Evidence inspected/located; independent qualification pending**. Documentation and independent exact/rational/rounding/float-reference/currency checks passed; production Rust/host tests, backend accuracy and full ISO-source qualification were not executed for this review.
 - Audit date: **2026-11-05**. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; see [scope and inventory](README.md).
 
