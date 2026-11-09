@@ -60,6 +60,42 @@ inventory, not universal correctness certification or independent model validati
 - [Terminal cash](14-loss-recognition-and-terminal-cash.md), [principal regimes](13-principal-regimes-and-amortization.md), [borrowing base](19-borrowing-base-facility.md) and [quotes](20-quotes-and-inverse-pricing.md) describe observed contracts; they do not establish legal or market approval.
 - Synthetic CDS tranches belong to [ADR 0031](../models-and-valuations-credit/0031-tranche-loss-model-selection.md) and the credit slice, not this cash-waterfall inventory.
 
+## Month counts at structured-credit sites
+
+[CORE-CONVENTIONS-007 #4](../core-conventions/007-tenor-date-arithmetic.md#accepted-decision-tenor-and-date-arithmetic-conventions)
+redefined the core `months_until` as completed months from the original
+anchor and made a reversed range an error. Per owner resolution O13, the
+structured-credit sites below do not adopt that measure automatically. Each
+site's meaning is stated here; every site currently uses the named site-local
+`ClampedMonths::clamped_months_until` (`structured_credit/utils/months.rs`),
+which keeps the pre-007 count: `(Y₂-Y₁)·12 + (M₂-M₁)`, minus one when the
+start day exceeds the end day unless both are month-ends, and zero for a
+reversed range. No accepted structured-credit record selects a measure for
+any of these meanings, so none has been migrated.
+
+| Site | Meaning | Measure needed (unsettled) |
+| --- | --- | --- |
+| `metrics/deal_specific/cmbs.rs` (age) | Loan seasoning: age of the loan at valuation | Seasoning convention of the CMBS servicing record (06) |
+| `metrics/deal_specific/cmbs.rs` (remaining term) | Remaining months to loan maturity for IO/amortization tests | Contractual remaining payment count from the loan schedule |
+| `metrics/risk/oas.rs` (horizon) | Length of the monthly OAS rate path (plus a 12-month buffer) | Simulation grid length (17) |
+| `metrics/risk/oas.rs` (index) | Monthly OU-path index of a cashflow date | Simulation month index on the OAS grid (17) |
+| `pricing/simulation_engine/orchestration.rs` | Pool seasoning at a redemption date (closing seasoning plus months since closing) | Seasoning convention used for liquidation value (14) |
+| `pricing/simulation_engine/pool_flow_source.rs` (seasoning) | Per-asset seasoning at a payment date for prepayment/default ramps | Seasoning convention of the collateral projection (03) |
+| `pricing/simulation_engine/pool_flow_source.rs` (index) | Rate-shift path index of a payment date | Simulation month index (15) |
+| `pricing/simulation_engine/pool_flows.rs` (age) | Per-asset age at the period start for ramp curves | Seasoning convention of the collateral projection (03) |
+| `pricing/simulation_engine/pool_flows.rs` (remaining term) | Remaining amortization months to asset maturity | Contractual remaining payment count (13) |
+| `pricing/simulation_engine/simulate_period/mod.rs` | Deal seasoning at a payment date for ramp entry | Seasoning convention of the collateral projection (03) |
+| `pricing/simulation_engine/simulate_period/period_waterfall.rs` | Months since closing for shifting-interest lock-out schedules | Contractual lock-out schedule definition (13) |
+| `pricing/stochastic/pricer/engine.rs` (test) | Scenario-tree depth in months | Simulation grid length (15) |
+| `types/instrument.rs` | Asset original term from origination to maturity | Contractual original term |
+| `types/pool.rs` (bound) | Largest representable seasoning from the earliest supported date | A domain bound; either measure suffices |
+| `types/pool.rs` (age) | Balance-weighted pool age at a date | Seasoning convention of pool statistics (02) |
+| `types/pricing_methods.rs` | Scenario-tree depth from valuation to maturity | Simulation grid length (15) |
+
+These are the open "state the meaning" items of the core-conventions follow-up
+for record 007; each moves to its measure only when the owning record selects
+it.
+
 ## Follow-up tracking
 
 The [structured-credit follow-ups](../FOLLOW_UPS.md#structured-credit) own adoption
