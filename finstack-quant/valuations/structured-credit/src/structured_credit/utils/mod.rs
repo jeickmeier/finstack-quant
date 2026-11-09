@@ -6,6 +6,7 @@
 //! - Validation framework for waterfall specifications
 
 pub(crate) mod amortization;
+pub(crate) mod months;
 pub(crate) mod simulation;
 pub(crate) mod validation;
 

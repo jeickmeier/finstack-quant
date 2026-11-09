@@ -1,5 +1,6 @@
 use super::*;
 use crate::structured_credit::utils::amortization::level_payment_per_unit;
+use crate::structured_credit::utils::months::ClampedMonths;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 
 /// AssetPool flow results for a single period.
@@ -745,7 +746,7 @@ pub(super) fn calculate_pool_flows_with_rates(
             // acquisition date, else the deal closing).
             let origination = state.pool_state.origination_dates[i].unwrap_or(state.closing_date);
             let age_months = if origination < request.prev_date {
-                origination.months_until(request.prev_date)
+                origination.clamped_months_until(request.prev_date)
             } else {
                 0
             };
@@ -758,7 +759,7 @@ pub(super) fn calculate_pool_flows_with_rates(
                     state.pool_state.amortization_term_months[i],
                     request
                         .pay_date
-                        .months_until(state.pool_state.maturities[i]),
+                        .clamped_months_until(state.pool_state.maturities[i]),
                     months_per_period_u32,
                 ),
             );

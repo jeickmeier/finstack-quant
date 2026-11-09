@@ -1,7 +1,7 @@
 # CORE-CONVENTIONS-007: Calendar tenor arithmetic and approximate frequency conversions
 
 - Decision status: **Accepted — complete tenor/date-arithmetic package, 2026-11-07**.
-- Implementation status: **Partly reconciled 2026-11-09** (#2 limits, #6 tenor bridge, #7 approximations, #8 nominal ratio, #10 epoch inverse, #11 WASM domain); #4 completed months, #5 required roll convention and #9 removals remain, scoped to `dates/{date_extensions,tenor,mod}.rs`.
+- Implementation status: **Partly reconciled 2026-11-09** (#2 limits, #6 tenor bridge, #7 approximations, #8 nominal ratio, #10 epoch inverse, #11 WASM domain; #4 completed months and #5 roll rule on 2026-11-09 for core and hosts); #9 removals and the structured-credit month consumers remain, scoped to `dates/{date_extensions,tenor,mod}.rs`.
 - Validation status: **Evidence inspected/located; independent qualification pending**. Documentation and independent calendar/rational-arithmetic examples passed; production Rust/host tests were not executed for this review.
 - Audit date: **2026-11-05**. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; see [scope and inventory](README.md).
 

@@ -6,6 +6,7 @@
 
 use super::*;
 use crate::structured_credit::types::{PaymentCalculation, PaymentType};
+use crate::structured_credit::utils::months::ClampedMonths;
 
 mod cash;
 mod losses;
@@ -72,7 +73,7 @@ pub(super) fn simulate_period(
     // Seasoned collateral therefore enters the ramp partway up instead of
     // restarting at month zero on the deal closing date.
     let seasoning_months =
-        state.closing_seasoning_months + state.closing_date.months_until(pay_date);
+        state.closing_seasoning_months + state.closing_date.clamped_months_until(pay_date);
 
     // Capture period start before updating prev_date (for accrual calculations)
     let period_start = period.accrual_start;

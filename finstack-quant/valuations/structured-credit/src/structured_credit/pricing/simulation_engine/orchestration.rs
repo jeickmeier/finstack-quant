@@ -1,4 +1,5 @@
 use super::*;
+use crate::structured_credit::utils::months::ClampedMonths;
 
 /// Record a residual principal distribution to a tranche at deal end: appends
 /// the flow to the tranche's cashflows and principal flows and bumps its
@@ -751,7 +752,7 @@ pub(crate) fn simulate_prepared<S: PoolFlowSource + ?Sized>(
         if redemption_due {
             let redemption_price_pct = deal_call.map_or(100.0, |call| call.price_pct);
             let seasoning_months =
-                state.closing_seasoning_months + state.closing_date.months_until(pay_date);
+                state.closing_seasoning_months + state.closing_date.clamped_months_until(pay_date);
             let proceeds = liquidation_value(
                 &state,
                 instrument.liquidation_price_pct.unwrap_or(100.0) / 100.0,

@@ -4,6 +4,7 @@ use crate::structured_credit::pricing::simulation_engine::period_helpers::term_r
 use crate::structured_credit::utils::amortization::{
     level_payment_per_unit, remaining_schedule_periods,
 };
+use crate::structured_credit::utils::months::ClampedMonths;
 use crate::structured_credit::{DealType, PoolAsset, StructuredCredit};
 use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -44,7 +45,7 @@ fn loan_debt_service(
     let periods_per_year = 12.0 / f64::from(months_per_period.max(1));
     let origination = asset.acquisition_date.unwrap_or(closing_date);
     let age_months = if origination < as_of {
-        origination.months_until(as_of)
+        origination.clamped_months_until(as_of)
     } else {
         0
     };
@@ -57,7 +58,7 @@ fn loan_debt_service(
         return Ok(asset.balance.amount() * coupon.max(0.0));
     }
     let months_to_maturity = if as_of < asset.maturity {
-        as_of.months_until(asset.maturity)
+        as_of.clamped_months_until(asset.maturity)
     } else {
         0
     };

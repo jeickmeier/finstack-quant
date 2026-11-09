@@ -6,6 +6,7 @@
 use super::*;
 use crate::structured_credit::pricing::resolve;
 use crate::structured_credit::types::SwapPriority;
+use crate::structured_credit::utils::months::ClampedMonths;
 use std::borrow::Cow;
 
 /// Period state deciding which rules apply.
@@ -67,7 +68,7 @@ pub(super) fn resolve_period_waterfall<'w>(
     if flags.is_accumulating {
         resolve::apply_accumulation_lockout(period_waterfall.to_mut(), &state.tranche_balances);
     } else if let Some(si) = rules.and_then(|r| r.shifting_interest.as_ref()) {
-        let months_from_closing = state.closing_date.months_until(pay_date);
+        let months_from_closing = state.closing_date.clamped_months_until(pay_date);
         // Senior's pro-rata share (by current balance) governs scheduled
         // principal; the schedule lock-out governs unscheduled principal.
         let senior_bal = state

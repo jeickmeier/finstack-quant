@@ -1,4 +1,5 @@
 use super::*;
+use crate::structured_credit::utils::months::ClampedMonths;
 use finstack_quant_cashflows::builder::DefaultModelSpec;
 use finstack_quant_models::correlation::RecoveryModel;
 
@@ -99,7 +100,7 @@ fn asset_seasoned_rates(request: &PoolFlowRequest<'_, '_>) -> Result<AssetSeason
     for (i, anchor) in dates.iter().enumerate() {
         let Some(anchor) = anchor else { continue };
         let seasoning = if *anchor < request.pay_date {
-            anchor.months_until(request.pay_date)
+            anchor.clamped_months_until(request.pay_date)
         } else {
             0
         };
@@ -344,7 +345,7 @@ impl OasPathFlowSource {
         // martingale correction keeps the mean PV unbiased so the OAS point
         // estimate survived, but the per-path dispersion — and therefore
         // `price_std_error` — measured a risk a CLO does not have.
-        let month = self.as_of.months_until(request.pay_date) as usize;
+        let month = self.as_of.clamped_months_until(request.pay_date) as usize;
         let rate_shift = self
             .rate_shift_path
             .as_ref()

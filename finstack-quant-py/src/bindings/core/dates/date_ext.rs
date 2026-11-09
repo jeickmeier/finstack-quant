@@ -273,10 +273,10 @@ fn py_fiscal_year(date: &Bound<'_, PyAny>, config: &PyFiscalConfig) -> PyResult<
 
 /// Whole months from ``date`` to ``other`` (``0`` when ``other`` is earlier).
 ///
-/// Counts complete months: ``(other.year - date.year) * 12 + (other.month -
-/// date.month)``, less one when ``other``'s day-of-month has not yet reached
-/// ``date``'s (month-end to month-end counts as whole). This is the
-/// loan-seasoning convention used by structured-credit models.
+/// The greatest ``k >= 0`` with ``add_months(date, k) <= other``, each
+/// candidate taken from the original ``date`` with last-valid-day clamping
+/// (Jan 30 to Feb 28 counts one month). A calendar measure, not a
+/// loan-seasoning or payment-count convention.
 ///
 /// Parameters
 /// ----------
@@ -288,12 +288,13 @@ fn py_fiscal_year(date: &Bound<'_, PyAny>, config: &PyFiscalConfig) -> PyResult<
 /// Returns
 /// -------
 /// int
-///     Non-negative month count.
+///     Completed months.
 ///
 /// Raises
 /// ------
 /// ValueError
-///     If either argument is not a valid calendar date or ISO string.
+///     If either argument is not a valid calendar date or ISO string, or
+///     ``other`` precedes ``date``.
 ///
 /// Examples
 /// --------
@@ -303,7 +304,9 @@ fn py_fiscal_year(date: &Bound<'_, PyAny>, config: &PyFiscalConfig) -> PyResult<
 #[pyfunction(name = "months_until")]
 #[pyo3(text_signature = "(date, other)")]
 fn py_months_until(date: &Bound<'_, PyAny>, other: &Bound<'_, PyAny>) -> PyResult<u32> {
-    Ok(py_to_date(date)?.months_until(py_to_date(other)?))
+    py_to_date(date)?
+        .months_until(py_to_date(other)?)
+        .map_err(crate::errors::core_to_py)
 }
 
 /// Register the date-extension free functions on the dates module.

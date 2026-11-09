@@ -1,5 +1,6 @@
 //! Asset pool structures for structured credit instruments.
 
+use crate::structured_credit::utils::months::ClampedMonths;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, DayCount};
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
@@ -916,7 +917,7 @@ impl AssetPool {
                         finstack_quant_core::validation::validate_f64_unit_interval(value, name)?;
                     }
                 }
-                if line.seasoning_months > Date::MIN.months_until(closing_date) {
+                if line.seasoning_months > Date::MIN.clamped_months_until(closing_date) {
                     return Err(finstack_quant_core::Error::Validation(
                         "representative seasoning precedes the supported date range".into(),
                     ));
@@ -1113,7 +1114,7 @@ impl AssetPool {
             let weight = asset.balance.amount().max(0.0);
             let start = asset.seasoning_anchor().unwrap_or(closing_date);
             let age = if start < date {
-                start.months_until(date)
+                start.clamped_months_until(date)
             } else {
                 0
             };

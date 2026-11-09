@@ -124,14 +124,21 @@ pub trait DateExt: Copy {
         cal: &C,
     ) -> crate::Result<Self>;
 
-    /// Calculate the number of whole months between two dates.
+    /// Completed calendar months from `self` to `other`.
     ///
-    /// Counts completed months: `(other.year - self.year) * 12 + (other.month - self.month)`,
-    /// minus one when `self.day() > other.day()` (the final month is not yet complete)
-    /// unless both dates are month-ends. If `other` is before `self`, returns `0`.
+    /// The greatest `k >= 0` with `self.add_months(k) <= other`, each
+    /// candidate evaluated from the original `self` (last-valid-day
+    /// clamping, CORE-CONVENTIONS-007 #4). Equal dates give zero. This is a
+    /// calendar measure; it does not define loan seasoning, payment counts or
+    /// coupon periods.
     ///
-    /// This is commonly used to calculate loan seasoning (age) in months for
-    /// structured credit instruments.
+    /// # Arguments
+    ///
+    /// * `other` - End date; must not precede `self`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::InvalidDateRange` when `other` precedes `self`.
     ///
     /// # Example
     /// ```rust
@@ -140,12 +147,18 @@ pub trait DateExt: Copy {
     ///
     /// let start = Date::from_calendar_date(2020, Month::January, 15).expect("Valid date");
     /// let end = Date::from_calendar_date(2022, Month::March, 10).expect("Valid date");
-    /// assert_eq!(start.months_until(end), 25);
+    /// assert_eq!(start.months_until(end)?, 25);
     ///
-    /// // Returns 0 if end is before start
-    /// assert_eq!(end.months_until(start), 0);
+    /// // January 30 + 1M clamps to February 28, so one month is complete.
+    /// let jan30 = Date::from_calendar_date(2025, Month::January, 30).expect("Valid date");
+    /// let feb28 = Date::from_calendar_date(2025, Month::February, 28).expect("Valid date");
+    /// assert_eq!(jan30.months_until(feb28)?, 1);
+    ///
+    /// // A reversed range is an error, not zero.
+    /// assert!(end.months_until(start).is_err());
+    /// # Ok::<(), finstack_quant_core::Error>(())
     /// ```
-    fn months_until(self, other: Self) -> u32;
+    fn months_until(self, other: Self) -> crate::Result<u32>;
 }
 
 impl DateExt for Date {
@@ -287,17 +300,19 @@ impl DateExt for Date {
         Ok(current)
     }
 
-    fn months_until(self, other: Self) -> u32 {
+    fn months_until(self, other: Self) -> crate::Result<u32> {
+        if other < self {
+            return Err(crate::InputError::InvalidDateRange.into());
+        }
+        // The year/month difference bounds the answer; clamping can only make
+        // the final candidate overshoot `other` by part of one month.
         let mut months =
             (other.year() - self.year()) * 12 + (other.month() as i32 - self.month() as i32);
-        if self.day() > other.day() {
-            let self_eom = self.day() == self.month().length(self.year());
-            let other_eom = other.day() == other.month().length(other.year());
-            if !(self_eom && other_eom) {
-                months -= 1;
-            }
+        while months > 0 && self.add_months(months)? > other {
+            months -= 1;
         }
-        months.max(0) as u32
+        u32::try_from(months)
+            .map_err(|_| crate::Error::Validation("month count is negative".into()))
     }
 }
 
@@ -493,34 +508,31 @@ mod tests {
 
     #[test]
     fn test_months_until() {
-        // Jan 15 → Mar 10: day 15 > day 10, so 26 - 1 = 25 completed months
+        let months = |a: Date, b: Date| a.months_until(b).expect("forward range");
+        // Jan 15 → Mar 10: Jan 15 + 26M = Mar 15 > Mar 10, so 25 completed months
         let start = make_date(2020, 1, 15);
         let end = make_date(2022, 3, 10);
-        assert_eq!(start.months_until(end), 25);
+        assert_eq!(months(start, end), 25);
 
         // Same date = 0 months
-        assert_eq!(start.months_until(start), 0);
+        assert_eq!(months(start, start), 0);
 
-        // End before start = 0 (clamped)
-        assert_eq!(end.months_until(start), 0);
+        // End before start is an input error, not a zero clamp
+        assert!(end.months_until(start).is_err());
 
         // Exactly one month (same day-of-month)
-        let one_month_later = make_date(2020, 2, 15);
-        assert_eq!(start.months_until(one_month_later), 1);
+        assert_eq!(months(start, make_date(2020, 2, 15)), 1);
 
         // Cross year boundary (same day-of-month)
-        let dec = make_date(2024, 12, 1);
-        let jan = make_date(2025, 1, 1);
-        assert_eq!(dec.months_until(jan), 1);
+        assert_eq!(months(make_date(2024, 12, 1), make_date(2025, 1, 1)), 1);
 
         // Negative year handling (for completeness)
-        let ancient = make_date(-500, 6, 1);
-        let later = make_date(-498, 6, 1);
-        assert_eq!(ancient.months_until(later), 24);
+        assert_eq!(months(make_date(-500, 6, 1), make_date(-498, 6, 1)), 24);
 
-        // Jan 31 → Feb 1: only 1 day apart, not a completed month
-        let jan31 = make_date(2020, 1, 31);
-        let feb1 = make_date(2020, 2, 1);
-        assert_eq!(jan31.months_until(feb1), 0);
+        // Jan 31 → Feb 1: Jan 31 + 1M clamps to Feb 29, after Feb 1
+        assert_eq!(months(make_date(2020, 1, 31), make_date(2020, 2, 1)), 0);
+
+        // Jan 30 + 1M clamps to Feb 28, so one month is complete (007 #4)
+        assert_eq!(months(make_date(2025, 1, 30), make_date(2025, 2, 28)), 1);
     }
 }

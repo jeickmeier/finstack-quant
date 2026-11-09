@@ -1,6 +1,7 @@
 use super::{
     DealAccruals, StructuredCredit, TrancheAccrualPeriod, TrancheCashflows, TrancheSeniority,
 };
+use crate::structured_credit::utils::months::ClampedMonths;
 use finstack_quant_cashflows::CashflowScheduleSource;
 use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::{
@@ -325,7 +326,7 @@ impl StructuredCredit {
         for asset in &self.pool.assets {
             let origination = asset.acquisition_date.unwrap_or(self.closing_date);
             let months_to_maturity = if origination < asset.maturity {
-                origination.months_until(asset.maturity)
+                origination.clamped_months_until(asset.maturity)
             } else {
                 0
             };

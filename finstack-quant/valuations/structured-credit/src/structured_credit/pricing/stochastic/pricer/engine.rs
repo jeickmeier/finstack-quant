@@ -1443,13 +1443,14 @@ fn expected_shortfall(losses: &mut [f64], confidence: f64) -> f64 {
 mod tests {
     use super::*;
     use crate::structured_credit::pricing::stochastic::pricer::ScenarioTreeConfig;
+    use crate::structured_credit::utils::months::ClampedMonths;
     use crate::structured_credit::{
         AssetPool, DealType, PoolAsset, Tranche, TrancheCashflows, TrancheStructure,
     };
     use finstack_quant_cashflows::builder::RateSpec;
     use finstack_quant_cashflows::builder::{DefaultModelSpec, RecoveryModelSpec};
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::dates::{Date, DateExt};
+    use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
@@ -1594,7 +1595,7 @@ mod tests {
         let config = StochasticPricerConfig::new(
             test_date(),
             test_discount_curve(),
-            ScenarioTreeConfig::new(test_date().months_until(instrument.maturity) as usize),
+            ScenarioTreeConfig::new(test_date().clamped_months_until(instrument.maturity) as usize),
             StructuredCreditPricingMode::MonteCarlo {
                 num_paths: 2,
                 antithetic: false,

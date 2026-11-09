@@ -27,8 +27,9 @@ use crate::structured_credit::pricing::simulation_engine::{
     InstrumentPathFlowSource, OasPathFlowSource, PreparedInstrumentSchedules,
     prepare_deal_simulation, simulate_prepared,
 };
+use crate::structured_credit::utils::months::ClampedMonths;
 use finstack_quant_core::Result;
-use finstack_quant_core::dates::{Date, DateExt, DayCountContext};
+use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
@@ -159,7 +160,7 @@ pub fn tranche_oas(
         .map(|t| t.maturity)
         .max()
         .unwrap_or(as_of);
-    let num_months = as_of.months_until(maturity) as usize + 12;
+    let num_months = as_of.clamped_months_until(maturity) as usize + 12;
     // Base rate for the rate-dependent prepayment response. This is
     // deliberately the FIRST ONE-MONTH FORWARD, not the spot zero rate: the
     // simulated short-rate path is expressed in one-month-forward units, so
@@ -319,7 +320,7 @@ pub fn tranche_oas(
             // Exact curve DF times the convexity-adjusted OU factor.
             let mut base_df = disc.df_between_dates(quote.settlement, *date)?;
             if let Some(dev) = &deviation {
-                let month = as_of.months_until(*date) as usize;
+                let month = as_of.clamped_months_until(*date) as usize;
                 base_df *= ou_discount_factor(dev, month);
                 if let Some(adj) = &rate_convexity_adj {
                     base_df *= adj

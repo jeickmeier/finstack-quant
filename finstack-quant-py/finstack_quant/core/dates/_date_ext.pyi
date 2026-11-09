@@ -243,11 +243,12 @@ def fiscal_year(date: datetime.date | str, config: FiscalConfig) -> int:
 
 def months_until(date: datetime.date | str, other: datetime.date | str) -> int:
     """
-    Whole months from *date* to *other* (``0`` when *other* is earlier).
+    Completed calendar months from *date* to *other*.
 
-    Counts complete months, subtracting one when *other*'s day-of-month has
-    not yet reached *date*'s (month-end to month-end counts as whole). This
-    is the loan-seasoning convention used by structured-credit models.
+    The greatest ``k >= 0`` with ``add_months(date, k) <= other``, each
+    candidate taken from the original *date* with last-valid-day clamping
+    (Jan 30 to Feb 28 counts one month). A calendar measure, not a
+    loan-seasoning or payment-count convention.
 
     Parameters
     ----------
@@ -259,12 +260,13 @@ def months_until(date: datetime.date | str, other: datetime.date | str) -> int:
     Returns
     -------
     int
-        Non-negative month count.
+        Completed months.
 
     Raises
     ------
     ValueError
-        If either argument is not a valid calendar date or ISO string.
+        If either argument is not a valid calendar date or ISO string, or
+        *other* precedes *date*.
 
     Examples
     --------

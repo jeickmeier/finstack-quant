@@ -57,7 +57,7 @@ fn loan(id: &str, maturity: Date) -> PoolAsset {
     let mut loan =
         PoolAsset::fixed_rate_bond(id, usd(10_000_000.0), 0.08, maturity, DayCount::Thirty360);
     loan.asset_type = AssetType::CommercialMortgage { ltv: None };
-    loan.io_months = Some(close().months_until(maturity));
+    loan.io_months = Some(close().months_until(maturity).expect("forward range"));
     loan
 }
 
@@ -470,7 +470,7 @@ fn a_fixed_extension_rate_replaces_the_index_and_spread() {
         DayCount::Act360,
     );
     floating.asset_type = AssetType::CommercialMortgage { ltv: None };
-    floating.io_months = Some(close().months_until(loan_maturity));
+    floating.io_months = Some(close().months_until(loan_maturity).expect("forward range"));
     floating.balloon = Some(balloon(0.3, Some(0.09)));
     let deal = cmbs(vec![floating]);
     let run = deal
@@ -622,7 +622,7 @@ fn dscr_uses_the_live_floating_coupon_and_the_amortization_schedule() {
         DayCount::Act360,
     );
     floating.asset_type = AssetType::CommercialMortgage { ltv: None };
-    floating.io_months = Some(close().months_until(maturity()));
+    floating.io_months = Some(close().months_until(maturity()).expect("forward range"));
     floating.noi = Some(usd(8_000_000.0));
     let sofr = ForwardCurve::builder("USD-SOFR-3M", 0.25)
         .base_date(close())

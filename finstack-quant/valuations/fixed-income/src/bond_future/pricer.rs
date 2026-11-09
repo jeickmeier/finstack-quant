@@ -143,7 +143,7 @@ impl BondFuturePricer {
         }
 
         // Whole months from the first day of the delivery month to redemption.
-        let total_months = month_start.months_until(redemption_date);
+        let total_months = month_start.months_until(redemption_date)?;
         // Round the *months* component down to the contract's granularity:
         // 3 months for the 10Y/30Y contracts, 1 month for 2Y/3Y/5Y.
         let is_long_contract = standard_maturity_years >= 6.0;

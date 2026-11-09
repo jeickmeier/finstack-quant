@@ -843,11 +843,11 @@ export interface CoreNamespace {
    * * `date` - Start date as days since 1970-01-01.
    * * `other` - End date as days since 1970-01-01.
    *
-   * @returns Completed months: `(other.year - date.year) * 12 + (other.month - date.month)`,
-   * minus one when the day of `date` is later than the day of `other`, unless both are
-   * month-ends; `0` when `other` is before `date`.
+   * @returns Completed months: the greatest `k >= 0` with `addMonths(date, k) <= other`,
+   * each candidate taken from the original `date` with last-valid-day clamping.
    * @throws `TypeError` if a date is not an integer; `FinstackError` (kind
-   * `validation`) if a date is outside the supported range.
+   * `validation`) if a date is outside the supported range or `other` precedes
+   * `date`.
    * @param date - Start date as days since 1970-01-01.
    * @param other - End date as days since 1970-01-01.
    */

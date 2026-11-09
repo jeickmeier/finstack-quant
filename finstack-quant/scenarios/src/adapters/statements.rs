@@ -102,7 +102,8 @@ pub fn apply_forecast_assign(
 /// * `model` - Statement model whose scalar forecast rates are replaced; actuals stay fixed.
 ///   Monetary target nodes are rejected because annualized rates are dimensionless.
 /// * `market` - Discount and forward curves used to obtain annualized decimal rates.
-/// * `calendar` - Optional calendar for ModifiedFollowing tenor date adjustments.
+/// * `calendar` - Optional calendar for Modified Following tenor date adjustments;
+///   without one, tenor dates are unadjusted.
 pub fn update_rate_from_binding(
     binding: &RateBindingSpec,
     model: &mut FinancialModelSpec,
@@ -128,6 +129,14 @@ pub fn update_rate_from_binding(
     }
 
     let curve_id = binding.curve_id.as_str();
+    // Tenor dates roll Modified Following on the supplied calendar; without
+    // one they stay unadjusted, which is the only convention a calendar-free
+    // roll admits (CORE-CONVENTIONS-007 #5).
+    let roll = if calendar.is_some() {
+        BusinessDayConvention::ModifiedFollowing
+    } else {
+        BusinessDayConvention::Unadjusted
+    };
 
     if let Ok(curve) = market.get_discount(curve_id) {
         let effective_day_count = binding.day_count.unwrap_or(curve.day_count());
@@ -136,7 +145,7 @@ pub fn update_rate_from_binding(
             .to_years_with_context(
                 curve.base_date(),
                 calendar,
-                BusinessDayConvention::ModifiedFollowing,
+                roll,
                 curve.day_count(),
                 finstack_quant_core::dates::DayCountContext::default(),
             )
@@ -158,7 +167,7 @@ pub fn update_rate_from_binding(
         let output_years = tenor.to_years_with_context(
             curve.base_date(),
             calendar,
-            BusinessDayConvention::ModifiedFollowing,
+            roll,
             effective_day_count,
             finstack_quant_core::dates::DayCountContext::default(),
         )?;
@@ -177,7 +186,7 @@ pub fn update_rate_from_binding(
             .to_years_with_context(
                 curve.base_date(),
                 calendar,
-                BusinessDayConvention::ModifiedFollowing,
+                roll,
                 curve.day_count(),
                 finstack_quant_core::dates::DayCountContext::default(),
             )
@@ -192,17 +201,13 @@ pub fn update_rate_from_binding(
             )));
         }
 
-        let forward_start = tenor.add_to_date(
-            curve.base_date(),
-            calendar,
-            BusinessDayConvention::ModifiedFollowing,
-        )?;
+        let forward_start = tenor.add_to_date(curve.base_date(), calendar, roll)?;
 
         let accrual_years = Tenor::from_years(curve.tenor(), curve.day_count())?
             .to_years_with_context(
                 forward_start,
                 calendar,
-                BusinessDayConvention::ModifiedFollowing,
+                roll,
                 curve.day_count(),
                 finstack_quant_core::dates::DayCountContext::default(),
             )?;
@@ -226,7 +231,7 @@ pub fn update_rate_from_binding(
             .to_years_with_context(
                 forward_start,
                 calendar,
-                BusinessDayConvention::ModifiedFollowing,
+                roll,
                 effective_day_count,
                 finstack_quant_core::dates::DayCountContext::default(),
             )?;
@@ -379,7 +384,7 @@ mod tests {
             let start = date!(2026 - 01 - 01);
             let end = Tenor::from_years(0.25, DayCount::Act365F)
                 .expect("tenor")
-                .add_to_date(start, None, BusinessDayConvention::ModifiedFollowing)
+                .add_to_date(start, None, BusinessDayConvention::Unadjusted)
                 .expect("end");
             let native = DayCount::Act365F
                 .year_fraction(start, end, DayCountContext::default())

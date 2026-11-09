@@ -544,12 +544,14 @@ impl Tenor {
         }
     }
 
-    /// Add the tenor to a date, optionally respecting a business day calendar.
+    /// Add the tenor to a date, then roll the raw target once with the
+    /// selected business-day convention (CORE-CONVENTIONS-007 #5).
     ///
     /// # Arguments
     /// * `date` - Starting date
-    /// * `calendar` - Optional holiday calendar for business day adjustment
-    /// * `business_day_convention` - Business day convention to apply if calendar is provided
+    /// * `calendar` - Holiday calendar used to roll the raw target; may be
+    ///   omitted only with `BusinessDayConvention::Unadjusted`
+    /// * `business_day_convention` - Business-day convention applied to the raw target
     ///
     /// # Returns
     /// The resulting date after adding the tenor period.
@@ -564,7 +566,7 @@ impl Tenor {
     /// let start = date!(2025 - 01 - 15);
     /// let tenor = Tenor::parse("1M")?;
     ///
-    /// let end = tenor.add_to_date(start, None, BusinessDayConvention::ModifiedFollowing)?;
+    /// let end = tenor.add_to_date(start, None, BusinessDayConvention::Unadjusted)?;
     /// assert_eq!(end, date!(2025 - 02 - 15));
     /// # Ok(())
     /// # }
@@ -573,7 +575,9 @@ impl Tenor {
     /// # Errors
     ///
     /// Returns `InputError::InvalidTenor` when a month or year count cannot be
-    /// represented for date arithmetic, or a validation error if the shifted date exceeds the supported calendar range. When `calendar` is supplied, it also
+    /// represented for date arithmetic, or a validation error if the shifted
+    /// date exceeds the supported calendar range or `calendar` is omitted with
+    /// a convention other than `Unadjusted`. With a calendar it also
     /// propagates the calendar's business-day adjustment error.
     pub fn add_to_date(
         &self,
@@ -598,10 +602,13 @@ impl Tenor {
             }
         };
 
-        if let Some(cal) = calendar {
-            adjust(raw_date, business_day_convention, cal)
-        } else {
-            Ok(raw_date)
+        match (calendar, business_day_convention) {
+            (_, BusinessDayConvention::Unadjusted) => Ok(raw_date),
+            (Some(cal), convention) => adjust(raw_date, convention, cal),
+            (None, convention) => Err(crate::Error::Validation(format!(
+                "business-day convention {convention} requires a calendar; only \
+                 `unadjusted` may omit it"
+            ))),
         }
     }
 
@@ -639,7 +646,7 @@ impl Tenor {
     /// let years = tenor.to_years_with_context(
     ///     as_of,
     ///     None,
-    ///     BusinessDayConvention::ModifiedFollowing,
+    ///     BusinessDayConvention::Unadjusted,
     ///     DayCount::ActAct,
     ///     DayCountContext::default(),
     /// )?;
