@@ -1095,40 +1095,6 @@ export type NonFiniteSentinel = "inf" | "-inf" | "nan";
  */
 export type PeriodId = string;
 /**
- * Warning generated during schedule construction.
- *
- * Warnings indicate non-fatal issues that occurred during schedule generation.
- * Unlike errors, these allow the schedule to be created but signal that
- * something unexpected happened that callers should be aware of.
- *
- * # Use Cases
- *
- * - **Graceful fallback**: When [`ScheduleErrorPolicy::GracefulEmpty`] is set and an error
- *   would normally occur, the builder returns an empty schedule with a warning
- *   describing the original error.
- */
-export type ScheduleWarning =
-  | {
-      graceful_fallback: {
-        /**
-         * Human-readable description of the error that was suppressed.
-         */
-        error_message: string;
-      };
-    }
-  | {
-      missing_calendar_id: {
-        /**
-         * The calendar identifier that could not be resolved.
-         */
-        calendar_id: string;
-      };
-    };
-/**
- * Explicit policy for how schedule construction should respond to recoverable issues.
- */
-export type ScheduleErrorPolicy = "strict" | "missing_calendar_warning" | "graceful_empty";
-/**
  * Stub period handling when start/end dates don't align with payment frequency.
  *
  * Controls how schedules are generated when the start and end dates don't
@@ -2011,13 +1977,6 @@ export interface Schedule {
    * retained so the series stays 1:1 with period ends.
    */
   payment_dates?: DateWire[];
-  /**
-   * Warnings generated during schedule construction.
-   *
-   * Non-empty when graceful fallback mode suppressed an error or when
-   * other non-fatal issues occurred during generation.
-   */
-  warnings?: ScheduleWarning[];
 }
 /**
  * Persisted inputs of a date schedule: range, frequency, stub, adjustment and lags.
@@ -2028,7 +1987,6 @@ export interface ScheduleSpec {
   cds_imm_mode: boolean;
   end: DateWire;
   end_of_month: boolean;
-  error_policy: ScheduleErrorPolicy;
   fixing_lag_business_days?: number | null;
   frequency: Tenor;
   imm_mode?: boolean;

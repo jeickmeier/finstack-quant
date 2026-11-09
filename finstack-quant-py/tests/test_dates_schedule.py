@@ -14,7 +14,6 @@ from finstack_quant.core.dates import (
     FiscalConfig,
     PeriodId,
     Schedule,
-    ScheduleErrorPolicy,
     StubKind,
     available_calendars,
 )
@@ -108,7 +107,6 @@ def test_schedule_builder_setters_are_fluent_and_mutate_in_place() -> None:
         .end_of_month(False)
         .imm()
         .cds_imm()
-        .error_policy(ScheduleErrorPolicy.STRICT)
     )
 
     assert result is builder
@@ -186,7 +184,6 @@ def test_schedule_builder_accepts_strings_and_calendar_objects() -> None:
         .frequency("6M")
         .stub_rule("short_front")
         .adjust_with("modified_following", HolidayCalendar("nyse+gblo"))
-        .error_policy("strict")
         .build()
     )
     assert len(schedule) == 3
@@ -196,20 +193,14 @@ def test_schedule_builder_accepts_strings_and_calendar_objects() -> None:
         Schedule.builder("2026-01-15", "2025-01-15")
 
 
-def test_schedule_warnings_are_typed_dicts() -> None:
-    schedule = (
-        Schedule
-        .builder("2025-01-15", "2026-01-15")
-        .adjust_with("following", "no_such_calendar")
-        .error_policy("missing_calendar_warning")
-        .build()
-    )
-    assert schedule.has_warnings()
-    assert not schedule.used_graceful_fallback()
-    (warning,) = schedule.warnings
-    assert warning["kind"] == "missing_calendar_id"
-    assert warning["calendar_id"] == "no_such_calendar"
-    assert "no_such_calendar" in warning["message"]
+def test_schedule_has_no_lenient_policy_or_warnings() -> None:
+    # A build returns a complete schedule or raises (CORE-CONVENTIONS-008 #12).
+    builder = Schedule.builder("2025-01-15", "2026-01-15")
+    assert not hasattr(builder, "error_policy")
+    with pytest.raises(KeyError):
+        builder.adjust_with("following", "no_such_calendar").build()
+    schedule = Schedule.builder("2025-01-15", "2026-01-15").frequency("6M").build()
+    assert not hasattr(schedule, "warnings")
 
 
 def test_dates_pickle_round_trips() -> None:
@@ -233,7 +224,6 @@ def test_dates_pickle_round_trips() -> None:
         DayCountContext(bus_basis=250),
         StubKind.LONG_BACK,
         BusinessDayConvention.MODIFIED_PRECEDING,
-        ScheduleErrorPolicy.GRACEFUL_EMPTY,
         DayCount.THIRTY_360_ISDA,
         FiscalConfig.uk(),
         build_periods("2024Q1..Q4", "2024Q2"),
@@ -329,7 +319,7 @@ def test_thirty360_and_date_extension_free_functions() -> None:
 
 
 def test_empty_schedule_dataframe() -> None:
-    schedule = Schedule.from_json('{"dates":[],"payment_dates":[],"fixing_dates":[],"warnings":[]}')
+    schedule = Schedule.from_json('{"dates":[],"payment_dates":[],"fixing_dates":[]}')
     frame = schedule.to_dataframe()
     assert frame.empty
     assert list(frame.columns) == ["period_start", "period_end", "payment_date", "fixing_date"]

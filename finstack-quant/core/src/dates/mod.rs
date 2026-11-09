@@ -137,9 +137,7 @@ pub use calendar::{WEEKENDS_ONLY, WEEKENDS_ONLY_ID};
 
 mod schedule;
 
-pub use schedule::{
-    Schedule, ScheduleBuilder, ScheduleErrorPolicy, ScheduleSpec, ScheduleWarning, StubKind,
-};
+pub use schedule::{Schedule, ScheduleBuilder, ScheduleSpec, StubKind};
 
 pub(crate) use calendar::composite::CompositeCalendar;
 

@@ -1,7 +1,7 @@
 # CORE-CONVENTIONS-008: Anchored coupon grids, stubs, payment/fixing lags and failure policy
 
 - Decision status: **Accepted — complete schedule-generation package, 2026-11-07**.
-- Implementation status: **Observed; reconciliation pending**, scoped to all four files under `dates/schedule/`.
+- Implementation status: **Partly reconciled 2026-11-09** (#12 policies/warnings/repair removed; the explicit spec, grid modes, anchors, ceiling and private state remain), scoped to all four files under `dates/schedule/`.
 - Validation status: **Evidence inspected/located; independent qualification pending**. Documentation and independent anchor/stub/grid/event-date examples passed; production Rust/host tests were not executed for this review.
 - Audit date: **2026-11-05**. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; see [scope and inventory](README.md).
 

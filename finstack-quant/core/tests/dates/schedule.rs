@@ -1,9 +1,7 @@
 //! Tests for schedule iterator functionality.
 
 use super::common::make_date;
-use finstack_quant_core::dates::{
-    BusinessDayConvention, Schedule, ScheduleErrorPolicy, StubKind, Tenor,
-};
+use finstack_quant_core::dates::{BusinessDayConvention, Schedule, StubKind, Tenor};
 
 #[test]
 fn eom_rejects_incompatible_schedule_rules() {
@@ -1150,21 +1148,19 @@ fn imm_and_cds_imm_setters_use_last_call_wins() {
 }
 
 #[test]
-fn test_schedule_error_policy_missing_calendar_warning() {
+fn test_schedule_unknown_calendar_is_an_error() {
+    // There is no lenient missing-calendar mode (CORE-CONVENTIONS-008 #12).
     let start = make_date(2025, 1, 15);
     let end = make_date(2025, 3, 15);
 
-    let schedule = Schedule::builder(start, end)
-        .unwrap()
-        .frequency(Tenor::monthly())
-        .error_policy(ScheduleErrorPolicy::MissingCalendarWarning)
-        .adjust_with(BusinessDayConvention::Following, "unknown_calendar")
-        .build()
-        .expect("warning policy should preserve schedule generation");
-
-    assert!(!schedule.dates.is_empty());
-    assert!(schedule.has_warnings());
-    assert!(!schedule.used_graceful_fallback());
+    assert!(
+        Schedule::builder(start, end)
+            .unwrap()
+            .frequency(Tenor::monthly())
+            .adjust_with(BusinessDayConvention::Following, "unknown_calendar")
+            .build()
+            .is_err()
+    );
 }
 
 #[test]

@@ -1266,8 +1266,8 @@
     "kind": "class",
     "constructor": false,
     "statics": ["builder", "fromJson", "fromSpec"],
-    "methods": ["free", "hasWarnings", "toJson", "usedGracefulFallback"],
-    "getters": ["dates", "fixingDates", "paymentDates", "warnings"]
+    "methods": ["free", "toJson"],
+    "getters": ["dates", "fixingDates", "paymentDates"]
   },
   "core.ScheduleBuilder": {
     "kind": "class",
@@ -1278,7 +1278,6 @@
       "build",
       "cdsImm",
       "endOfMonth",
-      "errorPolicy",
       "fixingLagBusinessDays",
       "free",
       "frequency",

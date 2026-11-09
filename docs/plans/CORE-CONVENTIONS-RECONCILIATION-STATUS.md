@@ -42,7 +42,7 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 19 | E1 | committed (`E1:` in git log) | workspace rust-lint; gen-write; workspace rust-test 16361; core doctests 285; python-test 13993; python-lint; wasm-test 1085; wasm-lint; ui-check | 014/007 entry: 007 core arithmetic recorded, remaining narrowed; 002 tenor-bridge item marked landed; record 007 partly reconciled | Representation limits (D u32, W u32/7, M i32, Y i32/12; 200-year cap gone); `to_years` → `to_years_approx` in Rust, Python and WASM (`toYearsApprox`); exact `to_days_approx`; `payments_per_year -> Result` rejecting D/W (about 20 callers propagate); Hull-White swaption cashflows pick their payoff annuity at construction and look up the nominal frequency only for cash par-yield (O5); `date_from_epoch_days -> Result`; WASM `toDaysApprox` returns an exact number; `to_years_with_context` takes the caller's context (Python `ctx=`, WASM trailing optional `ctx`) and errors on an end before the origin |
 | 20 | E2 | **E2a committed** (`E2a:` in git log); **E2c (O6 compounding) not executed (scope)**; `from_years` removal **blocked (owner decision)** | E2a: workspace rust-lint; gen-write; workspace rust-test; core doctests; python-test; python-lint; wasm-test; wasm-lint; ui-check | 014/007 entry: `months_until` and roll rule recorded; remaining narrowed | E2a: `months_until -> Result<u32>` (greatest `k` with `add_months(k) <= end`; reversed errors) in core, Python and WASM; structured-credit sites moved to a named site-local `ClampedMonths::clamped_months_until` keeping the pre-007 count (E2b assigns meanings); bond future uses the checked core measure (day-1 start, identical values); `Tenor::add_to_date` errors without a calendar unless `Unadjusted` |
 | 21 | E2b | committed (`E2b:` in git log); documentation only | docs (no code change) | 014/007 entry links the stated meanings | All 16 structured-credit sites have a stated meaning (seasoning, remaining term, simulation index/grid length, lock-out months, domain bound) in the structured-credit README. None migrated: no accepted record selects a measure, and O13 forbids assuming completed months. All stay on `ClampedMonths::clamped_months_until` |
-| 22 | E3 | pending | | | |
+| 22 | E3 | **E3a committed** (`E3a:` in git log); **E3b not executed (scope)** | E3a: workspace rust-lint; gen-write; workspace rust-test; core doctests; python-test; python-lint; wasm-test; wasm-lint; ui-check; notebooks schedule_building and dates_calendars_schedules | 008 entry: removed policies/warnings recorded; record 008 partly reconciled | E3a: removed `ScheduleErrorPolicy`, `ScheduleWarning`, `GracefulEmpty`, the missing-calendar warning, `warnings`/`has_warnings`/`used_graceful_fallback`, the builder/host `error_policy` and the monotonic/drop repair (now a strictness error) across Rust, Python, WASM, parity ledger, stubs and notebooks |
 | 23 | E4 | pending | | | |
 | 24 | E4b | pending | | | |
 | 25 | G1 | skipped (dep B3) | | | |
@@ -190,6 +190,14 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
   and always asked for Modified Following. It now rolls Modified Following
   with a calendar and `Unadjusted` without one (previously the convention was
   silently ignored without a calendar; values are unchanged).
+- **E3b not executed (scope).** The rest of E3 (an explicit `ScheduleSpec` with
+  no defaults and `start < end`, `GridMode` replacing the mode booleans, strict
+  EOM/IMM anchors, the 100,000 final-date ceiling, private validated
+  `Schedule` state and the nominal reference accessors, then removing
+  `imm_on_or_after`/`_before`) touches every schedule construction site:
+  `Schedule::builder` 386 sites in 138 files and `ScheduleBuilder` 306 sites
+  in 119 files on this branch. Not attempted in this run; E4/E4b (CDS mode
+  removal and the CDS date regime) build on it.
 - **A1 not closed.** The 020 register entry stays open as Evidence. Equality,
   adjacent and already-beyond observations, window/history behavior, and
   settlement/discount boundaries at each consumer were not independently

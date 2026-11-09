@@ -40,26 +40,6 @@
       "format": "date",
       "type": "string"
     },
-    "ScheduleErrorPolicy": {
-      "description": "Explicit policy for how schedule construction should respond to recoverable issues.",
-      "oneOf": [
-        {
-          "const": "strict",
-          "description": "Strict production mode: propagate all errors.",
-          "type": "string"
-        },
-        {
-          "const": "missing_calendar_warning",
-          "description": "Allow missing calendar IDs and continue with a warning.",
-          "type": "string"
-        },
-        {
-          "const": "graceful_empty",
-          "description": "Return an empty schedule with a warning instead of propagating build errors.",
-          "type": "string"
-        }
-      ]
-    },
     "StubKind": {
       "description": "Stub period handling when start/end dates don't align with payment frequency.\n\nControls how schedules are generated when the start and end dates don't\ndivide evenly by the payment frequency, resulting in an irregular period\n(stub) at the beginning or end of the schedule.\n\n# Variants\n\n- **`None`**: No stub allowed (default). Generates regular periods from\n  start to end and returns an error\n  ([`InputError::NonIntegerScheduleTenor`]) when the dates don't divide\n  evenly by the frequency. Use a stub variant for misaligned schedules.\n\n[`InputError::NonIntegerScheduleTenor`]: crate::InputError::NonIntegerScheduleTenor\n- **`ShortFront`**: Short stub period at the start. Schedule is built\n  backward from the end date, creating a short first period.\n- **`ShortBack`**: Short stub period at the end. Schedule is built forward\n  from the start date, creating a short final period.\n- **`LongFront`**: Long stub period at the start. Combines the first two\n  periods into a single longer period.\n- **`LongBack`**: Long stub period at the end. Combines the last two periods\n  into a single longer period.\n\n# Financial Context\n\nStub conventions are important for:\n- Interest accrual calculations (short/long first coupons)\n- Cash flow present value computations\n- Matching market conventions for specific instruments\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Schedule, StubKind, Tenor};\nuse time::{Date, Month};\n\nlet start = Date::from_calendar_date(2025, Month::January, 10)?;\nlet end = Date::from_calendar_date(2025, Month::December, 15)?;\n\n// Short stub at front\nlet sched = Schedule::builder(start, end)?\n    .frequency(Tenor::quarterly())\n    .stub_rule(StubKind::ShortFront)\n    .build()?;\n# Ok::<(), Box<dyn std::error::Error>>(())\n```\n\n# See Also\n\n- [`ScheduleBuilder::stub_rule`] to configure stub behavior",
       "oneOf": [
@@ -148,7 +128,6 @@
       "cds_imm_mode": false,
       "end": "2026-01-15",
       "end_of_month": false,
-      "error_policy": "strict",
       "fixing_lag_business_days": null,
       "frequency": {
         "count": 1,
@@ -186,9 +165,6 @@
     "end_of_month": {
       "type": "boolean"
     },
-    "error_policy": {
-      "$ref": "#/$defs/ScheduleErrorPolicy"
-    },
     "fixing_lag_business_days": {
       "default": null,
       "format": "int32",
@@ -222,8 +198,7 @@
     "frequency",
     "stub",
     "end_of_month",
-    "cds_imm_mode",
-    "error_policy"
+    "cds_imm_mode"
   ],
   "title": "ScheduleSpec",
   "type": "object"

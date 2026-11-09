@@ -38,7 +38,6 @@ import type {
   RatingLevel,
   SabrParameterData,
   ScheduleSpec,
-  ScheduleWarning,
   ScorecardScale,
 } from '../types/generated/core/index.js';
 import type {
@@ -285,7 +284,6 @@ export type {
   MarketScalar,
   PeriodPlan,
   ScheduleSpec,
-  ScheduleWarning,
   ScorecardScale,
   ToleranceConfig,
 };

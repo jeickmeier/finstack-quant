@@ -39,7 +39,7 @@ test('ScheduleBuilder setters update the builder in place and return it', () => 
   builder.endOfMonth(true);
   assert.equal(builder.stubRule('short_front').adjustWith('following', 'nyse'), builder);
   assert.equal(builder.paymentLagDays(2).fixingLagBusinessDays(1), builder);
-  assert.equal(builder.cdsImm().imm().errorPolicy('strict'), builder);
+  assert.equal(builder.cdsImm().imm(), builder);
   const spec = builder.toSpec();
   assert.deepEqual(spec.frequency, { count: 3, unit: 'months' });
   assert.equal(spec.end_of_month, true);

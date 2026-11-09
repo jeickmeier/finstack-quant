@@ -105,7 +105,6 @@ impl TrsScheduleSpec {
             dates,
             payment_dates,
             fixing_dates: Vec::new(),
-            warnings: Vec::new(),
         })
     }
 

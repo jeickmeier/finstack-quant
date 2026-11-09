@@ -72,63 +72,6 @@ class StubKind:
     def __eq__(self, other: object) -> bool: ...
     def __ne__(self, other: object) -> bool: ...
 
-class ScheduleErrorPolicy:
-    """
-    Error handling policy for schedule building.
-
-    Immutable, hashable enum-style type.
-
-    Examples
-    --------
-    >>> from finstack_quant.core.dates import ScheduleErrorPolicy
-    >>> ScheduleErrorPolicy.STRICT != ScheduleErrorPolicy.GRACEFUL_EMPTY
-    True
-
-    """
-
-    STRICT: ScheduleErrorPolicy
-    """Strict -- errors are immediately propagated."""
-    MISSING_CALENDAR_WARNING: ScheduleErrorPolicy
-    """Emit a warning for missing calendars, but continue."""
-    GRACEFUL_EMPTY: ScheduleErrorPolicy
-    """Gracefully return an empty schedule on error."""
-
-    @classmethod
-    def from_name(cls, name: str) -> ScheduleErrorPolicy:
-        """
-        Parse this variant from its snake_case name, case-insensitively.
-
-        Parameters
-        ----------
-        name : str
-            One of ``"strict"``, ``"missing_calendar_warning"``,
-            ``"graceful_empty"``.
-
-        Returns
-        -------
-        ScheduleErrorPolicy
-            The matching policy.
-
-        Raises
-        ------
-        ValueError
-            If *name* is not one of the three policy names.
-
-        Examples
-        --------
-        >>> from finstack_quant.core.dates import ScheduleErrorPolicy
-        >>> ScheduleErrorPolicy.from_name("graceful_empty") == ScheduleErrorPolicy.GRACEFUL_EMPTY
-        True
-
-        """
-        ...
-
-    def __repr__(self) -> str: ...
-    def __str__(self) -> str: ...
-    def __hash__(self) -> int: ...
-    def __eq__(self, other: object) -> bool: ...
-    def __ne__(self, other: object) -> bool: ...
-
 class Schedule:
     """
     A generated date schedule.
@@ -192,8 +135,8 @@ class Schedule:
             Mapping or JSON string with the canonical fields ``start``,
             ``end`` (ISO dates), ``frequency`` (``"3M"``), ``stub``,
             ``business_day_convention``, ``calendar_id``, ``end_of_month``,
-            ``imm_mode``, ``cds_imm_mode``, ``error_policy``,
-            ``payment_lag_days`` and ``fixing_lag_business_days``
+            ``imm_mode``, ``cds_imm_mode``, ``payment_lag_days`` and
+            ``fixing_lag_business_days``
             (as produced by :meth:`ScheduleBuilder.to_spec`).
 
         Returns
@@ -274,55 +217,6 @@ class Schedule:
         """
         ...
 
-    def has_warnings(self) -> bool:
-        """
-        Whether any warnings were generated during schedule building.
-
-        Returns
-        -------
-        bool
-            Whether this `Schedule` has warnings.
-
-        Notes
-        -----
-        This method does not raise; it returns ``True`` or ``False``.
-        """
-        ...
-
-    def used_graceful_fallback(self) -> bool:
-        """
-        Whether a graceful fallback was used during schedule building.
-
-        Returns
-        -------
-        bool
-            ``True`` exactly when the schedule warnings include a graceful-fallback warning.
-
-        Notes
-        -----
-        This method does not raise; it returns ``True`` or ``False``.
-        """
-        ...
-
-    @property
-    def warnings(self) -> list[dict[str, object]]:
-        """
-        Warnings generated during schedule construction.
-
-        Returns
-        -------
-        list[dict[str, object]]
-            One dict per warning with ``kind`` (``"graceful_fallback"`` or
-            ``"missing_calendar_id"``), ``message`` (human-readable text) and
-            the warning's own field (``error_message`` or ``calendar_id``).
-            Empty under the strict policy.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
     def to_dataframe(self) -> pd.DataFrame:
         """
         Accrual periods as a pandas DataFrame.
@@ -355,8 +249,8 @@ class Schedule:
         Returns
         -------
         str
-            JSON object with ``dates``, ``payment_dates``, ``fixing_dates``
-            (ISO strings) and, when present, ``warnings``.
+            JSON object with ``dates``, ``payment_dates`` and ``fixing_dates``
+            (ISO strings).
 
         Raises
         ------
@@ -429,7 +323,6 @@ class ScheduleBuilder:
     ...     ScheduleBuilder,
     ...     StubKind,
     ...     BusinessDayConvention,
-    ...     ScheduleErrorPolicy,
     ... )
     >>> schedule = (
     ...     Schedule
@@ -438,7 +331,6 @@ class ScheduleBuilder:
     ...     .stub_rule(StubKind.SHORT_FRONT)
     ...     .adjust_with(BusinessDayConvention.MODIFIED_FOLLOWING, "usny")
     ...     .end_of_month(False)
-    ...     .error_policy(ScheduleErrorPolicy.STRICT)
     ...     .build()
     ... )
     >>> len(schedule) >= 20
@@ -652,31 +544,6 @@ class ScheduleBuilder:
         """
         ...
 
-    def error_policy(self, policy: Union[ScheduleErrorPolicy, str]) -> ScheduleBuilder:
-        """
-        Set how invalid schedule dates are reported or skipped.
-
-        Setting a policy fully replaces any previous policy; calls are
-        order-independent and idempotent.
-
-        Parameters
-        ----------
-        policy : ScheduleErrorPolicy | str
-            Error handling policy, or its name (``"strict"``,
-            ``"missing_calendar_warning"``, ``"graceful_empty"``).
-
-        Returns
-        -------
-        ScheduleBuilder
-            Same builder instance after fully replacing its schedule-build error policy.
-
-        Raises
-        ------
-        ValueError
-            If a string *policy* is not a policy name.
-        """
-        ...
-
     def to_spec(self) -> dict[str, object]:
         """
         Current builder state as a ``ScheduleSpec`` mapping.
@@ -687,8 +554,7 @@ class ScheduleBuilder:
             The canonical spec fields (``start``, ``end``, ``frequency``,
             ``stub``, ``business_day_convention``, ``calendar_id``,
             ``end_of_month``, ``imm_mode``, ``cds_imm_mode``,
-            ``error_policy``, ``payment_lag_days``,
-            ``fixing_lag_business_days``), accepted by
+            ``payment_lag_days``, ``fixing_lag_business_days``), accepted by
             :meth:`Schedule.from_spec`.
 
         Notes
@@ -707,11 +573,9 @@ class ScheduleBuilder:
         """
         Materialize the date schedule from the builder settings.
 
-        Delegates entirely to the canonical Rust ``ScheduleBuilder::build``:
-        under the default ``STRICT`` policy a generation failure raises
-        ``ValueError`` and an unknown calendar id ``KeyError``. Under ``MISSING_CALENDAR_WARNING`` or
-        ``GRACEFUL_EMPTY`` the schedule is returned carrying its warnings
-        (inspect via ``Schedule.warnings`` / ``Schedule.has_warnings()``).
+        Delegates entirely to the canonical Rust ``ScheduleBuilder::build``,
+        which returns a complete schedule or an error: a generation failure
+        raises ``ValueError`` and an unknown calendar id ``KeyError``.
 
         Returns
         -------
@@ -721,8 +585,7 @@ class ScheduleBuilder:
         Raises
         ------
         ValueError
-            If the schedule cannot be built with the given parameters, or
-            if warnings occur under the strict policy.
+            If the schedule cannot be built with the given parameters.
         """
         ...
 

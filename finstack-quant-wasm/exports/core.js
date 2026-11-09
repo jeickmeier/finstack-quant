@@ -123,7 +123,6 @@ chain(wasm.ScheduleBuilder, [
   'endOfMonth',
   'cdsImm',
   'imm',
-  'errorPolicy',
 ]);
 
 /**

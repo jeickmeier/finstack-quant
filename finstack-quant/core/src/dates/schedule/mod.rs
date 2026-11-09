@@ -210,129 +210,18 @@ impl std::str::FromStr for StubKind {
     }
 }
 
-/// Warning generated during schedule construction.
-///
-/// Warnings indicate non-fatal issues that occurred during schedule generation.
-/// Unlike errors, these allow the schedule to be created but signal that
-/// something unexpected happened that callers should be aware of.
-///
-/// # Use Cases
-///
-/// - **Graceful fallback**: When [`ScheduleErrorPolicy::GracefulEmpty`] is set and an error
-///   would normally occur, the builder returns an empty schedule with a warning
-///   describing the original error.
-///
-/// # Examples
-///
-/// ```rust
-/// use finstack_quant_core::dates::{Schedule, ScheduleErrorPolicy, ScheduleWarning, Tenor};
-/// use time::{Date, Month};
-///
-/// let start = Date::from_calendar_date(2025, Month::January, 1)?;
-/// let end = Date::from_calendar_date(2025, Month::January, 20)?; // not a whole month
-///
-/// // Without a stub rule the misaligned range fails; GracefulEmpty turns the
-/// // failure into an empty schedule carrying the error as a warning.
-/// let schedule = Schedule::builder(start, end)?
-///     .frequency(Tenor::monthly())
-///     .error_policy(ScheduleErrorPolicy::GracefulEmpty)
-///     .build()?;
-/// assert!(schedule.dates.is_empty());
-/// assert!(matches!(
-///     schedule.warnings.as_slice(),
-///     [ScheduleWarning::GracefulFallback { .. }]
-/// ));
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case", deny_unknown_fields)]
-#[non_exhaustive]
-pub enum ScheduleWarning {
-    /// Schedule generation failed but graceful fallback returned an empty schedule.
-    ///
-    /// This warning captures the original error message that would have been
-    /// returned if graceful fallback mode was not enabled. Callers should
-    /// inspect this to understand why the schedule is empty.
-    GracefulFallback {
-        /// Human-readable description of the error that was suppressed.
-        error_message: String,
-    },
-
-    /// A calendar ID was provided, but resolution was skipped because
-    /// [`ScheduleErrorPolicy::MissingCalendarWarning`] was enabled.
-    MissingCalendarId {
-        /// The calendar identifier that could not be resolved.
-        calendar_id: String,
-    },
-}
-
-/// Explicit policy for how schedule construction should respond to recoverable issues.
-#[derive(
-    Clone, Copy, Debug, Default, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize,
-)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-pub enum ScheduleErrorPolicy {
-    /// Strict production mode: propagate all errors.
-    #[default]
-    Strict,
-    /// Allow missing calendar IDs and continue with a warning.
-    MissingCalendarWarning,
-    /// Return an empty schedule with a warning instead of propagating build errors.
-    GracefulEmpty,
-}
-
-impl std::fmt::Display for ScheduleErrorPolicy {
-    /// Writes the serde label (`strict`, `missing_calendar_warning`, `graceful_empty`).
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&crate::wire::serde_label(self).map_err(|_| std::fmt::Error)?)
-    }
-}
-
-impl std::str::FromStr for ScheduleErrorPolicy {
-    type Err = crate::Error;
-
-    /// Parses the serde label, ignoring surrounding whitespace and ASCII case.
-    fn from_str(s: &str) -> crate::Result<Self> {
-        crate::wire::serde_parse(&s.trim().to_ascii_lowercase())
-    }
-}
-
-impl std::fmt::Display for ScheduleWarning {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::GracefulFallback { error_message } => {
-                write!(f, "graceful fallback triggered: {error_message}")
-            }
-            Self::MissingCalendarId { calendar_id } => {
-                write!(
-                    f,
-                    "calendar id '{calendar_id}' not found; adjustment skipped"
-                )
-            }
-        }
-    }
-}
-
 /// Concrete schedule containing generated payment/coupon dates.
 ///
 /// Represents the output of schedule generation: a sequence of dates
-/// for cashflows, coupon payments, or other periodic events. Dates are
-/// guaranteed to be monotonically increasing with no duplicates.
+/// for cashflows, coupon payments, or other periodic events. A build either
+/// returns a complete schedule or an error; there is no empty or warning
+/// fallback (CORE-CONVENTIONS-008 #12).
 ///
 /// # Invariants
 ///
-/// - Dates are strictly increasing (no duplicates)
-/// - Empty schedules are allowed (zero-length Vec)
+/// - Generated dates are strictly increasing; a generated grid that is not
+///   is an error, never repaired by dropping dates
 /// - All dates are valid `time::Date` values
-///
-/// # Warnings
-///
-/// When using [`ScheduleErrorPolicy::GracefulEmpty`],
-/// the schedule may contain warnings that describe issues encountered during
-/// generation. Always check [`has_warnings()`](Schedule::has_warnings) when
-/// using graceful fallback mode to detect potential pricing issues.
 ///
 /// # Examples
 ///
@@ -357,7 +246,6 @@ impl std::fmt::Display for ScheduleWarning {
 /// # See Also
 ///
 /// - [`ScheduleBuilder`] for constructing schedules
-/// - [`ScheduleWarning`] for warning types
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -383,53 +271,6 @@ pub struct Schedule {
     #[serde(default)]
     #[cfg_attr(feature = "json-schema", schemars(with = "Vec<crate::wire::DateWire>"))]
     pub fixing_dates: Vec<Date>,
-    /// Warnings generated during schedule construction.
-    ///
-    /// Non-empty when graceful fallback mode suppressed an error or when
-    /// other non-fatal issues occurred during generation.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub warnings: Vec<ScheduleWarning>,
-}
-
-impl Schedule {
-    /// Returns `true` if any warnings were generated during schedule construction.
-    ///
-    /// When using graceful fallback mode, this should be checked to ensure
-    /// the schedule was generated successfully. An empty schedule with warnings
-    /// indicates a generation error was suppressed.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_core::dates::{Schedule, Tenor};
-    /// use time::{Date, Month};
-    ///
-    /// let start = Date::from_calendar_date(2025, Month::January, 15)?;
-    /// let end = Date::from_calendar_date(2025, Month::March, 15)?;
-    ///
-    /// let schedule = Schedule::builder(start, end)?
-    ///     .frequency(Tenor::monthly())
-    ///     .build()?;
-    ///
-    /// // Valid schedules have no warnings
-    /// assert!(!schedule.has_warnings());
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
-    #[must_use]
-    pub fn has_warnings(&self) -> bool {
-        !self.warnings.is_empty()
-    }
-
-    /// Returns `true` if schedule generation used graceful fallback.
-    ///
-    /// This is a convenience method equivalent to checking for the presence
-    /// of [`ScheduleWarning::GracefulFallback`] in the warnings.
-    #[must_use]
-    pub fn used_graceful_fallback(&self) -> bool {
-        self.warnings
-            .iter()
-            .any(|w| matches!(w, ScheduleWarning::GracefulFallback { .. }))
-    }
 }
 
 impl IntoIterator for Schedule {

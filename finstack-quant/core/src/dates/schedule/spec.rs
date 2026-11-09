@@ -33,8 +33,6 @@ pub struct ScheduleSpec {
     pub imm_mode: bool,
     /// If true, use CDS IMM date logic (20th of quarterly months).
     pub cds_imm_mode: bool,
-    /// Policy for recoverable schedule-construction errors.
-    pub error_policy: ScheduleErrorPolicy,
     /// Business days after each (adjusted) period end for the payment date.
     #[serde(default)]
     pub payment_lag_days: i32,
@@ -59,7 +57,6 @@ struct ScheduleSpecWire {
     #[serde(default)]
     imm_mode: bool,
     cds_imm_mode: bool,
-    error_policy: ScheduleErrorPolicy,
     #[serde(default)]
     payment_lag_days: i32,
     #[serde(default)]
@@ -86,7 +83,6 @@ impl TryFrom<ScheduleSpecWire> for ScheduleSpec {
             end_of_month: wire.end_of_month,
             imm_mode: wire.imm_mode,
             cds_imm_mode: wire.cds_imm_mode,
-            error_policy: wire.error_policy,
             payment_lag_days: wire.payment_lag_days,
             fixing_lag_business_days: wire.fixing_lag_business_days,
         })
@@ -118,7 +114,6 @@ impl ScheduleSpec {
             end_of_month: false,
             imm_mode: false,
             cds_imm_mode: false,
-            error_policy: ScheduleErrorPolicy::Strict,
             payment_lag_days: 0,
             fixing_lag_business_days: None,
         })

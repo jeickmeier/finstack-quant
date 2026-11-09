@@ -107,7 +107,7 @@ public = [
     "BusinessDayConvention", "CalendarMetadata", "HolidayCalendar", "adjust", "available_calendars",
     "add_business_days", "add_months", "add_weekdays", "end_of_month", "fiscal_year",
     "is_weekend", "months_until", "quarter",
-    "StubKind", "ScheduleErrorPolicy", "Schedule", "ScheduleBuilder",
+    "StubKind", "Schedule", "ScheduleBuilder",
     "SifmaSettlementClass", "sifma_settlement_date",
     "next_sifma_settlement",
     "third_wednesday", "third_friday", "next_imm", "is_imm_date", "is_cds_date",
@@ -116,7 +116,7 @@ public = [
     "next_third_friday",
     "create_date", "days_since_epoch", "date_from_epoch_days", "fx_standard_settlement_days",
 ]
-note = "DayCountContext is the sole owned host context; it stores Rust DayCountContextState and resolves the borrowed Rust context during calculation. Rust DayCountContextState is not a separate host class. The Rust dates::fx::fx_standard_settlement_days function is exposed as core.dates.fx_standard_settlement_days (WASM core.fxStandardSettlementDays). Other dates::fx settlement-date logic remains Rust-only; calendar construction (rules, generated calendars, composites) is crate-private in Rust, and hosts reach calendars by string id (or `a+b` joint ids, resolved in Rust calendar_by_id_strict) through adjust, HolidayCalendar and the schedule builder. The Rust DateExt trait methods are bound as free functions taking the date first (add_business_days, add_weekdays, add_months, end_of_month, is_weekend, quarter, fiscal_year, months_until); ScheduleBuilder.to_spec / Schedule.from_spec wrap the serde ScheduleSpec; ScheduleSpec.new supplies canonical Rust builder defaults. Rust-only: dates::canonical_calendar_id (the one id-normalization seam; both host HolidayCalendar constructors take their canonical code from it), DateExt::add_days (checked calendar-day arithmetic shared by Rust curve rolls and tenor/schedule generation; hosts use named financial date shifts or MarketContext.roll_forward), PeriodId::from_date (calendar bucket construction from an already validated Rust Date), ScheduleWarning as a type (Python exposes Schedule.warnings as list[dict] with kind/message)."
+note = "DayCountContext is the sole owned host context; it stores Rust DayCountContextState and resolves the borrowed Rust context during calculation. Rust DayCountContextState is not a separate host class. The Rust dates::fx::fx_standard_settlement_days function is exposed as core.dates.fx_standard_settlement_days (WASM core.fxStandardSettlementDays). Other dates::fx settlement-date logic remains Rust-only; calendar construction (rules, generated calendars, composites) is crate-private in Rust, and hosts reach calendars by string id (or `a+b` joint ids, resolved in Rust calendar_by_id_strict) through adjust, HolidayCalendar and the schedule builder. The Rust DateExt trait methods are bound as free functions taking the date first (add_business_days, add_weekdays, add_months, end_of_month, is_weekend, quarter, fiscal_year, months_until); ScheduleBuilder.to_spec / Schedule.from_spec wrap the serde ScheduleSpec; ScheduleSpec.new supplies canonical Rust builder defaults. Rust-only: dates::canonical_calendar_id (the one id-normalization seam; both host HolidayCalendar constructors take their canonical code from it), DateExt::add_days (checked calendar-day arithmetic shared by Rust curve rolls and tenor/schedule generation; hosts use named financial date shifts or MarketContext.roll_forward), PeriodId::from_date (calendar bucket construction from an already validated Rust Date)."
 
 [crates.core.module_symbols.market_data]
 python_package = "finstack_quant.core.market_data"
@@ -2071,12 +2071,12 @@ types = { CFKind = "CFKind", CashFlow = "CashFlow", CashFlowAccrual = "CashFlowA
 
 [parity.modules."finstack_quant.core.dates"]
 js = "core"
-# BusinessDayConvention, StubKind and ScheduleErrorPolicy cross WASM as their
-# snake_case labels: every WASM consumer (`adjust`, `Tenor.addToDate`,
-# `ScheduleBuilder.adjustWith/stubRule/errorPolicy`) takes the label and parses
+# BusinessDayConvention and StubKind cross WASM as their snake_case labels:
+# every WASM consumer (`adjust`, `Tenor.addToDate`,
+# `ScheduleBuilder.adjustWith/stubRule`) takes the label and parses
 # it with the Rust `FromStr`, so the TypeScript literal type is the twin of the
 # Python enum class.
-types = { BusinessDayConvention = "BusinessDayConvention", CalendarMetadata = "CalendarMetadata", Period = "Period", PeriodPlan = "PeriodPlan", ScheduleErrorPolicy = "ScheduleErrorPolicy", StubKind = "StubKind" }
+types = { BusinessDayConvention = "BusinessDayConvention", CalendarMetadata = "CalendarMetadata", Period = "Period", PeriodPlan = "PeriodPlan", StubKind = "StubKind" }
 
 [parity.modules."finstack_quant.core.market_data"]
 # HazardCurve.conditional_default_prob maps by the snake_case/camelCase rule
@@ -2418,9 +2418,6 @@ excluded = { from_returns = "pandas" }
 wasm_only = { summary = "WASM twin of the pandas exit Performance.to_dataframe, returned as a TableEnvelope" }
 
 [parity.members."finstack_quant.core.dates.BusinessDayConvention"]
-excluded = { from_name = "literal" }
-
-[parity.members."finstack_quant.core.dates.ScheduleErrorPolicy"]
 excluded = { from_name = "literal" }
 
 [parity.members."finstack_quant.core.dates.StubKind"]

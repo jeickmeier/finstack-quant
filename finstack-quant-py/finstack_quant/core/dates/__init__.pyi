@@ -53,7 +53,6 @@ from finstack_quant.core.dates._calendar import (
 from finstack_quant.core.dates._schedule import (
     Schedule as Schedule,
     ScheduleBuilder as ScheduleBuilder,
-    ScheduleErrorPolicy as ScheduleErrorPolicy,
     StubKind as StubKind,
 )
 from finstack_quant.core.dates._imm import (
@@ -104,7 +103,6 @@ __all__ = [
     "available_calendars",
     # schedule
     "StubKind",
-    "ScheduleErrorPolicy",
     "Schedule",
     "ScheduleBuilder",
     # SIFMA settlements

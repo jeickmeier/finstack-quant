@@ -5,9 +5,7 @@ use crate::bindings::core::dates::tenor::extract_tenor;
 use crate::bindings::date_utils::py_to_date;
 use crate::bindings::macros::{label_enum, typed_or_label, wire_methods};
 use crate::errors::core_to_py;
-use finstack_quant_core::dates::{
-    Schedule, ScheduleBuilder, ScheduleErrorPolicy, ScheduleSpec, StubKind,
-};
+use finstack_quant_core::dates::{Schedule, ScheduleBuilder, ScheduleSpec, StubKind};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyIterator, PyList, PyModule};
 
@@ -61,47 +59,6 @@ typed_or_label!(
     "StubKind or str",
     |label| label.parse().map_err(core_to_py)
 );
-
-/// Error handling policy for schedule building.
-///
-/// Immutable, hashable enum-style type. ``str()`` gives the snake_case wire
-/// name (``"strict"``, ``"missing_calendar_warning"``, ``"graceful_empty"``),
-/// which ``from_name`` parses.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.core.dates import ScheduleErrorPolicy
-/// >>> ScheduleErrorPolicy.from_name("graceful_empty") == ScheduleErrorPolicy.GRACEFUL_EMPTY
-/// True
-#[pyclass(
-    name = "ScheduleErrorPolicy",
-    module = "finstack_quant.core.dates",
-    frozen,
-    eq,
-    hash,
-    skip_from_py_object
-)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct PyScheduleErrorPolicy {
-    /// Inner policy variant.
-    pub(crate) inner: ScheduleErrorPolicy,
-}
-
-typed_or_label!(
-    fn extract_error_policy -> ScheduleErrorPolicy,
-    PyScheduleErrorPolicy,
-    "ScheduleErrorPolicy or str",
-    |label| label.parse().map_err(core_to_py)
-);
-
-label_enum!(PyScheduleErrorPolicy, ScheduleErrorPolicy, "ScheduleErrorPolicy", from_name, {
-    /// Strict — errors are immediately propagated.
-    STRICT => Strict,
-    /// Emit a warning for missing calendars, but continue.
-    MISSING_CALENDAR_WARNING => MissingCalendarWarning,
-    /// Gracefully return an empty schedule on error.
-    GRACEFUL_EMPTY => GracefulEmpty,
-});
 
 /// Convert a Python spec (``dict`` or JSON string) into a [`ScheduleSpec`].
 fn extract_schedule_spec(obj: &Bound<'_, PyAny>) -> PyResult<ScheduleSpec> {
@@ -180,7 +137,7 @@ impl PySchedule {
     /// Build a schedule from a serialized spec (``dict`` or JSON string)
     /// with the canonical ``ScheduleSpec`` fields (``start``, ``end``,
     /// ``frequency``, ``stub``, ``business_day_convention``, ``calendar_id``,
-    /// ``end_of_month``, ``imm_mode``, ``cds_imm_mode``, ``error_policy``,
+    /// ``end_of_month``, ``imm_mode``, ``cds_imm_mode``,
     /// ``payment_lag_days``, ``fixing_lag_business_days``).
     ///
     /// Raises ``ValueError`` when the spec is malformed or the schedule
@@ -210,48 +167,6 @@ impl PySchedule {
     #[getter]
     fn fixing_dates<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
         crate::bindings::pandas_utils::dates_to_pylist(py, &self.inner.fixing_dates)
-    }
-
-    /// Whether any warnings were generated.
-    fn has_warnings(&self) -> bool {
-        self.inner.has_warnings()
-    }
-
-    /// Whether a graceful fallback was used.
-    fn used_graceful_fallback(&self) -> bool {
-        self.inner.used_graceful_fallback()
-    }
-
-    /// Warnings as a list of dicts with ``kind`` (``"graceful_fallback"`` or
-    /// ``"missing_calendar_id"``), ``message`` and the warning's own field
-    /// (``error_message`` / ``calendar_id``).
-    #[getter]
-    fn warnings<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyDict>>> {
-        self.inner
-            .warnings
-            .iter()
-            .map(|w| {
-                let d = PyDict::new(py);
-                let value = serde_json::to_value(w).map_err(|e| {
-                    crate::errors::serde_json_to_py(e, "cannot serialize ScheduleWarning")
-                })?;
-                if let serde_json::Value::Object(map) = value {
-                    for (kind, payload) in map {
-                        d.set_item("kind", kind)?;
-                        if let serde_json::Value::Object(fields) = payload {
-                            for (name, field) in fields {
-                                d.set_item(
-                                    name,
-                                    crate::bindings::pandas_utils::serde_to_py(py, &field)?,
-                                )?;
-                            }
-                        }
-                    }
-                }
-                d.set_item("message", w.to_string())?;
-                Ok(d)
-            })
-            .collect()
     }
 
     /// Accrual periods as a pandas DataFrame with ``datetime64`` columns
@@ -445,17 +360,6 @@ impl PyScheduleBuilder {
         slf
     }
 
-    /// Set the error policy (``ScheduleErrorPolicy`` or its name such as
-    /// ``"graceful_empty"``). Setting a policy fully replaces any previous
-    /// policy (calls are order-independent and idempotent).
-    fn error_policy<'py>(
-        mut slf: PyRefMut<'py, Self>,
-        policy: &Bound<'_, PyAny>,
-    ) -> PyResult<PyRefMut<'py, Self>> {
-        slf.spec.error_policy = extract_error_policy(policy)?;
-        Ok(slf)
-    }
-
     /// Current builder state as a ``ScheduleSpec`` dict (the input accepted by
     /// ``Schedule.from_spec``).
     #[pyo3(text_signature = "(self)")]
@@ -465,12 +369,9 @@ impl PyScheduleBuilder {
 
     /// Build the schedule.
     ///
-    /// Delegates entirely to the canonical Rust ``ScheduleBuilder::build``:
-    /// under the default ``STRICT`` policy a generation failure raises
-    /// ``ValueError`` and an unknown calendar id ``KeyError``. Under
-    /// ``MISSING_CALENDAR_WARNING`` or ``GRACEFUL_EMPTY`` the schedule is
-    /// returned carrying its warnings (inspect via ``Schedule.warnings`` /
-    /// ``Schedule.has_warnings()``).
+    /// Delegates entirely to the canonical Rust ``ScheduleBuilder::build``,
+    /// which returns a complete schedule or an error: a generation failure
+    /// raises ``ValueError`` and an unknown calendar id ``KeyError``.
     fn build(&self) -> PyResult<PySchedule> {
         ScheduleBuilder::from(self.spec.clone())
             .build()
@@ -489,16 +390,10 @@ impl PyScheduleBuilder {
 /// Register schedule types on the `finstack_quant.core.dates` module.
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyStubKind>()?;
-    m.add_class::<PyScheduleErrorPolicy>()?;
     m.add_class::<PySchedule>()?;
     m.add_class::<PyScheduleBuilder>()?;
     Ok(())
 }
 
 /// Names exported from this submodule.
-pub const EXPORTS: &[&str] = &[
-    "StubKind",
-    "ScheduleErrorPolicy",
-    "Schedule",
-    "ScheduleBuilder",
-];
+pub const EXPORTS: &[&str] = &["StubKind", "Schedule", "ScheduleBuilder"];

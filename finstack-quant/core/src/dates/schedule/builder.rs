@@ -286,17 +286,6 @@ impl ScheduleBuilder {
         self
     }
 
-    /// Configure how recoverable schedule-construction errors are handled.
-    ///
-    /// # Arguments
-    ///
-    /// * `policy` - Policy enum controlling error handling, unmatched keys, or fallbacks
-    #[must_use]
-    pub fn error_policy(mut self, policy: ScheduleErrorPolicy) -> Self {
-        self.spec.error_policy = policy;
-        self
-    }
-
     /// Shift each payment date by `lag` business days after the (adjusted)
     /// period end.
     ///
@@ -338,9 +327,8 @@ impl ScheduleBuilder {
     ///
     /// # Errors
     ///
-    /// By default, [`build()`](Self::build) returns an error if the calendar ID
-    /// is not found. Use [`error_policy`](Self::error_policy) with
-    /// [`ScheduleErrorPolicy::MissingCalendarWarning`] to opt into lenient behavior.
+    /// [`build()`](Self::build) returns an error if the calendar ID is not
+    /// found; there is no lenient mode.
     ///
     /// # Arguments
     ///
@@ -380,16 +368,16 @@ impl ScheduleBuilder {
     /// convention and a calendar id are set; either alone (possible in a
     /// deserialized [`ScheduleSpec`]) leaves payment dates unadjusted.
     ///
-    /// When [`ScheduleErrorPolicy::GracefulEmpty`] is selected,
-    /// this method returns an empty schedule with a [`ScheduleWarning::GracefulFallback`]
-    /// warning instead of propagating errors. Always check [`Schedule::has_warnings()`]
-    /// when using graceful mode to detect potential pricing issues.
+    /// The result is a complete schedule or an error; failures are never
+    /// turned into an empty schedule.
     ///
     /// # Errors
     ///
     /// Returns an error if:
-    /// - Start date is after end date (and graceful mode is disabled)
-    /// - Calendar lookup fails under [`ScheduleErrorPolicy::Strict`]
+    /// - Start date is after end date
+    /// - Calendar lookup fails
+    /// - The generated grid is not strictly increasing (it is never repaired
+    ///   by dropping dates)
     /// - EOM is combined with a day/week tenor or an IMM/CDS IMM rule
     /// - In IMM mode, `frequency` is not a whole number of quarters, or
     ///   [`StubKind::None`] is used with an off-cycle `start` or `end`
@@ -414,59 +402,24 @@ impl ScheduleBuilder {
         if self.spec.start > self.spec.end {
             return Err(crate::InputError::InvalidDateRange.into());
         }
-        let error_policy = self.spec.error_policy;
-        let result = self.build_impl();
-
-        match result {
-            Ok(schedule) => Ok(schedule),
-            Err(e) if error_policy == ScheduleErrorPolicy::GracefulEmpty => {
-                tracing::warn!(error = %e, "schedule build fell back to empty schedule");
-                // Capture the error as a warning instead of propagating
-                Ok(Schedule {
-                    dates: Vec::new(),
-                    payment_dates: Vec::new(),
-                    fixing_dates: Vec::new(),
-                    warnings: vec![ScheduleWarning::GracefulFallback {
-                        error_message: e.to_string(),
-                    }],
-                })
-            }
-            Err(e) => Err(e),
-        }
+        self.build_impl()
     }
 
     /// Internal implementation of schedule building.
     fn build_impl(self) -> crate::Result<Schedule> {
         use crate::dates::calendar_by_id_strict;
 
-        let mut warnings: Vec<ScheduleWarning> = Vec::new();
-
         // A calendar id adjusts payment dates only together with a convention.
         let calendar_id = self
             .spec
             .business_day_convention
             .and(self.spec.calendar_id.as_ref());
-        let resolved_cal: Option<&dyn HolidayCalendar> = match calendar_id {
-            None => None,
-            Some(calendar_id) => match calendar_by_id_strict(calendar_id) {
-                Ok(cal) => Some(cal),
-                Err(_) if self.spec.error_policy == ScheduleErrorPolicy::MissingCalendarWarning => {
-                    tracing::warn!(
-                        calendar_id,
-                        "schedule build skipped missing calendar due to warning policy"
-                    );
-                    warnings.push(ScheduleWarning::MissingCalendarId {
-                        calendar_id: calendar_id.clone(),
-                    });
-                    None
-                }
-                // Strict mode: error on missing calendar
-                Err(err) => return Err(err),
-            },
-        };
+        let resolved_cal: Option<&dyn HolidayCalendar> = calendar_id
+            .map(|calendar_id| calendar_by_id_strict(calendar_id))
+            .transpose()?;
 
         // Generate dates based on mode
-        let mut dates = if self.spec.imm_mode {
+        let dates = if self.spec.imm_mode {
             BuilderInternal {
                 start: self.spec.start,
                 end: self.spec.end,
@@ -514,15 +467,9 @@ impl ScheduleBuilder {
             builder.generate()?
         };
 
-        // Enforce monotonicity and remove duplicates produced by EOM/stub handling
-        let pre_dedup_len = dates.len();
-        enforce_monotonic_and_dedup(&mut dates);
-        if dates.len() != pre_dedup_len {
-            tracing::warn!(
-                dropped = pre_dedup_len - dates.len(),
-                "schedule generation dropped duplicate or non-monotonic dates"
-            );
-        }
+        // A generated grid must already be strictly increasing; it is never
+        // repaired by dropping dates (CORE-CONVENTIONS-008 #12).
+        require_strictly_increasing(&dates)?;
 
         // Apply business day adjustment to period-end payment dates only.
         // Accrual dates stay on the unadjusted roll grid (CDS 20ths included).
@@ -538,7 +485,6 @@ impl ScheduleBuilder {
             dates,
             payment_dates,
             fixing_dates,
-            warnings,
         })
     }
 }

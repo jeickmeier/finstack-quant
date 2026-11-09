@@ -338,20 +338,6 @@ declare module './pkg/finstack_quant_wasm.js' {
      */
     endOfMonth(eom: boolean): this;
     /**
-     * Set the policy for recoverable construction errors.
-     *
-     * # Arguments
-     *
-     * * `policy` - Policy name: `"strict"`, `"missing_calendar_warning"` or
-     *   `"graceful_empty"`, in any ASCII case.
-     *
-     * @returns This builder, updated in place.
-     * @throws `TypeError` if `policy` is not a string; `FinstackError` (kind
-     * `validation`) if no policy matches.
-     * @param policy - Policy name: `"strict"`, `"missing_calendar_warning"` or `"graceful_empty"`, in any ASCII case.
-     */
-    errorPolicy(policy: string): this;
-    /**
      * Set the fixing lag in business days before each period's accrual start.
      *
      * # Arguments

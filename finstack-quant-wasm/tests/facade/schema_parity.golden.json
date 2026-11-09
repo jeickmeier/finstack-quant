@@ -18,14 +18,14 @@
             "$id": "https://finstack_quant.dev/schemas/dates/1/schedule.schema.json",
             "type_name": "Schedule",
             "kind": "output",
-            "bytes": 5559
+            "bytes": 2197
           },
           {
             "path": "schemas/dates/1/schedule_spec.schema.json",
             "$id": "https://finstack_quant.dev/schemas/dates/1/schedule_spec.schema.json",
             "type_name": "ScheduleSpec",
             "kind": "input",
-            "bytes": 10480
+            "bytes": 9667
           },
           {
             "path": "schemas/market_data/1/market_context_state.schema.json",
@@ -4088,7 +4088,7 @@
             "$id": "https://finstack_quant.dev/schemas/dates/1/schedule.schema.json",
             "type_name": "Schedule",
             "kind": "output",
-            "bytes": 5559
+            "bytes": 2197
           },
           {
             "domain": "core",
@@ -4096,7 +4096,7 @@
             "$id": "https://finstack_quant.dev/schemas/dates/1/schedule_spec.schema.json",
             "type_name": "ScheduleSpec",
             "kind": "input",
-            "bytes": 10480
+            "bytes": 9667
           },
           {
             "domain": "core",

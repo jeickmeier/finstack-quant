@@ -75,7 +75,7 @@ impl JsSchedule {
     /// * `spec` - `ScheduleSpec` JSON text or plain object, such as
     ///   `ScheduleBuilder.toSpec()` output: ISO `start`/`end`, `frequency`
     ///   (a `{ count, unit }` tenor), `stub`, `business_day_convention`, `calendar_id`,
-    ///   `end_of_month`, `imm_mode`, `cds_imm_mode`, `error_policy`,
+    ///   `end_of_month`, `imm_mode`, `cds_imm_mode`,
     ///   `payment_lag_days` and `fixing_lag_business_days`. Unknown fields are
     ///   rejected.
     ///
@@ -83,8 +83,8 @@ impl JsSchedule {
     /// @throws `TypeError` if `spec` is not a JSON string or plain object;
     /// `FinstackError` (kind `validation`) for an invalid spec, both IMM modes
     /// together, or a generation failure; kind `not_found` for an unknown
-    /// calendar under the strict policy.
-    /// @param spec - `ScheduleSpec` JSON text or plain object, such as `ScheduleBuilder.toSpec()` output: ISO `start`/`end`, `frequency` (a `{ count, unit }` tenor), `stub`, `business_day_convention`, `calendar_id`, `end_of_month`, `imm_mode`, `cds_imm_mode`, `error_policy`, `payment_lag_days` and `fixing_lag_business_days`. Unknown fields are rejected.
+    /// calendar.
+    /// @param spec - `ScheduleSpec` JSON text or plain object, such as `ScheduleBuilder.toSpec()` output: ISO `start`/`end`, `frequency` (a `{ count, unit }` tenor), `stub`, `business_day_convention`, `calendar_id`, `end_of_month`, `imm_mode`, `cds_imm_mode`, `payment_lag_days` and `fixing_lag_business_days`. Unknown fields are rejected.
     #[wasm_bindgen(js_name = fromSpec)]
     pub fn from_spec(
         #[wasm_bindgen(unchecked_param_type = "ScheduleSpec | string")] spec: JsValue,
@@ -113,29 +113,6 @@ impl JsSchedule {
         epoch_day_array(&self.inner.fixing_dates)
     }
 
-    /// Whether schedule construction produced any warning.
-    ///
-    /// @returns `true` when `warnings` is non-empty.
-    #[wasm_bindgen(js_name = hasWarnings)]
-    pub fn has_warnings(&self) -> bool {
-        self.inner.has_warnings()
-    }
-
-    /// Whether a graceful-fallback policy suppressed a construction error.
-    ///
-    /// @returns `true` when a `graceful_fallback` warning is present.
-    #[wasm_bindgen(js_name = usedGracefulFallback)]
-    pub fn used_graceful_fallback(&self) -> bool {
-        self.inner.used_graceful_fallback()
-    }
-
-    /// Construction warnings in the Rust `ScheduleWarning` wire form (an
-    /// array of single-key objects such as `{ graceful_fallback: { … } }`).
-    #[wasm_bindgen(getter, js_name = warnings, unchecked_return_type = "ScheduleWarning[]")]
-    pub fn warnings(&self) -> Result<JsValue, JsValue> {
-        to_js_value(&self.inner.warnings)
-    }
-
     /// Serialize to the canonical JSON wire form shared with Python `Schedule.to_json`.
     ///
     /// @returns Compact JSON text with ISO-8601 dates.
@@ -150,12 +127,12 @@ impl JsSchedule {
     /// # Arguments
     ///
     /// * `json` - Schedule JSON text or plain object with ISO `dates`,
-    ///   `payment_dates`, `fixing_dates` and optional `warnings`.
+    ///   `payment_dates` and `fixing_dates`.
     ///
     /// @returns The parsed `Schedule`.
     /// @throws `TypeError` if `json` is not a JSON string or plain object;
     /// `FinstackError` (kind `validation`) if it does not match the schema.
-    /// @param json - Schedule JSON text or plain object with ISO `dates`, `payment_dates`, `fixing_dates` and optional `warnings`.
+    /// @param json - Schedule JSON text or plain object with ISO `dates`, `payment_dates` and `fixing_dates`.
     #[wasm_bindgen(js_name = fromJson)]
     pub fn from_json(
         #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
@@ -373,26 +350,6 @@ impl JsScheduleBuilder {
     #[wasm_bindgen(js_name = imm)]
     pub fn imm(&mut self) {
         self.spec = self.spec.clone().with_imm();
-    }
-
-    /// Set the policy for recoverable construction errors.
-    ///
-    /// # Arguments
-    ///
-    /// * `policy` - Policy name: `"strict"`, `"missing_calendar_warning"` or
-    ///   `"graceful_empty"`, in any ASCII case.
-    ///
-    /// @returns This builder, updated in place.
-    /// @throws `TypeError` if `policy` is not a string; `FinstackError` (kind
-    /// `validation`) if no policy matches.
-    /// @param policy - Policy name: `"strict"`, `"missing_calendar_warning"` or `"graceful_empty"`, in any ASCII case.
-    #[wasm_bindgen(js_name = errorPolicy)]
-    pub fn error_policy(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] policy: JsValue,
-    ) -> Result<(), JsValue> {
-        self.spec.error_policy = js_string(&policy, "policy")?.parse().map_err(to_js_err)?;
-        Ok(())
     }
 
     /// The persisted specification this builder holds.

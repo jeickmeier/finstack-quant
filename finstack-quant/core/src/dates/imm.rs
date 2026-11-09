@@ -587,20 +587,10 @@ mod tests {
 
     #[test]
     fn unit_enum_labels_round_trip_and_parse_leniently() {
-        use crate::dates::ScheduleErrorPolicy;
-
         assert_eq!(SifmaSettlementClass::C.to_string(), "c");
         assert_eq!(
             " B ".parse::<SifmaSettlementClass>().unwrap(),
             SifmaSettlementClass::B
-        );
-        assert_eq!(
-            ScheduleErrorPolicy::GracefulEmpty.to_string(),
-            "graceful_empty"
-        );
-        assert_eq!(
-            "STRICT".parse::<ScheduleErrorPolicy>().unwrap(),
-            ScheduleErrorPolicy::Strict
         );
     }
 

@@ -87,13 +87,12 @@ fn schedule_spec_builds_expected_dates() {
         end_of_month: false,
         imm_mode: false,
         cds_imm_mode: false,
-        error_policy: finstack_quant_core::dates::ScheduleErrorPolicy::Strict,
         payment_lag_days: 0,
         fixing_lag_business_days: None,
     };
 
     let json = serde_json::to_string(&spec).unwrap();
-    assert!(json.contains("\"error_policy\":\"strict\""));
+    assert!(!json.contains("error_policy"));
     assert!(!json.contains("\"graceful\""));
     assert!(!json.contains("\"allow_missing_calendar\""));
     let restored: ScheduleSpec = serde_json::from_str(&json).unwrap();
@@ -123,7 +122,6 @@ fn schedule_spec_rejects_retired_policy_booleans() {
         "end_of_month":false,
         "imm_mode":false,
         "cds_imm_mode":false,
-        "error_policy":"strict",
         "allow_missing_calendar":true
     }"#;
     assert!(serde_json::from_str::<ScheduleSpec>(retired).is_err());
@@ -141,8 +139,7 @@ fn schedule_spec_rejects_retired_payment_lag_business_days() {
         "calendar_id":null,
         "end_of_month":false,
         "imm_mode":false,
-        "cds_imm_mode":false,
-        "error_policy":"strict","#;
+        "cds_imm_mode":false,"#;
     let canonical: ScheduleSpec =
         serde_json::from_str(&format!("{base}\"payment_lag_days\":2}}")).unwrap();
     assert_eq!(canonical.payment_lag_days, 2);
@@ -166,8 +163,7 @@ fn schedule_spec_rejects_dual_imm_modes() {
         "calendar_id":null,
         "end_of_month":false,
         "imm_mode":true,
-        "cds_imm_mode":true,
-        "error_policy":"strict"
+        "cds_imm_mode":true
     }"#;
     assert!(serde_json::from_str::<ScheduleSpec>(malformed).is_err());
 
@@ -181,7 +177,6 @@ fn schedule_spec_rejects_dual_imm_modes() {
         end_of_month: false,
         imm_mode: true,
         cds_imm_mode: true,
-        error_policy: finstack_quant_core::dates::ScheduleErrorPolicy::Strict,
         payment_lag_days: 0,
         fixing_lag_business_days: None,
     };

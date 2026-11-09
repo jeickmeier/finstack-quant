@@ -53,22 +53,16 @@ fn push_if_new(buf: &mut Buffer, d: Date) {
     }
 }
 
-/// Enforce strictly increasing, duplicate-free dates while preserving original order.
-/// Drops any consecutive duplicates and any dates that would not increase.
-pub(super) fn enforce_monotonic_and_dedup(dates: &mut Vec<Date>) {
-    if dates.is_empty() {
-        return;
+/// Reject a generated grid that is not strictly increasing, naming the first
+/// duplicate or backward pair.
+pub(super) fn require_strictly_increasing(dates: &[Date]) -> crate::Result<()> {
+    match dates.windows(2).find(|pair| pair[1] <= pair[0]) {
+        Some(pair) => Err(crate::Error::Validation(format!(
+            "generated schedule is not strictly increasing: {} is followed by {}",
+            pair[0], pair[1]
+        ))),
+        None => Ok(()),
     }
-    let mut write = 0;
-    for read in 1..dates.len() {
-        if dates[read] > dates[write] {
-            write += 1;
-            if read != write {
-                dates[write] = dates[read];
-            }
-        }
-    }
-    dates.truncate(write + 1);
 }
 
 // BuilderInternal – raw date sequence generator

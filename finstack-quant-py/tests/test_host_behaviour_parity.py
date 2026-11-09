@@ -40,7 +40,7 @@ def test_schedule_builder_setters_update_the_builder_in_place_and_return_it() ->
     builder.end_of_month(True)
     assert builder.stub_rule("short_front").adjust_with("following", "nyse") is builder
     assert builder.payment_lag_days(2).fixing_lag_business_days(1) is builder
-    assert builder.cds_imm().imm().error_policy("strict") is builder
+    assert builder.cds_imm().imm() is builder
     spec = builder.to_spec()
     assert spec["frequency"] == {"count": 3, "unit": "months"}
     assert spec["end_of_month"] is True
