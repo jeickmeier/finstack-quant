@@ -90,7 +90,7 @@ pub fn create_down_and_out_call(
         strike,
         barrier,
         rebate: None,
-        rebate_timing: Default::default(),
+        rebate_timing: None,
         option_type: OptionType::Call,
         barrier_type: BarrierType::DownAndOut,
         expiry,

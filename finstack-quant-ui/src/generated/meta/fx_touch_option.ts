@@ -943,19 +943,19 @@ export default [
   {
     "path": "#/$defs/d_5902d4af86ba7c7f64c8",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_touch_option.schema.json#/$defs/PayoutTiming",
-    "description": "When a barrier-triggered cash amount is paid.\n\nUsed for a knock-out rebate (`rebate_timing`) and for a one-touch payout\n(`payout_timing`). At-expiry payments are discounted from expiry; at-hit\npayments are discounted from the first-passage time. Knock-in rebates\nalways pay at expiry (only then is it known that no hit occurred), so this\nsetting does not affect them."
+    "description": "When an otherwise entitled barrier-conditional cash amount is paid.\n\nThe timing schedules a payment; it does not grant entitlement, choose the\namount or currency, or set a settlement lag, curve or clock. Each product\nvalidates which timings its payoff supports. For example, a no-hit\n(knock-in) rebate is only determined at expiry, so products reject\n`AtHit` for it rather than silently replacing the selection."
   },
   {
     "path": "#/$defs/d_5902d4af86ba7c7f64c8/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_touch_option.schema.json#/$defs/PayoutTiming/oneOf/0",
     "const": "at_hit",
-    "description": "Paid the moment the barrier is hit (market standard)."
+    "description": "Paid at the first qualifying recognized hit."
   },
   {
     "path": "#/$defs/d_5902d4af86ba7c7f64c8/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_touch_option.schema.json#/$defs/PayoutTiming/oneOf/1",
     "const": "at_expiry",
-    "description": "Paid at expiry regardless of when the barrier is hit."
+    "description": "Paid at the product's specified expiry."
   },
   {
     "path": "#/$defs/d_5c13df5a55f1da604df2",
@@ -4601,19 +4601,19 @@ export default [
   {
     "path": "#/$defs/d_cbd8d75e6c2a0cce883c",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_touch_option.schema.json#/$defs/BarrierDirection",
-    "description": "Side of spot on which a barrier sits."
+    "description": "Inequality sense of an inclusive barrier touch.\n\nAt a contractually eligible observation `x` of barrier `H` (finite, same\nunits), `Up` is hit when `x >= H` and `Down` when `x <= H`. Equality is a\nhit. The direction does not assert where the barrier sits relative to\ncurrent spot: an observation already at or beyond the barrier is a hit."
   },
   {
     "path": "#/$defs/d_cbd8d75e6c2a0cce883c/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_touch_option.schema.json#/$defs/BarrierDirection/oneOf/0",
     "const": "up",
-    "description": "Barrier is above spot: hit when spot touches or rises above it."
+    "description": "Hit when an eligible observation is at or above the barrier."
   },
   {
     "path": "#/$defs/d_cbd8d75e6c2a0cce883c/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_touch_option.schema.json#/$defs/BarrierDirection/oneOf/1",
     "const": "down",
-    "description": "Barrier is below spot: hit when spot touches or falls below it."
+    "description": "Hit when an eligible observation is at or below the barrier."
   },
   {
     "path": "#/$defs/d_cc8ed166abbb10ad4451",

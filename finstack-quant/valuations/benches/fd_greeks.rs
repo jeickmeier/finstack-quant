@@ -99,7 +99,7 @@ fn create_barrier_option() -> BarrierOption {
         strike: 100.0,
         barrier: 80.0,
         rebate: None,
-        rebate_timing: Default::default(),
+        rebate_timing: None,
         option_type: OptionType::Call,
         barrier_type: BarrierType::DownAndOut,
         expiry: as_of() + time::Duration::days(365),

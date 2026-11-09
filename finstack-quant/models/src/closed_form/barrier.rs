@@ -92,7 +92,7 @@
 //! - Zero-vol and near-zero-vol touch probability paths fall back to the deterministic limit
 //! - `time <= 0` helper behavior uses the current terminal spot as a convenience convention;
 //!   realized expired barrier state still requires observed path history at the instrument layer
-//! - Rebates support explicit [`PayoutTiming::AtHit`] and [`PayoutTiming::AtExpiry`] conventions
+//! - Knock-out rebates support explicit [`PayoutTiming::AtHit`] and [`PayoutTiming::AtExpiry`]; knock-in (no-hit) rebates support only `AtExpiry`
 //! - For discrete monitoring in production, apply Broadie-Glasserman-Kou correction
 //!
 //! # Examples
@@ -532,18 +532,21 @@ fn barrier_rebate_at_expiry(params: &BarrierParams, rebate: f64, barrier_type: B
 
 /// Calculate value of a barrier rebate with explicit payment timing.
 ///
-/// - Knock-in rebates pay at expiry iff the barrier is never hit; `timing` is
-///   ignored (a no-hit can only be known at expiry).
+/// - Knock-in (no-hit) rebates are determined only at expiry, so the only
+///   supported timing is [`PayoutTiming::AtExpiry`]. Knock-in with
+///   [`PayoutTiming::AtHit`] is unsupported and returns a `NaN` sentinel; it
+///   is never silently repriced at expiry.
 /// - Knock-out rebates pay when the barrier is hit. With
 ///   [`PayoutTiming::AtExpiry`] the payment is deferred to expiry; with
-///   [`PayoutTiming::AtHit`] (market standard) the rebate is valued as
+///   [`PayoutTiming::AtHit`] the rebate is valued as
 ///   `rebate · E[e^{-r·τ} 1{τ≤T}]`
 ///   via the Rubinstein–Reiner discounted first-passage value.
 ///
 /// Negative rates are supported, including the region where the usual
 /// real-valued closed form has an imaginary square root. In that region,
 /// the discounted first-passage expectation is evaluated by quadrature.
-/// Returns a `NaN` sentinel if that quadrature fails to converge.
+/// Returns a `NaN` sentinel if that quadrature fails to converge, or for the
+/// unsupported knock-in/`AtHit` combination.
 ///
 /// # Arguments
 ///
@@ -553,8 +556,8 @@ fn barrier_rebate_at_expiry(params: &BarrierParams, rebate: f64, barrier_type: B
 ///   currency units.
 /// * `barrier_type` - Knock-in or knock-out direction and activation
 ///   convention controlling whether hit or no-hit earns the rebate.
-/// * `timing` - Whether a knock-out rebate is paid at expiry or immediately
-///   on barrier hit; knock-in no-hit rebates always settle at expiry.
+/// * `timing` - Whether a knock-out rebate is paid at expiry or at the first
+///   hit. Knock-in rebates require [`PayoutTiming::AtExpiry`].
 pub fn barrier_rebate(
     params: &BarrierParams,
     rebate: f64,
@@ -562,10 +565,8 @@ pub fn barrier_rebate(
     timing: PayoutTiming,
 ) -> f64 {
     match (barrier_type, timing) {
-        (BarrierType::UpAndIn | BarrierType::DownAndIn, _)
-        | (BarrierType::UpAndOut | BarrierType::DownAndOut, PayoutTiming::AtExpiry) => {
-            barrier_rebate_at_expiry(params, rebate, barrier_type)
-        }
+        (BarrierType::UpAndIn | BarrierType::DownAndIn, PayoutTiming::AtHit) => f64::NAN,
+        (_, PayoutTiming::AtExpiry) => barrier_rebate_at_expiry(params, rebate, barrier_type),
         (BarrierType::UpAndOut | BarrierType::DownAndOut, PayoutTiming::AtHit) => {
             let is_up = barrier_type.is_up();
             rebate * discounted_touch_value(params, is_up)
@@ -573,25 +574,86 @@ pub fn barrier_rebate(
     }
 }
 
-/// Realized payoff of a barrier option whose monitoring window has closed.
+/// Validate a barrier product's rebate and its payment timing together.
+///
+/// A rebate requires an explicit timing, and a timing requires a rebate: no
+/// timing is invented for cash that does not exist. A knock-in (no-hit)
+/// rebate is only determined at expiry, so it must use
+/// [`PayoutTiming::AtExpiry`]; [`PayoutTiming::AtHit`] is rejected rather
+/// than silently repriced.
+///
+/// # Arguments
+///
+/// * `product` - Product name used to prefix the error message, for example
+///   `"BarrierOption"`.
+/// * `barrier_type` - Contractual barrier classification; only its in/out
+///   sense matters here.
+/// * `has_rebate` - Whether the product carries a rebate amount (including an
+///   explicit zero amount).
+/// * `timing` - The product's selected rebate payment timing, or `None` when
+///   the product has no rebate.
+///
+/// # Errors
+///
+/// Returns [`finstack_quant_core::Error::Validation`] when a rebate has no
+/// timing, a timing has no rebate, or a knock-in rebate selects `AtHit`.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_core::types::{BarrierType, PayoutTiming};
+/// use finstack_quant_models::closed_form::validate_rebate_timing;
+///
+/// assert!(validate_rebate_timing("Example", BarrierType::UpAndOut, true, Some(PayoutTiming::AtHit)).is_ok());
+/// assert!(validate_rebate_timing("Example", BarrierType::DownAndIn, true, Some(PayoutTiming::AtHit)).is_err());
+/// assert!(validate_rebate_timing("Example", BarrierType::UpAndOut, true, None).is_err());
+/// assert!(validate_rebate_timing("Example", BarrierType::UpAndOut, false, None).is_ok());
+/// ```
+pub fn validate_rebate_timing(
+    product: &str,
+    barrier_type: BarrierType,
+    has_rebate: bool,
+    timing: Option<PayoutTiming>,
+) -> finstack_quant_core::Result<()> {
+    match (has_rebate, timing) {
+        (true, None) => Err(finstack_quant_core::Error::Validation(format!(
+            "{product} rebate requires an explicit rebate_timing (at_hit or at_expiry)"
+        ))),
+        (false, Some(_)) => Err(finstack_quant_core::Error::Validation(format!(
+            "{product} rebate_timing requires a rebate"
+        ))),
+        (true, Some(PayoutTiming::AtHit)) if barrier_type.is_knock_in() => {
+            Err(finstack_quant_core::Error::Validation(format!(
+                "{product} knock-in rebates are paid only if no hit occurred, so rebate_timing must be at_expiry"
+            )))
+        }
+        (false, None) | (true, Some(_)) => Ok(()),
+    }
+}
+
+/// Expiry-slice payoff of a barrier option whose monitoring window has closed.
+///
+/// The result covers only the amount payable at expiry. An at-hit knock-out
+/// rebate is excluded because it was payable at the hit; whether that cash
+/// was actually settled belongs to the product's cash-flow and settlement
+/// records, not to this helper.
 ///
 /// | Barrier | Breached | Payoff |
 /// |---|---|---|
 /// | knock-out | no | `intrinsic` |
-/// | knock-out | yes | `rebate` at [`PayoutTiming::AtExpiry`]; `0.0` at [`PayoutTiming::AtHit`] (already settled on the hit) |
+/// | knock-out | yes | rebate amount at [`PayoutTiming::AtExpiry`]; `0.0` at [`PayoutTiming::AtHit`] (payable at the hit, outside the expiry slice) or with no rebate |
 /// | knock-in | yes | `intrinsic` |
-/// | knock-in | no | `rebate` |
+/// | knock-in | no | rebate amount at [`PayoutTiming::AtExpiry`]; `0.0` with no rebate; `NaN` sentinel at [`PayoutTiming::AtHit`] (unsupported) |
 ///
 /// # Arguments
 ///
 /// * `barrier_type` - Knock-in or knock-out direction of the contract.
 /// * `breached` - Whether the barrier was observed hit during monitoring.
-/// * `timing` - Knock-out rebate payment timing; knock-in rebates always
-///   settle at expiry.
 /// * `intrinsic` - Exercise value at expiry (`max(S - K, 0)` or
 ///   `max(K - S, 0)`), on the caller's scale (per unit or total).
-/// * `rebate` - Rebate amount on the same scale as `intrinsic`; `0.0` when
-///   the contract has none.
+/// * `rebate` - The contract's rebate as `(amount, timing)`, with the amount
+///   on the same scale as `intrinsic`; `None` when the contract has no
+///   rebate. Knock-in (no-hit) rebates require [`PayoutTiming::AtExpiry`].
 ///
 /// # Returns
 ///
@@ -604,27 +666,27 @@ pub fn barrier_rebate(
 /// use finstack_quant_core::types::{BarrierType, PayoutTiming};
 /// use finstack_quant_models::closed_form::expired_barrier_payoff;
 ///
-/// let knocked_out =
-///     expired_barrier_payoff(BarrierType::UpAndOut, true, PayoutTiming::AtExpiry, 5.0, 1.0);
+/// let knocked_out = expired_barrier_payoff(
+///     BarrierType::UpAndOut,
+///     true,
+///     5.0,
+///     Some((1.0, PayoutTiming::AtExpiry)),
+/// );
 /// assert_eq!(knocked_out, 1.0);
-/// let knocked_in =
-///     expired_barrier_payoff(BarrierType::DownAndIn, true, PayoutTiming::AtHit, 5.0, 1.0);
+/// let knocked_in = expired_barrier_payoff(BarrierType::DownAndIn, true, 5.0, None);
 /// assert_eq!(knocked_in, 5.0);
 /// ```
 pub fn expired_barrier_payoff(
     barrier_type: BarrierType,
     breached: bool,
-    timing: PayoutTiming,
     intrinsic: f64,
-    rebate: f64,
+    rebate: Option<(f64, PayoutTiming)>,
 ) -> f64 {
-    match (barrier_type.is_knock_out(), breached) {
-        (true, false) | (false, true) => intrinsic,
-        (true, true) => match timing {
-            PayoutTiming::AtHit => 0.0,
-            PayoutTiming::AtExpiry => rebate,
-        },
-        (false, false) => rebate,
+    match (barrier_type.is_knock_out(), breached, rebate) {
+        (true, false, _) | (false, true, _) => intrinsic,
+        (_, _, None) | (true, true, Some((_, PayoutTiming::AtHit))) => 0.0,
+        (_, _, Some((amount, PayoutTiming::AtExpiry))) => amount,
+        (false, false, Some((_, PayoutTiming::AtHit))) => f64::NAN,
     }
 }
 
@@ -2604,15 +2666,26 @@ mod tests {
         );
     }
 
-    /// Knock-in rebates pay at expiry by definition, so the timing flag must
-    /// be a no-op for them; an already-breached KO barrier pays immediately
+    /// A knock-in (no-hit) rebate is only determined at expiry: `AtHit` is
+    /// unsupported and yields the NaN sentinel instead of being silently
+    /// repriced at expiry. An already-breached KO barrier pays immediately
     /// (undiscounted) under at-hit timing.
     #[test]
     fn rebate_timing_edge_cases() {
         let p = BarrierParams::new(100.0, 100.0, 120.0, 1.0, 0.05, 0.0, 0.25);
-        let ki_hit = barrier_rebate(&p, 5.0, BarrierType::UpAndIn, PayoutTiming::AtHit);
+        for bt in [BarrierType::UpAndIn, BarrierType::DownAndIn] {
+            assert!(barrier_rebate(&p, 5.0, bt, PayoutTiming::AtHit).is_nan());
+            assert!(
+                expired_barrier_payoff(bt, false, 1.0, Some((5.0, PayoutTiming::AtHit))).is_nan()
+            );
+            assert_eq!(
+                expired_barrier_payoff(bt, false, 1.0, Some((5.0, PayoutTiming::AtExpiry))),
+                5.0
+            );
+            assert_eq!(expired_barrier_payoff(bt, false, 1.0, None), 0.0);
+        }
         let ki_exp = barrier_rebate(&p, 5.0, BarrierType::UpAndIn, PayoutTiming::AtExpiry);
-        assert_eq!(ki_hit, ki_exp, "timing must not affect knock-in rebates");
+        assert!(ki_exp.is_finite() && ki_exp > 0.0);
 
         let breached = BarrierParams::new(125.0, 100.0, 120.0, 1.0, 0.05, 0.0, 0.25);
         let v = barrier_rebate(&breached, 5.0, BarrierType::UpAndOut, PayoutTiming::AtHit);

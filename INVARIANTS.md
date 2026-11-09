@@ -2593,8 +2593,9 @@ return is not proof that all pending cash/PV is zero. Keep strict canonical wire
 values and the existing host payload/dispatcher boundaries without duplicate
 classes or merging distinct monitoring/structural-credit/touch concepts.
 
-Runtime/product/model/host reconciliation and independent qualification remain
-pending; this contract does not adopt downstream pricing algorithms or accuracy.
+Runtime/product/host reconciliation landed on 2026-11-08; independent
+observation, window and settlement qualification at each consumer remains
+pending. This contract does not adopt downstream pricing algorithms or accuracy.
 [Clause map S17–S20](docs/decisions/INVARIANT_MAP.md#3-sign-and-perspective-conventions).
 
 ## 4. Date, day-count, and time conventions

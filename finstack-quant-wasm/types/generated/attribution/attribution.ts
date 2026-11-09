@@ -3306,6 +3306,10 @@ export type CdsOptionStrike =
     };
 /**
  * Four-state barrier option classification.
+ *
+ * In/out describes whether a qualifying hit deactivates or activates the
+ * option. It does not describe payment entitlement or the option's current
+ * state.
  */
 export type BarrierType = "up_and_out" | "up_and_in" | "down_and_out" | "down_and_in";
 /**
@@ -3323,13 +3327,13 @@ export type Monitoring =
       type: "discrete";
     };
 /**
- * When a barrier-triggered cash amount is paid.
+ * When an otherwise entitled barrier-conditional cash amount is paid.
  *
- * Used for a knock-out rebate (`rebate_timing`) and for a one-touch payout
- * (`payout_timing`). At-expiry payments are discounted from expiry; at-hit
- * payments are discounted from the first-passage time. Knock-in rebates
- * always pay at expiry (only then is it known that no hit occurred), so this
- * setting does not affect them.
+ * The timing schedules a payment; it does not grant entitlement, choose the
+ * amount or currency, or set a settlement lag, curve or clock. Each product
+ * validates which timings its payoff supports. For example, a no-hit
+ * (knock-in) rebate is only determined at expiry, so products reject
+ * `AtHit` for it rather than silently replacing the selection.
  */
 export type PayoutTiming = "at_hit" | "at_expiry";
 /**
@@ -3408,7 +3412,12 @@ export type FxDeltaConventionKind = "spot" | "forward" | "premium_adjusted_spot"
  */
 export type DigitalPayoutType = "cash_or_nothing" | "asset_or_nothing";
 /**
- * Side of spot on which a barrier sits.
+ * Inequality sense of an inclusive barrier touch.
+ *
+ * At a contractually eligible observation `x` of barrier `H` (finite, same
+ * units), `Up` is hit when `x >= H` and `Down` when `x <= H`. Equality is a
+ * hit. The direction does not assert where the barrier sits relative to
+ * current spot: an observation already at or beyond the barrier is a hit.
  */
 export type BarrierDirection = "up" | "down";
 /**
@@ -13956,17 +13965,16 @@ export interface BarrierOption {
    */
   rebate?: Money | null;
   /**
-   * Timing of the knock-out rebate payment.
+   * Payment timing of the rebate. Required exactly when `rebate` is set.
    *
-   * `at_hit` (default, market standard) pays the rebate the moment a
-   * knock-out barrier is breached; `at_expiry` defers payment to expiry.
-   * Knock-in rebates always pay at expiry (a no-hit is only known then),
-   * so this setting does not affect them. The analytical pricer values
-   * at-hit rebates via the discounted first-passage closed form. Monte
-   * Carlo applies at-hit when `rebate_timing == AtHit` via
-   * `with_rebate_at_hit`; the crate primitive defaults to at-expiry.
+   * For a knock-out, `at_hit` pays the rebate at the first qualifying hit
+   * and `at_expiry` defers it to expiry. A knock-in (no-hit) rebate is
+   * only determined at expiry, so it must be `at_expiry`; `at_hit` is
+   * rejected. The analytical pricer values at-hit knock-out rebates via
+   * the discounted first-passage closed form; Monte Carlo applies at-hit
+   * timing via `with_rebate_at_hit`.
    */
-  rebate_timing?: PayoutTiming;
+  rebate_timing?: PayoutTiming | null;
   /**
    * Scenario-only pricing adjustments.
    */
@@ -15148,17 +15156,16 @@ export interface FxBarrierOption {
    */
   rebate?: Money | null;
   /**
-   * Timing of the knock-out rebate payment.
+   * Payment timing of the rebate. Required exactly when `rebate` is set.
    *
-   * `at_hit` (default, market standard) pays the rebate the moment a
-   * knock-out barrier is breached; `at_expiry` defers payment to expiry.
-   * Knock-in rebates always pay at expiry, so this setting does not affect
-   * them. The analytical pricer values at-hit rebates via the discounted
-   * first-passage closed form. Monte Carlo applies at-hit when
-   * `rebate_timing == AtHit` via `with_rebate_at_hit`; the crate primitive
-   * defaults to at-expiry.
+   * For a knock-out, `at_hit` pays the rebate at the first qualifying hit
+   * and `at_expiry` defers it to expiry. A knock-in (no-hit) rebate is
+   * only determined at expiry, so it must be `at_expiry`; `at_hit` is
+   * rejected. The analytical pricer values at-hit knock-out rebates via
+   * the discounted first-passage closed form; Monte Carlo applies at-hit
+   * timing via `with_rebate_at_hit`.
    */
-  rebate_timing?: PayoutTiming;
+  rebate_timing?: PayoutTiming | null;
   /**
    * Scenario-only pricing adjustments.
    */

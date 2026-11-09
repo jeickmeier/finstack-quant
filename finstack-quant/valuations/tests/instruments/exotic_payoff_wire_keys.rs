@@ -171,6 +171,7 @@ fn autocallable_retired_participation_keys_are_rejected() {
 fn fx_barrier_rebate_is_a_quote_currency_total() {
     let mut option = FxBarrierOption::example().expect("example");
     option.rebate = Some(Money::from((20_000_i64, Currency::USD)));
+    option.rebate_timing = Some(finstack_quant_core::types::PayoutTiming::AtExpiry);
     option.validate().expect("quote-currency rebate is valid");
 
     option.rebate = Some(Money::from((20_000_i64, Currency::EUR)));

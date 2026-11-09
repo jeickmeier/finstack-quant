@@ -135,7 +135,7 @@ impl FxBarrierOptionMcPricer {
         });
         // Exact at-hit rebate timing: compound the rebate forward from the
         // hit time at the domestic rate so DF(T) nets to DF(τ).
-        if inst.rebate.is_some() && inst.rebate_timing == PayoutTiming::AtHit {
+        if inst.rebate.is_some() && inst.rebate_timing == Some(PayoutTiming::AtHit) {
             payoff = payoff.with_rebate_at_hit(r_dom);
         }
 
@@ -274,9 +274,8 @@ fn expired_barrier_value_per_unit(
     Ok(finstack_quant_models::closed_form::expired_barrier_payoff(
         inst.barrier_type,
         barrier_hit,
-        inst.rebate_timing,
         intrinsic,
-        inst.rebate_per_unit().unwrap_or(0.0),
+        inst.rebate_terms_per_unit(),
     ))
 }
 
@@ -292,9 +291,9 @@ fn seasoned_breached_value_per_unit(inst: &FxBarrierOption, inputs: &FxOptionInp
             inst.option_type,
         )
     } else {
-        match inst.rebate_timing {
-            PayoutTiming::AtHit => 0.0,
-            PayoutTiming::AtExpiry => inst.rebate_per_unit().unwrap_or(0.0) * inputs.df_domestic,
+        match inst.rebate_terms_per_unit() {
+            Some((rebate, PayoutTiming::AtExpiry)) => rebate * inputs.df_domestic,
+            Some((_, PayoutTiming::AtHit)) | None => 0.0,
         }
     }
 }
@@ -416,13 +415,8 @@ fn bs_barrier_price_per_unit(
     );
     let price = barrier_price(&params, analytical_barrier_type, fx_barrier.option_type);
 
-    let rebate_val = if let Some(rebate) = fx_barrier.rebate_per_unit() {
-        barrier_rebate(
-            &params,
-            rebate,
-            analytical_barrier_type,
-            fx_barrier.rebate_timing,
-        )
+    let rebate_val = if let Some((rebate, timing)) = fx_barrier.rebate_terms_per_unit() {
+        barrier_rebate(&params, rebate, analytical_barrier_type, timing)
     } else {
         0.0
     };
@@ -661,6 +655,7 @@ mod tests {
         inst.barrier_type = BarrierType::UpAndOut;
         inst.observed_barrier_breached = Some(true);
         inst.rebate = Some(Money::from((50_000_i64, Currency::USD)));
+        inst.rebate_timing = Some(PayoutTiming::AtHit);
         inst.monitoring = Monitoring::Continuous;
         inst.instrument_pricing_overrides
             .market_quotes
@@ -679,7 +674,7 @@ mod tests {
             );
         }
         for timing in [PayoutTiming::AtHit, PayoutTiming::AtExpiry] {
-            inst.rebate_timing = timing;
+            inst.rebate_timing = Some(timing);
             for as_of in [before, inst.expiry, after] {
                 let remaining = if timing == PayoutTiming::AtExpiry && as_of <= inst.expiry {
                     50_000.0
@@ -699,14 +694,22 @@ mod tests {
         }
         // A same-day processed hit uses the same settled-event state; the
         // boolean does not introduce another unpaid at-hit receivable.
-        inst.rebate_timing = PayoutTiming::AtHit;
+        inst.rebate_timing = Some(PayoutTiming::AtHit);
         assert_eq!(
             expired_barrier_value_per_unit(&inst, 1.25).expect("settled"),
             0.0
         );
-        // Knock-in no-hit rebates still mature regardless of knockout timing.
+        // A knock-in no-hit rebate is only determined at expiry: at-hit timing
+        // is rejected, and at-expiry timing matures the rebate.
         inst.barrier_type = BarrierType::UpAndIn;
         inst.observed_barrier_breached = Some(false);
+        assert!(inst.validate().is_err());
+        assert!(
+            expired_barrier_value_per_unit(&inst, 1.15)
+                .map(|value| value.is_nan())
+                .unwrap_or(true)
+        );
+        inst.rebate_timing = Some(PayoutTiming::AtExpiry);
         assert!(
             (expired_barrier_value_per_unit(&inst, 1.15).expect("KI rebate")
                 * inst.notional.amount()
@@ -727,7 +730,7 @@ mod tests {
         inst.rebate = Some(Money::from((20_000_i64, Currency::USD)));
         inst.observed_barrier_breached = Some(true);
 
-        inst.rebate_timing = PayoutTiming::AtExpiry;
+        inst.rebate_timing = Some(PayoutTiming::AtExpiry);
         // A recorded hit leaves only the explicitly deferred rebate unpaid.
         let per_unit = expired_barrier_value_per_unit(&inst, 1.25).expect("expired value");
         assert!((per_unit - 0.02).abs() < 1e-12);
@@ -742,6 +745,7 @@ mod tests {
         inst.barrier = 1.20;
         // Total rebate = 0.02 USD per EUR on the 1m EUR example notional.
         inst.rebate = Some(Money::from((20_000_i64, Currency::USD)));
+        inst.rebate_timing = Some(PayoutTiming::AtExpiry);
         inst.observed_barrier_breached = Some(false);
 
         let per_unit = expired_barrier_value_per_unit(&inst, 1.25).expect("expired value");
@@ -780,6 +784,7 @@ mod tests {
         option.option_type = OptionType::Call;
         option.barrier_type = BarrierType::UpAndIn;
         option.rebate = Some(Money::from((20_000_i64, Currency::USD)));
+        option.rebate_timing = Some(PayoutTiming::AtExpiry);
         option.observed_barrier_breached = Some(false);
 
         let market = MarketContext::new().insert_price("EURUSD-SPOT", MarketScalar::Unitless(1.25));
@@ -804,6 +809,7 @@ mod tests {
             .strike(1.10)
             .barrier(1.20)
             .rebate(Money::from((20_000_i64, Currency::USD)))
+            .rebate_timing(PayoutTiming::AtExpiry)
             .option_type(OptionType::Call)
             .barrier_type(BarrierType::UpAndIn)
             .monitoring_start_date(as_of)
@@ -872,7 +878,7 @@ mod tests {
                 .rebate_opt(rebate.map(|per_unit| {
                     Money::new(per_unit * notional, Currency::USD).expect("valid money fixture")
                 }))
-                .rebate_timing(PayoutTiming::AtExpiry)
+                .rebate_timing_opt(rebate.map(|_| PayoutTiming::AtExpiry))
                 .option_type(OptionType::Call)
                 .barrier_type(BarrierType::UpAndOut)
                 .monitoring_start_date(as_of)

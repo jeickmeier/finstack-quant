@@ -469,6 +469,16 @@ export type DB556Bbeb1Ecf96C44C5A =
  */
 export type Date1 = string;
 /**
+ * When an otherwise entitled barrier-conditional cash amount is paid.
+ *
+ * The timing schedules a payment; it does not grant entitlement, choose the
+ * amount or currency, or set a settlement lag, curve or clock. Each product
+ * validates which timings its payoff supports. For example, a no-hit
+ * (knock-in) rebate is only determined at expiry, so products reject
+ * `AtHit` for it rather than silently replacing the selection.
+ */
+export type D_60424C40Edb275Fad708 = "at_hit" | "at_expiry";
+/**
  * Opaque string identifier.
  */
 export type Id3 = string;
@@ -567,17 +577,16 @@ export interface D_95Df9E3F9Fb8D601Ef0B {
    */
   rebate?: Money | null;
   /**
-   * Timing of the knock-out rebate payment.
+   * Payment timing of the rebate. Required exactly when `rebate` is set.
    *
-   * `at_hit` (default, market standard) pays the rebate the moment a
-   * knock-out barrier is breached; `at_expiry` defers payment to expiry.
-   * Knock-in rebates always pay at expiry (a no-hit is only known then),
-   * so this setting does not affect them. The analytical pricer values
-   * at-hit rebates via the discounted first-passage closed form. Monte
-   * Carlo applies at-hit when `rebate_timing == AtHit` via
-   * `with_rebate_at_hit`; the crate primitive defaults to at-expiry.
+   * For a knock-out, `at_hit` pays the rebate at the first qualifying hit
+   * and `at_expiry` defers it to expiry. A knock-in (no-hit) rebate is
+   * only determined at expiry, so it must be `at_expiry`; `at_hit` is
+   * rejected. The analytical pricer values at-hit knock-out rebates via
+   * the discounted first-passage closed form; Monte Carlo applies at-hit
+   * timing via `with_rebate_at_hit`.
    */
-  rebate_timing?: "at_hit" | "at_expiry";
+  rebate_timing?: D_60424C40Edb275Fad708 | null;
   scenario_pricing_overrides?: ScenarioPricingOverrides;
   spot_id: Id3;
   /**

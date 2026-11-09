@@ -200,7 +200,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json",
-      "bytes": 1005773,
+      "bytes": 1006375,
       "kind": "component",
       "path": "schemas/common/1/instrument_json.schema.json",
       "summary": "The instrument union embedded by portfolio positions and candidates; the same branches as the instrument envelope's `instrument` field.",
@@ -434,7 +434,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
-      "bytes": 1013686,
+      "bytes": 1014288,
       "kind": "input",
       "path": "schemas/instruments/1/composite/composite.schema.json",
       "summary": "Resolved cross-asset synthetic instrument with immutable leg quantities.",
@@ -623,7 +623,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/barrier_option.schema.json",
-      "bytes": 11460,
+      "bytes": 11697,
       "kind": "input",
       "path": "schemas/instruments/1/exotics/barrier_option.schema.json",
       "summary": "Knock-in or knock-out option on a monitored barrier.",
@@ -632,7 +632,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
-      "bytes": 1012663,
+      "bytes": 1013265,
       "kind": "input",
       "path": "schemas/instruments/1/exotics/basket.schema.json",
       "summary": "Weighted basket of constituents priced as one position.",
@@ -803,7 +803,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_barrier_option.schema.json",
-      "bytes": 12018,
+      "bytes": 12248,
       "kind": "input",
       "path": "schemas/instruments/1/fx/fx_barrier_option.schema.json",
       "summary": "FX option with a knock-in or knock-out barrier.",
@@ -875,7 +875,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_touch_option.schema.json",
-      "bytes": 9195,
+      "bytes": 9515,
       "kind": "input",
       "path": "schemas/instruments/1/fx/fx_touch_option.schema.json",
       "summary": "FX option paying on barrier touch or no-touch.",
@@ -911,7 +911,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
-      "bytes": 1103665,
+      "bytes": 1104230,
       "kind": "input",
       "path": "schemas/instruments/1/instrument.schema.json",
       "summary": "The seventy-branch union of every instrument type. Prefer the per-type schema beside it: this document is too large to hand to a model.",
@@ -1109,7 +1109,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
-      "bytes": 1015294,
+      "bytes": 1015896,
       "kind": "output",
       "path": "schemas/results/1/composite_rebalance_result.schema.json",
       "summary": "Result of resolving a new composite holdings state.",

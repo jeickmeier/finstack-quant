@@ -1,26 +1,26 @@
 {
   "$defs": {
     "BarrierType": {
-      "description": "Four-state barrier option classification.",
+      "description": "Four-state barrier option classification.\n\nIn/out describes whether a qualifying hit deactivates or activates the\noption. It does not describe payment entitlement or the option's current\nstate.",
       "oneOf": [
         {
           "const": "up_and_out",
-          "description": "Up-and-out: knocked out when spot touches or rises above the barrier.",
+          "description": "Up-and-out: knocked out by an eligible observation at or above the barrier.",
           "type": "string"
         },
         {
           "const": "up_and_in",
-          "description": "Up-and-in: activated when spot touches or rises above the barrier.",
+          "description": "Up-and-in: activated by an eligible observation at or above the barrier.",
           "type": "string"
         },
         {
           "const": "down_and_out",
-          "description": "Down-and-out: knocked out when spot touches or falls below the barrier.",
+          "description": "Down-and-out: knocked out by an eligible observation at or below the barrier.",
           "type": "string"
         },
         {
           "const": "down_and_in",
-          "description": "Down-and-in: activated when spot touches or falls below the barrier.",
+          "description": "Down-and-in: activated by an eligible observation at or below the barrier.",
           "type": "string"
         }
       ]
@@ -135,9 +135,15 @@
           "description": "Total contractual trade rebate, paid in the quote (settlement)\ncurrency and independent of notional. Knock-outs pay on a hit according\nto `rebate_timing`; knock-ins pay at expiry only if no hit occurred."
         },
         "rebate_timing": {
-          "$ref": "#/$defs/PayoutTiming",
-          "default": "at_hit",
-          "description": "Timing of the knock-out rebate payment.\n\n`at_hit` (default, market standard) pays the rebate the moment a\nknock-out barrier is breached; `at_expiry` defers payment to expiry.\nKnock-in rebates always pay at expiry, so this setting does not affect\nthem. The analytical pricer values at-hit rebates via the discounted\nfirst-passage closed form. Monte Carlo applies at-hit when\n`rebate_timing == AtHit` via `with_rebate_at_hit`; the crate primitive\ndefaults to at-expiry."
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PayoutTiming"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Payment timing of the rebate. Required exactly when `rebate` is set.\n\nFor a knock-out, `at_hit` pays the rebate at the first qualifying hit\nand `at_expiry` defers it to expiry. A knock-in (no-hit) rebate is\nonly determined at expiry, so it must be `at_expiry`; `at_hit` is\nrejected. The analytical pricer values at-hit knock-out rebates via\nthe discounted first-passage closed form; Monte Carlo applies at-hit\ntiming via `with_rebate_at_hit`."
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
@@ -232,16 +238,16 @@
       ]
     },
     "PayoutTiming": {
-      "description": "When a barrier-triggered cash amount is paid.\n\nUsed for a knock-out rebate (`rebate_timing`) and for a one-touch payout\n(`payout_timing`). At-expiry payments are discounted from expiry; at-hit\npayments are discounted from the first-passage time. Knock-in rebates\nalways pay at expiry (only then is it known that no hit occurred), so this\nsetting does not affect them.",
+      "description": "When an otherwise entitled barrier-conditional cash amount is paid.\n\nThe timing schedules a payment; it does not grant entitlement, choose the\namount or currency, or set a settlement lag, curve or clock. Each product\nvalidates which timings its payoff supports. For example, a no-hit\n(knock-in) rebate is only determined at expiry, so products reject\n`AtHit` for it rather than silently replacing the selection.",
       "oneOf": [
         {
           "const": "at_hit",
-          "description": "Paid the moment the barrier is hit (market standard).",
+          "description": "Paid at the first qualifying recognized hit.",
           "type": "string"
         },
         {
           "const": "at_expiry",
-          "description": "Paid at expiry regardless of when the barrier is hit.",
+          "description": "Paid at the product's specified expiry.",
           "type": "string"
         }
       ]
@@ -293,7 +299,6 @@
           "option_type": "call",
           "quote_currency": "USD",
           "rebate": null,
-          "rebate_timing": "at_hit",
           "strike": 1.1,
           "vol_surface_id": "EURUSD-VOL"
         },

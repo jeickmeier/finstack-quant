@@ -38,18 +38,16 @@ pub struct BarrierOption {
     /// notional. Knock-outs pay on a hit according to `rebate_timing`;
     /// knock-ins pay at expiry only if no hit occurred.
     pub rebate: Option<Money>,
-    /// Timing of the knock-out rebate payment.
+    /// Payment timing of the rebate. Required exactly when `rebate` is set.
     ///
-    /// `at_hit` (default, market standard) pays the rebate the moment a
-    /// knock-out barrier is breached; `at_expiry` defers payment to expiry.
-    /// Knock-in rebates always pay at expiry (a no-hit is only known then),
-    /// so this setting does not affect them. The analytical pricer values
-    /// at-hit rebates via the discounted first-passage closed form. Monte
-    /// Carlo applies at-hit when `rebate_timing == AtHit` via
-    /// `with_rebate_at_hit`; the crate primitive defaults to at-expiry.
-    #[builder(default)]
-    #[serde(default)]
-    pub rebate_timing: PayoutTiming,
+    /// For a knock-out, `at_hit` pays the rebate at the first qualifying hit
+    /// and `at_expiry` defers it to expiry. A knock-in (no-hit) rebate is
+    /// only determined at expiry, so it must be `at_expiry`; `at_hit` is
+    /// rejected. The analytical pricer values at-hit knock-out rebates via
+    /// the discounted first-passage closed form; Monte Carlo applies at-hit
+    /// timing via `with_rebate_at_hit`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rebate_timing: Option<PayoutTiming>,
     /// Option type (call or put)
     pub option_type: OptionType,
     /// Barrier type (up/down, in/out)
@@ -138,6 +136,7 @@ impl BarrierOption {
             .strike(4500.0)
             .barrier(5000.0)
             .rebate(Money::from((50_i64, Currency::USD)))
+            .rebate_timing(PayoutTiming::AtHit)
             .option_type(finstack_quant_models::types::OptionType::Call)
             .barrier_type(BarrierType::UpAndOut)
             .expiry(date!(2024 - 12 - 20))
@@ -197,6 +196,12 @@ impl finstack_quant_valuations_core::instruments::Instrument for BarrierOption {
             // accepted; only negative or non-finite amounts are rejected.
             validation::validate_f64_non_negative(rebate.amount(), "BarrierOption rebate")?;
         }
+        finstack_quant_models::closed_form::validate_rebate_timing(
+            "BarrierOption",
+            self.barrier_type,
+            self.rebate.is_some(),
+            self.rebate_timing,
+        )?;
         if let Monitoring::Discrete { observation_dates } = &self.monitoring {
             validation::require_with(!observation_dates.is_empty(), || {
                 "BarrierOption discrete monitoring requires observation_dates".to_string()
@@ -332,6 +337,41 @@ mod tests {
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
+
+    #[test]
+    fn rebate_timing_is_required_with_a_rebate_and_rejects_knock_in_at_hit() {
+        use finstack_quant_core::types::{BarrierType, PayoutTiming};
+        use finstack_quant_valuations_core::instruments::Instrument;
+
+        let base = super::BarrierOption::example().expect("example");
+        base.validate_invariants().expect("example is valid");
+
+        let mut missing = base.clone();
+        missing.rebate_timing = None;
+        assert!(missing.validate_invariants().is_err());
+
+        let mut orphan = base.clone();
+        orphan.rebate = None;
+        assert!(orphan.validate_invariants().is_err());
+
+        let mut knock_in = base.clone();
+        knock_in.barrier_type = BarrierType::DownAndIn;
+        assert!(
+            knock_in.validate_invariants().is_err(),
+            "knock-in at_hit is rejected"
+        );
+        knock_in.rebate_timing = Some(PayoutTiming::AtExpiry);
+        knock_in
+            .validate_invariants()
+            .expect("knock-in at_expiry is valid");
+
+        let mut json = serde_json::to_value(&base).expect("serialize");
+        json.as_object_mut()
+            .expect("object")
+            .remove("rebate_timing");
+        let restored: super::BarrierOption = serde_json::from_value(json).expect("deserialize");
+        assert!(restored.validate_invariants().is_err());
+    }
 
     #[test]
     fn expired_barrier_requires_observed_state() {

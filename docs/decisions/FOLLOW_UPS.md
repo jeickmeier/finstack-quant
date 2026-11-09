@@ -713,7 +713,9 @@ core-market records are accepted**, completing this area's methodology review.
 Detailed reconciliation work stays in the financial register.
 All 20 [core-conventions records 001–020](financial/core-conventions/README.md)
 are also accepted within their complete stated scopes, completing that area's
-methodology review; runtime reconciliation and independent qualification remain open.
+methodology review; runtime reconciliation and independent qualification remain open,
+except that record 020's runtime reconciliation landed on 2026-11-08 (its consumer
+qualification remains open).
 [Core-numerics record 01](financial/core-numerics/compounding.md#accepted-decision-explicit-compounding-conversion-and-periodic-spreads)
 is accepted within its complete stated scope as of 2026-11-07; runtime/caller/host
 reconciliation and independent qualification remain open.

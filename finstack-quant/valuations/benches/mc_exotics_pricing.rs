@@ -551,7 +551,7 @@ fn bench_barrier_monitoring(c: &mut Criterion) {
                 option.barrier_type = BarrierType::UpAndOut;
                 option.quantity = 1_000.0;
                 option.rebate = Some(Money::from((25_i64, Currency::USD)));
-                option.rebate_timing = PayoutTiming::AtHit;
+                option.rebate_timing = Some(PayoutTiming::AtHit);
                 option.spot_id = "SPOT".into();
                 option.vol_surface_id = "SPOT_VOL".into();
                 option.div_yield_id = Some("SPOT_DIV".into());

@@ -308,7 +308,7 @@ mod tests {
             scenario_pricing_overrides: Default::default(),
             attributes: Default::default(),
             rebate: None,
-            rebate_timing: Default::default(),
+            rebate_timing: None,
         };
 
         let market = create_mc_market(as_of, 100.0, 0.25, 0.05);

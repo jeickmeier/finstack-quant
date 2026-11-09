@@ -168,7 +168,8 @@ pub use bachelier::{
     bachelier_price_with_annuity, bachelier_put, bachelier_vega,
 };
 pub use barrier::{
-    BarrierParams, barrier_price, barrier_rebate, barrier_touch_probability, expired_barrier_payoff,
+    BarrierParams, barrier_price, barrier_rebate, barrier_touch_probability,
+    expired_barrier_payoff, validate_rebate_timing,
 };
 pub use black::{
     black_call, black_delta_call, black_delta_put, black_gamma, black_put, black_vega, d1_d2,

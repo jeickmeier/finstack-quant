@@ -27,7 +27,9 @@ Of the **20 records** below, the complete packages in
 and [020](020-barrier-classification.md#accepted-decision-barrier-classification-touch-and-conditional-payment-timing)
 are **Accepted on 2026-11-07**. This completes methodology adoption for all
 20 core-conventions records. Implementation status is Observed for
-each stated scope; reconciliation and independent qualification remain open.
+each stated scope, except where a record's status line says Reconciled
+(020, 2026-11-08); reconciliation and independent qualification otherwise
+remain open.
 Financial unit/integration/golden tests were read or located, but no Rust test,
 lint or build pass was run. Documentation and independent formula/rule/date
 checks passed. A reference-table generator consistency check passed; it
@@ -163,8 +165,8 @@ touch and separates direction from current spot position. Timing remains
 conditional on entitlement and distinct from settlement; monitoring/history,
 numerical validation and product/model economics stay with their owners. Strict
 wire values and existing host surfaces are retained without new core abstractions.
-The complete package is accepted; runtime/product/host reconciliation and
-independent qualification remain pending.
+Runtime/product/host reconciliation landed on 2026-11-08; independent
+observation, window and settlement qualification at each consumer remains pending.
 
 ## Methodology inventory
 
@@ -228,7 +230,7 @@ independent qualification remain pending.
 | Rate and integer bp units | Decimal-assisted percent/bp scaling; rounded saturating integer accessor; truncating Bps division | Rate vs Bps selected by caller | [CORE-CONVENTIONS-018](018-rate-units.md) | Scaling/domain tests located |
 | Credit rating grade/distance | AAA..C,NR,D ordinal; bucket mapping; signed ordinal differences | Generic CreditRating | [CORE-CONVENTIONS-019](019-credit-ratings.md) | Grade and antisymmetric-notch invariants |
 | Scorecard rating scales | Descending0–100 scores/thresholds; default score50/S&P/unknown fallback | Embedded or config registry | [CORE-CONVENTIONS-019](019-credit-ratings.md) | Registry validation tests |
-| Barrier semantic defaults | UpAndOut and AtHit defaults; direction/activation predicates | Enum/default caller selection | [CORE-CONVENTIONS-020](020-barrier-classification.md) | Type/wire assertions only |
+| Barrier classification and timing | No enum defaults; direction/activation predicates; rebate timing validated with the rebate | Explicit product selection | [CORE-CONVENTIONS-020](020-barrier-classification.md) | Enum wire/predicate and product validation tests |
 
 ## Evidence boundaries
 

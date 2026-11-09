@@ -170,7 +170,7 @@ mod gbm_barrier {
             strike: STRIKE,
             barrier: 85.0,
             rebate: None,
-            rebate_timing: Default::default(),
+            rebate_timing: None,
             option_type: OptionType::Call,
             barrier_type: BarrierType::DownAndOut,
             expiry,

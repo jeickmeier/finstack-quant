@@ -94,7 +94,7 @@ fn production_barrier_ndf_known_expiry_rebate_is_total_trade_money() {
     let market = market(as_of);
     let mut option = barrier();
     option.observed_barrier_breached = Some(true);
-    option.rebate_timing = PayoutTiming::AtExpiry;
+    option.rebate_timing = Some(PayoutTiming::AtExpiry);
     for scale in [1.0, 1_000.0] {
         option.quantity = scale;
         assert!(
@@ -107,7 +107,7 @@ fn production_barrier_ndf_known_expiry_rebate_is_total_trade_money() {
 fn production_barrier_ndf_expired_at_hit_rebate_has_already_been_paid() {
     let mut option = barrier();
     option.observed_barrier_breached = Some(true);
-    option.rebate_timing = PayoutTiming::AtHit;
+    option.rebate_timing = Some(PayoutTiming::AtHit);
     option.expiry_fixing = Some(100.0);
     for as_of in [option.expiry, date!(2025 - 01 - 03)] {
         let value = option.value(&market(as_of), as_of).expect("expired value");
@@ -248,12 +248,12 @@ fn production_barrier_ndf_all_engines_keep_known_rebate_units_and_lifecycle() {
         ModelKey::PdeCrankNicolson1D,
     ] {
         for as_of in [date!(2024 - 01 - 02), option.expiry, date!(2025 - 01 - 03)] {
-            option.rebate_timing = PayoutTiming::AtExpiry;
+            option.rebate_timing = Some(PayoutTiming::AtExpiry);
             assert!(
                 (barrier_model_value(&option, &market(as_of), as_of, model) - 25.0).abs() < 1e-10,
                 "{model:?}/{as_of}"
             );
-            option.rebate_timing = PayoutTiming::AtHit;
+            option.rebate_timing = Some(PayoutTiming::AtHit);
             assert_eq!(
                 barrier_model_value(&option, &market(as_of), as_of, model),
                 0.0,
@@ -292,7 +292,7 @@ fn production_barrier_ndf_discrete_gbm_and_heston_do_not_observe_between_dates()
     option.quantity = 1.0;
     option.barrier = 90.0;
     option.rebate = Some(Money::new(2.5, Currency::USD).expect("rebate"));
-    option.rebate_timing = PayoutTiming::AtHit;
+    option.rebate_timing = Some(PayoutTiming::AtHit);
     option.div_yield_id = Some("DIV".into());
     option.instrument_pricing_overrides.model_config.mc_paths = Some(128);
     for model in [ModelKey::MonteCarloGBM, ModelKey::MonteCarloHeston] {

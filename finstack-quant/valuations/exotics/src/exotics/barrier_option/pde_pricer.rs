@@ -53,8 +53,8 @@ struct BarrierPde {
     /// True if the barrier is at the upper boundary.
     barrier_is_upper: bool,
     maturity: f64,
-    rebate: f64,
-    rebate_timing: PayoutTiming,
+    /// Knock-out rebate per unit with its payment timing; `None` without one.
+    rebate: Option<(f64, PayoutTiming)>,
     terminal_cash: Option<f64>,
     continuous: bool,
     observation_times: Vec<f64>,
@@ -62,9 +62,12 @@ struct BarrierPde {
 
 impl BarrierPde {
     fn rebate_at(&self, time: f64) -> f64 {
-        match self.rebate_timing {
-            PayoutTiming::AtHit => self.rebate,
-            PayoutTiming::AtExpiry => self.rebate * (-self.rate * (self.maturity - time)).exp(),
+        match self.rebate {
+            None => 0.0,
+            Some((rebate, PayoutTiming::AtHit)) => rebate,
+            Some((rebate, PayoutTiming::AtExpiry)) => {
+                rebate * (-self.rate * (self.maturity - time)).exp()
+            }
         }
     }
 
@@ -169,8 +172,8 @@ struct KnockOutPdeInputs {
     maturity: f64,
     is_call: bool,
     barrier_is_upper: bool,
-    rebate: f64,
-    rebate_timing: PayoutTiming,
+    /// Knock-out rebate per unit with its payment timing; `None` without one.
+    rebate: Option<(f64, PayoutTiming)>,
     terminal_cash: Option<f64>,
     observation_times: Option<Vec<f64>>,
 }
@@ -261,7 +264,7 @@ impl BarrierOptionPdePricer {
                 spot <= barrier_level
             }
         {
-            if is_knock_out && inst.rebate_timing == PayoutTiming::AtHit {
+            if is_knock_out && inst.rebate_timing == Some(PayoutTiming::AtHit) {
                 let rebate = inst.rebate.map_or(0.0, |m| m.amount());
                 return Money::new(rebate, ccy).map_err(wrap);
             }
@@ -280,11 +283,12 @@ impl BarrierOptionPdePricer {
             is_call,
             barrier_is_upper,
             rebate: if is_knock_out {
-                inst.rebate.map_or(0.0, |m| m.amount() / inst.quantity)
+                inst.rebate
+                    .zip(inst.rebate_timing)
+                    .map(|(money, timing)| (money.amount() / inst.quantity, timing))
             } else {
-                0.0
+                None
             },
-            rebate_timing: inst.rebate_timing,
             terminal_cash: None,
             observation_times,
         };
@@ -474,7 +478,6 @@ impl BarrierOptionPdePricer {
             barrier_is_upper: inputs.barrier_is_upper,
             maturity: inputs.maturity,
             rebate: inputs.rebate,
-            rebate_timing: inputs.rebate_timing,
             terminal_cash: inputs.terminal_cash,
             continuous: inputs.observation_times.is_none(),
             observation_times: inputs.observation_times.clone().unwrap_or_default(),
@@ -692,7 +695,7 @@ mod tests {
             strike,
             barrier,
             rebate: None,
-            rebate_timing: Default::default(),
+            rebate_timing: None,
             option_type,
             barrier_type,
             expiry,
@@ -1031,7 +1034,14 @@ mod tests {
                     barrier_option(barrier_type, OptionType::Call, expiry, 100.0, level);
                 option.quantity = 1_000.0;
                 option.rebate = Some(Money::new(25_000.0, Currency::USD).expect("rebate"));
-                option.rebate_timing = timing;
+                option.rebate_timing = Some(timing);
+                if barrier_type.is_knock_in()
+                    && timing == finstack_quant_core::types::PayoutTiming::AtHit
+                {
+                    // A no-hit rebate is only known at expiry: AtHit is rejected.
+                    assert!(option.value(&mkt, as_of).is_err());
+                    continue;
+                }
                 let analytical = option.value(&mkt, as_of).expect("analytical").amount();
                 let pde = BarrierOptionPdePricer {
                     space_points: 600,

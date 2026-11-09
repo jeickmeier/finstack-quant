@@ -3805,6 +3805,10 @@
           {
             "pointer": "#/$defs/d_95df9e3f9fb8d601ef0b/properties/rebate",
             "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_95df9e3f9fb8d601ef0b/properties/rebate_timing",
+            "keyword": "anyOf"
           }
         ],
         "optional-property-record": [
@@ -6166,6 +6170,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/BarrierOption/properties/rebate_timing",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/LookbackOption/properties/div_yield_id",
             "keyword": "anyOf"
           },
@@ -6239,6 +6247,10 @@
           },
           {
             "pointer": "#/$defs/FxBarrierOption/properties/rebate",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/FxBarrierOption/properties/rebate_timing",
             "keyword": "anyOf"
           },
           {
@@ -17876,6 +17888,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/BarrierOption/properties/rebate_timing",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/LookbackOption/properties/div_yield_id",
             "keyword": "anyOf"
           },
@@ -17949,6 +17965,10 @@
           },
           {
             "pointer": "#/$defs/FxBarrierOption/properties/rebate",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/FxBarrierOption/properties/rebate_timing",
             "keyword": "anyOf"
           },
           {
@@ -23996,6 +24016,10 @@
           },
           {
             "pointer": "#/$defs/d_9f54e6f1a3c511f443a0/properties/rebate",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_9f54e6f1a3c511f443a0/properties/rebate_timing",
             "keyword": "anyOf"
           }
         ],

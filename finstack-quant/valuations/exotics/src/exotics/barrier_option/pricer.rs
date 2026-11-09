@@ -86,11 +86,9 @@ pub(crate) fn known_knock_out_value(
     if inst.observed_barrier_breached != Some(true) || !inst.barrier_type.is_knock_out() {
         return Ok(None);
     }
-    let mut value = match inst.rebate_timing {
-        finstack_quant_core::types::PayoutTiming::AtHit => 0.0,
-        finstack_quant_core::types::PayoutTiming::AtExpiry => {
-            inst.rebate.map_or(0.0, |money| money.amount())
-        }
+    let mut value = match inst.rebate.zip(inst.rebate_timing) {
+        Some((money, finstack_quant_core::types::PayoutTiming::AtExpiry)) => money.amount(),
+        Some((_, finstack_quant_core::types::PayoutTiming::AtHit)) | None => 0.0,
     };
     if value != 0.0 && as_of < inst.expiry {
         value *= curves
@@ -110,7 +108,7 @@ pub(crate) fn known_knock_out_value(
 /// [`PayoutTiming::AtHit`](finstack_quant_core::types::PayoutTiming::AtHit).
 pub(crate) fn wants_at_hit_rebate(inst: &BarrierOption) -> bool {
     use finstack_quant_core::types::PayoutTiming;
-    inst.rebate.is_some() && inst.rebate_timing == PayoutTiming::AtHit
+    inst.rebate.is_some() && inst.rebate_timing == Some(PayoutTiming::AtHit)
 }
 
 /// Value fixed by the contract state alone, shared by every barrier engine.
@@ -326,12 +324,14 @@ pub(crate) fn price_expired_barrier(
         finstack_quant_models::types::OptionType::Call => (spot - inst.strike).max(0.0) * quantity,
         finstack_quant_models::types::OptionType::Put => (inst.strike - spot).max(0.0) * quantity,
     };
-    let rebate = inst.rebate.map(|m| m.amount()).unwrap_or(0.0);
+    let rebate = inst
+        .rebate
+        .zip(inst.rebate_timing)
+        .map(|(money, timing)| (money.amount(), timing));
 
     let pv = finstack_quant_models::closed_form::expired_barrier_payoff(
         inst.barrier_type,
         barrier_breached,
-        inst.rebate_timing,
         intrinsic,
         rebate,
     );
@@ -394,16 +394,12 @@ impl Pricer for BarrierOptionAnalyticalPricer {
             BarrierParams::with_df(spot, barrier_opt.strike, effective_barrier, t, df, q, sigma)?;
         let price = barrier_price(&params, analytical_barrier_type, barrier_opt.option_type);
 
-        let rebate_val = if let Some(rebate) = barrier_opt.rebate {
-            barrier_rebate(
-                &params,
-                rebate.amount(),
-                analytical_barrier_type,
-                barrier_opt.rebate_timing,
-            )
-        } else {
-            0.0
-        };
+        let rebate_val =
+            if let Some((rebate, timing)) = barrier_opt.rebate.zip(barrier_opt.rebate_timing) {
+                barrier_rebate(&params, rebate.amount(), analytical_barrier_type, timing)
+            } else {
+                0.0
+            };
         // The closed-form leaves return NaN sentinels for out-of-domain input;
         // convert that to an error before `Money::new` panics on non-finite.
         let price = finstack_quant_models::closed_form::checked_closed_form_value(
@@ -510,7 +506,7 @@ mod tests {
             strike,
             barrier,
             rebate: None,
-            rebate_timing: Default::default(),
+            rebate_timing: None,
             option_type: OptionType::Call,
             barrier_type: BarrierType::DownAndOut,
             expiry,
@@ -622,10 +618,11 @@ mod tests {
         };
         let with_rebate = BarrierOption {
             rebate: Some(Money::new(rebate, Currency::USD).expect("valid money fixture")),
+            rebate_timing: Some(finstack_quant_core::types::PayoutTiming::AtHit),
             ..base.clone()
         };
         let with_rebate_at_expiry = BarrierOption {
-            rebate_timing: finstack_quant_core::types::PayoutTiming::AtExpiry,
+            rebate_timing: Some(finstack_quant_core::types::PayoutTiming::AtExpiry),
             ..with_rebate.clone()
         };
 
@@ -645,7 +642,7 @@ mod tests {
             .expect("year fraction");
         let p = BarrierParams::new(spot, barrier, barrier, t, rate, div_yield, vol);
 
-        // Default timing is at-hit (market standard).
+        // Explicit at-hit timing values the discounted first-passage rebate.
         let expected_at_hit = finstack_quant_models::closed_form::barrier_rebate(
             &p,
             rebate,
@@ -654,7 +651,7 @@ mod tests {
         );
         assert!(((rebate_pv - base_pv) - expected_at_hit).abs() < 1e-12);
 
-        // Explicit AtExpiry reproduces the legacy pay-at-expiry value.
+        // Explicit AtExpiry values the rebate paid at expiry.
         let expected_at_expiry =
             barrier_rebate(&p, rebate, BarrierType::UpAndOut, PayoutTiming::AtExpiry);
         assert!(((rebate_pv_at_expiry - base_pv) - expected_at_expiry).abs() < 1e-12);
@@ -670,7 +667,7 @@ mod tests {
 
         let knocked_out = BarrierOption {
             rebate: Some(Money::from((3_i64, Currency::USD))),
-            rebate_timing: PayoutTiming::AtExpiry,
+            rebate_timing: Some(PayoutTiming::AtExpiry),
             observed_barrier_breached: Some(true),
             ..base.clone()
         };
@@ -686,6 +683,7 @@ mod tests {
         let no_hit_knock_in = BarrierOption {
             barrier_type: BarrierType::UpAndIn,
             rebate: Some(Money::new(2.5, Currency::USD).expect("valid money fixture")),
+            rebate_timing: Some(PayoutTiming::AtExpiry),
             observed_barrier_breached: Some(false),
             ..base
         };
@@ -1026,7 +1024,7 @@ mod tests {
             strike,
             barrier,
             rebate: None,
-            rebate_timing: Default::default(),
+            rebate_timing: None,
             option_type: OptionType::Call,
             barrier_type: BarrierType::UpAndOut,
             expiry,

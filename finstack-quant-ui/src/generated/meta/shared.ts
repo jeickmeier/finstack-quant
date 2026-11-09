@@ -2174,19 +2174,19 @@ export default [
   {
     "path": "#/$defs/BarrierDirection",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BarrierDirection",
-    "description": "Side of spot on which a barrier sits."
+    "description": "Inequality sense of an inclusive barrier touch.\n\nAt a contractually eligible observation `x` of barrier `H` (finite, same\nunits), `Up` is hit when `x >= H` and `Down` when `x <= H`. Equality is a\nhit. The direction does not assert where the barrier sits relative to\ncurrent spot: an observation already at or beyond the barrier is a hit."
   },
   {
     "path": "#/$defs/BarrierDirection/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BarrierDirection/oneOf/0",
     "const": "up",
-    "description": "Barrier is above spot: hit when spot touches or rises above it."
+    "description": "Hit when an eligible observation is at or above the barrier."
   },
   {
     "path": "#/$defs/BarrierDirection/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BarrierDirection/oneOf/1",
     "const": "down",
-    "description": "Barrier is below spot: hit when spot touches or falls below it."
+    "description": "Hit when an eligible observation is at or below the barrier."
   },
   {
     "path": "#/$defs/BarrierOption",
@@ -2319,10 +2319,17 @@ export default [
   {
     "path": "#/$defs/BarrierOption/properties/rebate_timing",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BarrierOption/properties/rebate_timing",
-    "default": "at_hit",
-    "description": "Timing of the knock-out rebate payment.\n\n`at_hit` (default, market standard) pays the rebate the moment a\nknock-out barrier is breached; `at_expiry` defers payment to expiry.\nKnock-in rebates always pay at expiry (a no-hit is only known then),\nso this setting does not affect them. The analytical pricer values\nat-hit rebates via the discounted first-passage closed form. Monte\nCarlo applies at-hit when `rebate_timing == AtHit` via\n`with_rebate_at_hit`; the crate primitive defaults to at-expiry.",
+    "description": "Payment timing of the rebate. Required exactly when `rebate` is set.\n\nFor a knock-out, `at_hit` pays the rebate at the first qualifying hit\nand `at_expiry` defers it to expiry. A knock-in (no-hit) rebate is\nonly determined at expiry, so it must be `at_expiry`; `at_hit` is\nrejected. The analytical pricer values at-hit knock-out rebates via\nthe discounted first-passage closed form; Monte Carlo applies at-hit\ntiming via `with_rebate_at_hit`."
+  },
+  {
+    "path": "#/$defs/BarrierOption/properties/rebate_timing/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BarrierOption/properties/rebate_timing/anyOf/0",
     "ref": "#/$defs/PayoutTiming",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PayoutTiming"
+  },
+  {
+    "path": "#/$defs/BarrierOption/properties/rebate_timing/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BarrierOption/properties/rebate_timing/anyOf/1"
   },
   {
     "path": "#/$defs/BarrierOption/properties/rebate/anyOf/0",
@@ -2369,31 +2376,31 @@ export default [
   {
     "path": "#/$defs/BarrierType",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BarrierType",
-    "description": "Four-state barrier option classification."
+    "description": "Four-state barrier option classification.\n\nIn/out describes whether a qualifying hit deactivates or activates the\noption. It does not describe payment entitlement or the option's current\nstate."
   },
   {
     "path": "#/$defs/BarrierType/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BarrierType/oneOf/0",
     "const": "up_and_out",
-    "description": "Up-and-out: knocked out when spot touches or rises above the barrier."
+    "description": "Up-and-out: knocked out by an eligible observation at or above the barrier."
   },
   {
     "path": "#/$defs/BarrierType/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BarrierType/oneOf/1",
     "const": "up_and_in",
-    "description": "Up-and-in: activated when spot touches or rises above the barrier."
+    "description": "Up-and-in: activated by an eligible observation at or above the barrier."
   },
   {
     "path": "#/$defs/BarrierType/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BarrierType/oneOf/2",
     "const": "down_and_out",
-    "description": "Down-and-out: knocked out when spot touches or falls below the barrier."
+    "description": "Down-and-out: knocked out by an eligible observation at or below the barrier."
   },
   {
     "path": "#/$defs/BarrierType/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BarrierType/oneOf/3",
     "const": "down_and_in",
-    "description": "Down-and-in: activated when spot touches or falls below the barrier."
+    "description": "Down-and-in: activated by an eligible observation at or below the barrier."
   },
   {
     "path": "#/$defs/BasisSwap",
@@ -18663,10 +18670,17 @@ export default [
   {
     "path": "#/$defs/FxBarrierOption/properties/rebate_timing",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxBarrierOption/properties/rebate_timing",
-    "default": "at_hit",
-    "description": "Timing of the knock-out rebate payment.\n\n`at_hit` (default, market standard) pays the rebate the moment a\nknock-out barrier is breached; `at_expiry` defers payment to expiry.\nKnock-in rebates always pay at expiry, so this setting does not affect\nthem. The analytical pricer values at-hit rebates via the discounted\nfirst-passage closed form. Monte Carlo applies at-hit when\n`rebate_timing == AtHit` via `with_rebate_at_hit`; the crate primitive\ndefaults to at-expiry.",
+    "description": "Payment timing of the rebate. Required exactly when `rebate` is set.\n\nFor a knock-out, `at_hit` pays the rebate at the first qualifying hit\nand `at_expiry` defers it to expiry. A knock-in (no-hit) rebate is\nonly determined at expiry, so it must be `at_expiry`; `at_hit` is\nrejected. The analytical pricer values at-hit knock-out rebates via\nthe discounted first-passage closed form; Monte Carlo applies at-hit\ntiming via `with_rebate_at_hit`."
+  },
+  {
+    "path": "#/$defs/FxBarrierOption/properties/rebate_timing/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxBarrierOption/properties/rebate_timing/anyOf/0",
     "ref": "#/$defs/PayoutTiming",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PayoutTiming"
+  },
+  {
+    "path": "#/$defs/FxBarrierOption/properties/rebate_timing/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FxBarrierOption/properties/rebate_timing/anyOf/1"
   },
   {
     "path": "#/$defs/FxBarrierOption/properties/rebate/anyOf/0",
@@ -24231,19 +24245,19 @@ export default [
   {
     "path": "#/$defs/PayoutTiming",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PayoutTiming",
-    "description": "When a barrier-triggered cash amount is paid.\n\nUsed for a knock-out rebate (`rebate_timing`) and for a one-touch payout\n(`payout_timing`). At-expiry payments are discounted from expiry; at-hit\npayments are discounted from the first-passage time. Knock-in rebates\nalways pay at expiry (only then is it known that no hit occurred), so this\nsetting does not affect them."
+    "description": "When an otherwise entitled barrier-conditional cash amount is paid.\n\nThe timing schedules a payment; it does not grant entitlement, choose the\namount or currency, or set a settlement lag, curve or clock. Each product\nvalidates which timings its payoff supports. For example, a no-hit\n(knock-in) rebate is only determined at expiry, so products reject\n`AtHit` for it rather than silently replacing the selection."
   },
   {
     "path": "#/$defs/PayoutTiming/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PayoutTiming/oneOf/0",
     "const": "at_hit",
-    "description": "Paid the moment the barrier is hit (market standard)."
+    "description": "Paid at the first qualifying recognized hit."
   },
   {
     "path": "#/$defs/PayoutTiming/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PayoutTiming/oneOf/1",
     "const": "at_expiry",
-    "description": "Paid at expiry regardless of when the barrier is hit."
+    "description": "Paid at the product's specified expiry."
   },
   {
     "path": "#/$defs/PayReceive",

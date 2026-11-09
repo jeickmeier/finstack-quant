@@ -226,6 +226,7 @@ fn analytical_barrier_price_and_risk_use_the_active_quote() {
     option.strike = 100.0;
     option.barrier = 80.0;
     option.barrier_type = BarrierType::DownAndIn;
+    option.rebate_timing = Some(finstack_quant_core::types::PayoutTiming::AtExpiry);
     option.observed_barrier_breached = Some(true);
     option.spot_id = "SPOT".into();
     option.vol_surface_id = "VOL".into();

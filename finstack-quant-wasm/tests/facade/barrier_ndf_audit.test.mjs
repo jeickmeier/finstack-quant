@@ -49,6 +49,7 @@ function pdeFixture() {
     quantity: 1,
     currency: 'USD',
     rebate: null,
+    rebate_timing: null,
     div_yield_id: null,
     expiry: '2026-01-02',
     option_type: 'call',
@@ -87,6 +88,11 @@ test('PDE total rebates follow continuous closed forms and payment timing', () =
     s.barrier = barrierType === 'up_and_out' ? 120 : 80;
     for (const timing of ['at_hit', 'at_expiry']) {
       s.rebate_timing = timing;
+      if (barrierType === 'down_and_in' && timing === 'at_hit') {
+        // A no-hit rebate is only known at expiry, so at-hit timing is rejected.
+        assert.throws(() => value(f, f.as_of, 'barrier_bs_continuous'), /at_expiry/);
+        continue;
+      }
       const analytical = value(f, f.as_of, 'barrier_bs_continuous');
       const pde = value(f, f.as_of, 'pde_crank_nicolson_1d');
       assert.ok(

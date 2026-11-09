@@ -1,7 +1,7 @@
 # CORE-CONVENTIONS-020: Shared barrier classification, touch and conditional payment timing
 
 - Decision status: **Accepted — complete barrier classification/timing package, 2026-11-07**.
-- Implementation status: **Observed; reconciliation pending**, scoped to `types/barrier.rs` only; valuation kernels are outside this record.
+- Implementation status: **Reconciled 2026-11-08** (run slice A1): no enum defaults; equity/FX `rebate_timing` is required exactly with a rebate; knock-in `AtHit` is rejected by product validation and the analytic helpers; full enum wire/predicate tests. Independent observation/window/settlement qualification at each consumer remains in the follow-up register. Scoped to `types/barrier.rs`; valuation kernels are outside this record.
 - Validation status: **Evidence inspected; independent predicate/touch/wire examples and semantic review passed; production qualification pending**. The four-row truth table, 24 equal/adjacent-value boundary assertions, eight nonfinite-error examples and strict wire reference examples passed. Linked Rust/host tests were located or inspected, not run; these checks do not certify current observation, payment or pricing behavior.
 - Audit date: **2026-11-05**. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; see [scope and inventory](README.md).
 
@@ -166,31 +166,35 @@ observed source behavior is retained separately below.
 
 `is_knock_out` matches the two Out variants; `is_knock_in` is its complement; `is_up` matches the two Up variants; `direction()` maps Up to BarrierDirection::Up and the rest to Down. The docs define touching as a hit (`spot >= barrier` for up and `spot <= barrier` for down), but this file does **not** execute spot comparisons or monitor paths.
 
-PayoutTiming has AtHit and AtExpiry. Documentation associates at-hit payments with first-passage-time discounting and at-expiry with expiry discounting; knock-in rebates are documented as expiry-only. This type does not enforce that exception, calculate first passage, apply a continuity correction, or validate a rebate against barrier type. Those are downstream algorithms with separate audit scopes.
+PayoutTiming has AtHit and AtExpiry and schedules an otherwise entitled payment; it grants no entitlement. The type calculates no first passage, applies no continuity correction and validates nothing itself. Products validate supported combinations: `finstack_quant_models::closed_form::validate_rebate_timing` requires a timing exactly when a rebate exists and rejects knock-in (no-hit) rebates with `AtHit`.
 
 ## Observed selection, limitations and alternatives
 
-Caller or enclosing instrument defaults choose the enum; serde accepts canonical snake_case names. Continuous/discrete monitoring, observation calendars, already-hit state, level validation and rebate amounts are not encoded. Both payout timings are supported labels, but availability in an actual pricer must be established at that pricer. No claim is made here that all combinations are implemented or financially approved.
+None of the three enums has a `Default`; every product selects them explicitly, and serde accepts only canonical snake_case names. Continuous/discrete monitoring, observation calendars, already-hit state, level validation and rebate amounts are not encoded. Both payout timings are supported labels, but availability in an actual pricer must be established at that pricer. No claim is made here that all combinations are implemented or financially approved.
 
 ## Evidence
 
 [Owning enum/predicates and serde test](../../../../finstack-quant/core/src/types/barrier.rs)
 contains only classifications and exact predicate matches; it does not execute
-spot/barrier comparisons, numerical validation, monitoring or pricing. Its single
-inspected test covers BarrierType canonical labels and rejected PascalCase only;
-it is not coverage of all three enums, missing product fields or touch behavior.
+spot/barrier comparisons, numerical validation, monitoring or pricing. Its tests
+cover canonical labels and case/whitespace/numeric/null rejection for all three
+enums plus the full predicate truth table; they do not cover touch behavior.
 
 [Equity barrier fields](../../../../finstack-quant/valuations/exotics/src/exotics/barrier_option/types.rs)
 and [FX barrier fields](../../../../finstack-quant/valuations/fx/src/fx_barrier_option/types.rs)
-inherit AtHit using builder/serde defaults. Barrier type is already required.
+carry `rebate_timing: Option<PayoutTiming>`, validated with the rebate: a
+rebate without a timing, a timing without a rebate, or a knock-in `AtHit`
+rebate is a validation error. Barrier type is required.
 The [FX touch product](../../../../finstack-quant/valuations/fx/src/fx_touch_option/types.rs)
 has explicit direction/timing and rejects NoTouch+AtHit. These are observed product
 contracts, not adoption of all their cash/history/model policies.
 
 The [analytic rebate and expired-payoff helpers](../../../../finstack-quant/models/src/closed_form/barrier.rs)
-ignore the timing selector for knock-ins, and the expired payoff excludes hit-time
-knock-out cash on the stated assumption of earlier settlement. That expiry-only
-return does not independently prove settlement or complete remaining cash/PV.
+return a NaN sentinel for the unsupported knock-in/`AtHit` combination instead of
+repricing it at expiry. The expired payoff takes the rebate and its timing as one
+optional pair and returns only the expiry slice, excluding hit-time knock-out cash.
+That expiry-only return does not independently prove settlement or complete
+remaining cash/PV.
 [FX touch pricing](../../../../finstack-quant/valuations/fx/src/fx_touch_option/pricer.rs)
 also has hit/history/payment distinctions requiring owner reconciliation.
 

@@ -35,18 +35,16 @@ pub struct FxBarrierOption {
     /// currency and independent of notional. Knock-outs pay on a hit according
     /// to `rebate_timing`; knock-ins pay at expiry only if no hit occurred.
     pub rebate: Option<Money>,
-    /// Timing of the knock-out rebate payment.
+    /// Payment timing of the rebate. Required exactly when `rebate` is set.
     ///
-    /// `at_hit` (default, market standard) pays the rebate the moment a
-    /// knock-out barrier is breached; `at_expiry` defers payment to expiry.
-    /// Knock-in rebates always pay at expiry, so this setting does not affect
-    /// them. The analytical pricer values at-hit rebates via the discounted
-    /// first-passage closed form. Monte Carlo applies at-hit when
-    /// `rebate_timing == AtHit` via `with_rebate_at_hit`; the crate primitive
-    /// defaults to at-expiry.
-    #[builder(default)]
-    #[serde(default)]
-    pub rebate_timing: PayoutTiming,
+    /// For a knock-out, `at_hit` pays the rebate at the first qualifying hit
+    /// and `at_expiry` defers it to expiry. A knock-in (no-hit) rebate is
+    /// only determined at expiry, so it must be `at_expiry`; `at_hit` is
+    /// rejected. The analytical pricer values at-hit knock-out rebates via
+    /// the discounted first-passage closed form; Monte Carlo applies at-hit
+    /// timing via `with_rebate_at_hit`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rebate_timing: Option<PayoutTiming>,
     /// Option type (call or put on foreign currency)
     pub option_type: OptionType,
     /// Barrier type (up/down, in/out)
@@ -143,6 +141,12 @@ impl FxBarrierOption {
             .map(|rebate| rebate.amount() / self.notional.amount())
     }
 
+    /// Rebate per unit of base notional together with its payment timing;
+    /// `None` when the option has no rebate.
+    pub(crate) fn rebate_terms_per_unit(&self) -> Option<(f64, PayoutTiming)> {
+        self.rebate_per_unit().zip(self.rebate_timing)
+    }
+
     /// Validate FX barrier option currency invariants.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         finstack_quant_core::validation::validate_distinct_currencies(
@@ -183,6 +187,12 @@ impl FxBarrierOption {
                 "FxBarrierOption rebate",
             )?;
         }
+        finstack_quant_models::closed_form::validate_rebate_timing(
+            "FxBarrierOption",
+            self.barrier_type,
+            self.rebate.is_some(),
+            self.rebate_timing,
+        )?;
         let start = self.monitoring_start_date.ok_or_else(|| {
             finstack_quant_core::Error::Validation(
                 "FxBarrierOption requires monitoring_start_date".to_string(),
@@ -718,6 +728,61 @@ mod tests {
         obj.remove("fx_spot_id");
         let option: FxBarrierOption = serde_json::from_value(value).expect("deserialize");
         assert!(option.fx_spot_id.is_none());
+    }
+
+    #[test]
+    fn rebate_and_timing_are_validated_together() {
+        let base = FxBarrierOption::example().expect("example");
+        let rebate = Money::from((10_000_i64, Currency::USD));
+
+        let mut missing_timing = base.clone();
+        missing_timing.rebate = Some(rebate);
+        missing_timing.rebate_timing = None;
+        assert!(missing_timing.validate().is_err());
+
+        let mut timing_without_rebate = base.clone();
+        timing_without_rebate.rebate = None;
+        timing_without_rebate.rebate_timing = Some(PayoutTiming::AtExpiry);
+        assert!(timing_without_rebate.validate().is_err());
+
+        let mut knock_in_at_hit = base.clone();
+        knock_in_at_hit.barrier_type = BarrierType::UpAndIn;
+        knock_in_at_hit.rebate = Some(rebate);
+        knock_in_at_hit.rebate_timing = Some(PayoutTiming::AtHit);
+        assert!(knock_in_at_hit.validate().is_err());
+
+        let mut knock_in_at_expiry = knock_in_at_hit;
+        knock_in_at_expiry.rebate_timing = Some(PayoutTiming::AtExpiry);
+        knock_in_at_expiry
+            .validate()
+            .expect("knock-in at-expiry rebate");
+
+        let mut knock_out_at_hit = base;
+        knock_out_at_hit.rebate = Some(rebate);
+        knock_out_at_hit.rebate_timing = Some(PayoutTiming::AtHit);
+        knock_out_at_hit
+            .validate()
+            .expect("knock-out at-hit rebate");
+    }
+
+    #[test]
+    fn json_rebate_without_timing_is_rejected() {
+        let mut value =
+            serde_json::to_value(FxBarrierOption::example().expect("example")).expect("serialize");
+        let obj = value.as_object_mut().expect("object");
+        obj.insert(
+            "rebate".to_string(),
+            serde_json::json!({"amount": "10000", "currency": "USD"}),
+        );
+        obj.remove("rebate_timing");
+        let option: FxBarrierOption = serde_json::from_value(value.clone()).expect("deserialize");
+        assert!(
+            option.validate().is_err(),
+            "a rebate requires explicit timing"
+        );
+
+        value["rebate_timing"] = serde_json::json!("AtHit");
+        assert!(serde_json::from_value::<FxBarrierOption>(value).is_err());
     }
 
     #[test]
