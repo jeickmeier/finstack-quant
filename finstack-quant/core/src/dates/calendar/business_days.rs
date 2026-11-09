@@ -49,33 +49,66 @@
 use crate::{Error, InputError};
 use time::{Date, Duration};
 
-/// Shared upper bound used across business-day search helpers to avoid runaway loops.
-pub(crate) const MAX_BUSINESS_DAY_SEARCH_DAYS: i32 = 100;
-
-/// Seek the nearest business day from `date` moving in steps of `step_days` (±1),
-/// searching up to [`MAX_BUSINESS_DAY_SEARCH_DAYS`] steps using the provided `cal`.
-///
-/// Returns `Ok(Some(date))` when found, `Ok(None)` if no business day is found
-/// within the window, and the calendar's error when membership cannot be
-/// determined.
+/// The calendar day one `step_days` (±1) away from `date`, or `None` past the
+/// supported date range.
 #[inline]
-pub(crate) fn seek_business_day<C: HolidayCalendar + ?Sized>(
-    mut date: Date,
+fn step_date(date: Date, step_days: i32) -> Option<Date> {
+    date.checked_add(Duration::days(i64::from(step_days)))
+}
+
+/// Seek the first business day strictly after `date` in the direction of
+/// `step_days` (±1), classifying each candidate with `cal` while `within`
+/// accepts it.
+///
+/// There is no closed-day cap (CORE-CONVENTIONS-006): the search ends on a
+/// business day (`Ok(Some)`), on the first candidate `within` rejects or the
+/// end of the supported date range (`Ok(None)`), or on the calendar's
+/// membership error, which propagates.
+pub(crate) fn seek_business_day_after<C: HolidayCalendar + ?Sized>(
+    date: Date,
     step_days: i32,
     cal: &C,
+    within: impl Fn(Date) -> bool,
 ) -> crate::Result<Option<Date>> {
-    let mut searched = 0;
-    while !cal.is_business_day(date)? {
-        let Some(next) = date.checked_add(Duration::days(i64::from(step_days))) else {
+    let mut current = date;
+    while let Some(next) = step_date(current, step_days) {
+        if !within(next) {
             return Ok(None);
-        };
-        date = next;
-        searched += 1;
-        if searched > MAX_BUSINESS_DAY_SEARCH_DAYS {
+        }
+        if cal.is_business_day(next)? {
+            return Ok(Some(next));
+        }
+        current = next;
+    }
+    Ok(None)
+}
+
+/// Nearest business day to the closed date `date`: the minimum calendar-day
+/// distance, Following on a tie.
+///
+/// Both sides advance one day at a time and the search stops as soon as the
+/// answer is proved, so no farther date is classified. A one-sided answer is
+/// returned only when the other side has run out of representable dates.
+fn seek_nearest<C: HolidayCalendar + ?Sized>(date: Date, cal: &C) -> crate::Result<Option<Date>> {
+    let mut forward = Some(date);
+    let mut backward = Some(date);
+    loop {
+        forward = forward.and_then(|d| step_date(d, 1));
+        if let Some(candidate) = forward
+            && cal.is_business_day(candidate)?
+        {
+            return Ok(Some(candidate));
+        }
+        backward = backward.and_then(|d| step_date(d, -1));
+        if let Some(candidate) = backward
+            && cal.is_business_day(candidate)?
+        {
+            return Ok(Some(candidate));
+        }
+        if forward.is_none() && backward.is_none() {
             return Ok(None);
         }
     }
-    Ok(Some(date))
 }
 
 /// Trait for market-specific holiday calendars.
@@ -347,9 +380,19 @@ impl core::str::FromStr for BusinessDayConvention {
 
 /// Adjust `date` according to `conv` utilising `cal` for holiday lookup.
 ///
-/// Returns an error if no business day is found within 100 days of the input date.
-/// This prevents infinite loops when using composite calendars that mark
-/// all days as holidays in a range.
+/// `Unadjusted` returns `date` without classifying it. Otherwise an open
+/// `date` is returned unchanged and a closed one is rolled. There is no
+/// closed-day cap: a long closure is searched through. The Modified
+/// conventions reverse from the original date once every remaining day of
+/// its year and month is proved closed, so a fully closed month can yield a
+/// date in a neighboring month. Nearest stops as soon as the minimal distance
+/// (Following on a tie) is proved.
+///
+/// # Errors
+///
+/// Returns [`InputError::AdjustmentFailed`] when the search reaches the end
+/// of the supported date range without a business day, and propagates the
+/// calendar's error when membership of a needed date cannot be determined.
 ///
 /// Example:
 /// ```
@@ -373,12 +416,11 @@ pub fn adjust<C: HolidayCalendar + ?Sized>(
     conv: BusinessDayConvention,
     cal: &C,
 ) -> Result<Date, Error> {
-    if cal.is_business_day(date)? {
+    if conv == BusinessDayConvention::Unadjusted || cal.is_business_day(date)? {
         return Ok(date);
     }
-    let seek = |step: i32| seek_business_day(date, step, cal);
-    let failed = || adjustment_failed(date, conv);
-    // Search direction and whether crossing the month end reverses it.
+    let anywhere = |_: Date| true;
+    // Search direction and whether leaving the original year/month reverses it.
     let (step, modified) = match conv {
         BusinessDayConvention::Unadjusted => return Ok(date),
         BusinessDayConvention::Following => (1, false),
@@ -386,33 +428,25 @@ pub fn adjust<C: HolidayCalendar + ?Sized>(
         BusinessDayConvention::Preceding => (-1, false),
         BusinessDayConvention::ModifiedPreceding => (-1, true),
         BusinessDayConvention::Nearest => {
-            return match (seek(1)?, seek(-1)?) {
-                (Some(f), Some(b)) => {
-                    let df = (f - date).whole_days().unsigned_abs();
-                    let db = (date - b).whole_days().unsigned_abs();
-                    Ok(if df <= db { f } else { b })
-                }
-                (Some(f), None) => Ok(f),
-                (None, Some(b)) => Ok(b),
-                (None, None) => Err(failed()),
-            };
+            return seek_nearest(date, cal)?.ok_or_else(|| adjustment_failed(date, conv));
         }
     };
-    let candidate = seek(step)?.ok_or_else(failed)?;
-    if modified && (candidate.year(), candidate.month()) != (date.year(), date.month()) {
-        return seek(-step)?.ok_or_else(failed);
-    }
-    Ok(candidate)
+    let found = if modified {
+        let same_month = |d: Date| (d.year(), d.month()) == (date.year(), date.month());
+        match seek_business_day_after(date, step, cal, same_month)? {
+            Some(candidate) => Some(candidate),
+            None => seek_business_day_after(date, -step, cal, anywhere)?,
+        }
+    } else {
+        seek_business_day_after(date, step, cal, anywhere)?
+    };
+    found.ok_or_else(|| adjustment_failed(date, conv))
 }
 
-/// The error for a business-day search that found nothing within
-/// [`MAX_BUSINESS_DAY_SEARCH_DAYS`].
+/// The error for a business-day search that reached the end of the supported
+/// date range without finding a business day.
 pub(crate) fn adjustment_failed(date: Date, convention: BusinessDayConvention) -> Error {
-    Error::Input(InputError::AdjustmentFailed {
-        date,
-        convention,
-        max_days: MAX_BUSINESS_DAY_SEARCH_DAYS,
-    })
+    Error::Input(InputError::AdjustmentFailed { date, convention })
 }
 
 // Runtime discovery helpers

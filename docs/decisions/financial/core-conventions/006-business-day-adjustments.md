@@ -1,7 +1,7 @@
 # CORE-CONVENTIONS-006: Business-day rolling, joint calendars and bounded stepping
 
 - Decision status: **Accepted — complete rolling/joint-calendar package, 2026-11-07**.
-- Implementation status: **Partly reconciled 2026-11-08**: no default convention (enum, cashflow/statements wire forms, host tenor rolls), strict joint-ID parsing and year+month Modified comparison landed; resolver fallbacks, the 100-day cap and composite coverage remain, scoped to `dates/calendar/{business_days,composite}.rs` and business-day methods in `date_extensions.rs`.
+- Implementation status: **Partly reconciled 2026-11-08**: no default convention (enum, cashflow/statements wire forms, host tenor rolls), strict joint-ID parsing, year+month Modified comparison and uncapped minimal searches (2026-11-09) landed; resolver fallbacks and composite coverage remain, scoped to `dates/calendar/{business_days,composite}.rs` and business-day methods in `date_extensions.rs`.
 - Validation status: **Evidence inspected/located; independent qualification pending**. Documentation and independent toy-calendar/date checks passed; production calendar tests were not executed for this review.
 - Audit date: **2026-11-05**. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; see [scope and inventory](README.md).
 

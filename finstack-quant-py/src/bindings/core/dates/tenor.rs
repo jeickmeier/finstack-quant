@@ -285,7 +285,7 @@ impl PyTenor {
     ///     If ``calendar`` names an unknown calendar.
     /// ValueError
     ///     If the convention string is unknown, the date is invalid, or no
-    ///     business day is found within 100 days.
+    ///     business day exists before the end of the supported date range.
     #[pyo3(
         signature = (date, calendar=None, *, business_day_convention),
         text_signature = "(self, date, calendar=None, *, business_day_convention)"

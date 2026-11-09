@@ -320,7 +320,7 @@ def adjust(
         If *calendar* names an unknown calendar.
     ValueError
         If *convention* is unknown, *date* is invalid, or no business day
-        exists within 100 days.
+        exists before the end of the supported date range.
     TypeError
         If an argument has an unsupported type.
 

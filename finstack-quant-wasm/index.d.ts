@@ -780,7 +780,7 @@ export interface CoreNamespace {
    * @returns The shifted date as epoch days.
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind
    * `not_found`) for an unknown calendar, or kind `validation` if no business
-   * day is found within the bounded search window.
+   * day exists before the end of the supported date range.
    * @param date - Start date as days since 1970-01-01.
    * @param n - Signed number of business days to move; negative moves backward and `0` returns `date` unchanged, even on a holiday.
    * @param calendar - Registered holiday-calendar id (for example `"nyse"`, or a `+`-joined union).

@@ -8,7 +8,8 @@
 //! - ModifiedPreceding
 //! - Nearest
 //!
-//! Also includes edge cases for consecutive holidays and infinite loop guards.
+//! Also includes edge cases for consecutive holidays, long closures and
+//! search termination at the end of the supported date range.
 
 use super::common::{TestCal, make_date};
 use finstack_quant_core::InputError;
@@ -232,11 +233,11 @@ impl HolidayCalendar for AllHolidaysCal {
     }
 }
 
-/// Test that all business day conventions properly guard against infinite loops
-/// when a calendar marks all days as holidays, and that error messages contain
-/// the original date and correct convention.
+/// With every day closed, each convention searches to the end of the supported
+/// date range (there is no closed-day cap) and reports the original date and
+/// convention.
 #[test]
-fn test_all_conventions_infinite_loop_guard_and_error_messages() {
+fn all_conventions_fail_only_at_the_date_range_end_with_original_date() {
     let cal = AllHolidaysCal;
     let original_date = make_date(2025, 1, 1);
 
@@ -260,7 +261,6 @@ fn test_all_conventions_infinite_loop_guard_and_error_messages() {
             finstack_quant_core::Error::Input(InputError::AdjustmentFailed {
                 date: err_date,
                 convention: err_conv,
-                max_days,
             }) => {
                 // Verify the error contains the ORIGINAL date (not the last attempted date)
                 assert_eq!(
@@ -274,12 +274,6 @@ fn test_all_conventions_infinite_loop_guard_and_error_messages() {
                     "{:?}: error should contain correct convention",
                     convention
                 );
-                // Verify the max_days limit
-                assert_eq!(
-                    max_days, 100,
-                    "{:?}: error should report max_days=100",
-                    convention
-                );
             }
             other => panic!(
                 "Expected AdjustmentFailed for {:?}, got {:?}",
@@ -287,6 +281,146 @@ fn test_all_conventions_infinite_loop_guard_and_error_messages() {
             ),
         }
     }
+}
+
+/// Business only outside `[closed_from, closed_until)`; dates in
+/// `[error_from, error_until)` cannot be classified.
+struct ClosedSpanCal {
+    closed_from: Date,
+    closed_until: Date,
+    error_span: Option<(Date, Date)>,
+}
+
+impl ClosedSpanCal {
+    fn new(closed_from: Date, closed_until: Date) -> Self {
+        Self {
+            closed_from,
+            closed_until,
+            error_span: None,
+        }
+    }
+
+    fn with_errors(mut self, from: Date, until: Date) -> Self {
+        self.error_span = Some((from, until));
+        self
+    }
+}
+
+impl HolidayCalendar for ClosedSpanCal {
+    fn is_holiday(&self, date: Date) -> finstack_quant_core::Result<bool> {
+        if let Some((from, until)) = self.error_span
+            && (from..until).contains(&date)
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "no holiday data for {date}"
+            )));
+        }
+        Ok((self.closed_from..self.closed_until).contains(&date))
+    }
+
+    fn is_business_day(&self, date: Date) -> finstack_quant_core::Result<bool> {
+        Ok(!self.is_holiday(date)?)
+    }
+}
+
+#[test]
+fn following_searches_through_a_closure_longer_than_100_days() {
+    let cal = ClosedSpanCal::new(make_date(2025, 1, 1), make_date(2025, 5, 1));
+    assert_eq!(
+        adjust(
+            make_date(2025, 1, 1),
+            BusinessDayConvention::Following,
+            &cal
+        )
+        .expect("closure is searched through"),
+        make_date(2025, 5, 1)
+    );
+}
+
+#[test]
+fn modified_following_reverses_out_of_a_fully_closed_month() {
+    // March 2025 is closed: Following lands in April, so Modified Following
+    // reverses from the original date into February.
+    let cal = ClosedSpanCal::new(make_date(2025, 3, 1), make_date(2025, 4, 1));
+    assert_eq!(
+        adjust(
+            make_date(2025, 3, 10),
+            BusinessDayConvention::ModifiedFollowing,
+            &cal
+        )
+        .expect("reverse search succeeds"),
+        make_date(2025, 2, 28)
+    );
+}
+
+#[test]
+fn modified_following_compares_year_and_month_across_a_year_end() {
+    // Closed from 2025-01-15 to 2026-01-20: the first later business day is in
+    // January 2026, the same month number a year later, which is still a
+    // different month, so the roll reverses into January 2025.
+    let cal = ClosedSpanCal::new(make_date(2025, 1, 15), make_date(2026, 1, 20));
+    assert_eq!(
+        adjust(
+            make_date(2025, 1, 20),
+            BusinessDayConvention::ModifiedFollowing,
+            &cal
+        )
+        .expect("reverse search succeeds"),
+        make_date(2025, 1, 14)
+    );
+}
+
+#[test]
+fn modified_following_does_not_classify_the_next_month() {
+    // 2025-01-31 is closed and February has no data: Modified Following must
+    // reverse without classifying any February date.
+    let cal = ClosedSpanCal::new(make_date(2025, 1, 31), make_date(2025, 2, 1))
+        .with_errors(make_date(2025, 2, 1), make_date(2025, 3, 1));
+    assert_eq!(
+        adjust(
+            make_date(2025, 1, 31),
+            BusinessDayConvention::ModifiedFollowing,
+            &cal
+        )
+        .expect("no February date is needed"),
+        make_date(2025, 1, 30)
+    );
+}
+
+#[test]
+fn nearest_stops_once_the_following_tie_is_proved() {
+    // The following day is open at distance one; the preceding day has no
+    // data but cannot beat the preferred tie, so it is never classified.
+    let cal = ClosedSpanCal::new(make_date(2025, 1, 8), make_date(2025, 1, 9))
+        .with_errors(make_date(2025, 1, 7), make_date(2025, 1, 8));
+    assert_eq!(
+        adjust(make_date(2025, 1, 8), BusinessDayConvention::Nearest, &cal)
+            .expect("tie resolved without the preceding date"),
+        make_date(2025, 1, 9)
+    );
+}
+
+#[test]
+fn nearest_propagates_missing_data_on_a_needed_date() {
+    // Following is closed at distance one, so the preceding day is needed.
+    let cal = ClosedSpanCal::new(make_date(2025, 1, 8), make_date(2025, 1, 10))
+        .with_errors(make_date(2025, 1, 7), make_date(2025, 1, 8));
+    let err = adjust(make_date(2025, 1, 8), BusinessDayConvention::Nearest, &cal)
+        .expect_err("a needed date without data is an error");
+    assert!(
+        matches!(err, finstack_quant_core::Error::Validation(_)),
+        "{err:?}"
+    );
+}
+
+#[test]
+fn unadjusted_does_not_classify_the_date() {
+    let day = make_date(2025, 1, 8);
+    let cal = ClosedSpanCal::new(day, day).with_errors(day, make_date(2025, 1, 9));
+    assert_eq!(
+        adjust(day, BusinessDayConvention::Unadjusted, &cal).expect("identity"),
+        day
+    );
 }
 
 // Business Day Convention Display

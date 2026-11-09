@@ -453,7 +453,7 @@ class Tenor:
             If *calendar* names an unknown calendar.
         ValueError
             If the convention string is unknown, *date* is invalid, or no
-            business day is found within 100 days.
+            business day exists before the end of the supported date range.
 
         Examples
         --------

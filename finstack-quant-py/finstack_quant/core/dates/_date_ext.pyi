@@ -42,7 +42,7 @@ def add_business_days(
         If *calendar* names an unknown calendar.
     ValueError
         If *date* is invalid, the shift exceeds the supported date range,
-        or no business day is found within the bounded (100-day) search window.
+        or no business day exists before the end of the supported date range.
 
     OverflowError
         If the offset is outside the signed 32-bit integer range.

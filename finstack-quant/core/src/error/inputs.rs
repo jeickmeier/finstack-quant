@@ -131,17 +131,16 @@ pub enum InputError {
         day: u8,
     },
 
-    /// No business day found within maximum allowed adjustment period.
+    /// A business-day search reached the end of the supported date range
+    /// without finding a business day.
     #[error(
-        "Business day adjustment failed: no business day found within {max_days} days from {date} using {convention:?} convention"
+        "Business day adjustment failed: no business day from {date} before the end of the supported date range using {convention:?} convention"
     )]
     AdjustmentFailed {
         /// The original date that couldn't be adjusted.
         date: Date,
         /// The business day convention that was attempted.
         convention: BusinessDayConvention,
-        /// Maximum number of days searched.
-        max_days: i32,
     },
 
     /// Date falls outside the allowed range (e.g., principal event after maturity).

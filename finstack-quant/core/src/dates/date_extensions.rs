@@ -5,7 +5,7 @@
 //! and business day arithmetic. All methods are allocation-free.
 
 use crate::dates::calendar::business_days::{
-    BusinessDayConvention, adjustment_failed, seek_business_day,
+    BusinessDayConvention, adjustment_failed, seek_business_day_after,
 };
 use crate::dates::periods::FiscalConfig;
 use time::{Date, Duration, Month};
@@ -94,8 +94,15 @@ pub trait DateExt: Copy {
     /// Positive `n` moves forward, negative `n` moves backward. Zero returns
     /// the input unchanged.
     ///
-    /// Returns an error if the date range overflows or no business day is found
-    /// within the bounded search window.
+    /// The start is excluded and is not pre-rolled when closed. There is no
+    /// closed-day cap: each step searches until it reaches a business day.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when fewer than `|n|` calendar days fit in
+    /// the supported date range, [`crate::InputError::AdjustmentFailed`] when
+    /// a step reaches the end of that range without a business day, and the
+    /// calendar's error when membership of a needed date cannot be determined.
     ///
     /// # Arguments
     ///
@@ -267,17 +274,14 @@ impl DateExt for Date {
 
         // A business-day shift cannot require fewer calendar days than counted days.
         self.add_days(i64::from(n))?;
-        let step = if n > 0 { 1 } else { -1 };
+        let (step, conv) = if n > 0 {
+            (1, BusinessDayConvention::Following)
+        } else {
+            (-1, BusinessDayConvention::Preceding)
+        };
         let mut current = self;
         for _ in 0..n.unsigned_abs() {
-            // move at least one day in the desired direction, then seek to a business day
-            let start = current.add_days(i64::from(step))?;
-            let conv = if step > 0 {
-                BusinessDayConvention::Following
-            } else {
-                BusinessDayConvention::Preceding
-            };
-            current = seek_business_day(start, step, cal)?
+            current = seek_business_day_after(current, step, cal, |_| true)?
                 .ok_or_else(|| adjustment_failed(self, conv))?;
         }
         Ok(current)
@@ -300,7 +304,6 @@ impl DateExt for Date {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dates::calendar::business_days::MAX_BUSINESS_DAY_SEARCH_DAYS;
     use time::Date;
 
     fn make_date(y: i32, m: u8, d: u8) -> Date {
@@ -432,7 +435,8 @@ mod tests {
 
     #[test]
     fn test_add_business_days_error_on_all_holidays() {
-        // A calendar that marks every day as a holiday to trigger bounded search failure
+        // Every day closed: the uncapped search fails only at the end of the
+        // supported date range.
         struct AllHolidaysCal;
         impl crate::dates::HolidayCalendar for AllHolidaysCal {
             fn is_holiday(&self, _date: Date) -> crate::Result<bool> {
@@ -450,11 +454,41 @@ mod tests {
             .add_business_days(1, &cal)
             .expect_err("Should fail with AllHolidaysCal");
         match err {
-            crate::Error::Input(crate::InputError::AdjustmentFailed { max_days, .. }) => {
-                assert_eq!(max_days, MAX_BUSINESS_DAY_SEARCH_DAYS);
+            crate::Error::Input(crate::InputError::AdjustmentFailed { date, convention }) => {
+                assert_eq!(date, start);
+                assert_eq!(convention, BusinessDayConvention::Following);
             }
             other => panic!("Expected AdjustmentFailed error, got {:?}", other),
         }
+    }
+
+    #[test]
+    fn add_business_days_i32_min_is_a_range_error() {
+        use crate::dates::calendar::TARGET2;
+
+        let err = make_date(2025, 1, 2)
+            .add_business_days(i32::MIN, &TARGET2)
+            .expect_err("i32::MIN business days cannot fit in the date range");
+        assert!(matches!(err, crate::Error::Validation(_)), "{err:?}");
+    }
+
+    #[test]
+    fn add_business_days_crosses_a_closure_longer_than_100_days() {
+        struct ClosedUntilMay;
+        impl crate::dates::HolidayCalendar for ClosedUntilMay {
+            fn is_holiday(&self, date: Date) -> crate::Result<bool> {
+                Ok(date < make_date(2025, 5, 1))
+            }
+
+            fn is_business_day(&self, date: Date) -> crate::Result<bool> {
+                Ok(!self.is_holiday(date)?)
+            }
+        }
+
+        let next = make_date(2025, 1, 1)
+            .add_business_days(1, &ClosedUntilMay)
+            .expect("a 120-day closure is searched through");
+        assert_eq!(next, make_date(2025, 5, 1));
     }
 
     #[test]
