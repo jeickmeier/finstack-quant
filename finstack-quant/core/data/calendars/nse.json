@@ -4,11 +4,11 @@
   "ignore_weekends": false,
   "comment": "Recurring Gregorian/statutory rules apply every year. Moving festivals use published NSE circular dates (exact_date) for 2024-2026 only (2024: NSE/CMTR/59722; 2025: NSE/CMTR/65587; 2026: NSE/CMTR/71775). Years outside that verified window have only the statutory/Gregorian rules. Full-day model: Diwali Laxmi Pujan regular sessions are holidays; Muhurat is not modeled. Weekend statutory dates are not observed on an adjacent weekday.",
   "rules": [
-    { "type": "fixed", "name": "Republic Day", "month": "january", "day": 26 },
-    { "type": "fixed", "name": "Maharashtra Day", "month": "may", "day": 1 },
-    { "type": "fixed", "name": "Independence Day", "month": "august", "day": 15 },
-    { "type": "fixed", "name": "Gandhi Jayanti", "month": "october", "day": 2 },
-    { "type": "fixed", "name": "Christmas", "month": "december", "day": 25 },
+    { "type": "fixed", "name": "Republic Day", "month": "january", "day": 26, "observed": "none" },
+    { "type": "fixed", "name": "Maharashtra Day", "month": "may", "day": 1, "observed": "none" },
+    { "type": "fixed", "name": "Independence Day", "month": "august", "day": 15, "observed": "none" },
+    { "type": "fixed", "name": "Gandhi Jayanti", "month": "october", "day": 2, "observed": "none" },
+    { "type": "fixed", "name": "Christmas", "month": "december", "day": 25, "observed": "none" },
     { "type": "easter_offset", "name": "Good Friday", "days": -3 },
 
     { "type": "exact_date", "name": "Mahashivratri 2024", "year": 2024, "month": "march", "day": 8 },

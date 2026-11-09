@@ -4,13 +4,13 @@
   "ignore_weekends": false,
   "comment": "TARGET2-style all-derivatives closes plus Christmas Eve and New Year's Eve (trading-only closes). This is the gap versus defr/target2. Source: Eurex holiday regulations (full-day model; no half-day / early-close representation).",
   "rules": [
-    { "type": "fixed", "name": "New Year's Day", "month": "january", "day": 1 },
+    { "type": "fixed", "name": "New Year's Day", "month": "january", "day": 1, "observed": "none" },
     { "type": "easter_offset", "name": "Good Friday", "days": -3 },
     { "type": "easter_offset", "name": "Easter Monday", "days": 0 },
-    { "type": "fixed", "name": "Labour Day", "month": "may", "day": 1 },
-    { "type": "fixed", "name": "Christmas Eve", "month": "december", "day": 24 },
-    { "type": "fixed", "name": "Christmas Day", "month": "december", "day": 25 },
-    { "type": "fixed", "name": "Boxing Day", "month": "december", "day": 26 },
-    { "type": "fixed", "name": "New Year's Eve", "month": "december", "day": 31 }
+    { "type": "fixed", "name": "Labour Day", "month": "may", "day": 1, "observed": "none" },
+    { "type": "fixed", "name": "Christmas Eve", "month": "december", "day": 24, "observed": "none" },
+    { "type": "fixed", "name": "Christmas Day", "month": "december", "day": 25, "observed": "none" },
+    { "type": "fixed", "name": "Boxing Day", "month": "december", "day": 26, "observed": "none" },
+    { "type": "fixed", "name": "New Year's Eve", "month": "december", "day": 31, "observed": "none" }
   ]
 }

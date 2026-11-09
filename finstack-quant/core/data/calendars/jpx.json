@@ -4,8 +4,8 @@
   "ignore_weekends": false,
   "rules": [
     { "type": "japan_public_holidays", "name": "National holidays, Sunday substitutes and citizens' holidays" },
-    { "type": "fixed", "name": "New Year Holiday", "month": "january", "day": 2 },
-    { "type": "fixed", "name": "New Year Holiday", "month": "january", "day": 3 },
-    { "type": "fixed", "name": "Bank and Exchange Holiday", "month": "december", "day": 31 }
+    { "type": "fixed", "name": "New Year Holiday", "month": "january", "day": 2, "observed": "none" },
+    { "type": "fixed", "name": "New Year Holiday", "month": "january", "day": 3, "observed": "none" },
+    { "type": "fixed", "name": "Bank and Exchange Holiday", "month": "december", "day": 31, "observed": "none" }
   ]
 }

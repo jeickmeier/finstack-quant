@@ -7,7 +7,7 @@
     { "type": "fixed", "name": "Labour Day", "month": "may", "day": 1, "observed": "mon_if_sun" },
     { "type": "fixed", "name": "National Day", "month": "august", "day": 9, "observed": "mon_if_sun" },
     { "type": "fixed", "name": "Christmas Day", "month": "december", "day": 25, "observed": "mon_if_sun" },
-    { "type": "span", "name": "Chinese New Year", "start": { "type": "chinese_new_year"}, "len": 2 },
+    { "type": "span", "name": "Chinese New Year", "start": { "type": "chinese_new_year"}, "len": 2, "offset": 0 },
     { "type": "easter_offset", "name": "Good Friday", "days": -3 },
     { "type": "exact_date", "name": "Chinese New Year substitute", "year": 2024, "month": "february", "day": 12 },
     { "type": "exact_date", "name": "Hari Raya Puasa", "year": 2024, "month": "april", "day": 10 },

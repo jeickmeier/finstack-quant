@@ -11,16 +11,16 @@
     { "type": "easter_offset", "name": "Easter Monday", "days": 0 },
     { "type": "nth_weekday", "name": "Early May Bank Holiday", "n": 1, "weekday": "monday", "month": "may", "to_year": 2019 },
     { "type": "nth_weekday", "name": "Early May Bank Holiday", "n": 1, "weekday": "monday", "month": "may", "from_year": 2021 },
-    { "type": "fixed", "name": "Early May Bank Holiday (moved for VE Day 75th anniversary)", "month": "may", "day": 8, "from_year": 2020, "to_year": 2020 },
+    { "type": "fixed", "name": "Early May Bank Holiday (moved for VE Day 75th anniversary)", "month": "may", "day": 8, "observed": "none", "from_year": 2020, "to_year": 2020 },
     { "type": "nth_weekday", "name": "Spring Bank Holiday", "n": -1, "weekday": "monday", "month": "may", "to_year": 2011 },
     { "type": "nth_weekday", "name": "Spring Bank Holiday", "n": -1, "weekday": "monday", "month": "may", "from_year": 2013, "to_year": 2021 },
     { "type": "nth_weekday", "name": "Spring Bank Holiday", "n": -1, "weekday": "monday", "month": "may", "from_year": 2023 },
-    { "type": "fixed", "name": "Spring Bank Holiday (moved for Diamond Jubilee)", "month": "june", "day": 4, "from_year": 2012, "to_year": 2012 },
-    { "type": "fixed", "name": "Queen's Diamond Jubilee", "month": "june", "day": 5, "from_year": 2012, "to_year": 2012 },
-    { "type": "fixed", "name": "Spring Bank Holiday (moved for Platinum Jubilee)", "month": "june", "day": 2, "from_year": 2022, "to_year": 2022 },
-    { "type": "fixed", "name": "Queen's Platinum Jubilee", "month": "june", "day": 3, "from_year": 2022, "to_year": 2022 },
-    { "type": "fixed", "name": "State Funeral of Queen Elizabeth II", "month": "september", "day": 19, "from_year": 2022, "to_year": 2022 },
-    { "type": "fixed", "name": "Coronation of King Charles III", "month": "may", "day": 8, "from_year": 2023, "to_year": 2023 },
+    { "type": "fixed", "name": "Spring Bank Holiday (moved for Diamond Jubilee)", "month": "june", "day": 4, "observed": "none", "from_year": 2012, "to_year": 2012 },
+    { "type": "fixed", "name": "Queen's Diamond Jubilee", "month": "june", "day": 5, "observed": "none", "from_year": 2012, "to_year": 2012 },
+    { "type": "fixed", "name": "Spring Bank Holiday (moved for Platinum Jubilee)", "month": "june", "day": 2, "observed": "none", "from_year": 2022, "to_year": 2022 },
+    { "type": "fixed", "name": "Queen's Platinum Jubilee", "month": "june", "day": 3, "observed": "none", "from_year": 2022, "to_year": 2022 },
+    { "type": "fixed", "name": "State Funeral of Queen Elizabeth II", "month": "september", "day": 19, "observed": "none", "from_year": 2022, "to_year": 2022 },
+    { "type": "fixed", "name": "Coronation of King Charles III", "month": "may", "day": 8, "observed": "none", "from_year": 2023, "to_year": 2023 },
     { "type": "nth_weekday", "name": "Summer Bank Holiday", "n": -1, "weekday": "monday", "month": "august" }
   ]
 }

@@ -405,8 +405,9 @@ const fn year_in_effective_range(year: i32, from: Option<i32>, to: Option<i32>) 
     true
 }
 
+#[cfg(test)]
 impl Rule {
-    /// Convenience for `Rule::Fixed { … }` with no observation.
+    /// Test convenience for `Rule::Fixed { … }` with no observation.
     #[inline]
     pub const fn fixed(month: Month, day: u8) -> Self {
         Rule::Fixed {

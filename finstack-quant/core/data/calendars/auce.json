@@ -7,7 +7,7 @@
     { "type": "fixed", "name": "Australia Day", "month": "january", "day": 26, "observed": "next_monday" },
     { "type": "easter_offset", "name": "Good Friday", "days": -3 },
     { "type": "easter_offset", "name": "Easter Monday", "days": 0 },
-    { "type": "fixed", "name": "ANZAC Day", "month": "april", "day": 25 },
+    { "type": "fixed", "name": "ANZAC Day", "month": "april", "day": 25, "observed": "none" },
     { "type": "nth_weekday", "name": "King's Birthday", "n": 2, "weekday": "monday", "month": "june" },
     { "type": "nth_weekday", "name": "Bank Holiday", "n": 1, "weekday": "monday", "month": "august" },
     { "type": "nth_weekday", "name": "Labour Day", "n": 1, "weekday": "monday", "month": "october" },

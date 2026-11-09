@@ -3,11 +3,11 @@
   "name": "ECB TARGET2 Settlement Holidays",
   "ignore_weekends": false,
   "rules": [
-    { "type": "fixed", "name": "New Year's Day", "month": "january", "day": 1 },
+    { "type": "fixed", "name": "New Year's Day", "month": "january", "day": 1, "observed": "none" },
     { "type": "easter_offset", "name": "Good Friday", "days": -3 },
     { "type": "easter_offset", "name": "Easter Monday", "days": 0 },
-    { "type": "fixed", "name": "Labour Day", "month": "may", "day": 1 },
-    { "type": "fixed", "name": "Christmas Day", "month": "december", "day": 25 },
-    { "type": "fixed", "name": "St. Stephen's Day", "month": "december", "day": 26 }
+    { "type": "fixed", "name": "Labour Day", "month": "may", "day": 1, "observed": "none" },
+    { "type": "fixed", "name": "Christmas Day", "month": "december", "day": 25, "observed": "none" },
+    { "type": "fixed", "name": "St. Stephen's Day", "month": "december", "day": 26, "observed": "none" }
   ]
 }

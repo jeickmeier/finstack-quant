@@ -4,11 +4,11 @@
   "ignore_weekends": false,
   "comment": "BSE cash-segment holidays match NSE. Both IDs exist so desks can look up either name. Recurring Gregorian/statutory rules apply every year. Moving festivals use published circular dates (exact_date) for 2024-2026 only. Years outside that verified window have only the statutory/Gregorian rules. Full-day model: Diwali Laxmi Pujan regular sessions are holidays; Muhurat is not modeled.",
   "rules": [
-    { "type": "fixed", "name": "Republic Day", "month": "january", "day": 26 },
-    { "type": "fixed", "name": "Maharashtra Day", "month": "may", "day": 1 },
-    { "type": "fixed", "name": "Independence Day", "month": "august", "day": 15 },
-    { "type": "fixed", "name": "Gandhi Jayanti", "month": "october", "day": 2 },
-    { "type": "fixed", "name": "Christmas", "month": "december", "day": 25 },
+    { "type": "fixed", "name": "Republic Day", "month": "january", "day": 26, "observed": "none" },
+    { "type": "fixed", "name": "Maharashtra Day", "month": "may", "day": 1, "observed": "none" },
+    { "type": "fixed", "name": "Independence Day", "month": "august", "day": 15, "observed": "none" },
+    { "type": "fixed", "name": "Gandhi Jayanti", "month": "october", "day": 2, "observed": "none" },
+    { "type": "fixed", "name": "Christmas", "month": "december", "day": 25, "observed": "none" },
     { "type": "easter_offset", "name": "Good Friday", "days": -3 },
 
     { "type": "exact_date", "name": "Mahashivratri 2024", "year": 2024, "month": "march", "day": 8 },

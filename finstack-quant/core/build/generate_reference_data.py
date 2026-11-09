@@ -35,7 +35,10 @@ def currency_rows(path: Path) -> list[tuple[str, int, int, str]]:
         reader = csv.DictReader(stream)
         if reader.fieldnames != ["code", "numeric", "minor_units", "name"]:
             raise ValueError(f"{path}: invalid currency CSV header")
-        rows = [(r["code"], int(r["numeric"]), int(r["minor_units"]), r["name"]) for r in reader]
+        rows = [
+            (r["code"], int(r["numeric"]), int(r["minor_units"]), r["name"])
+            for r in (complete_row(path, reader.line_num, record) for record in reader)
+        ]
     if not rows or len({r[0] for r in rows}) != len(rows) or len({r[1] for r in rows}) != len(rows):
         raise ValueError(f"{path}: empty table or duplicate currency identifier")
     for code, numeric, decimals, name in rows:
@@ -197,13 +200,23 @@ def date_rows(path: Path) -> list[tuple[int, int, int]]:
         reader = csv.DictReader(stream)
         if reader.fieldnames != ["year", "month", "day"]:
             raise ValueError(f"{path}: invalid date CSV header")
-        rows = sorted((int(r["year"]), int(r["month"]), int(r["day"])) for r in reader)
+        rows = sorted(
+            (int(r["year"]), int(r["month"]), int(r["day"]))
+            for r in (complete_row(path, reader.line_num, record) for record in reader)
+        )
     base_year, end_year = cache_year_range()
     if [r[0] for r in rows] != list(range(base_year, end_year + 1)):
         raise ValueError(f"{path}: expected one date per year from {base_year} through {end_year}")
     for row in rows:
         dt.date(*row)
     return rows
+
+
+def complete_row(path: Path, line_number: int, record: dict) -> dict:
+    """Reject surplus or missing CSV cells instead of silently ignoring them."""
+    if None in record or any(value is None for value in record.values()):
+        raise ValueError(f"{path}:{line_number}: row does not have exactly the header's columns")
+    return record
 
 
 RUST_KEYWORDS = {"as", "do", "fn", "if", "in", "mod", "pub", "ref", "try", "use"}

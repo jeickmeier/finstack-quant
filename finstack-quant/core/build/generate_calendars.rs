@@ -7,34 +7,43 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+/// One maintained calendar definition. Unknown fields are rejected and every
+/// financial control is explicit (CORE-CONVENTIONS-004 item 10).
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct CalendarDef {
     id: String,
     name: String,
-    ignore_weekends: Option<bool>,
+    ignore_weekends: bool,
     notes: Option<String>,
     comment: Option<String>,
     rules: Vec<RuleDef>,
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 enum RuleDef {
     ExactDate {
+        #[serde(default)]
+        name: Option<String>,
         year: i32,
         month: MonthName,
         day: u8,
     },
     Fixed {
+        #[serde(default)]
+        name: Option<String>,
         month: MonthName,
         day: u8,
-        observed: Option<ObservedName>,
+        observed: ObservedName,
         #[serde(default)]
         from_year: Option<i32>,
         #[serde(default)]
         to_year: Option<i32>,
     },
     EasterOffset {
+        #[serde(default)]
+        name: Option<String>,
         days: i16,
         #[serde(default)]
         from_year: Option<i32>,
@@ -42,6 +51,8 @@ enum RuleDef {
         to_year: Option<i32>,
     },
     NthWeekday {
+        #[serde(default)]
+        name: Option<String>,
         n: i8,
         weekday: WeekdayName,
         month: MonthName,
@@ -51,38 +62,50 @@ enum RuleDef {
         to_year: Option<i32>,
     },
     WeekdayShift {
+        #[serde(default)]
+        name: Option<String>,
         weekday: WeekdayName,
         month: MonthName,
         day: u8,
         dir: DirectionName,
     },
     Span {
+        #[serde(default)]
+        name: Option<String>,
         start: Box<RuleDef>,
         len: u8,
-        #[serde(default)]
         offset: i16,
         #[serde(default)]
         from_year: Option<i32>,
         #[serde(default)]
         to_year: Option<i32>,
     },
-    ChineseNewYear,
-    QingMing,
-    DragonBoat,
-    MidAutumn,
+    ChineseNewYear {},
+    QingMing {},
+    DragonBoat {},
+    MidAutumn {},
     ChinaBridge {
+        #[serde(default)]
+        name: Option<String>,
         festival: Box<RuleDef>,
         #[serde(default)]
         from_year: Option<i32>,
         #[serde(default)]
         to_year: Option<i32>,
     },
-    HongKongPublicHolidays,
-    JapanPublicHolidays,
+    HongKongPublicHolidays {
+        #[serde(default)]
+        name: Option<String>,
+    },
+    JapanPublicHolidays {
+        #[serde(default)]
+        name: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, Copy)]
 enum ObservedName {
+    None,
     NextMonday,
     FriIfSatMonIfSun,
     MonIfSun,
@@ -186,6 +209,7 @@ impl<'de> Deserialize<'de> for ObservedName {
     {
         let s = String::deserialize(deserializer)?.to_lowercase();
         match s.as_str() {
+            "none" => Ok(Self::None),
             "next_monday" => Ok(Self::NextMonday),
             "fri_if_sat_mon_if_sun" => Ok(Self::FriIfSatMonIfSun),
             "mon_if_sun" => Ok(Self::MonIfSun),
@@ -240,6 +264,7 @@ impl DirectionName {
 impl ObservedName {
     fn to_rust_code(self) -> &'static str {
         match self {
+            Self::None => "Observed::None",
             Self::NextMonday => "Observed::NextMonday",
             Self::FriIfSatMonIfSun => "Observed::FriIfSatMonIfSun",
             Self::MonIfSun => "Observed::MonIfSun",
@@ -267,9 +292,30 @@ fn wrap_effective(inner: String, from_year: Option<i32>, to_year: Option<i32>) -
 }
 
 impl RuleDef {
+    /// Human-readable rule name, emitted as a comment in the generated code.
+    fn name(&self) -> Option<&str> {
+        match self {
+            RuleDef::ExactDate { name, .. }
+            | RuleDef::Fixed { name, .. }
+            | RuleDef::EasterOffset { name, .. }
+            | RuleDef::NthWeekday { name, .. }
+            | RuleDef::WeekdayShift { name, .. }
+            | RuleDef::Span { name, .. }
+            | RuleDef::ChinaBridge { name, .. }
+            | RuleDef::HongKongPublicHolidays { name }
+            | RuleDef::JapanPublicHolidays { name } => name.as_deref(),
+            RuleDef::ChineseNewYear {}
+            | RuleDef::QingMing {}
+            | RuleDef::DragonBoat {}
+            | RuleDef::MidAutumn {} => None,
+        }
+    }
+
     fn to_rust_code(&self) -> String {
         match self {
-            RuleDef::ExactDate { year, month, day } => format!(
+            RuleDef::ExactDate {
+                year, month, day, ..
+            } => format!(
                 "Rule::ExactDate {{ year: {}, month: {}, day: {} }}",
                 year,
                 month.to_rust_code(),
@@ -281,22 +327,21 @@ impl RuleDef {
                 observed,
                 from_year,
                 to_year,
+                ..
             } => {
-                let inner = match observed {
-                    None => format!("Rule::fixed({}, {})", month.to_rust_code(), day),
-                    Some(obs) => format!(
-                        "Rule::Fixed {{ month: {}, day: {}, observed: {} }}",
-                        month.to_rust_code(),
-                        day,
-                        obs.to_rust_code()
-                    ),
-                };
+                let inner = format!(
+                    "Rule::Fixed {{ month: {}, day: {}, observed: {} }}",
+                    month.to_rust_code(),
+                    day,
+                    observed.to_rust_code()
+                );
                 wrap_effective(inner, *from_year, *to_year)
             }
             RuleDef::EasterOffset {
                 days,
                 from_year,
                 to_year,
+                ..
             } => wrap_effective(
                 format!("Rule::EasterOffset({})", days),
                 *from_year,
@@ -308,6 +353,7 @@ impl RuleDef {
                 month,
                 from_year,
                 to_year,
+                ..
             } => {
                 let inner = format!(
                     "Rule::NthWeekday {{ n: {}, weekday: {}, month: {} }}",
@@ -322,6 +368,7 @@ impl RuleDef {
                 month,
                 day,
                 dir,
+                ..
             } => {
                 format!(
                     "Rule::WeekdayShift {{ weekday: {}, month: {}, day: {}, dir: {} }}",
@@ -337,6 +384,7 @@ impl RuleDef {
                 offset,
                 from_year,
                 to_year,
+                ..
             } => {
                 let inner = format!(
                     "Rule::Span {{ start: &({}), len: {}, offset: {} }}",
@@ -346,14 +394,15 @@ impl RuleDef {
                 );
                 wrap_effective(inner, *from_year, *to_year)
             }
-            RuleDef::ChineseNewYear => "Rule::ChineseNewYear".to_string(),
-            RuleDef::QingMing => "Rule::QingMing".to_string(),
-            RuleDef::DragonBoat => "Rule::DragonBoat".to_string(),
-            RuleDef::MidAutumn => "Rule::MidAutumn".to_string(),
+            RuleDef::ChineseNewYear {} => "Rule::ChineseNewYear".to_string(),
+            RuleDef::QingMing {} => "Rule::QingMing".to_string(),
+            RuleDef::DragonBoat {} => "Rule::DragonBoat".to_string(),
+            RuleDef::MidAutumn {} => "Rule::MidAutumn".to_string(),
             RuleDef::ChinaBridge {
                 festival,
                 from_year,
                 to_year,
+                ..
             } => {
                 let inner = format!(
                     "Rule::ChinaBridge {{ festival: &({}) }}",
@@ -361,8 +410,8 @@ impl RuleDef {
                 );
                 wrap_effective(inner, *from_year, *to_year)
             }
-            RuleDef::HongKongPublicHolidays => "Rule::HongKongPublicHolidays".to_string(),
-            RuleDef::JapanPublicHolidays => "Rule::JapanPublicHolidays".to_string(),
+            RuleDef::HongKongPublicHolidays { .. } => "Rule::HongKongPublicHolidays".to_string(),
+            RuleDef::JapanPublicHolidays { .. } => "Rule::JapanPublicHolidays".to_string(),
         }
     }
 }
@@ -387,6 +436,22 @@ pub(crate) fn generate() -> io::Result<()> {
                     format!("Failed to parse {}: {}", path.display(), e),
                 )
             })?;
+            let valid_id = !cal.id.is_empty()
+                && cal.id.len() <= 32
+                && cal
+                    .id
+                    .bytes()
+                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_');
+            if !valid_id {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!(
+                        "{}: calendar id '{}' must be 1..=32 lowercase ASCII letters, digits or '_'",
+                        path.display(),
+                        cal.id
+                    ),
+                ));
+            }
             if let Some(previous_path) = calendar_sources.get(&cal.id) {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
@@ -421,6 +486,9 @@ pub(crate) fn generate() -> io::Result<()> {
         // Generate rules array
         output.push_str(&format!("static {}_RULES: &[Rule] = &[\n", const_name));
         for rule in &cal.rules {
+            if let Some(name) = rule.name() {
+                output.push_str(&format!("    // {}\n", name.replace('\n', " ")));
+            }
             output.push_str("    ");
             output.push_str(&rule.to_rust_code());
             output.push_str(",\n");
@@ -451,7 +519,7 @@ pub(crate) fn generate() -> io::Result<()> {
             const_name,
             id,
             cal.name,
-            cal.ignore_weekends.unwrap_or(false),
+            cal.ignore_weekends,
             const_name
         ));
     }
