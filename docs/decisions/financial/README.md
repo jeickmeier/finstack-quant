@@ -145,6 +145,9 @@ convention.
 | [Core numerics: bounded contracts, validation and diagnostics](core-numerics/contracts-and-diagnostics.md#accepted-decision-bounded-contract-loading-validation-and-diagnostics) | Complete bounded/lossless loading and owner validation, guarded fatal reports/pointers, exact Money/recovery/registry/table boundaries, nullable/exact host exports, bounded hints/causes/traces, ordered execution and fail-closed lock package. Accepted 2026-11-08; runtime/caller/host/state and independent financial qualification remain open. |
 | [Core numerics: canonical schemas, compact views and publication](core-numerics/schema-publication.md#accepted-decision-canonical-schemas-compact-views-and-bounded-publication) | Complete explicit2020-12 original-graph/offline-corpus, exact-example/identity, deterministic owned staged publication, description-only compact replacement and bounded root-context validation/report package. Accepted 2026-11-08, completing all26 core-numerics records; runtime/host/schema/filesystem and independent financial qualification remain open. |
 | [Cashflows: contractual periods, calendars and day-count context](cashflows/01-schedule-periods.md#accepted-decision-contractual-periods-calendars-and-day-count-context) | Complete explicit convention/preset/CDS cleanup, original nominal grid/reference context, ICMA/365L/termination and calendar/reset/event rules, immutable period queries and accepted core015 endpoint clarification. Accepted2026-11-08; runtime/caller/host and independent financial qualification remain open. |
+| [Cashflows: coupon and payment program compilation](cashflows/02-program-compilation.md#accepted-decision-coupon-and-payment-program-compilation) | Complete independent-window/strict nesting, atomic fallible configuration, explicit settlement/exchange/cutoff, distinct fixed/FROM/UNTIL rules and exact shared build/host contract. Accepted 2026-11-08; runtime and independent geometry/financial/host qualification remain open. |
+| [Cashflows: dated opening principal, signed cash and atomic event phases](cashflows/03-principal-and-emission-order.md#accepted-decision-dated-opening-principal-signed-cash-and-atomic-event-phases) | Complete dated opening/history authority, literal signed cash/deltas, exact same-date batches, paired terminal dates and explicit par exchanges with faithful replay/export/host boundaries. Accepted 2026-11-08; runtime and independent financial/host qualification remain open. |
+| [Cashflows: explicit amortization laws and live-balance installments](cashflows/04-amortization.md#accepted-decision-explicit-amortization-laws-live-balance-installments-and-monetary-boundaries) | Complete explicit seven-rule/exact-fraction contract, protected hard final targets, stateless live B/k installments, actual date/payment mapping and exact par effects without implicit financial rounding. Accepted 2026-11-08; runtime/caller/host and independent qualification remain open. |
 | [Analytics: explicit frequency](analytics/01-panels-windows-and-wire.md#accepted-decision-explicit-observation-frequency) | Caller-supplied observation frequency for annualized risk; no date-index inference. |
 | [Analytics: explicit tail confidence](analytics/01-panels-windows-and-wire.md#accepted-decision-explicit-tail-confidence) | Caller-supplied finite `0.5 < c < 1` for tail metrics and affected summaries, without an implicit 95% default. |
 | [Analytics: panels, windows, wire and summary](analytics/01-panels-windows-and-wire.md#accepted-decision-panels-windows-wire-and-summary) | Complete actual valuation-grid admission, explicit context/unit selection, atomic active windows, validated state/wire and fixed-summary inputs, provenance and result/failure contract. |
@@ -213,10 +216,13 @@ selection in 0033 retains its own scope.
 [record16](core-market/sabr-cube-data.md#accepted-decision-canonical-sabr-sources-and-explicit-evaluated-quote-meaning),
 [record17](core-market/forward-variance.md#accepted-decision-nonnegative-variance-sources-and-explicit-model-time-semantics),
 [record18](core-market/base-correlation.md#accepted-decision-exact-base-correlation-sources-and-unclipped-native-shocks),
-and [record19](core-market/credit-index-composition.md#accepted-decision-explicit-credit-pool-composition-and-exact-issuer-contracts)
-were accepted on 2026-11-08 within their complete stated packages. The other 3
-core-market records remain Draft; runtime/caller/host reconciliation and
-independent qualification remain open. This does not accept ADR0032's remaining
+[record19](core-market/credit-index-composition.md#accepted-decision-explicit-credit-pool-composition-and-exact-issuer-contracts),
+[record20](core-market/context-lifecycle.md#accepted-decision-typed-targets-and-atomic-context-lifecycle),
+[record21](core-market/hierarchy-selection.md#accepted-decision-typed-selection-and-explicit-ordered-overlap),
+and [record22](core-market/market-change-measurement.md#accepted-decision-explicit-comparable-quantities-and-ordered-measurement-rows)
+were accepted on 2026-11-08 within their complete stated packages. **All 22
+detailed core-market records are accepted**, completing this area's methodology
+review. Runtime/caller/host reconciliation and independent qualification remain open. This does not accept ADR0032's remaining
 calibration selections or broader model/context aging methodologies.
 
 All 20 complete packages in [core-conventions records 001–020](core-conventions/README.md)
@@ -322,11 +328,21 @@ choices, original nominal references, ICMA/365L/termination context, coincident
 events and checked immutable period queries. Its narrow core015 clarification
 was applied in place: metadata endpoints describe actual calculation dates,
 including explicit adjustment, separately from nominal references.
-[Cashflows record002](cashflows/02-program-compilation.md#proposed-decisions-for-whole-record-review)
-remains Proposed for its complete independent-window, explicit-selection/cutoff,
-strict-override, atomic-builder and exact shared-build package. The other14
-cashflow records remain Draft. Runtime/caller/host reconciliation and independent
-qualification remain pending.
+[Cashflows record002](cashflows/02-program-compilation.md#accepted-decision-coupon-and-payment-program-compilation)
+has complete scoped acceptance as of 2026-11-08 for independent atomic windows,
+explicit settlement/exchange/cutoff, globally valid overrides, atomic fallible
+configuration and exact shared build paths.
+[Cashflows record003](cashflows/03-principal-and-emission-order.md#accepted-decision-dated-opening-principal-signed-cash-and-atomic-event-phases)
+has complete scoped acceptance as of 2026-11-08 for explicit dated opening
+stock, signed settlement cash, atomic same-date principal batches, covered
+history, paired terminal dates and exact explicit exchanges.
+[Cashflows record004](cashflows/04-amortization.md#accepted-decision-explicit-amortization-laws-live-balance-installments-and-monetary-boundaries)
+has complete scoped acceptance as of 2026-11-08 for explicit amortization laws,
+exact fractions, protected final targets, stateless live-balance installments,
+par effects and monetary/payment boundaries. Its removal of the obsolete owner
+installment-update slot was clarified in accepted003 without changing the relative
+economic phase order. The other 12 cashflow records remain Draft. Runtime/caller/
+host reconciliation and independent qualification remain pending.
 Runtime/host/caller reconciliation and independent qualification remain open.
 
 The [ADR 0044 collateral-input representation package](conventions/0044-financial-perspectives-and-boundary-conversions.md#accepted-amendment-explicit-collateral-components)

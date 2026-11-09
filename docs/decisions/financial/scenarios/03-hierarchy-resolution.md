@@ -28,6 +28,21 @@ Alternatives include rejecting equal-depth conflicts, explicit precedence betwee
 
 Owning source: [engine/hierarchy.rs](../../../../finstack-quant/scenarios/src/engine/hierarchy.rs), [spec.rs](../../../../finstack-quant/scenarios/src/spec.rs). The shared path/tag resolver is recorded in [market hierarchy selection](../core-market/hierarchy-selection.md). [Hierarchy tests](../../../../finstack-quant/scenarios/tests/hierarchy_targeting/mod.rs) locate assertions for parent/child tag deduplication, cumulative stacking, deepest matched-node precedence and namespace-qualified overlap. These establish targeted selection behavior rather than market stress severity.
 
+## Relationship to the accepted typed hierarchy package
+
+[CORE-MARKET-21's accepted package](../core-market/hierarchy-selection.md#accepted-decision-typed-selection-and-explicit-ordered-overlap)
+was accepted on **2026-11-08**. It preserves authored equal-depth/direct action order and
+per-selector deduplication, while replacing bare associations with accepted20's
+exact typed targets, stabilizing placement order and normalizing empty filters.
+Declared family projection precedes strict retained-active source binding;
+missing paths/zero applicable matches or unavailable selected sources error
+rather than warn/skip. Mixed effective composition modes error instead of
+silently becoming Cumulative. Selection membership freezes once, with actual
+execution-stage admission and context-owned atomicity under accepted20.
+Ordered name/node arrays and shared strict loading preserve hierarchy transport;
+accepted21 does not adopt broader scenario phase ordering, instrument/
+statement atomicity, source dynamics, replay or financial stress calibration.
+
 ## Follow-up tracking
 
 Implementation, adoption and validation work is tracked in the

@@ -179,10 +179,10 @@ financial qualification remain pending; observed implementation stays separate b
    comparisons and lagged/seasonally changed base CPI; calibration's source versus
    contractual anchors; attribution/context/cache/wire and Python/WASM stubs,
    declarations, schemas, parity and examples. Bindings convert types and use
-   existing errors, without a separate host resolver. Record22's latest-print
-   market comparison remains Draft and must not imply aligned month/vintage
-   change from two unrelated latest observations. Broader scenario projected
-   fixings and time evolution remain separately owned; they cannot mutate K
+   existing errors, without a separate host resolver. Accepted22 replaces the
+   latest-print comparison with explicit period/vintage/knowledge identity;
+   unrelated latest observations do not imply an aligned revision. Broader
+   scenario projected fixings and time evolution remain separately owned; they cannot mutate K
    into actual observation authority merely by advancing the valuation date.
 
 ## Observed implementation and discrepancies

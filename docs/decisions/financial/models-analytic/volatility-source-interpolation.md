@@ -78,6 +78,17 @@ and truthful source-clock/coordinate metadata. Materialized sigma grids select
 their own interpolation, instead of inheriting a parameter-mode label. Record 16 was accepted on **2026-11-08**, with reconciliation/qualification
 pending; this record's complete off-grid/tail/cube kernels remain Draft.
 
+## Relationship to the accepted context lifecycle boundary
+
+[CORE-MARKET-20's accepted package](../core-market/context-lifecycle.md#accepted-decision-typed-targets-and-atomic-context-lifecycle)
+requires explicit active source kind/namespace and exact ID rather than cube/
+surface/FX-delta priority probing. Resolve only the actual selected source;
+explicit scalar/model overrides and inactive branches do not inspect unused
+same-ID artifacts. Conditioning/cloning preserves original quote/clock metadata,
+not an automatic aged-smile or current-fit interpretation. Accepted record20
+does not adopt this record's complete off-grid, materialization,
+convention-conversion or volatility-aging models.
+
 ## Follow-up tracking
 
 Adoption questions and implementation or validation work are tracked in the

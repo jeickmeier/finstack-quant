@@ -19,9 +19,10 @@ Their explicit choices, positive-factor admission, contractual accrual and
 analytic derivative rules are not reopened.
 
 Quote shocks with recalibration, stochastic future curves, theta decomposition,
-market-context-wide aging and observed fixing availability remain owned by
-calibration, models, [record20](context-lifecycle.md) and products. This package
-does not adopt their Draft methodologies. Shared bucket geometry is specified
+market-context-wide aging and observed fixing availability retain their actual
+owners. Accepted [record20](context-lifecycle.md) defines source conditioning
+and context integrity; calibration, model and product methodologies retain
+their remaining Draft choices. Shared bucket geometry is specified
 here, but other asset families retain their own shocked financial quantities,
 units and domain constraints. [Record06](calibration-provenance.md) owns
 calibration provenance and fit-state disclosure.

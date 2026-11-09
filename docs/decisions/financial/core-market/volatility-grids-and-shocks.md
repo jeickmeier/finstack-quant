@@ -20,8 +20,9 @@ source mapping at dated use; this proposal does not reopen that decision.
 [surface diagnostics](../models-analytic/surface-arbitrage-diagnostics.md),
 [calibrated materialization](../calibration-targets/10-total-variance-materialization.md),
 [calibration acceptance](../calibration-framework/17-surface-validation.md),
-[scenario diagnostics](../scenarios/09-volatility-surface-shocks.md) and
-[context aging](context-lifecycle.md) retain their remaining Draft choices.
+and [scenario diagnostics](../scenarios/09-volatility-surface-shocks.md) retain
+their remaining Draft choices. Accepted [context lifecycle20](context-lifecycle.md)
+owns dated source conditioning and active eligibility boundaries.
 This record defines source/evaluator compatibility without adopting their full
 off-grid kernels, tails, price models, arbitrage thresholds or aging dynamics.
 

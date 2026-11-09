@@ -34,6 +34,17 @@ The implementation uses quote-space replay to match par-spread units, and separa
 - [credit_cascade.rs](../../../../finstack-quant/attribution/src/credit_cascade.rs) — owning implementation.
 - [credit_decomposition.rs](../../../../finstack-quant/attribution/src/credit_decomposition.rs) — owning implementation.
 
+## Relationship to the accepted comparable-measurement package
+
+[CORE-MARKET-22's accepted package](../core-market/market-change-measurement.md#accepted-decision-explicit-comparable-quantities-and-ordered-measurement-rows)
+was accepted on **2026-11-08**. It removes inferred core par-spread/triangle measurement and
+requires full matched quote/contract basis or the actual CDS pricer before a
+spread move is claimed. Factor scalars remain opaque native values until their
+bp meaning is explicitly established. Required source absence cannot silently
+change an issuer mean's population. The separate issuer factor hierarchy and
+its beta model/order, replay allocation, adder/shape and optional-detail policy
+remain owned by this Draft record.
+
 ## Follow-up tracking
 
 Implementation, adoption and validation work is tracked in the

@@ -1,14 +1,13 @@
 # Core market-data methodology audit
 
-Decision status: **CORE-MARKET-01 through CORE-MARKET-19 Accepted; the other 3 detailed records remain Draft.** Audit date: **2026-11-05**. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
+Decision status: **All 22 detailed records CORE-MARKET-01 through CORE-MARKET-22 Accepted; none remain Draft.** Audit date: **2026-11-05**. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
 [CORE-MARKET-01's complete discount-evaluation package](discount-evaluation.md#accepted-decision-explicit-discount-sources-and-checked-rate-extraction)
 was accepted on **2026-11-08**, covering explicit source choices, signed factor
 domains, strict state, negative-rate admission and checked zero/interval/local
 rate extraction. Its independent expression examples were executed separately;
 they do not qualify the production implementation. Runtime/caller/host
-reconciliation and independent qualification remain pending; the other 3
-records retain their existing observed or proposed choices.
+reconciliation and independent qualification remain pending.
 
 [CORE-MARKET-02's revised factor package](forward-projection.md#accepted-decision-explicit-index-projection-factors-and-contractual-rates)
 was accepted on **2026-11-08**: one positive projection-factor source using
@@ -156,13 +155,34 @@ and historical recoveries; retain actual index/member dependencies and canonical
 state/host contracts. Runtime/caller/host reconciliation and independent
 qualification remain pending.
 
-The next unaccepted record is [CORE-MARKET-20](context-lifecycle.md), covering
-market-context selection, ordered mutations, composite references, scratch state,
-dated conditioning and snapshots. Its methodology remains Draft.
+[CORE-MARKET-20's complete context package](context-lifecycle.md#accepted-decision-typed-targets-and-atomic-context-lifecycle)
+was accepted on **2026-11-08**: namespace-local IDs with explicit typed targets,
+atomic owned mutations and registered composite integrity, ordered actions and
+scoped exact scratch state. It selects explicit dated source conditioning and
+strict state/quote capture, separating live provider capability and frozen data
+from financial horizon/replay qualification. Runtime/caller/host reconciliation
+and independent qualification remain pending.
+
+[CORE-MARKET-21's complete hierarchy package](hierarchy-selection.md#accepted-decision-typed-selection-and-explicit-ordered-overlap)
+was accepted on **2026-11-08**: exact typed associations and shared path grammar,
+local subtree tags, one result per selector/source in stable placement order,
+explicit deepest-match precedence and ordered equal-depth/direct actions.
+Missing active targets and mixed-mode composition error; ordered root/child
+arrays preserve cross-host identity. Runtime/caller/host reconciliation and
+independent qualification remain pending.
+
+[CORE-MARKET-22's complete comparison package](market-change-measurement.md#accepted-decision-explicit-comparable-quantities-and-ordered-measurement-rows)
+was accepted on **2026-11-08**: explicit typed quantities/sources and coordinates,
+common-calendar factor-rate comparison, distinct native hazard/quote/CPI/FX/
+scalar meanings, exact Money and stable arithmetic, strict complete ordered
+rows and optional equal-weight scaled means. Actual risk-coordinate pairing
+and attribution remain qualified at their owners. This completes acceptance
+of **all 22 detailed core-market methodology records**. Runtime/caller/host
+reconciliation and independent qualification remain pending.
 
 The exact assigned scope is **60 Rust source files** under `finstack-quant/core/src/market_data`: **52 algorithm-bearing files, 6 support/adapter files, and 2 dedicated test files**. Every assigned file was inspected and classified once in [coverage.json](coverage.json). The **22 records** below describe numerical kernels, input validation, data resolution, transformations, approximations and failures at algorithm level. Default model names and stored metadata are not treated as approval. No runtime code, tests or fixtures were changed.
 
-Production validation is **source and existing-test inspection/location, not test execution**. Inspected hand-computed formulas are distinguished from comparisons to the production kernel and from serialization/invariant tests. No build, production test suite, vendor reconciliation or new empirical accuracy experiment was run. The separately executed 2026-11-08 expressions/counterexamples are recorded in CORE-MARKET-01 through CORE-MARKET-19. An implementation domain or validation gap remains explicit even when existing regression tests cover ordinary inputs.
+Production validation is **source and existing-test inspection/location, not test execution**. Inspected hand-computed formulas are distinguished from comparisons to the production kernel and from serialization/invariant tests. No build, production test suite, vendor reconciliation or new empirical accuracy experiment was run. The separately executed 2026-11-08 expressions/counterexamples are recorded in CORE-MARKET-01 through CORE-MARKET-22. An implementation domain or validation gap remains explicit even when existing regression tests cover ordinary inputs.
 
 The shared interpolation kernels are owned by the [core numerics value-interpolation](../core-numerics/value-interpolation.md) and [forward-interpolation](../core-numerics/forward-interpolation.md) records. This slice records each curve's actual selection, variable being interpolated, domain, extrapolation and caller behavior. Core surface/cube/FX quote files store and validate data; [model volatility interpolation](../models-analytic/volatility-source-interpolation.md), [FX delta smiles](../models-analytic/fx-delta-smiles.md), and [SABR expansions/calibration](../models-analytic/sabr-expansions.md) own their numerical evaluators. Money/FX matrix resolution is outside this manifest; context FX delegation and units are covered here. Calibration recipes are inspected as recipe-validation/dispatch contracts; no inverse calibration solver exists in those two core files.
 
@@ -177,7 +197,7 @@ from the detailed algorithm records and source counts below.
 
 ## Inventory
 
-All production evidence in the fifth column is **not executed**. Inventory rows describe observed runtime selection, including defaults targeted by accepted numerical decisions and CORE-MARKET-01/02/03/04/05/06/07/08/09/10/11/12/13/14/15/16/17/18/19. Each linked record gives the exact owning source/test paths, method references, domain, alternatives and limitations.
+All production evidence in the fifth column is **not executed**. Inventory rows describe observed runtime selection, including defaults targeted by accepted numerical decisions and CORE-MARKET-01/02/03/04/05/06/07/08/09/10/11/12/13/14/15/16/17/18/19/20/21/22. Each linked record gives the exact owning source/test paths, method references, domain, alternatives and limitations.
 
 | Calculation / supported instruments | Implemented method / material variants | Actual selection | Decision record | Implementation / validation |
 |---|---|---|---|---|

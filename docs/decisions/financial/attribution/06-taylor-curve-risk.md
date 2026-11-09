@@ -32,6 +32,17 @@ The source motivates directional differences by twist/cross-bucket convexity and
 - [taylor.rs](../../../../finstack-quant/attribution/src/taylor.rs) — owning implementation.
 - [metrics_based/shifts.rs](../../../../finstack-quant/attribution/src/metrics_based/shifts.rs) — owning implementation.
 
+## Relationship to the accepted comparable-measurement package
+
+[CORE-MARKET-22's accepted package](../core-market/market-change-measurement.md#accepted-decision-explicit-comparable-quantities-and-ordered-measurement-rows)
+was accepted on **2026-11-08**. It requires explicit source role, measured quantity, coordinates,
+clock and units before pairing a move with parameter or quote risk. Dated factor
+rate differences use one declared calendar/reporting basis; direct intensity
+and full CDS quote changes remain distinct. Preserve producer bucket/quote
+identity and qualify actual directional risk mapping. This does not adopt this
+record's Taylor order, repricing path, mixed/curvature approximations or residual
+allocation.
+
 ## Follow-up tracking
 
 Implementation, adoption and validation work is tracked in the

@@ -31,6 +31,17 @@ Explicit units prevent spot-price and percentage normalization errors; omitted d
 - [metrics_based/inflation.rs](../../../../finstack-quant/attribution/src/metrics_based/inflation.rs) — owning implementation.
 - [metrics_based/cross_factor.rs](../../../../finstack-quant/attribution/src/metrics_based/cross_factor.rs) — owning implementation.
 
+## Relationship to the accepted comparable-measurement package
+
+[CORE-MARKET-22's accepted package](../core-market/market-change-measurement.md#accepted-decision-explicit-comparable-quantities-and-ordered-measurement-rows)
+was accepted on **2026-11-08**. It preserves exact native monetary movements, explicit directed
+FX queries/per-pair changes and distinct projected-CPI annual-growth versus
+observed-period level quantities. Require actual producer quantity/coordinate
+pairing; equal bp or percent labels do not identify one factor, and required
+source failure cannot become a successful partial mean. This does not adopt
+primary-underlying/pair proxies, joint sensitivity allocation, mixed-gamma
+approximations or remaining inflation/volatility/status methodology.
+
 ## Follow-up tracking
 
 Implementation, adoption and validation work is tracked in the

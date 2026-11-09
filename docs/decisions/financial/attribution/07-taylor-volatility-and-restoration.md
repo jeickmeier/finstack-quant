@@ -29,6 +29,17 @@ The hybrid supplies full-family attribution where a scalar sensitivity contract 
 
 - [taylor.rs](../../../../finstack-quant/attribution/src/taylor.rs) — owning implementation.
 
+## Relationship to the accepted context lifecycle boundary
+
+[CORE-MARKET-20's accepted package](../core-market/context-lifecycle.md#accepted-decision-typed-targets-and-atomic-context-lifecycle)
+requires each factor restore to declare its typed namespace scope and build one
+validated final context before publication. Preserve unselected data and canonical
+composite dependencies; propagate construction failure instead of warning away
+invalidated credit indices. Reconcile actual restore_market callers, guarded
+scratch and required FX quote/query coverage rather than treating clone/JSON as
+complete immutable replay. Accepted record 20 does not adopt this
+record's Taylor/hybrid allocation, factor-error reporting, residual or theta model.
+
 ## Follow-up tracking
 
 Implementation, adoption and validation work is tracked in the

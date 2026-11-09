@@ -1,7 +1,7 @@
 # CORE-MARKET-20: Typed market-context operations and atomic source lifecycle
 
-- Decision status: **Draft — complete context identity/lifecycle/state package proposed 2026-11-08; adoption pending.**
-- Implementation status: **Observed** in the owning paths below; the proposed targeting, mutation, scratch, dated-conditioning and state reconciliation is unimplemented.
+- Decision status: **Accepted — complete context identity/lifecycle/state package adopted 2026-11-08.**
+- Implementation status: **Observed** in the owning paths below; the accepted targeting, mutation, scratch, dated-conditioning and state reconciliation is unimplemented.
 - Validation status: **Primary/source evidence and independent selection, atomicity/scratch, financial-conditioning and snapshot/host reviews inspected; standalone state-machine/rational/high-precision examples executed 2026-11-08; production qualification pending.** Existing tests were inspected or located, not executed. Examples do not certify financial replay, horizon pricing, risk or production mutation safety.
 - Audit date: **2026-11-05**. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 - Scope: the implementation listed here; the [slice inventory](README.md) and [coverage ledger](coverage.json) identify exact file coverage.
@@ -21,9 +21,9 @@ Also preserve accepted [explicit FX queries/state/shocks](../core-conventions/01
 and [bounded contract loading](../core-numerics/contracts-and-diagnostics.md#accepted-decision-bounded-contract-loading-validation-and-diagnostics).
 These decisions are not reopened by context storage or serialization.
 
-[Hierarchy expansion](hierarchy-selection.md),
-[market-change measurement](market-change-measurement.md),
-[scenario time roll](../scenarios/13-market-time-roll.md),
+Accepted [hierarchy expansion21](hierarchy-selection.md) and
+[market-change measurement22](market-change-measurement.md) own their scoped
+selection and comparison contracts. [Scenario time roll](../scenarios/13-market-time-roll.md),
 [fixing materialization](../cashflows/16-fixing-materialization.md),
 [theta/carry](../valuations-framework/carry-theta-breakeven.md)
 and [attribution restoration](../attribution/07-taylor-volatility-and-restoration.md)
@@ -52,11 +52,12 @@ date-sensitive provider rather than freezing its quotes. A valid serialized cont
 can restore its captured sources without reproducing arbitrary future provider
 queries or proving a financially admissible horizon valuation.
 
-## Proposed decision: typed targets and atomic context lifecycle
+## Accepted decision: typed targets and atomic context lifecycle
 
-This complete recommendation remains **Draft** until explicit adoption.
+The complete package was accepted on **2026-11-08** following independent
+selection, atomicity/scratch, financial-conditioning and snapshot/host reviews.
 Runtime/caller/host reconciliation and independent financial qualification
-would remain separate work after acceptance.
+remain pending; acceptance does not certify the observed implementation.
 
 1. **Keep namespace-local IDs and make active selection typed.** Retain the
    existing typed stores/getters; do not impose global ID uniqueness on unrelated
@@ -240,9 +241,8 @@ would remain separate work after acceptance.
     active source. A resolved concrete financial action carries the required
     namespace/type and exact ID and must satisfy the context contract above.
     Hierarchy path/tag/overlap, missing/zero-match and leaf-association policy
-    remain with Draft21; this record does not adopt them or certify all hierarchy
-    references merely because a snapshot restores. It likewise does not adopt
-    Draft22's market-change measurement conventions.
+    are owned by accepted21. Context restoration does not certify all active
+    hierarchy bindings. Accepted22 owns market-change measurement choices.
 
 12. **Reconcile actual Rust and host callers through the same owner.** Update
     typed source/volatility dispatch, all context mutation/scratch/condition/state
@@ -364,14 +364,24 @@ distinguish reference dates and day-count time mapping. Its
 uses an explicit reference date; this is architectural context, not adoption of
 its scalar-time offset algorithm, observer behavior or this repository's financial
 conditioning accuracy. Typed targeting, atomicity, snapshot and scratch policies
-are this proposal's design choices, not rules mandated by a pricing standard.
+are this contract's design choices, not rules mandated by a pricing standard.
 
-Global ID uniqueness, warning-driven cascade deletion, default namespace priority,
-generic full-market aging and arbitrary provider replay are not alternative
-fallbacks selected by this package. Separately owned financial forecasting,
-conditional history, scenario expansion and quote replay remain explicit operations.
+Financial forecasting, conditional history, scenario expansion and quote replay
+remain explicit operations at their actual owners.
+
+## Relationship to the accepted hierarchy selection package
+
+[CORE-MARKET-21's accepted package](hierarchy-selection.md#accepted-decision-typed-selection-and-explicit-ordered-overlap)
+was accepted on **2026-11-08**. It specifies typed hierarchy associations,
+local subtree selection,
+ordered overlap and strict active binding while preserving this record's
+structure-only metadata and namespace-local source identity. Its ordered name/
+node arrays make intentional hierarchy order explicit through state and hosts;
+shared v1-only version domains and lossless bounded loading remain unchanged.
+Acceptance of either record does not certify active financial binding merely
+because a context restores successfully.
 
 ## Follow-up tracking
 
-Pending adoption, runtime reconciliation and independent qualification are
+Runtime reconciliation and independent qualification remain pending and are
 tracked in the [core-market follow-ups](../FOLLOW_UPS.md#core-market-data).

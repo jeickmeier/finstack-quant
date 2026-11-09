@@ -20,9 +20,10 @@ qualified tranche loss model.
 [scenario financial operations](../scenarios/10-correlation-shocks.md),
 [loss-family selection](../models-and-valuations-credit/0031-tranche-loss-model-selection.md),
 [loss distributions](../models-and-valuations-credit/17-tranche-loss-distribution.md),
-[tranche risk](../models-and-valuations-credit/19-tranche-risk.md),
-[credit-index composition](credit-index-composition.md) and
-[context lifecycle](context-lifecycle.md) retain their remaining Draft choices.
+and [tranche risk](../models-and-valuations-credit/19-tranche-risk.md) retain their
+remaining Draft choices. Accepted [credit-index composition19](credit-index-composition.md)
+and [context lifecycle20](context-lifecycle.md) own source association and
+atomic dependency integrity.
 This source contract does not adopt their complete copula, loss/recovery,
 calibration, interpolation-in-time, realized-state mapping or risk methodology.
 

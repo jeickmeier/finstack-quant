@@ -22,9 +22,10 @@ retain their actual product/data owners. [Term coupons](../cashflows/06-floating
 [overnight projection](../valuations-framework/overnight-projection.md),
 [CMS](../valuations-rates/11-cms-convexity.md),
 [fixing materialization](../cashflows/16-fixing-materialization.md),
-[scenario roll](../scenarios/13-market-time-roll.md) and
-[context dispatch](context-lifecycle.md) retain their remaining Draft choices.
-This package does not adopt their forecasts, same-day policies or pricing models.
+and [scenario roll](../scenarios/13-market-time-roll.md) retain their remaining
+Draft choices. This package does not adopt their forecasts, same-day policies
+or pricing models. Accepted [context dispatch20](context-lifecycle.md) owns
+typed selection, source lifecycle and state integrity.
 
 ## Foundational findings
 

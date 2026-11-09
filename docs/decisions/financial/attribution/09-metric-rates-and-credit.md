@@ -28,6 +28,17 @@ Buckets retain first-order nonparallel exposure; the scalar curvature terms are 
 - [metrics_based/credit.rs](../../../../finstack-quant/attribution/src/metrics_based/credit.rs) — owning implementation.
 - [metrics_based/shifts.rs](../../../../finstack-quant/attribution/src/metrics_based/shifts.rs) — owning implementation.
 
+## Relationship to the accepted comparable-measurement package
+
+[CORE-MARKET-22's accepted package](../core-market/market-change-measurement.md#accepted-decision-explicit-comparable-quantities-and-ordered-measurement-rows)
+was accepted on **2026-11-08**. It distinguishes a homogeneous equal-weight diagnostic mean from
+producer-defined risk coordinates. Retain complete per-bucket movements and
+explicit parameter-versus-quote basis; a zero mean can conceal a twist, and
+aggregate sensitivity times a mean needs separately qualified mapping or an
+explicit approximation. Missing required rows are errors at measurement, not
+unchanged inputs. This does not adopt this record's curvature/gamma proxies,
+warning thresholds, P&L allocation or accuracy claims.
+
 ## Follow-up tracking
 
 Implementation, adoption and validation work is tracked in the

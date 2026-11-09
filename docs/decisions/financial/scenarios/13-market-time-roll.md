@@ -69,6 +69,19 @@ CPI snapshot representation into a universal fixing store. Record12 was accepted
 on **2026-11-08**, with reconciliation/qualification pending; this scenario's
 remaining time/materialization policy stays Draft.
 
+## Relationship to the accepted context lifecycle boundary
+
+[CORE-MARKET-20's accepted package](../core-market/context-lifecycle.md#accepted-decision-typed-targets-and-atomic-context-lifecycle)
+replaces per-source day-offset roll with explicit target-date source conditioning
+and atomic canonical composite rebinding. Retain actual frozen observation/event/
+volatility clocks and knowledge cutoffs; active horizon pricing still requires
+its qualified model/eligibility. Recipe presence does not authorize automatic
+current-fit/replay claims; replay qualifies the actual request under accepted06.
+Cloned FX can retain a live date-sensitive provider, so held-FX scenarios need
+explicit qualified quote capture/coverage. Accepted record 20 does not
+adopt this record's date resolution, projected fixings, replay selection, carry
+rows or broader scenario financial model.
+
 ## Follow-up tracking
 
 Implementation, adoption and validation work is tracked in the

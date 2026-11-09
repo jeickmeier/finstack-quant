@@ -18,10 +18,11 @@ Quote-space smiles and absolute-strike grids remain distinct sources.
 [FX smile interpolation/materialization](../models-analytic/fx-delta-smiles.md),
 [generic volatility dispatch](../models-analytic/volatility-source-interpolation.md),
 [delivery forwards](../valuations-fx-and-exotics/fx-delivery-cip.md),
-[option pricing/reporting deltas](../valuations-fx-and-exotics/fx-vanilla-delta.md)
-and [context lifecycle](context-lifecycle.md) retain their remaining Draft
-models/policies. This source contract does not adopt their complete interpolation,
-tail, delivery/collateral, sticky-smile, pricing or aging choices.
+and [option pricing/reporting deltas](../valuations-fx-and-exotics/fx-vanilla-delta.md)
+retain their remaining Draft models/policies. This source contract does not adopt
+their complete interpolation, tail, delivery/collateral, sticky-smile, pricing or
+aging choices. Accepted [context lifecycle20](context-lifecycle.md) owns typed
+selection, atomic mutation and state capture.
 
 ## Foundational findings
 

@@ -1108,6 +1108,106 @@ reporting choices retain their owners; runtime and independent qualification rem
 pending.
 [Clause map M135–M138](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
 
+### 1.35 Coupon and payment program compilation
+
+The [accepted program-compilation contract](docs/decisions/financial/cashflows/02-program-compilation.md#accepted-decision-coupon-and-payment-program-compilation)
+selects independent atomic raw coupon/payment windows: every supplied boundary
+regenerates its own admitted period grid, even for equal settings. Preserve each
+window's original nominal phase/context and validate its anchors under001; no
+implicit global-grid continuation, cut coalescing or date repair. Require exact
+coupon coverage, or no active coupon/payment windows after validated permitted
+empty-edge omission. Payment windows form a globally valid disjoint/touching or
+properly nested family; reject equal/crossing windows before unique innermost
+selection, with no insertion-order priority.
+
+Configuration is fallible and atomic, without sticky error history; symbolic
+horizons resolve at build. Validate all supplied payloads before omission/selection.
+Fixed steps sample each raw period start, floating margins are effective FROM
+window dates, and payment_splits_until applies the supplied split UNTIL a raw
+boundary. No implicit Cash tail: remaining coupons use their explicit base split.
+Require explicit coupon settlement and principal exchange, and owner as_of for
+active floating through one build path without curve-base cutoff inference.
+
+Preserve actual calendar/market causes and exact Money through shared build
+state, event and redemption handoffs. Fee/principal processing dates do not cut
+coupon grids automatically; period context remains authoritative over global
+reporting labels. Check aggregate resources and publish complete local results
+or errors without claiming provider-side rollback or live-input reproducibility.
+Reconcile existing fluent/spec/JSON/product/host/schema/parity paths without
+legacy aliases or parallel compilers. Principal, coupon, observation and lifecycle
+formulas retain their owners; runtime and independent qualification remain pending.
+[Clause map M139–M142](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.36 Dated opening principal and atomic cashflow phases
+
+The [accepted principal/event contract](docs/decisions/financial/cashflows/03-principal-and-emission-order.md#accepted-decision-dated-opening-principal-signed-cash-and-atomic-event-phases)
+requires exact nonnegative opening stock and an explicit opening_date before all
+modeled economic activity and required actual accrual/history intervals. Stock is
+known immediately before opening-date movements; it is not issue-closing stock.
+Preserve complete chronological pre-issue/issue history without inferred origins
+or live-stock fallback. Closing stock at a date applies on [date,next_date), so
+end-date movements do not change the coupon just accrued.
+
+Explicit events require literal signed settlement cash, signed principal delta,
+economic date and a core015 principal-capable kind. Retain zero/duplicate rows;
+PIK/write-downs require zero cash and matching event/economic dates. No par/sign
+inference, cash netting or kind-based balance guesses. Apply all explicit deltas
+at one economic date as an exact atomic batch, independent of insertion/output
+order; validate the representable nonnegative stock after each stock-changing
+phase, without cross-phase cancellation or intermediate-sum false overflow.
+
+The disclosed phases are ending coupons, admitted generated PIK, explicit principal
+batch, scheduled amortization, periodic fees, terminal redemption and closing
+history. Accepted004 removes the obsolete cached installment-update slot. PIK timing here is actual accrual end and needs
+product qualification; eligibility and amount laws retain their owners. Select
+one terminal coupon's actual-economic/payment pair, or raw maturity for a deliberate
+couponless program. Actual terminal date bounds principal economic activity;
+settlement remains independent. Explicit InitialAndFinal settles -initial at issue
+with zero delta and +remaining at terminal payment with delta -remaining. None
+suppresses automatic exchanges/closure and can retain stock; never count initial
+stock twice or fabricate a residual write-off.
+
+Use exact Money/Decimal state and checked atomic complete publication. Reconcile
+guarded existing construction/restoration, complete opening/economic metadata,
+replay, product/export consumers and host/schema/parity paths without compatibility
+inference. Amortization, coupon, fee and lifecycle formulas retain their owners;
+runtime and independent qualification remain pending.
+[Clause map M143–M146](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.37 Explicit amortization laws and live-balance installments
+
+The [accepted amortization contract](docs/decisions/financial/cashflows/04-amortization.md#accepted-decision-explicit-amortization-laws-live-balance-installments-and-monetary-boundaries)
+requires an explicit rule including None, exact same-currency amounts and Decimal
+fractions in [0,1] under the member fraction rather than pct. Original B0 is the
+declared pre-movement opening stock; live B follows same-date admitted PIK and
+explicit principal batches. Generated cadence is distinct actual coupon accrual
+ends, with one unique payment mapping per economic date and no fee/slice/cash-date
+cadence inference. Dated activity lies in [issue,actual terminal]; LinearBetween
+requires an aligned end and nonempty (start,end]. Empty dated programs and exact
+zero fractions remain valid; grid rules still require their admitted cadence.
+
+LinearTo fixes I=(B0-F)/n, pays min(I,max(B-F,0)) before the final date, then requires
+B>=F and pays exact B-F to retain F after amortization, before separate redemption.
+StepRemaining requires a live funded target and pays exact B-target. Original
+fraction pays min(B0*fraction,B); remaining fraction pays B*fraction, without an
+implicit final sweep. LinearBetween pays B/k at each due boundary, including
+today's stock and remaining-date count; its end sweeps B exactly. Remove cached
+installments, funding-kind detectors and post-payment updates. CustomPrincipal
+sums all nonnegative same-date amounts exactly and rejects overpayment. None
+suppresses scheduled reduction only; later activity/exchanges retain003 authority.
+
+Emit exact par cash +P and delta -P with the actual economic/payment dates; omit
+only exact-zero generated rows. Rule-specific caps are mathematical definitions,
+not permission for a common emitter to repair invalid payments. Preserve exact
+Money/Decimal state and accepted bounded transforms, truthful range/underflow
+errors and complete atomic admission/publication. Select no implicit financial
+payment rounding; contractual quantization requires its actual owner schedule.
+Reconcile existing construction/restoration, original/live bases, term-loan/bond
+adapters, economic history and host/schema/parity paths without defaults, float
+monetary detours or compatibility inference. Runtime and independent qualification
+remain pending.
+[Clause map M147–M150](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
 ## 2. Determinism and floating point
 
 **Authority:** [ADR 0021](docs/decisions/standards/0021-reproducibility-guarantees.md)

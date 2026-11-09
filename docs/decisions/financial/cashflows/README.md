@@ -3,13 +3,18 @@
 Audit date: **2026-11-05**. Source revision: **`7e82fd03ad98346727769e88dd5ac5d84b56e9fc`**.
 
 [CASHFLOWS-001 — Contractual periods, calendars and day-count context](01-schedule-periods.md#accepted-decision-contractual-periods-calendars-and-day-count-context)
-is **Accepted on2026-11-08** after complete whole-record review.
-[CASHFLOWS-002 — Coupon and payment program compilation](02-program-compilation.md#proposed-decisions-for-whole-record-review)
-is **Proposed** for complete whole-record review; **14 other records remain Draft**.
+is **Accepted on 2026-11-08** after complete whole-record review.
+[CASHFLOWS-002 — Coupon and payment program compilation](02-program-compilation.md#accepted-decision-coupon-and-payment-program-compilation)
+is **Accepted on 2026-11-08** after complete whole-record review.
+[CASHFLOWS-003 — Dated opening principal, signed cash and atomic event phases](03-principal-and-emission-order.md#accepted-decision-dated-opening-principal-signed-cash-and-atomic-event-phases)
+is **Accepted on 2026-11-08** after complete whole-record review.
+[CASHFLOWS-004 — Explicit amortization laws and live-balance installments](04-amortization.md#accepted-decision-explicit-amortization-laws-live-balance-installments-and-monetary-boundaries)
+is **Accepted on 2026-11-08** after complete whole-record review;
+**12 other records remain Draft**.
 Implementation status is **Observed within the defined file scope**; runtime
 reconciliation and independent qualification remain pending. Production validation
 is **Evidence inspected/located, not executed**; independent reference examples
-are reported separately in record001. Existing code/tests establish observed
+are reported separately in records001–004. Existing code/tests establish observed
 behavior, not financial adoption or universal correctness. Outstanding work is
 tracked in the [cashflow follow-ups](../FOLLOW_UPS.md#cashflows).
 
@@ -22,7 +27,7 @@ single-period helper with canonical grid admission. The narrow core015 metadata 
 package on2026-11-08 and applied to that existing record in place. Program/window/coupon/replay/reporting decisions retain their
 separate owning records; this package changes no runtime or generated artifact.
 
-The complete proposed002 package selects independent atomic coupon/payment
+The complete accepted002 package selects independent atomic coupon/payment
 windows explicitly, including re-anchoring from redundant cuts and strict001
 anchor/context admission. It replaces sticky errors with atomic fallible updates,
 requires globally valid strict payment nesting, explicit settlement/exchange and
@@ -31,8 +36,25 @@ Fixed period-start rates, margin FROM and payment UNTIL remain distinct disclose
 operators. Exact monetary state, genuine source errors and complete local plan
 publication retain accepted authority; actual helpers/specs/hosts/schema/parity
 require reconciliation. Broader amount/principal/fixing/lifecycle choices remain
-with their own records. The complete package is proposed; runtime and independent
+with their own records. The complete package is accepted; runtime and independent
 financial/host/geometry qualification remain pending.
+
+The complete accepted003 package requires an explicit dated opening stock and
+covered economic history, required signed cash independent of principal effects,
+atomic same-date principal batches and unique paired terminal dates. It discloses
+coupon/PIK/event/amortization/fee/redemption phases and the explicit
+automatic par-exchange recipe without universal market claims. It preserves exact
+rows and monetary state and identifies replay/export/host reconciliation; amount,
+fixing, amortization and fee laws keep their owners. The whole package is
+accepted; runtime/host reconciliation and independent qualification remain pending.
+
+The complete accepted004 package requires an explicit amortization rule and exact
+Decimal fractions, defines one actual-coupon cadence and economic/payment mapping,
+protects LinearTo's literal final target and replaces cached LinearBetween draw
+adjustments with live-balance/remaining-date installments. It discloses all seven
+laws, no implicit financial rounding and exact par cash/principal effects, with
+strict admission and existing consumer/host reconciliation. The package is
+accepted; runtime/host reconciliation and independent qualification remain pending.
 
 ## Scope and completeness
 

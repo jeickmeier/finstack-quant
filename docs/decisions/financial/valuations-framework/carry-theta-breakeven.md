@@ -33,6 +33,18 @@ Iterative mode holds fixings and curves at the horizon and solves `carry_total+P
 
 Alternatives such as financed cash reinvestment theta, business-day horizons and instrument-quote yield solves are not silently implemented here.
 
+## Relationship to the accepted context lifecycle boundary
+
+[CORE-MARKET-20's accepted package](../core-market/context-lifecycle.md#accepted-decision-typed-targets-and-atomic-context-lifecycle)
+requires explicit target-date context conditioning through family-owned source
+semantics, atomic composites and active frozen-source/model qualification.
+Horizon valuation and source knowledge are distinct; projected fixings or held-
+spot product observations do not become actual publications. Cloning FX does
+not imply held quotes. Reconcile actual theta producers and distinguish their
+conditioning from unrolled-curve carry decomposition; context plumbing chooses
+no universal carry/aging formula. Accepted record 20 does not adopt
+this record's cash, observation, reinvestment, funding, breakeven or risk budgets.
+
 ## Follow-up tracking
 
 Adoption, implementation and validation work is tracked in the

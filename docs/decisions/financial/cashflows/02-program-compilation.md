@@ -1,7 +1,7 @@
 # CASHFLOWS-002 — Coupon and payment program compilation
 
-- Decision status: **Proposed — complete coupon/payment-program compilation package awaiting agreement**.
-- Implementation status: **Observed**, scoped below.
+- Decision status: **Accepted — complete coupon/payment-program compilation package, 2026-11-08**.
+- Implementation status: **Observed; reconciliation pending**, scoped below.
 - Validation status: **Production evidence inspected/located, not executed**. Independent bounded program/date examples and read-only compiler/API/host/reference reviews are reported below; these do not qualify production compilation, market observations or financial product contracts.
 - Audit date: **2026-11-05**. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
 
@@ -9,9 +9,9 @@
 
 The builder resolves coupon/payment programs into independent adjacent windows across the issue-to-maturity horizon. This supports fixed, floating, fixed-to-floating, margin-step, fixed step-up, cash, PIK and split coupons. Source comments explicitly warn that window boundaries change the generated coupon grid. This is a deliberate implementation rule, not evidence that an off-cycle contract should adopt it.
 
-## Proposed decisions for whole-record review
+## Accepted decision: coupon and payment program compilation
 
-The complete package below is **Proposed**, not accepted. Inherit accepted
+Accepted on **2026-11-08** after whole-record review. Inherit accepted
 [001's period/grid/context contract](01-schedule-periods.md#accepted-decision-contractual-periods-calendars-and-day-count-context),
 [exact Money authority](../core-conventions/012-money-decimal-precision.md#accepted-decision-monetary-precision-rounding-and-currency-identity),
 [cashflow metadata](../core-conventions/015-cashflow-semantics.md#accepted-decision-cash-settlement-principal-effects-and-accrual-metadata),
@@ -222,12 +222,12 @@ pending; observed source behavior is retained separately below.
     payload-before-shadow validation, helper endpoints/tails, period-start step
     sampling, exact-money/cutoff/error transport and complete-output behavior.
     Reference examples/source reviews are not executed production, provider replay
-    or market-product qualification. This proposal changes no runtime, tests,
+    or market-product qualification. This review changes no runtime, tests,
     generators, schemas, fixtures, hosts or financial defaults in code.
 
-## Boundary examples for the proposed package
+## Boundary examples for the accepted package
 
-| Input / situation | Required proposed outcome |
+| Input / situation | Required accepted outcome |
 | --- | --- |
 | Quarterly Natural/ShortFront Jan15,2025→Jan15,2026, no cuts | Raw ends Apr15/Jul15/Oct15/Jan15. |
 | Same input with supplied Cash-on-Cash payment cut May1 | Raw windows Jan15/Feb1/May1 then May1/Jul15/Oct15/Jan15; Apr15 is replaced even though split values match. |
@@ -296,7 +296,7 @@ Supported alternatives are explicit coupon windows, fixed step-up on a retained 
   duplicate/touching intervals, an off-EOM cut and exact-money float loss. The
   interval reference checks compare all pairs, independently of a future sorted
   stack implementation. Four read-only source/caller/reference reviews checked
-  the complete staged package. These are bounded targets, not production
+  the complete staged package. These are bounded accepted targets, not production
   compiler/provider/state execution or financial-product qualification.
 
 ## Follow-up tracking

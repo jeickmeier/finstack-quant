@@ -20,10 +20,11 @@ A complete input bundle does not compute or qualify a pool loss distribution.
 [tranche loss](../models-and-valuations-credit/17-tranche-loss-distribution.md),
 [projection and realized state](../models-and-valuations-credit/18-tranche-projection.md),
 [credit risk](../models-and-valuations-credit/19-tranche-risk.md),
-[base-correlation calibration](../calibration-targets/15-base-correlation.md)
-and [context lifecycle](context-lifecycle.md) retain their remaining Draft
-methods. This source contract does not adopt their complete copula, projection,
-realized-event approximation, recovery model, fit, risk or invalidation policies.
+and [base-correlation calibration](../calibration-targets/15-base-correlation.md)
+retain their remaining Draft methods. This source contract does not adopt their
+complete copula, projection, realized-event approximation, recovery model, fit
+or risk policies. Accepted [context lifecycle20](context-lifecycle.md) owns
+atomic dependency mutation and composite invalidation.
 
 ## Foundational findings
 
@@ -198,7 +199,7 @@ independent financial qualification remain pending.
    series/pool/model qualification or current fit. Existing raw-handle rebinding
    leaves structural fields unchanged; this is not a claim of a reproduced count
    defect. New invariants must survive all actual replacement/restore paths.
-   The broader policy for invalidated composites and reported IDs stays Draft20.
+   Accepted20 owns the broader policy for invalidated composites and reported IDs.
 
 10. **Reconcile existing hosts and financial owners together.** Update canonical
     builder/lookup/state, context/calibration-envelope/attribution transport,
@@ -320,6 +321,17 @@ loss/risk implementation.
 Alternative pool aggregation, recovery/event inference, approximate homogeneity,
 normalization and index/member calibration remain explicit financial operations
 rather than hidden lookup defaults or source repairs.
+
+## Relationship to the accepted context lifecycle boundary
+
+[CORE-MARKET-20's accepted package](context-lifecycle.md#accepted-decision-typed-targets-and-atomic-context-lifecycle)
+requires atomic context mutation/state restoration and checked canonical
+rebinding, preserving accepted19's explicit composition, member inputs and role
+associations. Ordinary dependency-breaking replacement/removal errors without
+silently deleting a composite. Explicit joint removal is an owned validated
+operation; same-ID type resolution alone remains insufficient financial fit
+qualification. Accepted record 20 does not reopen this record's accepted
+composition contract or adopt broader pricing/risk/aging methods.
 
 ## Follow-up tracking
 

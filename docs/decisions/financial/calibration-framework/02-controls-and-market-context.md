@@ -36,6 +36,27 @@ Per-instrument calibrated limits would offer more precision than one global tole
 - Test evidence: [src/api/context_builder.rs](../../../../finstack-quant/calibration/src/api/context_builder.rs) — FX/context materialization regressions; inspected or located, not executed.
 - Reference gap: no method-specific independent source or external benchmark is established by this record; source and regression evidence describe implementation behavior.
 
+## Relationship to the accepted context lifecycle boundary
+
+[CORE-MARKET-20's accepted package](../core-market/context-lifecycle.md#accepted-decision-typed-targets-and-atomic-context-lifecycle)
+requires typed source identity and one validated final context candidate. Prior/
+market-data replacements must be intentional same-kind actions rather than
+last-wins duplicate ingestion; reject preserved duplicate keys and embedded-ID
+mismatches before map construction. Restore registered composites after sources
+through the existing canonical state owner, preserving actual composition and
+role metadata. Accepted record 20 does not adopt this record's solver,
+freshness, hierarchy, overlay or broader numerical-policy choices.
+
+## Relationship to the accepted typed hierarchy package
+
+[CORE-MARKET-21's accepted package](../core-market/hierarchy-selection.md#accepted-decision-typed-selection-and-explicit-ordered-overlap)
+was accepted on **2026-11-08**. Calibration transports canonical typed hierarchy associations and
+ordered name/node sequences through the shared validated context/state path;
+attachment remains structural metadata, without requiring all associations to
+exist in the current calibrated market. Actual active financial selection uses
+strict typed binding. This does not adopt this record's remaining solver,
+calibration-control or financial-fit choices.
+
 ## Follow-up tracking
 
 Implementation reconciliation, adoption questions and missing evidence are tracked in the

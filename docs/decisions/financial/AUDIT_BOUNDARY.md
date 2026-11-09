@@ -56,10 +56,14 @@ recorded separately from the original documentation audit.
 [record16](core-market/sabr-cube-data.md#accepted-decision-canonical-sabr-sources-and-explicit-evaluated-quote-meaning),
 [record17](core-market/forward-variance.md#accepted-decision-nonnegative-variance-sources-and-explicit-model-time-semantics),
 [record18](core-market/base-correlation.md#accepted-decision-exact-base-correlation-sources-and-unclipped-native-shocks),
-and [record19](core-market/credit-index-composition.md#accepted-decision-explicit-credit-pool-composition-and-exact-issuer-contracts)
+[record19](core-market/credit-index-composition.md#accepted-decision-explicit-credit-pool-composition-and-exact-issuer-contracts),
+[record20](core-market/context-lifecycle.md#accepted-decision-typed-targets-and-atomic-context-lifecycle),
+[record21](core-market/hierarchy-selection.md#accepted-decision-typed-selection-and-explicit-ordered-overlap),
+and [record22](core-market/market-change-measurement.md#accepted-decision-explicit-comparable-quantities-and-ordered-measurement-rows)
 have complete scoped acceptance as of 2026-11-08, with runtime/caller/host
-reconciliation and independent qualification pending. The other 3 core-market
-records retain Draft status; detailed work stays in the financial register.
+reconciliation and independent qualification pending. **All 22 detailed
+core-market records are accepted**, completing this area's methodology review.
+Detailed reconciliation work stays in the financial register.
 All 20 [core-conventions records 001–020](core-conventions/README.md) also have
 complete scoped acceptance as of 2026-11-07, with reconciliation and
 qualification pending. [Core-numerics record 01](core-numerics/compounding.md#accepted-decision-explicit-compounding-conversion-and-periodic-spreads)
@@ -159,11 +163,21 @@ choices, original nominal references, ICMA/365L/termination context, coincident
 events and checked immutable period queries. Its narrow core015 clarification
 was applied in place: metadata endpoints describe actual calculation dates,
 including explicit adjustment, separately from nominal references.
-[Cashflows record002](cashflows/02-program-compilation.md#proposed-decisions-for-whole-record-review)
-remains Proposed for its complete independent-window, explicit-selection/cutoff,
-strict-override, atomic-builder and exact shared-build package. The other14
-cashflow records remain Draft. Runtime/caller/host reconciliation and independent
-qualification remain pending. The governing
+[Cashflows record002](cashflows/02-program-compilation.md#accepted-decision-coupon-and-payment-program-compilation)
+has complete scoped acceptance as of 2026-11-08 for independent atomic windows,
+explicit settlement/exchange/cutoff, globally valid overrides, atomic fallible
+configuration and exact shared build paths.
+[Cashflows record003](cashflows/03-principal-and-emission-order.md#accepted-decision-dated-opening-principal-signed-cash-and-atomic-event-phases)
+has complete scoped acceptance as of 2026-11-08 for explicit dated opening
+stock, signed settlement cash, atomic same-date principal batches, covered
+history, paired terminal dates and exact explicit exchanges.
+[Cashflows record004](cashflows/04-amortization.md#accepted-decision-explicit-amortization-laws-live-balance-installments-and-monetary-boundaries)
+has complete scoped acceptance as of 2026-11-08 for explicit amortization laws,
+exact fractions, protected final targets, stateless live-balance installments,
+par effects and monetary/payment boundaries. Its removal of the obsolete owner
+installment-update slot was clarified in accepted003 without changing the relative
+economic phase order. The other 12 cashflow records remain Draft. Runtime/caller/
+host reconciliation and independent qualification remain pending. The governing
 and convention ADRs retain their separately stated statuses; describing an
 observed method does not approve it.
 
