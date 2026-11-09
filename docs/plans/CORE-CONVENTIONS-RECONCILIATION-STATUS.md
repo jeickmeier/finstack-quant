@@ -7,7 +7,37 @@
 
 ## Summary
 
-Run in progress.
+**Interim summary (run in progress; refreshed after each slice).** Last full
+gate: Phase E `mise run all` **pass** after G2.
+
+**Committed (24 commits on `refactor/core-conventions-reconciliation`):**
+A1 `b6f0dd8d61`, A2 `c808334fd3`, A3 `bb0fb7b027`, A3b `b7248fccbf`,
+B1 `c94d13be41`, B1b `49da53a95e`, B2a `69c2dc0d3a`, C1a `a078dd7301`,
+C1b `8f24022396`, C2 `a59aaebe60` (partial), H2 `92c4c64a5a`,
+C3 `5e6e2d0586` (partial), C4 `96d1d0a2ec`, D1 `848317a970`
+(+ follow-up `c671891da1`), D2 `a5023cbec1`, D3 `6645922848`,
+E1 `7dbae3e236`, E2a `17103b7ba5`, E2b `4c5cb90980` (docs),
+E3a `28530ab1ef`, G2 `63645b0593`; status-only `b6182cf840`.
+
+**Not done, with reasons:**
+- Blocked (owner decision): B2b (sub-1e-28 model values entering `Money`);
+  `from_years` removal inside E2 (`ForwardCurve` carries no contractual
+  tenor).
+- Not executed (scope): E2c, the O6 required quote `Compounding` on Bond,
+  TermLoan, RevolvingCredit and ABF (about 1,000 construction sites).
+- Not attempted (run budget; plan sized L): E3b (explicit schedule spec,
+  grid modes, anchors, ceiling, private state; about 700 builder sites).
+- Skipped (dependency): B3, B4, B5, G1, G4, F6, F7, F8, G5, H6 (B2b chain);
+  E4, E4b, E5 (E3b); E6 (G5, CASHFLOWS-001).
+- Remaining queue at the time of this summary: G3, F1–F5, H1, H3–H5.
+
+**Register changes:** deleted the 018 Rate/Bps entry (B1b) and the
+day-count evidence-prose entry (D3); rewritten as Evidence: the 020 barrier
+entry (A1) and the 003 30/360 entry (D3); narrowed in place: 004/005, 006,
+001/002, 007/014, 008, 010, 012, 019. Totals now 593 items; Core
+conventions 19.
+
+**Needs review:** see the section at the end of this file.
 
 ## Baseline
 
@@ -42,7 +72,7 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 19 | E1 | committed (`E1:` in git log) | workspace rust-lint; gen-write; workspace rust-test 16361; core doctests 285; python-test 13993; python-lint; wasm-test 1085; wasm-lint; ui-check | 014/007 entry: 007 core arithmetic recorded, remaining narrowed; 002 tenor-bridge item marked landed; record 007 partly reconciled | Representation limits (D u32, W u32/7, M i32, Y i32/12; 200-year cap gone); `to_years` → `to_years_approx` in Rust, Python and WASM (`toYearsApprox`); exact `to_days_approx`; `payments_per_year -> Result` rejecting D/W (about 20 callers propagate); Hull-White swaption cashflows pick their payoff annuity at construction and look up the nominal frequency only for cash par-yield (O5); `date_from_epoch_days -> Result`; WASM `toDaysApprox` returns an exact number; `to_years_with_context` takes the caller's context (Python `ctx=`, WASM trailing optional `ctx`) and errors on an end before the origin |
 | 20 | E2 | **E2a committed** (`E2a:` in git log); **E2c (O6 compounding) not executed (scope)**; `from_years` removal **blocked (owner decision)** | E2a: workspace rust-lint; gen-write; workspace rust-test; core doctests; python-test; python-lint; wasm-test; wasm-lint; ui-check | 014/007 entry: `months_until` and roll rule recorded; remaining narrowed | E2a: `months_until -> Result<u32>` (greatest `k` with `add_months(k) <= end`; reversed errors) in core, Python and WASM; structured-credit sites moved to a named site-local `ClampedMonths::clamped_months_until` keeping the pre-007 count (E2b assigns meanings); bond future uses the checked core measure (day-1 start, identical values); `Tenor::add_to_date` errors without a calendar unless `Unadjusted` |
 | 21 | E2b | committed (`E2b:` in git log); documentation only | docs (no code change) | 014/007 entry links the stated meanings | All 16 structured-credit sites have a stated meaning (seasoning, remaining term, simulation index/grid length, lock-out months, domain bound) in the structured-credit README. None migrated: no accepted record selects a measure, and O13 forbids assuming completed months. All stay on `ClampedMonths::clamped_months_until` |
-| 22 | E3 | **E3a committed** (`E3a:` in git log); **E3b not executed (scope)** | E3a: workspace rust-lint; gen-write; workspace rust-test; core doctests; python-test; python-lint; wasm-test; wasm-lint; ui-check; notebooks schedule_building and dates_calendars_schedules | 008 entry: removed policies/warnings recorded; record 008 partly reconciled | E3a: removed `ScheduleErrorPolicy`, `ScheduleWarning`, `GracefulEmpty`, the missing-calendar warning, `warnings`/`has_warnings`/`used_graceful_fallback`, the builder/host `error_policy` and the monotonic/drop repair (now a strictness error) across Rust, Python, WASM, parity ledger, stubs and notebooks |
+| 22 | E3 | **E3a committed** (`E3a:` in git log); **E3b not attempted (run budget; plan sized L)** | E3a: workspace rust-lint; gen-write; workspace rust-test; core doctests; python-test; python-lint; wasm-test; wasm-lint; ui-check; notebooks schedule_building and dates_calendars_schedules | 008 entry: removed policies/warnings recorded; record 008 partly reconciled | E3a: removed `ScheduleErrorPolicy`, `ScheduleWarning`, `GracefulEmpty`, the missing-calendar warning, `warnings`/`has_warnings`/`used_graceful_fallback`, the builder/host `error_policy` and the monotonic/drop repair (now a strictness error) across Rust, Python, WASM, parity ledger, stubs and notebooks |
 | 23 | E4 | skipped (dep E3: E3b not executed) | | | CDS-mode removal needs the explicit schedule spec/grid modes |
 | 24 | E4b | skipped (dep E4) | | | O7 decision not recorded in this run |
 | 25 | G1 | skipped (dep B3) | | | |
@@ -80,6 +110,8 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
   loop variable `dc` (a retired abbreviated identifier). Fixed in the separate
   commit "D1 follow-up: rename a test variable..."; the rerun passed (Python
   13992, nextest 16360).
+- **Phase E** (after E3a `28530ab1ef`, run after G2 `63645b0593`; E4/E4b/E5
+  skipped): `mise run all` **pass** (Python 13988).
 
 ## Judgement log
 
@@ -190,7 +222,7 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
   and always asked for Modified Following. It now rolls Modified Following
   with a calendar and `Unadjusted` without one (previously the convention was
   silently ignored without a calendar; values are unchanged).
-- **E3b not executed (scope).** The rest of E3 (an explicit `ScheduleSpec` with
+- **E3b not attempted (run budget; plan sized L).** The rest of E3 (an explicit `ScheduleSpec` with
   no defaults and `start < end`, `GridMode` replacing the mode booleans, strict
   EOM/IMM anchors, the 100,000 final-date ceiling, private validated
   `Schedule` state and the nominal reference accessors, then removing
@@ -198,6 +230,10 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
   `Schedule::builder` 386 sites in 138 files and `ScheduleBuilder` 306 sites
   in 119 files on this branch. Not attempted in this run; E4/E4b (CDS mode
   removal and the CDS date regime) build on it.
+- **Dependency added (G2).** `indexmap` (already a workspace dependency, used
+  by core and structured credit) was added to `finstack-quant-models` so the
+  rating-factor table keeps a deterministic order once `CreditRating` lost
+  `Ord`.
 - **A1 not closed.** The 020 register entry stays open as Evidence. Equality,
   adjacent and already-beyond observations, window/history behavior, and
   settlement/discount boundaries at each consumer were not independently
