@@ -1,7 +1,7 @@
 # CORE-CONVENTIONS-018: Decimal rates, percent/basis-point scaling and integer spread arithmetic
 
 - Decision status: **Accepted — complete Rate/Bps package, 2026-11-07**.
-- Implementation status: **Reconciled 2026-11-08** for `types/rates.rs` and the Python/WASM Rate surface; the term-loan covenant step-up consumer (item 11) is reconciled separately.
+- Implementation status: **Reconciled 2026-11-08** for `types/rates.rs`, the Python/WASM Rate surface and the term-loan covenant step-up consumer (item 11: finite nonnegative fractional-bp increases through checked Decimal, no whole-bp rounding). Former discrepancies have been removed from the follow-up register.
 - Validation status: **Evidence inspected; independent conversion/arithmetic examples passed; production qualification pending**. Exact unit/text grammar, numeric-versus-text rounding, normal/subnormal/MAX, integer and underflow examples passed. Linked Rust/host tests were located or inspected, not run; these checks do not certify current parser, arithmetic or host behavior.
 - Audit date: **2026-11-05**. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; see [scope and inventory](README.md).
 

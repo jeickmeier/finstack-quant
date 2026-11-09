@@ -28,8 +28,8 @@ and [020](020-barrier-classification.md#accepted-decision-barrier-classification
 are **Accepted on 2026-11-07**. This completes methodology adoption for all
 20 core-conventions records. Implementation status is Observed for
 each stated scope, except where a record's status line says Reconciled
-(020, 2026-11-08); reconciliation and independent qualification otherwise
-remain open.
+(018 and 020, 2026-11-08); reconciliation and independent qualification
+otherwise remain open.
 Financial unit/integration/golden tests were read or located, but no Rust test,
 lint or build pass was run. Documentation and independent formula/rule/date
 checks passed. A reference-table generator consistency check passed; it

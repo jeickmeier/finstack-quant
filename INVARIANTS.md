@@ -205,8 +205,8 @@ Bps integer arithmetic is exact or errors, including nonintegral division and
 minimum-i32 overflow. Default Rate display is shortest decimal text; canonical
 wire remains numeric decimal Rate versus whole-bp Bps, without recovering intent
 already lost by a numeric decoder. Product-specific rounding/whole-bp eligibility
-and 012 monetary boundaries remain separately owned. Runtime/host/product
-reconciliation and independent conversion qualification remain pending.
+and 012 monetary boundaries remain separately owned. Runtime, host and
+term-loan consumer reconciliation landed on 2026-11-08.
 [Clause map M23–M26](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
 
 ### 1.7 Credit ratings and scorecard scales

@@ -940,16 +940,37 @@ impl finstack_quant_covenants::InstrumentMutator for TermLoan {
     }
 
     fn increase_rate(&mut self, increase: f64) -> finstack_quant_core::Result<()> {
-        // Covenant margin increases apply in whole basis points.
-        let bp_increase = Decimal::from((increase * 10_000.0).round() as i64);
+        // A covenant step-up is a finite, nonnegative decimal-rate increase.
+        // Fractional basis points are preserved through checked Decimal
+        // arithmetic; no whole-bp rounding is applied (owner resolution O12).
+        if !(increase.is_finite() && increase >= 0.0) {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Term loan '{}' rate increase must be finite and nonnegative, got {increase}",
+                self.id.as_str()
+            )));
+        }
+        let overflow = || {
+            finstack_quant_core::Error::Validation(format!(
+                "Term loan '{}' rate increase overflows decimal arithmetic",
+                self.id.as_str()
+            ))
+        };
+        let increase = finstack_quant_core::decimal::f64_to_decimal(increase)?;
         match &mut self.rate {
             RateSpec::Fixed { rate } => {
                 let stepped = finstack_quant_core::decimal::f64_to_decimal(*rate)?
-                    + bp_increase / Decimal::from(10_000);
+                    .checked_add(increase)
+                    .ok_or_else(overflow)?;
                 *rate = stepped.as_f64();
             }
             RateSpec::Floating(spec) => {
-                spec.spread_bp += bp_increase;
+                let bp_increase = increase
+                    .checked_mul(Decimal::from(10_000))
+                    .ok_or_else(overflow)?;
+                spec.spread_bp = spec
+                    .spread_bp
+                    .checked_add(bp_increase)
+                    .ok_or_else(overflow)?;
             }
         }
         self.validate()
@@ -997,6 +1018,31 @@ mod tests {
     use super::*;
     use finstack_quant_core::dates::Date;
     use time::Month;
+
+    #[test]
+    fn covenant_step_up_preserves_fractional_basis_points() {
+        use finstack_quant_covenants::InstrumentMutator;
+
+        let mut floating = TermLoan::example_floating_with_ddtl().expect("floating loan");
+        floating.increase_rate(0.00125).expect("12.5bp step-up");
+        match &floating.rate {
+            RateSpec::Floating(spec) => assert_eq!(spec.spread_bp, Decimal::new(4125, 1)),
+            RateSpec::Fixed { .. } => panic!("expected floating"),
+        }
+
+        let mut fixed = TermLoan::example().expect("fixed loan");
+        fixed.increase_rate(0.000_05).expect("half-bp step-up");
+        match fixed.rate {
+            RateSpec::Fixed { rate } => assert_eq!(rate, 0.06005),
+            RateSpec::Floating(_) => panic!("expected fixed"),
+        }
+
+        for bad in [-0.0001, f64::NAN, f64::INFINITY] {
+            let mut loan = TermLoan::example().expect("fixed loan");
+            assert!(loan.increase_rate(bad).is_err(), "{bad}");
+            assert!(matches!(loan.rate, RateSpec::Fixed { rate } if rate == 0.06));
+        }
+    }
 
     #[test]
     fn date_offset_rejects_wrapping_settlement_days() {
