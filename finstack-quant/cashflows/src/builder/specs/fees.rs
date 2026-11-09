@@ -40,10 +40,8 @@ pub enum FeeSpec {
         frequency: Tenor,
         /// Day-count convention used to annualize the fee accrual.
         day_count: DayCount,
-        /// Business-day convention applied to generated fee dates
-        /// (`ModifiedFollowing` when omitted from the wire form, as for
-        /// [`ScheduleParams`](crate::builder::ScheduleParams)).
-        #[serde(default)]
+        /// Business-day convention applied to generated fee dates. Required:
+        /// there is no default convention.
         business_day_convention: BusinessDayConvention,
         /// Holiday calendar identifier used with `business_day_convention`.
         ///

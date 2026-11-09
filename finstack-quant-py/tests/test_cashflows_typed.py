@@ -156,6 +156,7 @@ class TestBuilderSpecs:
             frequency=Tenor.quarterly(),
             day_count=DayCount.ACT_360,
             calendar_id="weekends_only",
+            business_day_convention="modified_following",
         )
         assert p.calendar_id == "weekends_only"
         assert p.end_of_month is False
@@ -300,7 +301,10 @@ class TestBuilderSpecs:
                 FixedCouponSpec(
                     rate=Decimal("0.05"),
                     schedule=ScheduleParams(
-                        frequency=Tenor.parse("3M"), day_count=DayCount.ACT_360, calendar_id="weekends_only"
+                        frequency=Tenor.parse("3M"),
+                        day_count=DayCount.ACT_360,
+                        calendar_id="weekends_only",
+                        business_day_convention="modified_following",
                     ),
                 )
             )
@@ -319,6 +323,7 @@ class TestBuilderSpecs:
                         "frequency": {"count": 3, "unit": "months"},
                         "day_count": "act_360",
                         "calendar_id": "weekends_only",
+                        "business_day_convention": "modified_following",
                     },
                 }
             ],
@@ -389,7 +394,10 @@ class TestBuilderSpecs:
                         reset_frequency=Tenor.parse("3M"),
                     ),
                     schedule=ScheduleParams(
-                        frequency=Tenor.parse("3M"), day_count=DayCount.ACT_360, calendar_id="weekends_only"
+                        frequency=Tenor.parse("3M"),
+                        day_count=DayCount.ACT_360,
+                        calendar_id="weekends_only",
+                        business_day_convention="modified_following",
                     ),
                 )
             )
@@ -412,6 +420,7 @@ class TestBuilderSpecs:
                         "frequency": {"count": 3, "unit": "months"},
                         "day_count": "act_360",
                         "calendar_id": "weekends_only",
+                        "business_day_convention": "modified_following",
                     },
                 }
             ],
@@ -481,6 +490,7 @@ class TestBuilderSpecs:
                             frequency=Tenor.parse("3M"),
                             day_count=DayCount.ACT_360,
                             calendar_id="weekends_only",
+                            business_day_convention="modified_following",
                         ),
                     )
                 )
@@ -507,6 +517,7 @@ class TestBuilderSpecs:
                         "frequency": {"count": 3, "unit": "months"},
                         "day_count": "act_360",
                         "calendar_id": "weekends_only",
+                        "business_day_convention": "modified_following",
                     },
                 }
             ],
@@ -560,7 +571,10 @@ class TestBuilderSpecs:
                         reset_frequency=Tenor.parse("3M"),
                     ),
                     schedule=ScheduleParams(
-                        frequency=Tenor.parse("3M"), day_count=DayCount.ACT_360, calendar_id="weekends_only"
+                        frequency=Tenor.parse("3M"),
+                        day_count=DayCount.ACT_360,
+                        calendar_id="weekends_only",
+                        business_day_convention="modified_following",
                     ),
                 )
             )
@@ -584,6 +598,7 @@ class TestBuilderSpecs:
                         "frequency": {"count": 3, "unit": "months"},
                         "day_count": "act_360",
                         "calendar_id": "weekends_only",
+                        "business_day_convention": "modified_following",
                     },
                 }
             ],
@@ -1312,6 +1327,7 @@ class TestTypedTwinsAndWire:
                         "frequency": {"count": 6, "unit": "months"},
                         "day_count": "30_360",
                         "calendar_id": "weekends_only",
+                        "business_day_convention": "modified_following",
                     },
                 }
             ],
@@ -1439,7 +1455,12 @@ class TestTypedTwinsAndWire:
         )
         from finstack_quant.core.dates import DayCount
 
-        params = ScheduleParams(frequency=Tenor.parse("3M"), day_count=DayCount.ACT_360, calendar_id="weekends_only")
+        params = ScheduleParams(
+            frequency=Tenor.parse("3M"),
+            day_count=DayCount.ACT_360,
+            calendar_id="weekends_only",
+            business_day_convention="modified_following",
+        )
         assert params.business_day_convention is not None
         assert params.stub is not None
         assert params.roll_rule is not None
@@ -1458,6 +1479,7 @@ class TestTypedTwinsAndWire:
                 frequency=Tenor.parse("3M"),
                 day_count=DayCount.ACT_360,
                 calendar_id="weekends_only",
+                business_day_convention="modified_following",
             ),
             PrepaymentModelSpec.psa(1.0),
             RecoveryModelSpec(0.4, 12),
@@ -1494,6 +1516,7 @@ class TestTypedTwinsAndWire:
             frequency=Tenor.parse("3M"),
             day_count=DayCount.ACT_360,
             calendar_id="weekends_only",
+            business_day_convention="modified_following",
         )
         assert fee.kind == "periodic_bp"
         assert fee.business_day_convention is not None
@@ -1506,15 +1529,26 @@ class TestTypedTwinsAndWire:
         from finstack_quant.core.dates import DayCount
 
         with pytest.raises(ValueError, match="unknown calendar_id"):
-            ScheduleParams(frequency=Tenor.parse("3M"), day_count=DayCount.ACT_360, calendar_id="not-a-calendar")
+            ScheduleParams(
+                frequency=Tenor.parse("3M"),
+                day_count=DayCount.ACT_360,
+                calendar_id="not-a-calendar",
+                business_day_convention="modified_following",
+            )
         with pytest.raises(ValueError, match="payment_lag_days"):
             ScheduleParams(
                 frequency=Tenor.parse("3M"),
                 day_count=DayCount.ACT_360,
                 calendar_id="weekends_only",
                 payment_lag_days=-1,
+                business_day_convention="modified_following",
             )
-        params = ScheduleParams(frequency=Tenor.parse("3M"), day_count=DayCount.ACT_360, calendar_id="weekends_only")
+        params = ScheduleParams(
+            frequency=Tenor.parse("3M"),
+            day_count=DayCount.ACT_360,
+            calendar_id="weekends_only",
+            business_day_convention="modified_following",
+        )
         assert str(FixedCouponSpec("0.05", params).rate) == "0.05"
 
     def test_credit_rate_error_text(self) -> None:

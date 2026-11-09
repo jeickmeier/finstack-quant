@@ -90,16 +90,29 @@ test('Tenor members pass through the Rust Tenor', () => {
   const oneMonth = new core.Tenor(1, core.TenorUnit.months());
   // Month-end clamp; no calendar means no roll.
   assert.deepEqual(
-    [...core.dateFromEpochDays(oneMonth.addToDate(core.createDate(2025, 1, 31)))],
+    [
+      ...core.dateFromEpochDays(
+        oneMonth.addToDate(core.createDate(2025, 1, 31), null, 'unadjusted')
+      ),
+    ],
     [2025, 2, 28]
   );
-  // With a calendar and no convention: the Rust default, modified following.
+  // With a calendar and an explicit convention; there is no default.
   assert.deepEqual(
-    [...core.dateFromEpochDays(oneMonth.addToDate(core.createDate(2025, 5, 31), 'nyse'))],
+    [
+      ...core.dateFromEpochDays(
+        oneMonth.addToDate(core.createDate(2025, 5, 31), 'nyse', 'modified_following')
+      ),
+    ],
     [2025, 6, 30]
   );
   assert.equal(
-    core.Tenor.parse('6M').toYearsWithContext(core.createDate(2025, 1, 15), core.DayCount.act360()),
+    core.Tenor.parse('6M').toYearsWithContext(
+      core.createDate(2025, 1, 15),
+      core.DayCount.act360(),
+      null,
+      'unadjusted'
+    ),
     0.5027777777777778
   );
   assert.throws(

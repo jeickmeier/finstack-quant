@@ -517,7 +517,7 @@ export type Date = string;
  * Accrual boundaries are left unadjusted (bond/ICMA convention) unless
  * [`Self::adjust_accrual_dates`] is `true`, in which case the same
  * convention also rolls both accrual-period boundaries (swap/ISDA 2006
- * §4.10 convention).
+ * §4.10 convention). Required: there is no default convention.
  */
 export type BusinessDayConvention =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
@@ -3382,7 +3382,7 @@ export interface ScheduleParams {
    * Serialized only when `true`, so existing wire payloads are unchanged.
    */
   adjust_accrual_dates?: boolean;
-  business_day_convention?: BusinessDayConvention;
+  business_day_convention: BusinessDayConvention;
   calendar_id: Id4;
   day_count: DayCount1;
   /**

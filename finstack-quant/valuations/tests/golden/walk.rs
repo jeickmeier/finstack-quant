@@ -264,7 +264,14 @@ fn strip_default_instrument_inputs(value: &mut serde_json::Value) {
     }
 
     remove_default_string(object, "coupon_type", "cash");
-    remove_default_string(object, "business_day_convention", "modified_following");
+    // Cashflow schedule parameters carry no default convention (006); only
+    // instrument-level conventions default to Modified Following.
+    let is_schedule_params = ["frequency", "day_count", "calendar_id"]
+        .iter()
+        .all(|key| object.contains_key(*key));
+    if !is_schedule_params {
+        remove_default_string(object, "business_day_convention", "modified_following");
+    }
     remove_default_string(object, "stub", "short_front");
     remove_default_string(object, "vol_surface_extrapolation", "error");
     remove_default_string(object, "bond_risk_basis", "bullet_discountable");

@@ -12,12 +12,6 @@
  * - **ISDA**: 2006 ISDA Definitions, Section 4.12
  * - **FpML**: BusinessDayConventionEnum
  * - **ISO 20022**: Business Day Convention codes
- *
- * # Default
- *
- * `BusinessDayConvention::default()` is `ModifiedFollowing`, the ISDA 2006
- * Definitions Section 4.12(c) convention used for swap and bond period dates.
- * Host bindings use it whenever a caller omits the convention.
  */
 export type BusinessDayConvention =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";

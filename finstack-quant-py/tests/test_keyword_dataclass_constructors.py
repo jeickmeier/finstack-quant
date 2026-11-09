@@ -154,7 +154,10 @@ CASES: dict[str, Any] = {
         fallback=FloatingRateFallback.SPREAD_ONLY,
     ),
     "ScheduleParams.min": lambda: ScheduleParams(
-        frequency=Tenor.parse("3M"), day_count=DayCount.ACT_360, calendar_id="weekends_only"
+        frequency=Tenor.parse("3M"),
+        day_count=DayCount.ACT_360,
+        calendar_id="weekends_only",
+        business_day_convention="modified_following",
     ),
     "ScheduleParams.full": lambda: ScheduleParams(
         frequency=Tenor.parse("6M"),
@@ -173,6 +176,7 @@ CASES: dict[str, Any] = {
         frequency=Tenor.parse("3M"),
         day_count=DayCount.ACT_360,
         calendar_id="weekends_only",
+        business_day_convention="modified_following",
     ),
     "FeeSpec.periodic_bp.full": lambda: FeeSpec.periodic_bp(
         base=FeeBase.undrawn(commitment=Money(10_000_000.0, USD)),
@@ -658,7 +662,13 @@ def test_positional_fields_are_rejected(build: Any) -> None:
 @pytest.mark.parametrize(
     "build",
     [
-        lambda: ScheduleParams(frequency=Tenor.parse("3M"), day_count=DayCount.ACT_360, calendar_id="x", lag=1),
+        lambda: ScheduleParams(
+            frequency=Tenor.parse("3M"),
+            day_count=DayCount.ACT_360,
+            calendar_id="x",
+            lag=1,
+            business_day_convention="modified_following",
+        ),
         lambda: RecoveryClaim(
             id="SEN",
             seniority="secured",

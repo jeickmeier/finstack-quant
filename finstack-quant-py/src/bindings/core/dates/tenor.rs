@@ -4,7 +4,7 @@ use crate::bindings::core::dates::calendar::{extract_business_day_convention, ex
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::macros::{label_enum, typed_or_label};
 use crate::errors::core_to_py;
-use finstack_quant_core::dates::{BusinessDayConvention, HolidayCalendar, Tenor, TenorUnit};
+use finstack_quant_core::dates::{HolidayCalendar, Tenor, TenorUnit};
 use pyo3::prelude::*;
 use pyo3::types::{PyModule, PyType};
 
@@ -270,8 +270,9 @@ impl PyTenor {
     ///     Holiday calendar (object or registered id such as ``"usny"``;
     ///     ``"nyse+gblo"`` joins calendars). ``None`` skips adjustment.
     /// business_day_convention : BusinessDayConvention | str
-    ///     Roll rule applied when ``calendar`` is given (default
-    ///     ``"modified_following"``; canonical names ignore outer whitespace and ASCII case).
+    ///     Roll rule applied when ``calendar`` is given (required keyword;
+    ///     there is no default convention; canonical names ignore outer
+    ///     whitespace and ASCII case).
     ///
     /// Returns
     /// -------
@@ -286,23 +287,20 @@ impl PyTenor {
     ///     If the convention string is unknown, the date is invalid, or no
     ///     business day is found within 100 days.
     #[pyo3(
-        signature = (date, calendar=None, business_day_convention=None),
-        text_signature = "(self, date, calendar=None, business_day_convention='modified_following')"
+        signature = (date, calendar=None, *, business_day_convention),
+        text_signature = "(self, date, calendar=None, *, business_day_convention)"
     )]
     fn add_to_date<'py>(
         &self,
         py: Python<'py>,
         date: &Bound<'py, PyAny>,
         calendar: Option<&Bound<'py, PyAny>>,
-        business_day_convention: Option<&Bound<'py, PyAny>>,
+        business_day_convention: &Bound<'py, PyAny>,
     ) -> PyResult<Bound<'py, PyAny>> {
         let d = py_to_date(date)?;
         let cal: Option<&'static dyn HolidayCalendar> =
             calendar.map(extract_calendar).transpose()?;
-        let conv = match business_day_convention {
-            Some(c) => extract_business_day_convention(c)?,
-            None => BusinessDayConvention::default(),
-        };
+        let conv = extract_business_day_convention(business_day_convention)?;
         let end = self.inner.add_to_date(d, cal, conv).map_err(core_to_py)?;
         date_to_py(py, end)
     }
@@ -322,7 +320,8 @@ impl PyTenor {
     /// calendar : HolidayCalendar | str | None
     ///     Holiday calendar for the end-date roll; ``None`` skips adjustment.
     /// business_day_convention : BusinessDayConvention | str
-    ///     Roll rule for the end date (default ``"modified_following"``).
+    ///     Roll rule for the end date (required keyword; there is no default
+    ///     convention).
     ///
     /// Returns
     /// -------
@@ -337,23 +336,20 @@ impl PyTenor {
     ///     If ``day_count`` or the convention is unrecognized, or the
     ///     day-count needs context (e.g. ``BUS_252`` without a calendar).
     #[pyo3(
-        signature = (as_of, *, day_count, calendar=None, business_day_convention=None),
-        text_signature = "(self, as_of, *, day_count, calendar=None, business_day_convention='modified_following')"
+        signature = (as_of, *, day_count, calendar=None, business_day_convention),
+        text_signature = "(self, as_of, *, day_count, calendar=None, business_day_convention)"
     )]
     fn to_years_with_context(
         &self,
         as_of: &Bound<'_, PyAny>,
         day_count: &Bound<'_, PyAny>,
         calendar: Option<&Bound<'_, PyAny>>,
-        business_day_convention: Option<&Bound<'_, PyAny>>,
+        business_day_convention: &Bound<'_, PyAny>,
     ) -> PyResult<f64> {
         let d = py_to_date(as_of)?;
         let cal: Option<&'static dyn HolidayCalendar> =
             calendar.map(extract_calendar).transpose()?;
-        let conv = match business_day_convention {
-            Some(c) => extract_business_day_convention(c)?,
-            None => BusinessDayConvention::default(),
-        };
+        let conv = extract_business_day_convention(business_day_convention)?;
         let day_count = crate::bindings::core::dates::daycount::extract_day_count(day_count)?;
         self.inner
             .to_years_with_context(d, cal, conv, day_count)

@@ -638,9 +638,9 @@ class ModelBuilder:
             * ``float_frequency`` (dict): floating-leg payment and fixing cadence,
               e.g. ``{"count": 3, "unit": "months"}``.
             * ``float_day_count`` (str): floating-leg day count label.
-            * ``business_day_convention`` (str, optional): schedule-date rolling
-              rule, e.g. ``"modified_following"`` or ``"following"``; omitted
-              uses the Rust default, Modified Following.
+            * ``business_day_convention`` (str): schedule-date rolling rule,
+              e.g. ``"modified_following"`` or ``"following"``. Required:
+              there is no default convention.
 
         Returns
         -------

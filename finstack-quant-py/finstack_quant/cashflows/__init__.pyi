@@ -167,6 +167,7 @@ def build_cashflow_schedule(spec: dict[str, Any] | str, market: MarketContext | 
     ...                 "frequency": {"count": 6, "unit": "months"},
     ...                 "day_count": "30_360",
     ...                 "calendar_id": "weekends_only",
+    ...                 "business_day_convention": "modified_following",
     ...             },
     ...         }
     ...     ],
@@ -348,6 +349,7 @@ def build_cashflow_schedule_json(spec_json: str, market_json: str | None = None)
     ...                 "day_count": "30_360",
     ...                 "business_day_convention": "following",
     ...                 "calendar_id": "weekends_only",
+    ...                 "business_day_convention": "modified_following",
     ...                 "stub": "none",
     ...                 "end_of_month": False,
     ...                 "payment_lag_days": 0,

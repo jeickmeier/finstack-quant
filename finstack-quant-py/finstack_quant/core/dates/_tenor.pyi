@@ -421,7 +421,8 @@ class Tenor:
         self,
         date: datetime.date | str,
         calendar: Union[HolidayCalendar, str, None] = None,
-        business_day_convention: Union[BusinessDayConvention, str] = "modified_following",
+        *,
+        business_day_convention: Union[BusinessDayConvention, str],
     ) -> datetime.date:
         """
         Add this tenor to a date with optional business-day adjustment.
@@ -437,8 +438,9 @@ class Tenor:
             Holiday calendar (object or id such as ``"usny"``; ``"nyse+gblo"``
             joins calendars). ``None`` skips adjustment.
         business_day_convention : BusinessDayConvention | str
-            Roll rule applied when *calendar* is given; canonical names ignore
-            surrounding whitespace and ASCII case.
+            Roll rule applied when *calendar* is given (required keyword; there
+            is no default convention); canonical names ignore surrounding
+            whitespace and ASCII case.
 
         Returns
         -------
@@ -456,7 +458,7 @@ class Tenor:
         Examples
         --------
         >>> from finstack_quant.core.dates import Tenor
-        >>> Tenor.parse("1M").add_to_date("2025-01-31")
+        >>> Tenor.parse("1M").add_to_date("2025-01-31", business_day_convention="unadjusted")
         datetime.date(2025, 2, 28)
 
         """
@@ -468,7 +470,7 @@ class Tenor:
         *,
         day_count: Union[DayCount, str],
         calendar: Union[HolidayCalendar, str, None] = None,
-        business_day_convention: Union[BusinessDayConvention, str] = "modified_following",
+        business_day_convention: Union[BusinessDayConvention, str],
     ) -> float:
         """
         Exact year fraction of this tenor from *as_of* under a day count.
@@ -504,7 +506,9 @@ class Tenor:
         Examples
         --------
         >>> from finstack_quant.core.dates import DayCount, Tenor
-        >>> Tenor.parse("1Y").to_years_with_context("2025-01-15", day_count=DayCount.ACT_ACT)
+        >>> Tenor.parse("1Y").to_years_with_context(
+        ...     "2025-01-15", day_count=DayCount.ACT_ACT, business_day_convention="unadjusted"
+        ... )
         1.0
 
         """

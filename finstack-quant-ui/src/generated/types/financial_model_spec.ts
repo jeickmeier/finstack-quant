@@ -1444,9 +1444,9 @@ export interface DCdca3F67B974113083De {
    * Accrual boundaries are left unadjusted (bond/ICMA convention) unless
    * [`Self::adjust_accrual_dates`] is `true`, in which case the same
    * convention also rolls both accrual-period boundaries (swap/ISDA 2006
-   * §4.10 convention).
+   * §4.10 convention). Required: there is no default convention.
    */
-  business_day_convention?:
+  business_day_convention:
     "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
   /**
    * Holiday calendar identifier used together with `business_day_convention`.
@@ -1576,9 +1576,9 @@ export interface D_210Ab4B44Ffb533F1266 {
    * Accrual boundaries are left unadjusted (bond/ICMA convention) unless
    * [`Self::adjust_accrual_dates`] is `true`, in which case the same
    * convention also rolls both accrual-period boundaries (swap/ISDA 2006
-   * §4.10 convention).
+   * §4.10 convention). Required: there is no default convention.
    */
-  business_day_convention?:
+  business_day_convention:
     "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
   /**
    * Holiday calendar identifier used together with `business_day_convention`.
@@ -1973,9 +1973,9 @@ export interface D_78D4B16242Febe84F62B {
    * Accrual boundaries are left unadjusted (bond/ICMA convention) unless
    * [`Self::adjust_accrual_dates`] is `true`, in which case the same
    * convention also rolls both accrual-period boundaries (swap/ISDA 2006
-   * §4.10 convention).
+   * §4.10 convention). Required: there is no default convention.
    */
-  business_day_convention?:
+  business_day_convention:
     "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
   /**
    * A phantom-typed identifier that prevents mixing different kinds of IDs.

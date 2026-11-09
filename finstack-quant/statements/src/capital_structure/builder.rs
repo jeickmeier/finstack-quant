@@ -99,10 +99,8 @@ pub struct SwapConventions {
     pub float_frequency: Tenor,
     /// Floating-leg accrual year-fraction convention.
     pub float_day_count: DayCount,
-    /// Schedule-date rolling rule on the currency's settlement calendar;
-    /// omitted on the wire it takes the [`BusinessDayConvention`] default,
-    /// Modified Following.
-    #[serde(default)]
+    /// Schedule-date rolling rule on the currency's settlement calendar.
+    /// Required: there is no default convention.
     pub business_day_convention: BusinessDayConvention,
 }
 

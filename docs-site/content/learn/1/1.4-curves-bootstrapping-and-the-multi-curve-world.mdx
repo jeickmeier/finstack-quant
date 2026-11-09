@@ -146,7 +146,7 @@ for quote in forward_input['market_data']:
         for boundary in ('start','end'):
             original=date.fromisoformat(quote[boundary]['date'])
             months=12*(original.year-anchor.year)+original.month-anchor.month
-            quote[boundary]['date']=(AS_OF if months==0 else Tenor.parse(f'{months}M').add_to_date(AS_OF)).isoformat()
+            quote[boundary]['date']=(AS_OF if months==0 else Tenor.parse(f'{months}M').add_to_date(AS_OF, business_day_convention="unadjusted")).isoformat()
 for step in forward_input['plan']['steps']:step['base_date']=AS_OF.isoformat()
 forward_fit=calibrate(json.dumps(forward_input))
 forward_curve=forward_fit.market.get_forward('USD-SOFR-3M')

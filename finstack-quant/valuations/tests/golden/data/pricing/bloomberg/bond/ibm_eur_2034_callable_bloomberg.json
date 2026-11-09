@@ -1114,7 +1114,8 @@
               "unit": "months"
             },
             "day_count": "act_act",
-            "calendar_id": "target2"
+            "calendar_id": "target2",
+            "business_day_convention": "modified_following"
           }
         },
         "discount_curve_id": "EUR-SWAP-514",

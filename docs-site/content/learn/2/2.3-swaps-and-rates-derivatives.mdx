@@ -191,7 +191,7 @@ swap_result = price_instrument(json.dumps(swap), parity_market, AS_OF)
 caplet_values = []
 start = date(2025, 4, 15)
 for index in range(4):
-    end = Tenor.quarterly().add_to_date(start)
+    end = Tenor.quarterly().add_to_date(start, business_day_convention="unadjusted")
     caplet = json.loads(cap.to_json())
     caplet['instrument']['spec'].update({'id': f'LESSON-CAPLET-{index}', 'rate_option_type': 'caplet',
                                        'start_date': start.isoformat(), 'maturity': end.isoformat()})
@@ -301,7 +301,7 @@ swap_result = price_instrument(json.dumps(swap), parity_market, AS_OF)
 caplet_values = []
 start = date(2025, 4, 15)
 for index in range(4):
-    end = Tenor.quarterly().add_to_date(start)
+    end = Tenor.quarterly().add_to_date(start, business_day_convention="unadjusted")
     caplet = json.loads(cap.to_json())
     caplet['instrument']['spec'].update({'id': f'LESSON-CAPLET-{index}', 'rate_option_type': 'caplet',
                                        'start_date': start.isoformat(), 'maturity': end.isoformat()})

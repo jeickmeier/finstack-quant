@@ -181,7 +181,8 @@
               },
               "day_count": "30_360",
               "calendar_id": "nyse",
-              "stub": "none"
+              "stub": "none",
+              "business_day_convention": "modified_following"
             }
           },
           "discount_curve_id": "USD-TREASURY",

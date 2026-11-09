@@ -1050,8 +1050,7 @@
         },
         "business_day_convention": {
           "$ref": "#/$defs/d_01cd6b2e4ad257352fdb",
-          "default": "modified_following",
-          "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention)."
+          "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention). Required: there is no default convention."
         },
         "calendar_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
@@ -1117,6 +1116,7 @@
         "step_schedule",
         "frequency",
         "day_count",
+        "business_day_convention",
         "calendar_id"
       ],
       "type": "object"
@@ -1824,8 +1824,7 @@
         },
         "business_day_convention": {
           "$ref": "#/$defs/d_01cd6b2e4ad257352fdb",
-          "default": "modified_following",
-          "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention)."
+          "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention). Required: there is no default convention."
         },
         "calendar_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
@@ -1873,6 +1872,7 @@
         "rate",
         "frequency",
         "day_count",
+        "business_day_convention",
         "calendar_id"
       ],
       "title": "FixedCouponSpec",
@@ -4639,8 +4639,7 @@
         },
         "business_day_convention": {
           "$ref": "#/$defs/d_01cd6b2e4ad257352fdb",
-          "default": "modified_following",
-          "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention)."
+          "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention). Required: there is no default convention."
         },
         "calendar_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
@@ -4688,6 +4687,7 @@
         "rate_spec",
         "frequency",
         "day_count",
+        "business_day_convention",
         "calendar_id"
       ],
       "type": "object"

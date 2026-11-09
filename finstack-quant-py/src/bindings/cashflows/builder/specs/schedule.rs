@@ -151,7 +151,7 @@ impl PyScheduleParams {
     #[new]
     #[pyo3(
         signature = (**fields),
-        text_signature = "(*, frequency, day_count, calendar_id, business_day_convention='modified_following', stub='short_front', end_of_month=False, payment_lag_days=0, adjust_accrual_dates=False, roll_rule='none')"
+        text_signature = "(*, frequency, day_count, calendar_id, business_day_convention, stub='short_front', end_of_month=False, payment_lag_days=0, adjust_accrual_dates=False, roll_rule='none')"
     )]
     fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
         let inner: ScheduleParams =

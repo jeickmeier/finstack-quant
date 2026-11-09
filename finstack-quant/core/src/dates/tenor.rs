@@ -809,14 +809,6 @@ mod tests {
     }
 
     #[test]
-    fn business_day_convention_default_is_modified_following() {
-        assert_eq!(
-            BusinessDayConvention::default(),
-            BusinessDayConvention::ModifiedFollowing
-        );
-    }
-
-    #[test]
     fn test_parse_valid_tenors() {
         let cases = vec![
             ("1D", 1, TenorUnit::Days),

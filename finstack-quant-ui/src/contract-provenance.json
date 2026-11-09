@@ -68,7 +68,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/composite/composite.schema.json",
-          "sha256": "b63bade860f36585cedcc1fe6330aeaa590b57a32dfdf1c9f9eb076145f98a6a",
+          "sha256": "3e26205d59bdd2a0c06afd696f63a09830d567b06b90b7f929aeb53ea3a37b2d",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -159,7 +159,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/equity/levered_real_estate_equity.schema.json",
-          "sha256": "28b5324823f41cff4fefccf2d5aafd92a7587bd8d3d0a3591772f0cf1a587af0",
+          "sha256": "0d0f956184a3082c6baa6ba0a4d232dfc19daee8810a092873d775206fc2fa86",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -222,7 +222,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/exotics/basket.schema.json",
-          "sha256": "e17e14f6b09320d97e72755a0c642db69b48fa3fc1792d56827d2daebaf0be99",
+          "sha256": "b975dfdc7aed8317c096f3396e537c52418c8330c7c8127ccdf4487c76014f93",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -285,28 +285,28 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/asset_backed_facility.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/asset_backed_facility.schema.json",
-          "sha256": "65117f67eac5804f6b28317d29eb8da23d084b894b9a66e0d30e243f4ee602da",
+          "sha256": "b6b96ca732602c0f43cddec8422f0419504c56faadfaee910a49c03146d80464",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/bond.schema.json",
-          "sha256": "18b2cefa2fbbf2d2d4781ecc19a219f66aac2b8240ee2e722c6be1e3dc1de360",
+          "sha256": "49dbc67bbc9294129600219033811fd8f9d045dc4af7d0e7aef0381e90e6a7cc",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/bond_future.schema.json",
-          "sha256": "478063b8ab022c8979a9f961d3df8e41489128b5a01d4be114fe53a6ccc25eae",
+          "sha256": "56a75eb53c78778513b45989267ece3cfefc008e707eb5d7ac6883f35cadea18",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/convertible_bond.schema.json",
-          "sha256": "e1a82b2b9332571db47b599608558e3322f5bde82050f9088377867705efcec4",
+          "sha256": "23d832067b96896834693c33d4a0b7005d97fe95d665919bba5c12f34b102bd9",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -334,7 +334,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/structured_credit.schema.json",
-          "sha256": "06c3eb334c2109b733518cb66ef31185cf09bcf96c12fc1e7700d2f5ff7a5a3f",
+          "sha256": "2cb7053c470e08f4329633bc51d9f12401368c750385e1621104d0caba1ea9c7",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {

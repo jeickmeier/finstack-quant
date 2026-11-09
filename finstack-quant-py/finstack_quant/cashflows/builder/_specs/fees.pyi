@@ -231,7 +231,7 @@ class FeeSpec:
         frequency: Tenor,
         day_count: DayCount | str,
         calendar_id: str,
-        business_day_convention: BusinessDayConvention | str = "modified_following",
+        business_day_convention: BusinessDayConvention | str,
         stub: StubKind | str = "short_front",
         accrual_basis: FeeAccrualBasis | str = "point_in_time",
     ) -> FeeSpec:

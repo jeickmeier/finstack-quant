@@ -751,7 +751,7 @@ impl JsTenor {
     /// (kind `not_found`), or no business day is found.
     /// @param epochDays - Anchor date as days since 1970-01-01.
     /// @param calendarCode - Registered holiday-calendar identifier used to roll the result; omitted skips adjustment.
-    /// @param convention - Business-day convention name applied with the calendar; omitted uses the Rust default (`"modified_following"`).
+    /// @param convention - Business-day convention name; required (omitting it throws), there is no default convention.
     #[wasm_bindgen(js_name = addToDate)]
     pub fn add_to_date(
         &self,
@@ -793,7 +793,7 @@ impl JsTenor {
     /// @param asOfEpochDays - Start date as days since 1970-01-01.
     /// @param dayCount - Convention used to measure the span.
     /// @param calendarCode - Registered holiday-calendar identifier used to roll the end date; omitted skips adjustment.
-    /// @param convention - Business-day convention name applied with the calendar; omitted uses the Rust default (`"modified_following"`).
+    /// @param convention - Business-day convention name; required (omitting it throws), there is no default convention.
     #[wasm_bindgen(js_name = toYearsWithContext)]
     pub fn to_years_with_context(
         &self,
@@ -827,7 +827,7 @@ impl JsTenor {
 
 /// Resolve the optional calendar and business-day convention of a tenor roll.
 ///
-/// An omitted convention is `BusinessDayConvention::default()`.
+/// The convention is required: there is no default convention.
 fn roll_rule(
     calendar_code: Option<JsValue>,
     convention: Option<JsValue>,
@@ -838,7 +838,11 @@ fn roll_rule(
         .map_err(to_js_err)?;
     let convention = match js_opt_string(convention.as_ref(), "convention")? {
         Some(name) => name.parse().map_err(to_js_err)?,
-        None => BusinessDayConvention::default(),
+        None => {
+            return Err(to_js_err(finstack_quant_core::Error::Validation(
+                "a business-day convention is required: there is no default convention".to_string(),
+            )));
+        }
     };
     Ok((calendar, convention))
 }

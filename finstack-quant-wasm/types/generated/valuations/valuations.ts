@@ -6547,9 +6547,9 @@ export interface FloatingCouponSpec {
    * Accrual boundaries are left unadjusted (bond/ICMA convention) unless
    * [`Self::adjust_accrual_dates`] is `true`, in which case the same
    * convention also rolls both accrual-period boundaries (swap/ISDA 2006
-   * §4.10 convention).
+   * §4.10 convention). Required: there is no default convention.
    */
-  business_day_convention?: BusinessDayConvention;
+  business_day_convention: BusinessDayConvention;
   /**
    * Holiday calendar identifier used together with `business_day_convention`.
    *
@@ -6825,9 +6825,9 @@ export interface StepUpCouponSpec {
    * Accrual boundaries are left unadjusted (bond/ICMA convention) unless
    * [`Self::adjust_accrual_dates`] is `true`, in which case the same
    * convention also rolls both accrual-period boundaries (swap/ISDA 2006
-   * §4.10 convention).
+   * §4.10 convention). Required: there is no default convention.
    */
-  business_day_convention?: BusinessDayConvention;
+  business_day_convention: BusinessDayConvention;
   /**
    * Holiday calendar identifier used together with `business_day_convention`.
    *

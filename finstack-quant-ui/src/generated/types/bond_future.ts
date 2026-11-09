@@ -22,7 +22,7 @@ export type Date1 = string;
  * Accrual boundaries are left unadjusted (bond/ICMA convention) unless
  * [`Self::adjust_accrual_dates`] is `true`, in which case the same
  * convention also rolls both accrual-period boundaries (swap/ISDA 2006
- * §4.10 convention).
+ * §4.10 convention). Required: there is no default convention.
  */
 export type BusinessDayConvention =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
@@ -71,7 +71,7 @@ export type Decimal2 = string;
  * Accrual boundaries are left unadjusted (bond/ICMA convention) unless
  * [`Self::adjust_accrual_dates`] is `true`, in which case the same
  * convention also rolls both accrual-period boundaries (swap/ISDA 2006
- * §4.10 convention).
+ * §4.10 convention). Required: there is no default convention.
  */
 export type BusinessDayConvention1 =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
@@ -218,7 +218,7 @@ export type Decimal7 = string;
  * Accrual boundaries are left unadjusted (bond/ICMA convention) unless
  * [`Self::adjust_accrual_dates`] is `true`, in which case the same
  * convention also rolls both accrual-period boundaries (swap/ISDA 2006
- * §4.10 convention).
+ * §4.10 convention). Required: there is no default convention.
  */
 export type BusinessDayConvention2 =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
@@ -1283,7 +1283,7 @@ export interface FixedCouponSpec {
    * Serialized only when `true`, so existing wire payloads are unchanged.
    */
   adjust_accrual_dates?: boolean;
-  business_day_convention?: BusinessDayConvention;
+  business_day_convention: BusinessDayConvention;
   calendar_id: Id1;
   /**
    * Coupon settlement behavior: cash, PIK, or an explicit split of the
@@ -1372,7 +1372,7 @@ export interface D_0555F752Dff2D680B0B6 {
    * Serialized only when `true`, so existing wire payloads are unchanged.
    */
   adjust_accrual_dates?: boolean;
-  business_day_convention?: BusinessDayConvention1;
+  business_day_convention: BusinessDayConvention1;
   calendar_id: Id2;
   /**
    * Coupon type (Cash/PIK/Split).
@@ -1629,7 +1629,7 @@ export interface D_7Fdd8D325754C89E8272 {
    * Serialized only when `true`, so existing wire payloads are unchanged.
    */
   adjust_accrual_dates?: boolean;
-  business_day_convention?: BusinessDayConvention2;
+  business_day_convention: BusinessDayConvention2;
   calendar_id: Id5;
   /**
    * Coupon type (Cash/PIK/Split).

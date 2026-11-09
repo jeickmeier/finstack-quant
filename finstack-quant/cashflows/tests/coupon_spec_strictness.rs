@@ -29,6 +29,7 @@ fn fixed_coupon_spec_rejects_unknown_field() {
         "rate": "0.05",
         "frequency": {"count": 6, "unit": "months"},
         "day_count": "30_360",
+        "business_day_convention": "modified_following",
         "calendar_id": "weekends_only",
         "totally_bogus_field": 42
     }"#;
@@ -91,6 +92,7 @@ fn step_up_coupon_spec_rejects_unknown_field() {
         "step_schedule": [],
         "frequency": {"count": 6, "unit": "months"},
         "day_count": "30_360",
+        "business_day_convention": "modified_following",
         "calendar_id": "weekends_only",
         "nope": true
     }"#;

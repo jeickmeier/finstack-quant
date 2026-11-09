@@ -86,7 +86,7 @@ class ScheduleParams:
         frequency: Tenor,
         day_count: DayCount | str,
         calendar_id: str,
-        business_day_convention: BusinessDayConvention | str = "modified_following",
+        business_day_convention: BusinessDayConvention | str,
         stub: StubKind | str = "short_front",
         end_of_month: bool = False,
         payment_lag_days: int = 0,

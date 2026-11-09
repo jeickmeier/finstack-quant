@@ -146,7 +146,7 @@ impl PyFeeSpec {
     #[staticmethod]
     #[pyo3(
         signature = (**fields),
-        text_signature = "(*, base, bp, frequency, day_count, calendar_id, business_day_convention='modified_following', stub='short_front', accrual_basis='point_in_time')"
+        text_signature = "(*, base, bp, frequency, day_count, calendar_id, business_day_convention, stub='short_front', accrual_basis='point_in_time')"
     )]
     fn periodic_bp(
         py: Python<'_>,

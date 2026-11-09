@@ -635,8 +635,7 @@
                 },
                 "business_day_convention": {
                   "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
-                  "default": "modified_following",
-                  "description": "Business-day convention applied to generated fee dates\n(`ModifiedFollowing` when omitted from the wire form, as for\n[`ScheduleParams`](crate::builder::ScheduleParams))."
+                  "description": "Business-day convention applied to generated fee dates. Required:\nthere is no default convention."
                 },
                 "calendar_id": {
                   "description": "Holiday calendar identifier used with `business_day_convention`.\n\nUse `\"weekends_only\"` when only weekend adjustment is required.",
@@ -661,6 +660,7 @@
                 "bp",
                 "frequency",
                 "day_count",
+                "business_day_convention",
                 "calendar_id"
               ],
               "type": "object"
@@ -683,8 +683,7 @@
         },
         "business_day_convention": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
-          "default": "modified_following",
-          "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention)."
+          "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention). Required: there is no default convention."
         },
         "calendar_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -732,6 +731,7 @@
         "rate",
         "frequency",
         "day_count",
+        "business_day_convention",
         "calendar_id"
       ],
       "type": "object"
@@ -746,8 +746,7 @@
         },
         "business_day_convention": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
-          "default": "modified_following",
-          "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention)."
+          "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention). Required: there is no default convention."
         },
         "calendar_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -795,6 +794,7 @@
         "rate_spec",
         "frequency",
         "day_count",
+        "business_day_convention",
         "calendar_id"
       ],
       "type": "object"
@@ -1274,8 +1274,7 @@
         },
         "business_day_convention": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
-          "default": "modified_following",
-          "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention)."
+          "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention). Required: there is no default convention."
         },
         "calendar_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -1341,6 +1340,7 @@
         "step_schedule",
         "frequency",
         "day_count",
+        "business_day_convention",
         "calendar_id"
       ],
       "type": "object"

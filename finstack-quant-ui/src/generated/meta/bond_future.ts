@@ -402,8 +402,7 @@ export default [
   {
     "path": "#/$defs/d_0555f752dff2d680b0b6/properties/business_day_convention",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json#/$defs/FloatingCouponSpec/properties/business_day_convention",
-    "default": "modified_following",
-    "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention).",
+    "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention). Required: there is no default convention.",
     "ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json#"
   },
@@ -2108,8 +2107,7 @@ export default [
   {
     "path": "#/$defs/d_67346ed55fd8e55563e7/properties/business_day_convention",
     "source": "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json#/properties/business_day_convention",
-    "default": "modified_following",
-    "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention).",
+    "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention). Required: there is no default convention.",
     "ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json#"
   },
@@ -2612,8 +2610,7 @@ export default [
   {
     "path": "#/$defs/d_7fdd8d325754c89e8272/properties/business_day_convention",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json#/$defs/StepUpCouponSpec/properties/business_day_convention",
-    "default": "modified_following",
-    "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention).",
+    "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention). Required: there is no default convention.",
     "ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json#"
   },

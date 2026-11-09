@@ -273,14 +273,9 @@ pub struct CalendarMetadata {
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 ///
-/// # Default
-///
-/// `BusinessDayConvention::default()` is `ModifiedFollowing`, the ISDA 2006
-/// Definitions Section 4.12(c) convention used for swap and bond period dates.
-/// Host bindings use it whenever a caller omits the convention.
-#[derive(
-    Debug, Clone, Copy, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
-)]
+/// There is no default convention: every roll selects one explicitly
+/// (CORE-CONVENTIONS-006).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -306,7 +301,6 @@ pub enum BusinessDayConvention {
     /// **ISDA**: Section 4.12(c) - "Modified Following Business Day Convention"
     /// **FpML**: "MODFOLLOWING"
     /// **ISO 20022**: "MODF"
-    #[default]
     ModifiedFollowing,
 
     /// Adjust to previous business day (may cross month boundary).
@@ -405,7 +399,7 @@ pub fn adjust<C: HolidayCalendar + ?Sized>(
         }
     };
     let candidate = seek(step)?.ok_or_else(failed)?;
-    if modified && candidate.month() != date.month() {
+    if modified && (candidate.year(), candidate.month()) != (date.year(), date.month()) {
         return seek(-step)?.ok_or_else(failed);
     }
     Ok(candidate)
@@ -521,6 +515,13 @@ static JOINT_CALENDARS: std::sync::OnceLock<
 /// `"GBLO + nyse"` and `"nyse+gblo"` share one interned composite; a single
 /// distinct member resolves to that built-in calendar directly.
 fn joint_calendar(id: &str) -> crate::Result<&'static dyn HolidayCalendar> {
+    // `+a`, `a+`, `a++b` and `a+ +b` name an empty member: reject rather than
+    // silently drop it (CORE-CONVENTIONS-006 item 9).
+    if id.split('+').any(|member| member.trim().is_empty()) {
+        return Err(crate::Error::Validation(format!(
+            "malformed joint calendar id {id:?}: every '+'-separated member must be a calendar id"
+        )));
+    }
     let parts = joint_members(id);
     if parts.is_empty() {
         return Err(crate::Error::calendar_not_found_with_suggestions(
@@ -919,5 +920,17 @@ mod joint_calendar_tests {
             .and_then(|cal| trade_date.add_business_days(2, cal));
 
         assert!(result.is_err(), "Unknown calendar should error");
+    }
+
+    #[test]
+    fn joint_calendar_ids_reject_empty_members() {
+        for bad in ["+nyse", "nyse+", "nyse++gblo", "nyse+ +gblo", "+"] {
+            assert!(super::calendar_by_id_strict(bad).is_err(), "{bad:?}");
+        }
+        assert!(super::calendar_by_id_strict("NYSE + gblo").is_ok());
+        assert_eq!(
+            super::canonical_calendar_id("GBLO + nyse").expect("joint id"),
+            "gblo+nyse"
+        );
     }
 }

@@ -333,6 +333,7 @@ fn schedule_params_roll_rule_defaults_to_none_and_is_omitted_on_wire() {
     let json = r#"{
         "frequency": {"count": 3, "unit": "months"},
         "day_count": "act_360",
+        "business_day_convention": "modified_following",
         "calendar_id": "weekends_only"
     }"#;
     let params: ScheduleParams = serde_json::from_str(json).expect("deserializes without field");

@@ -344,6 +344,7 @@ test('ModelBuilder capital-structure and registry steps build a valid model', ()
     fixed_day_count: 'act_360',
     float_frequency: { count: 3, unit: 'months' },
     float_day_count: 'act_360',
+    business_day_convention: 'modified_following',
   });
   const model = builder.build();
   registry.free();

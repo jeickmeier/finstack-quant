@@ -442,11 +442,10 @@ export type FeeSpec =
          */
         bp: valuations.DecimalWire;
         /**
-         * Business-day convention applied to generated fee dates
-         * (`ModifiedFollowing` when omitted from the wire form, as for
-         * [`ScheduleParams`](crate::builder::ScheduleParams)).
+         * Business-day convention applied to generated fee dates. Required:
+         * there is no default convention.
          */
-        business_day_convention?: valuations.BusinessDayConvention;
+        business_day_convention: valuations.BusinessDayConvention;
         /**
          * Holiday calendar identifier used with `business_day_convention`.
          *
@@ -946,9 +945,9 @@ export interface FixedCouponSpec {
    * Accrual boundaries are left unadjusted (bond/ICMA convention) unless
    * [`Self::adjust_accrual_dates`] is `true`, in which case the same
    * convention also rolls both accrual-period boundaries (swap/ISDA 2006
-   * §4.10 convention).
+   * §4.10 convention). Required: there is no default convention.
    */
-  business_day_convention?: valuations.BusinessDayConvention;
+  business_day_convention: valuations.BusinessDayConvention;
   /**
    * Holiday calendar identifier used together with `business_day_convention`.
    *
@@ -1036,9 +1035,9 @@ export interface FloatingCouponSpec {
    * Accrual boundaries are left unadjusted (bond/ICMA convention) unless
    * [`Self::adjust_accrual_dates`] is `true`, in which case the same
    * convention also rolls both accrual-period boundaries (swap/ISDA 2006
-   * §4.10 convention).
+   * §4.10 convention). Required: there is no default convention.
    */
-  business_day_convention?: valuations.BusinessDayConvention;
+  business_day_convention: valuations.BusinessDayConvention;
   /**
    * Holiday calendar identifier used together with `business_day_convention`.
    *
@@ -1314,9 +1313,9 @@ export interface StepUpCouponSpec {
    * Accrual boundaries are left unadjusted (bond/ICMA convention) unless
    * [`Self::adjust_accrual_dates`] is `true`, in which case the same
    * convention also rolls both accrual-period boundaries (swap/ISDA 2006
-   * §4.10 convention).
+   * §4.10 convention). Required: there is no default convention.
    */
-  business_day_convention?: valuations.BusinessDayConvention;
+  business_day_convention: valuations.BusinessDayConvention;
   /**
    * Holiday calendar identifier used together with `business_day_convention`.
    *
@@ -1508,9 +1507,9 @@ export interface ScheduleParams {
    * Accrual boundaries are left unadjusted (bond/ICMA convention) unless
    * [`Self::adjust_accrual_dates`] is `true`, in which case the same
    * convention also rolls both accrual-period boundaries (swap/ISDA 2006
-   * §4.10 convention).
+   * §4.10 convention). Required: there is no default convention.
    */
-  business_day_convention?: valuations.BusinessDayConvention;
+  business_day_convention: valuations.BusinessDayConvention;
   /**
    * Holiday calendar identifier used together with `business_day_convention`.
    *

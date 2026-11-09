@@ -34,7 +34,7 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 11 | C1 | **C1a and C1b committed** (`C1a:`, `C1b:` in git log) | C1a: workspace rust-lint; rust-test 16346; core doctests 286; gen-write; python-test 14003; wasm-test 1086 | 004 entry: fallible membership/counting recorded | C1 split: C1a = fallible `HolidayCalendar` trait + propagation; C1b = engine semantics (nominal-year gating, reach, checked arithmetic, ordinals, missing-table errors, cache) |
 | 12 | C2 | committed (`C2:` in git log); partial | core lint; core tests 2226; gen-write; gen-check; py test_core_parity 134, parity 6067 | Calendar-input admission entry rewritten to the remaining work | Done: strict JSON admission + explicit controls (28 files) + ID validation + CSV widths. Not done: `CalendarMetadata` purpose/ranges/edition extension (004 #8), generator-level semantic checks, independent table ranges |
 | 13 | H2 | committed (`H2:` in git log) | workspace lint; rust-test (9 fixture fixes re-run: exotics 314, core count test); gen-write; python-test 14003; wasm-test 1086; ui-check | 004/005 entry updated (cme/cnbe removed; NERC settlement use rejected); record 005 partly reconciled | Commodity example uses `usny` as an illustrative contract calendar; NERC purpose restriction is enforced at the commodity forward only (metadata purposes pending) |
-| 14 | C3 | pending | | | |
+| 14 | C3 | committed (`C3:` in git log); partial | gen-write; workspace rust-test 16350; python-test 14003; wasm-test 1086; ui-check; py test_runtime_docs 3684 | 006 entry rewritten to the remaining work; record 006 partly reconciled | Done: no `BusinessDayConvention` default (enum, cashflow schedule/fee specs, statements `SwapConventions`, Python/WASM tenor rolls), empty `+` joint members rejected, Modified rolls compare year+month. Not done: resolver fallbacks (with 011 FX callers), 100-day cap, composite coverage; product-level defaults (see Needs review) |
 | 15 | C4 | pending | | | |
 | 16 | D1 | pending | | | |
 | 17 | D2 | pending | | | |
@@ -111,6 +111,14 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
   **B2a** (exact text grammar, exact `DecimalWire`, exact Python `int`,
   zero normalization). Slices that build on the float converter
   (B3 named f64 adapters onward) are affected; see their rows.
+- **C3 scope boundary.** Removing `BusinessDayConvention::default` exposed
+  `valuations::serde_defaults::bdc_modified_following` and two
+  variance-swap observation defaults. These are product-level instrument
+  defaults across many instruments; whether each product's wire form
+  should require the convention is a product-owner choice, so they were
+  left in place and are recorded as remaining in the 006 register entry.
+  The core enum, the cashflow schedule/fee specs, the statements
+  `SwapConventions` and the host tenor rolls no longer default.
 - **A1 not closed.** The 020 register entry stays open as Evidence. Equality,
   adjacent and already-beyond observations, window/history behavior, and
   settlement/discount boundaries at each consumer were not independently

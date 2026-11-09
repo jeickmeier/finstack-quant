@@ -417,12 +417,6 @@ export type CashflowSpec =
  * - **ISDA**: 2006 ISDA Definitions, Section 4.12
  * - **FpML**: BusinessDayConventionEnum
  * - **ISO 20022**: Business Day Convention codes
- *
- * # Default
- *
- * `BusinessDayConvention::default()` is `ModifiedFollowing`, the ISDA 2006
- * Definitions Section 4.12(c) convention used for swap and bond period dates.
- * Host bindings use it whenever a caller omits the convention.
  */
 export type BusinessDayConvention =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
@@ -2506,9 +2500,9 @@ export interface FixedCouponSpec {
    * Accrual boundaries are left unadjusted (bond/ICMA convention) unless
    * [`Self::adjust_accrual_dates`] is `true`, in which case the same
    * convention also rolls both accrual-period boundaries (swap/ISDA 2006
-   * §4.10 convention).
+   * §4.10 convention). Required: there is no default convention.
    */
-  business_day_convention?: BusinessDayConvention;
+  business_day_convention: BusinessDayConvention;
   /**
    * Holiday calendar identifier used together with `business_day_convention`.
    *
@@ -2614,9 +2608,9 @@ export interface FloatingCouponSpec {
    * Accrual boundaries are left unadjusted (bond/ICMA convention) unless
    * [`Self::adjust_accrual_dates`] is `true`, in which case the same
    * convention also rolls both accrual-period boundaries (swap/ISDA 2006
-   * §4.10 convention).
+   * §4.10 convention). Required: there is no default convention.
    */
-  business_day_convention?: BusinessDayConvention;
+  business_day_convention: BusinessDayConvention;
   /**
    * Holiday calendar identifier used together with `business_day_convention`.
    *
@@ -2892,9 +2886,9 @@ export interface StepUpCouponSpec {
    * Accrual boundaries are left unadjusted (bond/ICMA convention) unless
    * [`Self::adjust_accrual_dates`] is `true`, in which case the same
    * convention also rolls both accrual-period boundaries (swap/ISDA 2006
-   * §4.10 convention).
+   * §4.10 convention). Required: there is no default convention.
    */
-  business_day_convention?: BusinessDayConvention;
+  business_day_convention: BusinessDayConvention;
   /**
    * Holiday calendar identifier used together with `business_day_convention`.
    *
@@ -7716,11 +7710,10 @@ export interface StatementResult {
  */
 export interface SwapConventions {
   /**
-   * Schedule-date rolling rule on the currency's settlement calendar;
-   * omitted on the wire it takes the [`BusinessDayConvention`] default,
-   * Modified Following.
+   * Schedule-date rolling rule on the currency's settlement calendar.
+   * Required: there is no default convention.
    */
-  business_day_convention?: BusinessDayConvention;
+  business_day_convention: BusinessDayConvention;
   /**
    * Fixed-leg accrual year-fraction convention.
    */

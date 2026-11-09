@@ -67,6 +67,7 @@ def test_rejected_instrument_keeps_builder_usable(method: str, ready: bool) -> N
             "fixed_day_count": "30_360",
             "float_frequency": {"count": 3, "unit": "months"},
             "float_day_count": "act_360",
+            "business_day_convention": "modified_following",
         }
         return [swap, conventions]
 
@@ -319,12 +320,14 @@ def test_swap_conventions_take_tenor_and_day_count_objects() -> None:
         "fixed_day_count": "30_360",
         "float_frequency": {"count": 3, "unit": "months"},
         "float_day_count": "act_360",
+        "business_day_convention": "modified_following",
     }
     typed = {
         "fixed_frequency": Tenor.semi_annual(),
         "fixed_day_count": DayCount.THIRTY_360,
         "float_frequency": Tenor.quarterly(),
         "float_day_count": DayCount.ACT_360,
+        "business_day_convention": "modified_following",
     }
 
     def build(conventions: dict[str, object]) -> str:

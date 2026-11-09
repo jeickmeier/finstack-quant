@@ -534,7 +534,7 @@ impl JsModelBuilder {
     /// the builder usable.
     ///
     /// @param params - Rust `SwapParams` (object or JSON) with the keys `id`, `notional`, `fixed_rate`, `start_date`, `maturity_date`, `discount_curve_id` and `forward_curve_id`, as for `addSwap`.
-    /// @param conventions - Rust `SwapConventions` (object or JSON); an unknown key is rejected: `fixed_frequency` and `float_frequency` (tenor wire objects such as `{ count: 1, unit: "years" }`; `unit` is `"days"`, `"weeks"`, `"months"` or `"years"`), `fixed_day_count` and `float_day_count` (day-count labels such as `"act_360"` or `"30_360"`) and the optional `business_day_convention` (schedule roll, e.g. `"modified_following"`; omitted uses the Rust default, Modified Following).
+    /// @param conventions - Rust `SwapConventions` (object or JSON); an unknown key is rejected: `fixed_frequency` and `float_frequency` (tenor wire objects such as `{ count: 1, unit: "years" }`; `unit` is `"days"`, `"weeks"`, `"months"` or `"years"`), `fixed_day_count` and `float_day_count` (day-count labels such as `"act_360"` or `"30_360"`) and the required `business_day_convention` (schedule roll, e.g. `"modified_following"`; there is no default convention).
     /// @throws Error with kind `validation` if either object is malformed, misses a required key or carries an unknown one, a tenor, day count or roll convention is unknown, the swap cannot be constructed, or the builder was consumed.
     #[wasm_bindgen(js_name = addSwapWithConventions)]
     pub fn add_swap_with_conventions(

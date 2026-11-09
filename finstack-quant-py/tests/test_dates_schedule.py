@@ -270,11 +270,13 @@ def test_tenor_constructor_forms_and_context_helpers() -> None:
     assert Tenor.parse(" 1d ") == Tenor.daily()
     assert Tenor.parse("3M").payments_per_year() == 4.0
     assert str(Tenor.from_years(0.5, "act_365f")) == "6M"
-    assert Tenor.parse("1M").add_to_date("2025-01-31") == date(2025, 2, 28)
+    assert Tenor.parse("1M").add_to_date("2025-01-31", business_day_convention="unadjusted") == date(2025, 2, 28)
     assert Tenor.parse("1M").add_to_date("2025-01-31", calendar="usny", business_day_convention="following") == date(
         2025, 2, 28
     )
-    assert Tenor.parse("1Y").to_years_with_context("2025-01-15", day_count=DayCount.ACT_ACT) == pytest.approx(1.0)
+    assert Tenor.parse("1Y").to_years_with_context(
+        "2025-01-15", day_count=DayCount.ACT_ACT, business_day_convention="unadjusted"
+    ) == pytest.approx(1.0)
     with pytest.raises(TypeError):
         Tenor(3)
 

@@ -995,8 +995,7 @@ export default [
   {
     "path": "#/$defs/d_210ab4b44ffb533f1266/properties/business_day_convention",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FloatingCouponSpec/properties/business_day_convention",
-    "default": "modified_following",
-    "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention).",
+    "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention). Required: there is no default convention.",
     "ref": "#/$defs/BusinessDayConvention",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/BusinessDayConvention"
   },
@@ -4109,7 +4108,7 @@ export default [
   {
     "path": "#/$defs/d_7007e4d36b5614c397b8",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/BusinessDayConvention",
-    "description": "Business day adjustment conventions per ISDA standards.\n\nDefines how dates are adjusted when they fall on non-business days\n(weekends or holidays). Used throughout fixed income and derivatives\nmarkets for determining payment dates, fixing dates, and maturity dates.\n\n# Standards References\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.12\n- **FpML**: BusinessDayConventionEnum\n- **ISO 20022**: Business Day Convention codes\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{adjust, calendar_by_id_strict, BusinessDayConvention, Date};\nuse time::Month;\n\nlet target2 = calendar_by_id_strict(\"target2\")?;\n// Saturday, January 4, 2025\nlet weekend = Date::from_calendar_date(2025, Month::January, 4).expect(\"Valid date\");\n\n// Following: moves to next Monday (Jan 6)\nlet adj = adjust(weekend, BusinessDayConvention::Following, target2)?;\nassert_eq!(adj.day(), 6);\n\n// Preceding: moves to previous Friday (Jan 3)\nlet adj = adjust(weekend, BusinessDayConvention::Preceding, target2)?;\nassert_eq!(adj.day(), 3);\n# Ok::<(), finstack_quant_core::Error>(())\n```\n\n# Default\n\n`BusinessDayConvention::default()` is `ModifiedFollowing`, the ISDA 2006\nDefinitions Section 4.12(c) convention used for swap and bond period dates.\nHost bindings use it whenever a caller omits the convention."
+    "description": "Business day adjustment conventions per ISDA standards.\n\nDefines how dates are adjusted when they fall on non-business days\n(weekends or holidays). Used throughout fixed income and derivatives\nmarkets for determining payment dates, fixing dates, and maturity dates.\n\n# Standards References\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.12\n- **FpML**: BusinessDayConventionEnum\n- **ISO 20022**: Business Day Convention codes\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{adjust, calendar_by_id_strict, BusinessDayConvention, Date};\nuse time::Month;\n\nlet target2 = calendar_by_id_strict(\"target2\")?;\n// Saturday, January 4, 2025\nlet weekend = Date::from_calendar_date(2025, Month::January, 4).expect(\"Valid date\");\n\n// Following: moves to next Monday (Jan 6)\nlet adj = adjust(weekend, BusinessDayConvention::Following, target2)?;\nassert_eq!(adj.day(), 6);\n\n// Preceding: moves to previous Friday (Jan 3)\nlet adj = adjust(weekend, BusinessDayConvention::Preceding, target2)?;\nassert_eq!(adj.day(), 3);\n# Ok::<(), finstack_quant_core::Error>(())\n```\n\nThere is no default convention: every roll selects one explicitly\n(CORE-CONVENTIONS-006)."
   },
   {
     "path": "#/$defs/d_7007e4d36b5614c397b8/oneOf/0",
@@ -4690,8 +4689,7 @@ export default [
   {
     "path": "#/$defs/d_78d4b16242febe84f62b/properties/business_day_convention",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/StepUpCouponSpec/properties/business_day_convention",
-    "default": "modified_following",
-    "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention).",
+    "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention). Required: there is no default convention.",
     "ref": "#/$defs/BusinessDayConvention",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/BusinessDayConvention"
   },
@@ -7599,8 +7597,7 @@ export default [
   {
     "path": "#/$defs/d_cdca3f67b974113083de/properties/business_day_convention",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FixedCouponSpec/properties/business_day_convention",
-    "default": "modified_following",
-    "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention).",
+    "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention). Required: there is no default convention.",
     "ref": "#/$defs/BusinessDayConvention",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/BusinessDayConvention"
   },
