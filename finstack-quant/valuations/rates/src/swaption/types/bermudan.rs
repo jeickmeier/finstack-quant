@@ -448,11 +448,14 @@ impl BermudanSwaption {
         if as_of >= self.get_underlying_maturity() {
             return Ok(0.0);
         }
+        // Only the horizon is read, so no settlement annuity is needed.
         let flows = crate::swaption::pricing::hw_cashflows::HwSwaptionCashflows::new(
             &self.underlying_fixed_leg,
             &self.underlying_float_leg,
             as_of,
             as_of,
+            finstack_quant_valuations_core::instruments::SettlementType::Physical,
+            crate::swaption::CashSettlementMethod::default(),
         )?;
         Ok(flows.horizon())
     }

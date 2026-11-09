@@ -659,7 +659,7 @@ impl InflationLinkedBond {
             .unwrap_or(1.0)
             .max(1e-6); // guard against zero / expired bond
 
-        let n_f = self.frequency.payments_per_year().max(1.0);
+        let n_f = self.frequency.payments_per_year()?.max(1.0);
         // ILB coupon frequencies are always an integer number of periods per
         // year (annual/semi-annual/quarterly/monthly); a non-integer here would
         // mean an unsupported tenor whose compounding cannot be expressed as

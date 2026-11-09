@@ -153,6 +153,8 @@ impl SwaptionHullWhitePricer {
             &swaption.underlying_float_leg,
             swaption.expiry,
             as_of,
+            swaption.settlement,
+            swaption.cash_settlement_method,
         )
         .map_err(|e| PricingError::from_core(e, PricingErrorContext::from_instrument(swaption)))?;
         let swap_end_time = cashflows.horizon().max(time_to_expiry);
@@ -208,8 +210,6 @@ impl SwaptionHullWhitePricer {
                         strike,
                         notional,
                         option_type: swaption.option_type,
-                        settlement: swaption.settlement,
-                        cash_method: swaption.cash_settlement_method,
                     },
                 );
                 continuation.max(exercise_value)

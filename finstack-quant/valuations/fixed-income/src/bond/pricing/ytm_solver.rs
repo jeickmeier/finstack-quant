@@ -84,7 +84,7 @@ pub(crate) fn solve_ytm_timed(
                 YieldCompounding::Rate(rate_comp) => rate_comp.rate_from_df(target / fv, years),
                 YieldCompounding::Moosmuller => (ratio - 1.0) / years,
                 YieldCompounding::Street => {
-                    let m = spec.frequency.payments_per_year().max(1.0);
+                    let m = spec.frequency.payments_per_year()?.max(1.0);
                     m * (ratio.powf(1.0 / (m * years)) - 1.0)
                 }
             };

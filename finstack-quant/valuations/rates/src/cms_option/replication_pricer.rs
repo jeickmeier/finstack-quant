@@ -230,7 +230,7 @@ impl CmsReplicationPricer {
                 let observed = crate::cms_common::historical_cms_fixing(
                     curves,
                     &inst.forward_curve_id,
-                    inst.cms_tenor.to_years(),
+                    inst.cms_tenor.to_years_approx(),
                     fixing_date,
                 )?;
                 let df_pay = discount_curve
@@ -279,7 +279,7 @@ impl CmsReplicationPricer {
                     time_to_fixing: ttf,
                     df_pay,
                     vol_surface: vol_surface.as_ref(),
-                    cms_tenor: inst.cms_tenor.to_years(),
+                    cms_tenor: inst.cms_tenor.to_years_approx(),
                     payments_per_year: m,
                     payment_delay: crate::cms_common::signed_act365f_year_fraction(
                         swap_start,

@@ -106,7 +106,7 @@ impl CmsOptionPricer {
                 let observed = crate::cms_common::historical_cms_fixing(
                     curves,
                     &inst.forward_curve_id,
-                    inst.cms_tenor.to_years(),
+                    inst.cms_tenor.to_years_approx(),
                     fixing_date,
                 )?;
                 let option_val = match inst.option_type {
@@ -175,7 +175,7 @@ impl CmsOptionPricer {
                 convexity_adjustment_with_frequency(
                     atm_vol,
                     time_to_fixing,
-                    inst.cms_tenor.to_years(),
+                    inst.cms_tenor.to_years_approx(),
                     forward_swap_rate,
                     reference_swap.payments_per_year()?,
                     crate::cms_common::signed_act365f_year_fraction(swap_start, payment_date)?,

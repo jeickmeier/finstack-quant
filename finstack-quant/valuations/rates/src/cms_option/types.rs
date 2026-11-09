@@ -248,7 +248,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for CmsOption {
         deps.add_series_id(
             finstack_quant_core::market_data::fixings::cms_fixing_series_id(
                 self.forward_curve_id.as_str(),
-                self.cms_tenor.to_years(),
+                self.cms_tenor.to_years_approx(),
             ),
         );
         Ok(deps)

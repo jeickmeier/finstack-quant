@@ -226,8 +226,8 @@ def _mean_variance(value):
 def _tenor(value):
     assert value.count == 3
     assert value.months == 3
-    assert value.to_years() == 0.25
-    return {"count": value.count, "months": value.months, "years": value.to_years()}
+    assert value.to_years_approx() == 0.25
+    return {"count": value.count, "months": value.months, "years": value.to_years_approx()}
 
 
 def _rates(value):

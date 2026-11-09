@@ -77,7 +77,7 @@ fn daycount_from_string() {
 fn tenor_parse() {
     let t = JsTenor::parse(JsValue::from("3M")).expect("valid");
     assert_eq!(t.count(), 3);
-    assert!(t.to_years() > 0.24 && t.to_years() < 0.26);
+    assert!(t.to_years_approx() > 0.24 && t.to_years_approx() < 0.26);
     let constructed = JsTenor::new(
         JsValue::from(3),
         &finstack_quant_wasm::api::core::imm::JsTenorUnit::months(),
@@ -89,7 +89,7 @@ fn tenor_parse() {
 #[wasm_bindgen_test]
 fn tenor_parse_year() {
     let t = JsTenor::parse(JsValue::from("1Y")).expect("valid");
-    assert!((t.to_years() - 1.0).abs() < 0.01);
+    assert!((t.to_years_approx() - 1.0).abs() < 0.01);
 }
 
 #[wasm_bindgen_test]

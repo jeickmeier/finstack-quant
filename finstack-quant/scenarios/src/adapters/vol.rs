@@ -260,6 +260,7 @@ pub(crate) fn vol_effects(
                         ctx.calendar,
                         BusinessDayConvention::Unadjusted,
                         DayCount::Act365F,
+                        finstack_quant_core::dates::DayCountContext::default(),
                     )
                     .map_err(|e| Error::Internal(e.to_string()))
             })

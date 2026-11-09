@@ -460,6 +460,7 @@ fn interpolate_delivers_overlapping_tenors_and_exact_pillars_together() {
                     None,
                     BusinessDayConvention::Unadjusted,
                     DayCount::Act365F,
+                    finstack_quant_core::dates::DayCountContext::default(),
                 )
                 .unwrap();
             let t = if tenor == "3Y" { 3.0 } else { t };

@@ -540,6 +540,8 @@ impl BermudanSwaptionPricer {
                     &swaption.underlying_float_leg,
                     date,
                     as_of,
+                    swaption.settlement,
+                    CashSettlementMethod::CollateralizedCashPrice,
                 )
             })
             .collect::<finstack_quant_core::Result<Vec<_>>>()?;
@@ -547,8 +549,6 @@ impl BermudanSwaptionPricer {
             strike: swaption.strike_f64()?,
             notional: swaption.notional.amount(),
             option_type: swaption.option_type,
-            settlement: swaption.settlement,
-            cash_method: CashSettlementMethod::CollateralizedCashPrice,
         };
 
         // Build exercise-aligned time grid

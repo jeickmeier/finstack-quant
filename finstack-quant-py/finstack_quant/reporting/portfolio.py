@@ -56,7 +56,7 @@ def _abs_key(x: float) -> float:
 
 def _tenor_years(tenor: str) -> float:
     try:
-        return Tenor.parse(tenor).to_years()
+        return Tenor.parse(tenor).to_years_approx()
     except ValueError:
         return 1e9  # unknown tenors sort last
 

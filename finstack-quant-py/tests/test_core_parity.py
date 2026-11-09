@@ -92,8 +92,9 @@ def test_reference_cpi_requires_exact_monthly_fixings(interpolation: str) -> Non
 def test_tenor_constructor_uses_checked_rust_validation() -> None:
     with pytest.raises(ValueError, match="count must be positive"):
         Tenor(0, TenorUnit.MONTHS)
-    with pytest.raises(ValueError, match="exceeds maximum"):
-        Tenor(2**32 - 1, TenorUnit.YEARS)
+    with pytest.raises(ValueError, match="representation limit"):
+        Tenor((2**31 - 1) // 12 + 1, TenorUnit.YEARS)
+    assert Tenor(201, TenorUnit.YEARS).count == 201
 
 
 def test_bps_constructor_rejects_rounded_i32_overflow() -> None:

@@ -80,7 +80,7 @@ def _bucketed_series(result: Any, prefix: str) -> tuple[list[str], list[float], 
 def _tenor_years(label: str) -> float | None:
     """Year fraction of a tenor label via the Rust ``Tenor`` parser, or ``None``."""
     try:
-        return Tenor.parse(label).to_years()
+        return Tenor.parse(label).to_years_approx()
     except ValueError:
         return None
 

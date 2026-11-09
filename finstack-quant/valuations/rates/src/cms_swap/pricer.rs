@@ -298,7 +298,7 @@ impl CmsSwapReplicationPricer {
                 time_to_fixing,
                 df_pay,
                 vol_surface: vol_surface.as_ref(),
-                cms_tenor: inst.cms_tenor.to_years(),
+                cms_tenor: inst.cms_tenor.to_years_approx(),
                 payments_per_year,
                 payment_delay: crate::cms_common::signed_act365f_year_fraction(
                     inst.reference_swap().reference_swap_start(fixing_date)?,
@@ -391,7 +391,7 @@ pub(super) fn cms_coupon_rate(
         let observed = crate::cms_common::historical_cms_fixing(
             market,
             &inst.forward_curve_id,
-            inst.cms_tenor.to_years(),
+            inst.cms_tenor.to_years_approx(),
             fixing_date,
         )?;
         return apply_cms_cap_floor(
@@ -425,7 +425,7 @@ pub(super) fn cms_coupon_rate(
                 forward_swap_rate,
             ),
             time_to_fixing,
-            inst.cms_tenor.to_years(),
+            inst.cms_tenor.to_years_approx(),
             forward_swap_rate,
             inst.reference_swap().payments_per_year()?,
             crate::cms_common::signed_act365f_year_fraction(

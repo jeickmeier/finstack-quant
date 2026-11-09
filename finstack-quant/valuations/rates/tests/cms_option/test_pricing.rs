@@ -231,7 +231,7 @@ fn test_vanna_computable() {
             let convexity = convexity_adjustment_with_frequency(
                 sigma,
                 t,
-                inst.cms_tenor.to_years(),
+                inst.cms_tenor.to_years_approx(),
                 forward,
                 reference.payments_per_year().unwrap(),
                 (inst.payment_dates[i] - start).whole_days() as f64 / 365.0,
@@ -651,7 +651,7 @@ fn vanna_oracle(inst: &CmsOption, market: &MarketContext, as_of: Date) -> f64 {
             let convexity = convexity_adjustment_with_frequency(
                 atm_vol + shift,
                 t,
-                inst.cms_tenor.to_years(),
+                inst.cms_tenor.to_years_approx(),
                 forward,
                 reference.payments_per_year().unwrap(),
                 (inst.payment_dates[i] - start).whole_days() as f64 / 365.0,

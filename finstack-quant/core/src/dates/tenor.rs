@@ -16,7 +16,7 @@
 //! assert_eq!(tenor.unit(), TenorUnit::Months);
 //!
 //! // Convert to years with default settings (simple approximation)
-//! let years = tenor.to_years();
+//! let years = tenor.to_years_approx();
 //! assert!((years - 0.25).abs() < 1e-6);
 //! # Ok(())
 //! # }
@@ -49,6 +49,7 @@
 //!     Some(target2),
 //!     BusinessDayConvention::ModifiedFollowing,
 //!     DayCount::ActAct,
+//!     DayCountContext::default(),
 //! )?;
 //! # let _ = (end_date, years);
 //! # Ok(())
@@ -60,10 +61,12 @@ use crate::dates::{
     BusinessDayConvention, Date, DayCount, DayCountContext, HolidayCalendar, adjust,
 };
 
-const MAX_TENOR_YEARS: u32 = 200;
-const MAX_TENOR_DAYS: u32 = MAX_TENOR_YEARS * 366;
-const MAX_TENOR_WEEKS: u32 = MAX_TENOR_DAYS / 7;
-const MAX_TENOR_MONTHS: u32 = MAX_TENOR_YEARS * 12;
+// Representation limits (CORE-CONVENTIONS-007 #2), not financial maturity
+// caps: day counts fit `u32`, month counts fit the signed month-offset API.
+const MAX_TENOR_DAYS: u32 = u32::MAX;
+const MAX_TENOR_WEEKS: u32 = u32::MAX / 7;
+const MAX_TENOR_MONTHS: u32 = i32::MAX as u32;
+const MAX_TENOR_YEARS: u32 = MAX_TENOR_MONTHS / 12;
 
 /// Unit of a tenor period.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -195,14 +198,15 @@ impl Tenor {
     /// Create a validated tenor.
     ///
     /// This is the canonical constructor for external input. It rejects zero
-    /// counts, unsupported lengths, and counts whose unit conversion would
-    /// overflow.
+    /// counts and counts beyond the representation limits: D `1..=u32::MAX`,
+    /// W `1..=u32::MAX/7` (days fit `u32`), M `1..=i32::MAX` and Y
+    /// `1..=i32::MAX/12` (months fit the signed month offset). These are not
+    /// maturity caps; applying a tenor must still reach a valid date.
     ///
     /// # Errors
     ///
-    /// Returns `InputError::InvalidTenor` when `count` is zero, exceeds the
-    /// supported range for `unit`, or cannot be converted safely between weeks
-    /// and days or years and months.
+    /// Returns `InputError::InvalidTenor` when `count` is zero or exceeds the
+    /// representation limit for `unit`.
     ///
     /// # Arguments
     ///
@@ -221,7 +225,10 @@ impl Tenor {
                 reason: if count == 0 {
                     "count must be positive".to_string()
                 } else {
-                    format!("count exceeds maximum supported tenor of {MAX_TENOR_YEARS} years")
+                    format!(
+                        "count exceeds the representation limit of {max_count} for unit {}",
+                        unit.designator()
+                    )
                 },
             }
             .into());
@@ -423,15 +430,15 @@ impl Tenor {
     /// # fn main() -> finstack_quant_core::Result<()> {
     ///
     /// let tenor = Tenor::parse("6M")?;
-    /// assert!((tenor.to_years() - 0.5).abs() < 1e-6);
+    /// assert!((tenor.to_years_approx() - 0.5).abs() < 1e-6);
     ///
     /// let tenor = Tenor::parse("1Y")?;
-    /// assert!((tenor.to_years() - 1.0).abs() < 1e-6);
+    /// assert!((tenor.to_years_approx() - 1.0).abs() < 1e-6);
     /// # Ok(())
     /// # }
     /// ```
     #[inline]
-    pub fn to_years(&self) -> f64 {
+    pub fn to_years_approx(&self) -> f64 {
         let count = f64::from(self.count);
         match self.unit {
             TenorUnit::Days => count / 365.0,
@@ -443,56 +450,58 @@ impl Tenor {
 
     /// Integer compounding periods per year for a contractual coupon tenor.
     ///
-    /// The reciprocal of [`Self::to_years`] rounded to the nearest integer and
+    /// The reciprocal of [`Self::to_years_approx`] rounded to the nearest integer and
     /// floored at one, so a 90-day or 91-day coupon both compound four times a
     /// year. [`Self::payments_per_year`] is the unrounded ratio.
     #[inline]
     #[must_use]
     pub fn compounding_frequency(&self) -> f64 {
-        (1.0 / self.to_years()).round().max(1.0)
+        (1.0 / self.to_years_approx()).round().max(1.0)
     }
 
-    /// Number of payments per year for a payment-frequency tenor.
+    /// Nominal payments per year of a monthly or yearly payment tenor.
     ///
-    /// Uses the same calendar approximations as [`to_years`](Self::to_years)
-    /// for months and years (`6M` → 2, `1Y` → 1); week and day tenors use the
-    /// market coupon-count conventions `52` weeks and `365` days per year
-    /// (`1W` → 52, `1D` → 365), which is the convention swaption cash-settlement
-    /// annuities use.
+    /// `nM` gives `12/n` and `nY` gives `1/n`, including fractional ratios
+    /// such as `5M` → 2.4. This is a nominal ratio, not the number of
+    /// payments observed in a calendar year.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::InvalidTenor` for day and week tenors: no 365,
+    /// 252 or 52 observation convention is inferred; an explicit product
+    /// convention or actual schedule owns those choices.
     ///
     /// # Examples
     ///
     /// ```rust
     /// use finstack_quant_core::dates::Tenor;
     /// # fn main() -> finstack_quant_core::Result<()> {
-    /// assert_eq!(Tenor::parse("3M")?.payments_per_year(), 4.0);
-    /// assert_eq!(Tenor::parse("2Y")?.payments_per_year(), 0.5);
-    /// assert_eq!(Tenor::parse("1W")?.payments_per_year(), 52.0);
+    /// assert_eq!(Tenor::parse("3M")?.payments_per_year()?, 4.0);
+    /// assert_eq!(Tenor::parse("2Y")?.payments_per_year()?, 0.5);
+    /// assert!(Tenor::parse("1W")?.payments_per_year().is_err());
     /// # Ok(())
     /// # }
     /// ```
-    #[inline]
-    pub fn payments_per_year(&self) -> f64 {
+    pub fn payments_per_year(&self) -> crate::Result<f64> {
         let count = f64::from(self.count);
         match self.unit {
-            TenorUnit::Days => 365.0 / count,
-            TenorUnit::Weeks => 52.0 / count,
-            TenorUnit::Months => 12.0 / count,
-            TenorUnit::Years => 1.0 / count,
+            TenorUnit::Months => Ok(12.0 / count),
+            TenorUnit::Years => Ok(1.0 / count),
+            TenorUnit::Days | TenorUnit::Weeks => Err(InputError::InvalidTenor {
+                tenor: self.to_string(),
+                reason: "payments per year is defined only for month and year tenors".into(),
+            }
+            .into()),
         }
     }
 
-    /// Convert tenor to an approximate number of days.
+    /// Convert tenor to an approximate number of whole calendar days.
     ///
-    /// This uses consistent approximations that align with [`to_years`](Self::to_years):
-    /// - 1D = 1 day
-    /// - 1W = 7 days
-    /// - 1M = 365/12 ≈ 30.42 days (consistent with 1M = 1/12 year)
-    /// - 1Y = 365 days
-    ///
-    /// The month approximation uses 365/12 rather than 30 to maintain consistency
-    /// with year fraction calculations. This avoids discrepancies when converting
-    /// between days and years for multi-year periods.
+    /// The declared approximation matching [`to_years_approx`](Self::to_years_approx),
+    /// computed exactly in integers: `nD` → `n`, `nW` → `7n`, `nM` →
+    /// `floor((365n + 6) / 12)` (365/12 days a month, half-day ties rounded
+    /// up, so `6M` → 183) and `nY` → `365n`. It does not recover actual dated
+    /// accrual or the endpoint of calendar addition.
     ///
     /// # Returns
     /// Approximate number of days as i64.
@@ -512,6 +521,9 @@ impl Tenor {
     /// let tenor = Tenor::parse("1M")?;
     /// assert_eq!(tenor.to_days_approx(), 30); // 365/12 ≈ 30.42, rounded
     ///
+    /// let tenor = Tenor::parse("6M")?;
+    /// assert_eq!(tenor.to_days_approx(), 183); // 182.5 rounds up
+    ///
     /// let tenor = Tenor::parse("1Y")?;
     /// assert_eq!(tenor.to_days_approx(), 365);
     ///
@@ -523,16 +535,13 @@ impl Tenor {
     /// ```
     #[inline]
     pub fn to_days_approx(&self) -> i64 {
-        const DAYS_PER_MONTH: f64 = super::CALENDAR_DAYS_PER_YEAR / 12.0; // ≈ 30.4167
-
-        let count = f64::from(self.count);
-        let days = match self.unit {
+        let count = i64::from(self.count);
+        match self.unit {
             TenorUnit::Days => count,
-            TenorUnit::Weeks => count * 7.0,
-            TenorUnit::Months => count * DAYS_PER_MONTH,
-            TenorUnit::Years => count * super::CALENDAR_DAYS_PER_YEAR,
-        };
-        days.round() as i64
+            TenorUnit::Weeks => 7 * count,
+            TenorUnit::Months => (365 * count + 6) / 12,
+            TenorUnit::Years => 365 * count,
+        }
     }
 
     /// Add the tenor to a date, optionally respecting a business day calendar.
@@ -574,14 +583,20 @@ impl Tenor {
     ) -> crate::Result<Date> {
         use crate::dates::date_extensions::DateExt;
 
-        // `new` bounds every count (at most 2,400 months), so the casts are exact.
-        let raw_date: crate::Result<Date> = match self.unit {
-            TenorUnit::Days => date.add_days(i64::from(self.count)),
-            TenorUnit::Weeks => date.add_days(i64::from(self.count) * 7),
-            TenorUnit::Months => date.add_months(self.count as i32),
-            TenorUnit::Years => date.add_months((self.count * 12) as i32),
+        let raw_date = match self.unit {
+            TenorUnit::Days => date.add_days(i64::from(self.count))?,
+            TenorUnit::Weeks => date.add_days(7 * i64::from(self.count))?,
+            TenorUnit::Months | TenorUnit::Years => {
+                let months = self
+                    .months()
+                    .and_then(|months| i32::try_from(months).ok())
+                    .ok_or_else(|| InputError::InvalidTenor {
+                        tenor: self.to_string(),
+                        reason: "month count does not fit the signed month offset".into(),
+                    })?;
+                date.add_months(months)?
+            }
         };
-        let raw_date = raw_date?;
 
         if let Some(cal) = calendar {
             adjust(raw_date, business_day_convention, cal)
@@ -592,10 +607,11 @@ impl Tenor {
 
     /// Convert tenor to year fraction using calendar-aware date computation.
     ///
-    /// This method computes the actual year fraction by:
-    /// 1. Adding the tenor to the as-of date using proper date arithmetic
-    /// 2. Applying business day adjustment if a calendar is provided
-    /// 3. Computing the year fraction using the specified day count convention
+    /// Adds the tenor to `as_of`, rolls the end with `calendar` and
+    /// `business_day_convention` when a calendar is given, then measures
+    /// `as_of` to that end with `day_count` under the caller's `context`. The
+    /// endpoint-adjustment calendar and the accrual context keep separate
+    /// roles: no coupon frequency or period is invented from the tenor.
     ///
     /// # Arguments
     ///
@@ -603,6 +619,9 @@ impl Tenor {
     /// * `calendar` - Optional holiday calendar used when applying `business_day_convention` to the end date
     /// * `business_day_convention` - Business-day convention applied when a calendar is provided
     /// * `day_count` - Day-count convention used to convert the date span into a year fraction
+    /// * `context` - Caller-supplied day-count context (calendar, frequency,
+    ///   coupon period, termination status) required by `day_count`; the empty
+    ///   context suits context-free conventions
     ///
     /// # Returns
     /// Year fraction computed using the specified conventions.
@@ -622,6 +641,7 @@ impl Tenor {
     ///     None,
     ///     BusinessDayConvention::ModifiedFollowing,
     ///     DayCount::ActAct,
+    ///     DayCountContext::default(),
     /// )?;
     ///
     /// assert!((years - 1.0).abs() < 0.01);
@@ -632,38 +652,25 @@ impl Tenor {
     /// # Errors
     ///
     /// Propagates failures from date addition, optional business-day
-    /// adjustment, or the selected day-count calculation.
+    /// adjustment, or the selected day-count calculation (including missing
+    /// required context). Returns `Error::Validation` when the adjusted end
+    /// precedes `as_of`; an end equal to `as_of` gives zero only after
+    /// `context` is valid for `day_count`.
     pub fn to_years_with_context(
         &self,
         as_of: Date,
         calendar: Option<&dyn HolidayCalendar>,
         business_day_convention: BusinessDayConvention,
         day_count: DayCount,
+        context: DayCountContext<'_>,
     ) -> crate::Result<f64> {
-        let unadjusted_end = self.add_to_date(as_of, None, BusinessDayConvention::Unadjusted)?;
-        let end_date = if let Some(cal) = calendar {
-            adjust(unadjusted_end, business_day_convention, cal)?
-        } else {
-            unadjusted_end
-        };
-        if end_date <= as_of {
-            return Ok(0.0);
+        let end_date = self.add_to_date(as_of, calendar, business_day_convention)?;
+        if end_date < as_of {
+            return Err(crate::Error::Validation(format!(
+                "tenor {self} from {as_of} rolls to {end_date}, before its origin"
+            )));
         }
-
-        let coupon_period = match day_count {
-            DayCount::ActActIsma => Some((as_of, unadjusted_end)),
-            _ => Some((as_of, end_date)),
-        };
-
-        let ctx = DayCountContext {
-            calendar,
-            frequency: Some(*self),
-            bus_basis: None,
-            coupon_period,
-            end_is_termination_date: None,
-        };
-
-        day_count.year_fraction(as_of, end_date, ctx)
+        day_count.year_fraction(as_of, end_date, context)
     }
 
     /// Convenience constructor for Annual frequency (1 Year).
@@ -870,23 +877,30 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_rejects_unreasonably_large_tenors() {
-        assert!(Tenor::parse("201Y").is_err());
-        assert!(Tenor::parse("2401M").is_err());
-        assert!(Tenor::parse("10458W").is_err());
-        assert!(Tenor::parse("73201D").is_err());
+    fn test_parse_rejects_counts_beyond_representation_limits() {
+        // The old 200-year cap is gone: long tenors parse up to the
+        // representation limits (CORE-CONVENTIONS-007 #2).
+        assert!(Tenor::parse("201Y").is_ok());
+        assert!(Tenor::parse("178956970Y").is_ok());
+        assert!(Tenor::parse("178956971Y").is_err());
+        assert!(Tenor::parse("2147483647M").is_ok());
+        assert!(Tenor::parse("2147483648M").is_err());
+        assert!(Tenor::parse("613566756W").is_ok());
+        assert!(Tenor::parse("613566757W").is_err());
+        assert!(Tenor::parse("4294967295D").is_ok());
+        assert!(Tenor::parse("4294967296D").is_err());
     }
 
     #[test]
     fn test_to_years() {
-        assert!((Tenor::parse("1D").expect("valid").to_years() - 1.0 / 365.0).abs() < 1e-10);
-        assert!((Tenor::parse("7D").expect("valid").to_years() - 7.0 / 365.0).abs() < 1e-10);
-        assert!((Tenor::parse("1W").expect("valid").to_years() - 7.0 / 365.0).abs() < 1e-10);
-        assert!((Tenor::parse("1M").expect("valid").to_years() - 1.0 / 12.0).abs() < 1e-10);
-        assert!((Tenor::parse("3M").expect("valid").to_years() - 0.25).abs() < 1e-10);
-        assert!((Tenor::parse("6M").expect("valid").to_years() - 0.5).abs() < 1e-10);
-        assert!((Tenor::parse("1Y").expect("valid").to_years() - 1.0).abs() < 1e-10);
-        assert!((Tenor::parse("5Y").expect("valid").to_years() - 5.0).abs() < 1e-10);
+        assert!((Tenor::parse("1D").expect("valid").to_years_approx() - 1.0 / 365.0).abs() < 1e-10);
+        assert!((Tenor::parse("7D").expect("valid").to_years_approx() - 7.0 / 365.0).abs() < 1e-10);
+        assert!((Tenor::parse("1W").expect("valid").to_years_approx() - 7.0 / 365.0).abs() < 1e-10);
+        assert!((Tenor::parse("1M").expect("valid").to_years_approx() - 1.0 / 12.0).abs() < 1e-10);
+        assert!((Tenor::parse("3M").expect("valid").to_years_approx() - 0.25).abs() < 1e-10);
+        assert!((Tenor::parse("6M").expect("valid").to_years_approx() - 0.5).abs() < 1e-10);
+        assert!((Tenor::parse("1Y").expect("valid").to_years_approx() - 1.0).abs() < 1e-10);
+        assert!((Tenor::parse("5Y").expect("valid").to_years_approx() - 5.0).abs() < 1e-10);
     }
 
     #[test]
@@ -947,7 +961,7 @@ mod tests {
         for tenor_str in &["1M", "3M", "6M", "1Y", "5Y"] {
             let tenor = Tenor::parse(tenor_str).expect("valid");
             let days = tenor.to_days_approx() as f64;
-            let years = tenor.to_years();
+            let years = tenor.to_years_approx();
             // Allow 1 day tolerance due to rounding
             assert!(
                 (days / 365.0 - years).abs() < 0.003,
@@ -1026,7 +1040,11 @@ mod tests {
     fn tenor_rejects_count_exceeding_supported_range() {
         let err = Tenor::new((i32::MAX as u32) + 1, TenorUnit::Months)
             .expect_err("oversized tenor rejected at construction");
-        assert!(err.to_string().contains("maximum supported tenor"));
+        assert!(err.to_string().contains("representation limit"), "{err}");
+        assert!(Tenor::new(i32::MAX as u32, TenorUnit::Months).is_ok());
+        assert!(Tenor::new(u32::MAX, TenorUnit::Days).is_ok());
+        assert!(Tenor::new(u32::MAX / 7 + 1, TenorUnit::Weeks).is_err());
+        assert!(Tenor::new(i32::MAX as u32 / 12 + 1, TenorUnit::Years).is_err());
     }
 
     #[test]
@@ -1040,6 +1058,7 @@ mod tests {
                 None,
                 BusinessDayConvention::Unadjusted,
                 DayCount::ActAct,
+                DayCountContext::default(),
             )
             .expect("year fraction");
 
@@ -1050,15 +1069,70 @@ mod tests {
         // (2025-02-15 is a Saturday -> rolls to Monday 2025-02-17 under Following).
         let cal = crate::dates::calendar_by_id_strict("target2").expect("target2 calendar");
         let start = Date::from_calendar_date(2025, Month::January, 15).expect("valid");
+        // The caller supplies the ICMA reference period; none is invented
+        // from the tenor.
+        let reference = DayCountContext {
+            frequency: Some(Tenor::monthly()),
+            coupon_period: Some((
+                start,
+                Date::from_calendar_date(2025, Month::February, 15).expect("valid"),
+            )),
+            ..DayCountContext::default()
+        };
         let isma_years = Tenor::monthly()
             .to_years_with_context(
                 start,
                 Some(cal),
                 BusinessDayConvention::Following,
                 DayCount::ActActIsma,
+                reference,
             )
             .expect("ActActIsma with adjusted end date");
         assert!(isma_years > 1.0 / 12.0);
+        assert!(
+            Tenor::monthly()
+                .to_years_with_context(
+                    start,
+                    Some(cal),
+                    BusinessDayConvention::Following,
+                    DayCount::ActActIsma,
+                    DayCountContext::default(),
+                )
+                .is_err(),
+            "missing ICMA context is an error, not an invented frequency"
+        );
+    }
+
+    #[test]
+    fn approximations_are_exact_integer_rules() {
+        assert_eq!(Tenor::parse("6M").expect("valid").to_days_approx(), 183);
+        assert_eq!(Tenor::parse("1M").expect("valid").to_days_approx(), 30);
+        assert_eq!(Tenor::parse("2W").expect("valid").to_days_approx(), 14);
+        assert_eq!(
+            Tenor::new(i32::MAX as u32, TenorUnit::Months)
+                .expect("max months")
+                .to_days_approx(),
+            (365 * i64::from(i32::MAX) + 6) / 12
+        );
+        assert_eq!(
+            Tenor::parse("5M")
+                .expect("valid")
+                .payments_per_year()
+                .expect("ratio"),
+            2.4
+        );
+        assert!(
+            Tenor::parse("1D")
+                .expect("valid")
+                .payments_per_year()
+                .is_err()
+        );
+        assert!(
+            Tenor::parse("1W")
+                .expect("valid")
+                .payments_per_year()
+                .is_err()
+        );
     }
 
     #[test]

@@ -146,9 +146,15 @@ fn resolve_bump_targets(
         } else {
             let tenor = Tenor::parse(tenor_str).map_err(|e| Error::InvalidTenor(e.to_string()))?;
             let tenor_years_ctx = tenor
-                .to_years_with_context(as_of, None, BusinessDayConvention::Unadjusted, day_count)
+                .to_years_with_context(
+                    as_of,
+                    None,
+                    BusinessDayConvention::Unadjusted,
+                    day_count,
+                    finstack_quant_core::dates::DayCountContext::default(),
+                )
                 .map_err(|e| Error::Internal(e.to_string()))?;
-            (tenor_years_ctx, tenor.to_years())
+            (tenor_years_ctx, tenor.to_years_approx())
         };
 
         let add = *bp;

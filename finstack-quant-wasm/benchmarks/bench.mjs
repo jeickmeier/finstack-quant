@@ -982,7 +982,7 @@ async function main() {
         () =>
           captureOwned((own) => {
             const tenor = own(w.Tenor.parse('3M'));
-            return { tenor, years: tenor.toYears() };
+            return { tenor, years: tenor.toYearsApprox() };
           }),
         (value) => {
           assert.equal(value.output.tenor.toString(), '3M');

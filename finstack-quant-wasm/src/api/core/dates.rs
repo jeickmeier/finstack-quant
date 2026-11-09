@@ -524,7 +524,7 @@ impl JsDayCount {
 /// await init();
 /// const t = new core.Tenor(3, core.TenorUnit.months());
 /// t.toString();        // "3M"
-/// t.toYears();   // 0.25
+/// t.toYearsApprox();   // 0.25
 ///
 /// const annual = core.Tenor.annual();
 /// annual.toString();   // "1Y"
@@ -722,25 +722,30 @@ impl JsTenor {
 
     /// Approximate length in years (simple estimate, no calendar).
     /// @returns Approximate tenor length in years, such as `0.25` for `"3M"`.
-    #[wasm_bindgen(js_name = toYears)]
-    pub fn to_years(&self) -> f64 {
-        self.inner.to_years()
+    #[wasm_bindgen(js_name = toYearsApprox)]
+    pub fn to_years_approx(&self) -> f64 {
+        self.inner.to_years_approx()
     }
 
-    /// Coupon payments per year implied by this tenor (`3M` gives `4`, `2Y` gives `0.5`).
+    /// Nominal payments per year of a month or year tenor (`3M` gives `4`, `2Y` gives `0.5`).
     /// @returns Payments per year.
+    /// @throws `FinstackError` (kind `validation`) for a day or week tenor, which
+    /// has no nominal payment ratio.
     #[wasm_bindgen(js_name = paymentsPerYear)]
-    pub fn payments_per_year(&self) -> f64 {
-        self.inner.payments_per_year()
+    pub fn payments_per_year(&self) -> Result<f64, JsValue> {
+        self.inner.payments_per_year().map_err(to_js_err)
     }
 
-    /// Approximate length in calendar days (no calendar).
+    /// Approximate length in whole calendar days (no calendar): `nD` → `n`,
+    /// `nW` → `7n`, `nM` → `floor((365n + 6) / 12)`, `nY` → `365n`.
     ///
-    /// @returns Whole days as a number.
-    /// @throws Never for a valid tenor (the Rust tenor bounds keep it within range).
+    /// @returns Whole days as a number (exact: every admitted tenor stays
+    /// below 2^53).
     #[wasm_bindgen(js_name = toDaysApprox)]
-    pub fn to_days_approx(&self) -> Result<i32, JsValue> {
-        i32::try_from(self.inner.to_days_approx()).map_err(|e| to_js_err(e.to_string()))
+    pub fn to_days_approx(&self) -> f64 {
+        // Admitted tenors give at most 365 * (i32::MAX / 12) days, far below
+        // 2^53, so the conversion is exact.
+        self.inner.to_days_approx() as f64
     }
 
     /// Add this tenor to a date (Rust `Tenor::add_to_date`).
@@ -794,16 +799,21 @@ impl JsTenor {
     /// * `calendar_code` - Registered holiday-calendar identifier used to roll
     ///   the end date; omitted skips adjustment.
     /// * `convention` - Business-day convention name applied with the
-    ///   calendar; omitted uses the Rust default (`"modified_following"`).
+    ///   calendar; required, there is no default convention.
+    /// * `ctx` - Caller's `DayCountContext` for conventions that need one; the
+    ///   published facade makes it optional (omitted is the empty context). No
+    ///   frequency or coupon period is invented from the tenor.
     ///
     /// @returns Year fraction between the start and the rolled end date.
     /// @throws `TypeError` for a mistyped argument; `FinstackError` if the date
-    /// is out of range, the convention or calendar is unknown, or the day count
-    /// needs context it cannot get (e.g. Bus/252 without a calendar).
+    /// is out of range, the convention or calendar is unknown, the day count
+    /// needs context `ctx` lacks (e.g. Bus/252 without a calendar), or the
+    /// rolled end precedes the start.
     /// @param asOfEpochDays - Start date as days since 1970-01-01.
     /// @param dayCount - Convention used to measure the span.
     /// @param calendarCode - Registered holiday-calendar identifier used to roll the end date; omitted skips adjustment.
     /// @param convention - Business-day convention name; required (omitting it throws), there is no default convention.
+    /// @param ctx - Caller's `DayCountContext` for conventions that need one; omitted is the empty context.
     #[wasm_bindgen(js_name = toYearsWithContext)]
     pub fn to_years_with_context(
         &self,
@@ -818,11 +828,13 @@ impl JsTenor {
         #[wasm_bindgen(unchecked_optional_param_type = "string | null")] convention: Option<
             JsValue,
         >,
+        #[wasm_bindgen(unchecked_optional_param_type = "DayCountContext")] ctx: &JsDayCountContext,
     ) -> Result<f64, JsValue> {
         let as_of = js_epoch_days(&as_of_epoch_days, "asOfEpochDays")?;
         let (calendar, convention) = roll_rule(calendar_code, convention)?;
+        let context = ctx.inner.to_ctx().map_err(to_js_err)?;
         self.inner
-            .to_years_with_context(as_of, calendar, convention, day_count.inner)
+            .to_years_with_context(as_of, calendar, convention, day_count.inner, context)
             .map_err(to_js_err)
     }
 
@@ -1048,19 +1060,19 @@ mod tests {
     #[test]
     fn tenor_semi_annual_years() {
         let t = JsTenor::semi_annual();
-        assert!((t.to_years() - 0.5).abs() < 0.01);
+        assert!((t.to_years_approx() - 0.5).abs() < 0.01);
     }
 
     #[test]
     fn tenor_annual_years() {
         let t = JsTenor::annual();
-        assert!((t.to_years() - 1.0).abs() < 0.01);
+        assert!((t.to_years_approx() - 1.0).abs() < 0.01);
     }
 
     #[test]
     fn tenor_daily_years() {
         let t = JsTenor::daily();
-        assert!(t.to_years() < 0.01);
+        assert!(t.to_years_approx() < 0.01);
     }
 
     // -- Boundary tests ------------------------------------------------
@@ -1080,8 +1092,8 @@ mod tests {
 
     #[test]
     fn date_from_epoch_days_extreme() {
-        assert!(finstack_quant_core::dates::date_from_epoch_days(i32::MAX).is_none());
-        assert!(finstack_quant_core::dates::date_from_epoch_days(i32::MIN).is_none());
+        assert!(finstack_quant_core::dates::date_from_epoch_days(i32::MAX).is_err());
+        assert!(finstack_quant_core::dates::date_from_epoch_days(i32::MIN).is_err());
     }
 
     #[test]
@@ -1108,11 +1120,8 @@ mod tests {
         assert_eq!(t.unit(), "M");
         assert_eq!(t.months(), Some(3));
         assert_eq!(t.days(), None);
-        assert!((t.payments_per_year() - 4.0).abs() < 1e-12);
-        assert_eq!(
-            t.to_days_approx().expect("days"),
-            i32::try_from(t.inner.to_days_approx()).expect("fits")
-        );
+        assert!((t.payments_per_year().expect("monthly ratio") - 4.0).abs() < 1e-12);
+        assert_eq!(t.to_days_approx(), t.inner.to_days_approx() as f64);
         assert_eq!(JsTenor::biweekly().days(), Some(14));
         assert_eq!(JsTenor::bimonthly().months(), Some(2));
     }

@@ -145,7 +145,8 @@ fn density_price(inst: &CmsOption, market: &MarketContext, as_of: Date, vol: f64
     let m = reference.payments_per_year().expect("reference frequency");
     let weight = |rate: f64| {
         // Direct par-annuity formula, evaluated only at strictly positive rates.
-        let annuity = -(-(inst.cms_tenor.to_years() * m) * (rate / m).ln_1p()).exp_m1() / rate;
+        let annuity =
+            -(-(inst.cms_tenor.to_years_approx() * m) * (rate / m).ln_1p()).exp_m1() / rate;
         (1.0 + rate / m).powf(-m * delay) / annuity
     };
     let sigma_t = vol * t.sqrt();

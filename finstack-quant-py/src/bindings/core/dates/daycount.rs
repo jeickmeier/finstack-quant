@@ -52,7 +52,9 @@ typed_or_label!(
 );
 
 /// Resolve the optional ``ctx`` argument of a year-fraction call.
-fn resolve_context(ctx: Option<&PyDayCountContext>) -> PyResult<DayCountContext<'static>> {
+pub(crate) fn resolve_context(
+    ctx: Option<&PyDayCountContext>,
+) -> PyResult<DayCountContext<'static>> {
     match ctx {
         Some(c) => c.to_rust_ctx(),
         None => Ok(DayCountContext::default()),

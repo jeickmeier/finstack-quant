@@ -118,6 +118,8 @@ impl<'a> BermudanSwaptionTreeValuator<'a> {
                 &swaption.underlying_float_leg,
                 date,
                 as_of,
+                swaption.settlement,
+                crate::swaption::CashSettlementMethod::default(),
             )?;
             model.validate_reuse(discount_curve, as_of, flows.horizon())?;
             exercise_cashflows.insert(step, flows);
@@ -190,8 +192,6 @@ impl<'a> BermudanSwaptionTreeValuator<'a> {
                     strike: self.strike,
                     notional: self.swaption.notional.amount(),
                     option_type: self.swaption.option_type,
-                    settlement: self.swaption.settlement,
-                    cash_method: crate::swaption::CashSettlementMethod::default(),
                 },
             )
         })

@@ -138,6 +138,7 @@ pub fn update_rate_from_binding(
                 calendar,
                 BusinessDayConvention::ModifiedFollowing,
                 curve.day_count(),
+                finstack_quant_core::dates::DayCountContext::default(),
             )
             .map_err(|e| Error::Internal(e.to_string()))?;
 
@@ -159,6 +160,7 @@ pub fn update_rate_from_binding(
             calendar,
             BusinessDayConvention::ModifiedFollowing,
             effective_day_count,
+            finstack_quant_core::dates::DayCountContext::default(),
         )?;
         let converted = convert_continuous_rate(
             zero * tenor_years / output_years,
@@ -177,6 +179,7 @@ pub fn update_rate_from_binding(
                 calendar,
                 BusinessDayConvention::ModifiedFollowing,
                 curve.day_count(),
+                finstack_quant_core::dates::DayCountContext::default(),
             )
             .map_err(|e| Error::Internal(e.to_string()))?;
 
@@ -201,6 +204,7 @@ pub fn update_rate_from_binding(
                 calendar,
                 BusinessDayConvention::ModifiedFollowing,
                 curve.day_count(),
+                finstack_quant_core::dates::DayCountContext::default(),
             )?;
         if !accrual_years.is_finite() || accrual_years <= 0.0 {
             return Err(Error::Validation(format!(
@@ -224,6 +228,7 @@ pub fn update_rate_from_binding(
                 calendar,
                 BusinessDayConvention::ModifiedFollowing,
                 effective_day_count,
+                finstack_quant_core::dates::DayCountContext::default(),
             )?;
         let forward_continuous = Compounding::Simple.convert_rate(
             forward_simple,

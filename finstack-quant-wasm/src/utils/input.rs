@@ -363,7 +363,7 @@ pub fn js_opt_u64(value: Option<&JsValue>, label: &str) -> Result<Option<u64>, J
 /// it is outside the supported date range.
 pub fn js_epoch_days(value: &JsValue, label: &str) -> Result<Date, JsValue> {
     let days: i32 = js_int(value, label)?;
-    finstack_quant_core::dates::date_from_epoch_days(days).ok_or_else(|| {
+    finstack_quant_core::dates::date_from_epoch_days(days).map_err(|_| {
         super::to_js_err(format!(
             "{label}: {days} epoch days is outside the supported date range"
         ))

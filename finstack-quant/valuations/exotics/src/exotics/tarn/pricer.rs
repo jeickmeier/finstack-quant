@@ -356,7 +356,7 @@ impl Hw1fNote for Tarn {
                     )));
                 }
                 event_times.push(fixing_time);
-                let tenor = inst.index_tenor.to_years();
+                let tenor = inst.index_tenor.to_years_approx();
                 let coeffs = term_forward.period_coeffs(fixing_time, tenor)?;
                 let discount_forward = term_forward.curve_forward(fixing_time, tenor)?;
                 let basis = finstack_quant_valuations_core::instruments::pricing::term_fixings::term_fixing_on_date(

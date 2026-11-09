@@ -109,8 +109,7 @@ fn py_days_since_epoch(date: &Bound<'_, PyAny>) -> PyResult<i32> {
 #[pyfunction]
 #[pyo3(name = "date_from_epoch_days", text_signature = "(days)")]
 fn py_date_from_epoch_days<'py>(py: Python<'py>, days: i32) -> PyResult<Bound<'py, PyAny>> {
-    let date = finstack_quant_core::dates::date_from_epoch_days(days).ok_or_else(|| {
-        crate::errors::value_error(format!("epoch days {days} out of valid date range"))
-    })?;
+    let date = finstack_quant_core::dates::date_from_epoch_days(days)
+        .map_err(crate::errors::core_to_py)?;
     crate::bindings::date_utils::date_to_py(py, date)
 }

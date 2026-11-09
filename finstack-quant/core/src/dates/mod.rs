@@ -267,28 +267,39 @@ pub fn days_since_epoch(date: Date) -> i32 {
 
 /// Convert days since Unix epoch (1970-01-01) to a [`Date`].
 ///
-/// Returns `None` if the resulting date is outside the range supported by the
-/// `time` crate.
+/// The exact inverse of [`days_since_epoch`]: signed civil calendar days,
+/// with no time-zone, instant or local-calendar meaning.
 ///
 /// # Examples
 /// ```
 /// use finstack_quant_core::dates::{date_from_epoch_days, Date};
 /// use time::Month;
 ///
-/// let date = date_from_epoch_days(0);
-/// assert_eq!(date, Some(Date::from_calendar_date(1970, Month::January, 1).expect("valid")));
+/// let date = date_from_epoch_days(0)?;
+/// assert_eq!(date, Date::from_calendar_date(1970, Month::January, 1).expect("valid"));
 ///
-/// let y2k = date_from_epoch_days(10957);
-/// assert_eq!(y2k, Some(Date::from_calendar_date(2000, Month::January, 1).expect("valid")));
+/// let y2k = date_from_epoch_days(10957)?;
+/// assert_eq!(y2k, Date::from_calendar_date(2000, Month::January, 1).expect("valid"));
+/// assert!(date_from_epoch_days(i32::MAX).is_err());
+/// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 ///
 /// # Arguments
 ///
-/// * `days` - Signed number of calendar days from 1970-01-01 UTC. Values that
-///   exceed the `time` crate's date range return `None`.
-pub fn date_from_epoch_days(days: i32) -> Option<Date> {
-    let julian_day = days.checked_add(UNIX_EPOCH_JULIAN_DAY)?;
-    Date::from_julian_day(julian_day).ok()
+/// * `days` - Signed number of calendar days from 1970-01-01.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when the day number lies outside the
+/// supported `Date` range.
+pub fn date_from_epoch_days(days: i32) -> crate::Result<Date> {
+    days.checked_add(UNIX_EPOCH_JULIAN_DAY)
+        .and_then(|julian_day| Date::from_julian_day(julian_day).ok())
+        .ok_or_else(|| {
+            crate::Error::Validation(format!(
+                "epoch day {days} is outside the supported date range"
+            ))
+        })
 }
 
 #[cfg(test)]

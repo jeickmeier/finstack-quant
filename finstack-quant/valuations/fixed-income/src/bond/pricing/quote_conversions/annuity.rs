@@ -369,7 +369,7 @@ fn interpolated_swap_quote_rate(
     let Some(calibration) = disc.rate_calibration() else {
         return Ok(None);
     };
-    let yield_periods = yield_frequency.payments_per_year();
+    let yield_periods = yield_frequency.payments_per_year()?;
     let mut swap_quotes = Vec::new();
     for quote in &calibration.quotes {
         let RateCalibrationQuote::Swap {
@@ -382,7 +382,7 @@ fn interpolated_swap_quote_rate(
             continue;
         };
         let time = match pillar {
-            RateCalibrationPillar::Tenor(tenor) => tenor.to_years(),
+            RateCalibrationPillar::Tenor(tenor) => tenor.to_years_approx(),
             RateCalibrationPillar::Date(date) => disc.day_count().year_fraction(
                 disc.base_date(),
                 *date,
@@ -392,7 +392,7 @@ fn interpolated_swap_quote_rate(
         let swap_periods = ConventionRegistry::try_global()?
             .require_rate_index(index_id)?
             .default_fixed_leg_frequency
-            .payments_per_year();
+            .payments_per_year()?;
         let restated =
             yield_periods * ((1.0 + rate / swap_periods).powf(swap_periods / yield_periods) - 1.0);
         swap_quotes.push((time, restated));

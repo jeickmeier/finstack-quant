@@ -12,6 +12,7 @@ let defaultDayCountContext;
 const dayCountContext = (ctx) =>
   ctx === undefined || ctx === null ? (defaultDayCountContext ??= new wasm.DayCountContext()) : ctx;
 const rawYearFraction = wasm.DayCount.prototype.yearFraction;
+const rawToYearsWithContext = wasm.Tenor.prototype.toYearsWithContext;
 const rawSignedYearFraction = wasm.DayCount.prototype.signedYearFraction;
 // wasm-bindgen cannot borrow an optional context: `dayCountContext` resolves it.
 wasm.DayCount.prototype.yearFraction = function yearFraction(start, end, ctx = undefined) {
@@ -24,6 +25,23 @@ wasm.DayCount.prototype.signedYearFraction = function signedYearFraction(
   ctx = undefined
 ) {
   return rawSignedYearFraction.call(this, start, end, dayCountContext(ctx));
+};
+// wasm-bindgen cannot borrow an optional context: `dayCountContext` resolves it.
+wasm.Tenor.prototype.toYearsWithContext = function toYearsWithContext(
+  asOf,
+  dayCount,
+  calendarCode = undefined,
+  convention = undefined,
+  ctx = undefined
+) {
+  return rawToYearsWithContext.call(
+    this,
+    asOf,
+    dayCount,
+    calendarCode,
+    convention,
+    dayCountContext(ctx)
+  );
 };
 
 // `FxMatrix.rate(base, quote, date, policy?)`: an omitted policy is the Rust

@@ -313,7 +313,7 @@ impl CompiledCashFlowPlan {
             {
                 continue;
             }
-            let spec_years = spec_tenor.to_years();
+            let spec_years = spec_tenor.to_years_approx();
             let curve_years = curve.tenor();
             if curve_years > 0.0
                 && spec_years > 0.0

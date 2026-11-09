@@ -155,7 +155,7 @@ impl CmsReferenceSwap<'_> {
     ///
     /// Returns an error when the fixed frequency cannot be resolved.
     pub fn payments_per_year(&self) -> Result<f64> {
-        Ok(self.resolved_fixed_frequency()?.payments_per_year())
+        self.resolved_fixed_frequency()?.payments_per_year()
     }
 
     /// Effective date of the reference swap observed on `fixing_date`: the

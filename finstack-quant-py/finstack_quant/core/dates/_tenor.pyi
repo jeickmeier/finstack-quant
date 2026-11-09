@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime
 from typing import Optional, Union
 from finstack_quant.core.dates._calendar import BusinessDayConvention, HolidayCalendar
-from finstack_quant.core.dates._daycount import DayCount
+from finstack_quant.core.dates._daycount import DayCount, DayCountContext
 
 # Tenor
 
@@ -105,8 +105,10 @@ class Tenor:
         Raises
         ------
         ValueError
-            If *count* is zero or exceeds the supported range for *unit*
-            (200 years).
+            If *count* is zero or exceeds the representation limit for *unit*
+            (days ``2**32 - 1``, weeks ``(2**32 - 1) // 7``, months
+            ``2**31 - 1``, years ``(2**31 - 1) // 12``); these are not
+            maturity caps.
         TypeError
             If *count* is not an ``int`` or *unit* is neither a ``TenorUnit``
             nor a unit letter.
@@ -397,17 +399,20 @@ class Tenor:
 
     def payments_per_year(self) -> float:
         """
-        Coupon payments per year implied by this tenor.
+        Nominal payments per year of a month or year tenor.
 
         Returns
         -------
         float
-            ``12 / months`` for month tenors, ``52 / weeks``, ``365 / days`` or
-            ``1 / years`` (``3M`` gives ``4.0``, ``2Y`` gives ``0.5``).
+            ``12 / months`` for month tenors or ``1 / years`` for year tenors
+            (``3M`` gives ``4.0``, ``5M`` gives ``2.4``, ``2Y`` gives
+            ``0.5``); a nominal ratio, not a count of payments in a year.
 
-        Notes
-        -----
-        This method does not raise; it returns the derived value.
+        Raises
+        ------
+        ValueError
+            For a day or week tenor: no 365, 252 or 52 observation
+            convention is inferred.
 
         Examples
         --------
@@ -471,13 +476,16 @@ class Tenor:
         day_count: Union[DayCount, str],
         calendar: Union[HolidayCalendar, str, None] = None,
         business_day_convention: Union[BusinessDayConvention, str],
+        ctx: Optional[DayCountContext] = None,
     ) -> float:
         """
         Exact year fraction of this tenor from *as_of* under a day count.
 
         Adds the tenor to *as_of* (see :meth:`add_to_date`) and measures the
-        span with *day_count*, so calendars and roll conventions are honoured,
-        unlike the fixed approximation in :meth:`to_years`.
+        span with *day_count* under the caller's *ctx*, so calendars and roll
+        conventions are honoured, unlike the fixed approximation in
+        :meth:`to_years_approx`. No coupon frequency or period is invented
+        from the tenor.
 
         Parameters
         ----------
@@ -489,6 +497,10 @@ class Tenor:
             Holiday calendar for the end-date roll; ``None`` skips adjustment.
         business_day_convention : BusinessDayConvention | str
             Roll rule for the end date.
+        ctx : DayCountContext | None
+            Day-count context (frequency, coupon period, calendar, termination
+            status) for conventions that need one; ``None`` is the empty
+            context.
 
         Returns
         -------
@@ -500,8 +512,9 @@ class Tenor:
         KeyError
             If *calendar* names an unknown calendar.
         ValueError
-            If *day_count* or the convention is unrecognised, or the
-            convention needs context that was not supplied.
+            If *day_count* or the convention is unrecognised, the convention
+            needs context that *ctx* lacks, or the rolled end precedes
+            *as_of*.
 
         Examples
         --------
@@ -578,16 +591,16 @@ class Tenor:
         """
         ...
 
-    def to_years(self) -> float:
+    def to_years_approx(self) -> float:
         """
         Approximate tenor length in years (simple estimate, no calendar).
 
         Returns
         -------
         float
-            Approximate years using days divided by 365, weeks multiplied by
-            seven and divided by 365, months divided by 12, or the stored year
-            count.
+            The declared approximation: days divided by 365, weeks times seven
+            divided by 365, months divided by 12, or the stored year count. It
+            is not an actual dated accrual.
 
         Notes
         -----
@@ -602,8 +615,9 @@ class Tenor:
         Returns
         -------
         int
-            Nearest whole-day length using seven-day weeks, ``365 / 12`` days
-            per month, and 365-day years.
+            Exact integer approximation: ``n`` days, ``7n`` for weeks,
+            ``(365n + 6) // 12`` for months (half-day ties round up, so
+            ``6M`` gives 183) and ``365n`` for years.
 
         Notes
         -----

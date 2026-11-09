@@ -446,7 +446,7 @@ fn rate_and_accrual(tranche: &Tranche, context: &TestContext<'_>) -> Result<(f64
     let accrual = if context.period_start.is_some() {
         projection_accrual
     } else {
-        1.0 / tranche.frequency.payments_per_year()
+        1.0 / tranche.frequency.payments_per_year()?
     };
     Ok((rate, accrual))
 }
@@ -1589,7 +1589,10 @@ mod haircut_tests {
             .coupon
             .try_rate_for_period(as_of, coupon_end, coupon_accrual, as_of, &market)
             .expect("market-aware coupon");
-        let tau = 1.0 / (tranches.tranches[0].frequency).payments_per_year();
+        let tau = 1.0
+            / (tranches.tranches[0].frequency)
+                .payments_per_year()
+                .expect("monthly tranche frequency");
         let total_due = 100_000.0 * all_in_rate * tau;
         let expected = (total_due - collections / trigger_level) / (all_in_rate * tau);
 

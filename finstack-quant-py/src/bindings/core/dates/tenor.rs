@@ -242,13 +242,14 @@ impl PyTenor {
     }
 
     /// Approximate tenor length in years (1D = 1/365, 1W = 7/365, 1M = 1/12, no calendar).
-    fn to_years(&self) -> f64 {
-        self.inner.to_years()
+    fn to_years_approx(&self) -> f64 {
+        self.inner.to_years_approx()
     }
 
-    /// Coupon payments per year implied by this tenor (``3M`` gives ``4.0``, ``2Y`` gives ``0.5``).
-    fn payments_per_year(&self) -> f64 {
-        self.inner.payments_per_year()
+    /// Nominal payments per year of a month or year tenor (``3M`` gives ``4.0``,
+    /// ``2Y`` gives ``0.5``); day and week tenors raise ``ValueError``.
+    fn payments_per_year(&self) -> PyResult<f64> {
+        self.inner.payments_per_year().map_err(core_to_py)
     }
 
     /// Approximate tenor length in calendar days.
@@ -309,7 +310,7 @@ impl PyTenor {
     ///
     /// Adds the tenor to ``as_of`` (see ``add_to_date``) and measures the
     /// result with ``day_count``, so calendars and roll conventions are
-    /// honoured, unlike the fixed approximation in ``to_years()``.
+    /// honoured, unlike the fixed approximation in ``to_years_approx()``.
     ///
     /// Parameters
     /// ----------
@@ -322,6 +323,11 @@ impl PyTenor {
     /// business_day_convention : BusinessDayConvention | str
     ///     Roll rule for the end date (required keyword; there is no default
     ///     convention).
+    /// ctx : DayCountContext | None
+    ///     Caller's day-count context (frequency, coupon period, calendar,
+    ///     termination status) for conventions that need one; ``None`` is the
+    ///     empty context. No frequency or coupon period is invented from the
+    ///     tenor.
     ///
     /// Returns
     /// -------
@@ -333,11 +339,12 @@ impl PyTenor {
     /// KeyError
     ///     If ``calendar`` names an unknown calendar.
     /// ValueError
-    ///     If ``day_count`` or the convention is unrecognized, or the
-    ///     day-count needs context (e.g. ``BUS_252`` without a calendar).
+    ///     If ``day_count`` or the convention is unrecognized, the day-count
+    ///     needs context that ``ctx`` lacks (e.g. ``BUS_252`` without a
+    ///     calendar), or the rolled end precedes ``as_of``.
     #[pyo3(
-        signature = (as_of, *, day_count, calendar=None, business_day_convention),
-        text_signature = "(self, as_of, *, day_count, calendar=None, business_day_convention)"
+        signature = (as_of, *, day_count, calendar=None, business_day_convention, ctx=None),
+        text_signature = "(self, as_of, *, day_count, calendar=None, business_day_convention, ctx=None)"
     )]
     fn to_years_with_context(
         &self,
@@ -345,14 +352,16 @@ impl PyTenor {
         day_count: &Bound<'_, PyAny>,
         calendar: Option<&Bound<'_, PyAny>>,
         business_day_convention: &Bound<'_, PyAny>,
+        ctx: Option<&crate::bindings::core::dates::daycount::PyDayCountContext>,
     ) -> PyResult<f64> {
         let d = py_to_date(as_of)?;
         let cal: Option<&'static dyn HolidayCalendar> =
             calendar.map(extract_calendar).transpose()?;
         let conv = extract_business_day_convention(business_day_convention)?;
         let day_count = crate::bindings::core::dates::daycount::extract_day_count(day_count)?;
+        let context = crate::bindings::core::dates::daycount::resolve_context(ctx)?;
         self.inner
-            .to_years_with_context(d, cal, conv, day_count)
+            .to_years_with_context(d, cal, conv, day_count, context)
             .map_err(core_to_py)
     }
 

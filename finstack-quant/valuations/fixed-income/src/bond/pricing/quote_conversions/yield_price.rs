@@ -81,7 +81,7 @@ pub fn df_from_yield(
             df
         }
         YieldCompounding::Street => {
-            let m = bond_frequency.payments_per_year().max(1.0);
+            let m = bond_frequency.payments_per_year()?.max(1.0);
             let base = 1.0 + ytm / m;
             if base <= 0.0 {
                 return Err(finstack_quant_core::Error::Validation(format!(
@@ -96,7 +96,7 @@ pub fn df_from_yield(
             // and the remaining whole coupon periods are `k-1`. On a period
             // boundary (`t` is a multiple of `1/m`) this collapses to Street:
             // `w = 1/m` and `DF = (1 + y/m)^(-m*t)`.
-            let m = bond_frequency.payments_per_year().max(1.0);
+            let m = bond_frequency.payments_per_year()?.max(1.0);
             let n_full = (t * m).floor();
             let mut w = t - n_full / m;
             if w <= 1e-12 {
@@ -314,7 +314,7 @@ pub(crate) fn price_from_ytm_timed(
                         moosmuller_k = moosmuller_k.saturating_add(1);
                         moosmuller_date = Some(date);
                     }
-                    let m = frequency.payments_per_year().max(1.0);
+                    let m = frequency.payments_per_year()?.max(1.0);
                     moosmuller_df(ytm, m, w, f64::from(moosmuller_k.saturating_sub(1)))?
                 }
                 _ => df_from_yield(ytm, t, comp, frequency)?,

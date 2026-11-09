@@ -13,61 +13,53 @@ use finstack_quant_valuations_fixed_income::bond::pricing::quote_conversions::{
 
 #[test]
 fn test_periods_per_year_monthly() {
+    let ratio = |tenor: Tenor| tenor.payments_per_year().expect("month tenor ratio");
     // 1 month = 12 periods per year
-    assert_eq!(Tenor::monthly().payments_per_year(), 12.0);
+    assert_eq!(ratio(Tenor::monthly()), 12.0);
 
     // 3 months = 4 periods per year (quarterly)
-    assert_eq!(Tenor::quarterly().payments_per_year(), 4.0);
+    assert_eq!(ratio(Tenor::quarterly()), 4.0);
 
     // 6 months = 2 periods per year (semi-annual)
-    assert_eq!(Tenor::semi_annual().payments_per_year(), 2.0);
+    assert_eq!(ratio(Tenor::semi_annual()), 2.0);
 
     // 12 months = 1 period per year (annual)
-    assert_eq!(Tenor::annual().payments_per_year(), 1.0);
-}
+    assert_eq!(ratio(Tenor::annual()), 1.0);
 
-#[test]
-fn test_periods_per_year_days() {
-    // 30 days = 365/30 ≈ 12.17 periods per year
-    let result = Tenor::new(30, TenorUnit::Days)
-        .expect("valid tenor fixture")
-        .payments_per_year();
-    assert!((result - 12.166666).abs() < 0.01);
-
-    // 90 days ≈ 4.06 periods per year
-    let result = Tenor::new(90, TenorUnit::Days)
-        .expect("valid tenor fixture")
-        .payments_per_year();
-    assert!((result - 4.0555).abs() < 0.01);
-
-    // 365 days = 1 period per year
+    // A fractional nominal ratio is kept: 5M gives 2.4.
     assert_eq!(
-        Tenor::new(365, TenorUnit::Days)
-            .expect("valid tenor fixture")
-            .payments_per_year(),
-        1.0
+        ratio(Tenor::new(5, TenorUnit::Months).expect("valid tenor fixture")),
+        2.4
     );
 }
 
 #[test]
-fn test_periods_per_year_years_and_weeks() {
+fn test_periods_per_year_rejects_days_and_weeks() {
+    // No 365, 252 or 52 observation convention is inferred for D/W tenors
+    // (CORE-CONVENTIONS-007 #8).
+    for (count, unit) in [
+        (30, TenorUnit::Days),
+        (365, TenorUnit::Days),
+        (1, TenorUnit::Weeks),
+        (2, TenorUnit::Weeks),
+    ] {
+        assert!(
+            Tenor::new(count, unit)
+                .expect("valid tenor fixture")
+                .payments_per_year()
+                .is_err()
+        );
+    }
+}
+
+#[test]
+fn test_periods_per_year_years() {
     assert_eq!(
         Tenor::new(2, TenorUnit::Years)
             .expect("valid tenor fixture")
-            .payments_per_year(),
+            .payments_per_year()
+            .expect("year tenor ratio"),
         0.5
-    );
-    assert_eq!(
-        Tenor::new(1, TenorUnit::Weeks)
-            .expect("valid tenor fixture")
-            .payments_per_year(),
-        52.0
-    );
-    assert_eq!(
-        Tenor::new(2, TenorUnit::Weeks)
-            .expect("valid tenor fixture")
-            .payments_per_year(),
-        26.0
     );
 }
 

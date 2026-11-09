@@ -720,7 +720,7 @@ impl Swaption {
         let periods = self.fixed_schedule_periods()?;
         Ok(crate::swaption::pricing::hw_cashflows::par_yield_annuity(
             periods.len(),
-            self.get_fixed_frequency().payments_per_year(),
+            self.get_fixed_frequency().payments_per_year()?,
             forward_rate,
         ))
     }

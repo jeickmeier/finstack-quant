@@ -14,9 +14,20 @@ use finstack_quant_models::types::OptionType;
 use finstack_quant_valuations_core::instruments::SettlementType;
 use finstack_quant_valuations_core::instruments::{FixedLegSpec, FloatLegSpec};
 
+/// Annuity an exercise pays against, fixed when the cashflows are built.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum PayoffAnnuity {
+    /// The fixed-leg annuity (physical settlement or collateralized cash price).
+    FixedLeg,
+    /// Par-yield cash annuity on the fixed leg's nominal payment frequency.
+    ParYield { payments_per_year: f64 },
+    /// Zero-coupon cash annuity.
+    ZeroCoupon,
+}
+
 pub(crate) struct HwSwaptionCashflows {
     fixed: Vec<(f64, f64)>,
-    fixed_payments_per_year: f64,
+    payoff: PayoffAnnuity,
     float: Vec<(f64, f64, f64, f64, f64)>,
     spread: f64,
     compounded: bool,
@@ -24,11 +35,19 @@ pub(crate) struct HwSwaptionCashflows {
 }
 
 impl HwSwaptionCashflows {
+    /// Build exercise cashflows for one exercise date.
+    ///
+    /// `settlement` and `cash_method` select the payoff annuity. Only cash
+    /// par-yield settlement needs the fixed leg's nominal payment frequency,
+    /// so only it requires a month or year fixed tenor (owner resolution O5);
+    /// other methods use the actual scheduled cashflows.
     pub(crate) fn new(
         fixed: &FixedLegSpec,
         float: &FloatLegSpec,
         exercise: Date,
         as_of: Date,
+        settlement: SettlementType,
+        cash_method: CashSettlementMethod,
     ) -> Result<Self> {
         use finstack_quant_cashflows::builder::FloatingLegCompounding;
         let fixed = resolve_fixed_leg(fixed, &float.forward_curve_id, &"Swaption underlying")?;
@@ -43,7 +62,13 @@ impl HwSwaptionCashflows {
         };
         let cash_settlement_time = model_time(as_of, fixed.start.max(exercise));
         let fixed_params = fixed.schedule_params(false);
-        let fixed_payments_per_year = fixed.frequency.payments_per_year();
+        let payoff = match (settlement, cash_method) {
+            (SettlementType::Cash, CashSettlementMethod::ParYield) => PayoffAnnuity::ParYield {
+                payments_per_year: fixed.frequency.payments_per_year()?,
+            },
+            (SettlementType::Cash, CashSettlementMethod::ZeroCoupon) => PayoffAnnuity::ZeroCoupon,
+            _ => PayoffAnnuity::FixedLeg,
+        };
         let fixed = build_periods(fixed_params)?
             .iter()
             .filter(|p| p.accrual_end > exercise && p.payment_date > exercise)
@@ -85,7 +110,7 @@ impl HwSwaptionCashflows {
             .collect::<Result<Vec<_>>>()?;
         Ok(Self {
             fixed,
-            fixed_payments_per_year,
+            payoff,
             float,
             spread,
             compounded,
@@ -156,15 +181,15 @@ impl HwSwaptionCashflows {
                 (bond(start)? / bond(end)? * adjustment - 1.0 + self.spread * tau) * bond(pay)?;
         }
         let swap_rate = floating / annuity;
-        let payoff_annuity = match (terms.settlement, terms.cash_method) {
-            (SettlementType::Cash, CashSettlementMethod::ParYield) => {
-                par_yield_annuity(self.fixed.len(), self.fixed_payments_per_year, swap_rate)
+        let payoff_annuity = match self.payoff {
+            PayoffAnnuity::ParYield { payments_per_year } => {
+                par_yield_annuity(self.fixed.len(), payments_per_year, swap_rate)
                     * bond(self.cash_settlement_time)?
             }
-            (SettlementType::Cash, CashSettlementMethod::ZeroCoupon) => {
+            PayoffAnnuity::ZeroCoupon => {
                 self.fixed.iter().map(|&(_, tau)| tau).sum::<f64>() * bond(self.horizon())?
             }
-            _ => annuity,
+            PayoffAnnuity::FixedLeg => annuity,
         };
         let sign = match terms.option_type {
             OptionType::Call => 1.0,
@@ -252,14 +277,14 @@ pub(crate) fn value_with_exercise_today(
         &swaption.underlying_float_leg,
         as_of,
         as_of,
+        swaption.settlement,
+        CashSettlementMethod::default(),
     )?;
     let curve = finstack_quant_models::rates::clock::ModelDiscountCurve::new(discount, as_of)?;
     let terms = HwExerciseTerms {
         strike: swaption.strike_f64()?,
         notional: swaption.notional.amount(),
         option_type: swaption.option_type,
-        settlement: swaption.settlement,
-        cash_method: CashSettlementMethod::default(),
     };
     // Zero volatility switches every convexity adjustment off; the
     // mean-reversion argument is then irrelevant.
@@ -273,8 +298,6 @@ pub(crate) struct HwExerciseTerms {
     pub strike: f64,
     pub notional: f64,
     pub option_type: OptionType,
-    pub settlement: SettlementType,
-    pub cash_method: CashSettlementMethod,
 }
 
 #[cfg(test)]
@@ -285,7 +308,7 @@ mod tests {
     fn exercise_evaluation_propagates_bond_errors_without_zero_substitution() {
         let flows = HwSwaptionCashflows {
             fixed: vec![(2.0, 1.0)],
-            fixed_payments_per_year: 1.0,
+            payoff: PayoffAnnuity::FixedLeg,
             float: vec![],
             spread: 0.0,
             compounded: false,
@@ -295,8 +318,6 @@ mod tests {
             strike: 0.03,
             notional: 1.0,
             option_type: OptionType::Call,
-            settlement: SettlementType::Physical,
-            cash_method: CashSettlementMethod::default(),
         };
         let error = flows
             .evaluate(
@@ -322,8 +343,6 @@ mod tests {
             strike: 0.02,
             notional: 1_000_000.0,
             option_type: OptionType::Call,
-            settlement: SettlementType::Cash,
-            cash_method: CashSettlementMethod::ParYield,
         };
         let mut prices = Vec::new();
         for lag in [0.0, 1.0] {
@@ -331,7 +350,9 @@ mod tests {
             let end = start + 1.0;
             let flows = HwSwaptionCashflows {
                 fixed: vec![(end, 1.0)],
-                fixed_payments_per_year: 1.0,
+                payoff: PayoffAnnuity::ParYield {
+                    payments_per_year: 1.0,
+                },
                 float: vec![(start, end, end, 1.0, start)],
                 spread: 0.0,
                 compounded: false,
@@ -364,8 +385,6 @@ mod tests {
             strike: 0.0,
             notional: 1.0,
             option_type: OptionType::Call,
-            settlement: SettlementType::Physical,
-            cash_method: CashSettlementMethod::CollateralizedCashPrice,
         };
         // Integrate the Brownian loading products directly. Under the payment
         // measure, the log coupon ratio shifts by minus its covariance with
@@ -373,7 +392,7 @@ mod tests {
         for compounded in [false, true] {
             let flows = HwSwaptionCashflows {
                 fixed: vec![(pay, 1.0)],
-                fixed_payments_per_year: 1.0,
+                payoff: PayoffAnnuity::FixedLeg,
                 float: vec![(start, end, pay, 1.0, start)],
                 spread: 0.001,
                 compounded,

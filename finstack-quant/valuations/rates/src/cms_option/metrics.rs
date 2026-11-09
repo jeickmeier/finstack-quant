@@ -264,7 +264,7 @@ impl MetricCalculator for VannaCalculator {
             let conv_adj = convexity_adjustment_with_frequency(
                 atm_vol,
                 time_to_fixing,
-                inst.cms_tenor.to_years(),
+                inst.cms_tenor.to_years_approx(),
                 forward_swap_rate,
                 reference_swap.payments_per_year()?,
                 crate::cms_common::signed_act365f_year_fraction(swap_start, payment_date)?,

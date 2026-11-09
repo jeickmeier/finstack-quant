@@ -828,7 +828,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for CmsSwap {
         deps.add_series_id(
             finstack_quant_core::market_data::fixings::cms_fixing_series_id(
                 self.forward_curve_id.as_str(),
-                self.cms_tenor.to_years(),
+                self.cms_tenor.to_years_approx(),
             ),
         );
         if let FundingLeg::Floating {
@@ -863,7 +863,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CmsSwap {
                 projected_fixings.push(finstack_quant_cashflows::fixings::ProjectedFixing {
                     series_id: finstack_quant_core::market_data::fixings::cms_fixing_series_id(
                         self.forward_curve_id.as_str(),
-                        self.cms_tenor.to_years(),
+                        self.cms_tenor.to_years_approx(),
                     ),
                     date: fixing_date,
                     value: Some(

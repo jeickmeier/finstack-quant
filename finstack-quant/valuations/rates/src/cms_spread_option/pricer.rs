@@ -147,7 +147,7 @@ impl CmsSpreadOptionPricer {
         time_to_expiry: f64,
         vol_provider: &VolSource,
     ) -> Result<CmsSpreadLeg> {
-        let tenor_years = tenor.to_years();
+        let tenor_years = tenor.to_years_approx();
 
         // Seasoned option: both CMS rates fixed at the (past) expiry. Resolve
         // the leg from the recorded fixing (mirroring the cap/floor pricer) —

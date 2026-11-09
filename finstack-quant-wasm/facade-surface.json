@@ -1174,7 +1174,7 @@
       "paymentsPerYear",
       "toDaysApprox",
       "toString",
-      "toYears",
+      "toYearsApprox",
       "toYearsWithContext"
     ],
     "getters": ["count", "days", "months", "unit"]
