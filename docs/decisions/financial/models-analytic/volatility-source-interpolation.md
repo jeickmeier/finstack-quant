@@ -40,6 +40,44 @@ Raw-vol and total-variance surface/cube modes are supported. Price-space or arbi
 
 [source.rs](../../../../finstack-quant/models/src/volatility/source.rs). [vol_surface_tests.rs](../../../../finstack-quant/models/tests/vol_surface_tests.rs), [vol_cube_tests.rs](../../../../finstack-quant/models/tests/vol_cube_tests.rs) and [market_data_diff_tests.rs](../../../../finstack-quant/models/tests/market_data_diff_tests.rs) locate interpolation/shape/convention and shift regressions; cube quote comparisons use the same SABR kernel. Reference: [SABR](../../../REFERENCES.md#hagan-2002-sabr). Storage provenance and interpolation defaults are separate from evaluator accuracy.
 
+## Relationship to the accepted volatility-grid boundary
+
+[CORE-MARKET-14's complete accepted package](../core-market/volatility-grids-and-shocks.md#accepted-decision-explicit-annual-volatility-sources-and-exact-grid-shocks) selects explicit sigma
+source conventions/axes, positive expiries, known strike/shift domains and the
+accepted optional source clock. Reconcile exact-node native sigma and stable
+requested-output evaluation without epsilon expiry division or unnecessary
+squared-vol overflow/underflow. Preserve actual convention guards and full
+clock/displacement metadata through materialization. Record14 does not adopt
+this record's remaining off-grid/cube/tail/aging kernels. Record14 was accepted
+on **2026-11-08**, with reconciliation/qualification pending; this record's
+remaining methodology stays Draft.
+
+## Relationship to the accepted FX forward-input boundary
+
+[CORE-MARKET-15's complete accepted package](../core-market/fx-delta-quotes.md#accepted-decision-one-explicit-fx-quote-profile-and-qualified-forward-inputs)
+requires explicit FX pair/profile/clock compatibility and a named qualified
+delivery-forward input when the active source is FX delta quotes. Replace the
+tenor-as-forward convention and actual caller's zero sentinel; do not infer a
+forward from an unrelated tenor or insert one when missing. Resolve the actual
+source before its dependencies, so explicit sigma overrides and inactive
+branches need no unused FX source/forward. Materialized strike grids retain
+their own explicit convention, interpolation and clock; they are not lossless
+substitutes for quote-space evaluation. Record 15 was accepted on **2026-11-08**,
+with reconciliation/qualification pending; this record's remaining dispatch/
+interpolation methodology remains Draft.
+
+## Relationship to the accepted SABR source boundary
+
+[CORE-MARKET-16's complete accepted package](../core-market/sabr-cube-data.md#accepted-decision-canonical-sabr-sources-and-explicit-evaluated-quote-meaning)
+keeps SABR cubes as parameter/forward sources with an explicit output request;
+Auto/beta inference cannot supply quote units. Preserve exact nodes and shift
+Options without alpha/rho repair or missing-shift filling. Off-grid mixed-beta/
+shift/forward combinations need an explicitly supported qualified model or
+refusal. Require named cube parameter/variance modes, checked failure propagation
+and truthful source-clock/coordinate metadata. Materialized sigma grids select
+their own interpolation, instead of inheriting a parameter-mode label. Record 16 was accepted on **2026-11-08**, with reconciliation/qualification
+pending; this record's complete off-grid/tail/cube kernels remain Draft.
+
 ## Follow-up tracking
 
 Adoption questions and implementation or validation work are tracked in the

@@ -28,6 +28,18 @@ Quote bump and full recalibration would measure a different risk. A uniform cont
 
 Owning source: [adapters/curves.rs](../../../../finstack-quant/scenarios/src/adapters/curves.rs); shared kernels [rate shocks](../core-market/rate-shocks.md). Inline tests inspect exact/interpolated delivery and preservation of forward tenor/reset-lag/grid/day-count/interpolation/extrapolation/FX-policy metadata. [Curve-variant tests](../../../../finstack-quant/scenarios/tests/shocks/curve_variants_test.rs) locate integration evidence. Selected positive-rate monotonicity fixtures do not prove all stressed DFs decrease or that negative forwards are prohibited.
 
+## Relationship to the accepted inflation parameter boundary
+
+[CORE-MARKET-10's complete accepted package](../core-market/inflation-projection.md#accepted-decision-explicit-cpi-levels-and-anchored-annual-parameter-shocks) defines inflation risk on
+original-source annual CAGR parameters with an explicit pinned source origin,
+exact bucket/target coordinates and stable direct CPI reconstruction. It removes
+zero-time implied-inflation substitution and does not promise an off-pillar
+continuous CAGR shift. Advancing the valuation reference does not create a new
+shock anchor. Quoted-inflation recalibration and this scenario's inverse delivery
+choices retain their own owners/status; the current behavior above is observed,
+while record10 was accepted on **2026-11-08** with reconciliation and
+qualification pending.
+
 ## Follow-up tracking
 
 Implementation, adoption and validation work is tracked in the

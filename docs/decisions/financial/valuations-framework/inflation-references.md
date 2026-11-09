@@ -30,6 +30,32 @@ Publication schedules must be supplied to represent not-yet-published past refer
 - [helpers.rs](../../../../finstack-quant/valuations/core/src/instruments/common_impl/helpers.rs): production inflation helpers after the first inline test module; `realized_inflation_index_tests` exercise known/future anchors and stale history. Those tests are behavioral, not vendor calibration evidence.
 - [Deacon–Derry–Mirfendereski](../../../REFERENCES.md#deacon-derry-mirfendereski-2004) and [Kerkhof](../../../REFERENCES.md#kerkhof-2005) are canonical inflation-model context. The precise publication/default policy remains a repository choice awaiting approval.
 
+## Relationship to the accepted CPI source boundary
+
+[CORE-MARKET-10's complete accepted package](../core-market/inflation-projection.md#accepted-decision-explicit-cpi-levels-and-anchored-annual-parameter-shocks) removes projection-curve lag
+metadata, the months/12 shortcut and its implicit principal ratio. Resolve the
+actual contractual/index convention without silently selecting None when that
+metadata disappears. The source supplies checked unlagged absolute levels at
+actual reference dates; contractual base reference CPI and publication/history
+selection retain their owners. A supplied source origin is not automatically a
+published monthly print. The fallback above is observed behavior requiring
+reconciliation under record10's package accepted on **2026-11-08**. This
+record's remaining availability/indexation choices stay Draft; runtime
+reconciliation and qualification of the accepted source contract remain open.
+
+## Relationship to the accepted monthly fixing boundary
+
+[CORE-MARKET-11's complete accepted package](../core-market/inflation-observations.md#accepted-decision-exact-monthly-fixing-snapshots-and-explicit-availability) selects exact positive
+monthly fixing snapshots with explicit version selection and knowledge date K.
+It removes source lag/interpolation/seasonal conventions and makes monthly
+identity independent of release metadata. The shared resolver uses actual
+availability for eligible observations and distinct expected-release facts for
+missing future anchors; missing/overdue facts error instead of defaulting to
+reference-date publication. Reconcile K separately from valuation date and
+apply explicit contractual lag/weights once. The observed fallback above is not
+adopted. Record11 was accepted on **2026-11-08** with reconciliation and
+qualification pending; this record's remaining product/model choices stay Draft.
+
 ## Follow-up tracking
 
 Adoption, implementation and validation work is tracked in the

@@ -34,6 +34,17 @@ Continuous dividend income is simple, not reinvested compounded total return. Th
 
 [equity carry reference](../../../REFERENCES.md#hull-options-futures); [test_equity_trs.rs](../../../../finstack-quant/valuations/tests/instruments/trs/test_equity_trs.rs) and inline [pricer.rs](../../../../finstack-quant/valuations/equity/src/equity_trs/pricer.rs) locate seasoned/dividend/payment cases. Tests establish local leg identities; an independent financing/payment-lag and SIMM reconciliation is not established.
 
+## Relationship to the accepted cash-dividend source boundary
+
+[CORE-MARKET-13's complete accepted package](../core-market/dividend-events.md#accepted-decision-identified-cash-per-share-events-with-explicit-dates) uses gross source cash
+per one explicitly associated share/unit with independent ex/pay dates. Resolve
+actual position entitlement and contractual payment/net-tax treatment once; do
+not read a source magnitude as position cash or apply investor withholding
+twice. Reconcile this product's ex-only cash vectors, payment-date forwarding
+and continuous/discrete priority through qualified adapters. Source aging does
+not settle receivables. Record13 was accepted on **2026-11-08**, with
+reconciliation/qualification pending; these remaining TRS choices stay Draft.
+
 ## Follow-up tracking
 
 Pending decisions, implementation reconciliation and validation work are tracked in

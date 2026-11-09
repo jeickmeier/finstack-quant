@@ -30,6 +30,18 @@ Non-European exercise and physical cap/floor requests error. Rates/strikes are d
 
 The Auto variant prose and test introduction describe negative-rate conversion, while executable convention resolution preserves quote units and rejects invalid Black coordinates. This is a documentation discrepancy, not an adopted conversion fallback.
 
+## Relationship to the accepted SABR source boundary
+
+[CORE-MARKET-16's complete accepted package](../core-market/sabr-cube-data.md#accepted-decision-canonical-sabr-sources-and-explicit-evaluated-quote-meaning)
+requires financially compatible source selection before evaluation. A caplet's
+tenor 0 must not clamp to a same-ID swaption cube's first tenor; supply an actual
+qualified underlying coordinate and supported mapping or refuse that source.
+Cube requests select output units explicitly, without beta inference or implicit
+shift retagging. Scalar overrides with explicit model inputs need no unused
+source. Record 16 was accepted on **2026-11-08**, with reconciliation/qualification
+pending. Its acceptance does not adopt this record's caplet pricing,
+projection, lifecycle or off-grid policy.
+
 ## Follow-up tracking
 
 Adoption, reconciliation and validation work is tracked in the

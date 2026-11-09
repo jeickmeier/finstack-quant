@@ -27,6 +27,19 @@ Alternatives are explicit forward quotes/price curves, foreign-currency cash con
 - Owning [util.rs](../../../../finstack-quant/calibration/src/targets/util.rs), with calls in [SABR](../../../../finstack-quant/calibration/src/targets/vol.rs) and [SVI](../../../../finstack-quant/calibration/src/targets/svi.rs), is inspected.
 - Inspected inline tests use hand-computed continuous-yield/cash formulas and change discount base/ACT360 versus ACT365F clocks; a missing-carry rejection is also inspected. These establish intended algebra and invariance as test evidence, without a run.
 
+## Relationship to the accepted cash-dividend source boundary
+
+[CORE-MARKET-13's complete accepted package](../core-market/dividend-events.md#accepted-decision-identified-cash-per-share-events-with-explicit-dates) replaces mixed dividend
+events with identified gross cash-per-share events and explicit ex/pay dates,
+underlying/share basis and matching currency. Reconcile exact configured
+schedule association rather than ticker/ID guesses, and payment-date cash
+discounting rather than implicit pay=ex. Continuous versus discrete/residual
+carry must be explicit, without precedence inferred from input presence.
+The source decision does not approve this Draft forward/calibration model;
+qualified payment-delay/entitlement adapters or explicit refusals are required.
+Record13 was accepted on **2026-11-08**, with runtime reconciliation and
+independent production qualification pending.
+
 ## Follow-up tracking
 
 Adoption, reconciliation and qualification work is tracked in the

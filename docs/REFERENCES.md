@@ -82,8 +82,23 @@ and implementation and validation evidence.
 ### Hull White 1990 Pricing Interest-Rate Derivatives
 
 - Hull, J., and White, A. "Pricing Interest-Rate-Derivative Securities."
-  *Review of Financial Studies*, 3(4), 573-592. One-factor Hull-White short-rate
-  model used by HW1F calibration and tree pricers.
+  *Review of Financial Studies*, 3(4), 573-592 (1990).
+  [DOI: 10.1093/rfs/3.4.573](https://doi.org/10.1093/rfs/3.4.573).
+  One-factor Hull-White context for calibration and tree pricers; it does not
+  by itself qualify CORE-NUMERICS-21's finite-range step-kernel implementation,
+  schedule conventions or model/financial error budget.
+
+<a id="ou-state-variance-kernel"></a>
+
+### OU state variance kernel
+
+- [QuantLib's official Ornstein–Uhlenbeck implementation](https://raw.githubusercontent.com/lballabio/QuantLib/master/ql/processes/ornsteinuhlenbeckprocess.cpp)
+  gives the constant-coefficient state-noise variance
+  `sigma^2*(1-exp(-2*kappa*dt))/(2*kappa)` and its zero-rate limit.
+  CORE-NUMERICS-21 derives the scheduled/anchored kernel by segment integration;
+  QuantLib's own small-rate cutoff, implementation arithmetic and error policy
+  are not adopted. This is not integrated-short-rate or bond-option variance
+  without the consuming model's additional transformation.
 
 <a id="hull-white-1994-numerical-procedures"></a>
 
@@ -1091,12 +1106,223 @@ and implementation and validation evidence.
 
 ## Numerical Methods, Statistics, And Randomness
 
+<a id="erdely-2017-bernoulli-subcopula"></a>
+
+### Erdely 2017 Bernoulli Joint Laws
+
+- Erdely, A. (2017). "A Subcopula Based Dependence Measure." *Kybernetika*,
+  53(2),231–243. [Primary paper](https://dml.cz/bitstream/handle/10338.dmlcz/146803/Kybernetika_53-2017-2_4.pdf),
+  Example3.1, printed p238, for Bernoulli joint cells, Fréchet bounds,
+  independence and Pearson correlation. [CORE-NUMERICS-16](decisions/financial/core-numerics/correlated-bernoulli.md)
+  selects strict admission and explicit undefined/representation rules; the
+  reference does not certify an implementation's rounded cells or sampling.
+
+<a id="huber-maric-2019-bernoulli-correlations"></a>
+
+### Huber–Marić 2019 Admissible Bernoulli Correlations
+
+- Huber, M., and Marić, N. (2019). "Admissible Bernoulli Correlations."
+  *Journal of Statistical Distributions and Applications*, 6,article2.
+  [Primary article/DOI10.1186/s40488-019-0091-5](https://doi.org/10.1186/s40488-019-0091-5).
+  The two-variable Fréchet characterization is separate from multivariate
+  compatibility: pairwise feasibility and PSD alone do not guarantee a joint
+  Bernoulli law. This supports the ownership limit in CORE-NUMERICS-16, not an
+  automatic projection or financial dependence-model choice.
+
+<a id="laurent-massart-2000-chi-squared"></a>
+
+### Laurent–Massart 2000 Chi-Squared Concentration
+
+- Laurent, B., and Massart, P. (2000). "Adaptive Estimation of a Quadratic
+  Functional by Model Selection." *Annals of Statistics*, 28(5),1302–1338.
+  [DOI: 10.1214/aos/1015957395](https://doi.org/10.1214/aos/1015957395),
+  section4.1/equation4.3 for an integer-dimension chi-squared upper-tail bound.
+  The real-df Gamma-MGF extension and wider numerical bracket in
+  [CORE-NUMERICS-15](decisions/financial/core-numerics/chi-squared-inversion.md)
+  are derived there explicitly; the concentration result does not establish
+  floating-point inversion accuracy or finite-budget success.
+
+<a id="marsaglia-tsang-2000-gamma"></a>
+
+### Marsaglia–Tsang 2000 Gamma Sampling
+
+- Marsaglia, G., and Tsang, W. W. (2000). "A Simple Method for Generating Gamma
+  Variables." *ACM Transactions on Mathematical Software*, 26(3), 363–372.
+  [DOI: 10.1145/358407.358414](https://doi.org/10.1145/358407.358414);
+  [coauthor institutional record/abstract](https://hub.hku.hk/handle/10722/89056).
+  Primary provenance for the normal/cubic rejection method, squeeze and
+  positive-shape augmentation. The checked finite-RNG/component/budget profile
+  in [CORE-NUMERICS-14](decisions/financial/core-numerics/beta-gamma-sampling.md)
+  requires independent numerical/statistical qualification; the ideal method
+  does not certify every finite implementation or recovery model.
+
+<a id="devroye-1986-random-variates"></a>
+
+### Devroye 1986 Non-Uniform Random Variate Generation
+
+- Devroye, L. (1986). *Non-Uniform Random Variate Generation*. Springer.
+  [Author-hosted chapter IX](https://luc.devroye.org/chapter_nine.pdf),
+  theorem3.1 (printed pp402–403) for independent-Gamma beta ratios and printed
+  p420 for positive-shape augmentation. The distributional identities support
+  the selected sampler construction, not endpoint approximations, unchecked
+  numerical floors or a production tail/accuracy guarantee.
+  [Author-hosted chapter V](https://luc.devroye.org/chapter_five.pdf), section4.4,
+  printed pp235–236, derives the Box–Muller normal transform used as ideal-law
+  provenance in CORE-NUMERICS-17; finite grids and project endpoint/cache profiles
+  need their own qualification.
+
+<a id="nist-binomial"></a>
+
+### Binomial Law and Mode
+
+- NIST/SEMATECH *e-Handbook of Statistical Methods*,
+  [Binomial Distribution](https://www.itl.nist.gov/div898/handbook/eda/section3/eda366i.htm):
+  PMF, support, common per-trial probability and mode inequality. The
+  [Boost binomial documentation](https://www.boost.org/doc/libs/latest/libs/math/doc/html/math_toolkit/dist_ref/dists/binomial_dist.html)
+  provides a maintained implementation reference; [R's binomial documentation](https://www.stat.ethz.ch/R-manual/R-devel/library/stats/html/Binomial.html)
+  distinguishes probability from direct logarithmic evaluation.
+  [CORE-NUMERICS-13](decisions/financial/core-numerics/binomial-mass.md) selects a
+  derived full-array mode-relative recurrence with checked normalization. Its
+  resource cap, numerical admission gate and arithmetic/error policy are project
+  decisions; these sources do not certify its per-cell/tail accuracy or credit
+  model suitability.
+
+<a id="nist-special-functions"></a>
+
+### NIST DLMF Special Functions
+
+- NIST *Digital Library of Mathematical Functions*: [Gamma definition](https://dlmf.nist.gov/5.2),
+  [Gamma recurrence](https://dlmf.nist.gov/5.5.E1),
+  [Gamma increment series](https://dlmf.nist.gov/5.7),
+  [Stirling expansion and remainders](https://dlmf.nist.gov/5.11),
+  [error-function definitions](https://dlmf.nist.gov/7.2),
+  [continued fractions](https://dlmf.nist.gov/7.9) and
+  [erfc asymptotic expansion/remainder](https://dlmf.nist.gov/7.12.E1).
+  For chi-squared inversion, [NIST's central-law CDF](https://www.itl.nist.gov/div898/handbook/eda/section3/eda3666.htm),
+  [incomplete-Gamma definitions](https://dlmf.nist.gov/8.2),
+  [special values](https://dlmf.nist.gov/8.4),
+  [lower series](https://dlmf.nist.gov/8.7.E1),
+  [shift recurrence](https://dlmf.nist.gov/8.8.E5) and
+  [upper fraction](https://dlmf.nist.gov/8.9.E2) identify the exact functions.
+  Primary mathematical provenance for the selected real functions and bounded
+  reference calculations in [CORE-NUMERICS-12](decisions/financial/core-numerics/distribution-functions.md)
+  and [CORE-NUMERICS-15](decisions/financial/core-numerics/chi-squared-inversion.md).
+  Exact-function identities and series remainder bounds do not certify the total
+  floating error, convergence or financial suitability of an implementation.
+
+<a id="statrs-018-special-functions"></a>
+
+### statrs 0.18 Special-Function Profiles
+
+- statrs0.18.0 [normal](https://github.com/statrs-dev/statrs/blob/v0.18.0/src/distribution/normal.rs),
+  [erf](https://github.com/statrs-dev/statrs/blob/v0.18.0/src/function/erf.rs),
+  [Gamma](https://github.com/statrs-dev/statrs/blob/v0.18.0/src/function/gamma.rs),
+  [Student-t](https://github.com/statrs-dev/statrs/blob/v0.18.0/src/distribution/students_t.rs)
+  and [beta](https://github.com/statrs-dev/statrs/blob/v0.18.0/src/function/beta.rs)
+  source; version pinned in [Cargo.lock](../Cargo.lock). These identify the actual
+  Boost-derived inverse-error-function and AS64/AS109 inverse-beta profiles,
+  including dependency stopping/range limitations. The owning
+  [distribution decision](decisions/financial/core-numerics/distribution-functions.md)
+  selects checked domains, outputs and a narrowly bounded private Student-t
+  adaptation; dependency reuse alone supplies no accuracy or work certificate.
+
 <a id="higham-accuracy-and-stability"></a>
 
 ### Higham Accuracy And Stability
 
 - Higham, N. J. *Accuracy and Stability of Numerical Algorithms*. Canonical
   reference for floating-point error analysis and numerically stable algorithms.
+
+<a id="higham-2002-nearest-correlation"></a>
+
+### Higham 2002 Nearest Correlation Matrix
+
+- Higham, N. J. (2002). *Computing the nearest correlation matrix—A problem
+  from finance*. IMA Journal of Numerical Analysis, 22(3), 329–343.
+  [DOI: 10.1093/imanum/22.3.329](https://doi.org/10.1093/imanum/22.3.329);
+  [author's paper](https://eprints.maths.manchester.ac.uk/232/1/paper3.pdf).
+  Canonical reference for the Frobenius nearest-correlation problem and
+  modified alternating projections with Dykstra correction. The paper's
+  displayed stopping quantities use infinity norms; the
+  [author's later implementation](https://nhigham.com/2013/02/13/the-nearest-correlation-matrix/)
+  uses three relative Frobenius quantities. Finite stopping is not a certified
+  objective-gap or exact-PSD guarantee.
+
+<a id="higham-1993-summation"></a>
+
+### Higham 1993 Floating Point Summation
+
+- Higham, N. J. (1993). *The Accuracy of Floating Point Summation*. SIAM
+  Journal on Scientific Computing, 14(4), 783–799.
+  [Author's paper](https://nhigham.com/wp-content/uploads/2023/10/high93s.pdf).
+  Reference for ordered floating-point summation, compensation and conditional
+  error analysis; no method is uniformly more accurate for every sequence.
+
+<a id="hyndman-fan-1996-quantiles"></a>
+
+### Hyndman And Fan 1996 Sample Quantiles
+
+- Hyndman, R. J., and Fan, Y. (1996). *Sample Quantiles in Statistical Packages*.
+  The American Statistician, 50(4), 361–365.
+  [Author's page and errata](https://robjhyndman.com/publications/quantiles/);
+  [DOI: 10.1080/00031305.1996.10473566](https://doi.org/10.1080/00031305.1996.10473566).
+  Reference for sample-quantile definitions; the selected R7 convention is also
+  specified in the [official R manual](https://www.stat.ethz.ch/R-manual/R-patched/library/stats/html/quantile.html).
+  Estimator agreement does not adopt another package's range/missing-data/fuzz rules.
+
+<a id="pebay-2008-moments"></a>
+
+### Pebay 2008 Parallel Centered Moments
+
+- Pébay, P. P. (2008). *Formulas for Robust, One-Pass Parallel Computation of
+  Covariances and Arbitrary-Order Statistical Moments*. Sandia report
+  SAND2008-6212. [Sandia publication record](https://www.sandia.gov/research/publications/details/formulas-for-robust-one-pass-parallel-computation-of-covariances-and-arbitr-2008-09-01/).
+  Reference for incremental/parallel centered-moment and covariance algebra,
+  not a universal finite-range or rounding-accuracy guarantee.
+
+<a id="parkinson-1980-range-variance"></a>
+
+### Parkinson 1980 Range Variance
+
+- Parkinson, M. (1980). *The Extreme Value Method for Estimating the Variance
+  of the Rate of Return*. Journal of Business, 53(1), 61–65.
+  [DOI: 10.1086/296071](https://doi.org/10.1086/296071).
+  Reference for the high–low squared-log-range estimator under its diffusion
+  assumptions, not universal efficiency for discretely recorded market extrema.
+
+<a id="garman-klass-1980-range-variance"></a>
+
+### Garman And Klass 1980 Range Variance
+
+- Garman, M. B., and Klass, M. J. (1980). *On the Estimation of Security Price
+  Volatilities from Historical Data*. Journal of Business, 53(1), 67–78.
+  [DOI: 10.1086/296072](https://doi.org/10.1086/296072);
+  [author manuscript hosted by CME](https://www.cmegroup.com/trading/fx/files/a_estimation_of_security_price.pdf).
+  Distinguish the selected practical estimator (19a) from the full optimized
+  quadratic (19) and opening-gap extension (20).
+
+<a id="rogers-satchell-1991-range-variance"></a>
+
+### Rogers And Satchell 1991 Range Variance
+
+- Rogers, L. C. G., and Satchell, S. E. (1991). *Estimating Variance from High,
+  Low and Closing Prices*. Annals of Applied Probability, 1(4), 504–512.
+  [DOI: 10.1214/aoap/1177005835](https://doi.org/10.1214/aoap/1177005835);
+  [author paper](https://www.skokholm.co.uk/wp-content/uploads/2016/01/R_Satchell_HLOC.pdf).
+  Drift independence is model-conditional; discrete recorded extrema introduce
+  a separate estimation error and opening gaps require their own treatment.
+
+<a id="yang-zhang-2000-range-variance"></a>
+
+### Yang And Zhang 2000 Range Variance
+
+- Yang, D., and Zhang, Q. (2000). *Drift-Independent Volatility Estimation
+  Based on High, Low, Open, and Close Prices*. Journal of Business, 73(3),
+  477–492. [DOI: 10.1086/209650](https://doi.org/10.1086/209650);
+  [paper](https://www.atmif.com/papers/range.pdf).
+  Reference for complete periods with a preceding close, overnight/intraday
+  sample variances and mean Rogers–Satchell. The selected practical weight
+  (18) fixes alpha=1.34; the general weight (10) is parameter-dependent.
 
 <a id="press-numerical-recipes"></a>
 
@@ -1158,13 +1384,46 @@ and implementation and validation evidence.
   Canonical reference for shape-preserving (monotone) cubic Hermite
   interpolation.
 
+<a id="expression-three-valued-logic"></a>
+
+### Expression three-valued logic
+
+- PostgreSQL 18's official [logical truth tables](https://www.postgresql.org/docs/18/functions-logical.html)
+  and [unknown comparison rules](https://www.postgresql.org/docs/18/functions-comparison.html)
+  provide an established NULL-valued comparison/strong-three-valued-logic
+  reference. CORE-NUMERICS-22 selects those value tables with runtime NaN as its
+  own missing carrier; it does not adopt PostgreSQL floating NaN semantics,
+  SQL syntax/optimizer/order or statements-evaluator compatibility.
+
+<a id="binary64-decimal-quantization"></a>
+
+### Exact decimal quantization of binary64 values
+
+- [num-rational 0.4.2 source](https://raw.githubusercontent.com/rust-num/num-rational/num-rational-0.4.2/src/lib.rs)
+  supplies exact from_float decomposition, Ratio::round with half-away integer
+  ties, and ratio_to_f64 with guard/remainder nearest-even restoration.
+  [Core dependencies](../finstack-quant/core/Cargo.toml) and the
+  [lockfile](../Cargo.lock) already include this version. CORE-NUMERICS-22 uses
+  these bounded existing primitives for exact binary-input decimal quantization
+  and rejects nonfinite final restoration. Its full-i32 tails, language missing/
+  error controls and financial-owner boundaries are separately selected project
+  policy; source inspection is not executed production qualification or Money
+  rounding/Excel compatibility.
+
 <a id="joe-kuo-2008-sobol"></a>
 
 ### Joe Kuo 2008 Sobol
 
 - Joe, S., and Kuo, F. Y. "Constructing Sobol Sequences with Better
   Two-Dimensional Projections." *SIAM Journal on Scientific Computing*, 30(5),
-  2635-2654. Direction numbers used by the Sobol generator.
+  2635-2654. [Author data page](https://web.maths.unsw.edu.au/~fkuo/sobol/)
+  and [construction notes](https://web.maths.unsw.edu.au/~fkuo/sobol/joe-kuo-notes.pdf).
+  CORE-NUMERICS-18 identifies the D6 `new-joe-kuo-6.21201` subset for dimensions
+  2..40, rather than an interchangeable Joe–Kuo-labelled table. Its existing
+  [golden-data record](../finstack-quant/core/tests/data/README_sobol.md)
+  provides retrieval date/full-file checksum; subset agreement is not fresh
+  authentication of that full author file. Natural binary and Gray point order
+  require explicit distinction.
 
 <a id="sobol-1967"></a>
 
@@ -1179,15 +1438,53 @@ and implementation and validation evidence.
 ### Owen 1995 Scrambling
 
 - Owen, A. B. "Randomly Permuted (t,m,s)-Nets and (t,s)-Sequences." Monte Carlo
-  and Quasi-Monte Carlo Methods in Scientific Computing, 299-317. Owen
-  scrambling of Sobol nets.
+  and Quasi-Monte Carlo Methods in Scientific Computing, 299-317. Canonical
+  random-permutation theory; this citation does not establish the project's
+  deterministic prefix-hash seed law, unbiasedness or variance guarantees.
+
+<a id="owen-2021-sobol-first-point"></a>
+
+### Owen 2021 Sobol first point
+
+- Owen, A. B. "On dropping the first Sobol' point."
+  [arXiv:2008.08051v4](https://arxiv.org/abs/2008.08051v4), revised 2021-12-12.
+  Explains how first-point removal, thinning and inappropriate sample counts
+  can damage net structure. Independent replicate means, rather than within-net
+  points, are the units for replicate uncertainty under the relevant assumptions;
+  this paper does not qualify the project's prefix-hash family or owner policy.
 
 <a id="box-muller-1958"></a>
 
 ### Box Muller 1958
 
 - Box, G. E. P., and Muller, M. E. "A Note on the Generation of Random Normal
-  Deviates." Polar/Box-Muller transform for Gaussian sampling.
+  Deviates." *Annals of Mathematical Statistics*, 29(2),610–611 (1958).
+  [DOI: 10.1214/aoms/1177706645](https://doi.org/10.1214/aoms/1177706645).
+  Polar/Box–Muller ideal Gaussian transform; CORE-NUMERICS-17's reflected
+  half-open binary64 inputs/cache/error choices require separate qualification.
+
+<a id="brownian-bridge-conditional-law"></a>
+
+### Conditional Brownian Bridge Evaluation
+
+- [QMCPy's official Brownian bridge demonstration](https://qmcsoftware.org/qmcpy/demos/brownian_bridge/)
+  supplies a maintained implementation reference for conditional Gaussian path
+  construction. The terminal-first DFS index mapping, bounded topology, stable
+  arithmetic and scratch/error contract in [CORE-NUMERICS-17](decisions/financial/core-numerics/pseudorandom-and-bridge.md)
+  are project choices. The reference does not certify global variance ordering,
+  every finite-grid payoff, QMC convergence rates or continuous barrier monitoring.
+
+<a id="poisson-count-quantile"></a>
+
+### Poisson Count Quantiles
+
+- [R's official Poisson documentation](https://stat.ethz.ch/R-manual/R-patched/library/stats/html/Poisson.html)
+  defines the smallest-count CDF inverse and expected-count parameter.
+  [Boost's Poisson documentation](https://www.boost.org/doc/libs/latest/libs/math/doc/html/math_toolkit/dist_ref/dists/poisson_dist.html)
+  identifies the regularized-Gamma CDF/survival relations. The project selects its
+  own checked bounded integer search and exact count domain in CORE-NUMERICS-17;
+  neither source's complete inversion/rounding policy or runtime implementation
+  is adopted as a numerical oracle.
 
 <a id="salmon-2011-philox"></a>
 
@@ -1202,16 +1499,38 @@ and implementation and validation evidence.
 ### O'Neill 2014 PCG
 
 - O'Neill, M. E. "PCG: A Family of Simple Fast Space-Efficient Statistically
-  Good Algorithms for Random Number Generation." Permuted congruential
-  generators.
+  Good Algorithms for Random Number Generation." (2014).
+  [Author's paper page](https://www.pcg-random.org/paper.html). Permuted
+  congruential generators; distinguish the family reference from the pinned
+  rand_pcg implementation and CORE-NUMERICS-17's explicit initialization/grid
+  profile. Distinct streams, seeds and long period alone establish neither
+  empirical independence nor non-overlapping consumed windows.
 
 <a id="mandelbrot-van-ness-1968"></a>
 
 ### Mandelbrot Van Ness 1968
 
 - Mandelbrot, B., and Van Ness, J. "Fractional Brownian Motions, Fractional
-  Noises and Applications." *SIAM Review*, 10(4), 422-437. Fractional Brownian
-  motion and the Hurst exponent.
+  Noises and Applications." *SIAM Review*, 10(4), 422-437 (1968).
+  [DOI/primary paper](https://epubs.siam.org/doi/pdf/10.1137/1010093).
+  Stationary/self-similar increments (Theorem 3.3), amplitude convention
+  (Corollary 3.4), separated-increment covariance (section 5.1) and
+  nondifferentiability (Proposition 4.2). CORE-NUMERICS-19 explicitly selects
+  unit variance at time one; its arithmetic/gate and nonnegative-time admission
+  are project choices, not the unmodified moving-average normalization or a
+  financial-model recommendation.
+
+<a id="gao-liu-oosterlee-temme-2023-fbm"></a>
+
+### Gao Liu Oosterlee Temme 2023 fBM
+
+- Gao, F., Liu, S., Oosterlee, C. W., and Temme, N. M. "Evaluation of integrals
+  with fractional Brownian motion for different Hurst indices." *International
+  Journal of Computer Mathematics* (2023), DOI: 10.1080/00207160.2022.2163166.
+  [Author/institutional paper](https://ir.cwi.nl/pub/32819/32819.pdf), equation 1,
+  explicitly states the standard unit-normalized covariance and Brownian limit.
+  This source anchors that mathematical definition, not the project's numerical
+  cancellation gate, rounded PSD, sampler policy or financial accuracy.
 
 <a id="in-t-hout-welfert-2009"></a>
 
@@ -1420,10 +1739,15 @@ and implementation and validation evidence.
 
 - Ledoit, O., & Wolf, M. (2004). "A well-conditioned estimator for
   large-dimensional covariance matrices." *Journal of Multivariate Analysis*,
-  88(2), 365–411. Canonical reference for identity-target covariance
-  shrinkage with analytic optimal intensity, implemented in
-  `finstack_quant_core::math::linalg::ledoit_wolf_shrinkage` and consumed by
-  `CovarianceStrategy::LedoitWolf` in the credit factor-model calibrator.
+  88(2), 365–411. [DOI: 10.1016/S0047-259X(03)00096-4](https://doi.org/10.1016/S0047-259X(03)00096-4);
+  [primary paper](https://perso.ens-lyon.fr/patrick.flandrin/LedoitWolf_JMA2004.pdf).
+  Scaled-identity linear covariance shrinkage with an estimated intensity and
+  asymptotic quadratic-risk optimality under the paper's IID, moment and
+  dimensional conditions, not a finite-sample oracle or universal conditioning
+  guarantee. The estimated-mean population-normalized plug-in profile in
+  `finstack_quant_core::math::linalg::ledoit_wolf_shrinkage` and its
+  `CovarianceStrategy::LedoitWolf` credit consumer require separate numerical
+  and financial qualification; see the [owning decision](decisions/financial/core-numerics/covariance-shrinkage.md).
 
 <a id="artzner1999CoherentRisk"></a>
 

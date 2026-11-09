@@ -31,6 +31,29 @@ Alternatives include unconstrained per-tranche compound correlation, global base
 
 No execution or external model certification occurred.
 
+## Relationship to the accepted base-correlation boundary
+
+[CORE-MARKET-18's complete accepted package](../core-market/base-correlation.md#accepted-decision-exact-base-correlation-sources-and-unclipped-native-shocks)
+requires strict ordered canonical detachment-percent/rho data and permits an
+explicit constant singleton. Remove synthetic second knots and tolerance-based
+source deduplication. Fraction-valued quote inputs convert to percent exactly
+once; retain actual maturity/series/pool/hazard/recovery/loss-model provenance.
+A monotone-fit constraint and restricted solver bounds are calibration choices,
+not core source admission or a tranche no-arbitrage theorem. Record 18 was accepted on **2026-11-08**, with reconciliation/qualification
+pending. Its acceptance does not adopt this record's solver, fit constraints/budgets, quote
+selection or complete publication methodology.
+
+## Relationship to the accepted credit-pool boundary
+
+[CORE-MARKET-19's complete accepted package](../core-market/credit-index-composition.md#accepted-decision-explicit-credit-pool-composition-and-exact-issuer-contracts)
+requires published CreditIndexData to retain explicit pool composition, complete
+Named effective inputs, exact reference bindings and financial construction
+association. Refreshed composites must preserve mode, membership, cash recovery
+and weights when replacing correlation/hazard sources. Typed context restoration
+is structural evidence, not new source fit authority. Record 19 was accepted on **2026-11-08**, with reconciliation/qualification
+pending. Its acceptance does not adopt this record's bootstrap, monotone-fit constraints, quote
+selection or acceptance budgets.
+
 ## Follow-up tracking
 
 Adoption, reconciliation and qualification work is tracked in the

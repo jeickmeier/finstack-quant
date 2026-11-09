@@ -33,6 +33,17 @@ Owning source: [adapters/curves.rs](../../../../finstack-quant/scenarios/src/ada
 
 A pure triangular shock at the requested time or calibrated-quote bucket risk are alternatives with different economics.
 
+## Relationship to the accepted inflation parameter boundary
+
+[CORE-MARKET-10's complete accepted package](../core-market/inflation-projection.md#accepted-decision-explicit-cpi-levels-and-anchored-annual-parameter-shocks) selects exact original
+positive source-pillar annual-growth parameters. Its direct shock is distinct
+from this record's inverse solve to force an evaluated off-pillar quantity.
+Reconcile the native inflation adapter and remove zero-time growth sentinels
+without treating inverse delivery or tolerance matching as an implicit core
+parameter operation. Record10 does not adopt this Draft solve or its objective/
+acceptance rules. Record10 was accepted on **2026-11-08**; its runtime
+reconciliation and independent qualification remain pending.
+
 ## Follow-up tracking
 
 Implementation, adoption and validation work is tracked in the

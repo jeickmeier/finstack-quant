@@ -26,6 +26,18 @@ Owning source: [adapters/fx.rs](../../../../finstack-quant/scenarios/src/adapter
 
 A currency-factor shock followed by coherent cross reconstruction is an alternative economic definition; rejecting inconsistencies is another. The present warning-only cross policy is observed, not approved.
 
+## Relationship to the accepted generic scalar boundary
+
+[CORE-MARKET-12's complete accepted package](../core-market/scalar-series-and-fixings.md#accepted-decision-validated-values-literal-sampling-and-qualified-exact-fixings) makes MarketScalar
+construction checked and generic transforms native Additive/Fraction or literal
+Multiplicative/Factor. This scenario's explicitly relative price operation
+resolves its percentage at the financial owner and sends the checked intended
+multiplier; it must not depend on generic Percent changing meaning between
+Money and numeric storage. Preserve accepted Money Decimal admission/arithmetic
+and typed FX ownership. Record12 was accepted on **2026-11-08**, with
+reconciliation/qualification pending; this note does not adopt the
+remaining scenario diagnostic/targeting choices above.
+
 ## Follow-up tracking
 
 Implementation, adoption and validation work is tracked in the

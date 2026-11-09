@@ -35,6 +35,18 @@ Cash-settlement annuities are materially distinct supported branches; equality o
 
 A physical-settlement label does not implement exercise-state transfer.
 
+## Relationship to the accepted SABR source boundary
+
+[CORE-MARKET-16's complete accepted package](../core-market/sabr-cube-data.md#accepted-decision-canonical-sabr-sources-and-explicit-evaluated-quote-meaning)
+requires active cube requests to select Normal/Black/ShiftedBlack explicitly,
+retain the actual evaluated displacement and agree with the source expiry clock
+and underlying reference. Match the contractual tenor and distinguish stored
+construction forwards from the live pricing forward; choose any frozen/rebased
+smile model explicitly. Scalar sigma plus explicit model inputs must not inspect
+unused same-ID cubes. Record 16 was accepted on **2026-11-08**, with reconciliation/qualification
+pending. Its acceptance does not adopt this record's
+settlement, pricing, degenerate Greeks or smile dynamics.
+
 ## Follow-up tracking
 
 Adoption, reconciliation and validation work is tracked in the

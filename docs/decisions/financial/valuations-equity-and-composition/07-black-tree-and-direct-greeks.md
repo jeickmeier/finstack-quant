@@ -36,6 +36,18 @@ Escrowed dividends are a Black approximation and are rejected by stochastic-vola
 
 [Black–Scholes](../../../REFERENCES.md#black-scholes-1973), [Merton](../../../REFERENCES.md#merton-1973), [Haug](../../../REFERENCES.md#haug-2007-option-formulas), [American numerical comparison context](../../../REFERENCES.md#broadie-detemple-1996); [test_greeks.rs](../../../../finstack-quant/valuations/tests/instruments/equity_option/test_greeks.rs), [test_put_call_parity.rs](../../../../finstack-quant/valuations/tests/instruments/equity_option/test_put_call_parity.rs) and [test_finance_regressions.rs](../../../../finstack-quant/valuations/tests/instruments/equity_option/test_finance_regressions.rs) locate formula identities and dividend/exercise regressions. These share production numerical components in places; no complete independent LR convergence envelope was reviewed. The [QuantLib-labelled equity fixture](../../../../finstack-quant/valuations/tests/golden/data/pricing/quantlib/equity_option/spx_atm_call_1y_quantlib.json) carries provenance and tolerances whose generation was not requalified in this audit.
 
+## Relationship to the accepted cash-dividend source boundary
+
+[CORE-MARKET-13's complete accepted package](../core-market/dividend-events.md#accepted-decision-identified-cash-per-share-events-with-explicit-dates) requires identified
+cash-per-share events with explicit ex/pay dates. Reconcile high-level ex-only
+numeric dividend inputs through a financially qualified source adapter, retaining
+underlying/share/currency and announcement/forecast meaning. A delayed payment
+is not automatically an instantaneous cash jump; map claim value and cum/ex
+exercise phases only under the selected model or reject unsupported cases.
+Record13 does not certify these Black/tree/Greek choices, which remain Draft;
+the source package was accepted on **2026-11-08**, with reconciliation and
+independent qualification pending.
+
 ## Follow-up tracking
 
 Pending decisions, implementation reconciliation and validation work are tracked in

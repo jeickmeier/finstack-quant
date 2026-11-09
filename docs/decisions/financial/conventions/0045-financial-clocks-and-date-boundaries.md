@@ -4,14 +4,19 @@
 
 **Decision date:** 2026-11-05
 
+**Amended:** 2026-11-07 — complete volatility-mapping, dated-use, variance-
+conversion and fixing-eligibility package accepted. Implementation
+reconciliation and independent qualification remain open.
+
 **Category:** Financial conventions
 
 **Implementation status:** Shared date and discount-factor primitives located;
 pricer adoption, volatility metadata, and operation-specific defaults remain
 partially traced.
 
-**Validation status:** No numerical or host-parity checks executed for this
-record.
+**Validation status:** No runtime pricer or host-parity checks executed.
+Illustrative arithmetic was checked independently on 2026-11-07; it does not
+qualify the implementation or a product model.
 
 ## Scope and existing authority
 
@@ -26,6 +31,183 @@ Acceptance establishes the clock and boundary contracts below. It does not
 certify implementation coverage, accept an instrument model, choose a universal
 option day count, or change a default. The CAGR decision does not redefine frequency-based
 annualization, XIRR, or an instrument's model clock.
+
+## Accepted amendment: volatility clocks and fixing eligibility
+
+**Accepted:** 2026-11-07.
+**Implementation:** Not reconciled; selected source inspected at `827ebb75b9`.
+Volatility artifacts have numeric expiry grids but no complete persisted
+calibration clock. Dated callers, calibration/materialization, fixing eligibility
+and existing bridge enforcement require reconciliation. No runtime or host
+checks were executed.
+
+Keep the accepted clock roles, date-based projection/relative discounting and
+finite-positive DF bridge below. This package settles the remaining shared
+representation, missing/conflicting mapping and information-set requirements.
+It does not adopt every instrument's day-count default, aging model, same-day
+cutoff or expiry payoff. Those remain with their existing methodology owners.
+
+### One calibration-clock representation and truthful producers
+
+Add one data-only core `VolatilityClock` reused by existing volatility sources:
+
+```text
+VolatilityClock {
+    reference_date: Date,
+    day_count: DayCount,
+    context: DayCountContextState,
+}
+```
+
+The reference date is the calibration origin for the numeric expiry axis.
+The declared basis and required context describe that axis and the time unit
+of its annualized volatility. Reuse existing validated date/day-count types,
+[DayCountContextState](../../../../finstack-quant/core/src/dates/daycount/context.rs)
+and calendar resolution; do not add another calendar or clock framework.
+The [QuantLib date-to-time definition](https://raw.githubusercontent.com/lballabio/QuantLib/master/ql/termstructure.hpp)
+provides primary context for reference-date/day-count mapping; it does not
+choose this API's missing-metadata or aging policy.
+An empty context is sufficient only for conventions that need no extra context.
+Required calendar, reference-period, frequency or other context must be supplied
+under the chosen convention, not inferred from coupon, discount or observation
+clocks. A calibration mapping outside this representation's supported domain
+cannot be silently labelled as another convention.
+
+Use `expiry_clock: Option<VolatilityClock>` on existing `VolSurface`, `VolCube`,
+`FxDeltaVolSurface` and fixed-expiry cube artifacts. The clock concerns option
+expiry/volatility time, not the underlying swap-tenor axis or contractual coupon
+accrual. Pure numeric-time construction/interpolation may omit it: the caller
+then supplies coordinates in the source's declared numeric units. Such a source
+does not acquire a dated interpretation automatically.
+
+Dated calibration producers record the mapping actually used. Preserve it through
+serialization/restoration, clones, quote shocks, calibrated outputs and derived
+surfaces/cubes/slices. Do not retag numeric pillars with a different origin or
+basis, invent metadata from a convenient default, or treat metadata attachment
+as proof that the original dated calibration is consistent. Date-based producer
+pipelines must construct coordinates from the recorded mapping. Recording an
+existing pipeline's observed mapping does not approve its other Draft defaults
+or financial methodology.
+
+### Resolve active source clocks explicitly
+
+Resolve the actually used volatility source first. Its metadata governs its
+date-to-expiry lookup. If absent, a complete explicit source-clock contract
+supplied by the caller or owning model may supply the mapping. That contract
+must identify the actual calibration origin, basis and required context; a
+hardcoded model day count alone does not establish them.
+
+When both metadata and an explicit declaration describe the same source,
+require agreement on the validated, normalized reference date, convention and
+context. Otherwise error; do not silently override either or infer equivalence
+from matching a single expiry. Unresolved/missing mappings and invalid required
+context are request errors before a dated lookup. No universal Act/365F fallback,
+borrowing of a curve/coupon clock or legacy inferred-origin path is selected.
+
+A separately declared **model** clock may differ from the source clock. That
+is not a conflicting source declaration; it needs the explicit parameter/time
+conversion supported by that operation. A scalar-volatility path with its own
+explicit model/source-unit contract does not inspect an unused surface or acquire
+its metadata requirements. Do not require volatility data in a lifecycle branch
+whose accepted operation contract does not use it.
+
+All dated volatility consumers must use this resolution contract; continuing to
+compute an unverified scalar expiry and pass it to a numeric lookup is not a
+date-based fallback. A future contractual expiry that maps to zero/nonfinite or
+negative required time is an unsupported clock/date calculation, not automatic
+expiry or permission to floor time. Actual zero-time/expired branches remain
+explicit operation contracts based on their relevant dates and state.
+
+### Calibration origin, valuation date and variance conversion
+
+For the simple direct dated-pricing path, require the effective source calibration
+reference date to equal valuation `as_of`. A past or future source origin requires
+an explicitly selected and owned rolling/recalibration/model contract. Do not
+silently replace the origin with `as_of`, shift the expiry grid, or query an old
+surface using remaining time as though it were calibrated at the new date.
+This accepted 2026-11-07 admission boundary does not prevent an operation
+from explicitly selecting and qualifying a seasoned-volatility model.
+
+Keep source lookup coordinates and model remaining time distinct. Where an
+operation explicitly uses a variance representation `sigma^2 * time`, preserve
+that quantity over the **same physical interval** `[v, T]` when changing bases:
+
+```text
+delta_source = tau_source(T) - tau_source(v)
+delta_model = tau_model(T) - tau_model(v)
+sigma_model = sigma_source * sqrt(delta_source / delta_model)
+sigma_model^2 * delta_model = sigma_source^2 * delta_source
+```
+
+Both coordinates use their fixed declared reference mappings. Require finite
+positive interval times for this bridge, preserve zero volatility, and evaluate
+adequately without unnecessary overflow/underflow in squared intermediates.
+This adopts variance preservation for operations supporting that representation;
+it does not authorize automatic rescaling of every volatility/model parameter
+or assert equivalent stochastic dynamics.
+
+In particular, selecting `W(origin,T) - W(origin,v)` from an older implied-volatility
+surface chooses forward-variance/aging and smile assumptions. Metadata and existing
+origin-to-expiry total-variance interpolation do not select that model. A dated
+caller must use its independently owned aging contract or require a current source.
+The [separate forward-variance operations in QuantLib](https://raw.githubusercontent.com/lballabio/QuantLib/master/ql/termstructures/volatility/equityfx/blackvoltermstructure.cpp)
+are primary context for that distinction, not a selected finstack aging method.
+The accepted DF bridge similarly preserves a factor, not full model dynamics.
+
+For one 30-calendar-day interval, source Act/365F volatility `20%` corresponds to
+approximately `19.8625%` on an Act/360 model clock under this variance bridge:
+`0.20 * sqrt(360/365)`. Both give integrated variance `0.04 * 30/365`.
+This is independent arithmetic, not executed pricer/model qualification.
+
+### Publication-aware fixing eligibility without a universal cutoff
+
+Keep the rate's observation/value date as its fixing lookup key. Determine
+eligibility using the index publication convention and the operation's explicit
+valuation information cutoff/phase, not only `fixing_date < as_of` or presence
+in a date-only series. Required published observations missing from the configured
+source are errors. An observation not yet eligible must not be consumed; project
+only where the operation explicitly permits projection, otherwise error.
+
+For example, [SOFR](https://www.newyorkfed.org/markets/reference-rates/additional-information-about-reference-rates)
+and [SONIA](https://www.bankofengland.co.uk/markets/sonia-benchmark/sonia-key-features-and-policies)
+publish after their rate value dates. A past value date can therefore still be
+unpublished at a valuation cutoff. Their publication schedules illustrate the
+distinction; this decision does not choose a universal market hour.
+
+Each operation declares its same-day phase, relevant publication calendar/time
+zone where needed, and treatment of revisions. Callers/producers supply a snapshot
+consistent with that information set. A latest unversioned date-only series cannot
+be described as historical point-in-time publication evidence; data presence does
+not authorize use of a later publication/revision. Do not consult wall-clock time
+or fabricate publication timestamps from value dates. No universal timestamp,
+snapshot store or default same-day policy is introduced by this shared package.
+The distinct cashflow, rate-specification, cap/floor and overnight conventions
+remain decisions in their existing owners, not implicitly adopted here.
+
+### Existing bridge enforcement, outputs and qualification
+
+Enforce the already accepted finite-positive factor/time contract in
+`zero_rate_from_df`: invalid required inputs and unrepresentable required results
+are errors. Its current `t <= 0 -> 0` branch and claim of a universally correct
+zero-rate limit require reconciliation. A zero-time DF alone does not define a
+unique model zero rate; operation lifecycle logic runs under its own contract
+instead of using a fabricated rate. Do not turn this enforcement into a new
+universal expiry payoff or select additional pricing defaults.
+
+Persist and validate the clock type through existing core and host/state/schema
+surfaces. Reconcile dated callers, calibration, transformations, snapshots,
+Rust/Python/WASM docs/types/parity and fixtures together when implementation is
+authorized. Preserve the existing numerical/reference-evidence contracts; no
+compatibility fallback, parallel volatility framework or new result/status
+hierarchy is selected.
+
+Independent qualification must cover missing/conflicting active mappings, inactive
+sources, actual origin versus `as_of`, context resolution, positive-calendar-span
+zero-clock cases, both endpoints of basis conversion, quote/model units, preserved
+metadata, same-day and next-day publications/revisions, and strict bridge errors.
+Full product models, interpolation/arbitrage policies, calibration defaults and
+aging dynamics remain with their existing Draft owners. This review changes
+existing records only.
 
 ## Decision
 
@@ -45,8 +227,9 @@ An accrual convention such as Act/360 does not establish the option clock.
 Use the surface-declared or explicitly documented calibration mapping. Each
 rate-option, equity, FX, or commodity default needs evidence at its actual
 selection path; none becomes a universal clock through this decision.
-This decision does not choose the metadata representation or omitted-metadata
-behavior; missing metadata does not establish an Act/365F or other universal fallback.
+The accepted 2026-11-07 amendment above chooses `VolatilityClock` and the
+active-source metadata/explicit-contract, omission/conflict and origin rules.
+Missing metadata does not establish an Act/365F or other universal fallback.
 
 ### Preserve discount factors across model clocks
 
@@ -115,8 +298,8 @@ it does not require a second curve framework.
 
 ## Follow-up tracking
 
-Metadata choices, caller adoption, fixing-cutoff reconciliation, and outstanding
-validation work are owned by the
+Accepted metadata implementation, caller adoption, operation-owned fixing-
+cutoff reconciliation and outstanding validation work are owned by the
 [clock follow-up](../../FOLLOW_UPS.md#clock-metadata-defaults). The
 [rate-option](../valuations-rates/0029-rate-option-exercise-and-volatility.md) and
 [curve](../calibration-targets/0032-curve-interpolation-and-calibration.md) methodology
@@ -153,5 +336,6 @@ Required checks should:
 - document the reproducible inputs and justified tolerance for any claimed
   numerical agreement or error band.
 
-No passing numerical results or model qualification are reported by this
-decision; execution and coverage are tracked in the linked register.
+No passing source-estimator/pricer tests or model qualification are reported
+by this decision. Its illustrative arithmetic is separate evidence; runtime
+execution and coverage remain tracked in the linked register.

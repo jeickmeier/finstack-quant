@@ -34,6 +34,17 @@ There is no stochastic-rate futures/forward convexity adjustment. Analytic delta
 
 [Hull futures carry](../../../REFERENCES.md#hull-options-futures) and [quanto reference](../../../REFERENCES.md#wystup-fx-options); inline tests in [types.rs](../../../../finstack-quant/valuations/equity/src/equity_future/types.rs) and the [equity-future regression fixture](../../../../finstack-quant/valuations/tests/golden/data/pricing/regression_goldens/equity_future/spx_es_3m.json) locate carry/quote/quanto evidence. The fixture is a regression reference; independent exchange reconciliation and convergence evidence are not established.
 
+## Relationship to the accepted cash-dividend source boundary
+
+[CORE-MARKET-13's complete accepted package](../core-market/dividend-events.md#accepted-decision-identified-cash-per-share-events-with-explicit-dates) preserves identified
+cash-per-share events with separate ex/pay dates and exact underlying/share/
+currency basis. Reconcile the product's ex-only cash inputs and same-date rules
+through a qualified adapter; payment timing and entitlement cannot be recovered
+by silently assigning pay=ex. Keep continuous/residual carry selection explicit.
+The source package does not adopt the future's carry/settlement model, and
+record13 was accepted on **2026-11-08**, with reconciliation/qualification
+pending. This record's remaining methodology stays Draft.
+
 ## Follow-up tracking
 
 Pending decisions, implementation reconciliation and validation work are tracked in

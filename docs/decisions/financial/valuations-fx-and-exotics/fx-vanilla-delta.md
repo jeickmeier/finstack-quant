@@ -46,6 +46,22 @@ A delta-coordinate smile with recalibrated delta strikes can change hedging risk
 
 Canonical reference index: [Garman Kohlhagen](../../../REFERENCES.md#garman-kohlhagen-1983); [Clark FX Options](../../../REFERENCES.md#clark-fx-options). The index supplies provenance pointers; agreement on the exact convention and validation domain remains open.
 
+## Relationship to the accepted FX quote-source boundary
+
+[CORE-MARKET-15's complete accepted package](../core-market/fx-delta-quotes.md#accepted-decision-one-explicit-fx-quote-profile-and-qualified-forward-inputs)
+requires an explicit ordered pair and fixed forward-delta/DNS/arithmetic-smile-BF
+profile for native FX quote sources. These quotation definitions are distinct
+from the product's selected reporting/hedge delta. A premium-adjusted reported
+delta can use a correctly interpreted unadjusted source; it does not convert or
+retag its quotes. Active native-source lookup must use the actual compatible
+delivery forward and source expiry clock. Reconcile the shared FX input collector
+and volatility request rather than forwarding a zero tenor or a flat-rate
+expiry substitute. Reject wrong-pair/ambiguous source association; reciprocal
+FX requires qualified repricing/relabeling. Overrides and inactive branches do
+not require unused source dependencies. Record 15 was accepted on **2026-11-08**,
+with reconciliation/qualification pending; this record's pricing, degenerate
+Greeks and smile dynamics remain Draft.
+
 ## Follow-up tracking
 
 Adoption, implementation reconciliation and validation work is tracked in the

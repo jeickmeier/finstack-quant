@@ -42,6 +42,17 @@ Exact survival-weighted protection integration would remove the timing approxima
 
 Owners: [engine.rs](../../../../finstack-quant/valuations/credit/src/cds_tranche/pricing/engine.rs), [types.rs](../../../../finstack-quant/valuations/credit/src/cds_tranche/types.rs), [parameters.rs](../../../../finstack-quant/valuations/credit/src/cds_tranche/parameters.rs). [Internal tests](../../../../finstack-quant/valuations/credit/src/cds_tranche/pricing/tests.rs) and [integration tests](../../../../finstack-quant/valuations/credit/tests/cds_tranche) locate schedule/seasoning evidence; no tests were executed.
 
+## Relationship to the accepted credit-pool boundary
+
+[CORE-MARKET-19's complete accepted package](../core-market/credit-index-composition.md#accepted-decision-explicit-credit-pool-composition-and-exact-issuer-contracts)
+separates future pool/member cash recovery, hazard construction metadata and
+historical default/recovery state. Resolve observed state or an explicitly
+retained historical approximation at its owner; do not infer prior defaults
+from shockable future recovery by default. Named pricing currently consumes
+index hazard for protection/accrued timing even when issuer hazards supply EL;
+retain and qualify that actual auxiliary role. Record 19 was accepted on **2026-11-08**, with reconciliation/qualification
+pending. Its acceptance does not adopt this record's timing, settlement, erosion or projection model.
+
 ## Follow-up tracking
 
 Adoption questions and implementation or validation work are tracked in the

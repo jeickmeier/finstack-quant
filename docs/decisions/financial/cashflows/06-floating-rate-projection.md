@@ -46,6 +46,18 @@ Supported alternatives are the two gearing conventions and explicit fallback pol
 - Located formula/regression tests: `term_projection_uses_the_reset_date_fixing_not_the_period_average`, `term_projection_converts_curve_basis_before_coupon_constraints` in rate_helpers; [floating_rate.rs](../../../../finstack-quant/cashflows/tests/cashflows/builder/floating_rate.rs) covers fallback modes, reset-date fixings and same-day projection. Emission unit test `overnight_fixing_policy_uses_valuation_cutoff_not_curve_base` was inspected; it explicitly expects future observations to be ignored and missing same-day fixing to project.
 - [ISDA 2006](../../../REFERENCES.md#isda-2006-definitions) is the repository convention pointer. No independent vendor tolerance study or contractual adoption rationale for every fallback/entry-point difference was located.
 
+## Relationship to the accepted exact fixing boundary
+
+[CORE-MARKET-12's complete accepted package](../core-market/scalar-series-and-fixings.md#accepted-decision-validated-values-literal-sampling-and-qualified-exact-fixings) resolves observed IndexId
+independently of projection CurveId and verifies exact configured series
+association before lookup. Exact retrieval supplies no publication authority;
+qualify the actual information phase and selected source/version before using
+a fixing, without presence-only same-day or swallowed-error projection. Reconcile
+both builder and RateSpec paths and raw fixing metadata together. Accepted02's
+projection contract is unchanged. Record12 was accepted on **2026-11-08**,
+with reconciliation/qualification pending; this record's remaining cutoff/
+fallback/coupon choices stay Draft.
+
 ## Follow-up tracking
 
 Adoption questions, implementation reconciliation and missing validation are tracked in the

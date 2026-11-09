@@ -6,6 +6,16 @@
 - Audit date: **2026-11-05**. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 - Scope: [inventory](README.md), [source coverage](coverage.json). Shared kernels are linked as dependencies, not reassigned implementations.
 
+## Relationship to accepted level-source boundaries
+
+[CORE-MARKET-08](../core-market/price-curves.md#accepted-decision-explicit-level-pillars-and-parameter-shocks)
+was accepted on 2026-11-08: no automatic spot anchor, explicit native/relative
+source-parameter shocks with original-coordinate weights, scalar domain checks
+and frozen dated reuse. Reconcile current bp-as-percent, additive-percent,
+zero-level and near-origin synchronization paths to that contract. Separately
+selected off-pillar native-level solving remains this scenario owner's
+operation; this dependency does not adopt its remaining delivery/diagnostic choices.
+
 ## Choice and rationale
 
 Observed choice: commodity stress scales forward prices relatively, while volatility-index stress adds index points. The same price-curve storage supports both, but typed getters and distinct operation variants prevent their units from being conflated.

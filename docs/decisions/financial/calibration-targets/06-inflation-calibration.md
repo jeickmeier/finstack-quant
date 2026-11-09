@@ -31,6 +31,31 @@ Observed CPI versus projected level, month anchoring, seasonality and publicatio
 
 No numerical tests were executed.
 
+## Relationship to the accepted CPI source boundary
+
+[CORE-MARKET-10's complete accepted package](../core-market/inflation-projection.md#accepted-decision-explicit-cpi-levels-and-anchored-annual-parameter-shocks) requires an explicit source
+origin (0,I0), clock/style/tails and exact positive source grid, while removing
+core lag metadata and duplicated CPI0 state. Reconcile this target's source
+anchor separately from its contractual start reference CPI: shifting a date by
+a lag does not identify a blended daily reference CPI as a raw source observation.
+This needs financial input/factory reconciliation, not a mechanical builder
+rename. Source-parameter shocks remain distinct from quote recalibration. The
+algorithm above records current runtime. Record10 was accepted on **2026-11-08**
+with reconciliation/qualification pending; this target stays Draft, including
+its solver and bounds.
+
+## Relationship to the accepted monthly fixing boundary
+
+[CORE-MARKET-11's complete accepted package](../core-market/inflation-observations.md#accepted-decision-exact-monthly-fixing-snapshots-and-explicit-availability) removes observed-source
+lag/interpolation/seasonal multiplication and requires exact selected monthly
+versions with explicit availability/cutoff. Reconcile preflight and target
+comparisons against the actual index identity and contract convention, rather
+than inheriting source controls or using a seasonally changed value_on. Keep
+accepted10's source origin separate from contractual reference CPI and preserve
+the complete selected fixing snapshot/dependencies in construction provenance.
+Record11 was accepted on **2026-11-08**, with reconciliation/qualification
+pending; this target's remaining calibration methodology stays Draft.
+
 ## Follow-up tracking
 
 Adoption, reconciliation and qualification work is tracked in the

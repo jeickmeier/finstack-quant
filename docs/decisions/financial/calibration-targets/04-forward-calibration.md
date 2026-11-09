@@ -5,6 +5,16 @@
 - **Validation status:** Source and selected evidence inspected or located; not executed.
 - **Audit date / source revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. Scope and evidence boundaries: [README](README.md).
 
+## Relationship to accepted projection factors
+
+[CORE-MARKET-02](../core-market/forward-projection.md#accepted-decision-explicit-index-projection-factors-and-contractual-rates)
+was accepted on 2026-11-08 and replaces scalar seed rates/reset-grid chaining
+with positive projection factors. Reconcile the observed parameterization below:
+fit factor state, retain explicit index/source identity and reprice resolved
+index observations through the same contractual projector as valuation. Quote
+selection, pillar placement, solver choice and market acceptance remain this
+calibration owner's separate Draft decisions; this dependency does not adopt them.
+
 ## Choice and inputs
 
 Projection curves fit all quotes simultaneously on actual contractual reset intervals; sequential Bootstrap is explicitly rejected. The retained forward curve uses a dense projection grid for DF chaining and a separate, sparse control-knot grid with approximately one parameter per quote. The source rationale is that off-grid/stub reset periods couple adjacent forwards. Discounting is supplied by an existing discount curve.

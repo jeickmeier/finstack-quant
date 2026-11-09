@@ -23,6 +23,17 @@ Exercise immediately before and after mapped cash events is represented by a max
 
 Inline `cash_dividend_tree_preserves_continuous_carry_in_deterministic_limit` checks the zero-volatility carry identity; `vanishing_cash_dividend_converges_to_continuous_yield_price` checks the small-cash limit; `cash_dividend_at_maturity_is_ex_dividend_at_expiry` checks expiry ordering. `test_bermudan_between_european_and_american` is an inequality check, not an independent American benchmark. [Hull textbook](../../../REFERENCES.md#hull-options-futures) is general background; it does not independently validate this specific escrow/exercise convention.
 
+## Relationship to the accepted cash-event adapter boundary
+
+[CORE-MARKET-13's complete accepted package](../core-market/dividend-events.md#accepted-decision-identified-cash-per-share-events-with-explicit-dates) retains full cash-event
+identity, ex/payment dates and exact share/currency basis at the financial
+source. This numerical tree's single-time reserve/jump inputs require a
+qualified adapter for payment-delay claim value, same-date aggregation and
+exercise phase, or explicit refusal. It must not silently coerce pay=ex or
+interpret source stock distributions as cash. The escrow/mapped-node model
+above remains Draft. Record13's source package was accepted on **2026-11-08**,
+with reconciliation and independent qualification pending.
+
 ## Follow-up tracking
 
 Adoption questions, implementation reconciliation and validation work are tracked in the

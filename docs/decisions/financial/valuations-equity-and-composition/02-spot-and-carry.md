@@ -34,6 +34,17 @@ The forward method does not reject a negative prepaid spot after cash dividends.
 
 [Hull carry reference](../../../REFERENCES.md#hull-options-futures); [types_tests.rs](../../../../finstack-quant/valuations/equity/tests/equity/types_tests.rs) and [test_bucketed_dv01.rs](../../../../finstack-quant/valuations/equity/tests/equity/test_bucketed_dv01.rs) contain local construction/carry and rate-risk checks; [pricer_tests.rs](../../../../finstack-quant/valuations/tests/instruments/equity/pricer_tests.rs) supplies pricing cases. These are formula/behavior comparisons, not a historical dividend or corporate-action benchmark.
 
+## Relationship to the accepted cash-dividend source boundary
+
+[CORE-MARKET-13's complete accepted package](../core-market/dividend-events.md#accepted-decision-identified-cash-per-share-events-with-explicit-dates) selects explicit cash
+events with ex/payment dates, gross per-share Money and authoritative underlying/
+share/currency association. Reconcile this instrument's ex-only numeric vector
+and continuous-yield priority with that checked source; no silent pay=ex,
+currency stripping or nonempty-vector suppression. Source preservation does not
+grant an ex-past receivable to a new buyer. Carry and position entitlement
+require an explicit qualified adapter or refusal. Record13 was accepted on
+**2026-11-08**, with reconciliation/qualification pending; this record stays Draft.
+
 ## Follow-up tracking
 
 Pending decisions, implementation reconciliation and validation work are tracked in

@@ -12,6 +12,11 @@ This describes the observed design. No historical adoption rationale is inferred
 
 The engine combines replacement cost and supervisory add-on PFE, then caps a margined calculation at a recalculated unmargined EAD. Collateral is positive when held by the bank. Runtime treats `config.collateral` as variation margin and adds NICA separately. Field scope is distinct from the accepted collateral sign convention.
 
+The shared public-field choice is accepted (2026-11-07) in
+[ADR 0044's complete collateral-input package](../conventions/0044-financial-perspectives-and-boundary-conversions.md#accepted-amendment-explicit-collateral-components):
+explicit VM/NICA components and one derived `C`. That acceptance does not adopt
+this record's other Draft methodology, including cap and unmargined policies.
+
 ## Algorithm and conventions
 
 1. `V=Σ signed_MTM`, `C=collateral+NICA`. Unmargined replacement cost is `max(V−C,0)`; margined RC is `max(V−C, threshold+MTA−NICA, 0)`.
@@ -25,7 +30,7 @@ The same VM/NICA/threshold/MTA values remain in the recursive cap config; unmarg
 
 ## Limitations and failure behavior
 
-When the cap binds, `ead` need not equal reported `alpha×(rc+pfe)`. The displayed components therefore cannot generally reconstruct capped EAD. The source [financial perspectives ADR](../conventions/0044-financial-perspectives-and-boundary-conversions.md) already records held-by-bank positive collateral and the margined RC equation; the VM-only input scope and unmargined NICA extension described here are observed behavior, not newly adopted policy. No final finiteness check prevents overflow of otherwise finite totals/products. Default ResultsMeta does not identify regulatory applicability or alpha/MPOR override provenance.
+When the cap binds, `ead` need not equal reported `alpha×(rc+pfe)`. The displayed components therefore cannot generally reconstruct capped EAD. The source [financial perspectives ADR](../conventions/0044-financial-perspectives-and-boundary-conversions.md) already records held-by-bank positive collateral and the margined RC equation; the public `variation_margin`/`nica` representation is now accepted, while the observed old name/defaults require reconciliation and the full unmargined NICA methodology remains separately unadopted. No final finiteness check prevents overflow of otherwise finite totals/products. Default ResultsMeta does not identify regulatory applicability or alpha/MPOR override provenance.
 
 ## Alternatives and tradeoffs
 

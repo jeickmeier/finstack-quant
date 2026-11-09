@@ -40,6 +40,18 @@ Free α and ATM-pinned variants are supported. Alternative price/vega weighting,
 
 [calibration.rs](../../../../finstack-quant/models/src/volatility/sabr/calibration.rs) and [tests.rs](../../../../finstack-quant/models/src/volatility/sabr/tests.rs). Deterministic repeatability/known-smile recovery tests are synthetic round trips; explicit rejected-stalled-start tests check final acceptance. Reference: [SABR formulation](../../../REFERENCES.md#hagan-2002-sabr); the exact bounds/weights/multistart policy lacks separately established adoption provenance.
 
+## Relationship to the accepted SABR source boundary
+
+[CORE-MARKET-16's complete accepted package](../core-market/sabr-cube-data.md#accepted-decision-canonical-sabr-sources-and-explicit-evaluated-quote-meaning)
+preserves nu=0 and exact canonical parameter units/domains in published sources.
+A fitter's selected positive-nu bounds do not invalidate stored deterministic
+limits or authorize post-fit source floors, caps or retagging. Preserve actual
+fit quote conventions, displacement, source clock and construction provenance;
+separate those input conventions from a later explicit evaluated output.
+Record 16 was accepted on **2026-11-08**, with reconciliation/qualification
+pending. Its acceptance does not adopt this record's objective, bounds,
+multistart, ATM pinning or fit acceptance policies.
+
 ## Follow-up tracking
 
 Adoption questions and implementation or validation work are tracked in the

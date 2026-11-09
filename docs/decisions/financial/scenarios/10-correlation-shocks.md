@@ -33,6 +33,18 @@ Owning source: [adapters/basecorr.rs](../../../../finstack-quant/scenarios/src/a
 
 Loss-space/no-arbitrage recalibration and nearest-correlation projection are alternatives, not behavior implemented by these adapters.
 
+## Relationship to the accepted base-correlation boundary
+
+[CORE-MARKET-18's complete accepted package](../core-market/base-correlation.md#accepted-decision-exact-base-correlation-sources-and-unclipped-native-shocks)
+requires detachment-bp conversion by /100 into the core percent coordinate,
+exact unique stored bucket targets and one checked selection shared by previews
+and application. Native correlation changes are decimal amounts; invalid final
+[0,1] parameters error atomically without clipping or no-match warning success.
+Preserve full empty/identity validation, source ID and actual applied quantities.
+Record 18 was accepted on **2026-11-08**, with reconciliation/qualification
+pending. Its acceptance does not adopt this record's distinct portfolio-model
+correlation domains, matrix/PSD policies or wider scenario reporting choices.
+
 ## Follow-up tracking
 
 Implementation, adoption and validation work is tracked in the

@@ -33,6 +33,28 @@ A common-date maturity grid, union/intersection of quote nodes, signed absolute 
 
 Owning implementation and inline tests: [diff.rs](../../../../finstack-quant/core/src/market_data/diff.rs). Located tests explicitly cover raw inflation prints bypassing seasonality/lag, new publication dates, hybrid source preference, credit type dispatch, incompatible scalar units, large-magnitude equality and invalid grids. These are calculation-contract tests; no independent attribution accuracy benchmark is asserted. [Tuckman–Serrat](../../../REFERENCES.md#tuckman-serrat-fixed-income) provides fixed-income risk context, while the exact grid and aggregation choices are repository policies. [Hazard quote-risk](hazard-quotes-and-risk.md) documents why spread shifts are not automatically recalibrated CDS spreads.
 
+## Relationship to the accepted CPI measurement boundary
+
+[CORE-MARKET-10's complete accepted package](inflation-projection.md#accepted-decision-explicit-cpi-levels-and-anchored-annual-parameter-shocks)
+requires checked annual growth and retains the original CPI source/anchor after
+valuation reference advancement. Reconcile duplicated raw-ratio CAGR arithmetic
+and source error handling. Comparing own-origin numeric tenors does not by
+itself align calendar maturities or actual observed reference periods. This
+record's measurement/grid/aggregation choices remain Draft. Record10 was
+accepted on **2026-11-08** with reconciliation/qualification pending; its
+source contract does not select an attribution convention.
+
+## Relationship to the accepted monthly comparison boundary
+
+[CORE-MARKET-11's complete accepted package](inflation-observations.md#accepted-decision-exact-monthly-fixing-snapshots-and-explicit-availability)
+selects raw exact monthly observations with version/rebasing/seasonal identity
+and explicit knowledge cutoff. A latest stored level from each dataset may
+refer to different months or vintages; their relative difference is not
+automatically a comparable fixing change. Reconcile actual source selection and
+error propagation without treating this record's observed latest-print proxy
+as adopted. Record11 was accepted on **2026-11-08**, with reconciliation/
+qualification pending; these remaining measurement choices stay Draft.
+
 ## Follow-up tracking
 
 Pending decisions, implementation reconciliation and validation work are tracked in the

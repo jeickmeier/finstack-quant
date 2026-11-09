@@ -30,6 +30,16 @@ No term-structure integration or funding/day-by-day index reconstruction occurs.
 
 Inline tests in [types.rs](../../../../finstack-quant/valuations/equity/src/equity_total_return_future/types.rs) locate projection and metric identity cases. [Hull futures reference](../../../REFERENCES.md#hull-options-futures) supplies general futures context, not independent verification of a specific exchange total-return-index formula.
 
+## Relationship to the accepted distribution source boundary
+
+[CORE-MARKET-13's complete accepted package](../core-market/dividend-events.md#accepted-decision-identified-cash-per-share-events-with-explicit-dates) distinguishes actual
+cash-event identity/ex/pay dates from accumulated distribution model inputs.
+Any owner deriving this product's accrued-distributions scalar from events must
+qualify share/point units, currency, entitlement, payment phase and provenance;
+a source schedule is not itself that accumulated scalar or evidence of payment.
+Record13 does not select this Draft projection/accrual model. Its source package
+was accepted on **2026-11-08**, with reconciliation/qualification pending.
+
 ## Follow-up tracking
 
 Pending decisions, implementation reconciliation and validation work are tracked in

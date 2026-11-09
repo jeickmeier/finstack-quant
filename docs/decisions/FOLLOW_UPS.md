@@ -297,13 +297,16 @@ resolve the stated scope question explicitly.
   The SA-CCR [public field](../../finstack-quant/margin/src/regulatory/sa_ccr/types.rs)
   documentation (Rust, Python and WASM) now matches the
   [kernel's](../../finstack-quant/margin/src/regulatory/sa_ccr/replacement_cost.rs)
-  VM-only interpretation of `config.collateral` and addition of NICA. Still
-  open: the kernel does not prevent a caller passing total collateral, so
-  verify or enforce that NICA is never counted twice. The
+  VM-only interpretation of `config.collateral` and addition of NICA. The
+  [accepted complete ADR 0044 package](financial/conventions/0044-financial-perspectives-and-boundary-conversions.md#accepted-amendment-explicit-collateral-components)
+  requires the `variation_margin` field, explicit signed VM/NICA components
+  and one derived total `C` for all consumers.
+  Qualify construction/wire validation and shared-C use; amount-only validation
+  cannot prove that an upstream total was not mislabelled as VM. The
   [SA-CCR qualification entry](financial/FOLLOW_UPS.md#saccr-collateral-qualification)
   owns regulatory qualification of the margined and unmargined methodologies.
-  Acceptance of the sign policy does not settle non-overlap enforcement or
-  certify either calculation.
+  Representation is now accepted; runtime reconciliation and independent
+  qualification of both calculations remain open.
 
 <a id="clock-metadata-defaults"></a>
 
@@ -314,10 +317,14 @@ resolve the stated scope question explicitly.
   Act/365F and equity/FX/commodity defaults as often Act/365F. Inventory and
   verify those defaults at their actual selection paths; these observations
   do not approve a universal option clock or settle the methodology drafts.
-  Define the full volatility date-to-expiry mapping through metadata or an
-  explicit model contract, including the reference date, time basis and any
-  required calendar context. Agree representation and missing-metadata behavior
-  without a universal fallback: current
+  Implement the [accepted complete ADR 0045 package](financial/conventions/0045-financial-clocks-and-date-boundaries.md#accepted-amendment-volatility-clocks-and-fixing-eligibility):
+  one reusable `VolatilityClock` (reference date, DayCount and
+  existing context state), preserved on volatility artifacts/derived outputs;
+  complete active source mapping for dated use, with missing/conflicting source
+  declarations rejected and no universal fallback. Model clocks remain distinct;
+  supported variance conversions preserve the same physical interval. Different
+  calibration origins require an explicitly owned aging/recalibration/model
+  contract rather than a relabelled grid. The current
   [VolSurface](../../finstack-quant/core/src/market_data/surfaces/vol_surface.rs)
   and [VolCube](../../finstack-quant/core/src/market_data/surfaces/vol_cube.rs)
   carry expiry grids without reference-date or day-count/time-basis fields.
@@ -328,13 +335,17 @@ resolve the stated scope question explicitly.
   `zero_rate_from_df` adoption across pricers. The
   [rate helper](../../finstack-quant/valuations/core/src/instruments/common_impl/helpers.rs)
   does not enforce finite model time and returns zero for `t <= 0` before
-  validating the factor. Establish enforcement for finite positive factors
-  and model time, with explicit expiry and invalid-input contracts; test the
+  validating the factor. Reconcile already accepted enforcement for finite
+  positive factors/model time, leaving lifecycle branches operation-owned; test the
   bridge with justified tolerances without claiming full model-dynamics
   equivalence. The old `common_impl::two_clock` reference has no current source
   counterpart.
-  Define valuation/publication cutoffs and reconcile same-day fixing behavior:
-  the [cashflow helper](../../finstack-quant/cashflows/src/builder/rate_helpers.rs)
+  The accepted information-set rules distinguish value dates from
+  publication eligibility at an explicitly declared operation cutoff, require
+  missing eligible published observations to error, and permit projection of
+  unpublished values only under that operation's contract. Preserve snapshot/
+  revision provenance without inventing a universal timestamp/cutoff framework.
+  Reconcile actual operation policies: the [cashflow helper](../../finstack-quant/cashflows/src/builder/rate_helpers.rs)
   uses an available same-day observation, while
   [term cap/floor projection](../../finstack-quant/valuations/rates/src/cap_floor/pricing/projection.rs)
   assumes start-of-day and projects it. Required historical fixings must fail
@@ -600,10 +611,13 @@ follow-up above.
 is accepted on 2026-11-05 for separate clocks and date roles, explicit
 volatility date-to-expiry mapping, contractual forward annualization,
 discount-factor bridges with finite positive inputs, and explicit fixing cutoffs.
-Metadata representation and omission behavior, projection-basis coverage,
-same-day fixing reconciliation, helper enforcement and caller verification
-remain in the clock follow-up above. No instrument model or universal option
-clock is adopted by this decision.
+The complete 2026-11-07 amendment accepts `VolatilityClock`, active dated
+admission, origin/same-interval variance and publication-eligibility requirements.
+All six shared financial convention ADRs are now accepted within their scope.
+Metadata implementation, projection-basis coverage, operation-owned same-day
+fixing reconciliation, helper enforcement and caller verification remain in
+the clock follow-up above. No instrument model or universal option clock is
+adopted by this decision.
 
 [ADR 0046](architecture/0046-portfolio-execution-operational-contract.md)
 is accepted on 2026-11-05 for the detailed portfolio execution contract,
@@ -664,11 +678,149 @@ methods and their evidence. Use that backlog for detailed reconciliation;
 the items below connect it to broader decisions and qualification boundaries.
 
 [ADR 0026](financial/governance/0026-methodology-decisions-and-inventory.md) accepts the
-documentation process. Overview drafts 0027–0032 do not approve their observed
-implementations.
-The [accepted analytics contracts and implementation evidence](financial/analytics/README.md)
-have their own recorded scope. The original documentation audit did not rerun
-numerical suites. Static source discrepancies, suspected numerical defects
+documentation process. [ADR 0033](financial/analytics/0033-value-at-risk-method-selection.md#accepted-decision-fixed-historical-tail-selection)
+accepts fixed historical tail-method selection; overview records 0027–0032
+remain Draft. Detailed algorithm records identify their accepted scopes;
+all 15 [analytics records](financial/analytics/README.md#accepted-scopes-in-detailed-records)
+are accepted as of 2026-11-07 and implemented on 2026-11-08, with
+[scoped implementation evidence](financial/analytics/README.md#implementation-evidence)
+recorded separately from methodology acceptance.
+[Core-market record01](financial/core-market/discount-evaluation.md#accepted-decision-explicit-discount-sources-and-checked-rate-extraction),
+[record02](financial/core-market/forward-projection.md#accepted-decision-explicit-index-projection-factors-and-contractual-rates),
+[record03](financial/core-market/rate-shocks.md#accepted-decision-explicit-zero-rate-shocks-and-dated-conditioning),
+[record04](financial/core-market/hazard-survival.md#accepted-decision-explicit-intensity-sources-and-local-probability-evaluation),
+[record05](financial/core-market/hazard-quotes-and-risk.md#accepted-decision-explicit-cds-observations-hazard-risk-and-recovery),
+[record06](financial/core-market/calibration-provenance.md#accepted-decision-lossless-construction-records-and-request-time-replay-qualification),
+[record07](financial/core-market/parametric-discount.md#accepted-decision-validated-nsnss-sources-and-analytic-factor-queries),
+[record08](financial/core-market/price-curves.md#accepted-decision-explicit-level-pillars-and-parameter-shocks),
+[record09](financial/core-market/basis-spreads.md#accepted-decision-source-derived-dated-zero-rate-differences),
+[record10](financial/core-market/inflation-projection.md#accepted-decision-explicit-cpi-levels-and-anchored-annual-parameter-shocks),
+[record11](financial/core-market/inflation-observations.md#accepted-decision-exact-monthly-fixing-snapshots-and-explicit-availability),
+[record12](financial/core-market/scalar-series-and-fixings.md#accepted-decision-validated-values-literal-sampling-and-qualified-exact-fixings),
+[record13](financial/core-market/dividend-events.md#accepted-decision-identified-cash-per-share-events-with-explicit-dates),
+[record14](financial/core-market/volatility-grids-and-shocks.md#accepted-decision-explicit-annual-volatility-sources-and-exact-grid-shocks),
+[record15](financial/core-market/fx-delta-quotes.md#accepted-decision-one-explicit-fx-quote-profile-and-qualified-forward-inputs),
+[record16](financial/core-market/sabr-cube-data.md#accepted-decision-canonical-sabr-sources-and-explicit-evaluated-quote-meaning),
+[record17](financial/core-market/forward-variance.md#accepted-decision-nonnegative-variance-sources-and-explicit-model-time-semantics),
+[record18](financial/core-market/base-correlation.md#accepted-decision-exact-base-correlation-sources-and-unclipped-native-shocks),
+and [record19](financial/core-market/credit-index-composition.md#accepted-decision-explicit-credit-pool-composition-and-exact-issuer-contracts)
+have complete scoped acceptance as of 2026-11-08, with runtime/caller/host
+reconciliation and independent qualification pending. The other 3 core-market
+records retain Draft status; detailed work stays in the financial register.
+All 20 [core-conventions records 001–020](financial/core-conventions/README.md)
+are also accepted within their complete stated scopes, completing that area's
+methodology review; runtime reconciliation and independent qualification remain open.
+[Core-numerics record 01](financial/core-numerics/compounding.md#accepted-decision-explicit-compounding-conversion-and-periodic-spreads)
+is accepted within its complete stated scope as of 2026-11-07; runtime/caller/host
+reconciliation and independent qualification remain open.
+[Record 02](financial/core-numerics/value-interpolation.md#accepted-decision-validated-scalar-interpolation-and-boundary-semantics)
+is also accepted within its complete stated scope as of 2026-11-07, with
+runtime/host/consumer reconciliation and qualification pending.
+[Record 03](financial/core-numerics/forward-interpolation.md#accepted-decision-natural-log-discount-and-hagan-west-interpolation)
+is also accepted within its complete scope as of 2026-11-07, with runtime/host/
+consumer reconciliation and qualification pending.
+[Record 04](financial/core-numerics/quadrature.md#accepted-decision-checked-quadrature-budgets-and-measures)
+is accepted within its complete scope as of 2026-11-07, with runtime/caller/table
+reconciliation and independent qualification pending.
+[Record 05](financial/core-numerics/brent-root.md#accepted-decision-checked-brent-solving-and-bounded-search)
+has complete scoped acceptance as of 2026-11-07, with runtime/caller
+reconciliation and independent qualification pending. [Record 06](financial/core-numerics/levenberg-marquardt.md#accepted-decision-checked-damped-least-squares-and-outcomes)
+has complete scoped acceptance as of 2026-11-07, with runtime/caller/host
+reconciliation and independent qualification pending. [Record 07](financial/core-numerics/matrix-factorization.md#accepted-decision-checked-matrix-factors-solves-and-correlation-admission)
+has complete scoped acceptance as of 2026-11-08, with runtime/caller/host
+reconciliation and independent qualification pending. [Record 08](financial/core-numerics/nearest-correlation.md#accepted-decision-explicit-nearest-correlation-projection-and-repair-limits)
+has complete scoped acceptance as of 2026-11-08, with runtime/caller/host
+reconciliation and independent qualification pending. [Record 09](financial/core-numerics/sample-statistics.md#accepted-decision-checked-sums-moments-quantiles-and-mean-uncertainty)
+has complete scoped acceptance as of 2026-11-08, with runtime/caller/host and
+independent numerical/statistical qualification pending. [Record 10](financial/core-numerics/realized-variance.md#accepted-decision-explicit-log-returns-and-realized-variance)
+has complete scoped acceptance as of 2026-11-08, with runtime/caller/host and
+independent numerical/financial qualification pending. [Record 11](financial/core-numerics/covariance-shrinkage.md#accepted-decision-checked-scaled-identity-covariance-shrinkage)
+has complete scoped acceptance as of 2026-11-08 for centered population/scaled-identity
+shrinkage, stable moment/complement, checked result/error and host/credit-owner
+reconciliation, with independent numerical/statistical/financial qualification pending; [Record 12](financial/core-numerics/distribution-functions.md#accepted-decision-checked-special-functions-and-distribution-domains)
+has complete scoped acceptance as of 2026-11-08 for checked scalar/distribution
+domains, normal/log-tail, bounded Student-t beta and host/caller reconciliation,
+with independent numerical/statistical/financial qualification pending;
+[Record 13](financial/core-numerics/binomial-mass.md#accepted-decision-checked-full-binomial-probability-mass)
+has complete scoped acceptance as of 2026-11-08 for strict binomial domains/
+resources, exact-mode/FMA recurrence, normalization, scratch/errors and Rust-only/
+credit-owner boundaries, with runtime and independent qualification pending; [Record 14](financial/core-numerics/beta-gamma-sampling.md#accepted-decision-checked-beta-and-gamma-sampling)
+has complete scoped acceptance as of 2026-11-08 for checked RNG/shapes, stable
+bounded MT/component beta ratios, endpoint/errors and Rust-only/model ownership,
+with runtime and independent qualification pending;
+[Record 15](financial/core-numerics/chi-squared-inversion.md#accepted-decision-checked-chi-squared-log-tail-inversion)
+has complete scoped acceptance as of2026-11-08 for closed endpoints/interior
+domain, bounded log-Gamma/Brent, actual-returned-output tail gate and Rust-only/
+copula ownership, with runtime and independent qualification pending; [Record 16](financial/core-numerics/correlated-bernoulli.md#accepted-decision-strict-correlated-bernoulli-laws)
+has complete scoped acceptance as of2026-11-08 for strict two-event feasibility/
+nullable correlation, stable law/conditional/half-open sampling, canonical hosts
+and financial ownership, with runtime and independent qualification pending; [Record 17](financial/core-numerics/pseudorandom-and-bridge.md#accepted-decision-checked-random-draws-bridge-and-poisson-counts)
+has complete scoped acceptance as of2026-11-08 for explicit PCG/checked normals,
+capped stable bridge, bounded Poisson counts and caller/financial ownership,
+with runtime and independent qualification pending;
+[Record 18](financial/core-numerics/sobol-sequences.md#accepted-decision-finite-period-sobol-points-and-prefix-hash-scrambling)
+has complete scoped acceptance as of 2026-11-08 for fixed directions/order,
+explicit seed mode, honest prefix hash guarantees, checked whole-point state/
+period/buffers, caller reconciliation and estimator ownership, with runtime and
+independent qualification pending.
+[Record 19](financial/core-numerics/fractional-covariance.md#accepted-decision-checked-fractional-increment-covariance)
+has complete scoped acceptance as of 2026-11-08 for typed/unit-normalized fBM,
+validated intervals/grids, stable bounded increment arithmetic/cancellation refusal,
+checked mirrored matrices and caller/schema/financial ownership, with runtime and
+independent qualification pending.
+[Record 20](financial/core-numerics/time-grids.md#accepted-decision-checked-simulation-grids-and-exact-event-knots)
+has complete scoped acceptance as of 2026-11-08 for canonical knots/actual dts,
+strict exact required events, checked lookup/access, bounded geometry/resources,
+honest uniform recognition and removal of generic financial snapping with explicit
+caller/model/host ownership, with runtime and independent qualification pending.
+[Record 21](financial/core-numerics/piecewise-coefficients.md#accepted-decision-checked-piecewise-coefficients-and-exponential-integration)
+has complete scoped acceptance as of 2026-11-08 for right-continuous checked
+coefficients, stable signed-kappa analytic integration without deadbands, scaled
+positive-total range/zero rules and complete model/tree/host error propagation
+with explicit financial ownership, with runtime and independent qualification
+pending.
+[Record 22](financial/core-numerics/expression-evaluation.md#accepted-decision-checked-scalar-expressions-missing-values-and-decimal-quantization)
+has complete scoped acceptance as of 2026-11-08 for bounded eager scalar syntax,
+explicit exact-shape rows, NaN-only missing/invalid-calculation errors, three-valued
+logic, exact binary-input decimal quantization and checked shared helpers with
+explicit caller/statements/host/financial boundaries, with runtime and independent
+qualification pending.
+[Record 23](financial/core-numerics/rounding-and-config.md#accepted-decision-explicit-rounding-config-local-tolerances-and-producer-metadata)
+has complete scoped acceptance as of 2026-11-08 for explicit monetary config/
+snapshots, local tolerance ownership, fixed embedded validation, optional actual
+producer metadata and removal of obsolete global-zero/override/overlay paths,
+with coordinated caller/host/replay qualification pending. [Record 24](financial/core-numerics/numeric-wire-and-canonical.md#accepted-decision-strict-numeric-wire-and-canonical-content-identity)
+has complete scoped acceptance as of 2026-11-08 for strict symmetric count,
+exact monetary/date/sentinel wire boundaries and c2 serialized identity,
+including duplicate/lossy-ingress rejection, explicit UTF-8 ordering/byte profile,
+bounded single-pass hashing and existing host/cache reconciliation. Runtime and
+independent qualification remain pending. [Record 25](financial/core-numerics/contracts-and-diagnostics.md#accepted-decision-bounded-contract-loading-validation-and-diagnostics)
+has complete scoped acceptance as of 2026-11-08 for bounded lossless loading,
+exact monetary/owner validation, independent fatal-report status, nullable/exact
+table values, bounded trace/error diagnostics, ordered execution and fail-closed
+locks. Runtime/caller/host/schema reconciliation and independent qualification
+remain pending. [Record 26](financial/core-numerics/schema-publication.md#accepted-decision-canonical-schemas-compact-views-and-bounded-publication)
+has complete scoped acceptance as of 2026-11-08 for original-graph/offline-corpus
+schemas, exact examples, bounded canonical validation, compact authoring views
+and staged publication. **All 26 core-numerics records are accepted**, completing
+that area's methodology review; none remain Draft or Proposed. Runtime/caller/
+host/schema reconciliation and independent qualification remain pending.
+[Cashflows record001](financial/cashflows/01-schedule-periods.md#accepted-decision-contractual-periods-calendars-and-day-count-context)
+has complete scoped acceptance as of2026-11-08 for explicit contractual schedule
+choices, original nominal references, ICMA/365L/termination context, coincident
+events and checked immutable period queries. Its narrow core015 clarification
+was applied in place: metadata endpoints describe actual calculation dates,
+including explicit adjustment, separately from nominal references.
+[Cashflows record002](financial/cashflows/02-program-compilation.md#proposed-decisions-for-whole-record-review)
+remains Proposed for its complete independent-window, explicit-selection/cutoff,
+strict-override, atomic-builder and exact shared-build package. The other14
+cashflow records remain Draft. Runtime/caller/host reconciliation and independent
+qualification remain pending.
+Other unadopted choices retain their stated Proposed or Draft status. Acceptance does not certify
+observed implementations.
+Numerical suites were not rerun in the original documentation audits.
+Subsequent analytics implementation checks are recorded in its linked evidence.
+Static source discrepancies, suspected numerical defects
 requiring reproduction, adoption choices and missing validation are distinct.
 
 ### Scoped algorithm reconciliation
@@ -729,9 +881,15 @@ requiring reproduction, adoption choices and missing validation are distinct.
   [0031](financial/models-and-valuations-credit/0031-tranche-loss-model-selection.md). Observed repairs are
   not approved fallbacks. Standalone copula configuration also needs a host
   reachability and result-provenance assessment.
-- **Curve construction:** agree the distinct direct-builder and calibration
-  interpolation defaults, permitted global polishing/seed adoption, fit
-  acceptance and tail behavior in
+- **Curve construction:** direct discount selection, tails and checked
+  evaluation are accepted in [CORE-MARKET-01](financial/core-market/discount-evaluation.md#accepted-decision-explicit-discount-sources-and-checked-rate-extraction);
+  index-specific projection factors and contractual rates are accepted in
+  [CORE-MARKET-02](financial/core-market/forward-projection.md#accepted-decision-explicit-index-projection-factors-and-contractual-rates).
+  Continuous-zero parameter shocks and dated frozen-source conditioning are
+  accepted in [CORE-MARKET-03](financial/core-market/rate-shocks.md#accepted-decision-explicit-zero-rate-shocks-and-dated-conditioning).
+  Reconcile those choices without reopening them. Agree separately owned
+  calibration selections, permitted global polishing/seed
+  adoption and fit acceptance in
   [0032](financial/calibration-targets/0032-curve-interpolation-and-calibration.md). Distinct hazard,
   inflation, cross-currency, SABR/SVI, HW and base-correlation calibration
   choices remain pending, including approximate-knot acceptance.
@@ -757,8 +915,8 @@ requiring reproduction, adoption choices and missing validation are distinct.
   crates across numerical frameworks, calibration, valuation, statements,
   scenarios, portfolios, attribution, margin and factor models.
   Covenant engines, panel features and Arrow conversions also have detailed
-  records. Their individually recorded adoption and evidence status governs
-  the remaining work. The
+  records. Analytics methodology adoption is complete; other unadopted
+  scopes remain open. The
   [audit boundaries](financial/AUDIT_BOUNDARY.md) identify separate root-package
   and host surfaces and outstanding numerical qualification. Embedded
   policy names and rule versions do not establish accounting or regulatory

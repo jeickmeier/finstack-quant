@@ -30,6 +30,19 @@ Alternatives are absolute vol-point moves, log-vol moves, calibrated parameter s
 
 Owning source: [adapters/vol.rs](../../../../finstack-quant/scenarios/src/adapters/vol.rs); shared [volatility grids/shocks](../core-market/volatility-grids-and-shocks.md). Inspected unit tests compare parallel and unfiltered bucket shocks bit-for-bit, reject zeroing parallel/bucket shocks, flag a post-bump calendar variance decrease, and check invalid expiry order. [Bucket tests](../../../../finstack-quant/scenarios/tests/shocks/bucket_filtering_test.rs) locate snap/filter and preview/execution consistency checks. These are algorithmic invariants, not independent smile-arbitrage certification.
 
+## Relationship to the accepted exact sigma-shock boundary
+
+[CORE-MARKET-14's complete accepted package](../core-market/volatility-grids-and-shocks.md#accepted-decision-explicit-annual-volatility-sources-and-exact-grid-shocks) selects direct native
+sigma delta/factor changes with strict nonnegative results, exact source targets
+and full validation before intentional empty/no-op requests. This scenario's
+explicitly relative percentage converts at its financial owner to a checked
+factor; it does not justify a generic unit alias, flooring or nearest expiry
+snapping. Zero sigma is source-admitted and actual pricing methods own their
+limits; remove the unconditional zero rejection. Preserve metadata and qualify
+clock-based date targets and convention-specific diagnostics. Record14 was
+accepted on **2026-11-08**, with reconciliation/qualification pending; this
+record's remaining diagnostic/report policies stay Draft.
+
 ## Follow-up tracking
 
 Implementation, adoption and validation work is tracked in the

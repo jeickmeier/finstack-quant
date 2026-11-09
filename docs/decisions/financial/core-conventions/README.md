@@ -120,7 +120,10 @@ and zero-cash noncash events, exhaustive kind/predicate semantics, distinct date
 roles, complete single-slice day-count context, atomic validated state and faithful
 cash/event exports. Runtime/product/host/state reconciliation and independent
 qualification remain pending; existing inferred balance changes, partial accrual
-metadata and protection/margin classifications are not certified.
+metadata and protection/margin classifications are not certified. The endpoint
+wording was clarified on2026-11-08 with accepted CASHFLOWS-001: metadata start/end
+are actual calculation endpoints, including explicit accrual adjustment; nominal
+references remain distinct, with the single-context/formula boundary unchanged.
 
 Accepted record 016 requires explicit same-day cash selection, whole-input validation,
 empty/zero identities without unused curve queries, source-owned dated relative

@@ -30,6 +30,19 @@ Different quote spots can imply different notionals while market FX remains a se
 
 Neither comments nor output type prove short-end anchors were supplied.
 
+## Relationship to the accepted zero-rate diagnostic boundary
+
+[CORE-MARKET-09's complete accepted package](../core-market/basis-spreads.md#accepted-decision-source-derived-dated-zero-rate-differences)
+was accepted on **2026-11-08**, removing BasisSpreadCurve and this target's optional
+basis_spread_curve_id/output. It preserves the actual signed convention/leg
+quotes and calibrated discount sources. A requested dated diagnostic would
+compare those actual sources on one explicit reporting clock, without the
+invented (0,0), independent interpolation or scalar roll. Its admission/errors
+belong to that explicit request, without changing the recorded calibration fit.
+Step5 above records current runtime behavior rather than an adopted replacement.
+Runtime reconciliation remains pending; neither record09 nor this note adopts the target's
+solver, collateral/FX conventions, bounds or quote-recalibration methodology.
+
 ## Follow-up tracking
 
 Adoption, reconciliation and qualification work is tracked in the

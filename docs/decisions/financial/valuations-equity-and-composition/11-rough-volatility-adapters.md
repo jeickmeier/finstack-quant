@@ -34,6 +34,20 @@ ATM strip construction is not calibration of rough parameters, and a positive to
 
 [rough Bergomi](../../../REFERENCES.md#bayer-friz-gatheral-2016), [rough Heston](../../../REFERENCES.md#el-euch-rosenbaum-2019), [hybrid scheme](../../../REFERENCES.md#bennedsen-lunde-pakkanen-2017); inline `variance_strip_tests` in [rough_bergomi_mc_pricer.rs](../../../../finstack-quant/valuations/equity/src/equity_option/rough_bergomi_mc_pricer.rs) inspect total-variance conservation, invalid surfaces and deterministic-variance refinement. [test_rough_bergomi.rs](../../../../finstack-quant/valuations/tests/instruments/equity_option/test_rough_bergomi.rs) locates simulation cases. These are limit/identity/cross-engine evidence, not independent calibrated-market validation.
 
+## Relationship to the accepted forward-variance boundary
+
+[CORE-MARKET-17's complete accepted package](../core-market/forward-variance.md#accepted-decision-nonnegative-variance-sources-and-explicit-model-time-semantics)
+requires the ATM total-variance strip to remain an explicitly qualified proxy,
+with actual source/forward/clock association, exact ordered strip nodes and
+checked complete variance differences. Admit genuine zero slopes; reject true
+negative variance without clipping. Moving-ATM monotonicity is not a general
+calendar-arbitrage verdict. Select active scalar/model or surface dependencies
+before evaluation, without discarded strike-specific lookups. Source area
+conservation and source zero admission do not certify MC grid/path accuracy;
+qualify break alignment while retaining adaptedness. Record 17 was accepted on **2026-11-08**, with reconciliation/qualification
+pending. Its acceptance does not adopt this record's ATM-forward/tail model, rough parameters,
+simulation, error budgets or price acceptance.
+
 ## Follow-up tracking
 
 Pending decisions, implementation reconciliation and validation work are tracked in

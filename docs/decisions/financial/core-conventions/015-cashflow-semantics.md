@@ -1,6 +1,6 @@
 # CORE-CONVENTIONS-015: Cash settlement, principal balance events and accrual metadata
 
-- Decision status: **Accepted — complete cash/balance/accrual package, 2026-11-07**.
+- Decision status: **Accepted — complete cash/balance/accrual package, 2026-11-07; accrual-endpoint clarification, 2026-11-08**.
 - Implementation status: **Observed; reconciliation pending**, scoped to `cashflow/primitives.rs`.
 - Validation status: **Evidence inspected; independent classification/arithmetic examples passed; production qualification pending**. Documentation links/status/counts, complete 27-kind table coverage, signed cash/principal and zero-accrual examples passed. Linked Rust/host tests were located or inspected, not run; this does not certify the current implementation.
 - Audit date: **2026-11-05**. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; see [scope and inventory](README.md).
@@ -23,6 +23,12 @@ alternatives; it does not certify projected schedules or adopt 016's NPV rules.
 Accepted on **2026-11-07** after whole-record review. Runtime implementation
 and independent production/host qualification remain pending;
 observed source behavior is retained separately below.
+
+Accrual-slice endpoint wording was clarified on **2026-11-08** with the
+[accepted CASHFLOWS-001 package](../cashflows/01-schedule-periods.md#accepted-decision-contractual-periods-calendars-and-day-count-context):
+metadata describes actual calculation endpoints when accrual adjustment was
+explicitly selected; nominal reference dates remain separate. The selected
+adjustment, day-count formulas and single-context limit are unchanged.
 
 1. **Give `amount` one meaning: actual signed settlement cash.** For cash-capable
    kinds, Money is economic cash received by the entity/holder being valued when
@@ -116,9 +122,12 @@ observed source behavior is retained separately below.
 
 7. **Use one complete existing day-count context in accrual metadata.** Keep
    `CashFlowAccrual` as an optional producer assertion about one actual accrual
-   calculation slice: positive unadjusted `start < end`, selected `day_count`,
+   calculation slice: strictly increasing actual endpoints `start < end`,
+   including explicitly adjusted accrual dates, selected `day_count`,
    optional projected decimal index rate before gearing/spread/caps/floors, and
-   the existing complete `DayCountContextState`. Replace parallel calendar/reference/
+   the existing complete `DayCountContextState`. Unadjusted nominal reference
+   dates remain distinct from those actual slice endpoints; metadata must match
+   the interval used to calculate its fraction. Replace parallel calendar/reference/
    termination fields with that context; do not introduce another partial context
    or frequency default. Follow accepted 001–003: Bus252 requires an explicit
    calendar and positive basis (omission selects its accepted 252); ICMA requires

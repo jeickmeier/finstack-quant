@@ -30,6 +30,19 @@ The floor treats an interpolated CPI ratio as one Black-lognormal forward and us
 
 Colocated `stored_cpi_is_not_known_before_publication`, `hybrid_ref_cpi_resolves_published_and_projected_anchors_independently`, `protected_unknown_cpi_includes_option_time_value`, adjusted-maturity and protection-scope tests address these branches. `protected_cpi_ratio_matches_independent_stochastic_density_grid` compares the floor formula with a separate numerical density grid; it does not validate an empirical CPI model. [Deacon–Derry–Mirfendereski](../../../REFERENCES.md#deacon-derry-mirfendereski-2004) and [Kerkhof](../../../REFERENCES.md#kerkhof-2005) are reference context.
 
+## Relationship to the accepted fixing and release boundary
+
+[CORE-MARKET-11's complete accepted package](../core-market/inflation-observations.md#accepted-decision-exact-monthly-fixing-snapshots-and-explicit-availability) makes monthly observations
+unmodified exact fixing snapshots and keeps lag/weights/denominator at the
+contractual resolver. Reconcile the observed index-lag/interpolation guards,
+version/rebasing identity and publication classification with an explicit
+knowledge date K. Unknown/overdue release facts cannot silently become known
+CPI or use a reference date as publication/option expiry. An official delayed
+index substitute requires the actual announcement/contract, not a projection
+or last print. Record11 was accepted on **2026-11-08**, with reconciliation/
+qualification pending; it does not adopt this record's Black
+floor approximation, aggregate-release expiry or jurisdiction mapping.
+
 ## Follow-up tracking
 
 Adoption, implementation and validation work is tracked in the

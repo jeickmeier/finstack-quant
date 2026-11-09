@@ -5,6 +5,18 @@
 - **Validation status:** Source and selected evidence inspected or located; not executed.
 - **Audit date / source revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. Scope and evidence boundaries: [README](README.md).
 
+## Relationship to accepted analytic-source boundaries
+
+[CORE-MARKET-07](../core-market/parametric-discount.md#accepted-decision-validated-nsnss-sources-and-analytic-factor-queries)
+was accepted on 2026-11-08: validated NS/NSS parameters, explicit source clocks,
+one checked analytic factor/derivative owner and retained-model conditioning.
+Reconcile model construction and any sampled pricing adapter to that contract.
+Evaluation admits equal decay horizons; fit identifiability, seeds/bounds/tau
+repair, objective, single-curve assumptions and sampling qualification remain
+this calibration owner's separate Draft choices. Accepted
+[record06](../core-market/calibration-provenance.md#accepted-decision-lossless-construction-records-and-request-time-replay-qualification)
+requires complete effective construction history and request-time replay qualification.
+
 ## Choice and model
 
 Fit Nelson–Siegel (four parameters) or Nelson–Siegel–Svensson (six) directly to rate-instrument PV/N through a simultaneous solve. The core analytic zero/DF formulas are owned by [CORE-MARKET-07](../core-market/parametric-discount.md); this record owns parameter controls, date sampling, residual construction and numerical selection.

@@ -42,6 +42,32 @@ Consistent selected-pricer dispatch and per-name recovery replay are possible al
 
 Owners: [sensitivities.rs](../../../../finstack-quant/valuations/credit/src/cds_tranche/pricing/sensitivities.rs), [metric implementations](../../../../finstack-quant/valuations/credit/src/cds_tranche/metrics). [Tranche tests](../../../../finstack-quant/valuations/credit/tests/cds_tranche) locate finite-difference/repricing and sign evidence; these do not establish independent risk accuracy.
 
+## Relationship to the accepted base-correlation boundary
+
+[CORE-MARKET-18's complete accepted package](../core-market/base-correlation.md#accepted-decision-exact-base-correlation-sources-and-unclipped-native-shocks)
+requires unclipped admitted source shocks and truthful actual action widths.
+Correlation01 reports the PV effect per 0.01 absolute correlation, separately
+from detachment/spread bp. The risk owner selects a supported central/reduced/
+one-sided boundary scheme or refuses the request, without clipped nodes and a
+nominal central denominator. Base/bumped valuation must use the same qualified
+financial evaluator; default Gaussian metric substitution is not custom-model
+risk parity. Record 18 was accepted on **2026-11-08**, with reconciliation/qualification
+pending. Its acceptance does not adopt this record's complete
+correlation/quote/recovery/default-risk methods or accuracy budgets.
+
+## Relationship to the accepted credit-pool boundary
+
+[CORE-MARKET-19's complete accepted package](../core-market/credit-index-composition.md#accepted-decision-explicit-credit-pool-composition-and-exact-issuer-contracts)
+requires actual active dependency selection, including named-loss hazards and
+any consumed aggregate timing hazard. Shared CurveIds can be shocked/replayed
+once while preserving separate issuer events and updating every active reference.
+Zero-weight roster entries do not imply active exposure for every metric. Future
+cash-recovery risk must target actual pool/member cash inputs and preserve the
+separate historical-state assumption, rather than bump an unused common field
+or rewrite observed history. Record 19 was accepted on **2026-11-08**, with reconciliation/qualification
+pending. Its acceptance does not adopt this
+record's JTD averaging, quote replay, recovery/rate/credit-risk methods or budgets.
+
 ## Follow-up tracking
 
 Adoption questions and implementation or validation work are tracked in the

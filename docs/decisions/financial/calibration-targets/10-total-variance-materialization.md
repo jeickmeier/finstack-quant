@@ -27,6 +27,18 @@ Flat-vol, flat-forward-variance or model-consistent tails have different long/sh
 - Inspected SVI flat-total-variance test checks `sqrt(.04/.75)` directly. SABR knot and Error/Clamp cases are located. The nonlinear varying-forward SVI calendar tests and [published-surface tests](../../../../finstack-quant/calibration/tests/calibration/svi_surface.rs) are located invariant/same-kernel evidence, not a market arbitrage certificate.
 - [Gatheral surface reference](../../../REFERENCES.md#gatheral-volatility-surface) is model provenance, not proof of these tail choices.
 
+## Relationship to the accepted published-grid boundary
+
+[CORE-MARKET-14's complete accepted package](../core-market/volatility-grids-and-shocks.md#accepted-decision-explicit-annual-volatility-sources-and-exact-grid-shocks) requires the materialized
+annual-sigma grid to carry explicit actual quote/axis/interpolation choices,
+compatible displacements and truthful source-clock metadata from dated
+producers. Remove inherited Black/Strike defaults and zero-expiry anchors;
+TotalVariance is a working quantity, not stored W or an arbitrage certificate.
+Reconcile stable sigma reconstruction and full exact-node/source compatibility.
+This target's fit, expiry interpolation and tail choices above remain Draft;
+record14's complete source package was accepted on **2026-11-08**, with runtime
+reconciliation and independent qualification pending.
+
 ## Follow-up tracking
 
 Adoption, reconciliation and qualification work is tracked in the

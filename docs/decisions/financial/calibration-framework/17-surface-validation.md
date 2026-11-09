@@ -30,6 +30,17 @@ Alternatives are analytic parameter restrictions (for example SVI density), cons
 - Test evidence: [tests/calibration/validation.rs](../../../../finstack-quant/calibration/tests/calibration/validation.rs) — explicit call-spread violations, fixed-forward-moneyness example, overflow rejection and zero-expiry preservation; inspected or located, not executed.
 - Reference context: [Gatheral–Jacquier 2014](../../../REFERENCES.md#gatheral-jacquier-2014-svi) — no-arbitrage surface context; not proof these finite probes suffice; a catalogue entry is not proof of implementation equivalence.
 
+## Relationship to the accepted volatility-source boundary
+
+[CORE-MARKET-14's complete accepted package](../core-market/volatility-grids-and-shocks.md#accepted-decision-explicit-annual-volatility-sources-and-exact-grid-shocks) separates valid finite
+nonnegative sigma sources from price-model and arbitrage acceptance. Preserve
+this validator's actual Black/absolute-strike assumptions; do not present it
+as a universal Normal/Shifted/Tenor theorem or reject all zero-vol sources
+without the actual model's limit contract. Explicit grid/clock/shift identity
+and admitted shocks do not certify fit or no-arbitrage. Record14 does not adopt
+this Draft diagnostic/repair/acceptance policy. Its source package was accepted
+on **2026-11-08**, with reconciliation and independent qualification pending.
+
 ## Follow-up tracking
 
 Implementation reconciliation, adoption questions and missing evidence are tracked in the

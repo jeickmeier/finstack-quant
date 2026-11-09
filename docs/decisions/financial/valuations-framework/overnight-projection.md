@@ -32,6 +32,18 @@ A representable cutoff can span the entire coupon: the adapter subtracts cutoff 
 - [overnight_conventions.rs](../../../../finstack-quant/valuations/core/src/instruments/pricing/overnight_conventions.rs): explicit/registry selection and unsupported arithmetic swap coupons.
 - [ARRC SOFR guide](../../../REFERENCES.md#arrc-sofr-users-guide), [ISDA 2021](../../../REFERENCES.md#isda-2021-definitions), and [Ametrano–Bianchetti](../../../REFERENCES.md#ametrano-bianchetti-2013) are canonical convention/multicurve context, not evidence that every configured index uses the correct settings.
 
+## Relationship to the accepted fixing identity and sampling boundary
+
+[CORE-MARKET-12's complete accepted package](../core-market/scalar-series-and-fixings.md#accepted-decision-validated-values-literal-sampling-and-qualified-exact-fixings) selects exact observed
+IndexId/series association independently of projection sources. It removes the
+core helper's diagnostic-only as_of and leaves publication/phase/version
+qualification explicit at this owning adapter under ADR0045. Generic Step/
+Linear or right-tail carry never supplies a missing overnight fixing. Reconcile
+unknown eligibility versus explicitly permitted projection and preserve causes;
+the strict-before-as_of rule above is observed behavior, not a new universal
+cutoff. Record12 was accepted on **2026-11-08**, with reconciliation/
+qualification pending; this record's remaining overnight choices stay Draft.
+
 ## Follow-up tracking
 
 Adoption, implementation and validation work is tracked in the

@@ -31,6 +31,18 @@ Quoted nodes use quote-specific swap conventions, while interpolated nodes use i
 
 No test run was performed.
 
+## Relationship to the accepted SABR source boundary
+
+[CORE-MARKET-16's complete accepted package](../core-market/sabr-cube-data.md#accepted-decision-canonical-sabr-sources-and-explicit-evaluated-quote-meaning)
+requires parameter-cube forwards and their financial reference association to
+remain explicit, including actual contracts, dates/conventions and source clock.
+Stored construction forwards are distinct from live pricing forwards; synthetic
+interpolated-node reconstruction and frozen/rebased smile policies require their
+actual owners' qualification. No shared ID or tenor coordinate proves those
+contracts match. Record 16 was accepted on **2026-11-08**, with reconciliation/qualification
+pending. Its acceptance does not adopt this record's
+projection, synthetic schedule or forward model.
+
 ## Follow-up tracking
 
 Adoption, reconciliation and qualification work is tracked in the

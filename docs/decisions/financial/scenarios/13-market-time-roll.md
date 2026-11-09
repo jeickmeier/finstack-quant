@@ -34,6 +34,41 @@ Owning source: [adapters/time_roll.rs](../../../../finstack-quant/scenarios/src/
 
 Approximate month/year days and holiday-aware tenor rolls are different models; their intended usage remains unadopted.
 
+## Relationship to the accepted frozen CPI boundary
+
+[CORE-MARKET-10's complete accepted package](../core-market/inflation-projection.md#accepted-decision-explicit-cpi-levels-and-anchored-annual-parameter-shocks) retains absolute CPI levels
+on their original source base/clock, with an independent valuation reference.
+It removes CPI rebasing, interpolated new origin levels and expired-pillar
+deletion; original annual-parameter shocks retain their original coordinates.
+A projection cannot become a published fixing merely because the valuation
+date advances. Step3 above records the current runtime, and broader fixing
+materialization/context/replay choices remain separately Draft. Record10 was
+accepted on **2026-11-08**; its reconciliation and qualification remain pending.
+
+## Relationship to the accepted observation knowledge boundary
+
+[CORE-MARKET-11's complete accepted package](../core-market/inflation-observations.md#accepted-decision-exact-monthly-fixing-snapshots-and-explicit-availability) keeps an immutable selected
+fixing snapshot and knowledge cutoff K distinct from valuation date v. Moving
+v alone cannot make a projection a published observation or advance actual
+revision knowledge. A new cutoff/version requires explicitly supplied data;
+any hypothetical projected-fixing materialization must remain labelled as such.
+Reconcile availability routing and provenance with the accepted CPI source
+boundary. Record11 was accepted on **2026-11-08** with reconciliation and
+qualification pending; this scenario's remaining fixing/time evolution
+methodology stays Draft.
+
+## Relationship to the accepted rate fixing dataset boundary
+
+[CORE-MARKET-12's complete accepted package](../core-market/scalar-series-and-fixings.md#accepted-decision-validated-values-literal-sampling-and-qualified-exact-fixings) keeps exact observation
+identity distinct from projection identity and prohibits ordinary generic bumps
+of fixing histories, including no-ops. Explicit pre-roll model materialization
+must retain hypothetical-dataset provenance; advancing valuation date or
+inserting FIXING data is not actual publication knowledge. Reconcile strict
+series sampling policies and financial eligibility without copying the monthly
+CPI snapshot representation into a universal fixing store. Record12 was accepted
+on **2026-11-08**, with reconciliation/qualification pending; this scenario's
+remaining time/materialization policy stays Draft.
+
 ## Follow-up tracking
 
 Implementation, adoption and validation work is tracked in the

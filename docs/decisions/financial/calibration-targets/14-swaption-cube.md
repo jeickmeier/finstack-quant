@@ -33,6 +33,19 @@ Alternatives include quote-space/total-variance cube interpolation, globally con
 
 No calibration execution was performed.
 
+## Relationship to the accepted SABR source boundary
+
+[CORE-MARKET-16's complete accepted package](../core-market/sabr-cube-data.md#accepted-decision-canonical-sabr-sources-and-explicit-evaluated-quote-meaning)
+requires published canonical parameter/forward nodes, explicit cube mode and
+actual expiry clock/reference association. Retain fitted-node forwards and
+actual quote/contract construction provenance; interpolated synthetic contracts
+must be explicitly qualified at their owner. Rechecks select the actual output
+convention and checked evaluator rather than inferring units from beta or
+retagging displacement. Nu=0 source admission does not approve interpolation
+floors. Record 16 was accepted on **2026-11-08**, with reconciliation/qualification
+pending. Its acceptance does not adopt rounded bucketing, synthetic
+forwards, interpolation, missing-corner fallback or fit acceptance here.
+
 ## Follow-up tracking
 
 Adoption, reconciliation and qualification work is tracked in the

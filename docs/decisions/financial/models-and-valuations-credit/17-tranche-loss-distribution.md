@@ -48,6 +48,31 @@ Owners: [expected_loss.rs](../../../../finstack-quant/valuations/credit/src/cds_
 - The [loss reference fixture](../../../../finstack-quant/valuations/credit/tests/fixtures/production_tranche_loss_reference.json) identifies SciPy binomial CDF, QUADPACK and composite Gauss–Legendre values. Its located evidence does not qualify provenance or the full copula/grid domain under [ADR 0014](../../project/0014-financial-reference-evidence.md); no generators were rerun.
 - Technical sources: [Laurent–Gregory](../../../REFERENCES.md#laurent-gregory-2005-factor-copulas), [Gaussian copula](../../../REFERENCES.md#li-2000-gaussian-copula), [Student-t](../../../REFERENCES.md#demarta-mcneil-2005-t-copula), [random factor loadings](../../../REFERENCES.md#andersen-sidenius-2005-rfl) and [finite-pool/multi-factor loss methods](../../../REFERENCES.md#andersen-sidenius-basu-2003).
 
+## Relationship to the accepted base-correlation boundary
+
+[CORE-MARKET-18's complete accepted package](../core-market/base-correlation.md#accepted-decision-exact-base-correlation-sources-and-unclipped-native-shocks)
+requires checked detachment-percent queries without magnitude-based fraction
+inference, actual maturity/pool/model/recovery association, and exact admitted
+source parameters. Implement supported endpoint limits or refuse them rather
+than smoothing into an interior band. Common pool-basis capped equity losses
+must be subtracted before tranche-width normalization; increasing rho alone
+does not establish consistent losses. Interim-date reuse and original-versus-
+effective strikes remain explicit model choices. Record 18 was accepted on **2026-11-08**, with reconciliation/qualification
+pending. Its acceptance does not adopt this record's complete loss/recovery floors, quadrature,
+convolution, realized-state mapping or arbitrage acceptance methodology.
+
+## Relationship to the accepted credit-pool boundary
+
+[CORE-MARKET-19's complete accepted package](../core-market/credit-index-composition.md#accepted-decision-explicit-credit-pool-composition-and-exact-issuer-contracts)
+requires explicit pool mode and authoritative member probability/cash-recovery/
+weight inputs, strict lookup and the stated compensated mass gate. Preserve
+zero-weight roster identity and distinct default events even when hazards are
+shared. An approximate-homogeneity shortcut is not exact source equivalence;
+qualify an approximation explicitly or preserve the actual law. Reconcile named
+PDs with accepted hazard date/context/conditional-probability semantics rather
+than clipped 1-sp with default context. Record 19 was accepted on **2026-11-08**, with reconciliation/qualification
+pending. Its acceptance does not adopt this record's full copula/convolution/quadrature/loss-recovery model.
+
 ## Follow-up tracking
 
 Adoption questions and implementation or validation work are tracked in the

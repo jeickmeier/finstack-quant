@@ -40,6 +40,22 @@ Premium-adjusted/spot delta and market-strangle BF conventions require other sol
 
 [fx.rs](../../../../finstack-quant/models/src/volatility/fx.rs) and [fx_delta_vol_tests.rs](../../../../finstack-quant/models/tests/fx_delta_vol_tests.rs). The latter hand-builds RR/BF pillars but reuses public delta_to_strike, so it is partly shared-kernel evidence; short-expiry merged-grid and paired-quote tests cover regressions. Reference: [Garman–Kohlhagen](../../../REFERENCES.md#garman-kohlhagen-1983) supports the underlying FX law, not all broker-quote conventions.
 
+## Relationship to the accepted FX quote-source boundary
+
+[CORE-MARKET-15's complete accepted package](../core-market/fx-delta-quotes.md#accepted-decision-one-explicit-fx-quote-profile-and-qualified-forward-inputs)
+requires one canonical validated raw source with an explicit ordered pair,
+forward-delta/DNS/arithmetic-smile-BF profile and optional source clock. Model
+adapters consume that source and qualified delivery forwards instead of the
+duplicate raw quote/spot/rate builder. Share checked wing reconstruction, make
+delta/strike transforms fallible and admit the model's supported strike order
+before interpolation; positive raw wings alone do not establish that order.
+Preserve every original supported strike pillar exactly through materialization,
+without tolerance coalescing, and retain source/forward construction provenance.
+Quote-space expiry evaluation and a sampled strike grid are distinct model
+operations with independently qualified off-grid behavior and risk. Record 15
+was accepted on **2026-11-08**, with reconciliation/qualification pending; this
+record's full interpolation/tail model remains Draft.
+
 ## Follow-up tracking
 
 Adoption questions and implementation or validation work are tracked in the

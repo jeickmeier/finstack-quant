@@ -40,6 +40,18 @@ Normal and shifted Black both support negative unshifted rates, with different t
 
 [black.rs](../../../../finstack-quant/models/src/closed_form/black.rs), [bachelier.rs](../../../../finstack-quant/models/src/closed_form/bachelier.rs), [forward.rs](../../../../finstack-quant/models/src/closed_form/forward.rs). Inline parity, positive-vega and zero-vol boundary tests establish identities; `black76_price_matches_discounted_leaf_formula` is a production-kernel comparison. [vol_models_quantlib_tests.rs](../../../../finstack-quant/models/tests/vol_models_quantlib_tests.rs) contains independent price fixtures. References: [Black 1976](../../../REFERENCES.md#black-1976), [Bachelier](../../../REFERENCES.md#bachelier-1900).
 
+## Relationship to the accepted quote-grid boundary
+
+[CORE-MARKET-14's complete accepted package](../core-market/volatility-grids-and-shocks.md#accepted-decision-explicit-annual-volatility-sources-and-exact-grid-shocks) retains relative Black
+sigma versus Normal sigma in actual underlying units, explicit displacement
+and literal source coordinates. Black/shifted-Black adapters require finite
+positive transformed forward/strike coordinates; Normal retains finite signed
+inputs. Attaching shifts cannot retag unchanged quotes as a price-preserving
+conversion. Keep actual zero-time/zero-vol pricing branches at this model owner,
+without fabricated implied-vol grid nodes. Record14 was accepted on
+**2026-11-08**, with reconciliation/qualification pending; this record's
+remaining formula/limit policies stay Draft.
+
 ## Follow-up tracking
 
 Adoption questions and implementation or validation work are tracked in the

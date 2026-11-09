@@ -54,6 +54,19 @@ A fixed trade date/settlement and mandatory contract rates would remove template
 
 Canonical reference index: [Hull](../../../REFERENCES.md#hull-options-futures); [Clark FX Options](../../../REFERENCES.md#clark-fx-options). The index supplies provenance pointers; agreement on the exact convention and validation domain remains open.
 
+## Relationship to the accepted FX quote-source boundary
+
+[CORE-MARKET-15's complete accepted package](../core-market/fx-delta-quotes.md#accepted-decision-one-explicit-fx-quote-profile-and-qualified-forward-inputs)
+separates option expiry E, actual FX delivery L and market spot settlement P.
+The source clock maps volatility to expiry; a qualified FX owner supplies the
+forward for the actual delivery contract, with the same explicit quote-per-base
+pair. Reconcile actual spot-settlement/discount dependencies there rather than
+constructing a local constant-rate expiry forward inside smile conversion.
+Source metadata and successful strike inversion do not qualify the cash-spot,
+collateral or delivery model. Record 15 was accepted on **2026-11-08**, with
+reconciliation/qualification pending; this record's remaining valuation and
+date-policy choices remain Draft.
+
 ## Follow-up tracking
 
 Adoption, implementation reconciliation and validation work is tracked in the

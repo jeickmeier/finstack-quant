@@ -5,6 +5,17 @@
 - **Validation status:** Source and selected evidence inspected or located; not executed.
 - **Audit date / source revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. Scope and evidence boundaries: [README](README.md).
 
+## Relationship to accepted construction/replay boundaries
+
+[CORE-MARKET-06](../core-market/calibration-provenance.md#accepted-decision-lossless-construction-records-and-request-time-replay-qualification)
+was accepted on 2026-11-08: lossless effective construction records, original
+quote identity/resolved bindings, explicit source/target state and request-time
+replay qualification distinct from historical provenance. Reconcile the observed
+adapters below to that contract. This does not adopt the target's remaining
+solver, materialization, fit or horizon-calibration methodologies. Accepted
+[CORE-MARKET-05](../core-market/hazard-quotes-and-risk.md#accepted-decision-explicit-cds-observations-hazard-risk-and-recovery)
+already requires explicit quote risk, exact targets and separate recovery operations.
+
 ## Choice and distinction
 
 Rate recipes preserve benchmark economics and curve-role metadata for recalibration. Hazard recipes preserve both original calibration quotes and a par-spread risk representation, along with resolved dates/times and serialized configuration. These sidecars have different completeness contracts; storing a recipe does not demonstrate the current transformed curve still fits those inputs.

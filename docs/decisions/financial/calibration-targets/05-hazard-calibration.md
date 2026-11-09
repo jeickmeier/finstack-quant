@@ -5,6 +5,26 @@
 - **Validation status:** Source and selected evidence inspected or located; not executed.
 - **Audit date / source revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. Scope and evidence boundaries: [README](README.md).
 
+## Relationship to accepted intensity sources
+
+[CORE-MARKET-04](../core-market/hazard-survival.md#accepted-decision-explicit-intensity-sources-and-local-probability-evaluation)
+was accepted on 2026-11-08: explicit source-clock/context selection and strict
+positive ending knots, no core hazard cap, and local intensity-based probability
+evaluation. Reconcile source construction and repricing to that contract.
+The target's explicit solver/fit bounds, recovery assumptions, quote selection
+and market acceptance remain this calibration owner's separate Draft choices.
+The observed cap mismatch below remains unreconciled in runtime.
+
+## Relationship to accepted quote/risk boundaries
+
+[CORE-MARKET-05](../core-market/hazard-quotes-and-risk.md#accepted-decision-explicit-cds-observations-hazard-risk-and-recovery)
+was accepted on 2026-11-08: remove incomplete core quote/interpolation fields,
+preserve lossless original/par-space risk inputs, and use explicit quote
+recalibration with exact bindings/dependencies. Direct intensity risk and
+frozen-intensity recovery replacement remain distinct operations. Reconcile
+reporting/replay construction to that contract; this does not adopt the target's
+remaining solver, fit or quote-domain choices.
+
 ## Choice and domain
 
 Calibrate nonnegative, ending-knot constant hazard rates against complete CDS contract PV, with fixed curve recovery. Par spreads and upfront-plus-running quotes enter the same PV/N residual. The spread-over-LGD approximation is only an initial guess, never the calibration objective. The curve's survival interpolation is intrinsically log-linear; `par_interp` affects stored indicative spread reporting.

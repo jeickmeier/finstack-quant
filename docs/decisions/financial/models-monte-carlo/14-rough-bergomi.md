@@ -22,6 +22,20 @@ The compensation assumes Var(Y_t)=t^(2H); finite-window fBM and discrete RL appr
 
 [Process](../../../../finstack-quant/models/src/monte_carlo/process/rough_bergomi.rs), [stepper](../../../../finstack-quant/models/src/monte_carlo/discretization/rough_bergomi.rs). Located tests include left-endpoint variance reconstruction, workspace reset, spot/forward-variance martingales and small-eta Black–Scholes convergence. [Non-Markov tests](../../../../finstack-quant/models/src/monte_carlo/simulate/tests/non_markov.rs) compare dedicated path loops and generator variants; loop equality is shared-kernel evidence. [Bayer–Friz–Gatheral](../../../REFERENCES.md#bayer-friz-gatheral-2016) and [McCrickerd–Pakkanen](../../../REFERENCES.md#mccrickerd-pakkanen-2018) are canonical background, with no recorded product adoption.
 
+## Relationship to the accepted forward-variance boundary
+
+[CORE-MARKET-17's complete accepted package](../core-market/forward-variance.md#accepted-decision-nonnegative-variance-sources-and-explicit-model-time-semantics)
+requires a nonnegative variance-rate source with strict point/interval semantics,
+checked queries and explicit variance-time/underlying/measure/conditioning
+qualification. Reconcile genuine zero without an avoidable 0*exp(overflow),
+without discarding future positive values or fractional history. Exact source
+interval areas do not certify the left-sampled simulation grid across breaks;
+keep adaptedness and qualify the actual grid/quadrature/path bias. Frozen source
+reuse is not a new conditional curve or a qualified history-free restart.
+Record 17 was accepted on **2026-11-08**, with reconciliation/qualification
+pending. Its acceptance does not adopt this record's full driver,
+compensation, dynamics, simulation or pricing accuracy.
+
 ## Follow-up tracking
 
 Adoption questions, implementation reconciliation and validation work are tracked in the

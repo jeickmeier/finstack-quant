@@ -2,7 +2,37 @@
 
 Audit date: **2026-11-05**. Source revision: **`7e82fd03ad98346727769e88dd5ac5d84b56e9fc`**.
 
-Decision status for every record: **Draft — observed implementation, adoption pending**. Implementation status: **Observed within the defined file scope**; observed behavior and limitations are recorded individually; outstanding work is tracked in the [cashflow follow-ups](../FOLLOW_UPS.md#cashflows). Validation status: **Evidence inspected/located, not executed**. Existing code and tests establish behavior, not financial approval or universal correctness.
+[CASHFLOWS-001 — Contractual periods, calendars and day-count context](01-schedule-periods.md#accepted-decision-contractual-periods-calendars-and-day-count-context)
+is **Accepted on2026-11-08** after complete whole-record review.
+[CASHFLOWS-002 — Coupon and payment program compilation](02-program-compilation.md#proposed-decisions-for-whole-record-review)
+is **Proposed** for complete whole-record review; **14 other records remain Draft**.
+Implementation status is **Observed within the defined file scope**; runtime
+reconciliation and independent qualification remain pending. Production validation
+is **Evidence inspected/located, not executed**; independent reference examples
+are reported separately in record001. Existing code/tests establish observed
+behavior, not financial adoption or universal correctness. Outstanding work is
+tracked in the [cashflow follow-ups](../FOLLOW_UPS.md#cashflows).
+
+The complete accepted001 package inherits accepted core date/grid/day-count rules,
+removes broad presets and generic CDS overrides, and retains original nominal
+phase/context, explicit calendar/reset/accrual roles and coincident payment
+identity. It composes ICMA nominal slices, preserves full-context ACT365L and
+explicit termination facts, guards immutable period queries and unifies the
+single-period helper with canonical grid admission. The narrow core015 metadata endpoint clarification was accepted with this
+package on2026-11-08 and applied to that existing record in place. Program/window/coupon/replay/reporting decisions retain their
+separate owning records; this package changes no runtime or generated artifact.
+
+The complete proposed002 package selects independent atomic coupon/payment
+windows explicitly, including re-anchoring from redundant cuts and strict001
+anchor/context admission. It replaces sticky errors with atomic fallible updates,
+requires globally valid strict payment nesting, explicit settlement/exchange and
+owner observation cutoff, and removes implicit Cash tails/curve-date inference.
+Fixed period-start rates, margin FROM and payment UNTIL remain distinct disclosed
+operators. Exact monetary state, genuine source errors and complete local plan
+publication retain accepted authority; actual helpers/specs/hosts/schema/parity
+require reconciliation. Broader amount/principal/fixing/lifecycle choices remain
+with their own records. The complete package is proposed; runtime and independent
+financial/host/geometry qualification remain pending.
 
 ## Scope and completeness
 

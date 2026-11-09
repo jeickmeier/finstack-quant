@@ -6,6 +6,15 @@
 - **Implementation status:** Observed in the owned paths listed below; shared kernels are identified explicitly.
 - **Validation status:** Source and linked evidence inspected or located; no numerical tests executed in this audit. Located tests establish the stated local behavior only, not independent accuracy across the domain.
 
+## Relationship to accepted level-source boundaries
+
+[CORE-MARKET-08](../core-market/price-curves.md#accepted-decision-explicit-level-pillars-and-parameter-shocks)
+was accepted on 2026-11-08: explicit nonnegative index-point sources without
+automatic spot anchors. Use its checked dated source query and complete clock,
+preserving quoted/model/live/SOQ distinctions and product settlement eligibility.
+Core zero admission does not adopt this product's stricter contract/model domain
+or its remaining Draft valuation/lifecycle conventions.
+
 ## Choice and rationale
 
 A volatility-index future reads a prebuilt volatility-index futures curve; it does not derive a futures quote by taking a square root of expected variance. Equity and volatility-index future options are instances of the shared future-option contract/kernel.

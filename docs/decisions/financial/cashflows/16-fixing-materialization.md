@@ -29,6 +29,18 @@ Supported alternative is to supply authoritative exact fixings first. Holding fi
 - Located invariant/regression evidence in [production_fixing_roll.rs](../../../../finstack-quant/cashflows/tests/production_fixing_roll.rs): preservation of existing values/metadata, conflict and missing-projection failures, inclusion of both advancing endpoints and no-op equal dates. [compiler_regressions.rs](../../../../finstack-quant/cashflows/tests/cashflows/builder/compiler_regressions.rs) locates one raw fixing under weekend balance splits.
 - No external standard mandates realized-forward scenario rolls or the conflict tolerance. No tests executed.
 
+## Relationship to the accepted fixing dataset boundary
+
+[CORE-MARKET-12's complete accepted package](../core-market/scalar-series-and-fixings.md#accepted-decision-validated-values-literal-sampling-and-qualified-exact-fixings) binds exact rate/CMS
+observation identities and separates published fixing qualification from date
+matching. Materialized pre-roll model values require explicitly hypothetical
+dataset provenance; namespace insertion or a later valuation date cannot confer
+actual publication authority. Reconcile strict series construction/policies
+without retaining default Step or ordinary generic bumps of fixing history.
+The conflict/window/realization policy above remains observed and Draft;
+record12 does not adopt it. Record12 was accepted on **2026-11-08**, with
+reconciliation and independent qualification pending.
+
 ## Follow-up tracking
 
 Adoption questions, implementation reconciliation and missing validation are tracked in the

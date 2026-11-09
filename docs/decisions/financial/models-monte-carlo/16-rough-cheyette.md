@@ -22,6 +22,18 @@ Y compensation targets E[sigma²]=sigma_base² only under the assumed driver lev
 
 [Process](../../../../finstack-quant/models/src/monte_carlo/process/cheyette_rough.rs), [stepper](../../../../finstack-quant/models/src/monte_carlo/discretization/cheyette_rough.rs); located tests cover interpolation, left-endpoint sigma, variance mean and zero-mean stochastic increments. [Non-Markov tests](../../../../finstack-quant/models/src/monte_carlo/simulate/tests/non_markov.rs) explicitly exclude the short-window case from compensated-mean assertions. [Gatheral–Jaisson–Rosenbaum](../../../REFERENCES.md#gatheral-jaisson-rosenbaum-2018) is rough-volatility context, not a derivation of this Cheyette extension. A direct Cheyette rough-model primary reference, pricing benchmark and adoption rationale are missing.
 
+## Relationship to the accepted forward-variance boundary
+
+[CORE-MARKET-17's complete accepted package](../core-market/forward-variance.md#accepted-decision-nonnegative-variance-sources-and-explicit-model-time-semantics)
+removes ForwardVarianceCurve from sigma_base's volatility-amplitude role. Use
+an explicitly model-owned amplitude input with truthful units/sampling, retaining
+its intended values and interpolation semantics; no silent square-root, relabel
+or squared-knot variance interpolation. Reconcile checked input/zero/error and
+clock behavior through actual process/stepper/plain-spec host paths. This type
+misuse does not demonstrate wrong current prices. Record 17 was accepted on **2026-11-08**, with reconciliation/qualification
+pending. Its acceptance does not adopt this record's full amplitude, state, driver, stability or
+calibration policies.
+
 ## Follow-up tracking
 
 Adoption questions, implementation reconciliation and validation work are tracked in the

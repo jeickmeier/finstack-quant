@@ -40,6 +40,20 @@ Normal β=0 exact-backbone asymptotic form and explicit normal general-β expans
 
 [expansion.rs](../../../../finstack-quant/models/src/volatility/sabr/expansion.rs) and [parameters.rs](../../../../finstack-quant/models/src/volatility/sabr/parameters.rs). [tests.rs](../../../../finstack-quant/models/src/volatility/sabr/tests.rs) includes Hagan ATM hand-formula, endpoint/χ crossover and fractional-beta independent-formula tests. [vol_models_quantlib_tests.rs](../../../../finstack-quant/models/tests/vol_models_quantlib_tests.rs) distinguishes QuantLib lognormal and mpmath exact-β0 normal references. Reference: [Hagan SABR](../../../REFERENCES.md#hagan-2002-sabr).
 
+## Relationship to the accepted SABR source boundary
+
+[CORE-MARKET-16's complete accepted package](../core-market/sabr-cube-data.md#accepted-decision-canonical-sabr-sources-and-explicit-evaluated-quote-meaning)
+requires exact canonical source parameters and explicit evaluated Normal/Black/
+ShiftedBlack output, without beta-derived quote tags, source-node floors/caps or
+silent beta snapping. Reconcile source adapters with finite signed displacement
+admission and check actual backbone/effective forward/strike domains. A Normal
+output request does not remove a fractional-backbone positive-domain restriction;
+only a supported exact beta=0 normal method permits crossing zero. Independent
+normal/lognormal asymptotic outputs are not exact price-equivalent conversions.
+Record 16 was accepted on **2026-11-08**, with reconciliation/qualification
+pending. Its acceptance does not adopt this record's complete expansions,
+thresholds, range policy or financial accuracy.
+
 ## Follow-up tracking
 
 Adoption questions and implementation or validation work are tracked in the

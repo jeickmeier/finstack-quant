@@ -37,6 +37,29 @@ ConvexityAdjustmentRisk subtracts a zero-correction **Black approximation** PV f
 - [CMS option tests](../../../../finstack-quant/valuations/rates/tests/cms_option/test_pricing.rs) and inline CMS swap tests provide sign, fixed-coupon, cap/floor and schedule evidence. These do not establish full local-vanna accuracy over a smile.
 - [Hagan CMS convexity](../../../REFERENCES.md#hagan-2003-cms-convexity) is the canonical reference entry; the precise chosen approximation and admissible regimes still require agreement.
 
+## Relationship to the accepted observed CMS boundary
+
+[CORE-MARKET-12's complete accepted package](../core-market/scalar-series-and-fixings.md#accepted-decision-validated-values-literal-sampling-and-qualified-exact-fixings) requires a configured CMS
+fixing IndexId matching the actual reference swap/tenor/conventions/publication
+setting, distinct from the underlying rate index and projection curve. Remove
+floating-year/fuzzy-month fixing keys; existing positive calendar tenor
+resolution remains at the CMS owner. Reject mismatched overrides/wrong series
+and qualify publication/source version before exact retrieval. These changes
+do not adopt the convexity approximation, same-day intrinsic policy or local
+risk definitions above. Record12 was accepted on **2026-11-08**, with
+reconciliation/qualification pending; this record remains Draft.
+
+## Relationship to the accepted volatility association boundary
+
+[CORE-MARKET-14's complete accepted package](../core-market/volatility-grids-and-shocks.md#accepted-decision-explicit-annual-volatility-sources-and-exact-grid-shocks) requires the actual CMS
+strike-vol source to match the reference benchmark and fixed swap tenor, quote
+units/convention and source clock. A Strike grid is not an expiry/tenor matrix,
+and an ID or numerical scale alone cannot establish this association. Preserve
+existing guards and qualify active dated lookup under accepted ADR0045; no
+implicit source-origin roll is selected. This does not adopt the CMS model
+above. Record14's complete source/shock package was accepted on **2026-11-08**,
+with reconciliation and independent qualification pending.
+
 ## Follow-up tracking
 
 Adoption, reconciliation and validation work is tracked in the

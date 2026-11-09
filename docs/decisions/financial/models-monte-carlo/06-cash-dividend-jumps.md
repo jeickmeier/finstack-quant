@@ -22,6 +22,18 @@ Events at time zero are excluded by the interval selector and need explicit prio
 
 [Process](../../../../finstack-quant/models/src/monte_carlo/process/gbm_dividends.rs), [stepper](../../../../finstack-quant/models/src/monte_carlo/discretization/exact_gbm_dividends.rs); unit tests cover cash/proportional/multiple jumps and positivity. `gbm_with_dividends_forward_drops_by_each_dividend` in [simulation tests](../../../../finstack-quant/models/src/monte_carlo/simulate/tests.rs) uses a direct deterministic carried-dividend expectation, including an event inside a coarse step. [Black–Scholes](../../../REFERENCES.md#black-scholes-1973) is diffusion background; ordinary forward checks do not qualify floor-sensitive cases.
 
+## Relationship to the accepted cash-event adapter boundary
+
+[CORE-MARKET-13's complete accepted package](../core-market/dividend-events.md#accepted-decision-identified-cash-per-share-events-with-explicit-dates) removes stock/yield
+events from the core cash schedule and preserves ex/pay dates, cash-per-share
+Money and authoritative share/currency basis. MC Proportional(p) is a cash
+payout S*(1-p), not additional shares/share. Reconcile numerical jump inputs
+through an explicit payment-delay/entitlement/share-basis adapter or refusal,
+including same-date aggregation and same-day phase. Record13 does not adopt
+this Draft process's floor, time-zero or exact-scheme choices; its complete
+source package was accepted on **2026-11-08**, with reconciliation and
+independent qualification pending.
+
 ## Follow-up tracking
 
 Adoption questions, implementation reconciliation and validation work are tracked in the
