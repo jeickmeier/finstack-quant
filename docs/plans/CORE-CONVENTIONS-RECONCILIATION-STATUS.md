@@ -7,37 +7,68 @@
 
 ## Summary
 
-**Interim summary (run in progress; refreshed after each slice).** Last full
-gate: Phase E `mise run all` **pass** after G2.
+**Run complete (2026-11-09). Final gate: `mise run all` pass** at HEAD
+(nextest 16358 passed, Python 13988 passed / 112 skipped). Nothing pushed or
+merged; everything is on `refactor/core-conventions-reconciliation`, cut from
+local `master` `c5c5a0a56e`.
 
-**Committed (24 commits on `refactor/core-conventions-reconciliation`):**
-A1 `b6f0dd8d61`, A2 `c808334fd3`, A3 `bb0fb7b027`, A3b `b7248fccbf`,
-B1 `c94d13be41`, B1b `49da53a95e`, B2a `69c2dc0d3a`, C1a `a078dd7301`,
-C1b `8f24022396`, C2 `a59aaebe60` (partial), H2 `92c4c64a5a`,
-C3 `5e6e2d0586` (partial), C4 `96d1d0a2ec`, D1 `848317a970`
-(+ follow-up `c671891da1`), D2 `a5023cbec1`, D3 `6645922848`,
-E1 `7dbae3e236`, E2a `17103b7ba5`, E2b `4c5cb90980` (docs),
-E3a `28530ab1ef`, G2 `63645b0593`; status-only `b6182cf840`.
+**Committed slices (21 slices, 22 code/doc commits plus status commits):**
+
+| Slice | Commit | Scope |
+| --- | --- | --- |
+| A1 | `b6f0dd8d61` | barrier rebate timing (020) |
+| A2 | `c808334fd3` | IMM option-expiry helpers removed (009) |
+| A3 | `bb0fb7b027` | explicit SIFMA class, checked lookups (010) |
+| A3b | `b7248fccbf` | SIFMA agency/term classification removed; TBA class required (010, O2) |
+| B1 | `c94d13be41` | Rate/Bps units, admission, precision (018) |
+| B1b | `49da53a95e` | fractional-bp term-loan step-ups (018, O12) |
+| B2a | `69c2dc0d3a` | exact decimal grammar and canonical decimal wire (012) |
+| C1a | `a078dd7301` | fallible holiday membership/counting (004) |
+| C1b | `8f24022396` | holiday engine year gating, reach, data errors (004) |
+| C2 | `a59aaebe60` | strict calendar-input admission (004); partial |
+| H2 | `92c4c64a5a` | cme/cnbe retired; commodity contract calendar (005) |
+| C3 | `5e6e2d0586` | no default BDC; strict joint IDs (006); partial |
+| C4 | `96d1d0a2ec` | uncapped minimal business-day searches (006) |
+| D1 | `848317a970` (+ `c671891da1`) | day-count context validation before zero (001) |
+| D2 | `a5023cbec1` | ACT/365L coupon-end-year rule (002) |
+| D3 | `6645922848` | 30/360 package; QuantLib-regenerated fixture (003) |
+| E1 | `7dbae3e236` | tenor limits, `to_years_approx`, context bridge (007) |
+| E2a | `17103b7ba5` | completed months; roll calendar rule (007) |
+| E2b | `4c5cb90980` | structured-credit month meanings stated (007, O13; docs) |
+| E3a | `28530ab1ef` | schedules: no policies, warnings or repair (008 #12) |
+| G2 | `63645b0593` | CreditRating ladder, partial order (019) |
+
+Status-only commits: `b6182cf840`, the interim summary, and this one.
 
 **Not done, with reasons:**
-- Blocked (owner decision): B2b (sub-1e-28 model values entering `Money`);
-  `from_years` removal inside E2 (`ForwardCurve` carries no contractual
-  tenor).
-- Not executed (scope): E2c, the O6 required quote `Compounding` on Bond,
+- **Blocked (owner decision):** B2b (what a pricer does with a sub-1e-28
+  model value before `Money`); `from_years` removal in E2 (`ForwardCurve`
+  carries no contractual tenor).
+- **Not executed (scope):** E2c, the O6 required quote `Compounding` on Bond,
   TermLoan, RevolvingCredit and ABF (about 1,000 construction sites).
-- Not attempted (run budget; plan sized L): E3b (explicit schedule spec,
-  grid modes, anchors, ceiling, private state; about 700 builder sites).
-- Skipped (dependency): B3, B4, B5, G1, G4, F6, F7, F8, G5, H6 (B2b chain);
-  E4, E4b, E5 (E3b); E6 (G5, CASHFLOWS-001).
-- Remaining queue at the time of this summary: G3, F1–F5, H1, H3–H5.
+- **Not attempted (run budget):** E3b (plan L; about 700 builder sites),
+  G3 (plan M/L; classify validation and embedded-data retirement are coupled
+  and the embedded `sp` scale violates the representative rule), F1 (plan M;
+  about 200 sites), F2–F4 (F1 chain), F5 (plan L), H1, H3, H4, H5 (data
+  slices).
+- **Skipped (dependency):** B3, B4, B5, G1, G4, F6, F7, F8, G5, H6 (B2b
+  chain); E4, E4b, E5 (E3b); E6 (G5 and CASHFLOWS-001).
 
 **Register changes:** deleted the 018 Rate/Bps entry (B1b) and the
 day-count evidence-prose entry (D3); rewritten as Evidence: the 020 barrier
-entry (A1) and the 003 30/360 entry (D3); narrowed in place: 004/005, 006,
-001/002, 007/014, 008, 010, 012, 019. Totals now 593 items; Core
-conventions 19.
+entry (A1) and the 003 30/360 entry (D3); narrowed in place to the remaining
+work: 004/005 calendar-input and holiday entries, 006 rolling, 001/002
+actual-day/coupon-context, 007/014 tenor/periods, 008 schedules, 010 SIFMA,
+012 money, 019 ratings. Totals: 595 → 593 items; Core conventions 21 → 19.
 
-**Needs review:** see the section at the end of this file.
+**Needs review:** the section at the end of this file (A1 representation,
+B2 split, C3 product defaults, D1 choices, D3 product termination status and
+wire omission, E1 scenario curve clocks, E2 split/blocker/scenario roll,
+E2c and E3b scope, G2 `indexmap` dependency, G3 coupling, and A1 not closed).
+
+**Phase gates:** A, B, C, D and E passed (C and D on the second run, with the
+cause logged under Phase gates); the final gate passed. Phases F and G did
+not complete (G2 only), so the final gate stands for them.
 
 ## Baseline
 
@@ -77,23 +108,23 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 24 | E4b | skipped (dep E4) | | | O7 decision not recorded in this run |
 | 25 | G1 | skipped (dep B3) | | | |
 | 26 | G2 | committed (`G2:` in git log) | workspace rust-lint; gen-write; workspace rust-test 16358; core doctests 285; python-test 13988; python-lint; wasm-test 1085; wasm-lint; ui-check | 019 entry: CreditRating part recorded; record 019 partly reconciled | `D` = 21 and `NR` off the ladder; no `Ord`, hand-written `PartialOrd` (`NR` incomparable with rated values, equal to itself); `ladder_position()`; `notches_to`/`to_moodys_string -> Result` (`NR` arithmetic and Moody's `D` error); finite canonical/Moody's/status alias tables replace suffix stripping; the models rating-factor table and the structured-credit `rating_haircuts` move from `BTreeMap` to `IndexMap` (ladder order / wire order); Python ordering of `NR` against a rated value raises `TypeError` |
-| 27 | G3 | pending | | | |
+| 27 | G3 | not attempted (run budget; plan sized M/L) | | | See Needs review: classify validation and embedded-data retirement must land together |
 | 28 | G4 | skipped (dep B3) | | | |
-| 29 | F1 | pending | | | |
-| 30 | F2 | pending | | | |
-| 31 | F3 | pending | | | |
-| 32 | F4 | pending | | | |
-| 33 | F5 | pending | | | |
+| 29 | F1 | not attempted (run budget; plan sized M) | | | About 200 sites in about 50 files (fiscal presets 48+ in 19 files, `PeriodId::annual` 72 in 20, `next_fiscal`/`prev_fiscal` 39, plus host presets) |
+| 30 | F2 | not attempted (run budget; dep F1) | | | |
+| 31 | F3 | not attempted (run budget; dep F2) | | | |
+| 32 | F4 | not attempted (run budget; dep F3) | | | |
+| 33 | F5 | not attempted (run budget; plan sized L) | | | |
 | 34 | F6 | skipped (dep B3) | | | |
 | 35 | F7 | skipped (dep F6) | | | |
 | 36 | F8 | skipped (dep F7) | | | |
 | 37 | G5 | skipped (dep G4) | | | |
 | 38 | E5 | skipped (dep E3: E3b not executed) | | | |
 | 39 | E6 | skipped (dep G5, CASHFLOWS-001) | | | |
-| 40 | H1 | pending | | | |
-| 41 | H3 | pending | | | |
-| 42 | H4 | pending | | | |
-| 43 | H5 | pending | | | |
+| 40 | H1 | not attempted (run budget) | | | Data slice; needs primary sources fetched in-run |
+| 41 | H3 | not attempted (run budget) | | | Data slice |
+| 42 | H4 | not attempted (run budget) | | | Data slice |
+| 43 | H5 | not attempted (run budget) | | | Data slice |
 | 44 | H6 | skipped (dep B5) | | | |
 
 ## Phase gates
@@ -234,6 +265,18 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
   by core and structured credit) was added to `finstack-quant-models` so the
   rating-factor table keeps a deterministic order once `CreditRating` lost
   `Ord`.
+- **G3 not attempted (run budget).** Record 019 #7 and #9 couple the new
+  `classify` representative rule with retiring the embedded sp/moodys data:
+  the embedded `sp` scale already violates the rule (AA+ representative 95 is
+  not below AAA's minimum 95), and #7 forbids repairing those numbers, so the
+  validation cannot ship without removing `embedded_registry()` and having
+  scorecards resolve one snapshot from a supplied registry. Counted
+  rating-scale sites: Python binding 95 and stub 79, WASM binding 69, the
+  statements-analytics scorecard extension 12, schema examples 4, host tests
+  about 50, two notebooks (one, `registry_defaults_and_overrides.ipynb`, is
+  about the embedded defaults being removed). The scorecard API has two
+  defensible registry-supply shapes (explicit registry argument versus the
+  config extension), which is a design choice for the owner.
 - **A1 not closed.** The 020 register entry stays open as Evidence. Equality,
   adjacent and already-beyond observations, window/history behavior, and
   settlement/discount boundaries at each consumer were not independently
