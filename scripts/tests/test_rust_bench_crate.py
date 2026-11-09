@@ -29,15 +29,10 @@ DEFAULT_TIMING = [
 def _run_task(
     tmp_path: Path, overrides: dict[str, str] | None = None
 ) -> tuple[subprocess.CompletedProcess[str], list[str] | None]:
-    """Record task arguments and model Cargo appending --bench to the binary arguments."""
+    """Record the arguments passed to Cargo without running a benchmark."""
     cargo = tmp_path / "cargo"
     cargo.write_text(
-        "#!/bin/sh\n"
-        'printf "%s\\0" "$@" > "$FQ_TEST_CARGO_ARGS"\n'
-        'while [ "$#" -gt 0 ] && [ "$1" != "--" ]; do shift; done\n'
-        'if [ "$#" -gt 0 ]; then shift; fi\n'
-        'printf "%s\\0" "$@" --bench > "$FQ_TEST_CRITERION_ARGS"\n'
-        'exit "${FQ_TEST_CARGO_EXIT:-0}"\n',
+        '#!/bin/sh\nprintf "%s\\0" "$@" > "$FQ_TEST_CARGO_ARGS"\nexit "${FQ_TEST_CARGO_EXIT:-0}"\n',
         encoding="utf-8",
     )
     cargo.chmod(0o755)
@@ -46,7 +41,6 @@ def _run_task(
     env.update({
         "PATH": f"{tmp_path}{os.pathsep}{env.get('PATH', '')}",
         "FQ_TEST_CARGO_ARGS": str(argument_file),
-        "FQ_TEST_CRITERION_ARGS": str(tmp_path / "criterion-args"),
         "FQ_TEST_CARGO_EXIT": "0",
         "usage_package": "finstack-quant-valuations",
         "usage_bench": "mc_exotics_pricing",
@@ -113,16 +107,11 @@ def test_timing_environment_overrides_are_forwarded(tmp_path: Path) -> None:
         ("$(touch injected); `touch injected` *", "$(touch injected); `touch injected` *"),
     ],
 )
-def test_filter_preserves_regex_and_cargo_benchmark_flag(
-    tmp_path: Path, case_filter: str, forwarded_filter: str
-) -> None:
-    """Filters stay one safe positional while Cargo's appended --bench remains an option."""
+def test_filter_preserves_regex_as_one_safe_argument(tmp_path: Path, case_filter: str, forwarded_filter: str) -> None:
+    """Filters stay one safe positional without adding an option terminator."""
     result, arguments = _run_task(tmp_path, {"usage_filter": case_filter})
     assert result.returncode == 0, result.stderr
     assert arguments == CARGO_PREFIX + DEFAULT_TIMING + [forwarded_filter]
-    binary_arguments = (tmp_path / "criterion-args").read_bytes().decode().split("\0")[:-1]
-    assert binary_arguments == [*DEFAULT_TIMING, forwarded_filter, "--bench"]
-    assert "--" not in binary_arguments
     assert not forwarded_filter.startswith("-")
     assert not (tmp_path / "injected").exists()
 

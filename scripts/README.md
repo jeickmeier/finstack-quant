@@ -166,6 +166,21 @@ QuantLib (`quantlib>=1.41`, Python `dev` dependency group — run
 generated JSON is checked in, so the Rust and Python golden suites consume it
 without a QuantLib install.
 
+### Tranche numerical references
+
+`golden/valuation_tranche_reference.py` produces independent references from a
+reviewed Rust diagnostic export. Its module docstring gives the pinned
+NumPy/SciPy invocation and the numerical scope. Full generation is expensive;
+it is separate from `gen-write` and ordinary tests.
+
+`golden/tranche_reference_storage.py` writes compact regression pins and keeps
+the complete baseline report in `<output-stem>.report.json` beside them. The
+[provenance manifest](../benchmarks/valuation-evidence.json) pins the retained
+numerical payload and the original full fixture in Git history.
+`tests/test_tranche_reference_storage.py` checks payload integrity, coverage and
+lossless storage; the [valuation record](../benchmarks/VALUATION_PERFORMANCE.md#running-current-checks)
+gives the scoped Rust command that checks current prices against those pins.
+
 ## Release and packaging
 
 | Script | Purpose | Task (tier) |

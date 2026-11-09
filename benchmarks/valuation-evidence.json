@@ -1,0 +1,51 @@
+{
+  "schema": "finstack_quant.valuation_evidence/1",
+  "historical_commit": "827ebb75b9ec42a43906cf3a98c4b67834396f6f",
+  "historical_artifacts": {
+    "reference_and_baseline_reports": {
+      "path_at_commit": "finstack-quant/valuations/credit/tests/fixtures/valuation_b4_tranche_reference.json",
+      "git_blob": "c607f8a93646c7c46e2da464bf9c313991e961c7",
+      "sha256": "d1a1887ddf4133babf7cc94e43c1809b1532ab9c42f2dd639d4bb7fea1f2dc94",
+      "bytes": 27843606,
+      "url": "https://github.com/jeickmeier/finstack/blob/827ebb75b9ec42a43906cf3a98c4b67834396f6f/finstack-quant/valuations/credit/tests/fixtures/valuation_b4_tranche_reference.json"
+    },
+    "full_performance_record": {
+      "path_at_commit": "benchmarks/VALUATION_PERFORMANCE.md",
+      "git_blob": "5f077ac9c1e47d18555395ffc608b4ee9a92a0c1",
+      "sha256": "88f50edfa6c0b535aeaf70bafe68a2a3d6ea5bafa750d7a9f85e6a3478040ae7",
+      "bytes": 88863,
+      "url": "https://github.com/jeickmeier/finstack/blob/827ebb75b9ec42a43906cf3a98c4b67834396f6f/benchmarks/VALUATION_PERFORMANCE.md"
+    },
+    "oracle_generator": {
+      "path_at_commit": "scripts/golden/valuation_tranche_reference.py",
+      "git_blob": "3bc8936cc9d750e7e7537dabef9698c2b37a3774",
+      "sha256": "de545e3eab26f724c3bf49cd6e5c2e968f6103b218f09aa4a6516359caf4bf9a",
+      "bytes": 46067,
+      "url": "https://github.com/jeickmeier/finstack/blob/827ebb75b9ec42a43906cf3a98c4b67834396f6f/scripts/golden/valuation_tranche_reference.py"
+    }
+  },
+  "measurement_summary": {
+    "path": "benchmarks/valuation-performance-results.json",
+    "sha256": "52df4524df164e7023c3d0386154001e18e83f5fdba66a0db50419b77d2d8797",
+    "bytes": 385554,
+    "scope": "Recorded historical measurements and numerical limits. References to lost raw artifacts are removed; retained statistics do not establish a new validation of current source."
+  },
+  "regression_fixture": {
+    "path": "finstack-quant/valuations/credit/tests/fixtures/valuation_b4_tranche_reference.json",
+    "canonical_sha256": "90a2a0281dd62481b51e358953b32a8b63cd0c8cfc15663365ab6821e10b7121",
+    "canonical_encoding": "UTF-8 json.dumps(value, sort_keys=True, separators=(',', ':'), allow_nan=False), without a trailing newline",
+    "removed_report_fields": [
+      "baseline_errors_with_uncertainty",
+      "baseline_grid_deviations",
+      "baseline_acceptance"
+    ],
+    "coverage": {
+      "cases": 18,
+      "scenarios": 24,
+      "periods": 504,
+      "conditional_nodes": 20958
+    },
+    "provenance": "Original numerical provenance is preserved. This projection removes only the named report fields; expected values, baseline bits, uncertainties and tolerances are unchanged."
+  },
+  "historical_measurement_limit": "Raw timing archives, historical binaries and command ledgers were not retained. Their stale references are removed from the summary. Reported performance acceptance cannot be independently replayed from this repository; current oracle regressions use checked-in inputs and pins."
+}

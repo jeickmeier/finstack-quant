@@ -9,12 +9,22 @@ is **Accepted on 2026-11-08** after complete whole-record review.
 [CASHFLOWS-003 — Dated opening principal, signed cash and atomic event phases](03-principal-and-emission-order.md#accepted-decision-dated-opening-principal-signed-cash-and-atomic-event-phases)
 is **Accepted on 2026-11-08** after complete whole-record review.
 [CASHFLOWS-004 — Explicit amortization laws and live-balance installments](04-amortization.md#accepted-decision-explicit-amortization-laws-live-balance-installments-and-monetary-boundaries)
-is **Accepted on 2026-11-08** after complete whole-record review;
-**12 other records remain Draft**.
+is **Accepted on 2026-11-08** after complete whole-record review.
+[CASHFLOWS-005 — Parent-coupon accrual, exact splits and capitalization](05-coupon-cash-and-pik.md#accepted-decision-parent-coupon-accrual-exact-splits-and-capitalization)
+is **Accepted on 2026-11-08** after complete whole-record review.
+[CASHFLOWS-006 — Resolved term observations and exact rate controls](06-floating-rate-projection.md#accepted-decision-resolved-term-observations-exact-rate-controls-and-strict-failures)
+is **Accepted on 2026-11-08** after complete whole-record review.
+[CASHFLOWS-007 — Overnight blocks, cumulative growth and parent allocation](07-overnight-compounding.md#accepted-decision-resolved-overnight-blocks-cumulative-growth-and-parent-allocation)
+is **Accepted on 2026-11-09** after complete whole-record review.
+[CASHFLOWS-008 — Parent-bound replay, exact full settlement and timing ownership](08-floating-replay.md#accepted-decision-parent-bound-replay-exact-full-settlement-and-explicit-timing-ownership)
+is **Accepted on 2026-11-09** after complete whole-record review.
+[CASHFLOWS-009 — Explicit fee parents, exact amounts and literal tier selection](09-fees.md#proposed-decision-explicit-fee-parents-exact-amounts-and-literal-tier-selection)
+is **Proposed on 2026-11-09** for complete whole-record review;
+**7 other records remain Draft**.
 Implementation status is **Observed within the defined file scope**; runtime
 reconciliation and independent qualification remain pending. Production validation
 is **Evidence inspected/located, not executed**; independent reference examples
-are reported separately in records001–004. Existing code/tests establish observed
+are reported separately in records001–009. Existing code/tests establish observed
 behavior, not financial adoption or universal correctness. Outstanding work is
 tracked in the [cashflow follow-ups](../FOLLOW_UPS.md#cashflows).
 
@@ -56,6 +66,53 @@ laws, no implicit financial rounding and exact par cash/principal effects, with
 strict admission and existing consumer/host reconciliation. The package is
 accepted; runtime/host reconciliation and independent qualification remain pending.
 
+The complete accepted005 package selects original-parent cumulative accrual
+increments instead of re-anchored balance-slice day counts, one whole-parent
+monetary restoration and one exact cash-share/residual-PIK allocation. It preserves
+internal signed contributions and truthful parent authority, requires nonnegative
+generated PIK per parent, and emits enabled cash/noncash components including
+zero with the accepted dates/effects. It identifies strict nested coupon ingress
+and actual replay/host/consumer reconciliation without adopting later rate,
+observation, entitlement or reporting laws. The package is accepted; runtime/host reconciliation and independent
+qualification remain pending.
+
+The complete accepted006 package inherits index-specific factor projection and
+qualified observed identity, separates index annualization from coupon weights,
+and unifies exact published-fixing versus explicitly unpublished-projection
+selection across builder/RateSpec. It removes error-driven substitutes and
+calendar/tenor/preset inference, requires explicit ordinary-floater controls and
+one bounded Decimal contractual-rate stage, and retains truthful provenance and
+product/host reconciliation. Rates feed accepted005 monetary amounts without a
+float round trip; overnight/model owners retain their decisions. The package
+is accepted; runtime/host reconciliation and independent qualification remain pending.
+
+The complete accepted007 package separates actual overnight index periods from
+coupon carry weights, selects full-business-block lookback/shift/cutoff geometry
+and proportional shifted partial weights, and preserves frozen quotes/active
+carry in checked native-growth replay. It discloses model and monetary admission
+limits, a fixed full-parent clock bridge and compound-rate contributions under
+changing principal. Period reference caps need not cap weighted cash; partial
+state cannot manufacture future bound adjustments. Actual input/state/host and
+cross-engine qualification retain their separate owners. The package is accepted; runtime/host/state reconciliation and independent
+qualification remain pending.
+
+The complete accepted008 package binds state to its immutable original parent,
+separates qualified observation progress from exact principal capture, and keeps
+one constant-principal full-amount profile through005/006/007. It removes generic
+partial accrual and arbitrary segment settlement, preserves repeatable nonposting
+getters and distinguishes qualified forecasts from actual early-payment knowledge.
+Actual builder/bond/host handoffs are identified without adopting exercise,
+entitlement or lifecycle rules. The package is accepted; runtime and independent
+complete-path qualification remain pending.
+
+The complete proposed009 package selects the limited periodic-fee grid explicitly,
+renames balance methods Opening/Integrated, uses each fee parent's original
+accrual weights and one complete exact Money restoration, and defines static
+undrawn clipping before weighting. It retains literal fixed cash/date/currency,
+signed/enabled zero rows and strict nullable tier lookup without automatic
+product policy. Existing builder/product/host handoffs are identified; adoption,
+runtime reconciliation and independent complete-path qualification remain pending.
+
 ## Scope and completeness
 
 The assigned slice contains **35 Rust source files** under `finstack-quant/cashflows/src`: **30 algorithm-bearing files and 5 support files**, with no test-only or generated source files. Every file was read and classified exactly once in [coverage.json](coverage.json). Inline tests were located, selected formula/state examples inspected, and production functions following inline test blocks were included. Sixteen records cover the meaningful algorithm choices below; source-file count is not used as a substitute for algorithm coverage.
@@ -92,10 +149,10 @@ The [crate manifest](../../../../finstack-quant/cashflows/Cargo.toml) was also i
 | Overnight floor/cap placement | Daily index constraints before product or period constraints after aggregation | Daily default; Period explicit | [007](07-overnight-compounding.md) | Daily/period examples inspected |
 | Overnight changing principal | Difference cumulative prefix amounts; final period-bound adjustment spread over accrual time | Builder's fixed internal algorithm | [007](07-overnight-compounding.md) | Uniform-adjustment and signed-PIK test formulas inspected |
 | Incremental overnight replay | Replace partial carry factor; cache same fixing; monotone transactional advance | Reusable accumulator | [007](07-overnight-compounding.md) | Weekend checkpoint formula inspected; atomicity tests located |
-| Floating coupon state and settlement | Fix rate separately from capturing notional; require complete replay; split finite amount | CompiledFloatingCoupon | [CASHFLOWS-008](08-floating-replay.md) | State transition/domain tests located |
-| Replay accrued amount | Stored notional × elapsed fraction × replayed/fixed all-in rate | Explicit compiled-coupon method | [008](08-floating-replay.md) | Exact replay-through guard and ACT/365L logic inspected |
-| Fixed/periodic fee amount | Raw dated fixed amount; annual bp on drawn or floored undrawn balance | FeeSpec; PointInTime default/TWA explicit | [CASHFLOWS-009](09-fees.md) | Contract-day-count fee formula inspected |
-| Fee tier selection | Inclusive greatest threshold; whole-input rate; zero below first | evaluate_fee_tiers | [009](09-fees.md) | Ordered-threshold tests located |
+| Floating coupon state and settlement | Fix rate separately from capturing notional; require complete replay; split finite amount | CompiledFloatingCoupon | [CASHFLOWS-008](08-floating-replay.md) | State/domain evidence located; full parent-bound/exact package accepted2026-11-09 |
+| Replay accrued amount | Stored notional × elapsed fraction × replayed/fixed all-in rate | Explicit compiled-coupon method | [008](08-floating-replay.md) | Observed guard/context inspected; generic monetary method removal accepted2026-11-09 |
+| Fixed/periodic fee amount | Raw dated fixed amount; annual bp on drawn or floored undrawn balance | FeeSpec; PointInTime default/TWA explicit | [CASHFLOWS-009](09-fees.md) | Observed formula inspected; complete explicit fee-parent package proposed2026-11-09 |
+| Fee tier selection | Inclusive greatest threshold; whole-input rate; zero below first | evaluate_fee_tiers | [009](09-fees.md) | Observed ordering evidence; strict domain/nullable selection proposed2026-11-09 |
 | CPR/CDR ↔ monthly mortality | Survival-equivalent power via expm1/log; checked and explicit clamped APIs | Shared helper selected by caller | [CASHFLOWS-010](10-prepayment-and-mortality.md) | Boundary/roundtrip tests located; interleaved helper inspected |
 | Prepayment assumption curves | Constant CPR, PSA ramp, CMBS inclusive lockout, ABS depletion, annual-CPR vector | Explicit PrepaymentModelSpec | [010](10-prepayment-and-mortality.md) | Piecewise formulas and indexing read; PSA examples inspected |
 | Conditional default curves | Constant/vector CDR and SDA ramp/plateau/decline | Explicit DefaultModelSpec | [CASHFLOWS-011](11-default-and-recovery-assumptions.md) | SDA landmark examples inspected |

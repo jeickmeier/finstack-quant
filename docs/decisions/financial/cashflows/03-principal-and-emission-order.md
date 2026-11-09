@@ -26,6 +26,12 @@ LinearBetween is stateless, so no installment initialization/update phase remain
 The relative order of coupon, PIK, principal, amortization, fee and redemption
 phases is unchanged; the observed source pipeline below is not rewritten.
 
+Generated-coupon component wording was clarified on **2026-11-08** with
+[accepted005](05-coupon-cash-and-pik.md#accepted-decision-parent-coupon-accrual-exact-splits-and-capitalization):
+one parent coupon supplies one admitted nonnegative PIK component; signed
+internal calculation terms remain in its owner model rather than becoming
+separate principal events. Independently supplied signed003 events are unchanged.
+
 1. **Keep one exact nonnegative outstanding-principal stock.** Initial stock is
    same-currency exact Money, including zero; balances and principal effects use
    its stored Decimal authority throughout. No amount() binary64 round trip,
@@ -121,10 +127,12 @@ phases is unchanged; the observed source pipeline below is not rewritten.
 9. **Keep generated PIK timing explicit and contract-limited.** For this builder,
    capitalize admitted generated coupon PIK at its actual accrual end before
    explicit principal/amortization/redemption, independently of its cash payment
-   date. Preserve every admitted signed PIK component and apply its full checked
-   net effect; remove the positive-only gate that could drop an admitted negative
-   effect. Eligibility, splits and whether net negative capitalization is allowed
-   remain005/008 decisions, not adopted here. Terminal capitalization participates
+   date. Accepted005 defines one nonnegative admitted generated PIK component
+   per original parent coupon, retaining signed internal contributions. Apply
+   every admitted component's full checked effect; do not silently discard an
+   independently supplied signed principal effect through a positive-only gate.
+   Generated amount/allocation eligibility follows005;008 replay-state decisions
+   retain their scope. Terminal capitalization participates
    in the amount subsequently amortized/redeemed even when settlement is earlier
    or later. This operator does not represent every contract's capitalization
    date: payment-date capitalization and other timing require their real owner

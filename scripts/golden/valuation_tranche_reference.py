@@ -4,6 +4,9 @@ Run after producing and reviewing the Rust diagnostic export:
     uv run --no-project --with scipy==1.18.1 --with numpy==2.5.1 python \
         scripts/golden/valuation_tranche_reference.py --input export.json --output pins.json
 
+The output contains regression pins; pins.report.json retains the complete
+baseline acceptance report beside it. Both are written after all checks pass.
+
 It uses no finstack pricing, probability or integration functions.
 Equal-exposure estimates use a NumPy DFT;
 directed-rounding Decimal polynomial products independently enclose their
@@ -40,7 +43,6 @@ import math
 from pathlib import Path
 import struct
 import sys
-import tempfile
 import time
 from typing import Any
 import warnings
@@ -50,6 +52,7 @@ import scipy
 from scipy.integrate import IntegrationWarning, quad
 from scipy.special import ndtr, ndtri, roots_legendre
 from scipy.stats import binom
+from tranche_reference_storage import _report_path, regression_pins, write_json
 
 PRECISION = 80
 NODE_UNCERTAINTY_LIMIT = 1e-13
@@ -77,22 +80,6 @@ def _json_hash(value: Any) -> str:
     return hashlib.sha256(
         json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
     ).hexdigest()
-
-
-def _write_json(path: Path, value: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            mode="w", dir=path.parent, prefix=path.name + ".", suffix=".tmp", delete=False
-        ) as handle:
-            temporary = Path(handle.name)
-            json.dump(value, handle, indent=2, allow_nan=False)
-            handle.write("\n")
-        temporary.replace(path)
-    finally:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
 
 
 def _bits(value: float) -> str:
@@ -513,7 +500,7 @@ def _oracle_reference(period: dict[str, Any], student: bool, cache_dir: Path, sc
         reference["raw_caps"] = (
             _student_caps(reference["conditional"], period["nodes"]) if student else _gaussian_caps(oracle)
         )
-    _write_json(path, {"identity": identity, "reference": reference, "reference_sha256": _json_hash(reference)})
+    write_json(path, {"identity": identity, "reference": reference, "reference_sha256": _json_hash(reference)})
     _progress(f"saved completed oracle {key[:12]}")
     return {**reference, "cache_status": "computed", "cache_key": key}
 
@@ -861,7 +848,7 @@ def main() -> None:
         started = time.perf_counter()
         period = _period_reference(periods[args.probe_period], kind == "student_t", cache_dir, script_hash)
         elapsed = time.perf_counter() - started
-        _write_json(
+        write_json(
             args.output,
             {
                 "schema_version": 1,
@@ -882,6 +869,7 @@ def main() -> None:
         )
         _progress(f"completed probe in {elapsed:.3f}s; saved {args.output}")
         return
+    report_path = _report_path(args.input, args.output)
     output = {
         "schema_version": 1,
         "input_hash": payload["input_hash"],
@@ -918,13 +906,15 @@ def main() -> None:
         _check_exact_baseline(case, result)
         output["cases"].append(result)
         case_identity = {"input_hash": payload["input_hash"], "script_sha256": script_hash, "case_id": case["id"]}
-        _write_json(
+        write_json(
             cache_dir / "cases" / f"{_json_hash(case_identity)}.json", {"identity": case_identity, "case": result}
         )
         _progress(f"completed case {case['id']}; saved case report")
-    # No partial pin file survives an oracle failure.
-    _write_json(args.output, output)
-    _progress(f"complete reference and B0 acceptance report saved to {args.output}")
+    # No partial pin file survives an oracle failure. Retain the full report
+    # before publishing the smaller regression-only projection.
+    write_json(report_path, output)
+    write_json(args.output, regression_pins(output))
+    _progress(f"regression pins saved to {args.output}; complete B0 acceptance report saved to {report_path}")
 
 
 if __name__ == "__main__":

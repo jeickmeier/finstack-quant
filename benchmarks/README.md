@@ -17,8 +17,9 @@ gate.
 
 | Path | What it is |
 | --- | --- |
-| [`VALUATION_PERFORMANCE.md`](VALUATION_PERFORMANCE.md) | Completed valuation validity, six investigations and the final 111-case cumulative comparison, including numerical bounds and tradeoffs. |
-| [`valuation-performance-results.json`](valuation-performance-results.json) | Compact completed valuation measurements, process uncertainty, memory and hash-pinned evidence. |
+| [`VALUATION_PERFORMANCE.md`](VALUATION_PERFORMANCE.md) | Summary of the historical six valuation investigations and final 111-case comparison, retained decisions, numerical bounds and tradeoffs. |
+| [`valuation-performance-results.json`](valuation-performance-results.json) | Historical valuation measurements, process uncertainty and memory; raw artifacts were not retained and historical pass records are unverified. |
+| [`valuation-evidence.json`](valuation-evidence.json) | Provenance manifest for retained valuation summaries, numerical fixtures and immutable original Git revisions. |
 | [`CORE_CASHFLOW_MODEL_PERFORMANCE.md`](CORE_CASHFLOW_MODEL_PERFORMANCE.md) | Completed benchmark repairs and six investigations: three retained changes, 23 qualifying latency cases, three RSS reductions and the explicit typed-volatility control cost. |
 | [`core-cashflow-model-performance-results.json`](core-cashflow-model-performance-results.json) | Compact incremental and cumulative measurements, uncertainty, rejected LMM history, numerical validation and separate measured/delivered source identities. |
 | [`CORE_CASHFLOW_MODEL_PERFORMANCE_REVIEW.md`](CORE_CASHFLOW_MODEL_PERFORMANCE_REVIEW.md) | Initial 21-target core/cashflows/models audit, validity findings and six planned investigations. Its initial smoke evidence is separate from the subsequent implementation and baseline. |
@@ -31,6 +32,13 @@ gate.
 The materialization JSON files carry a `schema` field
 (`finstack_quant.materialization_benchmark_results/1` and siblings). These are
 data artifacts written by tooling — edit them only through the steps below.
+
+The valuation record describes the November 7, 2026 campaign. Its detailed
+original report is preserved at an immutable Git revision linked from the
+summary. Historical raw timing ledgers, archived binaries and validation logs
+were not retained and are lost. References to them have been removed from
+the current summary. Historical pass records are unverified; current test
+runs do not recreate the historical campaign.
 
 ## Materialization fixtures are not checked in
 

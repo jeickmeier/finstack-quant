@@ -1208,6 +1208,149 @@ monetary detours or compatibility inference. Runtime and independent qualificati
 remain pending.
 [Clause map M147–M150](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
 
+### 1.38 Parent-coupon accrual, exact splits and capitalization
+
+The [accepted coupon amount/allocation contract](docs/decisions/financial/cashflows/05-coupon-cash-and-pik.md#accepted-decision-parent-coupon-accrual-exact-splits-and-capitalization)
+uses each original contractual coupon as its amount/allocation unit. Retain covered
+half-open economic history, original period/context and signed internal balance/
+rate contributions; internal nominal or balance cuts do not force new settlement
+or principal events. For fixed/term allocation, admit original-start cumulative
+accrual prefixes once to Decimal and subtract them exactly. Weights must be
+nonnegative, context-valid and telescope at that admitted authority; do not
+re-anchor nonadditive day counts at balance changes or redefine001's direct query.
+OneOne assigns its unit to the first nonempty interval. Preserve legitimate zero
+weights without manufacturing missing index/rate values or projection authority.
+
+Restore total Money once from the complete exact admitted parent contribution
+sum using the accepted bounded profile, not per-piece Money or binary64 amounts.
+Split takes one exact cash_fraction in [0,1], with derived exact PIK complement.
+Allocate cash once, derive PIK by exact residual and require exact conservation,
+truthful range errors and both-share nonzero-underflow guards. Remove redundant
+fraction inputs, competing tolerances and automatic normalization. Generated PIK
+must be nonnegative per parent; signed internal terms do not become independent
+admitted events or offset another invalid coupon's eligibility. Explicit003 signed
+events retain their own literal effects.
+
+Emit each enabled parent cash/PIK component including exact zero; PIK is cash0
+with explicit delta and date=principal_date=actual whole-parent end. Cash settles
+independently; original stub/observation identity is preserved. Retain actual
+parent prefixes/context/contributions/provenance for required queries and omit
+false optional single-slice rates, references or resets. No implicit financial
+rounding, rate premium, floor, election or timing model. Reconcile strict nested
+coupon specs, canonical exact admission, complete atomic work and existing Rust/
+compiled settlement/replay/product/statement/host/schema/parity consumers. Rates,
+observations, state, entitlement and reporting retain their owners; runtime and
+independent qualification remain pending.
+[Clause map M151–M154](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.39 Resolved term observations and exact rate controls
+
+The [accepted term-rate contract](docs/decisions/financial/cashflows/06-floating-rate-projection.md#accepted-decision-resolved-term-observations-exact-rate-controls-and-strict-failures)
+inherits index-specific factor projection and exact observed identity. Require
+resolved IndexId/currency, fixing/effective/maturity dates, positive index alpha
+and qualified publication/source-version context. Use one observation per parent,
+explicit method/reset/calendar authority and conditional projection association;
+no dummy CurveId for a fixing-only request. Remove reset-point seed queries,
+coupon-basis rate rescaling, common reset-frequency/tenor hints, approximate
+matching, implicit convention bundles and curve-base/date-only eligibility rules.
+
+A required published observation uses its exact configured fixing without an
+unused curve. Explicitly unpublished observations may project through their
+selected source under this operation; unknown eligibility and missing required
+published values error. No generic failure-triggered rate substitutes. Ordinary
+term raw quotes require finite positive simple gross under their index alpha,
+including a post-model-admission check; all-in coupon rates have their separately
+selected cash/PIK domain. Preserve actual source and calculation failure causes.
+
+Use exact Decimal contractual spread/bounds, explicit strictly positive gearing
+and explicit spread-placement law. Apply index bounds, complete gearing/spread
+expression and all-in bounds in checked exact transient arithmetic, then restore
+one bounded Decimal contractual annual rate. Do not restore an internal clamp,
+round control operands independently or let a cap rescue invalid raw admission.
+Raw-index and final-rate admission can fail even if a downstream coupon could
+otherwise fit.005 consumes admitted R directly before its separate parent-Money
+stage. Fixed RateSpec quotes remain Decimal; one canonical get_rate resolver
+replaces divergent builder/direct paths and any requested model view is explicit.
+
+Retain observed/projected role and actual index/date/source provenance atomically;
+only real projections populate projected fixing metadata. Reconcile guarded
+existing specs/hosts/state, real product reset grids, factor/fixing users and
+schemas/parity without fallback aliases or duplicate rate logic. Overnight,
+replay, materialization and product models retain their owners; runtime and
+independent qualification remain pending.
+[Clause map M155–M158](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.40 Overnight blocks, cumulative growth and parent allocation
+
+The [accepted overnight contract](docs/decisions/financial/cashflows/07-overnight-compounding.md#accepted-decision-resolved-overnight-blocks-cumulative-growth-and-parent-allocation)
+requires a positive parent interval, explicit method, one observation calendar,
+Act360/Act365F index basis and Daily/Period index-bound placement. Actual resolved
+index value periods/quotes remain distinct from coupon weights; leading closed-
+day carry uses the preceding genuine fixing. Lookback moves observations only.
+Observation shift pairs full business blocks and prorates shifted weight by the
+actual overlap/full original block length, retaining exact fractional geometry.
+Cutoff requires k<block_count and freezes quotes without merging factor blocks.
+Control counts lie in0..=i32::MAX with checked date/reach arithmetic and at most
+100,000 compiled observation blocks per parent.
+
+Use checked source-neutral raw/base model growth, with stable sums/products and
+truthful cancellation/lost-increment refusal. Cache each actual observation quote
+once within replay; extend its original active carry factor without checkpoint
+compounding or rounded factor removal. Empty prefixes have growth0 and unavailable
+annualized rates. Required model-to-Decimal growth admission may error despite a
+possible large-notional rescue; no silent alternate numerical/financial mode.
+
+Allocate through the fixed parent bridge kappa=A_E/tau_E and exact residual
+q=R-g*H_E/tau_E, using one admitted growth/prefix authority. Per-unit contributions
+are g*kappa*deltaH+q*deltaA, entering005's complete exact parent amount sum. Constant
+principal gives admitted R*A_E; changing principal uses a compound-RATE payoff,
+not unpaid-interest-balance accounting. Period bounds constrain the reference
+rate and need not cap actual weighted cash. Partial replay must not fabricate a
+future final-bound adjustment or confer information not available to the owner.
+
+Keep exact transient bridge/weights, qualified model/admission stages and actual
+parent/source provenance. Preserve immutable schedule-bound state, atomic local
+updates and truthful external callback/RNG rollback limits. Reconcile existing
+Rust-only replay and host specs, source/monetary consumers and actual product
+engines without assuming their separate conventions/models are interchangeable.
+Runtime and independent qualification remain pending.
+[Clause map M159–M162](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.41 Parent-bound floating replay, full settlement and timing ownership
+
+The [accepted floating replay contract](docs/decisions/financial/cashflows/08-floating-replay.md#accepted-decision-parent-bound-replay-exact-full-settlement-and-explicit-timing-ownership)
+uses immutable001/005 original-parent context and006/007 observation/control
+authority, including legitimate zero full accrual. Create every Term/Overnight
+state from its compiled owner; cloned owners/states preserve binding, separately
+compiled parents cannot exchange states, and every coupon operation validates
+binding before shortcuts. Remove duplicate period/economics authority, approximate
+context matching and unbound Default.
+
+Capture one exact nonnegative same-currency Money balance at logical actual S
+after the applicable003 phases, independently of fixing/observation progress.
+Observation can precede capture. The constant-principal continuation profile
+requires that balance over the whole parent; changing stock uses003 covered
+history through the same005/007 parent authority or errors. Separate terminating
+branches retain their actual payoff owners.
+
+Use repeatable nonposting get_settlement with all required qualified observations
+and full overnight coverage through E.005 owns the exact full-parent amount,
+cash/PIK conservation, nonnegative generated PIK and enabled zero components;
+return truthful exact values, explicit noncash pik_delta and parent/source
+provenance. Remove settle_index_rate and generic accrued_amount. Native prefixes
+cannot establish a partial payoff or borrow an unknown final q. Calculation
+does not pay cash, capitalize PIK, change N, advance actual time or retire claims.
+
+Distinguish authorized labelled forecasts/scenarios from an actual contractual
+amount already known for early payment. Required principal/rate/information
+phases remain owner-qualified; future path storage and approximate model steps
+supply no permission. Local state transitions/errors are atomic without rolling
+back external callback/provider/RNG effects. Keep guarded state Rust-only and
+reconcile actual builder/bond/host exclusions, explicit principal effects and
+source errors. Lifecycle, exercise and accrued-interest entitlement retain their
+owning records. Runtime and independent complete-path qualification remain open.
+[Clause map M163–M166](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
 ## 2. Determinism and floating point
 
 **Authority:** [ADR 0021](docs/decisions/standards/0021-reproducibility-guarantees.md)

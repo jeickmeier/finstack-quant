@@ -148,6 +148,10 @@ convention.
 | [Cashflows: coupon and payment program compilation](cashflows/02-program-compilation.md#accepted-decision-coupon-and-payment-program-compilation) | Complete independent-window/strict nesting, atomic fallible configuration, explicit settlement/exchange/cutoff, distinct fixed/FROM/UNTIL rules and exact shared build/host contract. Accepted 2026-11-08; runtime and independent geometry/financial/host qualification remain open. |
 | [Cashflows: dated opening principal, signed cash and atomic event phases](cashflows/03-principal-and-emission-order.md#accepted-decision-dated-opening-principal-signed-cash-and-atomic-event-phases) | Complete dated opening/history authority, literal signed cash/deltas, exact same-date batches, paired terminal dates and explicit par exchanges with faithful replay/export/host boundaries. Accepted 2026-11-08; runtime and independent financial/host qualification remain open. |
 | [Cashflows: explicit amortization laws and live-balance installments](cashflows/04-amortization.md#accepted-decision-explicit-amortization-laws-live-balance-installments-and-monetary-boundaries) | Complete explicit seven-rule/exact-fraction contract, protected hard final targets, stateless live B/k installments, actual date/payment mapping and exact par effects without implicit financial rounding. Accepted 2026-11-08; runtime/caller/host and independent qualification remain open. |
+| [Cashflows: parent-coupon accrual, exact splits and capitalization](cashflows/05-coupon-cash-and-pik.md#accepted-decision-parent-coupon-accrual-exact-splits-and-capitalization) | Complete original-parent prefix/exact whole-coupon amount and cash-share/residual-PIK allocation, nonnegative generated-parent profile, truthful zero/noncash/provenance and strict nested ingress/consumer boundaries. Accepted 2026-11-08; runtime/caller/host and independent qualification remain open. |
+| [Cashflows: resolved term observations and exact rate controls](cashflows/06-floating-rate-projection.md#accepted-decision-resolved-term-observations-exact-rate-controls-and-strict-failures) | Complete index-specific factor/qualified-fixing resolution, explicit ordinary-floater controls, one bounded Decimal-rate stage and shared get_rate/provenance without generic failure substitutes or date/tenor/preset inference. Accepted 2026-11-08; runtime/caller/host and independent qualification remain open. |
+| [Cashflows: overnight blocks, cumulative growth and parent allocation](cashflows/07-overnight-compounding.md#accepted-decision-resolved-overnight-blocks-cumulative-growth-and-parent-allocation) | Complete actual quote intervals, explicit paired carry/shift/cutoff geometry, frozen-quote stable model replay, fixed parent bridge and compound-rate/reference-cap limits with truthful monetary/state domains. Accepted 2026-11-09; runtime/caller/host and independent qualification remain open. |
+| [Cashflows: parent-bound floating replay and full settlement](cashflows/08-floating-replay.md#accepted-decision-parent-bound-replay-exact-full-settlement-and-explicit-timing-ownership) | Complete immutable parent/state authority, independent exact principal capture and qualified observation progress, shared full-parent amount, removal of partial/segment monetary paths and explicit forecast/information/event timing boundaries. Accepted2026-11-09; runtime/caller/host and independent complete-path qualification remain open. |
 | [Analytics: explicit frequency](analytics/01-panels-windows-and-wire.md#accepted-decision-explicit-observation-frequency) | Caller-supplied observation frequency for annualized risk; no date-index inference. |
 | [Analytics: explicit tail confidence](analytics/01-panels-windows-and-wire.md#accepted-decision-explicit-tail-confidence) | Caller-supplied finite `0.5 < c < 1` for tail metrics and affected summaries, without an implicit 95% default. |
 | [Analytics: panels, windows, wire and summary](analytics/01-panels-windows-and-wire.md#accepted-decision-panels-windows-wire-and-summary) | Complete actual valuation-grid admission, explicit context/unit selection, atomic active windows, validated state/wire and fixed-summary inputs, provenance and result/failure contract. |
@@ -341,9 +345,35 @@ has complete scoped acceptance as of 2026-11-08 for explicit amortization laws,
 exact fractions, protected final targets, stateless live-balance installments,
 par effects and monetary/payment boundaries. Its removal of the obsolete owner
 installment-update slot was clarified in accepted003 without changing the relative
-economic phase order. The other 12 cashflow records remain Draft. Runtime/caller/
-host reconciliation and independent qualification remain pending.
-Runtime/host/caller reconciliation and independent qualification remain open.
+economic phase order.
+[Cashflows record005](cashflows/05-coupon-cash-and-pik.md#accepted-decision-parent-coupon-accrual-exact-splits-and-capitalization)
+has complete scoped acceptance as of 2026-11-08 for original-parent prefix
+weights, once-rounded parent amounts, one exact split share and conserved
+cash/PIK allocation, truthful component metadata and capitalization. Accepted003
+now explicitly points to005's generated-parent PIK unit/profile, retaining signed
+internal contributions and separate explicit events.
+[Cashflows record006](cashflows/06-floating-rate-projection.md#accepted-decision-resolved-term-observations-exact-rate-controls-and-strict-failures)
+has complete scoped acceptance as of 2026-11-08 for resolved term observations,
+publication-qualified exact fixing/projection, explicit exact rate controls and
+one shared strict rate path without generic failure substitutes. It inherits
+accepted market02/12 and cashflows005;005 now explicitly names006's admitted
+Decimal-rate handoff before its separate parent-Money stage.
+[Cashflows record007](cashflows/07-overnight-compounding.md#accepted-decision-resolved-overnight-blocks-cumulative-growth-and-parent-allocation)
+has complete scoped acceptance as of 2026-11-09 for actual overnight quote
+intervals, paired carry/shift blocks, stable frozen-quote growth replay and an
+explicit fixed-bridge compound-rate amount allocation with reference-cap limits.
+005 now names that overnight contribution/admission authority explicitly.
+[Cashflows record008](cashflows/08-floating-replay.md#accepted-decision-parent-bound-replay-exact-full-settlement-and-explicit-timing-ownership)
+has complete scoped acceptance as of2026-11-09 for immutable parent-bound state,
+independent qualified observation/exact principal capture, shared full-parent
+settlement, removal of generic partial/segment monetary paths and explicit
+information/event timing ownership.
+[Cashflows record009](cashflows/09-fees.md#proposed-decision-explicit-fee-parents-exact-amounts-and-literal-tier-selection)
+has a complete package proposed on2026-11-09 for explicit limited fee grids,
+opening/integrated original-parent bases, exact whole-parent amounts, literal
+fixed cash and strict nullable tier selection.009 adoption is pending; the other7
+cashflow records remain Draft. Runtime/caller/host/state reconciliation and
+independent qualification remain pending.
 
 The [ADR 0044 collateral-input representation package](conventions/0044-financial-perspectives-and-boundary-conversions.md#accepted-amendment-explicit-collateral-components)
 was accepted on 2026-11-07. Its explicit VM/NICA components supplement the

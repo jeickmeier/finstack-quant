@@ -176,8 +176,35 @@ has complete scoped acceptance as of 2026-11-08 for explicit amortization laws,
 exact fractions, protected final targets, stateless live-balance installments,
 par effects and monetary/payment boundaries. Its removal of the obsolete owner
 installment-update slot was clarified in accepted003 without changing the relative
-economic phase order. The other 12 cashflow records remain Draft. Runtime/caller/
-host reconciliation and independent qualification remain pending. The governing
+economic phase order.
+[Cashflows record005](cashflows/05-coupon-cash-and-pik.md#accepted-decision-parent-coupon-accrual-exact-splits-and-capitalization)
+has complete scoped acceptance as of 2026-11-08 for original-parent prefix
+weights, once-rounded parent amounts, one exact split share and conserved
+cash/PIK allocation, truthful component metadata and capitalization. Accepted003
+now explicitly points to005's generated-parent PIK unit/profile, retaining signed
+internal contributions and separate explicit events.
+[Cashflows record006](cashflows/06-floating-rate-projection.md#accepted-decision-resolved-term-observations-exact-rate-controls-and-strict-failures)
+has complete scoped acceptance as of 2026-11-08 for resolved term observations,
+publication-qualified exact fixing/projection, explicit exact rate controls and
+one shared strict rate path without generic failure substitutes. It inherits
+accepted market02/12 and cashflows005;005 now explicitly names006's admitted
+Decimal-rate handoff before its separate parent-Money stage.
+[Cashflows record007](cashflows/07-overnight-compounding.md#accepted-decision-resolved-overnight-blocks-cumulative-growth-and-parent-allocation)
+has complete scoped acceptance as of 2026-11-09 for actual overnight quote
+intervals, paired carry/shift blocks, stable frozen-quote growth replay and an
+explicit fixed-bridge compound-rate amount allocation with reference-cap limits.
+005 now names that overnight contribution/admission authority explicitly.
+[Cashflows record008](cashflows/08-floating-replay.md#accepted-decision-parent-bound-replay-exact-full-settlement-and-explicit-timing-ownership)
+has complete scoped acceptance as of2026-11-09 for immutable parent-bound state,
+independent qualified observation/exact principal capture, shared full-parent
+settlement, removal of generic partial/segment monetary paths and explicit
+information/event timing ownership.
+[Cashflows record009](cashflows/09-fees.md#proposed-decision-explicit-fee-parents-exact-amounts-and-literal-tier-selection)
+has a complete package proposed on2026-11-09 for explicit limited fee grids,
+opening/integrated original-parent bases, exact whole-parent amounts, literal
+fixed cash and strict nullable tier selection.009 adoption is pending; the other7
+cashflow records remain Draft. Runtime/caller/host/state reconciliation and
+independent qualification remain pending. Other financial records
 and convention ADRs retain their separately stated statuses; describing an
 observed method does not approve it.
 
