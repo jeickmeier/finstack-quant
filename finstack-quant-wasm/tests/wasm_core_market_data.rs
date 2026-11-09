@@ -345,7 +345,8 @@ fn day_count_exposes_act365l_and_signed_fraction() {
         JsDayCount::act365l()
             .year_fraction(JsValue::from(start), JsValue::from(end), &ctx)
             .unwrap(),
-        1.0
+        366.0 / 365.0,
+        "the whole of 2024 in a period ending in common year 2025"
     );
     assert!(
         JsDayCount::act365l()

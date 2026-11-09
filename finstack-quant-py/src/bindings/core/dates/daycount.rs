@@ -69,12 +69,11 @@ label_enum!(PyDayCount, DayCount, "DayCount", from_name, {
     ACT_360 => Act360,
     /// Actual/365 Fixed.
     ACT_365F => Act365F,
-    /// Actual/365L (ICMA Rule 251). Requires both ``frequency`` and
-    /// ``coupon_period`` in ``DayCountContext``. Annual periods use denominator
-    /// 366 exactly when February 29 falls in ``(coupon_start, coupon_end]``;
-    /// non-annual periods use 366 exactly when ``coupon_end``'s year is a leap
-    /// year. Otherwise the denominator is 365. This is explicitly not ACT/ACT
-    /// AFB, which uses sub-period splitting.
+    /// Actual/365L (ISDA coupon-end-year rule). Requires the enclosing
+    /// ``coupon_period`` in ``DayCountContext``; no frequency is used. The
+    /// denominator is 366 exactly when ``coupon_end``'s year is a leap year,
+    /// otherwise 365, for every coupon frequency. This is explicitly not
+    /// ACT/ACT AFB, which uses sub-period splitting.
     ACT_365L => Act365L,
     /// NL/365 (Actual/365 No Leap): actual days excluding every February 29
     /// in ``(start, end]``, divided by 365.
@@ -116,9 +115,9 @@ impl PyDayCount {
     /// end : datetime.date | str
     ///     Accrual end (exclusive); must not precede ``start``.
     /// ctx : DayCountContext | None
-    ///     Context for conventions that need one: ``ACT_ACT_ISMA`` and
-    ///     ``ACT_365L`` read ``frequency``, ``ACT_365L`` also the enclosing
-    ///     contractual ``coupon_period`` (partial accrual retains that coupon's
+    ///     Context for conventions that need one: ``ACT_ACT_ISMA`` reads
+    ///     ``frequency``, ``ACT_365L`` the enclosing contractual
+    ///     ``coupon_period`` (partial accrual retains that coupon's
     ///     denominator), ``BUS_252`` reads ``calendar_id``.
     ///
     /// Returns
@@ -130,8 +129,8 @@ impl PyDayCount {
     /// ------
     /// ValueError
     ///     If ``start > end`` or the convention needs context that was not
-    ///     supplied (ISMA without a frequency, ACT/365L without
-    ///     frequency/enclosing coupon dates, Bus/252 without a calendar),
+    ///     supplied (ISMA without a frequency, ACT/365L without enclosing
+    ///     coupon dates, Bus/252 without a calendar),
     ///     ACT/365L dates lie outside the coupon, or ICMA reference endpoints
     ///     do not share an unadjusted nominal month grid.
     /// KeyError
@@ -176,8 +175,8 @@ impl PyDayCount {
 /// - ``BUS_252`` requires a holiday calendar (``calendar_id``).
 /// - ``ACT_ACT_ISMA`` requires the coupon ``frequency`` and, for irregular
 ///   or mid-coupon accruals, the unadjusted regular reference ``coupon_period``.
-/// - ``ACT_365L`` requires ``frequency`` and the full enclosing contractual
-///   ``coupon_period``, including for partial accrual.
+/// - ``ACT_365L`` requires the full enclosing contractual ``coupon_period``,
+///   including for partial accrual.
 /// - ``THIRTY_E_360_ISDA`` uses ``end_is_termination_date`` for its
 ///   end-of-February rule.
 ///

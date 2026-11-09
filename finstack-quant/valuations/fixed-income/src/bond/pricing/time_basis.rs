@@ -8,7 +8,7 @@
 use crate::bond::Bond;
 use finstack_quant_core::Result;
 use finstack_quant_core::cashflow::CFKind;
-use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
@@ -105,12 +105,10 @@ pub(crate) fn bond_coupon_periods(bond: &Bond) -> Result<Vec<(Date, Date)>> {
 ///
 /// # Arguments
 ///
-/// * `frequency` - Contractual coupon tenor selecting the annual or nonannual denominator rule.
 /// * `periods` - Actual full coupon accrual boundaries covering the requested interval.
 /// * `start` - Inclusive origin of the bond clock interval.
 /// * `end` - Exclusive endpoint of the interval; must not precede `start`.
 pub(crate) fn act365l_year_fraction(
-    frequency: Tenor,
     periods: &[(Date, Date)],
     start: Date,
     end: Date,
@@ -134,7 +132,6 @@ pub(crate) fn act365l_year_fraction(
             current,
             slice_end,
             DayCountContext {
-                frequency: Some(frequency),
                 coupon_period: Some((coupon_start, coupon_end)),
                 ..DayCountContext::default()
             },
@@ -312,9 +309,12 @@ mod tests {
 
     #[test]
     fn act365l_bond_model_and_coupon_clocks_keep_independent_bases() {
-        let mut spec =
-            crate::bond::CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365L)
-                .expect("spec");
+        let mut spec = crate::bond::CashflowSpec::fixed(
+            0.05,
+            finstack_quant_core::dates::Tenor::semi_annual(),
+            DayCount::Act365L,
+        )
+        .expect("spec");
         if let crate::bond::CashflowSpec::Fixed(spec) = &mut spec {
             spec.schedule.business_day_convention =
                 finstack_quant_core::dates::BusinessDayConvention::Unadjusted;
@@ -342,8 +342,7 @@ mod tests {
         assert!((model.accrued - 1000.0 * 0.05 * 61.0 / 366.0).abs() < 1e-12);
         let periods = bond_coupon_periods(&bond).expect("coupon periods");
         assert!(
-            act365l_year_fraction(Tenor::semi_annual(), &periods, as_of, date!(2025 - 04 - 16),)
-                .is_err(),
+            act365l_year_fraction(&periods, as_of, date!(2025 - 04 - 16),).is_err(),
             "payment lag beyond the final coupon requires explicit coverage"
         );
         // Deferring coupons to one payment date retains distinct contractual
@@ -360,8 +359,7 @@ mod tests {
         let custom_periods = bond_coupon_periods(&custom_bond).expect("explicit coupon periods");
         assert_eq!(custom_periods, periods);
         assert!(
-            (act365l_year_fraction(Tenor::semi_annual(), &custom_periods, as_of, bond.maturity,)
-                .expect("custom clock")
+            (act365l_year_fraction(&custom_periods, as_of, bond.maturity,).expect("custom clock")
                 - expected)
                 .abs()
                 < 1e-14

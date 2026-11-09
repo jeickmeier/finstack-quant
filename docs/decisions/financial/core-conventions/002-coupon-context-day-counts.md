@@ -1,7 +1,7 @@
 # CORE-CONVENTIONS-002: Coupon reference periods for ACT/ACT ICMA and ACT/365L
 
 - Decision status: **Accepted — complete coupon-context package, 2026-11-07**.
-- Implementation status: **Observed; reconciliation pending**, scoped to `dates/daycount/{act_act,other,context}.rs` and `Tenor::to_years_with_context`.
+- Implementation status: **Partly reconciled 2026-11-09**: ACT/365L uses the coupon-end-year rule for every frequency, needs no frequency and checks containment before equal-date zero; the ICMA items remain, scoped to `dates/daycount/{act_act,other,context}.rs` and `Tenor::to_years_with_context`.
 - Validation status: **Evidence inspected/located; independent qualification pending**. Documentation and independent formula-example checks passed; production tests and vendor fixtures were not executed or regenerated.
 - Audit date: **2026-11-05**. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; see [scope and inventory](README.md).
 

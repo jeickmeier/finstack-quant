@@ -127,7 +127,7 @@ fn act365l_periodic_fees_use_actual_stub_boundaries_for_every_balance_segment() 
             "2024-01-15",
             "long_front",
             Tenor::annual(),
-            366.0,
+            365.0,
         ),
         // The first balance segment ends before the full coupon's leap day.
         (

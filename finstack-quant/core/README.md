@@ -211,8 +211,9 @@ is `25`). Curve knot values are decimals. Fields and parameters named
 
 **Day-count context.** Some conventions cannot be evaluated from two dates
 alone. `DayCount::ActActIsma` needs frequency and an unadjusted regular reference
-period for partial or irregular accrual. `DayCount::Act365L` needs frequency and
-the actual enclosing coupon period, including for partial accrual, while
+period for partial or irregular accrual. `DayCount::Act365L` needs the actual
+enclosing coupon period (its end year selects 365 or 366), including for
+partial accrual, while
 `DayCount::Bus252` needs a calendar. Supply these through `DayCountContext`;
 missing required context returns an error. Split ACT/365L spans at coupon
 boundaries so each slice retains its own coupon's denominator.

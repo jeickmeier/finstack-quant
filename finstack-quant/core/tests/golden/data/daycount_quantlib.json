@@ -1,7 +1,7 @@
 {
   "meta": {
     "suite_id": "daycount_quantlib_parity",
-    "description": "Day count convention tests validated against QuantLib output. Covers 30/360 US (SIA-NASD PSA / QuantLib Thirty360::USA), 30E/360 (Eurobond), 30/360 Italian, Act/Act ISDA, Act/Act AFB, and Act/365L (ICMA Rule 251).",
+    "description": "Day count convention tests validated against QuantLib output. Covers 30/360 US (SIA-NASD PSA / QuantLib Thirty360::USA), 30E/360 (Eurobond), 30/360 Italian, Act/Act ISDA, Act/Act AFB, and Act/365L (ISDA coupon-end-year rule; these three cases are hand-computed, not QuantLib output).",
     "reference_source": {
       "name": "QuantLib",
       "version": "1.32",
@@ -180,11 +180,11 @@
         "year_fraction": 0.16393442622950818,
         "tolerance": 1e-14
       },
-      "notes": "60 actual days, Feb 29 in range -> 60/366"
+      "notes": "60 actual days, period ends in leap year 2024 -> 60/366"
     },
     {
-      "id": "act365l_does_not_contain_feb29",
-      "description": "Act/365L: Period NOT containing Feb 29 uses 365 denominator.",
+      "id": "act365l_leap_end_year_without_feb29",
+      "description": "Act/365L: a period ending in a leap year uses 366 even without Feb 29.",
       "convention": "act_365l",
       "start_date": "2024-03-01",
       "end_date": "2024-06-01",
@@ -192,15 +192,15 @@
       "coupon_period": ["2024-03-01", "2024-06-01"],
       "expected": {
         "actual_days": 92,
-        "denominator": 365,
-        "year_fraction": 0.25205479452054796,
+        "denominator": 366,
+        "year_fraction": 0.25136612021857924,
         "tolerance": 1e-14
       },
-      "notes": "92 actual days, no Feb 29 in range -> 92/365"
+      "notes": "92 actual days, period ends in leap year 2024 -> 92/366 (ISDA coupon-end-year rule)"
     },
     {
       "id": "act365l_period_before_feb29_in_leap_year",
-      "description": "Act/365L: Period in leap year but before Feb 29 uses 365.",
+      "description": "Act/365L: a period before Feb 29 that ends in a leap year uses 366.",
       "convention": "act_365l",
       "start_date": "2024-01-01",
       "end_date": "2024-02-28",
@@ -208,11 +208,11 @@
       "coupon_period": ["2024-01-01", "2024-02-28"],
       "expected": {
         "actual_days": 58,
-        "denominator": 365,
-        "year_fraction": 0.15890410958904111,
+        "denominator": 366,
+        "year_fraction": 0.158469945355191271,
         "tolerance": 1e-14
       },
-      "notes": "58 actual days, Feb 29 NOT in [Jan 1, Feb 28] -> 58/365"
+      "notes": "58 actual days, period ends in leap year 2024 -> 58/366 (ISDA coupon-end-year rule)"
     },
     {
       "id": "act360_standard",

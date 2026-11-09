@@ -181,7 +181,7 @@ pub(crate) fn bond_flow_times(
         );
     }
     let coupons = crate::bond::pricing::time_basis::bond_coupon_dates(bond)?;
-    act365l_flow_times(bond.cashflow_spec.frequency(), &coupons, flows, as_of)
+    act365l_flow_times(&coupons, flows, as_of)
 }
 
 /// Measure ACT/365L quoted flows using explicit contractual coupon metadata.
@@ -192,12 +192,10 @@ pub(crate) fn bond_flow_times(
 ///
 /// # Arguments
 ///
-/// * `frequency` - Contractual coupon tenor selecting the ACT/365L denominator.
 /// * `coupons` - Payment dates and full accrual boundaries as `(payment, start, end)`.
 /// * `flows` - Dated signed coupon and principal amounts in payment order.
 /// * `as_of` - Settlement date; earlier or equal payments receive zero time.
 pub(crate) fn act365l_flow_times(
-    frequency: finstack_quant_core::dates::Tenor,
     coupons: &[(Date, Date, Date)],
     flows: &[(Date, Money)],
     as_of: Date,
@@ -237,7 +235,7 @@ pub(crate) fn act365l_flow_times(
                             .into(),
                     ));
                 }
-                act365l_year_fraction(frequency, &periods, as_of, end)?
+                act365l_year_fraction(&periods, as_of, end)?
             };
             Ok((date, time, amount))
         })

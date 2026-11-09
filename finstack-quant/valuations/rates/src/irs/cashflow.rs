@@ -788,7 +788,7 @@ mod tests {
                 date!(2025 - 01 - 01),
                 Tenor::annual(),
                 StubKind::LongFront,
-                366.0,
+                365.0,
                 CFKind::Stub,
             ),
             (

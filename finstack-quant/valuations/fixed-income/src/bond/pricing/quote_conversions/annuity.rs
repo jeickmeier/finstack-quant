@@ -654,7 +654,11 @@ mod tests {
             segmented_annuity += (first + second) * df;
         }
         assert!((annuity - segmented_annuity).abs() < 1e-14);
-        assert!(fixed_leg_annuity(&disc, DayCount::Act365L, None, &schedule).is_err());
+        // ACT/365L takes its denominator from each coupon's end year; no
+        // frequency is needed.
+        let without_frequency = fixed_leg_annuity(&disc, DayCount::Act365L, None, &schedule)
+            .expect("ACT/365L annuity without a frequency");
+        assert!((without_frequency - annuity).abs() < 1e-14);
     }
 
     #[test]
@@ -670,7 +674,7 @@ mod tests {
                 date!(2023 - 12 - 01),
                 date!(2025 - 01 - 01),
                 Tenor::annual(),
-                366.0,
+                365.0,
             ),
             (
                 date!(2024 - 03 - 01),

@@ -58,7 +58,7 @@ test('ACT/365L partial accrual uses the enclosing coupon denominator', () => {
     const remaining = dc.yearFraction(middle, end, context);
     assert.ok(Math.abs(partial - 61 / 366) < 1e-14);
     assert.ok(Math.abs(partial + remaining - dc.yearFraction(start, end, context)) < 1e-14);
-    assert.throws(() => dc.yearFraction(start, middle), validation(/frequency/));
+    assert.throws(() => dc.yearFraction(start, middle), validation(/coupon_period/));
     assert.throws(() => dc.yearFraction(start, middle, frequency), validation(/coupon_period/));
   } finally {
     context.free();

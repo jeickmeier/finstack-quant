@@ -39,12 +39,7 @@ impl YieldClock for BondYieldClock {
             ..DayCountContext::default()
         };
         let tau = if day_count == DayCount::Act365L {
-            act365l_year_fraction(
-                frequency,
-                &bond_coupon_periods(bond)?,
-                context.as_of,
-                rolled_date,
-            )?
+            act365l_year_fraction(&bond_coupon_periods(bond)?, context.as_of, rolled_date)?
         } else {
             day_count.year_fraction(context.as_of, rolled_date, dc_ctx)?
         };

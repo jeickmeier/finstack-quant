@@ -536,7 +536,7 @@ impl InflationLinkedBond {
                 Ok((flow.date, start, end))
             })
             .collect::<Result<Vec<_>>>()?;
-        act365l_flow_times(self.frequency, &coupons, &flows, as_of)
+        act365l_flow_times(&coupons, &flows, as_of)
     }
 
     /// Calculate real yield (yield in real terms, before inflation)

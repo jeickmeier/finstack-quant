@@ -920,7 +920,7 @@ mod tests {
                 date(2025, 1, 1),
                 Tenor::annual(),
                 StubKind::LongFront,
-                366.0,
+                365.0,
             ),
         ] {
             let as_of = start.previous_day().expect("valuation date");

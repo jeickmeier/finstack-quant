@@ -1474,7 +1474,7 @@ mod tests {
                 date!(2024 - 01 - 15),
                 Tenor::annual(),
                 StubKind::LongFront,
-                366.0,
+                365.0,
             ),
         ] {
             for floating in [false, true] {

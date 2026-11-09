@@ -299,7 +299,7 @@ class TestDayCountParity:
         assert accrued == pytest.approx(61 / 366, abs=1e-14)
         assert accrued + remaining == pytest.approx(0.5, abs=1e-14)
         assert DayCount.ACT_365L.signed_year_fraction(query, start, ctx) == pytest.approx(-accrued, abs=1e-14)
-        with pytest.raises(ValueError, match="frequency"):
+        with pytest.raises(ValueError, match="coupon_period"):
             DayCount.ACT_365L.year_fraction(start, end)
         with pytest.raises(ValueError, match="coupon_period"):
             DayCount.ACT_365L.year_fraction(start, end, DayCountContext(frequency="6M"))

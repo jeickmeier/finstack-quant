@@ -523,9 +523,9 @@ fn act365l_period_ending_on_feb29() {
 }
 
 #[test]
-fn act365l_period_before_feb29_in_leap_year() {
-    // Jan 1 to Feb 28 in 2024 - does NOT contain Feb 29 (end is exclusive of Feb 29)
-    // 58 actual days, Feb 29 NOT in [Jan 1, Feb 28] -> 365 denom
+fn act365l_period_before_feb29_uses_the_leap_end_year() {
+    // Jan 1 to Feb 28 in 2024: no Feb 29 in the period, but it ends in leap
+    // year 2024 -> 366 denom (ISDA coupon-end-year rule).
     let yf = DayCount::Act365L
         .year_fraction(
             make_date(2024, 1, 1),
@@ -534,15 +534,15 @@ fn act365l_period_before_feb29_in_leap_year() {
         )
         .unwrap();
     assert!(
-        (yf - 58.0 / 365.0).abs() < TOL,
-        "Expected 58/365, got {}",
+        (yf - 58.0 / 366.0).abs() < TOL,
+        "Expected 58/366, got {}",
         yf
     );
 }
 
 #[test]
-fn act365l_full_year_leap() {
-    // Full leap year: 366 days / 366 = 1.0
+fn act365l_full_leap_year_ending_in_a_common_year() {
+    // 366 days of 2024 in a period ending in common year 2025 -> 366/365.
     let yf = DayCount::Act365L
         .year_fraction(
             make_date(2024, 1, 1),
@@ -550,7 +550,11 @@ fn act365l_full_year_leap() {
             annual_coupon(make_date(2024, 1, 1), make_date(2025, 1, 1)),
         )
         .unwrap();
-    assert!((yf - 1.0).abs() < TOL, "Expected 1.0, got {}", yf);
+    assert!(
+        (yf - 366.0 / 365.0).abs() < TOL,
+        "Expected 366/365, got {}",
+        yf
+    );
 }
 
 #[test]
@@ -617,8 +621,8 @@ fn act365l_single_day_feb29() {
 }
 
 #[test]
-fn act365l_single_day_not_feb29() {
-    // Mar 1 to Mar 2 = 1 day, no Feb 29
+fn act365l_single_day_not_feb29_in_a_leap_end_year() {
+    // Mar 1 to Mar 2 2024 = 1 day; the period ends in leap year 2024 -> 366.
     let yf = DayCount::Act365L
         .year_fraction(
             make_date(2024, 3, 1),
@@ -626,7 +630,7 @@ fn act365l_single_day_not_feb29() {
             annual_coupon(make_date(2024, 3, 1), make_date(2024, 3, 2)),
         )
         .unwrap();
-    assert!((yf - 1.0 / 365.0).abs() < TOL, "Expected 1/365, got {}", yf);
+    assert!((yf - 1.0 / 366.0).abs() < TOL, "Expected 1/366, got {}", yf);
 }
 
 // Act/Act ISDA - Gregorian Leap-Year Boundaries
@@ -696,14 +700,23 @@ fn act365l_partial_accrual_retains_annual_and_non_annual_coupon_denominators() {
 fn act365l_requires_enclosing_coupon_context() {
     let start = make_date(2023, 10, 15);
     let end = make_date(2024, 4, 15);
+    // A frequency is not required (and not used).
+    assert!(
+        DayCount::Act365L
+            .year_fraction(
+                start,
+                end,
+                DayCountContext {
+                    coupon_period: Some((start, end)),
+                    ..Default::default()
+                },
+            )
+            .is_ok()
+    );
     for ctx in [
         DayCountContext::default(),
         DayCountContext {
             frequency: Some(Tenor::semi_annual()),
-            ..Default::default()
-        },
-        DayCountContext {
-            coupon_period: Some((start, end)),
             ..Default::default()
         },
         DayCountContext {

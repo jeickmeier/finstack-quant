@@ -9,12 +9,12 @@ use crate::dates::{HolidayCalendar, Tenor, calendar_by_id_strict, canonical_cale
 /// Certain conventions require additional information:
 /// - `Bus/252` requires a holiday `calendar`.
 /// - `Act/Act (ISMA)` requires the coupon `frequency`.
-/// - `Act/365L` requires `frequency` and the enclosing `coupon_period`.
+/// - `Act/365L` requires the enclosing `coupon_period`.
 #[derive(Clone, Copy, Default)]
 pub struct DayCountContext<'a> {
     /// Holiday calendar for business day conventions
     pub calendar: Option<&'a dyn HolidayCalendar>,
-    /// Payment frequency (required for ACT/ACT ISMA and ACT/365L).
+    /// Payment frequency (required for ACT/ACT ISMA).
     pub frequency: Option<Tenor>,
     /// Business-day divisor for Bus/252 (for example 252); `None` uses 252.
     pub bus_basis: Option<u16>,
@@ -88,7 +88,7 @@ impl<'a> std::fmt::Debug for DayCountContext<'a> {
 pub struct DayCountContextState {
     /// Optional calendar code (e.g. "target2").
     pub calendar_id: Option<String>,
-    /// Optional coupon frequency, required for ACT/ACT ISMA and ACT/365L.
+    /// Optional coupon frequency, required for ACT/ACT ISMA.
     pub frequency: Option<Tenor>,
     /// Optional custom business-day divisor (defaults to 252 when `None`).
     pub bus_basis: Option<u16>,
@@ -147,7 +147,7 @@ impl DayCountContextState {
     ///
     /// * `calendar_id` - Optional registered holiday-calendar id (for example
     ///   `"usny"`), required by `Bus/252`.
-    /// * `frequency` - Coupon frequency required by ACT/ACT ICMA and ACT/365L.
+    /// * `frequency` - Coupon frequency required by ACT/ACT ICMA.
     /// * `bus_basis` - Optional business-day divisor for `Bus/252`, a positive
     ///   count of business days per year; `None` selects 252.
     /// * `coupon_period` - Optional `(start, end)` unadjusted regular ACT/ACT ICMA

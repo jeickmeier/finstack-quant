@@ -1357,7 +1357,7 @@ mod tests {
                 date(2025, 1, 1),
                 Tenor::annual(),
                 StubKind::LongFront,
-                366.0,
+                365.0,
             ),
             (
                 date(2023, 12, 2),

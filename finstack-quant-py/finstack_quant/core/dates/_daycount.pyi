@@ -31,12 +31,11 @@ class DayCount:
     ACT_365F: DayCount
     """Actual/365 Fixed."""
     ACT_365L: DayCount
-    """Actual/365L (ICMA Rule 251).
+    """Actual/365L (ISDA coupon-end-year rule).
 
-    Requires both ``frequency`` and ``coupon_period`` in ``DayCountContext``.
-    Annual periods use denominator 366 exactly when February 29 falls in
-    ``(coupon_start, coupon_end]``; otherwise 365. Non-annual periods use 366
-    exactly when ``coupon_end``'s year is a leap year; otherwise 365. This is
+    Requires the enclosing ``coupon_period`` in ``DayCountContext``; no
+    frequency is used. The denominator is 366 exactly when ``coupon_end``'s
+    year is a leap year, otherwise 365, for every coupon frequency. This is
     explicitly not ACT/ACT AFB, which uses a different sub-period-splitting
     algorithm.
     """
@@ -124,10 +123,10 @@ class DayCount:
         end : datetime.date | str
             Accrual end (exclusive); must not precede *start*.
         ctx : DayCountContext | None
-            Context for conventions that need one: ``ACT_ACT_ISMA`` and
-            ``ACT_365L`` read ``frequency``, ``ACT_365L`` also the enclosing
-            contractual ``coupon_period`` (partial accrual retains that
-            coupon's denominator), ``BUS_252`` reads ``calendar_id``.
+            Context for conventions that need one: ``ACT_ACT_ISMA`` reads
+            ``frequency``, ``ACT_365L`` the enclosing contractual
+            ``coupon_period`` (partial accrual retains that coupon's
+            denominator), ``BUS_252`` reads ``calendar_id``.
 
         Returns
         -------
@@ -139,8 +138,8 @@ class DayCount:
         ValueError
             If *start* > *end* or the convention needs context that was not
             supplied. ACT/365L raises
-            if frequency or enclosing coupon dates are missing, or the
-            requested dates lie outside that coupon. ICMA raises if reference
+            if the enclosing coupon dates are missing, or the requested
+            dates (equal dates included) lie outside that coupon. ICMA raises if reference
             endpoints do not share an unadjusted nominal month grid.
         KeyError
             If *ctx* names an unknown calendar.
@@ -209,8 +208,8 @@ class DayCountContext:
     - **Act/Act (ISMA)** requires the coupon ``frequency`` and, for
       irregular or mid-coupon accruals, the unadjusted regular reference
       ``coupon_period``.
-    - **Act/365L** requires ``frequency`` and the full enclosing contractual
-      ``coupon_period``, including for partial accrual.
+    - **Act/365L** requires the full enclosing contractual ``coupon_period``,
+      including for partial accrual.
     - **30E/360 ISDA** uses ``end_is_termination_date`` for its
       end-of-February rule.
 
@@ -224,7 +223,7 @@ class DayCountContext:
         calendars). Resolved on each use, so an unknown id raises
         ``KeyError`` at calculation time.
     frequency : Tenor | str | None
-        Coupon frequency for ISMA and ACT/365L (``Tenor`` or ``"6M"``).
+        Coupon frequency for ISMA (``Tenor`` or ``"6M"``).
     bus_basis : int | None
         Custom positive business-day divisor (defaults to 252 when omitted).
     coupon_period : tuple[datetime.date | str, datetime.date | str] | None

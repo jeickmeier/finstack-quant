@@ -20,7 +20,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
-      "bytes": 386047,
+      "bytes": 385970,
       "kind": "input",
       "path": "schemas/statements/1/financial_model_spec.schema.json",
       "summary": "Statement model graph: periods, nodes and the Value > Forecast > Formula precedence.",
@@ -101,7 +101,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/swap_conventions.schema.json",
-      "bytes": 21650,
+      "bytes": 21573,
       "kind": "input",
       "path": "schemas/statements/1/swap_conventions.schema.json",
       "summary": "Fixed and floating leg frequencies and day counts plus the business-day convention of a capital-structure swap.",

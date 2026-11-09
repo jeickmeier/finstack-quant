@@ -117,8 +117,8 @@ test('yearFraction and signedYearFraction take an optional context', () => {
   const start = core.createDate(2024, 3, 1);
   const end = core.createDate(2024, 9, 1);
   const act365l = core.DayCount.act365l();
-  // Act/365L is defined per coupon period: it needs the coupon frequency and
-  // the enclosing coupon period, and the frequency selects the denominator.
+  // Act/365L is defined per coupon period: the enclosing period's end year
+  // selects the denominator (2025 -> 365, 2024 -> 366); frequency is unused.
   const annual = new core.DayCountContext(null, '1Y', null, [start, core.createDate(2025, 3, 1)]);
   const semiAnnual = new core.DayCountContext(null, '6M', null, [start, end]);
   assert.equal(act365l.yearFraction(start, end, annual), 0.5041095890410959);
@@ -133,7 +133,9 @@ test('yearFraction and signedYearFraction take an optional context', () => {
   ]) {
     assert.throws(
       call,
-      validation('Validation error: ACT/365L requires coupon frequency in DayCountContext')
+      validation(
+        'Validation error: ACT/365L requires the enclosing coupon_period in DayCountContext'
+      )
     );
   }
   const act360 = core.DayCount.act360();

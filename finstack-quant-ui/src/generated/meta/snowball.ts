@@ -3623,7 +3623,7 @@ export default [
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/3",
     "const": "act_365l",
-    "description": "Actual/365 Leap day count convention (Actual/365L).\n\nYear fraction = (actual days) / (365 or 366). Requires the coupon\nfrequency and the enclosing coupon period. Annual: 366 if February 29\nfalls in (coupon_start, coupon_end]. Other frequencies: 366 if the next\ncoupon date falls in a leap year. Not Actual/Actual AFB.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251.1(i)(c)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365L\" (A008)\n- **Also known as**: Act/365L, ISMA-Year"
+    "description": "Actual/365 Leap day count convention (Actual/365L).\n\nYear fraction = (actual days) / (365 or 366). Requires the enclosing\ncalculation period (`coupon_period`); no frequency is used. The\ndenominator is 366 if that period's end date is in a leap year, else\n365, for every coupon frequency. Not Actual/Actual AFB.\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions as amended, 2021 ISDA Definitions\n  section 4.6.1(ix); ISDA's October 2022 GLEIS response (A009)\n- **ISO 15022**: Day Count Fraction Code \"Actual/365L\" (A009)\n- **Also known as**: Act/365L, Actual/365 Leap"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/4",

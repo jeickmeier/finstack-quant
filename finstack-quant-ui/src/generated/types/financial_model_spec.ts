@@ -183,12 +183,11 @@ export type D_557De6D70142Abc041E8 = string;
  *
  * The actual-day conventions:
  *
- * - **`Act365L`** (ICMA Rule 251.1(i)(c)): the denominator depends on the
- *   coupon frequency and the enclosing `coupon_period` supplied via
- *   [`DayCountContext`]; both are required. Annual: 366 if February 29 falls
- *   in `(coupon_start, coupon_end]` (exclusive of start, inclusive of end),
- *   else 365. Non-annual: 366 if the next coupon date falls in a leap year,
- *   else 365. Partial accrual keeps the enclosing coupon's denominator.
+ * - **`Act365L`** (ISDA, A009): requires the enclosing calculation period
+ *   `coupon_period` in [`DayCountContext`]; no frequency is needed. The
+ *   denominator is 366 if that period's end date is in a leap year, else
+ *   365, for every coupon frequency. Partial accrual keeps the enclosing
+ *   coupon's denominator.
  *   Accrual dates outside that coupon are rejected; sum separate coupon
  *   slices for calculations spanning multiple coupon periods. This is **not**
  *   ACT/ACT AFB, which uses a sub-period splitting algorithm; use
@@ -255,7 +254,6 @@ export type D_557De6D70142Abc041E8 = string;
  * // Actual/365L: 29 days over a period containing Feb 29 → 366 denominator
  * let (start, end) = (date(2024, Month::February, 1), date(2024, Month::March, 1));
  * let ctx = DayCountContext {
- *     frequency: Some(Tenor::annual()),
  *     coupon_period: Some((start, end)),
  *     ..Default::default()
  * };
@@ -2106,12 +2104,11 @@ export interface D_78D4B16242Febe84F62B {
    *
    * The actual-day conventions:
    *
-   * - **`Act365L`** (ICMA Rule 251.1(i)(c)): the denominator depends on the
-   *   coupon frequency and the enclosing `coupon_period` supplied via
-   *   [`DayCountContext`]; both are required. Annual: 366 if February 29 falls
-   *   in `(coupon_start, coupon_end]` (exclusive of start, inclusive of end),
-   *   else 365. Non-annual: 366 if the next coupon date falls in a leap year,
-   *   else 365. Partial accrual keeps the enclosing coupon's denominator.
+   * - **`Act365L`** (ISDA, A009): requires the enclosing calculation period
+   *   `coupon_period` in [`DayCountContext`]; no frequency is needed. The
+   *   denominator is 366 if that period's end date is in a leap year, else
+   *   365, for every coupon frequency. Partial accrual keeps the enclosing
+   *   coupon's denominator.
    *   Accrual dates outside that coupon are rejected; sum separate coupon
    *   slices for calculations spanning multiple coupon periods. This is **not**
    *   ACT/ACT AFB, which uses a sub-period splitting algorithm; use
@@ -2178,7 +2175,6 @@ export interface D_78D4B16242Febe84F62B {
    * // Actual/365L: 29 days over a period containing Feb 29 → 366 denominator
    * let (start, end) = (date(2024, Month::February, 1), date(2024, Month::March, 1));
    * let ctx = DayCountContext {
-   *     frequency: Some(Tenor::annual()),
    *     coupon_period: Some((start, end)),
    *     ..Default::default()
    * };
@@ -2773,12 +2769,11 @@ export interface D_09Ad66Dca63Dbc62Aee4 {
    *
    * The actual-day conventions:
    *
-   * - **`Act365L`** (ICMA Rule 251.1(i)(c)): the denominator depends on the
-   *   coupon frequency and the enclosing `coupon_period` supplied via
-   *   [`DayCountContext`]; both are required. Annual: 366 if February 29 falls
-   *   in `(coupon_start, coupon_end]` (exclusive of start, inclusive of end),
-   *   else 365. Non-annual: 366 if the next coupon date falls in a leap year,
-   *   else 365. Partial accrual keeps the enclosing coupon's denominator.
+   * - **`Act365L`** (ISDA, A009): requires the enclosing calculation period
+   *   `coupon_period` in [`DayCountContext`]; no frequency is needed. The
+   *   denominator is 366 if that period's end date is in a leap year, else
+   *   365, for every coupon frequency. Partial accrual keeps the enclosing
+   *   coupon's denominator.
    *   Accrual dates outside that coupon are rejected; sum separate coupon
    *   slices for calculations spanning multiple coupon periods. This is **not**
    *   ACT/ACT AFB, which uses a sub-period splitting algorithm; use
@@ -2845,7 +2840,6 @@ export interface D_09Ad66Dca63Dbc62Aee4 {
    * // Actual/365L: 29 days over a period containing Feb 29 → 366 denominator
    * let (start, end) = (date(2024, Month::February, 1), date(2024, Month::March, 1));
    * let ctx = DayCountContext {
-   *     frequency: Some(Tenor::annual()),
    *     coupon_period: Some((start, end)),
    *     ..Default::default()
    * };
@@ -3076,12 +3070,11 @@ export interface D_63Aec3D47748D9F3D86A {
    *
    * The actual-day conventions:
    *
-   * - **`Act365L`** (ICMA Rule 251.1(i)(c)): the denominator depends on the
-   *   coupon frequency and the enclosing `coupon_period` supplied via
-   *   [`DayCountContext`]; both are required. Annual: 366 if February 29 falls
-   *   in `(coupon_start, coupon_end]` (exclusive of start, inclusive of end),
-   *   else 365. Non-annual: 366 if the next coupon date falls in a leap year,
-   *   else 365. Partial accrual keeps the enclosing coupon's denominator.
+   * - **`Act365L`** (ISDA, A009): requires the enclosing calculation period
+   *   `coupon_period` in [`DayCountContext`]; no frequency is needed. The
+   *   denominator is 366 if that period's end date is in a leap year, else
+   *   365, for every coupon frequency. Partial accrual keeps the enclosing
+   *   coupon's denominator.
    *   Accrual dates outside that coupon are rejected; sum separate coupon
    *   slices for calculations spanning multiple coupon periods. This is **not**
    *   ACT/ACT AFB, which uses a sub-period splitting algorithm; use
@@ -3148,7 +3141,6 @@ export interface D_63Aec3D47748D9F3D86A {
    * // Actual/365L: 29 days over a period containing Feb 29 → 366 denominator
    * let (start, end) = (date(2024, Month::February, 1), date(2024, Month::March, 1));
    * let ctx = DayCountContext {
-   *     frequency: Some(Tenor::annual()),
    *     coupon_period: Some((start, end)),
    *     ..Default::default()
    * };
@@ -6272,12 +6264,11 @@ export interface D_756Aabf913F51B821A96 {
    *
    * The actual-day conventions:
    *
-   * - **`Act365L`** (ICMA Rule 251.1(i)(c)): the denominator depends on the
-   *   coupon frequency and the enclosing `coupon_period` supplied via
-   *   [`DayCountContext`]; both are required. Annual: 366 if February 29 falls
-   *   in `(coupon_start, coupon_end]` (exclusive of start, inclusive of end),
-   *   else 365. Non-annual: 366 if the next coupon date falls in a leap year,
-   *   else 365. Partial accrual keeps the enclosing coupon's denominator.
+   * - **`Act365L`** (ISDA, A009): requires the enclosing calculation period
+   *   `coupon_period` in [`DayCountContext`]; no frequency is needed. The
+   *   denominator is 366 if that period's end date is in a leap year, else
+   *   365, for every coupon frequency. Partial accrual keeps the enclosing
+   *   coupon's denominator.
    *   Accrual dates outside that coupon are rejected; sum separate coupon
    *   slices for calculations spanning multiple coupon periods. This is **not**
    *   ACT/ACT AFB, which uses a sub-period splitting algorithm; use
@@ -6344,7 +6335,6 @@ export interface D_756Aabf913F51B821A96 {
    * // Actual/365L: 29 days over a period containing Feb 29 → 366 denominator
    * let (start, end) = (date(2024, Month::February, 1), date(2024, Month::March, 1));
    * let ctx = DayCountContext {
-   *     frequency: Some(Tenor::annual()),
    *     coupon_period: Some((start, end)),
    *     ..Default::default()
    * };
@@ -9329,12 +9319,11 @@ export interface D_8Dd62D29564577Ef6F97 {
    *
    * The actual-day conventions:
    *
-   * - **`Act365L`** (ICMA Rule 251.1(i)(c)): the denominator depends on the
-   *   coupon frequency and the enclosing `coupon_period` supplied via
-   *   [`DayCountContext`]; both are required. Annual: 366 if February 29 falls
-   *   in `(coupon_start, coupon_end]` (exclusive of start, inclusive of end),
-   *   else 365. Non-annual: 366 if the next coupon date falls in a leap year,
-   *   else 365. Partial accrual keeps the enclosing coupon's denominator.
+   * - **`Act365L`** (ISDA, A009): requires the enclosing calculation period
+   *   `coupon_period` in [`DayCountContext`]; no frequency is needed. The
+   *   denominator is 366 if that period's end date is in a leap year, else
+   *   365, for every coupon frequency. Partial accrual keeps the enclosing
+   *   coupon's denominator.
    *   Accrual dates outside that coupon are rejected; sum separate coupon
    *   slices for calculations spanning multiple coupon periods. This is **not**
    *   ACT/ACT AFB, which uses a sub-period splitting algorithm; use
@@ -9401,7 +9390,6 @@ export interface D_8Dd62D29564577Ef6F97 {
    * // Actual/365L: 29 days over a period containing Feb 29 → 366 denominator
    * let (start, end) = (date(2024, Month::February, 1), date(2024, Month::March, 1));
    * let ctx = DayCountContext {
-   *     frequency: Some(Tenor::annual()),
    *     coupon_period: Some((start, end)),
    *     ..Default::default()
    * };
@@ -10954,12 +10942,11 @@ export interface DF6Da7F7Ae3129Fc74F07 {
    *
    * The actual-day conventions:
    *
-   * - **`Act365L`** (ICMA Rule 251.1(i)(c)): the denominator depends on the
-   *   coupon frequency and the enclosing `coupon_period` supplied via
-   *   [`DayCountContext`]; both are required. Annual: 366 if February 29 falls
-   *   in `(coupon_start, coupon_end]` (exclusive of start, inclusive of end),
-   *   else 365. Non-annual: 366 if the next coupon date falls in a leap year,
-   *   else 365. Partial accrual keeps the enclosing coupon's denominator.
+   * - **`Act365L`** (ISDA, A009): requires the enclosing calculation period
+   *   `coupon_period` in [`DayCountContext`]; no frequency is needed. The
+   *   denominator is 366 if that period's end date is in a leap year, else
+   *   365, for every coupon frequency. Partial accrual keeps the enclosing
+   *   coupon's denominator.
    *   Accrual dates outside that coupon are rejected; sum separate coupon
    *   slices for calculations spanning multiple coupon periods. This is **not**
    *   ACT/ACT AFB, which uses a sub-period splitting algorithm; use
@@ -11026,7 +11013,6 @@ export interface DF6Da7F7Ae3129Fc74F07 {
    * // Actual/365L: 29 days over a period containing Feb 29 → 366 denominator
    * let (start, end) = (date(2024, Month::February, 1), date(2024, Month::March, 1));
    * let ctx = DayCountContext {
-   *     frequency: Some(Tenor::annual()),
    *     coupon_period: Some((start, end)),
    *     ..Default::default()
    * };
@@ -11351,12 +11337,11 @@ export interface D_450829Dac3A74A5C8761 {
    *
    * The actual-day conventions:
    *
-   * - **`Act365L`** (ICMA Rule 251.1(i)(c)): the denominator depends on the
-   *   coupon frequency and the enclosing `coupon_period` supplied via
-   *   [`DayCountContext`]; both are required. Annual: 366 if February 29 falls
-   *   in `(coupon_start, coupon_end]` (exclusive of start, inclusive of end),
-   *   else 365. Non-annual: 366 if the next coupon date falls in a leap year,
-   *   else 365. Partial accrual keeps the enclosing coupon's denominator.
+   * - **`Act365L`** (ISDA, A009): requires the enclosing calculation period
+   *   `coupon_period` in [`DayCountContext`]; no frequency is needed. The
+   *   denominator is 366 if that period's end date is in a leap year, else
+   *   365, for every coupon frequency. Partial accrual keeps the enclosing
+   *   coupon's denominator.
    *   Accrual dates outside that coupon are rejected; sum separate coupon
    *   slices for calculations spanning multiple coupon periods. This is **not**
    *   ACT/ACT AFB, which uses a sub-period splitting algorithm; use
@@ -11423,7 +11408,6 @@ export interface D_450829Dac3A74A5C8761 {
    * // Actual/365L: 29 days over a period containing Feb 29 → 366 denominator
    * let (start, end) = (date(2024, Month::February, 1), date(2024, Month::March, 1));
    * let ctx = DayCountContext {
-   *     frequency: Some(Tenor::annual()),
    *     coupon_period: Some((start, end)),
    *     ..Default::default()
    * };
@@ -13643,12 +13627,11 @@ export interface DB925Ced0Cbd67041A76F {
    *
    * The actual-day conventions:
    *
-   * - **`Act365L`** (ICMA Rule 251.1(i)(c)): the denominator depends on the
-   *   coupon frequency and the enclosing `coupon_period` supplied via
-   *   [`DayCountContext`]; both are required. Annual: 366 if February 29 falls
-   *   in `(coupon_start, coupon_end]` (exclusive of start, inclusive of end),
-   *   else 365. Non-annual: 366 if the next coupon date falls in a leap year,
-   *   else 365. Partial accrual keeps the enclosing coupon's denominator.
+   * - **`Act365L`** (ISDA, A009): requires the enclosing calculation period
+   *   `coupon_period` in [`DayCountContext`]; no frequency is needed. The
+   *   denominator is 366 if that period's end date is in a leap year, else
+   *   365, for every coupon frequency. Partial accrual keeps the enclosing
+   *   coupon's denominator.
    *   Accrual dates outside that coupon are rejected; sum separate coupon
    *   slices for calculations spanning multiple coupon periods. This is **not**
    *   ACT/ACT AFB, which uses a sub-period splitting algorithm; use
@@ -13715,7 +13698,6 @@ export interface DB925Ced0Cbd67041A76F {
    * // Actual/365L: 29 days over a period containing Feb 29 → 366 denominator
    * let (start, end) = (date(2024, Month::February, 1), date(2024, Month::March, 1));
    * let ctx = DayCountContext {
-   *     frequency: Some(Tenor::annual()),
    *     coupon_period: Some((start, end)),
    *     ..Default::default()
    * };
@@ -14944,12 +14926,11 @@ export interface DF6Da7F7Ae3129Fc74F071 {
    *
    * The actual-day conventions:
    *
-   * - **`Act365L`** (ICMA Rule 251.1(i)(c)): the denominator depends on the
-   *   coupon frequency and the enclosing `coupon_period` supplied via
-   *   [`DayCountContext`]; both are required. Annual: 366 if February 29 falls
-   *   in `(coupon_start, coupon_end]` (exclusive of start, inclusive of end),
-   *   else 365. Non-annual: 366 if the next coupon date falls in a leap year,
-   *   else 365. Partial accrual keeps the enclosing coupon's denominator.
+   * - **`Act365L`** (ISDA, A009): requires the enclosing calculation period
+   *   `coupon_period` in [`DayCountContext`]; no frequency is needed. The
+   *   denominator is 366 if that period's end date is in a leap year, else
+   *   365, for every coupon frequency. Partial accrual keeps the enclosing
+   *   coupon's denominator.
    *   Accrual dates outside that coupon are rejected; sum separate coupon
    *   slices for calculations spanning multiple coupon periods. This is **not**
    *   ACT/ACT AFB, which uses a sub-period splitting algorithm; use
@@ -15016,7 +14997,6 @@ export interface DF6Da7F7Ae3129Fc74F071 {
    * // Actual/365L: 29 days over a period containing Feb 29 → 366 denominator
    * let (start, end) = (date(2024, Month::February, 1), date(2024, Month::March, 1));
    * let ctx = DayCountContext {
-   *     frequency: Some(Tenor::annual()),
    *     coupon_period: Some((start, end)),
    *     ..Default::default()
    * };
@@ -15305,12 +15285,11 @@ export interface D_450829Dac3A74A5C87611 {
    *
    * The actual-day conventions:
    *
-   * - **`Act365L`** (ICMA Rule 251.1(i)(c)): the denominator depends on the
-   *   coupon frequency and the enclosing `coupon_period` supplied via
-   *   [`DayCountContext`]; both are required. Annual: 366 if February 29 falls
-   *   in `(coupon_start, coupon_end]` (exclusive of start, inclusive of end),
-   *   else 365. Non-annual: 366 if the next coupon date falls in a leap year,
-   *   else 365. Partial accrual keeps the enclosing coupon's denominator.
+   * - **`Act365L`** (ISDA, A009): requires the enclosing calculation period
+   *   `coupon_period` in [`DayCountContext`]; no frequency is needed. The
+   *   denominator is 366 if that period's end date is in a leap year, else
+   *   365, for every coupon frequency. Partial accrual keeps the enclosing
+   *   coupon's denominator.
    *   Accrual dates outside that coupon are rejected; sum separate coupon
    *   slices for calculations spanning multiple coupon periods. This is **not**
    *   ACT/ACT AFB, which uses a sub-period splitting algorithm; use
@@ -15377,7 +15356,6 @@ export interface D_450829Dac3A74A5C87611 {
    * // Actual/365L: 29 days over a period containing Feb 29 → 366 denominator
    * let (start, end) = (date(2024, Month::February, 1), date(2024, Month::March, 1));
    * let ctx = DayCountContext {
-   *     frequency: Some(Tenor::annual()),
    *     coupon_period: Some((start, end)),
    *     ..Default::default()
    * };

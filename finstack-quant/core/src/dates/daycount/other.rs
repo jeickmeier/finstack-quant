@@ -4,66 +4,57 @@ use time::{Date, Month};
 
 use super::DayCountContext;
 use crate::InputError;
-use crate::dates::Tenor;
-use crate::dates::tenor::TenorUnit;
 
 // ACT/365L helper
-/// Calculate year fraction for Act/365L convention per ICMA Rule 251.1(i)(c).
-///
-/// The denominator rule depends on the coupon frequency supplied via
-/// [`DayCountContext`]:
-///
-/// - **Annual**: 366 if February 29 falls in the full coupon period
-///   `(coupon_start, coupon_end]`, else 365.
-/// - **Non-annual**: 366 if the next coupon date falls in a leap year, else 365.
-///
-/// The requested accrual slice must lie within `ctx.coupon_period`; its end
-/// date does not change the coupon's denominator.
+/// ACT/365L (ISDA, A009): actual days over 366 when the enclosing
+/// calculation period's end date is in a leap year, else 365, for every
+/// coupon frequency. Every slice of one period keeps that denominator.
+/// Precondition: the context and containment were checked by
+/// [`validate_act_365l_interval`].
 pub(super) fn year_fraction_act_365l(
     start: Date,
     end: Date,
     ctx: DayCountContext<'_>,
 ) -> crate::Result<f64> {
-    let (frequency, (coupon_start, coupon_end)) = act_365l_context(ctx)?;
-    if coupon_start >= coupon_end || start < coupon_start || end > coupon_end {
-        return Err(crate::Error::Validation(
-            "ACT/365L accrual dates must lie within a strictly increasing coupon_period".into(),
-        ));
-    }
-
+    let (_, coupon_end) = validate_act_365l_interval(start, end, ctx)?;
     let actual_days = (end - start).whole_days() as f64;
-
-    let annual = matches!(
-        (frequency.unit(), frequency.count()),
-        (TenorUnit::Years, 1) | (TenorUnit::Months, 12)
-    );
-
-    let leap = if annual {
-        count_feb_29_in_interval(coupon_start, coupon_end) > 0
+    let denominator = if time::util::is_leap_year(coupon_end.year()) {
+        366.0
     } else {
-        time::util::is_leap_year(coupon_end.year())
+        365.0
     };
-
-    Ok(actual_days / if leap { 366.0 } else { 365.0 })
+    Ok(actual_days / denominator)
 }
 
-/// The ACT/365L frequency and enclosing coupon period, required by the
-/// convention.
-fn act_365l_context(ctx: DayCountContext<'_>) -> crate::Result<(Tenor, (Date, Date))> {
-    let frequency = ctx.frequency.ok_or_else(|| {
-        crate::Error::Validation("ACT/365L requires coupon frequency in DayCountContext".into())
-    })?;
-    let coupon_period = ctx.coupon_period.ok_or_else(|| {
+/// The enclosing calculation period ACT/365L requires.
+fn act_365l_period(ctx: DayCountContext<'_>) -> crate::Result<(Date, Date)> {
+    ctx.coupon_period.ok_or_else(|| {
         crate::Error::Validation(
             "ACT/365L requires the enclosing coupon_period in DayCountContext".into(),
         )
-    })?;
-    Ok((frequency, coupon_period))
+    })
 }
 
-/// Check that ACT/365L's required context is present.
+/// Check that ACT/365L's enclosing period is present.
 pub(super) fn validate_act_365l_context(ctx: DayCountContext<'_>) -> crate::Result<()> {
-    act_365l_context(ctx).map(|_| ())
+    act_365l_period(ctx).map(|_| ())
+}
+
+/// Check that `[start, end]` lies within the enclosing ACT/365L period and
+/// return that period.
+pub(super) fn validate_act_365l_interval(
+    start: Date,
+    end: Date,
+    ctx: DayCountContext<'_>,
+) -> crate::Result<(Date, Date)> {
+    let (coupon_start, coupon_end) = act_365l_period(ctx)?;
+    if start < coupon_start || end > coupon_end {
+        return Err(crate::Error::Validation(format!(
+            "ACT/365L accrual {start}..{end} must lie within its coupon_period \
+             {coupon_start}..{coupon_end}"
+        )));
+    }
+    Ok((coupon_start, coupon_end))
 }
 
 /// Count February 29 dates falling in the interval `(start, end]` (exclusive of

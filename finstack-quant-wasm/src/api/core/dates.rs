@@ -45,8 +45,7 @@ impl JsDayCountContext {
     /// * `calendar_id` - Registered holiday-calendar identifier (for example
     ///   `"nyse"`) used by Bus/252; resolved when the context is used.
     /// * `frequency` - Coupon frequency as tenor text (for example `"6M"`; use
-    ///   `tenor.toString()` for a `Tenor`), required by Act/Act ICMA and
-    ///   Act/365L.
+    ///   `tenor.toString()` for a `Tenor`), required by Act/Act ICMA.
     /// * `bus_basis` - Business-day denominator for Bus/252 (an integer in
     ///   `1..=65535`, normally `252`).
     /// * `coupon_period` - `[startEpochDays, endEpochDays]` (days since
@@ -64,7 +63,7 @@ impl JsDayCountContext {
     /// `FinstackError` (kind `validation`) if `frequency` is not a tenor, the
     /// coupon period is inverted or out of range, or `busBasis` is zero.
     /// @param calendarId - Registered holiday-calendar identifier (for example `"nyse"`) used by Bus/252; resolved when the context is used.
-    /// @param frequency - Coupon frequency as tenor text (for example `"6M"`; use `tenor.toString()` for a `Tenor`), required by Act/Act ICMA and Act/365L.
+    /// @param frequency - Coupon frequency as tenor text (for example `"6M"`; use `tenor.toString()` for a `Tenor`), required by Act/Act ICMA.
     /// @param busBasis - Business-day denominator for Bus/252 (an integer in `1..=65535`, normally `252`).
     /// @param couponPeriod - `[startEpochDays, endEpochDays]` (days since 1970-01-01): the unadjusted regular reference period for Act/Act ICMA, or the full enclosing contractual coupon for Act/365L; the start must precede the end. ICMA endpoints must share the contractual nominal month grid, rather than adjusted payment dates.
     /// @param endIsTerminationDate - Whether the accrual end is the instrument's termination date (30E/360 ISDA February-end handling); omitted means `false`.
@@ -308,12 +307,11 @@ impl JsDayCount {
         }
     }
 
-    /// Actual/365L (ICMA Rule 251). Requires a `DayCountContext` with the
-    /// coupon frequency and the enclosing coupon period. Annual periods use
-    /// denominator 366 exactly when February 29 falls in the coupon period's
-    /// `(start, end]`; non-annual periods use 366 exactly when the coupon end
-    /// date's year is a leap year. Otherwise the denominator is 365. This is
-    /// not ACT/ACT AFB.
+    /// Actual/365L (ISDA coupon-end-year rule). Requires a `DayCountContext`
+    /// with the enclosing coupon period; no frequency is used. The
+    /// denominator is 366 exactly when the coupon end date's year is a leap
+    /// year, otherwise 365, for every coupon frequency. This is not ACT/ACT
+    /// AFB.
     /// @returns A `DayCount` handle for this convention.
     #[wasm_bindgen(js_name = act365l)]
     pub fn act365l() -> JsDayCount {
@@ -407,8 +405,8 @@ impl JsDayCount {
     ///
     /// The published facade makes `ctx` optional: an omitted context is the
     /// empty Rust default (`new DayCountContext()`). Act/Act ISMA needs a
-    /// context frequency (or coupon period), Act/365L a frequency and an
-    /// enclosing coupon period (accrual dates outside that coupon throw), and
+    /// context frequency (or coupon period), Act/365L an enclosing coupon
+    /// period (accrual dates outside that coupon throw), and
     /// Bus/252 a context calendar; all throw without them. ICMA reference
     /// endpoints outside one unadjusted nominal month grid throw.
     ///
