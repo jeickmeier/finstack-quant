@@ -843,14 +843,18 @@ mod tests {
             coupon_period: Some((day, day)),
             ..DayCountContext::default()
         };
-        for dc in [DayCount::Act360, DayCount::OneOne, DayCount::ActAct] {
-            assert!(dc.year_fraction(day, day, zero_basis).is_err(), "{dc:?}");
+        for convention in [DayCount::Act360, DayCount::OneOne, DayCount::ActAct] {
             assert!(
-                dc.signed_year_fraction(day, day, inverted).is_err(),
-                "{dc:?}"
+                convention.year_fraction(day, day, zero_basis).is_err(),
+                "{convention:?}"
+            );
+            assert!(
+                convention.signed_year_fraction(day, day, inverted).is_err(),
+                "{convention:?}"
             );
             assert_eq!(
-                dc.year_fraction(day, day, DayCountContext::default())
+                convention
+                    .year_fraction(day, day, DayCountContext::default())
                     .expect("context-free"),
                 0.0
             );
