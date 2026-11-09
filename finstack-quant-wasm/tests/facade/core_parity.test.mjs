@@ -168,8 +168,6 @@ const CASES = {
   prev_cds_date: () => iso(core.prevCdsDate(ep('2025-03-20'))),
   prev_cds_semiannual_roll: () => iso(core.prevCdsSemiannualRoll(ep('2024-02-14'))),
   next_semiannual_cds_maturity: () => iso(core.nextSemiannualCdsMaturity(ep('2028-09-20'))),
-  imm_option_expiry: () => iso(core.immOptionExpiry(3, 2025)),
-  next_imm_option_expiry: () => iso(core.nextImmOptionExpiry(ep('2025-03-14'))),
   next_third_friday: () => iso(core.nextThirdFriday(ep('2025-03-21'))),
   // --- dates: SIFMA ---------------------------------------------------------------
   sifma_settlement_date: () => iso(core.sifmaSettlementDate(3, 2027)),

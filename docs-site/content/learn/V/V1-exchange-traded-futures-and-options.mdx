@@ -14,7 +14,6 @@ api:
 - finstack_quant.valuations.instruments.price_instrument
 - finstack_quant.models.monte_carlo.LsmcPricer
 - finstack_quant.core.dates.next_imm
-- finstack_quant.core.dates.imm_option_expiry
 status: published
 ---
 
@@ -177,7 +176,7 @@ The rate-volatility sweep isolates the convexity term. The equity and FX marks t
 ```python exec id=v1-rates-convexity role=build
 from _shared.instrument_fixtures import ir_future,instrument_envelope
 from finstack_quant.core.market_data import VolSurface
-from finstack_quant.core.dates import next_imm,imm_option_expiry
+from finstack_quant.core.dates import next_imm
 _,ir_raw=ir_future(0)
 ir_raw["spec"]["terms"].update({"last_trading_date":"2025-06-18","settlement_date":"2025-06-18"})
 ir_raw["spec"].update({"fixing_date":"2025-06-18",
@@ -193,7 +192,7 @@ for normal_vol in [0.,.005,.01]:
         metrics=["futures_price","implied_forward","convexity_adjustment"])
     convexity_rows.append({"normal_rate_vol":normal_vol,**future_result.metrics})
 print(pd.DataFrame(convexity_rows))
-print({"next_IMM":next_imm(AS_OF),"June_IMM_option_expiry":imm_option_expiry(6,2025)})
+print({"next_IMM":next_imm(AS_OF)})
 ```
 {/* /notebook-block */}
 

@@ -744,7 +744,6 @@
       "fiscalYear",
       "fxPairConvention",
       "fxStandardSettlementDays",
-      "immOptionExpiry",
       "invertFxRate",
       "isCdsDate",
       "isImmDate",
@@ -762,7 +761,6 @@
       "neumaierSum",
       "nextCdsDate",
       "nextImm",
-      "nextImmOptionExpiry",
       "nextSemiannualCdsMaturity",
       "nextSifmaSettlement",
       "nextThirdFriday",
@@ -1324,12 +1322,6 @@
     "kind": "function"
   },
   "core.nextSemiannualCdsMaturity": {
-    "kind": "function"
-  },
-  "core.immOptionExpiry": {
-    "kind": "function"
-  },
-  "core.nextImmOptionExpiry": {
     "kind": "function"
   },
   "core.nextThirdFriday": {

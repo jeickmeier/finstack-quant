@@ -1067,37 +1067,6 @@ export interface CoreNamespace {
    */
   readonly nextSemiannualCdsMaturity: typeof wasm.nextSemiannualCdsMaturity;
   /**
-   * IMM option expiry of a month: the Friday before the third Wednesday (Rust
-   * `imm_option_expiry`).
-   *
-   * # Arguments
-   *
-   * * `month` - Calendar month number, `1` through `12`.
-   * * `year` - Four-digit calendar year.
-   *
-   * @returns The option expiry date as epoch days.
-   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind
-   * `validation`) if `month` is outside `1..=12` or `year` is outside the
-   * supported date range.
-   * @param month - Calendar month number, `1` through `12`.
-   * @param year - Four-digit calendar year.
-   */
-  readonly immOptionExpiry: typeof wasm.immOptionExpiry;
-  /**
-   * Next quarterly IMM option expiry strictly after a date (Rust
-   * `next_imm_option_expiry`).
-   *
-   * # Arguments
-   *
-   * * `date` - Reference date as days since 1970-01-01.
-   *
-   * @returns The next March/June/September/December IMM option expiry, as epoch days.
-   * @throws `TypeError` if `date` is not an integer; `FinstackError` (kind
-   * `validation`) if it is outside the supported date range.
-   * @param date - Reference date as days since 1970-01-01.
-   */
-  readonly nextImmOptionExpiry: typeof wasm.nextImmOptionExpiry;
-  /**
    * Next third Friday of a month strictly after a date, the monthly
    * equity-option expiry (Rust `next_third_friday`).
    *

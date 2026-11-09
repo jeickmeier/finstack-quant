@@ -73,7 +73,7 @@
 //! [`ScheduleBuilder::cds_imm`]: super::ScheduleBuilder::cds_imm
 
 use crate::dates::calendar::algo::nth_weekday_of_month;
-use time::{Date, Duration, Month, Weekday};
+use time::{Date, Month, Weekday};
 
 // Shared quarter months used by IMM/CDS roll helpers
 const QUARTERLY_MONTHS: [Month; 4] = [Month::March, Month::June, Month::September, Month::December];
@@ -351,28 +351,6 @@ pub fn next_semiannual_cds_maturity(date: Date) -> crate::Result<Date> {
     scan_months(date, &MATURITY_MONTHS, Scan::OnOrAfter, twentieth)
 }
 
-/// Return the **IMM option expiry date** (Friday before the third Wednesday) for
-/// `month` in `year`.
-///
-/// IMM option expiry dates typically occur on the Friday preceding the IMM date
-/// (third Wednesday). This ensures options expire before the underlying futures
-/// contracts for orderly settlement.
-///
-/// # Arguments
-///
-/// * `month` - Gregorian month whose third Wednesday anchors the option expiry.
-/// * `year` - Proleptic Gregorian calendar year accepted by the `time` crate.
-///
-/// # Errors
-/// Returns `Error::Validation` when `year` or the option expiry is outside the supported date range.
-pub fn imm_option_expiry(month: Month, year: i32) -> crate::Result<Date> {
-    let third_wed = third_wednesday(month, year)?;
-    // Friday before Wednesday = subtract 5 days
-    third_wed.checked_sub(Duration::days(5)).ok_or_else(|| {
-        crate::Error::Validation("IMM option expiry is outside the supported date range".into())
-    })
-}
-
 /// Return the **third Friday** of `month` in `year`.
 ///
 /// Delegates to the shared `nth_weekday_of_month` helper used by calendar rules
@@ -387,19 +365,6 @@ pub fn imm_option_expiry(month: Month, year: i32) -> crate::Result<Date> {
 /// Returns `Error::Validation` when `year` is outside the supported date range.
 pub fn third_friday(month: Month, year: i32) -> crate::Result<Date> {
     third_weekday(month, year, Weekday::Friday)
-}
-
-/// Return the **next IMM option expiry date** (Friday before third Wednesday of
-/// Mar/Jun/Sep/Dec) **strictly after** `date`.
-///
-/// # Arguments
-///
-/// * `date` - Reference date to advance from. An expiry date supplied here
-///   returns the following quarterly expiry rather than itself.
-/// # Errors
-/// Returns `Error::Validation` when no later IMM option expiry is representable.
-pub fn next_imm_option_expiry(date: Date) -> crate::Result<Date> {
-    scan_months(date, &QUARTERLY_MONTHS, Scan::After, imm_option_expiry)
 }
 
 /// Return the next unadjusted third Friday of any month strictly after `date`.
@@ -679,7 +644,6 @@ mod tests {
             next_imm,
             next_cds_date,
             next_semiannual_cds_maturity,
-            next_imm_option_expiry,
             next_third_friday,
         ] {
             assert!(matches!(next(Date::MAX), Err(crate::Error::Validation(_))));
@@ -715,7 +679,6 @@ mod tests {
         ] {
             assert!(third_wednesday(Month::January, year).is_err());
             assert!(third_friday(Month::December, year).is_err());
-            assert!(imm_option_expiry(Month::March, year).is_err());
             assert!(
                 estimated_sifma_settlement_date(Month::January, year, SifmaSettlementClass::A)
                     .is_err()
@@ -725,7 +688,6 @@ mod tests {
             for month in [Month::January, Month::December] {
                 assert!(third_wednesday(month, year).is_ok());
                 assert!(third_friday(month, year).is_ok());
-                assert!(imm_option_expiry(month, year).is_ok());
                 assert!(
                     estimated_sifma_settlement_date(month, year, SifmaSettlementClass::D).is_ok()
                 );
@@ -826,26 +788,6 @@ mod tests {
     }
 
     #[test]
-    fn imm_option_expiry_march_2025() {
-        // March 2025: third Wednesday is 19th, so option expiry is Friday 14th
-        let expiry = imm_option_expiry(Month::March, 2025).expect("supported roll date");
-        assert_eq!(
-            expiry,
-            Date::from_calendar_date(2025, Month::March, 14).expect("Valid test date")
-        );
-    }
-
-    #[test]
-    fn imm_option_expiry_june_2025() {
-        // June 2025: third Wednesday is 18th, so option expiry is Friday 13th
-        let expiry = imm_option_expiry(Month::June, 2025).expect("supported roll date");
-        assert_eq!(
-            expiry,
-            Date::from_calendar_date(2025, Month::June, 13).expect("Valid test date")
-        );
-    }
-
-    #[test]
     fn third_friday_march_2025() {
         // March 2025: third Friday is 21st
         let friday = third_friday(Month::March, 2025).expect("supported roll date");
@@ -862,28 +804,6 @@ mod tests {
         assert_eq!(
             friday,
             Date::from_calendar_date(2025, Month::February, 21).expect("Valid test date")
-        );
-    }
-
-    #[test]
-    fn next_imm_option_expiry_after_march() {
-        // Starting after March 2025 IMM option expiry, should get June 2025
-        let start = Date::from_calendar_date(2025, Month::March, 15).expect("Valid test date");
-        let next_expiry = next_imm_option_expiry(start).expect("supported roll date");
-        assert_eq!(
-            next_expiry,
-            Date::from_calendar_date(2025, Month::June, 13).expect("Valid test date")
-        );
-    }
-
-    #[test]
-    fn next_imm_option_expiry_before_march() {
-        // Starting before March 2025 IMM option expiry, should get March 2025
-        let start = Date::from_calendar_date(2025, Month::March, 10).expect("Valid test date");
-        let next_expiry = next_imm_option_expiry(start).expect("supported roll date");
-        assert_eq!(
-            next_expiry,
-            Date::from_calendar_date(2025, Month::March, 14).expect("Valid test date")
         );
     }
 

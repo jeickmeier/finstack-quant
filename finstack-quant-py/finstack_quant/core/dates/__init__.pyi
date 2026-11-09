@@ -61,12 +61,10 @@ from finstack_quant.core.dates._schedule import (
     StubKind as StubKind,
 )
 from finstack_quant.core.dates._imm import (
-    imm_option_expiry as imm_option_expiry,
     is_cds_date as is_cds_date,
     is_imm_date as is_imm_date,
     next_cds_date as next_cds_date,
     next_imm as next_imm,
-    next_imm_option_expiry as next_imm_option_expiry,
     next_semiannual_cds_maturity as next_semiannual_cds_maturity,
     next_third_friday as next_third_friday,
     prev_cds_date as prev_cds_date,
@@ -131,8 +129,6 @@ __all__ = [
     "prev_cds_date",
     "prev_cds_semiannual_roll",
     "next_semiannual_cds_maturity",
-    "imm_option_expiry",
-    "next_imm_option_expiry",
     "next_third_friday",
     # free functions
     "create_date",

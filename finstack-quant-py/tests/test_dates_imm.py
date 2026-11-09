@@ -22,7 +22,7 @@ def test_month_out_of_range_raises() -> None:
     with pytest.raises(ValueError, match="invalid month: 13"):
         dates.third_wednesday(13, 2025)
     with pytest.raises(ValueError, match="invalid month: 0"):
-        dates.imm_option_expiry(0, 2025)
+        dates.third_friday(0, 2025)
 
 
 def test_imm_and_cds_roll_navigation() -> None:
@@ -41,16 +41,17 @@ def test_imm_and_cds_roll_navigation() -> None:
     assert dates.next_semiannual_cds_maturity(ref) == datetime.date(2025, 6, 20)
 
 
-def test_option_expiries() -> None:
-    """IMM option expiry precedes its future; monthly rolls are unadjusted."""
-    imm_expiry = dates.imm_option_expiry(3, 2025)
-    assert imm_expiry == datetime.date(2025, 3, 14)
-    assert imm_expiry < dates.third_wednesday(3, 2025)
-
+def test_monthly_third_friday_lattice() -> None:
+    """Monthly third-Friday rolls are unadjusted lattice dates."""
     ref = datetime.date(2025, 5, 1)
-    assert dates.next_imm_option_expiry(ref) == datetime.date(2025, 6, 13)
     assert dates.next_third_friday(ref) == datetime.date(2025, 5, 16)
     assert dates.next_third_friday(ref) == dates.third_friday(5, 2025)
+
+
+def test_generic_imm_option_expiry_helpers_are_removed() -> None:
+    """Listed-option expiry is a product convention, not a core date helper."""
+    assert not hasattr(dates, "imm_option_expiry")
+    assert not hasattr(dates, "next_imm_option_expiry")
 
 
 def test_monthly_third_friday_is_explicitly_unadjusted() -> None:
@@ -72,7 +73,6 @@ def test_next_helpers_are_strictly_forward_looking() -> None:
         dates.next_imm,
         dates.next_cds_date,
         dates.next_semiannual_cds_maturity,
-        dates.next_imm_option_expiry,
         dates.next_third_friday,
     ],
 )
@@ -93,7 +93,7 @@ def test_backward_rolls_cannot_return_a_non_python_year(
         helper(datetime.date.min)
 
 
-@pytest.mark.parametrize("helper", [dates.third_wednesday, dates.third_friday, dates.imm_option_expiry])
+@pytest.mark.parametrize("helper", [dates.third_wednesday, dates.third_friday])
 @pytest.mark.parametrize("year", [-10000, 0, 10000, 2147483647, -2147483648])
 def test_expiry_years_outside_python_range_raise_value_error(
     helper: Callable[[int, int], datetime.date], year: int

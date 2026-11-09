@@ -22,7 +22,7 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | # | Slice | Status | Gates | Register | Notes |
 |---|---|---|---|---|---|
 | 1 | A1 | committed (`A1:` in git log) | lint core/models/exotics/fx/valuations; tests core 2228, models 2077, exotics 314, fx 251, valuations 2453; gen-write; py-build + test_production_barrier_ndf 7; wasm-test 1090 + dts | 020 entry rewritten as Evidence (consumer qualification remains); Reconciliation 59→58, Evidence 66→67 | `rebate_timing: Option<PayoutTiming>` validated with the rebate via new `models::closed_form::validate_rebate_timing`; `expired_barrier_payoff` takes `Option<(f64, PayoutTiming)>` |
-| 2 | A2 | pending | | | |
+| 2 | A2 | committed (`A2:` in git log) | lint core/py/wasm; core tests; gen-write; py-build + test_dates_imm 29, test_core_wasm_parity 85, parity 6071; wasm-test | Roll-date entry trimmed (option-expiry action done); record 009 item 7 marked reconciled | Removed from core, Python, stubs, WASM, facade, parity, notebook, docs-site lesson and tracks |
 | 3 | A3 | pending | | | |
 | 4 | A3b | pending | | | |
 | 5 | B1 | pending | | | |
@@ -76,6 +76,12 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
   register files the precondition protects, and the run proceeds. **Rule for
   the rest of the run:** do not edit that file. If a slice needs to change
   it, mark the slice `blocked (concurrent edit)`.
+
+- **Tooling.** In this worktree, git must be invoked as
+  `/usr/bin/git -C <worktree>`, because the rtk-wrapped git is refused by the
+  isolation hook. The commit pre-commit hook runs the full workspace
+  `rust-lint` and acts as an extra per-slice gate. `mise run python-test-file`
+  accepts exactly one path.
 
 ## Needs review
 

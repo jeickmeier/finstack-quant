@@ -1,5 +1,5 @@
 //! WASM bindings for market date rules from [`finstack_quant_core::dates`]:
-//! IMM and CDS roll dates, listed-option expiries, SIFMA settlement dates and
+//! IMM and CDS roll dates, third-Friday lattice dates, SIFMA settlement dates and
 //! the 30/360 day counts.
 //!
 //! Dates are **epoch days** (`i32`, days since 1970-01-01).
@@ -203,49 +203,6 @@ pub fn next_semiannual_cds_maturity(
     #[wasm_bindgen(unchecked_param_type = "number")] date: JsValue,
 ) -> Result<i32, JsValue> {
     map_date(&date, rust_dates::next_semiannual_cds_maturity)
-}
-
-/// IMM option expiry of a month: the Friday before the third Wednesday (Rust
-/// `imm_option_expiry`).
-///
-/// # Arguments
-///
-/// * `month` - Calendar month number, `1` through `12`.
-/// * `year` - Four-digit calendar year.
-///
-/// @returns The option expiry date as epoch days.
-/// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
-/// `validation`) if `month` is outside `1..=12` or `year` is outside the
-/// supported date range.
-/// @param month - Calendar month number, `1` through `12`.
-/// @param year - Four-digit calendar year.
-#[wasm_bindgen(js_name = immOptionExpiry)]
-pub fn imm_option_expiry(
-    #[wasm_bindgen(unchecked_param_type = "number")] month: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] year: JsValue,
-) -> Result<i32, JsValue> {
-    let (month, year) = month_year(&month, &year)?;
-    rust_dates::imm_option_expiry(month, year)
-        .map(days_since_epoch)
-        .map_err(to_js_err)
-}
-
-/// Next quarterly IMM option expiry strictly after a date (Rust
-/// `next_imm_option_expiry`).
-///
-/// # Arguments
-///
-/// * `date` - Reference date as days since 1970-01-01.
-///
-/// @returns The next March/June/September/December IMM option expiry, as epoch days.
-/// @throws `TypeError` if `date` is not an integer; `FinstackError` (kind
-/// `validation`) if it is outside the supported date range.
-/// @param date - Reference date as days since 1970-01-01.
-#[wasm_bindgen(js_name = nextImmOptionExpiry)]
-pub fn next_imm_option_expiry(
-    #[wasm_bindgen(unchecked_param_type = "number")] date: JsValue,
-) -> Result<i32, JsValue> {
-    map_date(&date, rust_dates::next_imm_option_expiry)
 }
 
 /// Next third Friday of a month strictly after a date, the monthly

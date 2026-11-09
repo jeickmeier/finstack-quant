@@ -1,7 +1,7 @@
 # CORE-CONVENTIONS-009: Unadjusted roll dates and product expiry boundaries
 
 - Decision status: **Accepted — complete roll-date package, 2026-11-07**.
-- Implementation status: **Observed; reconciliation pending**, scoped to roll-date functions in `dates/imm.rs`.
+- Implementation status: **Observed; reconciliation pending**, scoped to roll-date functions in `dates/imm.rs`. Item 7 (generic IMM option-expiry removal) is reconciled as of 2026-11-08; the other items remain pending.
 - Validation status: **Evidence inspected/located; independent qualification pending**. Documentation and independent Gregorian/lattice/search examples passed; production Rust/host tests and product-date qualification were not executed for this review.
 - Audit date: **2026-11-05**. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; see [scope and inventory](README.md).
 
@@ -187,7 +187,7 @@ Third Wednesday/Friday uses the nth-weekday kernel. Quarterly months are March, 
 
 `prev_cds_semiannual_roll` returns March/September 20 on or before input. `next_semiannual_cds_maturity` returns June/December 20 on or after input. A generic month scan iterates candidate months in direction order, moves years as needed and errors at representable date boundaries.
 
-`imm_option_expiry(month,year)` is third Wednesday minus five calendar days, producing the preceding Friday. It accepts any month; `next_imm_option_expiry` searches quarterly months strictly after input. `next_third_friday` searches all months strictly after input. Neither moves a Good Friday or other closure; caller-specific holiday adjustment is separate.
+The former `imm_option_expiry(month,year)` (third Wednesday minus five calendar days) and `next_imm_option_expiry` were removed on 2026-11-08 under item 7. `next_third_friday` searches all months strictly after input. Neither moves a Good Friday or other closure; caller-specific holiday adjustment is separate.
 
 ## Observed conventions, controls and limitations
 

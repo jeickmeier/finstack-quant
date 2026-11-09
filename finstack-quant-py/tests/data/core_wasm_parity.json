@@ -235,7 +235,6 @@
     "is_holiday": true,
     "metadata_id": "nyse"
   },
-  "imm_option_expiry": "2025-03-14",
   "inflation_curve": {
     "base_cpi": 300.0,
     "base_date": "2025-01-02",
@@ -655,7 +654,6 @@
   "months_until": 25,
   "next_cds_date": "2025-06-20",
   "next_imm": "2025-06-18",
-  "next_imm_option_expiry": "2025-06-13",
   "next_semiannual_cds_maturity": "2028-12-20",
   "next_sifma_settlement": "2027-04-13",
   "next_third_friday": "2025-04-18",

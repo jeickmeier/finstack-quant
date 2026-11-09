@@ -199,8 +199,6 @@ CASES: dict[str, Callable[[], Any]] = {
     "prev_cds_date": lambda: _iso(dates.prev_cds_date("2025-03-20")),
     "prev_cds_semiannual_roll": lambda: _iso(dates.prev_cds_semiannual_roll("2024-02-14")),
     "next_semiannual_cds_maturity": lambda: _iso(dates.next_semiannual_cds_maturity("2028-09-20")),
-    "imm_option_expiry": lambda: _iso(dates.imm_option_expiry(3, 2025)),
-    "next_imm_option_expiry": lambda: _iso(dates.next_imm_option_expiry("2025-03-14")),
     "next_third_friday": lambda: _iso(dates.next_third_friday("2025-03-21")),
     # --- dates: SIFMA ------------------------------------------------------
     "sifma_settlement_date": lambda: _iso(dates.sifma_settlement_date(3, 2027)),

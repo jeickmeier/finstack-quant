@@ -197,8 +197,6 @@ export const core = {
   prevCdsDate: wasm.prevCdsDate,
   prevCdsSemiannualRoll: wasm.prevCdsSemiannualRoll,
   nextSemiannualCdsMaturity: wasm.nextSemiannualCdsMaturity,
-  immOptionExpiry: wasm.immOptionExpiry,
-  nextImmOptionExpiry: wasm.nextImmOptionExpiry,
   nextThirdFriday: wasm.nextThirdFriday,
   SifmaSettlementClass: wasm.SifmaSettlementClass,
   sifmaSettlementDate,

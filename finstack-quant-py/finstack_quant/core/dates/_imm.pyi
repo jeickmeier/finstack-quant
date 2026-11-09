@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime
 
-# IMM, CDS rolls, and listed-option expiries
+# IMM, CDS rolls and third-Friday lattice dates
 
 def third_wednesday(month: int, year: int) -> datetime.date:
     """
@@ -295,70 +295,6 @@ def next_semiannual_cds_maturity(date: datetime.date | str) -> datetime.date:
     >>> from finstack_quant.core.dates import next_semiannual_cds_maturity
     >>> next_semiannual_cds_maturity(datetime.date(2025, 5, 1))
     datetime.date(2025, 6, 20)
-
-    """
-    ...
-
-def imm_option_expiry(month: int, year: int) -> datetime.date:
-    """
-    Return the expiry of the option on the IMM future for a month.
-
-    Parameters
-    ----------
-    month : int
-        Month number from ``1`` through ``12``.
-    year : int
-        Calendar year from ``1`` through ``9999``.
-
-    Returns
-    -------
-    datetime.date
-        Option expiry date for that IMM contract month.
-
-    Raises
-    ------
-    ValueError
-        If *month* is outside ``1..12`` or the year/date is outside
-        Python years ``1..9999``.
-
-    Examples
-    --------
-    >>> from finstack_quant.core.dates import imm_option_expiry
-    >>> imm_option_expiry(3, 2025)
-    datetime.date(2025, 3, 14)
-
-    """
-    ...
-
-def next_imm_option_expiry(date: datetime.date | str) -> datetime.date:
-    """
-    Return the next quarterly IMM option expiry strictly after *date*.
-
-    Parameters
-    ----------
-    date : datetime.date | str
-        Reference date.
-
-    Returns
-    -------
-    datetime.date
-        Next quarterly IMM option expiry.
-
-    Raises
-    ------
-    TypeError
-        If *date* is not a date-like object with integer ``year``, ``month``,
-        and ``day`` attributes.
-    ValueError
-        If those attributes do not form a valid calendar date or the selected
-        roll/expiry cannot be represented in Python years ``1..9999``.
-
-    Examples
-    --------
-    >>> import datetime
-    >>> from finstack_quant.core.dates import next_imm_option_expiry
-    >>> next_imm_option_expiry(datetime.date(2025, 5, 1))
-    datetime.date(2025, 6, 13)
 
     """
     ...

@@ -1,9 +1,8 @@
-//! Python bindings for IMM, CDS-roll, and listed-option expiry dates.
+//! Python bindings for IMM, CDS-roll and third-Friday lattice dates.
 
 use finstack_quant_core::dates::{
-    imm_option_expiry, is_cds_date, is_imm_date, next_cds_date, next_imm, next_imm_option_expiry,
-    next_semiannual_cds_maturity, next_third_friday, prev_cds_date, prev_cds_semiannual_roll,
-    third_friday, third_wednesday,
+    is_cds_date, is_imm_date, next_cds_date, next_imm, next_semiannual_cds_maturity,
+    next_third_friday, prev_cds_date, prev_cds_semiannual_roll, third_friday, third_wednesday,
 };
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
@@ -22,8 +21,6 @@ pub const EXPORTS: &[&str] = &[
     "prev_cds_date",
     "prev_cds_semiannual_roll",
     "next_semiannual_cds_maturity",
-    "imm_option_expiry",
-    "next_imm_option_expiry",
     "next_third_friday",
 ];
 
@@ -198,49 +195,6 @@ fn py_next_semiannual_cds_maturity<'py>(
     )
 }
 
-/// Expiry of the option on the IMM future for the given month.
-///
-/// # Arguments
-///
-/// * `month` - Gregorian month number from 1 through 12.
-/// * `year` - Calendar year; the selected date must fit Python years 1 through 9999.
-///
-/// # Errors
-///
-/// Returns `ValueError` for an invalid month or an unrepresentable year/date.
-#[pyfunction(name = "imm_option_expiry")]
-#[pyo3(text_signature = "(month, year)")]
-fn py_imm_option_expiry<'py>(py: Python<'py>, month: u8, year: i32) -> PyResult<Bound<'py, PyAny>> {
-    date_to_py(
-        py,
-        imm_option_expiry(crate::bindings::date_utils::month_from_u8(month)?, year)
-            .map_err(core_to_py)?,
-    )
-}
-
-/// Next quarterly IMM option expiry strictly after `date`.
-///
-/// # Arguments
-///
-/// * `date` - Reference calendar date (`datetime.date` or date-like).
-///
-/// # Errors
-///
-/// Returns `TypeError` if `date` is not date-like, or `ValueError` if those
-/// attributes do not form a valid calendar date or no selected roll date is
-/// representable in Python years 1 through 9999.
-#[pyfunction(name = "next_imm_option_expiry")]
-#[pyo3(text_signature = "(date)")]
-fn py_next_imm_option_expiry<'py>(
-    py: Python<'py>,
-    date: &Bound<'_, PyAny>,
-) -> PyResult<Bound<'py, PyAny>> {
-    date_to_py(
-        py,
-        next_imm_option_expiry(py_to_date(date)?).map_err(core_to_py)?,
-    )
-}
-
 /// Next unadjusted monthly third Friday strictly after `date`.
 ///
 /// Exchange holidays are not applied. This primitive does not determine a
@@ -277,8 +231,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(py_prev_cds_date, module)?)?;
     module.add_function(wrap_pyfunction!(py_prev_cds_semiannual_roll, module)?)?;
     module.add_function(wrap_pyfunction!(py_next_semiannual_cds_maturity, module)?)?;
-    module.add_function(wrap_pyfunction!(py_imm_option_expiry, module)?)?;
-    module.add_function(wrap_pyfunction!(py_next_imm_option_expiry, module)?)?;
     module.add_function(wrap_pyfunction!(py_next_third_friday, module)?)?;
     Ok(())
 }

@@ -670,7 +670,6 @@
       "_shared.analyst_tracks",
       "_shared.instrument_fixtures.instrument_envelope",
       "_shared.instrument_fixtures.ir_future",
-      "finstack_quant.core.dates.imm_option_expiry",
       "finstack_quant.core.dates.next_imm",
       "finstack_quant.core.market_data.DiscountCurve",
       "finstack_quant.core.market_data.VolSurface",
