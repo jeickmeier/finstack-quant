@@ -201,13 +201,9 @@ CASES: dict[str, Callable[[], Any]] = {
     "next_semiannual_cds_maturity": lambda: _iso(dates.next_semiannual_cds_maturity("2028-09-20")),
     "next_third_friday": lambda: _iso(dates.next_third_friday("2025-03-21")),
     # --- dates: SIFMA ------------------------------------------------------
-    "sifma_settlement_date": lambda: _iso(dates.sifma_settlement_date(3, 2027)),
-    "sifma_settlement_date_uncovered": lambda: _iso(dates.sifma_settlement_date(3, 1990)),
+    "sifma_settlement_date": lambda: _iso(dates.sifma_settlement_date(3, 2027, dates.SifmaSettlementClass.A)),
     "sifma_settlement_date_class_b": lambda: _iso(dates.sifma_settlement_date(1, 2026, dates.SifmaSettlementClass.B)),
-    "estimated_sifma_settlement_date": lambda: _iso(
-        dates.estimated_sifma_settlement_date(3, 2031, dates.SifmaSettlementClass.from_agency_term("GNMA", 30))
-    ),
-    "next_sifma_settlement": lambda: _iso(dates.next_sifma_settlement("2027-03-16")),
+    "next_sifma_settlement": lambda: _iso(dates.next_sifma_settlement("2027-03-16", dates.SifmaSettlementClass.A)),
     # --- dates: DateExt, calendars, day counts ---------------------------------
     "add_business_days": lambda: _iso(dates.add_business_days("2025-06-27", 3, "target2")),
     "add_weekdays": lambda: _iso(dates.add_weekdays("2025-06-27", -3)),

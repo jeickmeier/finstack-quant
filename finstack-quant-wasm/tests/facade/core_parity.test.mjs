@@ -170,19 +170,12 @@ const CASES = {
   next_semiannual_cds_maturity: () => iso(core.nextSemiannualCdsMaturity(ep('2028-09-20'))),
   next_third_friday: () => iso(core.nextThirdFriday(ep('2025-03-21'))),
   // --- dates: SIFMA ---------------------------------------------------------------
-  sifma_settlement_date: () => iso(core.sifmaSettlementDate(3, 2027)),
-  sifma_settlement_date_uncovered: () => iso(core.sifmaSettlementDate(3, 1990)),
+  sifma_settlement_date: () =>
+    iso(core.sifmaSettlementDate(3, 2027, core.SifmaSettlementClass.a())),
   sifma_settlement_date_class_b: () =>
     iso(core.sifmaSettlementDate(1, 2026, core.SifmaSettlementClass.b())),
-  estimated_sifma_settlement_date: () =>
-    iso(
-      core.estimatedSifmaSettlementDate(
-        3,
-        2031,
-        core.SifmaSettlementClass.fromAgencyTerm('GNMA', 30)
-      )
-    ),
-  next_sifma_settlement: () => iso(core.nextSifmaSettlement(ep('2027-03-16'))),
+  next_sifma_settlement: () =>
+    iso(core.nextSifmaSettlement(ep('2027-03-16'), core.SifmaSettlementClass.a())),
   // --- dates: DateExt, calendars, day counts --------------------------------------
   add_business_days: () => iso(core.addBusinessDays(ep('2025-06-27'), 3, 'target2')),
   add_weekdays: () => iso(core.addWeekdays(ep('2025-06-27'), -3)),

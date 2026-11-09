@@ -154,9 +154,9 @@ pub mod fx;
 pub use tenor::{Tenor, TenorUnit};
 
 pub use imm::{
-    SifmaSettlementClass, estimated_sifma_settlement_date, is_cds_date, is_imm_date, next_cds_date,
-    next_imm, next_semiannual_cds_maturity, next_sifma_settlement, next_third_friday,
-    prev_cds_date, prev_cds_semiannual_roll, sifma_settlement_date, third_friday, third_wednesday,
+    SifmaSettlementClass, is_cds_date, is_imm_date, next_cds_date, next_imm,
+    next_semiannual_cds_maturity, next_sifma_settlement, next_third_friday, prev_cds_date,
+    prev_cds_semiannual_roll, sifma_settlement_date, third_friday, third_wednesday,
 };
 
 mod calendar;

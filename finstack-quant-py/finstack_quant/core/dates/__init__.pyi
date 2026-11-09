@@ -26,7 +26,6 @@ import datetime
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates._sifma import (
     SifmaSettlementClass as SifmaSettlementClass,
-    estimated_sifma_settlement_date as estimated_sifma_settlement_date,
     next_sifma_settlement as next_sifma_settlement,
     sifma_settlement_date as sifma_settlement_date,
 )
@@ -117,7 +116,6 @@ __all__ = [
     # SIFMA settlements
     "SifmaSettlementClass",
     "sifma_settlement_date",
-    "estimated_sifma_settlement_date",
     "next_sifma_settlement",
     # IMM, CDS rolls, and listed-option expiries
     "third_wednesday",

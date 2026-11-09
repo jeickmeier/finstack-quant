@@ -1,5 +1,5 @@
 //! WASM bindings for market date rules from [`finstack_quant_core::dates`]:
-//! IMM and CDS roll dates, third-Friday lattice dates, SIFMA settlement dates and
+//! IMM and CDS roll dates, third-Friday lattice dates, published SIFMA settlement dates and
 //! the 30/360 day counts.
 //!
 //! Dates are **epoch days** (`i32`, days since 1970-01-01).
@@ -233,7 +233,7 @@ pub fn next_third_friday(
 /// await init();
 /// const cls = core.SifmaSettlementClass.fromAgencyTerm("FNMA", 15);
 /// cls.toString(); // "b"
-/// core.sifmaSettlementDate(1, 2026, cls); // epoch days, or undefined
+/// core.sifmaSettlementDate(1, 2026, cls); // epoch days; throws when not maintained
 /// ```
 #[wasm_bindgen(js_name = SifmaSettlementClass)]
 #[derive(Clone, Copy, Debug)]
@@ -321,8 +321,7 @@ impl JsSifmaSettlementClass {
 /// Published SIFMA settlement date of a month for one class (Rust
 /// `sifma_settlement_date`).
 ///
-/// The published facade makes `settlement_class` optional: an omitted class is
-/// the Rust default `SifmaSettlementClass::default()` (Class A).
+/// The class is required: there is no default class.
 ///
 /// # Arguments
 ///
@@ -333,103 +332,49 @@ impl JsSifmaSettlementClass {
 /// @param month - Settlement month number, `1` through `12`.
 /// @param year - Settlement year.
 /// @param settlementClass - Agency-MBS settlement class whose date is requested.
-/// @returns The published date as epoch days, or `undefined` when that month
-/// and class are outside the embedded SIFMA calendar (dates are never
-/// approximated).
+/// @returns The maintained published settlement date as epoch days.
 /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
-/// `validation`) if `month` is outside `1..=12`.
+/// `not_found`) when the maintained SIFMA data has no date for that month,
+/// year and class; `FinstackError` (kind `validation`) if `month` is outside
+/// `1..=12` or the stored date is invalid.
 #[wasm_bindgen(js_name = sifmaSettlementDate)]
 pub fn sifma_settlement_date(
     #[wasm_bindgen(unchecked_param_type = "number")] month: JsValue,
     #[wasm_bindgen(unchecked_param_type = "number")] year: JsValue,
     #[wasm_bindgen(js_name = "settlementClass")] settlement_class: &JsSifmaSettlementClass,
-) -> Result<Option<i32>, JsValue> {
-    let (month, year) = month_year(&month, &year)?;
-    Ok(
-        rust_dates::sifma_settlement_date(month, year, settlement_class.inner)
-            .map(days_since_epoch),
-    )
-}
-
-/// Published SIFMA settlement date of a month for the Rust default class
-/// (`SifmaSettlementClass::default()`, Class A).
-///
-/// Raw-package implementation of `sifmaSettlementDate(month, year)` without a
-/// class; the published facade folds it into `sifmaSettlementDate`.
-///
-/// # Arguments
-///
-/// * `month` - Settlement month number, `1` through `12`.
-/// * `year` - Settlement year.
-///
-/// @param month - Settlement month number, `1` through `12`.
-/// @param year - Settlement year.
-/// @returns The published date as epoch days, or `undefined` when the month
-/// is outside the embedded SIFMA calendar.
-/// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
-/// `validation`) if `month` is outside `1..=12`.
-#[wasm_bindgen(js_name = sifmaSettlementDateDefaultClass)]
-pub fn sifma_settlement_date_default_class(
-    #[wasm_bindgen(unchecked_param_type = "number")] month: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] year: JsValue,
-) -> Result<Option<i32>, JsValue> {
-    let (month, year) = month_year(&month, &year)?;
-    Ok(
-        rust_dates::sifma_settlement_date(month, year, SifmaSettlementClass::default())
-            .map(days_since_epoch),
-    )
-}
-
-/// Projection-only estimate of a SIFMA settlement date (Rust
-/// `estimated_sifma_settlement_date`).
-///
-/// The estimate counts business days of the month on the SIFMA calendar; use
-/// `sifmaSettlementDate` for published dates.
-///
-/// # Arguments
-///
-/// * `month` - Settlement month number, `1` through `12`.
-/// * `year` - Settlement year.
-/// * `settlement_class` - Agency-MBS settlement class whose business-day
-///   anchor is used.
-///
-/// @returns The estimated settlement date as epoch days.
-/// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
-/// `validation`) if `month` is outside `1..=12` or `year` is outside the
-/// supported date range.
-/// @param month - Settlement month number, `1` through `12`.
-/// @param year - Settlement year.
-/// @param settlementClass - Agency-MBS settlement class whose business-day anchor is used.
-#[wasm_bindgen(js_name = estimatedSifmaSettlementDate)]
-pub fn estimated_sifma_settlement_date(
-    #[wasm_bindgen(unchecked_param_type = "number")] month: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] year: JsValue,
-    #[wasm_bindgen(js_name = "settlementClass")] settlement_class: &JsSifmaSettlementClass,
 ) -> Result<i32, JsValue> {
     let (month, year) = month_year(&month, &year)?;
-    rust_dates::estimated_sifma_settlement_date(month, year, settlement_class.inner)
+    rust_dates::sifma_settlement_date(month, year, settlement_class.inner)
         .map(days_since_epoch)
         .map_err(to_js_err)
 }
 
-/// Next published SIFMA class A settlement strictly after a date (Rust
+/// Next published SIFMA settlement for one class strictly after a date (Rust
 /// `next_sifma_settlement`).
 ///
 /// # Arguments
 ///
 /// * `date` - Reference date as days since 1970-01-01; a settlement on this
 ///   date is not returned.
+/// * `settlement_class` - Agency-MBS settlement class whose published dates
+///   are searched.
 ///
-/// @returns The next settlement date as epoch days, or `undefined` when a
-/// required month is outside the embedded SIFMA calendar.
-/// @throws `TypeError` if `date` is not an integer; `FinstackError` (kind
-/// `validation`) if it is outside the supported date range.
 /// @param date - Reference date as days since 1970-01-01; a settlement on this date is not returned.
+/// @param settlementClass - Agency-MBS settlement class whose published dates are searched.
+/// @returns The current month's published date when it is later than `date`,
+/// otherwise the following month's, as epoch days.
+/// @throws `TypeError` if `date` is not an integer; `FinstackError` (kind
+/// `not_found`) when a required current- or following-month date is not in
+/// the maintained data (gaps are never skipped); `FinstackError` (kind
+/// `validation`) if `date` is outside the supported range or has no later month.
 #[wasm_bindgen(js_name = nextSifmaSettlement)]
 pub fn next_sifma_settlement(
     #[wasm_bindgen(unchecked_param_type = "number")] date: JsValue,
-) -> Result<Option<i32>, JsValue> {
-    Ok(rust_dates::next_sifma_settlement(js_epoch_days(&date, "date")?).map(days_since_epoch))
+    #[wasm_bindgen(js_name = "settlementClass")] settlement_class: &JsSifmaSettlementClass,
+) -> Result<i32, JsValue> {
+    rust_dates::next_sifma_settlement(js_epoch_days(&date, "date")?, settlement_class.inner)
+        .map(days_since_epoch)
+        .map_err(to_js_err)
 }
 
 /// Day count between two dates under a 30/360 variant (Rust `days_30_360`).

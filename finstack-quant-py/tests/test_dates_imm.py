@@ -113,8 +113,28 @@ def test_date_boundary_roll_inclusivity_is_preserved() -> None:
     assert dates.prev_cds_semiannual_roll(first_semiannual) == first_semiannual
 
 
-@pytest.mark.parametrize("year", [-10000, 0, 10000, 2147483647, -2147483648])
-def test_estimated_sifma_rejects_unrepresentable_years(year: int) -> None:
-    """Projection estimates share the fallible date boundary."""
+@pytest.mark.parametrize("year", [-10000, 10000, 2147483647, -2147483648])
+def test_sifma_rejects_out_of_range_years_before_coverage(year: int) -> None:
+    """Out-of-range years are input errors, not missing data."""
     with pytest.raises(ValueError, match=r"(?i)year|date|range"):
-        dates.estimated_sifma_settlement_date(3, year, dates.SifmaSettlementClass.A)
+        dates.sifma_settlement_date(3, year, dates.SifmaSettlementClass.A)
+
+
+def test_sifma_requires_class_and_reports_missing_data() -> None:
+    """No default class; uncovered cells raise KeyError rather than None."""
+    with pytest.raises(TypeError):
+        dates.sifma_settlement_date(1, 2026)  # type: ignore[call-arg]
+    with pytest.raises(TypeError):
+        dates.next_sifma_settlement(datetime.date(2026, 1, 15))  # type: ignore[call-arg]
+    with pytest.raises(KeyError):
+        dates.sifma_settlement_date(3, 1990, dates.SifmaSettlementClass.A)
+    with pytest.raises(KeyError):
+        dates.sifma_settlement_date(3, 2025, dates.SifmaSettlementClass.B)
+    assert not hasattr(dates, "estimated_sifma_settlement_date")
+
+
+def test_next_sifma_is_strict_and_does_not_skip_gaps() -> None:
+    a = dates.SifmaSettlementClass.A
+    assert dates.next_sifma_settlement(datetime.date(2027, 3, 11), a) == datetime.date(2027, 4, 13)
+    with pytest.raises(KeyError):
+        dates.next_sifma_settlement(datetime.date(2027, 12, 20), a)

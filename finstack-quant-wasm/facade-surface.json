@@ -737,7 +737,6 @@
       "embeddedRegistry",
       "endOfMonth",
       "erf",
-      "estimatedSifmaSettlementDate",
       "finiteCount",
       "finiteMaxOrNan",
       "finiteMinOrNan",
@@ -1335,9 +1334,6 @@
     "getters": []
   },
   "core.sifmaSettlementDate": {
-    "kind": "function"
-  },
-  "core.estimatedSifmaSettlementDate": {
     "kind": "function"
   },
   "core.nextSifmaSettlement": {

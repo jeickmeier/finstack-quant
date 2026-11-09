@@ -316,8 +316,9 @@ pub(crate) fn settlement_class(
 ///
 /// # Errors
 ///
-/// Returns a validation error for an invalid month or when SIFMA has no
-/// published date for that month and class.
+/// Returns a validation error for an invalid month, and the core lookup's
+/// not-found error when the maintained SIFMA data has no published date for
+/// that month and class.
 pub(crate) fn sifma_settlement(
     year: i32,
     month: u8,
@@ -325,14 +326,7 @@ pub(crate) fn sifma_settlement(
 ) -> finstack_quant_core::Result<Date> {
     let calendar_month = time::Month::try_from(month)
         .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?;
-    finstack_quant_core::dates::sifma_settlement_date(calendar_month, year, class).ok_or_else(
-        || {
-            finstack_quant_core::Error::Validation(format!(
-                "No published SIFMA settlement date for {:02}/{} and class {:?}",
-                month, year, class
-            ))
-        },
-    )
+    finstack_quant_core::dates::sifma_settlement_date(calendar_month, year, class)
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for AgencyTba {

@@ -109,7 +109,7 @@ public = [
     "add_business_days", "add_months", "add_weekdays", "end_of_month", "fiscal_year",
     "is_weekend", "months_until", "quarter",
     "StubKind", "ScheduleErrorPolicy", "Schedule", "ScheduleBuilder",
-    "SifmaSettlementClass", "sifma_settlement_date", "estimated_sifma_settlement_date",
+    "SifmaSettlementClass", "sifma_settlement_date",
     "next_sifma_settlement",
     "third_wednesday", "third_friday", "next_imm", "is_imm_date", "is_cds_date",
     "next_cds_date", "prev_cds_date", "prev_cds_semiannual_roll",

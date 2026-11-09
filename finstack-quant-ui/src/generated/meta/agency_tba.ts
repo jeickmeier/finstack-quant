@@ -4134,7 +4134,7 @@ export default [
   {
     "path": "#/$defs/d_dd15732fc20736602c44",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_tba.schema.json#/$defs/SifmaSettlementClass",
-    "description": "SIFMA MBS settlement class.\n\nSIFMA publishes distinct settlement dates for four classes of agency MBS.\nThe class determines which specific settlement date applies within a given\nmonth. See <https://www.sifma.org/resources/general/mbs-notification-and-settlement-dates/>."
+    "description": "SIFMA MBS settlement class.\n\nSIFMA publishes distinct settlement dates for four classes of agency MBS.\nThe class determines which specific settlement date applies within a given\nmonth. There is no default class: every lookup selects one explicitly. See <https://www.sifma.org/resources/general/mbs-notification-and-settlement-dates/>."
   },
   {
     "path": "#/$defs/d_dd15732fc20736602c44/oneOf/0",

@@ -108,31 +108,6 @@ chain(wasm.ScheduleBuilder, [
   'errorPolicy',
 ]);
 
-// `sifmaSettlementDate(month, year, settlementClass?)`: wasm-bindgen cannot
-// take an optional borrowed handle, so an omitted class runs the raw
-// `sifmaSettlementDateDefaultClass`, which applies the Rust default
-// (`SifmaSettlementClass::default()`, Class A).
-/**
- * Published SIFMA settlement date of a month for one class (Rust
- * `sifma_settlement_date`).
- *
- * The published facade makes `settlementClass` optional: an omitted class is
- * the Rust default `SifmaSettlementClass::default()` (Class A).
- *
- * @param month - Settlement month number, `1` through `12`.
- * @param year - Settlement year.
- * @param settlementClass - Agency-MBS settlement class whose date is requested.
- * @returns The published date as epoch days, or `undefined` when that month and class are outside the embedded SIFMA calendar (dates are never approximated).
- * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `month` is outside `1..=12`.
- *
- * @facadeType (month: number, year: number, settlementClass?: SifmaSettlementClass | null) => number | undefined
- */
-function sifmaSettlementDate(month, year, settlementClass = undefined) {
-  return settlementClass === undefined || settlementClass === null
-    ? wasm.sifmaSettlementDateDefaultClass(month, year)
-    : wasm.sifmaSettlementDate(month, year, settlementClass);
-}
-
 /**
  * Namespaced TypeScript entry points for core calculations and types.
  * @example
@@ -199,8 +174,7 @@ export const core = {
   nextSemiannualCdsMaturity: wasm.nextSemiannualCdsMaturity,
   nextThirdFriday: wasm.nextThirdFriday,
   SifmaSettlementClass: wasm.SifmaSettlementClass,
-  sifmaSettlementDate,
-  estimatedSifmaSettlementDate: wasm.estimatedSifmaSettlementDate,
+  sifmaSettlementDate: wasm.sifmaSettlementDate,
   nextSifmaSettlement: wasm.nextSifmaSettlement,
   DiscountCurve: wasm.DiscountCurve,
   HazardCurve: wasm.HazardCurve,

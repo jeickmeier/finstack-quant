@@ -514,7 +514,7 @@ export type PrepaymentModelSpec1 =
  *
  * SIFMA publishes distinct settlement dates for four classes of agency MBS.
  * The class determines which specific settlement date applies within a given
- * month. See <https://www.sifma.org/resources/general/mbs-notification-and-settlement-dates/>.
+ * month. There is no default class: every lookup selects one explicitly. See <https://www.sifma.org/resources/general/mbs-notification-and-settlement-dates/>.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "SifmaSettlementClass".

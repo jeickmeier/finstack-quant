@@ -55,9 +55,7 @@ class SifmaSettlementClass:
         """
         ...
 
-def sifma_settlement_date(
-    month: int, year: int, settlement_class: SifmaSettlementClass | None = None
-) -> datetime.date | None:
+def sifma_settlement_date(month: int, year: int, settlement_class: SifmaSettlementClass) -> datetime.date:
     """
     Return the published SIFMA settlement date for a delivery month and class.
 
@@ -67,27 +65,30 @@ def sifma_settlement_date(
         Delivery month number from ``1`` through ``12``.
     year : int
         Four-digit delivery calendar year.
-    settlement_class : SifmaSettlementClass, optional
-        Good-delivery class inferred from the agency/program and mortgage term.
-        ``None`` uses the Rust default, Class A (conventional 30-year UMBS).
+    settlement_class : SifmaSettlementClass
+        Good-delivery class whose published date applies. Required: there is
+        no default class.
 
     Returns
     -------
-    datetime.date | None
-        The exact published settlement date for the requested month, year,
-        and settlement class, or ``None`` when the embedded SIFMA calendar
-        has no date for that combination.
+    datetime.date
+        The maintained published Settlement date for the requested month,
+        year and class, unchanged.
 
     Raises
     ------
+    KeyError
+        If the maintained SIFMA data has no published date for that month,
+        year and class.
     ValueError
-        If *month* is outside ``1`` through ``12``.
+        If *month* is outside ``1`` through ``12``, or the stored date is
+        invalid.
 
     Examples
     --------
     >>> import datetime
     >>> from finstack_quant.core.dates import sifma_settlement_date, SifmaSettlementClass
-    >>> sifma_settlement_date(1, 2026)
+    >>> sifma_settlement_date(1, 2026, SifmaSettlementClass.A)
     datetime.date(2026, 1, 14)
     >>> sifma_settlement_date(1, 2026, SifmaSettlementClass.B)
     datetime.date(2026, 1, 20)
@@ -95,70 +96,40 @@ def sifma_settlement_date(
     """
     ...
 
-def estimated_sifma_settlement_date(month: int, year: int, settlement_class: SifmaSettlementClass) -> datetime.date:
+def next_sifma_settlement(date: datetime.date | str, settlement_class: SifmaSettlementClass) -> datetime.date:
     """
-    Estimate a class-specific SIFMA settlement date for projections.
-
-    This uses the holiday-calendar business-day anchor even when a published
-    settlement exists; use ``sifma_settlement_date`` for operational dates.
-
-    Parameters
-    ----------
-    month : int
-        Delivery month number from ``1`` through ``12``.
-    year : int
-        Delivery calendar year from ``1`` through ``9999``.
-    settlement_class : SifmaSettlementClass
-        Good-delivery class whose conventional estimated date is required.
-
-    Returns
-    -------
-    datetime.date
-        Deterministic estimated settlement date for the requested class.
-
-    Raises
-    ------
-    ValueError
-        If *month* is outside ``1`` through ``12``, the year/date is outside
-        Python years ``1..9999``, or the month has too few business days.
-
-    Examples
-    --------
-    >>> import datetime
-    >>> from finstack_quant.core.dates import estimated_sifma_settlement_date, SifmaSettlementClass
-    >>> estimated_sifma_settlement_date(1, 2030, SifmaSettlementClass.C)
-    datetime.date(2030, 1, 22)
-
-    """
-    ...
-
-def next_sifma_settlement(date: datetime.date | str) -> datetime.date | None:
-    """
-    Return the next published SIFMA settlement date strictly after a date.
+    Return the next published SIFMA settlement date for a class strictly after a date.
 
     Parameters
     ----------
     date : datetime.date | str
-        Calendar date from which to search the published settlement calendar.
+        Reference date. A settlement on this date is not returned.
+    settlement_class : SifmaSettlementClass
+        Good-delivery class whose published dates are searched. Required.
 
     Returns
     -------
-    datetime.date or None
-        Earliest available settlement date not before ``date``, or ``None``.
+    datetime.date
+        The current month's published date when it is later than ``date``,
+        otherwise the following month's published date.
 
     Raises
     ------
+    KeyError
+        If a required current- or following-month date is not in the
+        maintained data; gaps are never skipped.
     TypeError
         If *date* is not a date-like object with integer ``year``, ``month``,
         and ``day`` attributes.
     ValueError
-        If those attributes do not form a valid calendar date.
+        If those attributes do not form a valid calendar date, or ``date``
+        has no later month.
 
     Examples
     --------
     >>> import datetime
-    >>> from finstack_quant.core.dates import next_sifma_settlement
-    >>> next_sifma_settlement(datetime.date(2026, 1, 15))
+    >>> from finstack_quant.core.dates import next_sifma_settlement, SifmaSettlementClass
+    >>> next_sifma_settlement(datetime.date(2026, 1, 15), SifmaSettlementClass.A)
     datetime.date(2026, 2, 12)
 
     """

@@ -6,7 +6,7 @@
 
 import type * as wasm from './pkg/finstack_quant_wasm.js';
 import type * as generated from './types/generated/index.js';
-import type { CashFlowBuilder, CashFlowSchedule, CreditIndexData, DayCountContext, DiscountCurve, FiscalConfig, FxMatrix, HazardCurve, HullWhiteParams, ImProfile, InflationIndex, JsonInput, LookbackReturns, MarketContext, MarketContextCurve, MoneyValue, MvaResult, Performance, PeriodStats, ScalarTimeSeries, ScheduleBuilder, SifmaSettlementClass, endOfMonth, start } from './pkg/finstack_quant_wasm.js';
+import type { CashFlowBuilder, CashFlowSchedule, CreditIndexData, DayCountContext, DiscountCurve, FiscalConfig, FxMatrix, HazardCurve, HullWhiteParams, ImProfile, InflationIndex, JsonInput, LookbackReturns, MarketContext, MarketContextCurve, MoneyValue, MvaResult, Performance, PeriodStats, ScalarTimeSeries, ScheduleBuilder, endOfMonth, start } from './pkg/finstack_quant_wasm.js';
 
 export { default } from './pkg/finstack_quant_wasm.js';
 export type * from './pkg/finstack_quant_wasm.js';
@@ -1085,53 +1085,43 @@ export interface CoreNamespace {
    * Published SIFMA settlement date of a month for one class (Rust
    * `sifma_settlement_date`).
    *
-   * The published facade makes `settlementClass` optional: an omitted class is
-   * the Rust default `SifmaSettlementClass::default()` (Class A).
-   *
-   * @param month - Settlement month number, `1` through `12`.
-   * @param year - Settlement year.
-   * @param settlementClass - Agency-MBS settlement class whose date is requested.
-   * @returns The published date as epoch days, or `undefined` when that month and class are outside the embedded SIFMA calendar (dates are never approximated).
-   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `month` is outside `1..=12`.
-   */
-  readonly sifmaSettlementDate: (month: number, year: number, settlementClass?: SifmaSettlementClass | null) => number | undefined;
-  /**
-   * Projection-only estimate of a SIFMA settlement date (Rust
-   * `estimated_sifma_settlement_date`).
-   *
-   * The estimate counts business days of the month on the SIFMA calendar; use
-   * `sifmaSettlementDate` for published dates.
+   * The class is required: there is no default class.
    *
    * # Arguments
    *
    * * `month` - Settlement month number, `1` through `12`.
    * * `year` - Settlement year.
-   * * `settlement_class` - Agency-MBS settlement class whose business-day
-   *   anchor is used.
+   * * `settlement_class` - Agency-MBS settlement class whose date is requested.
    *
-   * @returns The estimated settlement date as epoch days.
-   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind
-   * `validation`) if `month` is outside `1..=12` or `year` is outside the
-   * supported date range.
    * @param month - Settlement month number, `1` through `12`.
    * @param year - Settlement year.
-   * @param settlementClass - Agency-MBS settlement class whose business-day anchor is used.
+   * @param settlementClass - Agency-MBS settlement class whose date is requested.
+   * @returns The maintained published settlement date as epoch days.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind
+   * `not_found`) when the maintained SIFMA data has no date for that month,
+   * year and class; `FinstackError` (kind `validation`) if `month` is outside
+   * `1..=12` or the stored date is invalid.
    */
-  readonly estimatedSifmaSettlementDate: typeof wasm.estimatedSifmaSettlementDate;
+  readonly sifmaSettlementDate: typeof wasm.sifmaSettlementDate;
   /**
-   * Next published SIFMA class A settlement strictly after a date (Rust
+   * Next published SIFMA settlement for one class strictly after a date (Rust
    * `next_sifma_settlement`).
    *
    * # Arguments
    *
    * * `date` - Reference date as days since 1970-01-01; a settlement on this
    *   date is not returned.
+   * * `settlement_class` - Agency-MBS settlement class whose published dates
+   *   are searched.
    *
-   * @returns The next settlement date as epoch days, or `undefined` when a
-   * required month is outside the embedded SIFMA calendar.
-   * @throws `TypeError` if `date` is not an integer; `FinstackError` (kind
-   * `validation`) if it is outside the supported date range.
    * @param date - Reference date as days since 1970-01-01; a settlement on this date is not returned.
+   * @param settlementClass - Agency-MBS settlement class whose published dates are searched.
+   * @returns The current month's published date when it is later than `date`,
+   * otherwise the following month's, as epoch days.
+   * @throws `TypeError` if `date` is not an integer; `FinstackError` (kind
+   * `not_found`) when a required current- or following-month date is not in
+   * the maintained data (gaps are never skipped); `FinstackError` (kind
+   * `validation`) if `date` is outside the supported range or has no later month.
    */
   readonly nextSifmaSettlement: typeof wasm.nextSifmaSettlement;
   readonly DiscountCurve: typeof wasm.DiscountCurve;
