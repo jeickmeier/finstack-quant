@@ -15,6 +15,7 @@
         "format": "double",
         "type": "number"
       },
+      "description": "Factors in rating-ladder order (`NR` first); ratings have no total\norder, so the map keeps a deterministic storage order instead.",
       "type": "object"
     },
     "methodology": {

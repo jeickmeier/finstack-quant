@@ -957,14 +957,21 @@ export type Date11 = string;
  * | `CCCMinus`  | CCC-      | Caa3    |
  * | `CC`        | CC        | Ca      |
  * | `C`         | C         | C       |
- * | `D`         | D         | D       |
+ * | `D`         | D         | (none)  |
  * | `NR`        | NR        | NR      |
  *
- * # Investment Grade
+ * # Ladder, ordering and grades
  *
- * Ratings of `BBBMinus` and above are considered "investment grade".
- * Ordering follows the `repr(u8)` discriminant, so `NR` (21) sorts before
- * `D` (22) even though `D` is declared first:
+ * The rated ladder is consecutive, `AAA` = 0 through `C` = 20 and `D` = 21:
+ * library notch positions, not equally spaced risks. `NR` is explicit
+ * unrated status outside the ladder (CORE-CONVENTIONS-019). Ratings are
+ * partially ordered: rated values compare by ladder position (`<` means
+ * better quality), `NR` is incomparable with every rated value and equal to
+ * itself. There is no total order, so a rating cannot key an ordered map.
+ *
+ * Investment grade is `AAA` through `BBB-`; speculative grade is `BB+`
+ * through `D`, so `D` is both speculative and the generic default marker.
+ * `NR` is neither.
  *
  * ```rust
  * use finstack_quant_core::types::CreditRating;
@@ -972,7 +979,8 @@ export type Date11 = string;
  * assert!(CreditRating::A.is_investment_grade());
  * assert!(CreditRating::BBBMinus.is_investment_grade());
  * assert!(!CreditRating::BBPlus.is_investment_grade());
- * assert!(CreditRating::C < CreditRating::NR && CreditRating::NR < CreditRating::D);
+ * assert!(CreditRating::C < CreditRating::D);
+ * assert_eq!(CreditRating::C.partial_cmp(&CreditRating::NR), None);
  * ```
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema

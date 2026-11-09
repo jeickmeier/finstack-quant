@@ -1216,7 +1216,6 @@ mod haircut_tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::CurveId;
     use rust_decimal::Decimal;
-    use std::collections::BTreeMap;
     use time::Month;
 
     fn maturity() -> Date {
@@ -1257,8 +1256,8 @@ mod haircut_tests {
     }
 
     /// Carry CCC collateral at 50% of par — the standard CLO convention.
-    fn ccc_haircuts() -> BTreeMap<CreditRating, f64> {
-        let mut m = BTreeMap::new();
+    fn ccc_haircuts() -> indexmap::IndexMap<CreditRating, f64> {
+        let mut m = indexmap::IndexMap::new();
         m.insert(CreditRating::CCC, 0.5);
         m
     }

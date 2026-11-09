@@ -43,10 +43,10 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 20 | E2 | **E2a committed** (`E2a:` in git log); **E2c (O6 compounding) not executed (scope)**; `from_years` removal **blocked (owner decision)** | E2a: workspace rust-lint; gen-write; workspace rust-test; core doctests; python-test; python-lint; wasm-test; wasm-lint; ui-check | 014/007 entry: `months_until` and roll rule recorded; remaining narrowed | E2a: `months_until -> Result<u32>` (greatest `k` with `add_months(k) <= end`; reversed errors) in core, Python and WASM; structured-credit sites moved to a named site-local `ClampedMonths::clamped_months_until` keeping the pre-007 count (E2b assigns meanings); bond future uses the checked core measure (day-1 start, identical values); `Tenor::add_to_date` errors without a calendar unless `Unadjusted` |
 | 21 | E2b | committed (`E2b:` in git log); documentation only | docs (no code change) | 014/007 entry links the stated meanings | All 16 structured-credit sites have a stated meaning (seasoning, remaining term, simulation index/grid length, lock-out months, domain bound) in the structured-credit README. None migrated: no accepted record selects a measure, and O13 forbids assuming completed months. All stay on `ClampedMonths::clamped_months_until` |
 | 22 | E3 | **E3a committed** (`E3a:` in git log); **E3b not executed (scope)** | E3a: workspace rust-lint; gen-write; workspace rust-test; core doctests; python-test; python-lint; wasm-test; wasm-lint; ui-check; notebooks schedule_building and dates_calendars_schedules | 008 entry: removed policies/warnings recorded; record 008 partly reconciled | E3a: removed `ScheduleErrorPolicy`, `ScheduleWarning`, `GracefulEmpty`, the missing-calendar warning, `warnings`/`has_warnings`/`used_graceful_fallback`, the builder/host `error_policy` and the monotonic/drop repair (now a strictness error) across Rust, Python, WASM, parity ledger, stubs and notebooks |
-| 23 | E4 | pending | | | |
-| 24 | E4b | pending | | | |
+| 23 | E4 | skipped (dep E3: E3b not executed) | | | CDS-mode removal needs the explicit schedule spec/grid modes |
+| 24 | E4b | skipped (dep E4) | | | O7 decision not recorded in this run |
 | 25 | G1 | skipped (dep B3) | | | |
-| 26 | G2 | pending | | | |
+| 26 | G2 | committed (`G2:` in git log) | workspace rust-lint; gen-write; workspace rust-test 16358; core doctests 285; python-test 13988; python-lint; wasm-test 1085; wasm-lint; ui-check | 019 entry: CreditRating part recorded; record 019 partly reconciled | `D` = 21 and `NR` off the ladder; no `Ord`, hand-written `PartialOrd` (`NR` incomparable with rated values, equal to itself); `ladder_position()`; `notches_to`/`to_moodys_string -> Result` (`NR` arithmetic and Moody's `D` error); finite canonical/Moody's/status alias tables replace suffix stripping; the models rating-factor table and the structured-credit `rating_haircuts` move from `BTreeMap` to `IndexMap` (ladder order / wire order); Python ordering of `NR` against a rated value raises `TypeError` |
 | 27 | G3 | pending | | | |
 | 28 | G4 | skipped (dep B3) | | | |
 | 29 | F1 | pending | | | |
@@ -58,7 +58,7 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 35 | F7 | skipped (dep F6) | | | |
 | 36 | F8 | skipped (dep F7) | | | |
 | 37 | G5 | skipped (dep G4) | | | |
-| 38 | E5 | pending | | | |
+| 38 | E5 | skipped (dep E3: E3b not executed) | | | |
 | 39 | E6 | skipped (dep G5, CASHFLOWS-001) | | | |
 | 40 | H1 | pending | | | |
 | 41 | H3 | pending | | | |

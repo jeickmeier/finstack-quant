@@ -546,20 +546,22 @@ impl PyCreditRating {
         self.inner.is_default()
     }
 
-    /// Moody's-style label (``"Baa1"`` for BBB+).
+    /// Moody's-style label (``"Baa1"`` for BBB+); ``NR`` renders as ``"NR"``
+    /// and ``D`` raises ``ValueError`` (no Moody's long-term D grade).
     #[pyo3(text_signature = "(self)")]
-    fn to_moodys_string(&self) -> &'static str {
-        self.inner.to_moodys_string()
+    fn to_moodys_string(&self) -> PyResult<&'static str> {
+        self.inner.to_moodys_string().map_err(core_to_py)
     }
 
-    /// Signed notch distance to *other*: positive when *other* is weaker.
+    /// Signed ladder distance to *other*: positive when *other* is weaker.
     ///
     /// ``CreditRating.BBB.notches_to(CreditRating.BB) == 3``. Accepts a
-    /// ``CreditRating`` or a rating string.
+    /// ``CreditRating`` or a rating string; raises ``ValueError`` when either
+    /// side is ``NR``.
     #[pyo3(text_signature = "(self, other)")]
     fn notches_to(&self, other: &Bound<'_, PyAny>) -> PyResult<i32> {
         let rhs = extract_credit_rating(other)?;
-        Ok(self.inner.notches_to(rhs))
+        self.inner.notches_to(rhs).map_err(core_to_py)
     }
 
     /// Hash consistent with equality between ``CreditRating`` instances.
@@ -571,8 +573,10 @@ impl PyCreditRating {
 
     /// Rich comparison against another ``CreditRating``.
     ///
-    /// Ordering follows credit quality: ``AAA < BBB < D``. Other host types
-    /// compare unequal and do not support ordering.
+    /// Rated values order by quality (``AAA < BBB < D``). ``NR`` equals
+    /// itself but is not ordered against a rated value: ``<``/``<=``/``>``/
+    /// ``>=`` between ``NR`` and a rated value raise ``TypeError``. Other host
+    /// types compare unequal and do not support ordering.
     fn __richcmp__(
         &self,
         other: &Bound<'_, PyAny>,
@@ -580,7 +584,17 @@ impl PyCreditRating {
         py: Python<'_>,
     ) -> PyResult<Py<PyAny>> {
         if let Ok(rhs) = other.extract::<PyRef<'_, PyCreditRating>>() {
-            return op.matches(self.inner.cmp(&rhs.inner)).into_py_any(py);
+            return match op {
+                CompareOp::Eq => (self.inner == rhs.inner).into_py_any(py),
+                CompareOp::Ne => (self.inner != rhs.inner).into_py_any(py),
+                _ => match self.inner.partial_cmp(&rhs.inner) {
+                    Some(ordering) => op.matches(ordering).into_py_any(py),
+                    None => Err(PyTypeError::new_err(format!(
+                        "CreditRating {} is not ordered against {}: NR is unrated status",
+                        self.inner, rhs.inner
+                    ))),
+                },
+            };
         }
         Ok(py.NotImplemented())
     }

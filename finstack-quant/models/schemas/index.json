@@ -749,7 +749,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/rating_factor_table.schema.json",
-      "bytes": 716,
+      "bytes": 871,
       "kind": "component",
       "path": "schemas/models/1/rating_factor_table.schema.json",
       "summary": "Rating factor table for a specific rating-agency methodology.",

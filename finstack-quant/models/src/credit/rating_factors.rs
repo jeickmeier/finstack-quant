@@ -1,6 +1,6 @@
 //! Rating-factor tables and Moody's WARF lookup.
 
-use std::collections::BTreeMap;
+use indexmap::IndexMap;
 use std::sync::OnceLock;
 
 use finstack_quant_core::types::CreditRating;
@@ -27,7 +27,9 @@ use super::registry::{RatingFactorTableParts, embedded_registry};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct RatingFactorTable {
-    factors: BTreeMap<CreditRating, f64>,
+    /// Factors in rating-ladder order (`NR` first); ratings have no total
+    /// order, so the map keeps a deterministic storage order instead.
+    factors: IndexMap<CreditRating, f64>,
     agency: String,
     methodology: String,
     default_factor: f64,
@@ -63,7 +65,11 @@ impl RatingFactorTable {
 
     fn from_registry_parts(parts: RatingFactorTableParts) -> Self {
         Self {
-            factors: parts.factors.into_iter().collect(),
+            factors: {
+                let mut factors: Vec<_> = parts.factors.into_iter().collect();
+                factors.sort_by_key(|(rating, _)| rating.ladder_position());
+                factors.into_iter().collect()
+            },
             agency: parts.agency,
             methodology: parts.methodology,
             default_factor: parts.default_factor,

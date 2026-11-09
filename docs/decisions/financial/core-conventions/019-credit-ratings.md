@@ -1,7 +1,7 @@
 # CORE-CONVENTIONS-019: Ordinal credit ratings and configurable scorecard scale data
 
 - Decision status: **Accepted — complete ratings/scorecard package, 2026-11-07**.
-- Implementation status: **Observed; reconciliation pending**, scoped to `types/ratings.rs`, `rating_scales.rs` and embedded `rating_scales.v2.json`.
+- Implementation status: **Partly reconciled 2026-11-09** (`CreditRating`: ladder, partial order, fallible notches/Moody rendering, alias tables, hosts); scale registry and scorecards remain, scoped to `types/ratings.rs`, `rating_scales.rs` and embedded `rating_scales.v2.json`.
 - Validation status: **Evidence inspected; independent symbol/band examples and semantic review passed; production qualification pending**. Exact alias/rank/grade and illustrative score-boundary examples passed, and an independent calculation found 40 of 43 embedded representatives classify into another band. Linked Rust/host tests were located or inspected, not run; these checks do not certify current runtime/host behavior or agency calibration.
 - Audit date: **2026-11-05**. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; see [scope and inventory](README.md).
 

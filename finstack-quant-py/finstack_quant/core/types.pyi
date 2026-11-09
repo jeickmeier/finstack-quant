@@ -587,22 +587,27 @@ class Bps:
 
 class CreditRating:
     """
-    Standardised credit rating category on the 23-step S&P/Fitch scale.
+    Generic long-term credit rating: the rated ladder ``AAA`` (0) through ``C``
+    (20) and ``D`` (21), plus ``NR`` (unrated status, off the ladder).
 
-    Immutable, hashable, ordered enum-style type with class attributes for
-    each rating level. Ordering follows credit quality, so a *smaller* rating
-    is a *stronger* credit: ``AAA < AA+ < ... < CCC- < CC < C < NR < D``.
-    ``NR`` (not rated) is placed between ``C`` and ``D``; it is neither
-    investment nor speculative grade. Notched ratings (``"BBB+"``, ``"Baa1"``)
-    preserve their notch-level precision. Equality and ordering compare
+    Immutable, hashable enum-style type with class attributes for each level.
+    Rated values are ordered by quality, so a *smaller* rating is a
+    *stronger* credit: ``AAA < AA+ < ... < CC < C < D``. ``NR`` equals itself
+    but is not ordered against a rated value: ``<``, ``<=``, ``>`` and ``>=``
+    between ``NR`` and a rated value raise ``TypeError``. ``NR`` is neither
+    investment nor speculative grade. Equality and ordering compare
     ``CreditRating`` instances; parse string labels explicitly with
-    ``CreditRating(label)``. Serializes as the quoted S&P label and is picklable.
+    ``CreditRating(label)``. Serializes as the quoted canonical label and is
+    picklable.
 
     Parameters
     ----------
     name : str
-        Rating string in S&P/Fitch or Moody's notation, case-insensitive
-        (``"BBB+"``, ``"Baa1"``, ``"nr"``).
+        Canonical generic label (``"BBB+"``), Moody's-style long-term spelling
+        (``"Baa1"``, ``"Ca"``) or status alias (``"NR"``, ``"not rated"``,
+        ``"unrated"``, ``"D"``, ``"default"``), ASCII case-insensitive after
+        trimming. Bare ``"Baa"``/``"Ba"``/``"Caa"``, ``"AAA+"``, ``"SD"`` and
+        modifiers are rejected.
 
     Raises
     ------
@@ -665,7 +670,7 @@ class CreditRating:
     D: CreditRating
     """Default rating."""
     NR: CreditRating
-    """Not rated (ordered between C and D)."""
+    """Not rated: explicit unrated status, outside the rated ladder."""
 
     def __init__(self, name: str) -> None:
         """
@@ -785,11 +790,12 @@ class CreditRating:
         Returns
         -------
         str
-            e.g. ``"Baa1"`` for BBB+; ``"D"`` and ``"NR"`` are unchanged.
+            e.g. ``"Baa1"`` for BBB+; ``"NR"`` stays ``"NR"``.
 
-        Notes
-        -----
-        This method does not raise.
+        Raises
+        ------
+        ValueError
+            For ``D``: Moody's long-term scale has no D grade.
         """
         ...
 
@@ -806,13 +812,14 @@ class CreditRating:
         -------
         int
             Positive when *other* is weaker, negative when stronger, zero when
-            equal; ``a.notches_to(b) == -b.notches_to(a)``. ``NR`` counts as
-            one notch below ``C``.
+            equal; ``a.notches_to(b) == -b.notches_to(a)``; ``C`` to ``D`` is
+            one step.
 
         Raises
         ------
         ValueError
-            If *other* is a string that is not a recognised rating.
+            If *other* is a string that is not a recognised rating, or either
+            side is ``NR``.
         """
         ...
 

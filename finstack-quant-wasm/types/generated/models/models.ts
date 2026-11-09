@@ -5833,6 +5833,10 @@ export interface PositionRiskRequest {
 export interface RatingFactorTable {
   agency: string;
   default_factor: number;
+  /**
+   * Factors in rating-ladder order (`NR` first); ratings have no total
+   * order, so the map keeps a deterministic storage order instead.
+   */
   factors: {
     [k: string]: number;
   };

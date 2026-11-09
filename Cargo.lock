@@ -871,6 +871,7 @@ dependencies = [
  "finstack-quant-cashflows",
  "finstack-quant-core",
  "finstack-quant-test-utils",
+ "indexmap",
  "jsonschema",
  "nalgebra",
  "num-complex",

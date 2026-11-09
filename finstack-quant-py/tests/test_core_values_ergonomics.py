@@ -60,7 +60,15 @@ class TestCreditRating:
         assert CreditRating.BBB_PLUS.to_moodys_string() == "Baa1"
 
     def test_ordering_and_typed_equality(self) -> None:
-        assert CreditRating.AAA < CreditRating.BBB < CreditRating.C < CreditRating.NR < CreditRating.D
+        assert CreditRating.AAA < CreditRating.BBB < CreditRating.C < CreditRating.D
+        # NR is unrated status: equal to itself, not ordered against a rated value.
+        assert CreditRating("unrated") == CreditRating.NR
+        with pytest.raises(TypeError, match="NR"):
+            _ = CreditRating.NR < CreditRating.D
+        with pytest.raises(ValueError, match="NR has no ladder distance"):
+            CreditRating.NR.notches_to(CreditRating.BBB)
+        with pytest.raises(ValueError, match="no Moody's long-term equivalent"):
+            CreditRating.D.to_moodys_string()
         assert CreditRating("BBB") == CreditRating.BBB
         assert CreditRating("baa2") == CreditRating.BBB
         assert CreditRating.BBB != "not a rating"

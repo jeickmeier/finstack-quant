@@ -2,6 +2,7 @@
 //! IC and borrowing-base tests placed as waterfall positions.
 
 use super::*;
+use indexmap::IndexMap;
 
 /// Collateral valuation rules for the OC tests: rating haircuts, the value
 /// carried for defaulted collateral, the excess-CCC bucket and discount
@@ -19,7 +20,7 @@ pub struct CoverageRules {
     /// materialized instrument collateral are unrated by construction and
     /// stay at par. Empty (the indenture par-value convention) by default.
     #[serde(default)]
-    pub rating_haircuts: BTreeMap<CreditRating, f64>,
+    pub rating_haircuts: IndexMap<CreditRating, f64>,
     /// Value carried for defaulted collateral whose recovery cash has not yet
     /// arrived.
     #[serde(default)]
@@ -86,7 +87,7 @@ impl CoverageRules {
     #[must_use]
     pub fn clo_standard() -> Self {
         Self {
-            rating_haircuts: BTreeMap::new(),
+            rating_haircuts: IndexMap::new(),
             defaulted_valuation: DefaultedValuation::Recovery,
             ccc_bucket: Some(CccBucketRule {
                 threshold_pct: 7.5,
@@ -357,7 +358,7 @@ impl<'de> Deserialize<'de> for CoverageRules {
         #[serde(deny_unknown_fields)]
         struct Wire {
             #[serde(default)]
-            rating_haircuts: BTreeMap<CreditRating, f64>,
+            rating_haircuts: IndexMap<CreditRating, f64>,
 
             #[serde(default)]
             defaulted_valuation: DefaultedValuation,

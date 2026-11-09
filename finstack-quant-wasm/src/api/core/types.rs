@@ -620,12 +620,18 @@ impl JsCreditRating {
         self.inner.is_default()
     }
 
-    /// Moody's spelling of the rating, such as `"Baa3"` for `BBB-`.
+    /// Moody's spelling of the rating, such as `"Baa3"` for `BBB-`; `NR`
+    /// renders as `"NR"`.
     ///
     /// @returns The Moody's rating text.
+    /// @throws `FinstackError` (kind `validation`) for `D`, which has no
+    /// Moody's long-term grade.
     #[wasm_bindgen(js_name = toMoodysString)]
-    pub fn to_moodys_string(&self) -> String {
-        self.inner.to_moodys_string().to_string()
+    pub fn to_moodys_string(&self) -> Result<String, JsValue> {
+        self.inner
+            .to_moodys_string()
+            .map(str::to_string)
+            .map_err(to_js_err)
     }
 
     /// Signed notch distance to another rating (Rust `CreditRating::notches_to`).
@@ -635,10 +641,10 @@ impl JsCreditRating {
     /// * `other` - Rating text to measure against (S&P/Fitch or Moody's
     ///   spelling; use `rating.toString()` for a `CreditRating`).
     ///
-    /// @returns Notches from this rating to `other`: positive when `other` is
-    /// weaker, negative when stronger. `NR` sits between `C` and `D`.
+    /// @returns Ladder steps from this rating to `other`: positive when `other`
+    /// is weaker, negative when stronger (`C` to `D` is one step).
     /// @throws `TypeError` if `other` is not a string; `FinstackError` (kind
-    /// `validation`) if it is not a rating.
+    /// `validation`) if it is not a rating or either side is `NR`.
     /// @param other - Rating text to measure against (S&P/Fitch or Moody's spelling; use `rating.toString()` for a `CreditRating`).
     #[wasm_bindgen(js_name = notchesTo)]
     pub fn notches_to(
@@ -646,7 +652,7 @@ impl JsCreditRating {
         #[wasm_bindgen(unchecked_param_type = "string")] other: JsValue,
     ) -> Result<i32, JsValue> {
         let other = js_string(&other, "other")?.parse().map_err(to_js_err)?;
-        Ok(self.inner.notches_to(other))
+        self.inner.notches_to(other).map_err(to_js_err)
     }
 
     /// Serialize to the canonical JSON wire form (the quoted S&P/Fitch spelling).

@@ -8868,7 +8868,7 @@ export default [
   {
     "path": "#/$defs/CreditRating",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CreditRating",
-    "description": "Unified credit rating scale with notch-level precision (agency-agnostic).\n\nEach variant represents a specific notch in the rating scale. Ratings\nwithout a `Plus`/`Minus` suffix represent the \"flat\" (middle) notch.\n\n| Variant     | S&P/Fitch | Moody's |\n|-------------|-----------|---------|\n| `AAA`       | AAA       | Aaa     |\n| `AAPlus`    | AA+       | Aa1     |\n| `AA`        | AA        | Aa2     |\n| `AAMinus`   | AA-       | Aa3     |\n| `APlus`     | A+        | A1      |\n| `A`         | A         | A2      |\n| `AMinus`    | A-        | A3      |\n| `BBBPlus`   | BBB+      | Baa1    |\n| `BBB`       | BBB       | Baa2    |\n| `BBBMinus`  | BBB-      | Baa3    |\n| `BBPlus`    | BB+       | Ba1     |\n| `BB`        | BB        | Ba2     |\n| `BBMinus`   | BB-       | Ba3     |\n| `BPlus`     | B+        | B1      |\n| `B`         | B         | B2      |\n| `BMinus`    | B-        | B3      |\n| `CCCPlus`   | CCC+      | Caa1    |\n| `CCC`       | CCC       | Caa2    |\n| `CCCMinus`  | CCC-      | Caa3    |\n| `CC`        | CC        | Ca      |\n| `C`         | C         | C       |\n| `D`         | D         | D       |\n| `NR`        | NR        | NR      |\n\n# Investment Grade\n\nRatings of `BBBMinus` and above are considered \"investment grade\".\nOrdering follows the `repr(u8)` discriminant, so `NR` (21) sorts before\n`D` (22) even though `D` is declared first:\n\n```rust\nuse finstack_quant_core::types::CreditRating;\n\nassert!(CreditRating::A.is_investment_grade());\nassert!(CreditRating::BBBMinus.is_investment_grade());\nassert!(!CreditRating::BBPlus.is_investment_grade());\nassert!(CreditRating::C < CreditRating::NR && CreditRating::NR < CreditRating::D);\n```"
+    "description": "Unified credit rating scale with notch-level precision (agency-agnostic).\n\nEach variant represents a specific notch in the rating scale. Ratings\nwithout a `Plus`/`Minus` suffix represent the \"flat\" (middle) notch.\n\n| Variant     | S&P/Fitch | Moody's |\n|-------------|-----------|---------|\n| `AAA`       | AAA       | Aaa     |\n| `AAPlus`    | AA+       | Aa1     |\n| `AA`        | AA        | Aa2     |\n| `AAMinus`   | AA-       | Aa3     |\n| `APlus`     | A+        | A1      |\n| `A`         | A         | A2      |\n| `AMinus`    | A-        | A3      |\n| `BBBPlus`   | BBB+      | Baa1    |\n| `BBB`       | BBB       | Baa2    |\n| `BBBMinus`  | BBB-      | Baa3    |\n| `BBPlus`    | BB+       | Ba1     |\n| `BB`        | BB        | Ba2     |\n| `BBMinus`   | BB-       | Ba3     |\n| `BPlus`     | B+        | B1      |\n| `B`         | B         | B2      |\n| `BMinus`    | B-        | B3      |\n| `CCCPlus`   | CCC+      | Caa1    |\n| `CCC`       | CCC       | Caa2    |\n| `CCCMinus`  | CCC-      | Caa3    |\n| `CC`        | CC        | Ca      |\n| `C`         | C         | C       |\n| `D`         | D         | (none)  |\n| `NR`        | NR        | NR      |\n\n# Ladder, ordering and grades\n\nThe rated ladder is consecutive, `AAA` = 0 through `C` = 20 and `D` = 21:\nlibrary notch positions, not equally spaced risks. `NR` is explicit\nunrated status outside the ladder (CORE-CONVENTIONS-019). Ratings are\npartially ordered: rated values compare by ladder position (`<` means\nbetter quality), `NR` is incomparable with every rated value and equal to\nitself. There is no total order, so a rating cannot key an ordered map.\n\nInvestment grade is `AAA` through `BBB-`; speculative grade is `BB+`\nthrough `D`, so `D` is both speculative and the generic default marker.\n`NR` is neither.\n\n```rust\nuse finstack_quant_core::types::CreditRating;\n\nassert!(CreditRating::A.is_investment_grade());\nassert!(CreditRating::BBBMinus.is_investment_grade());\nassert!(!CreditRating::BBPlus.is_investment_grade());\nassert!(CreditRating::C < CreditRating::D);\nassert_eq!(CreditRating::C.partial_cmp(&CreditRating::NR), None);\n```"
   },
   {
     "path": "#/$defs/CreditRating/oneOf/0",
@@ -8952,19 +8952,19 @@ export default [
     "path": "#/$defs/CreditRating/oneOf/20",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CreditRating/oneOf/20",
     "const": "C",
-    "description": "C — Lowest rated, typically in default"
+    "description": "C — lowest rated quality"
   },
   {
     "path": "#/$defs/CreditRating/oneOf/21",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CreditRating/oneOf/21",
     "const": "D",
-    "description": "D — In default. Discriminant 22, so this sorts after `NR`."
+    "description": "D — the generic default marker; ladder position 21, after `C`."
   },
   {
     "path": "#/$defs/CreditRating/oneOf/22",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CreditRating/oneOf/22",
     "const": "NR",
-    "description": "NR — Not rated. Discriminant 21, between `C` and `D`."
+    "description": "NR — explicit unrated status, outside the rated ladder."
   },
   {
     "path": "#/$defs/CreditRating/oneOf/3",
@@ -9000,13 +9000,13 @@ export default [
     "path": "#/$defs/CreditRating/oneOf/8",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CreditRating/oneOf/8",
     "const": "BBB",
-    "description": "BBB / Baa2 — Medium grade, moderate credit risk (lowest investment grade)"
+    "description": "BBB / Baa2 — Medium grade, moderate credit risk"
   },
   {
     "path": "#/$defs/CreditRating/oneOf/9",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CreditRating/oneOf/9",
     "const": "BBB-",
-    "description": "BBB- / Baa3"
+    "description": "BBB- / Baa3 — lowest investment grade"
   },
   {
     "path": "#/$defs/CreditSpreadProcessSpec",
