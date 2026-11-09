@@ -27,14 +27,35 @@ fn rule_fixed_no_observation() {
     let rule = Rule::fixed(Month::July, 4);
 
     // Should match exact date in any year
-    assert!(rule.applies(make_date(2025, 7, 4)));
-    assert!(rule.applies(make_date(2024, 7, 4)));
-    assert!(rule.applies(make_date(2026, 7, 4)));
+    assert!(
+        rule.applies(make_date(2025, 7, 4))
+            .expect("rule evaluation")
+    );
+    assert!(
+        rule.applies(make_date(2024, 7, 4))
+            .expect("rule evaluation")
+    );
+    assert!(
+        rule.applies(make_date(2026, 7, 4))
+            .expect("rule evaluation")
+    );
 
     // Should not match other dates
-    assert!(!rule.applies(make_date(2025, 7, 5)));
-    assert!(!rule.applies(make_date(2025, 7, 3)));
-    assert!(!rule.applies(make_date(2025, 6, 4)));
+    assert!(
+        !rule
+            .applies(make_date(2025, 7, 5))
+            .expect("rule evaluation")
+    );
+    assert!(
+        !rule
+            .applies(make_date(2025, 7, 3))
+            .expect("rule evaluation")
+    );
+    assert!(
+        !rule
+            .applies(make_date(2025, 6, 4))
+            .expect("rule evaluation")
+    );
 }
 
 #[test]
@@ -46,15 +67,32 @@ fn rule_fixed_next_monday() {
     };
 
     // 2023: Jan 1 is Sunday, observed on Monday Jan 2
-    assert!(!rule.applies(make_date(2023, 1, 1)));
-    assert!(rule.applies(make_date(2023, 1, 2)));
+    assert!(
+        !rule
+            .applies(make_date(2023, 1, 1))
+            .expect("rule evaluation")
+    );
+    assert!(
+        rule.applies(make_date(2023, 1, 2))
+            .expect("rule evaluation")
+    );
 
     // 2024: Jan 1 is Monday, observed same day
-    assert!(rule.applies(make_date(2024, 1, 1)));
+    assert!(
+        rule.applies(make_date(2024, 1, 1))
+            .expect("rule evaluation")
+    );
 
     // 2022: Jan 1 is Saturday, observed on Monday Jan 3
-    assert!(!rule.applies(make_date(2022, 1, 1)));
-    assert!(rule.applies(make_date(2022, 1, 3)));
+    assert!(
+        !rule
+            .applies(make_date(2022, 1, 1))
+            .expect("rule evaluation")
+    );
+    assert!(
+        rule.applies(make_date(2022, 1, 3))
+            .expect("rule evaluation")
+    );
 }
 
 #[test]
@@ -66,15 +104,32 @@ fn rule_fixed_fri_if_sat_mon_if_sun() {
     };
 
     // 2026: July 4 is Saturday, observed on Friday July 3
-    assert!(rule.applies(make_date(2026, 7, 3)));
-    assert!(!rule.applies(make_date(2026, 7, 4)));
+    assert!(
+        rule.applies(make_date(2026, 7, 3))
+            .expect("rule evaluation")
+    );
+    assert!(
+        !rule
+            .applies(make_date(2026, 7, 4))
+            .expect("rule evaluation")
+    );
 
     // 2027: July 4 is Sunday, observed on Monday July 5
-    assert!(!rule.applies(make_date(2027, 7, 4)));
-    assert!(rule.applies(make_date(2027, 7, 5)));
+    assert!(
+        !rule
+            .applies(make_date(2027, 7, 4))
+            .expect("rule evaluation")
+    );
+    assert!(
+        rule.applies(make_date(2027, 7, 5))
+            .expect("rule evaluation")
+    );
 
     // 2025: July 4 is Friday, observed same day
-    assert!(rule.applies(make_date(2025, 7, 4)));
+    assert!(
+        rule.applies(make_date(2025, 7, 4))
+            .expect("rule evaluation")
+    );
 }
 
 #[test]
@@ -99,11 +154,22 @@ fn rule_fixed_feb_29_leap_year() {
     };
 
     // Feb 29 exists in 2024 (leap year)
-    assert!(rule.applies(make_date(2024, 2, 29)));
+    assert!(
+        rule.applies(make_date(2024, 2, 29))
+            .expect("rule evaluation")
+    );
 
     // Feb 29 doesn't exist in 2023 - shouldn't match any date
-    assert!(!rule.applies(make_date(2023, 2, 28)));
-    assert!(!rule.applies(make_date(2023, 3, 1)));
+    assert!(
+        !rule
+            .applies(make_date(2023, 2, 28))
+            .expect("rule evaluation")
+    );
+    assert!(
+        !rule
+            .applies(make_date(2023, 3, 1))
+            .expect("rule evaluation")
+    );
 }
 
 #[test]
@@ -115,8 +181,7 @@ fn rule_fixed_materialize_feb_29_non_leap() {
     };
 
     // Non-leap year 2023
-    let mut out = SmallVec::<[Date; 1]>::new();
-    rule.materialize_year(2023, &mut out);
+    let out = rule.materialize_nominal(2023).expect("rule evaluation");
 
     // Should not produce any dates (invalid date in non-leap year)
     assert!(
@@ -135,7 +200,7 @@ fn rule_fixed_materialize_feb_29_leap() {
 
     // Leap year 2024
     let mut out = SmallVec::<[Date; 1]>::new();
-    rule.materialize_year(2024, &mut out);
+    out.extend(rule.materialize_nominal(2024).expect("rule evaluation"));
 
     // Should produce Feb 29, 2024
     assert_eq!(out.len(), 1);
@@ -147,7 +212,7 @@ fn rule_materialize_year_fixed() {
     let rule = Rule::fixed(Month::July, 4);
     let mut out = SmallVec::<[Date; 16]>::new();
 
-    rule.materialize_year(2025, &mut out);
+    out.extend(rule.materialize_nominal(2025).expect("rule evaluation"));
 
     assert_eq!(out.len(), 1);
     assert_eq!(out[0], make_date(2025, 7, 4));
@@ -165,9 +230,20 @@ fn rule_nth_weekday_positive() {
     };
 
     // 2025: Third Monday is Jan 20
-    assert!(rule.applies(make_date(2025, 1, 20)));
-    assert!(!rule.applies(make_date(2025, 1, 13))); // Second Monday
-    assert!(!rule.applies(make_date(2025, 1, 27))); // Fourth Monday
+    assert!(
+        rule.applies(make_date(2025, 1, 20))
+            .expect("rule evaluation")
+    );
+    assert!(
+        !rule
+            .applies(make_date(2025, 1, 13))
+            .expect("rule evaluation")
+    ); // Second Monday
+    assert!(
+        !rule
+            .applies(make_date(2025, 1, 27))
+            .expect("rule evaluation")
+    ); // Fourth Monday
 }
 
 #[test]
@@ -180,8 +256,15 @@ fn rule_nth_weekday_negative() {
     };
 
     // 2025: Last Monday of May is May 26
-    assert!(rule.applies(make_date(2025, 5, 26)));
-    assert!(!rule.applies(make_date(2025, 5, 19))); // Second-to-last Monday
+    assert!(
+        rule.applies(make_date(2025, 5, 26))
+            .expect("rule evaluation")
+    );
+    assert!(
+        !rule
+            .applies(make_date(2025, 5, 19))
+            .expect("rule evaluation")
+    ); // Second-to-last Monday
 }
 
 #[test]
@@ -194,7 +277,7 @@ fn rule_nth_weekday_fifth_occurrence() {
     };
 
     let mut out = SmallVec::<[Date; 1]>::new();
-    rule.materialize_year(2025, &mut out);
+    out.extend(rule.materialize_nominal(2025).expect("rule evaluation"));
 
     // December 2025 has 5 Mondays: 1, 8, 15, 22, 29
     assert_eq!(out.len(), 1);
@@ -211,7 +294,7 @@ fn rule_nth_weekday_second_to_last() {
     };
 
     let mut out = SmallVec::<[Date; 1]>::new();
-    rule.materialize_year(2025, &mut out);
+    out.extend(rule.materialize_nominal(2025).expect("rule evaluation"));
 
     assert_eq!(out.len(), 1);
     // November 2025: Fridays are 7, 14, 21, 28
@@ -228,7 +311,7 @@ fn rule_materialize_year_nth_weekday() {
     };
     let mut out = SmallVec::<[Date; 16]>::new();
 
-    rule.materialize_year(2025, &mut out);
+    out.extend(rule.materialize_nominal(2025).expect("rule evaluation"));
 
     assert_eq!(out.len(), 1);
     // 2025: Fourth Thursday of November is Nov 27
@@ -248,8 +331,15 @@ fn rule_weekday_shift_after() {
     };
 
     // 2025: May 25 is Sunday, first Monday after is May 26
-    assert!(rule.applies(make_date(2025, 5, 26)));
-    assert!(!rule.applies(make_date(2025, 5, 25)));
+    assert!(
+        rule.applies(make_date(2025, 5, 26))
+            .expect("rule evaluation")
+    );
+    assert!(
+        !rule
+            .applies(make_date(2025, 5, 25))
+            .expect("rule evaluation")
+    );
 }
 
 #[test]
@@ -263,9 +353,20 @@ fn rule_weekday_shift_before() {
     };
 
     // 2025: May 25 is Sunday, first Monday before is May 19
-    assert!(rule.applies(make_date(2025, 5, 19)));
-    assert!(!rule.applies(make_date(2025, 5, 25)));
-    assert!(!rule.applies(make_date(2025, 5, 26)));
+    assert!(
+        rule.applies(make_date(2025, 5, 19))
+            .expect("rule evaluation")
+    );
+    assert!(
+        !rule
+            .applies(make_date(2025, 5, 25))
+            .expect("rule evaluation")
+    );
+    assert!(
+        !rule
+            .applies(make_date(2025, 5, 26))
+            .expect("rule evaluation")
+    );
 }
 
 #[test]
@@ -278,7 +379,10 @@ fn rule_weekday_shift_on_weekday() {
         dir: Direction::After,
     };
 
-    assert!(rule.applies(make_date(2025, 1, 6)));
+    assert!(
+        rule.applies(make_date(2025, 1, 6))
+            .expect("rule evaluation")
+    );
 }
 
 #[test]
@@ -292,7 +396,7 @@ fn rule_weekday_shift_materialize() {
     };
 
     let mut out = SmallVec::<[Date; 1]>::new();
-    rule.materialize_year(2024, &mut out);
+    out.extend(rule.materialize_nominal(2024).expect("rule evaluation"));
 
     // 2024: Nov 2 is Saturday, first Tuesday after is Nov 5
     assert_eq!(out.len(), 1);
@@ -310,7 +414,7 @@ fn rule_weekday_shift_before_materialize() {
     };
 
     let mut out = SmallVec::<[Date; 1]>::new();
-    rule.materialize_year(2025, &mut out);
+    out.extend(rule.materialize_nominal(2025).expect("rule evaluation"));
 
     assert_eq!(out.len(), 1);
     assert_eq!(out[0].weekday(), Weekday::Friday);
@@ -328,7 +432,10 @@ fn direction_after_finds_same_day() {
         dir: Direction::After,
     };
 
-    assert!(rule.applies(make_date(2025, 1, 1)));
+    assert!(
+        rule.applies(make_date(2025, 1, 1))
+            .expect("rule evaluation")
+    );
 }
 
 #[test]
@@ -341,7 +448,10 @@ fn direction_before_finds_same_day() {
         dir: Direction::Before,
     };
 
-    assert!(rule.applies(make_date(2025, 1, 1)));
+    assert!(
+        rule.applies(make_date(2025, 1, 1))
+            .expect("rule evaluation")
+    );
 }
 
 // Easter-Based Rules
@@ -352,11 +462,21 @@ fn rule_easter_offset() {
     let rule = Rule::EasterOffset(-3);
 
     // 2025: Easter Monday is April 21, Good Friday is April 18
-    assert!(rule.applies(make_date(2025, 4, 18)));
-    assert!(!rule.applies(make_date(2025, 4, 21)));
+    assert!(
+        rule.applies(make_date(2025, 4, 18))
+            .expect("rule evaluation")
+    );
+    assert!(
+        !rule
+            .applies(make_date(2025, 4, 21))
+            .expect("rule evaluation")
+    );
 
     // 2024: Easter Monday is April 1, Good Friday is March 29
-    assert!(rule.applies(make_date(2024, 3, 29)));
+    assert!(
+        rule.applies(make_date(2024, 3, 29))
+            .expect("rule evaluation")
+    );
 }
 
 #[test]
@@ -364,7 +484,7 @@ fn rule_materialize_year_easter_offset() {
     let rule = Rule::EasterOffset(-3); // Good Friday
     let mut out = SmallVec::<[Date; 16]>::new();
 
-    rule.materialize_year(2025, &mut out);
+    out.extend(rule.materialize_nominal(2025).expect("rule evaluation"));
 
     assert_eq!(out.len(), 1);
     assert_eq!(out[0], make_date(2025, 4, 18));
@@ -392,7 +512,7 @@ fn rule_easter_known_dates_2020_2030() {
     for (year, month, day) in known_easter_mondays {
         let expected = make_date(year, month, day);
         assert!(
-            rule.applies(expected),
+            rule.applies(expected).expect("rule evaluation"),
             "Easter Monday {} should be {:?}",
             year,
             expected
@@ -409,8 +529,16 @@ fn rule_good_friday_is_3_days_before_easter_monday() {
         let mut gf_out = SmallVec::<[Date; 1]>::new();
         let mut em_out = SmallVec::<[Date; 1]>::new();
 
-        good_friday.materialize_year(year, &mut gf_out);
-        easter_monday.materialize_year(year, &mut em_out);
+        gf_out.extend(
+            good_friday
+                .materialize_nominal(year)
+                .expect("rule evaluation"),
+        );
+        em_out.extend(
+            easter_monday
+                .materialize_nominal(year)
+                .expect("rule evaluation"),
+        );
 
         assert_eq!(gf_out.len(), 1);
         assert_eq!(em_out.len(), 1);
@@ -433,8 +561,16 @@ fn rule_easter_sunday_is_1_day_before_easter_monday() {
         let mut sun_out = SmallVec::<[Date; 1]>::new();
         let mut mon_out = SmallVec::<[Date; 1]>::new();
 
-        easter_sunday.materialize_year(year, &mut sun_out);
-        easter_monday.materialize_year(year, &mut mon_out);
+        sun_out.extend(
+            easter_sunday
+                .materialize_nominal(year)
+                .expect("rule evaluation"),
+        );
+        mon_out.extend(
+            easter_monday
+                .materialize_nominal(year)
+                .expect("rule evaluation"),
+        );
 
         assert_eq!(sun_out.len(), 1);
         assert_eq!(mon_out.len(), 1);
@@ -464,10 +600,16 @@ fn rule_qing_ming() {
 
     // Qing Ming is typically around April 4-5
     // 2024: April 4
-    assert!(rule.applies(make_date(2024, 4, 4)));
+    assert!(
+        rule.applies(make_date(2024, 4, 4))
+            .expect("rule evaluation")
+    );
 
     // 2025: April 4
-    assert!(rule.applies(make_date(2025, 4, 4)));
+    assert!(
+        rule.applies(make_date(2025, 4, 4))
+            .expect("rule evaluation")
+    );
 }
 
 #[test]
@@ -563,9 +705,20 @@ fn rule_observed_friday_for_saturday() {
 
     // 2020: July 4 is Saturday
     // Observed on Friday July 3
-    assert!(rule.applies(make_date(2020, 7, 3)));
-    assert!(!rule.applies(make_date(2020, 7, 4)));
-    assert!(!rule.applies(make_date(2020, 7, 6)));
+    assert!(
+        rule.applies(make_date(2020, 7, 3))
+            .expect("rule evaluation")
+    );
+    assert!(
+        !rule
+            .applies(make_date(2020, 7, 4))
+            .expect("rule evaluation")
+    );
+    assert!(
+        !rule
+            .applies(make_date(2020, 7, 6))
+            .expect("rule evaluation")
+    );
 }
 
 #[test]
@@ -578,9 +731,20 @@ fn rule_observed_monday_for_sunday() {
 
     // 2021: July 4 is Sunday
     // Observed on Monday July 5
-    assert!(rule.applies(make_date(2021, 7, 5)));
-    assert!(!rule.applies(make_date(2021, 7, 4)));
-    assert!(!rule.applies(make_date(2021, 7, 2)));
+    assert!(
+        rule.applies(make_date(2021, 7, 5))
+            .expect("rule evaluation")
+    );
+    assert!(
+        !rule
+            .applies(make_date(2021, 7, 4))
+            .expect("rule evaluation")
+    );
+    assert!(
+        !rule
+            .applies(make_date(2021, 7, 2))
+            .expect("rule evaluation")
+    );
 }
 
 #[test]
@@ -593,8 +757,15 @@ fn rule_observed_next_monday_saturday() {
 
     // 2021: Dec 25 is Saturday
     // UK style: observed on Monday Dec 27
-    assert!(rule.applies(make_date(2021, 12, 27)));
-    assert!(!rule.applies(make_date(2021, 12, 25)));
+    assert!(
+        rule.applies(make_date(2021, 12, 27))
+            .expect("rule evaluation")
+    );
+    assert!(
+        !rule
+            .applies(make_date(2021, 12, 25))
+            .expect("rule evaluation")
+    );
 }
 
 #[test]
@@ -607,8 +778,15 @@ fn rule_observed_next_monday_sunday() {
 
     // 2022: Dec 25 is Sunday
     // UK style: observed on Monday Dec 26
-    assert!(rule.applies(make_date(2022, 12, 26)));
-    assert!(!rule.applies(make_date(2022, 12, 25)));
+    assert!(
+        rule.applies(make_date(2022, 12, 26))
+            .expect("rule evaluation")
+    );
+    assert!(
+        !rule
+            .applies(make_date(2022, 12, 25))
+            .expect("rule evaluation")
+    );
 }
 
 // Rule Combinations
@@ -702,19 +880,33 @@ fn rule_fixed_observance_crosses_year_boundary() {
 
     // materialize_year(2022) yields the observed date Dec 31, 2021.
     let mut out: SmallVec<[Date; 8]> = SmallVec::new();
-    rule.materialize_year(2022, &mut out);
+    out.extend(rule.materialize_nominal(2022).expect("rule evaluation"));
     assert_eq!(out.as_slice(), &[make_date(2021, 12, 31)]);
 
     // applies() on the materialized date must agree (previously false because
     // the base was reconstructed only from date.year() == 2021).
-    assert!(rule.applies(make_date(2021, 12, 31)));
+    assert!(
+        rule.applies(make_date(2021, 12, 31))
+            .expect("rule evaluation")
+    );
 
     // The unobserved Saturday itself is not a holiday under this rule.
-    assert!(!rule.applies(make_date(2022, 1, 1)));
+    assert!(
+        !rule
+            .applies(make_date(2022, 1, 1))
+            .expect("rule evaluation")
+    );
 
     // Sanity: a year where Jan 1 is a weekday is unaffected.
-    assert!(rule.applies(make_date(2025, 1, 1)));
-    assert!(!rule.applies(make_date(2024, 12, 31)));
+    assert!(
+        rule.applies(make_date(2025, 1, 1))
+            .expect("rule evaluation")
+    );
+    assert!(
+        !rule
+            .applies(make_date(2024, 12, 31))
+            .expect("rule evaluation")
+    );
 }
 
 // Nth weekday occurrence overflow
@@ -730,10 +922,14 @@ fn rule_nth_weekday_overflow_does_not_spill_into_next_month() {
         month: Month::February,
     };
 
-    assert!(!rule.applies(make_date(2025, 3, 3)));
+    assert!(
+        !rule
+            .applies(make_date(2025, 3, 3))
+            .expect("rule evaluation")
+    );
 
     let mut out: SmallVec<[Date; 8]> = SmallVec::new();
-    rule.materialize_year(2025, &mut out);
+    out.extend(rule.materialize_nominal(2025).expect("rule evaluation"));
     assert!(out.is_empty(), "no 5th Monday exists in Feb 2025: {out:?}");
 
     // A month that DOES have five Mondays still works (June 2025: 2, 9, 16,
@@ -743,7 +939,11 @@ fn rule_nth_weekday_overflow_does_not_spill_into_next_month() {
         weekday: Weekday::Monday,
         month: Month::June,
     };
-    assert!(rule_june.applies(make_date(2025, 6, 30)));
+    assert!(
+        rule_june
+            .applies(make_date(2025, 6, 30))
+            .expect("rule evaluation")
+    );
 
     // Negative overflow: "-5th Monday" of Feb 2025 must not reach January.
     let rule_neg = Rule::NthWeekday {
@@ -751,9 +951,13 @@ fn rule_nth_weekday_overflow_does_not_spill_into_next_month() {
         weekday: Weekday::Monday,
         month: Month::February,
     };
-    assert!(!rule_neg.applies(make_date(2025, 1, 27)));
+    assert!(
+        !rule_neg
+            .applies(make_date(2025, 1, 27))
+            .expect("rule evaluation")
+    );
     let mut out_neg: SmallVec<[Date; 8]> = SmallVec::new();
-    rule_neg.materialize_year(2025, &mut out_neg);
+    out_neg.extend(rule_neg.materialize_nominal(2025).expect("rule evaluation"));
     assert!(out_neg.is_empty());
 }
 
@@ -782,7 +986,9 @@ fn japan_public_holidays_match_cabinet_office_1970_through_2027() {
                 continue;
             };
             assert_eq!(
-                Rule::JapanPublicHolidays.applies(date),
+                Rule::JapanPublicHolidays
+                    .applies(date)
+                    .expect("rule evaluation"),
                 expected.contains(&date),
                 "national/citizens/substitute holiday {date}"
             );
@@ -835,7 +1041,8 @@ fn builtin_holiday_tables_match_the_golden_digest() {
             for year in 1990..=2040 {
                 let mut dates = SmallVec::<[Date; 64]>::new();
                 for rule in calendar.rules {
-                    rule.dates_in_year(year, &mut dates);
+                    rule.dates_in_year(year, &mut dates)
+                        .expect("rule evaluation");
                 }
                 holidays.extend(dates);
             }
@@ -861,4 +1068,124 @@ fn builtin_holiday_tables_match_the_golden_digest() {
         .map(|(id, count, digest)| format!("        (\"{id}\", {count}, 0x{digest:016x}),\n"))
         .collect();
     assert_eq!(actual, EXPECTED, "current table:\n{rendered}");
+}
+
+// --- CORE-CONVENTIONS-004 engine semantics -------------------------------
+
+#[test]
+fn lunar_tables_stay_inside_declared_windows() {
+    use super::rule::{CNY_REACH, DRAGON_BOAT_REACH, MID_AUTUMN_REACH, QING_MING_REACH};
+    type LunarTable = (fn(i32) -> Option<Date>, (i64, i64), &'static str);
+    let tables: [LunarTable; 4] = [
+        (algo::cny_date, CNY_REACH, "cny"),
+        (algo::qing_ming_date, QING_MING_REACH, "qing ming"),
+        (algo::dragon_boat_date, DRAGON_BOAT_REACH, "dragon boat"),
+        (algo::mid_autumn_date, MID_AUTUMN_REACH, "mid-autumn"),
+    ];
+    for (lookup, (lo, hi), name) in tables {
+        for year in algo::BASE_YEAR..=algo::END_YEAR {
+            let date = lookup(year).unwrap_or_else(|| panic!("{name} {year} in table"));
+            let offset = i64::from(date.ordinal()) - 1;
+            assert!(
+                (lo..=hi).contains(&offset),
+                "{name} {date} offset {offset} outside declared window {lo}..={hi}"
+            );
+        }
+    }
+}
+
+#[test]
+fn missing_lunar_table_years_error_but_irrelevant_neighbours_do_not() {
+    let cny = Rule::ChineseNewYear;
+    assert!(cny.materialize_nominal(algo::BASE_YEAR - 1).is_err());
+    assert!(cny.applies(make_date(1960, 2, 1)).is_err());
+    // Early January 1970 cannot be reached by the (missing) 1969 festival.
+    assert!(
+        !cny.applies(make_date(1970, 1, 5))
+            .expect("no 1969 dependency")
+    );
+    assert!(cny.applies(make_date(2151, 3, 1)).is_err());
+}
+
+#[test]
+fn invalid_rule_definitions_are_errors_not_absence() {
+    for n in [0_i8, 6, -6] {
+        let rule = Rule::NthWeekday {
+            n,
+            weekday: Weekday::Monday,
+            month: Month::June,
+        };
+        assert!(rule.materialize_nominal(2025).is_err(), "ordinal {n}");
+    }
+    // A valid fifth occurrence that does not exist is an empty result.
+    let fifth = Rule::NthWeekday {
+        n: 5,
+        weekday: Weekday::Monday,
+        month: Month::February,
+    };
+    assert!(fifth.materialize_nominal(2025).expect("valid").is_empty());
+    // April 31 is invalid; February 29 is a valid pattern absent in 2025.
+    assert!(
+        Rule::fixed(Month::April, 31)
+            .materialize_nominal(2025)
+            .is_err()
+    );
+    assert!(
+        Rule::fixed(Month::February, 29)
+            .materialize_nominal(2025)
+            .expect("valid")
+            .is_empty()
+    );
+    static ANCHOR: Rule = Rule::fixed(Month::May, 1);
+    let empty_span = Rule::Span {
+        start: &ANCHOR,
+        len: 0,
+        offset: 0,
+    };
+    assert!(empty_span.materialize_nominal(2025).is_err());
+    assert!(Rule::EasterOffset(0).materialize_nominal(0).is_err());
+    assert!(Rule::EasterOffset(0).materialize_nominal(-5).is_err());
+}
+
+#[test]
+fn effective_range_gates_the_nominal_year_and_keeps_spillovers() {
+    static NEW_YEAR: Rule = Rule::Fixed {
+        month: Month::January,
+        day: 1,
+        observed: Observed::FriIfSatMonIfSun,
+    };
+    // 2022-01-01 is a Saturday, observed on Friday 2021-12-31.
+    let from_2022 = Rule::Effective {
+        from_year: Some(2022),
+        to_year: None,
+        inner: &NEW_YEAR,
+    };
+    assert!(
+        from_2022
+            .applies(make_date(2021, 12, 31))
+            .expect("spillover")
+    );
+    let to_2021 = Rule::Effective {
+        from_year: None,
+        to_year: Some(2021),
+        inner: &NEW_YEAR,
+    };
+    assert!(!to_2021.applies(make_date(2021, 12, 31)).expect("gated"));
+    assert!(to_2021.applies(make_date(2021, 1, 1)).expect("own year"));
+}
+
+#[test]
+fn reversed_business_day_ranges_are_errors() {
+    static RULES: [Rule; 0] = [];
+    let cal = Calendar::new("reversed", "Reversed", false, &RULES);
+    let a = make_date(2025, 1, 6);
+    let b = make_date(2025, 1, 13);
+    assert_eq!(cal.count_business_days(a, a).expect("equal"), 0);
+    assert_eq!(cal.count_business_days(a, b).expect("forward"), 5);
+    assert!(cal.count_business_days(b, a).is_err());
+    // Outside the cache window the scan path has the same contract.
+    let far_a = make_date(2200, 1, 6);
+    let far_b = make_date(2200, 1, 13);
+    assert!(cal.count_business_days(far_b, far_a).is_err());
+    assert_eq!(cal.count_business_days(far_a, far_b).expect("scan"), 5);
 }

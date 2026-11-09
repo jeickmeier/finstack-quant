@@ -2,8 +2,9 @@
 //!
 //! The `Calendar` struct provides a clean, efficient implementation supporting:
 //! - Rule-based holiday definition (see [`super::rule::Rule`])
-//! - A cache year range (`BASE_YEAR..=END_YEAR`); out-of-range queries still
-//!   evaluate but emit a one-time warning
+//! - A cache year range (`BASE_YEAR..=END_YEAR`); queries outside it are
+//!   evaluated directly and fail when a required rule input (for example a
+//!   lunar or equinox table year) is unavailable
 
 use super::algo::{BASE_YEAR, END_YEAR};
 use super::business_days::{CalendarMetadata, HolidayCalendar};
@@ -45,50 +46,38 @@ impl Calendar {
         }
     }
 
-    /// Evaluates the raw holiday rules without warnings or weekend overrides.
-    pub(super) fn holiday_from_rules(&self, date: Date) -> bool {
-        self.rules.iter().any(|rule| rule.applies(date))
+    /// Evaluates the raw holiday rules without the cache or weekend overrides.
+    ///
+    /// Every rule is evaluated, so a failure is never hidden by an earlier hit.
+    pub(super) fn holiday_from_rules(&self, date: Date) -> crate::Result<bool> {
+        let mut holiday = false;
+        for rule in self.rules {
+            holiday |= rule.applies(date)?;
+        }
+        Ok(holiday)
     }
 }
 
 impl HolidayCalendar for Calendar {
     fn is_holiday(&self, date: Date) -> crate::Result<bool> {
-        // The cache and astronomical tables use `[BASE_YEAR, END_YEAR]`; this
-        // is not the published coverage of every market calendar. Outside
-        // that window some table-based holidays are unavailable, so warn once.
-        if !(BASE_YEAR..=END_YEAR).contains(&date.year()) {
-            static ONCE: core::sync::atomic::AtomicBool =
-                core::sync::atomic::AtomicBool::new(false);
-            if !ONCE.swap(true, core::sync::atomic::Ordering::Relaxed) {
-                tracing::warn!(
-                    calendar = self.id,
-                    year = date.year(),
-                    base_year = BASE_YEAR,
-                    end_year = END_YEAR,
-                    "calendar evaluated outside its cache year range"
-                );
-            }
-        }
-        let mut is_holiday = if (BASE_YEAR..=END_YEAR).contains(&date.year()) {
-            year_cache::is_holiday_cached(self, date)
+        let is_holiday = if (BASE_YEAR..=END_YEAR).contains(&date.year()) {
+            year_cache::is_holiday_cached(self, date)?
         } else {
-            self.holiday_from_rules(date)
+            self.holiday_from_rules(date)?
         };
-
-        if self.ignore_weekends && date.is_weekend() {
-            is_holiday = false;
-        }
-
-        Ok(is_holiday)
+        Ok(is_holiday && !(self.ignore_weekends && date.is_weekend()))
     }
 
     fn is_business_day(&self, date: Date) -> crate::Result<bool> {
-        let is_weekend = date.is_weekend();
-        if (BASE_YEAR..=END_YEAR).contains(&date.year()) {
-            Ok(!is_weekend && !year_cache::is_holiday_cached(self, date))
-        } else {
-            Ok(!is_weekend && !self.is_holiday(date)?)
+        if date.is_weekend() {
+            return Ok(false);
         }
+        let holiday = if (BASE_YEAR..=END_YEAR).contains(&date.year()) {
+            year_cache::is_holiday_cached(self, date)?
+        } else {
+            self.holiday_from_rules(date)?
+        };
+        Ok(!holiday)
     }
 
     fn count_business_days(&self, start: Date, end: Date) -> crate::Result<i32> {

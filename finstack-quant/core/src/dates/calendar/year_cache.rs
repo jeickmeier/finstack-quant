@@ -75,10 +75,10 @@ fn set_holiday_bit(bits: &mut [u64; 6], ordinal: u16) {
     }
 }
 
-fn materialize(cal: &Calendar, year: i32) -> YearBits {
+fn materialize(cal: &Calendar, year: i32) -> crate::Result<YearBits> {
     let mut holidays = smallvec::SmallVec::<[Date; 64]>::new();
     for rule in cal.rules {
-        rule.dates_in_year(year, &mut holidays);
+        rule.dates_in_year(year, &mut holidays)?;
     }
     let mut holiday = [0_u64; 6];
     for date in holidays {
@@ -100,14 +100,15 @@ fn materialize(cal: &Calendar, year: i32) -> YearBits {
         bd_prefix[usize::from(ordinal)] = bd;
     }
 
-    YearBits {
+    Ok(YearBits {
         holiday,
         bd_prefix,
         last_ordinal,
-    }
+    })
 }
 
-fn year_bits(cal: &Calendar, year: i32) -> YearBits {
+/// Complete year entry for `cal`; a failed materialization is never cached.
+fn year_bits(cal: &Calendar, year: i32) -> crate::Result<YearBits> {
     let key = YearKey {
         id: cal.id,
         year,
@@ -116,22 +117,32 @@ fn year_bits(cal: &Calendar, year: i32) -> YearBits {
         rules_len: cal.rules.len(),
     };
     if let Some(bits) = recover_lock(cache().read()).get(&key).copied() {
-        return bits;
+        return Ok(bits);
     }
     let mut cache = recover_lock(cache().write());
     if let Some(bits) = cache.get(&key).copied() {
-        return bits;
+        return Ok(bits);
     }
-    let bits = materialize(cal, year);
+    let bits = materialize(cal, year)?;
     cache.insert(key, bits);
-    bits
+    Ok(bits)
 }
 
 /// Holiday lookup via the year bitset. Caller must keep `date` inside
 /// [`BASE_YEAR`, `END_YEAR`].
 #[inline]
-pub(super) fn is_holiday_cached(cal: &Calendar, date: Date) -> bool {
-    year_bits(cal, date.year()).is_holiday(date.ordinal())
+pub(super) fn is_holiday_cached(cal: &Calendar, date: Date) -> crate::Result<bool> {
+    Ok(year_bits(cal, date.year())?.is_holiday(date.ordinal()))
+}
+
+/// Reject a reversed `[start, end)` business-day range.
+pub(super) fn reject_reversed(start: Date, end: Date) -> crate::Result<()> {
+    if start > end {
+        return Err(crate::Error::Validation(format!(
+            "business-day count range is reversed: start {start} is after end {end}"
+        )));
+    }
+    Ok(())
 }
 
 /// Business days in `[start, end)` using per-year prefix sums when the
@@ -141,7 +152,8 @@ pub(super) fn count_business_days_cached(
     start: Date,
     end: Date,
 ) -> crate::Result<i32> {
-    if start >= end {
+    reject_reversed(start, end)?;
+    if start == end {
         return Ok(0);
     }
     let last = end - Duration::days(1);
@@ -153,7 +165,7 @@ pub(super) fn count_business_days_cached(
     let mut year = start.year();
     let last_year = last.year();
     while year <= last_year {
-        let bits = year_bits(cal, year);
+        let bits = year_bits(cal, year)?;
         let from = if year == start.year() {
             start.ordinal()
         } else {
@@ -201,6 +213,14 @@ mod tests {
         start: Date,
         end: Date,
     ) {
+        if start > end {
+            assert!(cal.count_business_days(start, end).is_err(), "{name}");
+            assert!(
+                DefaultScan(cal).count_business_days(start, end).is_err(),
+                "{name}"
+            );
+            return;
+        }
         let cached = cal
             .count_business_days(start, end)
             .expect("calendar lookup");
@@ -221,9 +241,9 @@ mod tests {
                     let Some(d) = Date::from_ordinal_date(year, ordinal).ok() else {
                         break;
                     };
-                    let rule_holiday = cal.holiday_from_rules(d);
+                    let rule_holiday = cal.holiday_from_rules(d).expect("rule evaluation");
                     assert_eq!(
-                        is_holiday_cached(cal, d),
+                        is_holiday_cached(cal, d).expect("cache lookup"),
                         rule_holiday,
                         "{} {} holiday bit must match the rule scan",
                         cal.id,
@@ -297,12 +317,12 @@ mod tests {
         let july4 = date(2025, Month::July, 4);
 
         // Populate both years in the process-wide cache.
-        assert!(is_holiday_cached(&cal_jan1, jan1));
-        assert!(is_holiday_cached(&cal_july4, july4));
+        assert!(is_holiday_cached(&cal_jan1, jan1).expect("cache lookup"));
+        assert!(is_holiday_cached(&cal_july4, july4).expect("cache lookup"));
 
-        assert!(is_holiday_cached(&cal_jan1, jan1));
-        assert!(!is_holiday_cached(&cal_july4, jan1));
-        assert!(!is_holiday_cached(&cal_jan1, july4));
-        assert!(is_holiday_cached(&cal_july4, july4));
+        assert!(is_holiday_cached(&cal_jan1, jan1).expect("cache lookup"));
+        assert!(!is_holiday_cached(&cal_july4, jan1).expect("cache lookup"));
+        assert!(!is_holiday_cached(&cal_jan1, july4).expect("cache lookup"));
+        assert!(is_holiday_cached(&cal_july4, july4).expect("cache lookup"));
     }
 }

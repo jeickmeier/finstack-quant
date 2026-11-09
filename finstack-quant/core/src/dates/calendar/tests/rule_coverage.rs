@@ -15,7 +15,7 @@ fn make_date(y: i32, m: u8, d: u8) -> Date {
 fn assert_applies(rule: &Rule, yes: &[(i32, u8, u8)], no: &[(i32, u8, u8)]) {
     for &(y, m, d) in yes {
         assert!(
-            rule.applies(make_date(y, m, d)),
+            rule.applies(make_date(y, m, d)).expect("rule evaluation"),
             "expected {}-{}-{} to match",
             y,
             m,
@@ -24,7 +24,7 @@ fn assert_applies(rule: &Rule, yes: &[(i32, u8, u8)], no: &[(i32, u8, u8)]) {
     }
     for &(y, m, d) in no {
         assert!(
-            !rule.applies(make_date(y, m, d)),
+            !rule.applies(make_date(y, m, d)).expect("rule evaluation"),
             "expected {}-{}-{} to miss",
             y,
             m,
@@ -35,7 +35,7 @@ fn assert_applies(rule: &Rule, yes: &[(i32, u8, u8)], no: &[(i32, u8, u8)]) {
 
 fn materialize(rule: &Rule, year: i32) -> SmallVec<[Date; 32]> {
     let mut out = SmallVec::<[Date; 32]>::new();
-    rule.materialize_year(year, &mut out);
+    rule.dates_in_year(year, &mut out).expect("rule evaluation");
     out
 }
 
@@ -72,13 +72,6 @@ fn span_rule_cases() {
         },
         SpanCase {
             start: (Month::January, 1),
-            len: 0,
-            hits: &[],
-            misses: &[(2025, 1, 1), (2025, 1, 2)],
-            materialize_year: Some(2025),
-        },
-        SpanCase {
-            start: (Month::January, 1),
             len: 1,
             hits: &[(2025, 1, 1)],
             misses: &[(2025, 1, 2)],
@@ -99,6 +92,14 @@ fn span_rule_cases() {
         },
     ];
 
+    // A zero-length span is an invalid definition, not an absent holiday.
+    static JAN1: Rule = Rule::fixed(Month::January, 1);
+    let empty = Rule::Span {
+        start: &JAN1,
+        len: 0,
+        offset: 0,
+    };
+    assert!(empty.applies(make_date(2025, 1, 1)).is_err());
     for case in CASES {
         let start_rule: &'static Rule = Box::leak(Box::new(Rule::Fixed {
             month: case.start.0,
@@ -181,7 +182,7 @@ fn dragon_boat_rules() {
             matches!(date.month(), Month::May | Month::June),
             "Dragon Boat should be May-Jun"
         );
-        assert!(rule.applies(date));
+        assert!(rule.applies(date).expect("rule evaluation"));
     }
 }
 
@@ -201,7 +202,7 @@ fn mid_autumn_rules() {
             matches!(date.month(), Month::September | Month::October),
             "Mid-Autumn should be Sep-Oct"
         );
-        assert!(rule.applies(date));
+        assert!(rule.applies(date).expect("rule evaluation"));
     }
 }
 
@@ -412,6 +413,14 @@ fn direction_same_day() {
         dir: Direction::Before,
     };
 
-    assert!(after.applies(make_date(2025, 1, 1)));
-    assert!(before.applies(make_date(2025, 1, 1)));
+    assert!(
+        after
+            .applies(make_date(2025, 1, 1))
+            .expect("rule evaluation")
+    );
+    assert!(
+        before
+            .applies(make_date(2025, 1, 1))
+            .expect("rule evaluation")
+    );
 }

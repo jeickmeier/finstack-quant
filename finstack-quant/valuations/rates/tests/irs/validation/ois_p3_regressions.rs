@@ -1392,29 +1392,19 @@ fn ois_control_calendar_range_exhaustion_preserves_errors() {
     }
 
     let calendar = calendar_by_id_strict("jpto").unwrap();
-    assert!(!calendar.is_business_day(end).expect("calendar lookup"));
-    assert_eq!(
-        adjust(start, BusinessDayConvention::Unadjusted, calendar).unwrap(),
-        start
-    );
-    assert_eq!(
-        adjust(end, BusinessDayConvention::Unadjusted, calendar).unwrap(),
-        end
-    );
-    // JPTO closes December 31. The daily algorithm must find the next
-    // business day before clamping it to the coupon end; that search cannot
-    // advance beyond Date::MAX. Derive the exact error independently from
-    // the public date API, without using either pricing route as the oracle.
+    // JPTO's equinox holidays come from a table that ends in 2150, so its
+    // membership in year 9999 is unavailable (CORE-CONVENTIONS-004 item 7):
+    // an error, never a silent "business day". The daily algorithm must ask
+    // for the next business day before clamping it to the coupon end; derive
+    // the exact error independently from the public date API, without using
+    // either pricing route as the oracle, and require both routes to
+    // propagate it unchanged.
+    assert!(calendar.is_business_day(end).is_err());
     let expected_error = start.add_business_days(1, calendar).unwrap_err();
     assert!(matches!(
         &expected_error,
-        finstack_quant_core::Error::Input(
-            finstack_quant_core::InputError::AdjustmentFailed {
-                date,
-                convention: BusinessDayConvention::Following,
-                ..
-            }
-        ) if *date == start
+        finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound { id })
+            if id.contains("equinox") && id.contains("9999")
     ));
     let market = MarketContext::new().insert(
         DiscountCurve::builder("USD-OIS")
@@ -1446,7 +1436,9 @@ fn ois_control_calendar_range_exhaustion_preserves_errors() {
 
 #[test]
 fn ois_control_nonbusiness_minimum_date_preserves_success() {
-    let calendar = calendar_by_id_strict("jpto").unwrap();
+    // USNY is rule-only (no lunar/equinox tables or Easter), so it is
+    // defined at Date::MIN, where its New Year's Day closure applies.
+    let calendar = calendar_by_id_strict("usny").unwrap();
     let start = Date::MIN;
     assert!(!calendar.is_business_day(start).expect("calendar lookup"));
     let end = start.add_business_days(1, calendar).unwrap();
@@ -1465,7 +1457,7 @@ fn ois_control_nonbusiness_minimum_date_preserves_success() {
     swap.float_leg.business_day_convention = BusinessDayConvention::Unadjusted;
     swap.float_leg.payment_lag_days = 0;
     swap.float_leg.reset_lag_days = 0;
-    swap.float_leg.fixing_calendar_id = Some("jpto".into());
+    swap.float_leg.fixing_calendar_id = Some("usny".into());
     swap.validate().unwrap();
     assert_eq!(swap.default_model(), ModelKey::Discounting);
     assert_eq!(swap.side, PayReceive::Pay);
@@ -1566,7 +1558,7 @@ fn ois_control_nonbusiness_minimum_date_preserves_success() {
         json!({
             "fixture": {"instrument": swap, "market": market,
                 "as_of": start.to_string(), "model": swap.default_model(),
-                "source": "discount", "fixing_calendar": "jpto",
+                "source": "discount", "fixing_calendar": "usny",
                 "payment_calendar": "weekends_only"},
             "reference": {"start_is_business_day": false,
                 "first_business_day": end.to_string(), "observation_count": 1,

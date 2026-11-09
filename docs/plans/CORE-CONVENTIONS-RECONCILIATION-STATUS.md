@@ -31,7 +31,7 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 8 | B3 | skipped (dep B2b) | | | |
 | 9 | B4 | skipped (dep B3) | | | |
 | 10 | B5 | skipped (dep B4) | | | |
-| 11 | C1 | **C1a committed** (`C1a:` in git log); C1b in progress | C1a: workspace rust-lint; rust-test 16346; core doctests 286; gen-write; python-test 14003; wasm-test 1086 | 004 entry: fallible membership/counting recorded | C1 split: C1a = fallible `HolidayCalendar` trait + propagation; C1b = engine semantics (nominal-year gating, reach, checked arithmetic, ordinals, missing-table errors, cache) |
+| 11 | C1 | **C1a and C1b committed** (`C1a:`, `C1b:` in git log) | C1a: workspace rust-lint; rust-test 16346; core doctests 286; gen-write; python-test 14003; wasm-test 1086 | 004 entry: fallible membership/counting recorded | C1 split: C1a = fallible `HolidayCalendar` trait + propagation; C1b = engine semantics (nominal-year gating, reach, checked arithmetic, ordinals, missing-table errors, cache) |
 | 12 | C2 | pending | | | |
 | 13 | H2 | pending | | | |
 | 14 | C3 | pending | | | |

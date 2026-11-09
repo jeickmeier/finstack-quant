@@ -10,6 +10,26 @@
 
 use super::algo;
 use smallvec::{Array, SmallVec};
+
+/// Required table lookup: a missing year is an error, not an absent holiday.
+fn required(value: Option<Date>, table: &str, year: i32) -> crate::Result<Date> {
+    value.ok_or_else(|| {
+        crate::Error::from(crate::InputError::NotFound {
+            id: format!("{table} table entry for year {year}"),
+        })
+    })
+}
+
+/// Gregorian Easter Monday for a positive representable year.
+fn easter_monday(year: i32) -> crate::Result<Date> {
+    algo::easter_monday(year)
+        .filter(|_| year > 0)
+        .ok_or_else(|| {
+            crate::Error::Validation(format!(
+                "invalid holiday rule: Gregorian Easter is not supported for year {year}"
+            ))
+        })
+}
 use time::{Date, Duration, Month, Weekday};
 
 type Dates = SmallVec<[Date; 32]>;
@@ -33,7 +53,10 @@ fn sunday_substitute(date: Date) -> Date {
 }
 
 /// Materialize Hong Kong general holidays excluding ordinary Sundays.
-pub(super) fn hong_kong<A: Array<Item = Date>>(year: i32, out: &mut SmallVec<A>) {
+pub(super) fn hong_kong<A: Array<Item = Date>>(
+    year: i32,
+    out: &mut SmallVec<A>,
+) -> crate::Result<()> {
     let mut dates = Dates::new();
     for (month, day) in [
         (Month::January, 1),
@@ -44,7 +67,8 @@ pub(super) fn hong_kong<A: Array<Item = Date>>(year: i32, out: &mut SmallVec<A>)
             dates.push(sunday_substitute(date));
         }
     }
-    if let Some(cny) = algo::cny_date(year) {
+    {
+        let cny = required(algo::cny_date(year), "Chinese New Year", year)?;
         for offset in 0..3 {
             let date = cny + Duration::days(offset);
             dates.push(if date.weekday() == Weekday::Sunday {
@@ -56,23 +80,22 @@ pub(super) fn hong_kong<A: Array<Item = Date>>(year: i32, out: &mut SmallVec<A>)
         }
     }
     for date in [
-        algo::qing_ming_date(year),
-        algo::dragon_boat_date(year),
-        algo::chung_yeung_date(year),
-    ]
-    .into_iter()
-    .flatten()
-    {
+        required(algo::qing_ming_date(year), "Qing Ming", year)?,
+        required(algo::dragon_boat_date(year), "Dragon Boat", year)?,
+        required(algo::chung_yeung_date(year), "Chung Yeung", year)?,
+    ] {
         dates.push(sunday_substitute(date));
     }
-    if let Some(easter) = algo::easter_monday(year) {
+    {
+        let easter = easter_monday(year)?;
         dates.extend([
             easter - Duration::days(3),
             easter - Duration::days(2),
             easter,
         ]);
     }
-    if let Some(autumn) = algo::mid_autumn_date(year) {
+    {
+        let autumn = required(algo::mid_autumn_date(year), "Mid-Autumn", year)?;
         let after = autumn + Duration::days(1);
         dates.push(
             if after.weekday() == Weekday::Sunday && (1983..=2011).contains(&year) {
@@ -84,7 +107,11 @@ pub(super) fn hong_kong<A: Array<Item = Date>>(year: i32, out: &mut SmallVec<A>)
     }
     if year >= 1999 {
         fixed(year, Month::May, 1, &mut dates);
-        dates.extend(algo::buddhas_birthday_date(year));
+        dates.push(required(
+            algo::buddhas_birthday_date(year),
+            "Buddha's Birthday",
+            year,
+        )?);
     }
     if year >= 1997 {
         fixed(year, Month::July, 1, &mut dates);
@@ -151,10 +178,11 @@ pub(super) fn hong_kong<A: Array<Item = Date>>(year: i32, out: &mut SmallVec<A>)
         }
     }
     out.extend(unique);
+    Ok(())
 }
 
 /// Materialize Japan's national, citizens' and substitute holidays.
-pub(super) fn japan<A: Array<Item = Date>>(year: i32, out: &mut SmallVec<A>) {
+pub(super) fn japan<A: Array<Item = Date>>(year: i32, out: &mut SmallVec<A>) -> crate::Result<()> {
     let mut national = Dates::new();
     for (month, day) in [
         (Month::January, 1),
@@ -167,8 +195,16 @@ pub(super) fn japan<A: Array<Item = Date>>(year: i32, out: &mut SmallVec<A>) {
     ] {
         fixed(year, month, day, &mut national);
     }
-    national.extend(algo::vernal_equinox_jp_date(year));
-    national.extend(algo::autumnal_equinox_jp_date(year));
+    national.push(required(
+        algo::vernal_equinox_jp_date(year),
+        "Japanese vernal equinox",
+        year,
+    )?);
+    national.push(required(
+        algo::autumnal_equinox_jp_date(year),
+        "Japanese autumnal equinox",
+        year,
+    )?);
     if year < 2000 {
         fixed(year, Month::January, 15, &mut national);
     } else {
@@ -254,4 +290,5 @@ pub(super) fn japan<A: Array<Item = Date>>(year: i32, out: &mut SmallVec<A>) {
     holidays.sort_unstable();
     holidays.dedup();
     out.extend(holidays);
+    Ok(())
 }

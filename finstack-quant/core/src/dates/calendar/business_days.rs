@@ -156,12 +156,13 @@ pub trait HolidayCalendar: Send + Sync {
 
     /// Counts business days in the half-open interval `[start, end)`.
     ///
-    /// Returns zero when `start >= end`. Implementors may override this method
+    /// Returns zero when `start == end`. Implementors may override this method
     /// with an equivalent optimized count.
     ///
     /// # Errors
     ///
-    /// Returns the first membership error for any date in the interval.
+    /// Returns an error for a reversed range (`start > end`) and the first
+    /// membership error for any date in the interval.
     ///
     /// # Arguments
     ///
@@ -210,12 +211,14 @@ impl<T: HolidayCalendar + ?Sized> HolidayCalendar for &T {
 }
 
 /// Business days in `[start, end)` by testing each date with
-/// [`HolidayCalendar::is_business_day`]; zero when `start >= end`.
+/// [`HolidayCalendar::is_business_day`]; zero when `start == end`, an error
+/// when `start > end`.
 pub(super) fn count_business_days_by_scan<C: HolidayCalendar + ?Sized>(
     calendar: &C,
     start: Date,
     end: Date,
 ) -> crate::Result<i32> {
+    super::year_cache::reject_reversed(start, end)?;
     let mut count = 0_i32;
     let mut current = start;
     while current < end {
