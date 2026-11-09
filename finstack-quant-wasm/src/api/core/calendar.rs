@@ -78,7 +78,9 @@ impl JsHolidayCalendar {
         &self,
         #[wasm_bindgen(unchecked_param_type = "number")] date: JsValue,
     ) -> Result<bool, JsValue> {
-        Ok(self.calendar.is_holiday(js_epoch_days(&date, "date")?))
+        self.calendar
+            .is_holiday(js_epoch_days(&date, "date")?)
+            .map_err(to_js_err)
     }
 
     /// Whether a date is a business day (neither a weekend nor a holiday).
@@ -96,7 +98,9 @@ impl JsHolidayCalendar {
         &self,
         #[wasm_bindgen(unchecked_param_type = "number")] date: JsValue,
     ) -> Result<bool, JsValue> {
-        Ok(self.calendar.is_business_day(js_epoch_days(&date, "date")?))
+        self.calendar
+            .is_business_day(js_epoch_days(&date, "date")?)
+            .map_err(to_js_err)
     }
 
     /// Count business days in the half-open interval `[start, end)`.
@@ -117,9 +121,9 @@ impl JsHolidayCalendar {
         #[wasm_bindgen(unchecked_param_type = "number")] start: JsValue,
         #[wasm_bindgen(unchecked_param_type = "number")] end: JsValue,
     ) -> Result<i32, JsValue> {
-        Ok(self
-            .calendar
-            .count_business_days(js_epoch_days(&start, "start")?, js_epoch_days(&end, "end")?))
+        self.calendar
+            .count_business_days(js_epoch_days(&start, "start")?, js_epoch_days(&end, "end")?)
+            .map_err(to_js_err)
     }
 
     /// Calendar metadata, or `undefined` for union calendars.

@@ -277,8 +277,8 @@ impl DateExt for Date {
             } else {
                 BusinessDayConvention::Preceding
             };
-            current =
-                seek_business_day(start, step, cal).ok_or_else(|| adjustment_failed(self, conv))?;
+            current = seek_business_day(start, step, cal)?
+                .ok_or_else(|| adjustment_failed(self, conv))?;
         }
         Ok(current)
     }
@@ -427,7 +427,7 @@ mod tests {
         // Should skip Christmas Day (Dec 25), Boxing Day (Dec 26), and weekends
         // Landing on the next available business day
         assert!(result > christmas_eve);
-        assert!(cal.is_business_day(result));
+        assert!(cal.is_business_day(result).expect("calendar lookup"));
     }
 
     #[test]
@@ -435,12 +435,12 @@ mod tests {
         // A calendar that marks every day as a holiday to trigger bounded search failure
         struct AllHolidaysCal;
         impl crate::dates::HolidayCalendar for AllHolidaysCal {
-            fn is_holiday(&self, _date: Date) -> bool {
-                true
+            fn is_holiday(&self, _date: Date) -> crate::Result<bool> {
+                Ok(true)
             }
 
-            fn is_business_day(&self, _date: Date) -> bool {
-                false
+            fn is_business_day(&self, _date: Date) -> crate::Result<bool> {
+                Ok(false)
             }
         }
 

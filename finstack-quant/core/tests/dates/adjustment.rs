@@ -23,20 +23,38 @@ fn test_holiday_calendar_trait() {
     let cal = TestCal::new().with_holiday(make_date(2025, 1, 1)); // New Year's Day (Wednesday)
 
     // Wednesday New Year should be a holiday
-    assert!(cal.is_holiday(make_date(2025, 1, 1)));
+    assert!(
+        cal.is_holiday(make_date(2025, 1, 1))
+            .expect("calendar lookup")
+    );
 
     // Regular weekday should not be a holiday
-    assert!(!cal.is_holiday(make_date(2025, 1, 2))); // Thursday
+    assert!(
+        !cal.is_holiday(make_date(2025, 1, 2))
+            .expect("calendar lookup")
+    ); // Thursday
 
     // Weekend should not be a business day (handled by trait default)
-    assert!(!cal.is_business_day(make_date(2025, 1, 4))); // Saturday
-    assert!(!cal.is_business_day(make_date(2025, 1, 5))); // Sunday
+    assert!(
+        !cal.is_business_day(make_date(2025, 1, 4))
+            .expect("calendar lookup")
+    ); // Saturday
+    assert!(
+        !cal.is_business_day(make_date(2025, 1, 5))
+            .expect("calendar lookup")
+    ); // Sunday
 
     // Holiday should not be a business day
-    assert!(!cal.is_business_day(make_date(2025, 1, 1))); // New Year
+    assert!(
+        !cal.is_business_day(make_date(2025, 1, 1))
+            .expect("calendar lookup")
+    ); // New Year
 
     // Regular weekday should be a business day
-    assert!(cal.is_business_day(make_date(2025, 1, 2))); // Thursday
+    assert!(
+        cal.is_business_day(make_date(2025, 1, 2))
+            .expect("calendar lookup")
+    ); // Thursday
 }
 
 // Unadjusted Convention
@@ -203,12 +221,14 @@ fn available_calendars_count_matches_module_docs() {
 struct AllHolidaysCal;
 
 impl HolidayCalendar for AllHolidaysCal {
-    fn is_holiday(&self, _date: Date) -> bool {
-        true // Every day is a holiday
+    fn is_holiday(&self, _date: Date) -> finstack_quant_core::Result<bool> {
+        Ok({
+            true // Every day is a holiday
+        })
     }
 
-    fn is_business_day(&self, _date: Date) -> bool {
-        false
+    fn is_business_day(&self, _date: Date) -> finstack_quant_core::Result<bool> {
+        Ok(false)
     }
 }
 
@@ -338,13 +358,24 @@ fn business_day_convention_parser_accepts_only_normalized_canonical_names() {
 struct MetadataCal;
 
 impl HolidayCalendar for MetadataCal {
-    fn is_holiday(&self, date: finstack_quant_core::dates::Date) -> bool {
-        // Treat only January 1st as a holiday to keep behaviour simple.
-        date.month() == time::Month::January && date.day() == 1
+    fn is_holiday(
+        &self,
+        date: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<bool> {
+        Ok({
+            // Treat only January 1st as a holiday to keep behaviour simple.
+            date.month() == time::Month::January && date.day() == 1
+        })
     }
 
-    fn is_business_day(&self, date: finstack_quant_core::dates::Date) -> bool {
-        !finstack_quant_core::dates::DateExt::is_weekend(date) && !self.is_holiday(date)
+    fn is_business_day(
+        &self,
+        date: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<bool> {
+        Ok({
+            !finstack_quant_core::dates::DateExt::is_weekend(date)
+                && !self.is_holiday(date).expect("calendar lookup")
+        })
     }
 
     fn metadata(&self) -> Option<CalendarMetadata> {
@@ -367,11 +398,11 @@ fn calendar_metadata_override_is_respected() {
 
     // Non-holiday weekday should be business day.
     let jan2 = make_date(2025, 1, 2);
-    assert!(cal.is_business_day(jan2));
+    assert!(cal.is_business_day(jan2).expect("calendar lookup"));
 
     // Holiday should not be business day.
     let new_year = make_date(2025, 1, 1);
-    assert!(!cal.is_business_day(new_year));
+    assert!(!cal.is_business_day(new_year).expect("calendar lookup"));
 }
 
 // Joint business days T+0 behavior

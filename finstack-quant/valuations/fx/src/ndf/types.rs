@@ -546,7 +546,7 @@ impl Ndf {
             let mut remaining = fixing_offset_days as u32;
             while remaining > 0 {
                 fixing_unadjusted -= time::Duration::days(1);
-                if joint_cal.is_business_day(fixing_unadjusted) {
+                if joint_cal.is_business_day(fixing_unadjusted)? {
                     remaining -= 1;
                 }
             }

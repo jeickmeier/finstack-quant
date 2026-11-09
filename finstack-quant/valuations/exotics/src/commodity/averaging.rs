@@ -23,13 +23,17 @@ use finstack_quant_core::dates::{Date, DateExt, calendar_by_id_strict};
 /// Returns an error when `calendar_id` names an unregistered calendar.
 pub(crate) fn business_day_filter(
     calendar_id: Option<&str>,
-) -> Result<impl Fn(Date) -> bool + use<>> {
+) -> Result<impl Fn(Date) -> Result<bool> + use<>> {
     let calendar = calendar_id.map(calendar_by_id_strict).transpose()?;
-    Ok(
-        move |date: Date| {
-            !date.is_weekend() && calendar.is_none_or(|cal| cal.is_business_day(date))
-        },
-    )
+    Ok(move |date: Date| {
+        if date.is_weekend() {
+            return Ok(false);
+        }
+        match calendar {
+            Some(cal) => cal.is_business_day(date),
+            None => Ok(true),
+        }
+    })
 }
 
 /// Build contractual commodity observation periods and separately adjusted payments.
@@ -82,7 +86,7 @@ pub(crate) fn commodity_periods(
 /// single mid-window observation.
 pub(crate) fn business_day_average_price(
     get_price: impl Fn(Date) -> Result<f64>,
-    is_business_day: impl Fn(Date) -> bool,
+    is_business_day: impl Fn(Date) -> Result<bool>,
     obs_start: Date,
     obs_end: Date,
     include_end: bool,
@@ -95,13 +99,13 @@ pub(crate) fn business_day_average_price(
     let mut current = obs_start;
 
     while current < obs_end {
-        if is_business_day(current) {
+        if is_business_day(current)? {
             sum.add(get_price(current)?);
             count += 1;
         }
         current += time::Duration::days(1);
     }
-    if include_end && obs_end >= obs_start && is_business_day(obs_end) {
+    if include_end && obs_end >= obs_start && is_business_day(obs_end)? {
         sum.add(get_price(obs_end)?);
         count += 1;
     }
@@ -125,9 +129,9 @@ mod tests {
         Date::from_calendar_date(year, month, day).expect("valid date")
     }
 
-    fn weekdays_only(date: Date) -> bool {
+    fn weekdays_only(date: Date) -> Result<bool> {
         let wd = date.weekday();
-        wd != time::Weekday::Saturday && wd != time::Weekday::Sunday
+        Ok(wd != time::Weekday::Saturday && wd != time::Weekday::Sunday)
     }
 
     /// Adjacent half-open windows must partition the observation dates: the
@@ -148,12 +152,12 @@ mod tests {
             let mut n = 0u64;
             let mut cur = s;
             while cur < e {
-                if weekdays_only(cur) {
+                if weekdays_only(cur).expect("weekday filter") {
                     n += 1;
                 }
                 cur += time::Duration::days(1);
             }
-            if inc && weekdays_only(e) {
+            if inc && weekdays_only(e).expect("weekday filter") {
                 n += 1;
             }
             let avg = business_day_average_price(price, weekdays_only, s, e, inc).expect("avg");

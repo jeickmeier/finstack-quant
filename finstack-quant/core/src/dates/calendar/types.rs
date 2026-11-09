@@ -52,7 +52,7 @@ impl Calendar {
 }
 
 impl HolidayCalendar for Calendar {
-    fn is_holiday(&self, date: Date) -> bool {
+    fn is_holiday(&self, date: Date) -> crate::Result<bool> {
         // The cache and astronomical tables use `[BASE_YEAR, END_YEAR]`; this
         // is not the published coverage of every market calendar. Outside
         // that window some table-based holidays are unavailable, so warn once.
@@ -79,19 +79,19 @@ impl HolidayCalendar for Calendar {
             is_holiday = false;
         }
 
-        is_holiday
+        Ok(is_holiday)
     }
 
-    fn is_business_day(&self, date: Date) -> bool {
+    fn is_business_day(&self, date: Date) -> crate::Result<bool> {
         let is_weekend = date.is_weekend();
         if (BASE_YEAR..=END_YEAR).contains(&date.year()) {
-            !is_weekend && !year_cache::is_holiday_cached(self, date)
+            Ok(!is_weekend && !year_cache::is_holiday_cached(self, date))
         } else {
-            !is_weekend && !self.is_holiday(date)
+            Ok(!is_weekend && !self.is_holiday(date)?)
         }
     }
 
-    fn count_business_days(&self, start: Date, end: Date) -> i32 {
+    fn count_business_days(&self, start: Date, end: Date) -> crate::Result<i32> {
         year_cache::count_business_days_cached(self, start, end)
     }
 
@@ -112,7 +112,7 @@ mod tests {
     #[test]
     fn borrowed_and_trait_object_calendars_preserve_weekends_and_counts() {
         fn generic_business<C: HolidayCalendar>(calendar: C, date: Date) -> bool {
-            calendar.is_business_day(date)
+            calendar.is_business_day(date).expect("calendar lookup")
         }
 
         let calendar = Calendar::new("borrowed", "Borrowed calendar", true, &[]);
@@ -122,11 +122,19 @@ mod tests {
             let date =
                 Date::from_calendar_date(2026, Month::October, day).expect("valid test date");
             let expected = !date.is_weekend();
-            assert_eq!(calendar.is_business_day(date), expected);
-            assert_eq!(generic_business(borrowed, date), expected);
-            assert_eq!(object.is_business_day(date), expected);
             assert_eq!(
-                object.count_business_days(date, date.next_day().expect("next date")),
+                calendar.is_business_day(date).expect("calendar lookup"),
+                expected
+            );
+            assert_eq!(generic_business(borrowed, date), expected);
+            assert_eq!(
+                object.is_business_day(date).expect("calendar lookup"),
+                expected
+            );
+            assert_eq!(
+                object
+                    .count_business_days(date, date.next_day().expect("next date"))
+                    .expect("calendar lookup"),
                 i32::from(expected)
             );
         }
@@ -140,8 +148,8 @@ mod tests {
         let sunday = Date::from_calendar_date(2025, Month::January, 5).expect("Valid test date");
         let friday = Date::from_calendar_date(2025, Month::January, 3).expect("Valid test date");
 
-        assert!(!cal.is_business_day(saturday));
-        assert!(!cal.is_business_day(sunday));
-        assert!(cal.is_business_day(friday));
+        assert!(!cal.is_business_day(saturday).expect("calendar lookup"));
+        assert!(!cal.is_business_day(sunday).expect("calendar lookup"));
+        assert!(cal.is_business_day(friday).expect("calendar lookup"));
     }
 }

@@ -28,10 +28,10 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 5 | B1 | committed (`B1:` in git log) | workspace rust-lint; core tests 2218 + 286 doctests; gen-write; py test_core_parity 134, members 6, ergonomics 48, calibration boundaries 45, core_wasm_parity 83, runtime_docs 3684, parity 6067; wasm 1086 | 018 entry narrowed to the term-loan step-up (B1b) | Only bindings consumed the changed API outside core; a CDS quote test now compares against the single binary64 `as_bp` view instead of noise-free decimal shifting (018 #6) |
 | 6 | B1b | committed (`B1b:` in git log) | lint fixed-income; tests fixed-income 1253, covenants 115 | **018 entry deleted**; totals 595→594, Reconciliation 58→57, Core conventions 21→20; record 018, README, INVARIANT_MAP M23–M26, INVARIANTS, financial README, central follow-ups updated | Step-up computed fully before mutation; negative/non-finite increases rejected |
 | 7 | B2 | **B2a committed** (`B2a:` in git log); **B2b blocked (owner decision)** | B2a: workspace rust-test (16346 incl. 2 re-pins), gen-write, python-test 14003, wasm-test 1086, ui-check | 012 entry: B2a items recorded; item 4 marked blocked | B2b (shortest-text float admission) breaks 55 tests on sub-1e-28 model values; see Needs review |
-| 8 | B3 | pending | | | |
-| 9 | B4 | pending | | | |
-| 10 | B5 | pending | | | |
-| 11 | C1 | pending | | | |
+| 8 | B3 | skipped (dep B2b) | | | |
+| 9 | B4 | skipped (dep B3) | | | |
+| 10 | B5 | skipped (dep B4) | | | |
+| 11 | C1 | **C1a committed** (`C1a:` in git log); C1b in progress | C1a: workspace rust-lint; rust-test 16346; core doctests 286; gen-write; python-test 14003; wasm-test 1086 | 004 entry: fallible membership/counting recorded | C1 split: C1a = fallible `HolidayCalendar` trait + propagation; C1b = engine semantics (nominal-year gating, reach, checked arithmetic, ordinals, missing-table errors, cache) |
 | 12 | C2 | pending | | | |
 | 13 | H2 | pending | | | |
 | 14 | C3 | pending | | | |
@@ -45,30 +45,31 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 22 | E3 | pending | | | |
 | 23 | E4 | pending | | | |
 | 24 | E4b | pending | | | |
-| 25 | G1 | pending | | | |
+| 25 | G1 | skipped (dep B3) | | | |
 | 26 | G2 | pending | | | |
 | 27 | G3 | pending | | | |
-| 28 | G4 | pending | | | |
+| 28 | G4 | skipped (dep B3) | | | |
 | 29 | F1 | pending | | | |
 | 30 | F2 | pending | | | |
 | 31 | F3 | pending | | | |
 | 32 | F4 | pending | | | |
 | 33 | F5 | pending | | | |
-| 34 | F6 | pending | | | |
-| 35 | F7 | pending | | | |
-| 36 | F8 | pending | | | |
-| 37 | G5 | pending | | | |
+| 34 | F6 | skipped (dep B3) | | | |
+| 35 | F7 | skipped (dep F6) | | | |
+| 36 | F8 | skipped (dep F7) | | | |
+| 37 | G5 | skipped (dep G4) | | | |
 | 38 | E5 | pending | | | |
-| 39 | E6 | pending | | | |
+| 39 | E6 | skipped (dep G5, CASHFLOWS-001) | | | |
 | 40 | H1 | pending | | | |
 | 41 | H3 | pending | | | |
 | 42 | H4 | pending | | | |
 | 43 | H5 | pending | | | |
-| 44 | H6 | pending | | | |
+| 44 | H6 | skipped (dep B5) | | | |
 
 ## Phase gates
 
 - **Phase A** (after A3b `b7248fccbf`): `mise run all` **pass**.
+- **Phase B** (after B2a `69c2dc0d3a`; B3–B5 skipped): `mise run all` **pass**.
 
 ## Judgement log
 

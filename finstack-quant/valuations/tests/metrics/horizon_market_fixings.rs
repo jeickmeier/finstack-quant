@@ -35,7 +35,7 @@ fn usny_business_days(from: Date, through: Date) -> Vec<Date> {
     let mut days = Vec::new();
     let mut day = from;
     while day <= through {
-        if calendar.is_business_day(day) {
+        if calendar.is_business_day(day).expect("calendar lookup") {
             days.push(day);
         }
         day = day.next_day().expect("next day");

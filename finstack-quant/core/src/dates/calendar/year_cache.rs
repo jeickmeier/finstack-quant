@@ -136,9 +136,13 @@ pub(super) fn is_holiday_cached(cal: &Calendar, date: Date) -> bool {
 
 /// Business days in `[start, end)` using per-year prefix sums when the
 /// half-open interval lies inside the cache year range.
-pub(super) fn count_business_days_cached(cal: &Calendar, start: Date, end: Date) -> i32 {
+pub(super) fn count_business_days_cached(
+    cal: &Calendar,
+    start: Date,
+    end: Date,
+) -> crate::Result<i32> {
     if start >= end {
-        return 0;
+        return Ok(0);
     }
     let last = end - Duration::days(1);
     if start.year() < BASE_YEAR || last.year() > END_YEAR {
@@ -163,7 +167,7 @@ pub(super) fn count_business_days_cached(cal: &Calendar, start: Date, end: Date)
         total += i32::from(bits.count_range(from, to_exclusive));
         year += 1;
     }
-    total
+    Ok(total)
 }
 
 #[cfg(test)]
@@ -182,12 +186,12 @@ mod tests {
     struct DefaultScan<'a>(&'a Calendar);
 
     impl HolidayCalendar for DefaultScan<'_> {
-        fn is_holiday(&self, date: Date) -> bool {
-            self.0.is_holiday(date)
+        fn is_holiday(&self, date: Date) -> crate::Result<bool> {
+            Ok(self.0.is_holiday(date).expect("calendar lookup"))
         }
 
-        fn is_business_day(&self, date: Date) -> bool {
-            self.0.is_business_day(date)
+        fn is_business_day(&self, date: Date) -> crate::Result<bool> {
+            Ok(self.0.is_business_day(date).expect("calendar lookup"))
         }
     }
 
@@ -197,8 +201,12 @@ mod tests {
         start: Date,
         end: Date,
     ) {
-        let cached = cal.count_business_days(start, end);
-        let scanned = DefaultScan(cal).count_business_days(start, end);
+        let cached = cal
+            .count_business_days(start, end)
+            .expect("calendar lookup");
+        let scanned = DefaultScan(cal)
+            .count_business_days(start, end)
+            .expect("calendar lookup");
         assert_eq!(
             cached, scanned,
             "{name}: cached count {cached} != default scan {scanned} for {start}..{end}"
@@ -224,14 +232,14 @@ mod tests {
                     let expected_public_holiday =
                         rule_holiday && !(cal.ignore_weekends && d.is_weekend());
                     assert_eq!(
-                        cal.is_holiday(d),
+                        cal.is_holiday(d).expect("calendar lookup"),
                         expected_public_holiday,
                         "{} {} public holiday must preserve the weekend override",
                         cal.id,
                         d
                     );
                     assert_eq!(
-                        cal.is_business_day(d),
+                        cal.is_business_day(d).expect("calendar lookup"),
                         !d.is_weekend() && !rule_holiday,
                         "{} {} business-day bit must match weekend + rule scan",
                         cal.id,

@@ -1392,7 +1392,7 @@ fn ois_control_calendar_range_exhaustion_preserves_errors() {
     }
 
     let calendar = calendar_by_id_strict("jpto").unwrap();
-    assert!(!calendar.is_business_day(end));
+    assert!(!calendar.is_business_day(end).expect("calendar lookup"));
     assert_eq!(
         adjust(start, BusinessDayConvention::Unadjusted, calendar).unwrap(),
         start
@@ -1448,9 +1448,9 @@ fn ois_control_calendar_range_exhaustion_preserves_errors() {
 fn ois_control_nonbusiness_minimum_date_preserves_success() {
     let calendar = calendar_by_id_strict("jpto").unwrap();
     let start = Date::MIN;
-    assert!(!calendar.is_business_day(start));
+    assert!(!calendar.is_business_day(start).expect("calendar lookup"));
     let end = start.add_business_days(1, calendar).unwrap();
-    assert!(end > start && calendar.is_business_day(end));
+    assert!(end > start && calendar.is_business_day(end).expect("calendar lookup"));
     let alpha = (end - start).whole_days() as f64 / 360.0;
     let mut swap = compact_swap();
     swap.id = "OIS-NONBUSINESS-MINIMUM-DATE".into();

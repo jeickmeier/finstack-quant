@@ -16,7 +16,7 @@ fn holiday_set(cal: &dyn HolidayCalendar, year: i32) -> HashSet<Date> {
         365
     })
         .filter_map(|d| Date::from_ordinal_date(year, d).ok())
-        .filter(|&dt| cal.is_holiday(dt))
+        .filter(|&dt| cal.is_holiday(dt).expect("calendar lookup"))
         .collect()
 }
 
@@ -46,11 +46,17 @@ fn calendars_match_complete_published_years_including_open_days() {
                 continue;
             };
             let expected = !date.is_weekend() && !closed.contains(&date);
-            assert_eq!(calendar.is_business_day(date), expected, "{id}: {date}");
+            assert_eq!(
+                calendar.is_business_day(date).expect("calendar lookup"),
+                expected,
+                "{id}: {date}"
+            );
             expected_count += i32::from(expected);
         }
         assert_eq!(
-            calendar.count_business_days(make_date(year, 1, 1), make_date(year + 1, 1, 1)),
+            calendar
+                .count_business_days(make_date(year, 1, 1), make_date(year + 1, 1, 1))
+                .expect("calendar lookup"),
             expected_count,
             "{id}: full-year accrual count {year}"
         );
@@ -70,52 +76,163 @@ fn calendar_conventions_preserve_neighboring_open_dates() {
             .unwrap(),
             make_date(2026, 5, 19)
         );
-        assert!(calendar.is_business_day(make_date(2026, 5, 25)));
+        assert!(
+            calendar
+                .is_business_day(make_date(2026, 5, 25))
+                .expect("calendar lookup")
+        );
     }
     for id in ["asx", "auce"] {
         let calendar = calendar_by_id_strict(id).unwrap();
-        assert!(!calendar.is_business_day(make_date(2024, 1, 26)));
-        assert!(calendar.is_business_day(make_date(2024, 1, 29)));
+        assert!(
+            !calendar
+                .is_business_day(make_date(2024, 1, 26))
+                .expect("calendar lookup")
+        );
+        assert!(
+            calendar
+                .is_business_day(make_date(2024, 1, 29))
+                .expect("calendar lookup")
+        );
     }
     for id in ["asx", "auce", "cato", "tsx", "nzau"] {
         let calendar = calendar_by_id_strict(id).unwrap();
         for closed in [make_date(2027, 12, 27), make_date(2027, 12, 28)] {
-            assert!(!calendar.is_business_day(closed), "{id}: {closed}");
+            assert!(
+                !calendar.is_business_day(closed).expect("calendar lookup"),
+                "{id}: {closed}"
+            );
         }
-        assert!(calendar.is_business_day(make_date(2027, 12, 29)));
-        assert!(!calendar.is_business_day(make_date(2022, 12, 27)));
-        assert!(calendar.is_business_day(make_date(2022, 12, 28)));
+        assert!(
+            calendar
+                .is_business_day(make_date(2027, 12, 29))
+                .expect("calendar lookup")
+        );
+        assert!(
+            !calendar
+                .is_business_day(make_date(2022, 12, 27))
+                .expect("calendar lookup")
+        );
+        assert!(
+            calendar
+                .is_business_day(make_date(2022, 12, 28))
+                .expect("calendar lookup")
+        );
     }
-    assert!(by_id("nyse").is_business_day(make_date(2027, 12, 31)));
-    assert!(!by_id("nyse").is_business_day(make_date(2025, 1, 9)));
-    assert!(by_id("usny").is_business_day(make_date(2025, 1, 9)));
-    assert!(by_id("sifma").is_business_day(make_date(2026, 4, 3)));
-    assert!(!by_id("nyse").is_business_day(make_date(2026, 4, 3)));
-    assert!(by_id("sgsi").is_business_day(make_date(2025, 8, 11)));
-    assert!(!by_id("sgsi").is_business_day(make_date(2027, 2, 8)));
+    assert!(
+        by_id("nyse")
+            .is_business_day(make_date(2027, 12, 31))
+            .expect("calendar lookup")
+    );
+    assert!(
+        !by_id("nyse")
+            .is_business_day(make_date(2025, 1, 9))
+            .expect("calendar lookup")
+    );
+    assert!(
+        by_id("usny")
+            .is_business_day(make_date(2025, 1, 9))
+            .expect("calendar lookup")
+    );
+    assert!(
+        by_id("sifma")
+            .is_business_day(make_date(2026, 4, 3))
+            .expect("calendar lookup")
+    );
+    assert!(
+        !by_id("nyse")
+            .is_business_day(make_date(2026, 4, 3))
+            .expect("calendar lookup")
+    );
+    assert!(
+        by_id("sgsi")
+            .is_business_day(make_date(2025, 8, 11))
+            .expect("calendar lookup")
+    );
+    assert!(
+        !by_id("sgsi")
+            .is_business_day(make_date(2027, 2, 8))
+            .expect("calendar lookup")
+    );
     // ANBIMA national accrual holidays deliberately differ from B3 trading.
-    assert!(by_id("brbd").is_business_day(make_date(2025, 12, 24)));
-    assert!(by_id("brbd").is_business_day(make_date(2025, 12, 31)));
+    assert!(
+        by_id("brbd")
+            .is_business_day(make_date(2025, 12, 24))
+            .expect("calendar lookup")
+    );
+    assert!(
+        by_id("brbd")
+            .is_business_day(make_date(2025, 12, 31))
+            .expect("calendar lookup")
+    );
     assert!(by_id("brbd").metadata().unwrap().name.contains("ANBIMA"));
 }
 
 #[test]
 fn holiday_adoption_bounds_are_respected() {
     for calendar in [by_id("cato"), by_id("tsx")] {
-        assert!(calendar.is_business_day(make_date(2007, 2, 19)));
-        assert!(!calendar.is_business_day(make_date(2008, 2, 18)));
+        assert!(
+            calendar
+                .is_business_day(make_date(2007, 2, 19))
+                .expect("calendar lookup")
+        );
+        assert!(
+            !calendar
+                .is_business_day(make_date(2008, 2, 18))
+                .expect("calendar lookup")
+        );
     }
-    assert!(by_id("cato").is_business_day(make_date(2020, 9, 30)));
-    assert!(!by_id("cato").is_business_day(make_date(2021, 9, 30)));
+    assert!(
+        by_id("cato")
+            .is_business_day(make_date(2020, 9, 30))
+            .expect("calendar lookup")
+    );
+    assert!(
+        !by_id("cato")
+            .is_business_day(make_date(2021, 9, 30))
+            .expect("calendar lookup")
+    );
     let auckland = calendar_by_id_strict("nzau").unwrap();
-    assert!(!auckland.is_business_day(make_date(2022, 6, 24)));
-    assert!(!auckland.is_business_day(make_date(2052, 6, 21)));
-    assert!(auckland.is_business_day(make_date(2021, 6, 25)));
-    assert!(!auckland.is_business_day(make_date(2022, 9, 26)));
-    assert!(auckland.is_business_day(make_date(2010, 4, 26)));
-    assert!(!auckland.is_business_day(make_date(2015, 4, 27)));
-    assert!(!auckland.is_business_day(make_date(2022, 1, 4)));
-    assert!(auckland.is_business_day(make_date(2022, 1, 5)));
+    assert!(
+        !auckland
+            .is_business_day(make_date(2022, 6, 24))
+            .expect("calendar lookup")
+    );
+    assert!(
+        !auckland
+            .is_business_day(make_date(2052, 6, 21))
+            .expect("calendar lookup")
+    );
+    assert!(
+        auckland
+            .is_business_day(make_date(2021, 6, 25))
+            .expect("calendar lookup")
+    );
+    assert!(
+        !auckland
+            .is_business_day(make_date(2022, 9, 26))
+            .expect("calendar lookup")
+    );
+    assert!(
+        auckland
+            .is_business_day(make_date(2010, 4, 26))
+            .expect("calendar lookup")
+    );
+    assert!(
+        !auckland
+            .is_business_day(make_date(2015, 4, 27))
+            .expect("calendar lookup")
+    );
+    assert!(
+        !auckland
+            .is_business_day(make_date(2022, 1, 4))
+            .expect("calendar lookup")
+    );
+    assert!(
+        auckland
+            .is_business_day(make_date(2022, 1, 5))
+            .expect("calendar lookup")
+    );
 }
 
 #[test]
@@ -232,7 +349,11 @@ fn hong_kong_matches_published_general_holidays() {
             "{id}: Easter/Ching Ming collision"
         );
         // Saturday holidays do not close the preceding Friday.
-        assert!(calendar.is_business_day(make_date(2027, 4, 30)));
+        assert!(
+            calendar
+                .is_business_day(make_date(2027, 4, 30))
+                .expect("calendar lookup")
+        );
     }
 }
 
@@ -257,7 +378,10 @@ fn hong_kong_historical_adoption_and_substitution() {
             make_date(2015, 9, 3),  // Published one-off special holiday.
             make_date(2020, 10, 2), // Mid-Autumn/National Day collision.
         ] {
-            assert!(calendar.is_holiday(date), "{id} missing {date}");
+            assert!(
+                calendar.is_holiday(date).expect("calendar lookup"),
+                "{id} missing {date}"
+            );
         }
         for date in [
             make_date(1998, 5, 1), // Labour Day only added to general holidays in 1999.
@@ -267,7 +391,10 @@ fn hong_kong_historical_adoption_and_substitution() {
             make_date(1999, 10, 2),
             make_date(2010, 2, 17), // No fourth-day substitute under the older regime.
         ] {
-            assert!(!calendar.is_holiday(date), "{id} unexpected {date}");
+            assert!(
+                !calendar.is_holiday(date).expect("calendar lookup"),
+                "{id} unexpected {date}"
+            );
         }
     }
 }
@@ -300,7 +427,10 @@ fn japan_matches_cabinet_office_holidays_1970_through_2027() {
                 && !matches!(date.weekday(), Weekday::Saturday | Weekday::Sunday);
             for id in ["jpto", "jpx"] {
                 assert_eq!(
-                    calendar_by_id_strict(id).unwrap().is_business_day(date),
+                    calendar_by_id_strict(id)
+                        .unwrap()
+                        .is_business_day(date)
+                        .expect("calendar lookup"),
                     business,
                     "{id} {date}"
                 );
@@ -323,14 +453,32 @@ fn japan_golden_week_and_citizens_holiday_adjustments() {
             make_date(2026, 5, 7),
             "{id}: substitute skips May 4 and May 5"
         );
-        assert!(!calendar.is_business_day(make_date(2026, 9, 22)));
-        assert!(calendar.is_business_day(make_date(2026, 9, 24)));
         assert!(
-            calendar.is_business_day(make_date(2023, 2, 10)),
+            !calendar
+                .is_business_day(make_date(2026, 9, 22))
+                .expect("calendar lookup")
+        );
+        assert!(
+            calendar
+                .is_business_day(make_date(2026, 9, 24))
+                .expect("calendar lookup")
+        );
+        assert!(
+            calendar
+                .is_business_day(make_date(2023, 2, 10))
+                .expect("calendar lookup"),
             "{id}: Saturday Feb 11 has no Friday substitute"
         );
-        assert!(!calendar.is_business_day(make_date(2027, 3, 22)));
-        assert!(!calendar.is_business_day(make_date(2026, 12, 31)));
+        assert!(
+            !calendar
+                .is_business_day(make_date(2027, 3, 22))
+                .expect("calendar lookup")
+        );
+        assert!(
+            !calendar
+                .is_business_day(make_date(2026, 12, 31))
+                .expect("calendar lookup")
+        );
     }
 }
 
@@ -708,32 +856,48 @@ const CASES: &[CalendarCase] = &[
 fn exchange_calendars_are_not_aliases() {
     let eve = make_date(2025, 12, 24);
     let nye = make_date(2025, 12, 31);
-    assert!(by_id("eurex").is_holiday(eve));
-    assert!(by_id("eurex").is_holiday(nye));
+    assert!(by_id("eurex").is_holiday(eve).expect("calendar lookup"));
+    assert!(by_id("eurex").is_holiday(nye).expect("calendar lookup"));
     assert!(
-        by_id("defr").is_business_day(eve),
+        by_id("defr").is_business_day(eve).expect("calendar lookup"),
         "defr must remain open on Christmas Eve (eurex is not an alias)"
     );
     assert!(
-        by_id("defr").is_business_day(nye),
+        by_id("defr").is_business_day(nye).expect("calendar lookup"),
         "defr must remain open on New Year's Eve (eurex is not an alias)"
     );
 
     let truth = make_date(2025, 9, 30);
     let remembrance = make_date(2025, 11, 11);
     assert!(
-        by_id("tsx").is_business_day(truth),
+        by_id("tsx")
+            .is_business_day(truth)
+            .expect("calendar lookup"),
         "TSX trades on National Day for Truth and Reconciliation"
     );
     assert!(
-        by_id("tsx").is_business_day(remembrance),
+        by_id("tsx")
+            .is_business_day(remembrance)
+            .expect("calendar lookup"),
         "TSX trades on Remembrance Day"
     );
-    assert!(by_id("cato").is_holiday(truth));
-    assert!(by_id("cato").is_holiday(remembrance));
+    assert!(by_id("cato").is_holiday(truth).expect("calendar lookup"));
+    assert!(
+        by_id("cato")
+            .is_holiday(remembrance)
+            .expect("calendar lookup")
+    );
 
-    assert!(by_id("nse").is_holiday(make_date(2026, 1, 26)));
-    assert!(by_id("nse").is_holiday(make_date(2026, 3, 3)));
+    assert!(
+        by_id("nse")
+            .is_holiday(make_date(2026, 1, 26))
+            .expect("calendar lookup")
+    );
+    assert!(
+        by_id("nse")
+            .is_holiday(make_date(2026, 3, 3))
+            .expect("calendar lookup")
+    );
     let independence_saturday = make_date(2026, 8, 15);
     assert_eq!(
         independence_saturday.weekday(),
@@ -741,15 +905,27 @@ fn exchange_calendars_are_not_aliases() {
         "2026-08-15 must be Saturday for this regression"
     );
     assert!(
-        by_id("nse").is_business_day(make_date(2026, 8, 14)),
+        by_id("nse")
+            .is_business_day(make_date(2026, 8, 14))
+            .expect("calendar lookup"),
         "Independence Day 2026 is Saturday; Friday is not an observed weekday holiday"
     );
     assert!(
-        by_id("nse").is_business_day(make_date(2026, 8, 17)),
+        by_id("nse")
+            .is_business_day(make_date(2026, 8, 17))
+            .expect("calendar lookup"),
         "Independence Day 2026 is Saturday; Monday is not an observed weekday holiday"
     );
-    assert!(by_id("bse").is_holiday(make_date(2026, 1, 26)));
-    assert!(by_id("bse").is_holiday(make_date(2026, 3, 3)));
+    assert!(
+        by_id("bse")
+            .is_holiday(make_date(2026, 1, 26))
+            .expect("calendar lookup")
+    );
+    assert!(
+        by_id("bse")
+            .is_holiday(make_date(2026, 3, 3))
+            .expect("calendar lookup")
+    );
 
     let ids = available_calendars();
     for id in ["eurex", "six", "tsx", "nse", "bse"] {
@@ -797,7 +973,10 @@ fn test_calendar_by_id_lookup() {
         assert!(typed.is_ok(), "Free resolver should find '{}'", id);
 
         let mid_week_date = make_date(2025, 6, 18);
-        let _ = cal.unwrap().is_holiday(mid_week_date);
+        let _ = cal
+            .unwrap()
+            .is_holiday(mid_week_date)
+            .expect("calendar lookup");
     }
 }
 
@@ -809,9 +988,18 @@ fn test_unknown_calendar_id() {
 #[test]
 fn test_calendar_weekend_behavior() {
     let cal = by_id("gblo");
-    assert!(!cal.is_business_day(make_date(2025, 6, 21)));
-    assert!(!cal.is_business_day(make_date(2025, 6, 22)));
-    assert!(cal.is_business_day(make_date(2025, 6, 18)));
+    assert!(
+        !cal.is_business_day(make_date(2025, 6, 21))
+            .expect("calendar lookup")
+    );
+    assert!(
+        !cal.is_business_day(make_date(2025, 6, 22))
+            .expect("calendar lookup")
+    );
+    assert!(
+        cal.is_business_day(make_date(2025, 6, 18))
+            .expect("calendar lookup")
+    );
 }
 
 // Chinese New Year Edge Cases (1970-2150)
@@ -824,7 +1012,7 @@ fn check_cny_dates(dates: &[(i32, u8, u8)]) {
         let date = make_date(y, m, d);
         for cal in &calendars {
             assert!(
-                cal.is_holiday(date),
+                cal.is_holiday(date).expect("calendar lookup"),
                 "Calendar {} should have holiday on {}-{}-{}",
                 cal.metadata().unwrap().id,
                 y,
@@ -895,7 +1083,7 @@ fn sse_cnbe_match_official_closure_notices_2024_2026() {
             let end = make_date(ey, em, ed);
             while d <= end {
                 assert!(
-                    !cal.is_business_day(d),
+                    !cal.is_business_day(d).expect("calendar lookup"),
                     "{id}: {d} should be closed (official holiday range)"
                 );
                 d += time::Duration::days(1);
@@ -903,7 +1091,8 @@ fn sse_cnbe_match_official_closure_notices_2024_2026() {
         }
         for &(y, m, d) in reopen {
             assert!(
-                cal.is_business_day(make_date(y, m, d)),
+                cal.is_business_day(make_date(y, m, d))
+                    .expect("calendar lookup"),
                 "{id}: {y}-{m:02}-{d:02} should be a business day (reopen)"
             );
         }
@@ -933,7 +1122,9 @@ fn sse_lunar_festivals_and_bridges_present() {
     ];
     for &(y, m, d) in must_be_holiday {
         assert!(
-            by_id("sse").is_holiday(make_date(y, m, d)),
+            by_id("sse")
+                .is_holiday(make_date(y, m, d))
+                .expect("calendar lookup"),
             "SSE should mark {y}-{m:02}-{d:02} as a holiday"
         );
     }
@@ -941,17 +1132,23 @@ fn sse_lunar_festivals_and_bridges_present() {
     // Dragon Boat and Mid-Autumn only became statutory in 2008; SSE traded on
     // them before then. 2007 Dragon Boat = Jun 19, 2007 Mid-Autumn = Sep 25.
     assert!(
-        by_id("sse").is_business_day(make_date(2007, 6, 19)),
+        by_id("sse")
+            .is_business_day(make_date(2007, 6, 19))
+            .expect("calendar lookup"),
         "Dragon Boat pre-dates its 2008 adoption"
     );
     assert!(
-        by_id("sse").is_business_day(make_date(2007, 9, 25)),
+        by_id("sse")
+            .is_business_day(make_date(2007, 9, 25))
+            .expect("calendar lookup"),
         "Mid-Autumn pre-dates its 2008 adoption"
     );
     // 2008 was the first year Dragon Boat was observed; it fell on Sunday
     // Jun 8, so the market closure is the substitute Monday Jun 9.
     assert!(
-        by_id("sse").is_holiday(make_date(2008, 6, 9)),
+        by_id("sse")
+            .is_holiday(make_date(2008, 6, 9))
+            .expect("calendar lookup"),
         "Dragon Boat 2008 substitute Monday"
     );
 }
@@ -963,16 +1160,32 @@ fn mainland_calendars_use_published_2022_closure_boundaries() {
         ("cnbe", by_id("cnbe") as &dyn HolidayCalendar),
     ] {
         assert!(
-            calendar.is_holiday(make_date(2022, 1, 31)),
+            calendar
+                .is_holiday(make_date(2022, 1, 31))
+                .expect("calendar lookup"),
             "{name} must close on the first published Spring Festival day"
         );
         assert!(
-            calendar.is_business_day(make_date(2022, 2, 7)),
+            calendar
+                .is_business_day(make_date(2022, 2, 7))
+                .expect("calendar lookup"),
             "{name} must reopen after the published Spring Festival closure"
         );
-        assert!(calendar.is_holiday(make_date(2022, 4, 30)));
-        assert!(calendar.is_holiday(make_date(2022, 5, 4)));
-        assert!(calendar.is_business_day(make_date(2022, 5, 5)));
+        assert!(
+            calendar
+                .is_holiday(make_date(2022, 4, 30))
+                .expect("calendar lookup")
+        );
+        assert!(
+            calendar
+                .is_holiday(make_date(2022, 5, 4))
+                .expect("calendar lookup")
+        );
+        assert!(
+            calendar
+                .is_business_day(make_date(2022, 5, 5))
+                .expect("calendar lookup")
+        );
     }
 }
 
@@ -999,11 +1212,14 @@ fn mainland_calendars_include_historical_official_one_off_closures() {
         ("cnbe", by_id("cnbe") as &dyn HolidayCalendar),
     ] {
         for date in closures {
-            assert!(calendar.is_holiday(date), "{name} must close on {date}");
+            assert!(
+                calendar.is_holiday(date).expect("calendar lookup"),
+                "{name} must close on {date}"
+            );
         }
         for date in adjacent_business_days {
             assert!(
-                calendar.is_business_day(date),
+                calendar.is_business_day(date).expect("calendar lookup"),
                 "{name} must remain open on published boundary {date}"
             );
         }
@@ -1032,25 +1248,33 @@ fn usny_fed_observance_saturday_no_substitute_sunday_to_monday() {
     // NYSE holiday.
     let fri_jul3_2026 = make_date(2026, 7, 3);
     assert!(
-        by_id("usny").is_business_day(fri_jul3_2026),
+        by_id("usny")
+            .is_business_day(fri_jul3_2026)
+            .expect("calendar lookup"),
         "Fed convention: no Friday substitute when July 4 falls on Saturday"
     );
     assert!(
-        by_id("nyse").is_holiday(fri_jul3_2026),
+        by_id("nyse")
+            .is_holiday(fri_jul3_2026)
+            .expect("calendar lookup"),
         "NYSE observes Saturday July 4 on the preceding Friday"
     );
 
     // Christmas 2027 falls on Saturday: Fri 2027-12-24 is a USNY business day.
     let fri_dec24_2027 = make_date(2027, 12, 24);
     assert!(
-        by_id("usny").is_business_day(fri_dec24_2027),
+        by_id("usny")
+            .is_business_day(fri_dec24_2027)
+            .expect("calendar lookup"),
         "Fed convention: banks open Fri 2027-12-24 (Christmas on Saturday)"
     );
 
     // New Year's Day 2023 fell on Sunday: Mon 2023-01-02 is a USNY holiday.
     let mon_jan2_2023 = make_date(2023, 1, 2);
     assert!(
-        by_id("usny").is_holiday(mon_jan2_2023),
+        by_id("usny")
+            .is_holiday(mon_jan2_2023)
+            .expect("calendar lookup"),
         "Fed convention: Sunday holiday observed the following Monday"
     );
 }
@@ -1065,9 +1289,14 @@ fn sofr_calendar_follows_repo_closures_independently_of_banking_and_trading() {
         (make_date(2026, 4, 3), make_date(2026, 4, 6)),
         (make_date(2026, 7, 3), make_date(2026, 7, 6)),
     ] {
-        assert!(!sofr.is_business_day(holiday), "SOFR closure: {holiday}");
         assert!(
-            by_id("usny").is_business_day(holiday),
+            !sofr.is_business_day(holiday).expect("calendar lookup"),
+            "SOFR closure: {holiday}"
+        );
+        assert!(
+            by_id("usny")
+                .is_business_day(holiday)
+                .expect("calendar lookup"),
             "banking day: {holiday}"
         );
         assert_eq!(
@@ -1077,18 +1306,47 @@ fn sofr_calendar_follows_repo_closures_independently_of_banking_and_trading() {
     }
     // Good Friday 2026 is a SIFMA early-close trading session, but the
     // cleared repo market is closed and SOFR does not fix.
-    assert!(by_id("sifma").is_business_day(make_date(2026, 4, 3)));
+    assert!(
+        by_id("sifma")
+            .is_business_day(make_date(2026, 4, 3))
+            .expect("calendar lookup")
+    );
 
     // Repo observance is holiday-specific; do not import the federal-workforce
     // Friday-substitution rule for New Year's Day or Veterans Day.
-    assert!(sofr.is_business_day(make_date(2021, 12, 31)));
-    assert!(sofr.is_business_day(make_date(2023, 11, 10)));
-    assert!(!sofr.is_business_day(make_date(2021, 12, 24)));
-    assert!(!sofr.is_business_day(make_date(2023, 1, 2)));
-    assert!(!sofr.is_business_day(make_date(2022, 6, 20)));
-    assert!(!sofr.is_business_day(make_date(2018, 12, 5)));
+    assert!(
+        sofr.is_business_day(make_date(2021, 12, 31))
+            .expect("calendar lookup")
+    );
+    assert!(
+        sofr.is_business_day(make_date(2023, 11, 10))
+            .expect("calendar lookup")
+    );
+    assert!(
+        !sofr
+            .is_business_day(make_date(2021, 12, 24))
+            .expect("calendar lookup")
+    );
+    assert!(
+        !sofr
+            .is_business_day(make_date(2023, 1, 2))
+            .expect("calendar lookup")
+    );
+    assert!(
+        !sofr
+            .is_business_day(make_date(2022, 6, 20))
+            .expect("calendar lookup")
+    );
+    assert!(
+        !sofr
+            .is_business_day(make_date(2018, 12, 5))
+            .expect("calendar lookup")
+    );
     // The 2025 Carter mourning day was an early close, with unchanged SOFR.
-    assert!(sofr.is_business_day(make_date(2025, 1, 9)));
+    assert!(
+        sofr.is_business_day(make_date(2025, 1, 9))
+            .expect("calendar lookup")
+    );
 }
 
 /// UK chained substitution for Christmas/Boxing Day: the two observed days
@@ -1097,36 +1355,66 @@ fn sofr_calendar_follows_repo_closures_independently_of_banking_and_trading() {
 fn gblo_christmas_boxing_day_chained_substitution() {
     // 2021: Dec 25 = Saturday, Dec 26 = Sunday.
     // Actual UK bank holidays: Mon 27 Dec + Tue 28 Dec.
-    assert!(by_id("gblo").is_holiday(make_date(2021, 12, 27)));
-    assert!(by_id("gblo").is_holiday(make_date(2021, 12, 28)));
     assert!(
-        by_id("gblo").is_business_day(make_date(2021, 12, 24)),
+        by_id("gblo")
+            .is_holiday(make_date(2021, 12, 27))
+            .expect("calendar lookup")
+    );
+    assert!(
+        by_id("gblo")
+            .is_holiday(make_date(2021, 12, 28))
+            .expect("calendar lookup")
+    );
+    assert!(
+        by_id("gblo")
+            .is_business_day(make_date(2021, 12, 24))
+            .expect("calendar lookup"),
         "Fri 2021-12-24 was a UK working day"
     );
     assert!(
-        by_id("gblo").is_business_day(make_date(2021, 12, 29)),
+        by_id("gblo")
+            .is_business_day(make_date(2021, 12, 29))
+            .expect("calendar lookup"),
         "Wed 2021-12-29 was a UK working day"
     );
 
     // 2022: Dec 25 = Sunday, Dec 26 = Monday.
     // Actual UK bank holidays: Mon 26 Dec (Boxing Day) + Tue 27 Dec (substitute).
-    assert!(by_id("gblo").is_holiday(make_date(2022, 12, 26)));
     assert!(
-        by_id("gblo").is_holiday(make_date(2022, 12, 27)),
+        by_id("gblo")
+            .is_holiday(make_date(2022, 12, 26))
+            .expect("calendar lookup")
+    );
+    assert!(
+        by_id("gblo")
+            .is_holiday(make_date(2022, 12, 27))
+            .expect("calendar lookup"),
         "Tue 2022-12-27 was the Christmas Day substitute (previously collapsed)"
     );
     assert!(
-        by_id("gblo").is_business_day(make_date(2022, 12, 28)),
+        by_id("gblo")
+            .is_business_day(make_date(2022, 12, 28))
+            .expect("calendar lookup"),
         "Wed 2022-12-28 was a UK working day"
     );
 
     // 2027: Dec 25 = Saturday, Dec 26 = Sunday (same shape as 2021).
-    assert!(by_id("gblo").is_holiday(make_date(2027, 12, 27)));
     assert!(
-        by_id("gblo").is_holiday(make_date(2027, 12, 28)),
+        by_id("gblo")
+            .is_holiday(make_date(2027, 12, 27))
+            .expect("calendar lookup")
+    );
+    assert!(
+        by_id("gblo")
+            .is_holiday(make_date(2027, 12, 28))
+            .expect("calendar lookup"),
         "Tue 2027-12-28 substitute was previously missing"
     );
-    assert!(by_id("gblo").is_business_day(make_date(2027, 12, 29)));
+    assert!(
+        by_id("gblo")
+            .is_business_day(make_date(2027, 12, 29))
+            .expect("calendar lookup")
+    );
 }
 
 /// UK one-off bank holidays and moved May bank holidays (gov.uk history).
@@ -1134,35 +1422,73 @@ fn gblo_christmas_boxing_day_chained_substitution() {
 fn gblo_one_off_and_moved_bank_holidays() {
     // 2012 Diamond Jubilee: Spring BH moved to Mon Jun 4, extra day Tue Jun 5;
     // the regular last-Monday-of-May (May 28) was a working day.
-    assert!(by_id("gblo").is_holiday(make_date(2012, 6, 4)));
-    assert!(by_id("gblo").is_holiday(make_date(2012, 6, 5)));
     assert!(
-        by_id("gblo").is_business_day(make_date(2012, 5, 28)),
+        by_id("gblo")
+            .is_holiday(make_date(2012, 6, 4))
+            .expect("calendar lookup")
+    );
+    assert!(
+        by_id("gblo")
+            .is_holiday(make_date(2012, 6, 5))
+            .expect("calendar lookup")
+    );
+    assert!(
+        by_id("gblo")
+            .is_business_day(make_date(2012, 5, 28))
+            .expect("calendar lookup"),
         "Spring Bank Holiday was moved out of May in 2012"
     );
 
     // 2020 VE Day 75th anniversary: Early May BH moved from Mon May 4 to Fri May 8.
-    assert!(by_id("gblo").is_holiday(make_date(2020, 5, 8)));
     assert!(
-        by_id("gblo").is_business_day(make_date(2020, 5, 4)),
+        by_id("gblo")
+            .is_holiday(make_date(2020, 5, 8))
+            .expect("calendar lookup")
+    );
+    assert!(
+        by_id("gblo")
+            .is_business_day(make_date(2020, 5, 4))
+            .expect("calendar lookup"),
         "Early May Bank Holiday was moved to May 8 in 2020"
     );
 
     // 2022 Platinum Jubilee: Spring BH moved to Thu Jun 2, extra day Fri Jun 3;
     // last Monday of May (May 30) was a working day.
-    assert!(by_id("gblo").is_holiday(make_date(2022, 6, 2)));
-    assert!(by_id("gblo").is_holiday(make_date(2022, 6, 3)));
     assert!(
-        by_id("gblo").is_business_day(make_date(2022, 5, 30)),
+        by_id("gblo")
+            .is_holiday(make_date(2022, 6, 2))
+            .expect("calendar lookup")
+    );
+    assert!(
+        by_id("gblo")
+            .is_holiday(make_date(2022, 6, 3))
+            .expect("calendar lookup")
+    );
+    assert!(
+        by_id("gblo")
+            .is_business_day(make_date(2022, 5, 30))
+            .expect("calendar lookup"),
         "Spring Bank Holiday was moved out of May in 2022"
     );
 
     // 2022-09-19: State Funeral of Queen Elizabeth II.
-    assert!(by_id("gblo").is_holiday(make_date(2022, 9, 19)));
+    assert!(
+        by_id("gblo")
+            .is_holiday(make_date(2022, 9, 19))
+            .expect("calendar lookup")
+    );
 
     // 2023-05-08: Coronation of King Charles III (extra; Early May BH May 1 kept).
-    assert!(by_id("gblo").is_holiday(make_date(2023, 5, 8)));
-    assert!(by_id("gblo").is_holiday(make_date(2023, 5, 1)));
+    assert!(
+        by_id("gblo")
+            .is_holiday(make_date(2023, 5, 8))
+            .expect("calendar lookup")
+    );
+    assert!(
+        by_id("gblo")
+            .is_holiday(make_date(2023, 5, 1))
+            .expect("calendar lookup")
+    );
 }
 
 /// Dia da Consciência Negra became a Brazilian national holiday only from 2024
@@ -1170,36 +1496,84 @@ fn gblo_one_off_and_moved_bank_holidays() {
 #[test]
 fn brbd_consciencia_negra_year_gated_from_2024() {
     assert!(
-        by_id("brbd").is_business_day(make_date(2023, 11, 20)),
+        by_id("brbd")
+            .is_business_day(make_date(2023, 11, 20))
+            .expect("calendar lookup"),
         "National accrual holiday applies from 2024"
     );
-    assert!(by_id("brbd").is_holiday(make_date(2024, 11, 20)));
+    assert!(
+        by_id("brbd")
+            .is_holiday(make_date(2024, 11, 20))
+            .expect("calendar lookup")
+    );
 }
 
 #[test]
 fn swiss_and_frankfurt_calendars_do_not_substitute_weekend_holidays() {
     for calendar in [by_id("six") as &dyn HolidayCalendar, by_id("chzh")] {
-        assert!(calendar.is_holiday(make_date(2026, 8, 1)));
-        assert!(calendar.is_business_day(make_date(2026, 8, 3)));
-        assert!(calendar.is_holiday(make_date(2026, 12, 25)));
-        assert!(calendar.is_holiday(make_date(2026, 12, 26)));
-        assert!(calendar.is_business_day(make_date(2026, 12, 28)));
+        assert!(
+            calendar
+                .is_holiday(make_date(2026, 8, 1))
+                .expect("calendar lookup")
+        );
+        assert!(
+            calendar
+                .is_business_day(make_date(2026, 8, 3))
+                .expect("calendar lookup")
+        );
+        assert!(
+            calendar
+                .is_holiday(make_date(2026, 12, 25))
+                .expect("calendar lookup")
+        );
+        assert!(
+            calendar
+                .is_holiday(make_date(2026, 12, 26))
+                .expect("calendar lookup")
+        );
+        assert!(
+            calendar
+                .is_business_day(make_date(2026, 12, 28))
+                .expect("calendar lookup")
+        );
     }
 
-    assert!(by_id("defr").is_holiday(make_date(2026, 12, 25)));
-    assert!(by_id("defr").is_holiday(make_date(2026, 12, 26)));
-    assert!(by_id("defr").is_business_day(make_date(2026, 12, 28)));
+    assert!(
+        by_id("defr")
+            .is_holiday(make_date(2026, 12, 25))
+            .expect("calendar lookup")
+    );
+    assert!(
+        by_id("defr")
+            .is_holiday(make_date(2026, 12, 26))
+            .expect("calendar lookup")
+    );
+    assert!(
+        by_id("defr")
+            .is_business_day(make_date(2026, 12, 28))
+            .expect("calendar lookup")
+    );
 }
 
 #[test]
 fn nerc_observes_sunday_holidays_on_monday_and_leaves_saturday_holidays() {
     let nerc = calendar_by_id_strict("nerc").unwrap();
     // 2026-07-04 is a Saturday: not moved, so Friday 2026-07-03 trades.
-    assert!(nerc.is_business_day(make_date(2026, 7, 3)));
+    assert!(
+        nerc.is_business_day(make_date(2026, 7, 3))
+            .expect("calendar lookup")
+    );
     // 2027-07-04 is a Sunday: observed on Monday 2027-07-05.
-    assert!(!nerc.is_business_day(make_date(2027, 7, 5)));
+    assert!(
+        !nerc
+            .is_business_day(make_date(2027, 7, 5))
+            .expect("calendar lookup")
+    );
     // Federal-only holidays (MLK Day) are NERC business days.
-    assert!(nerc.is_business_day(make_date(2026, 1, 19)));
+    assert!(
+        nerc.is_business_day(make_date(2026, 1, 19))
+            .expect("calendar lookup")
+    );
     for holiday in [
         make_date(2026, 1, 1),
         make_date(2026, 5, 25),
@@ -1207,6 +1581,9 @@ fn nerc_observes_sunday_holidays_on_monday_and_leaves_saturday_holidays() {
         make_date(2026, 11, 26),
         make_date(2026, 12, 25),
     ] {
-        assert!(!nerc.is_business_day(holiday), "{holiday}");
+        assert!(
+            !nerc.is_business_day(holiday).expect("calendar lookup"),
+            "{holiday}"
+        );
     }
 }

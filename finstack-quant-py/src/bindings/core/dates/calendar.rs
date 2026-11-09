@@ -214,7 +214,7 @@ impl PyHolidayCalendar {
     /// for an invalid calendar date or ISO string.
     #[pyo3(text_signature = "(self, date)")]
     fn is_holiday(&self, date: &Bound<'_, PyAny>) -> PyResult<bool> {
-        Ok(self.cal.is_holiday(py_to_date(date)?))
+        self.cal.is_holiday(py_to_date(date)?).map_err(core_to_py)
     }
 
     /// Whether ``date`` is a business day (neither a weekend nor a holiday).
@@ -223,7 +223,9 @@ impl PyHolidayCalendar {
     /// for an invalid calendar date or ISO string.
     #[pyo3(text_signature = "(self, date)")]
     fn is_business_day(&self, date: &Bound<'_, PyAny>) -> PyResult<bool> {
-        Ok(self.cal.is_business_day(py_to_date(date)?))
+        self.cal
+            .is_business_day(py_to_date(date)?)
+            .map_err(core_to_py)
     }
 
     /// Count business days in ``[start, end)``.
@@ -252,9 +254,9 @@ impl PyHolidayCalendar {
         start: &Bound<'_, PyAny>,
         end: &Bound<'_, PyAny>,
     ) -> PyResult<i32> {
-        Ok(self
-            .cal
-            .count_business_days(py_to_date(start)?, py_to_date(end)?))
+        self.cal
+            .count_business_days(py_to_date(start)?, py_to_date(end)?)
+            .map_err(core_to_py)
     }
 
     /// Calendar metadata; ``None`` for ``+``-joined union calendars.

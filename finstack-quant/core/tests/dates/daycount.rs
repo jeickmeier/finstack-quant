@@ -1360,7 +1360,7 @@ fn bus252_full_year_is_deterministic() {
     let mut expected_biz_days: i32 = 0;
     let mut current = start;
     while current < end {
-        if calendar.is_business_day(current) {
+        if calendar.is_business_day(current).expect("calendar lookup") {
             expected_biz_days += 1;
         }
         current += time::Duration::days(1);

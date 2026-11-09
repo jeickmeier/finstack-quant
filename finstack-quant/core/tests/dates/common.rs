@@ -40,11 +40,11 @@ impl TestCal {
 }
 
 impl HolidayCalendar for TestCal {
-    fn is_holiday(&self, date: Date) -> bool {
-        self.holidays.contains(&date)
+    fn is_holiday(&self, date: Date) -> finstack_quant_core::Result<bool> {
+        Ok(self.holidays.contains(&date))
     }
 
-    fn is_business_day(&self, date: Date) -> bool {
-        !date.is_weekend() && !self.is_holiday(date)
+    fn is_business_day(&self, date: Date) -> finstack_quant_core::Result<bool> {
+        Ok(!date.is_weekend() && !self.is_holiday(date).expect("calendar lookup"))
     }
 }

@@ -456,7 +456,7 @@ pub fn project_arithmetic_overnight_rate(
     let mut observation_exposures = Vec::new();
     let mut fixing_date = None;
     let mut date = input.accrual_start;
-    let mut observation_date = if input.fixing_calendar.is_business_day(date) {
+    let mut observation_date = if input.fixing_calendar.is_business_day(date)? {
         date
     } else {
         date.add_business_days(-1, input.fixing_calendar)?

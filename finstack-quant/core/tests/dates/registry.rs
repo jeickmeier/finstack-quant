@@ -27,7 +27,10 @@ fn resolution_is_case_insensitive_and_unknown_is_none() {
 fn typed_id_resolves() {
     let id = CalendarId::from("target2");
     let cal = calendar_by_id_strict(id.as_str()).expect("TARGET2 resolves");
-    assert!(cal.is_holiday(make_date(2025, 1, 1)));
+    assert!(
+        cal.is_holiday(make_date(2025, 1, 1))
+            .expect("calendar lookup")
+    );
 }
 
 #[test]
@@ -47,8 +50,16 @@ fn strict_many_resolution_preserves_order_and_builds_composite() {
     assert_eq!(calendars[2].metadata().expect("metadata").id, "nyse");
 
     let composite = calendar_by_id_strict("gblo+target2").expect("joint id resolves");
-    assert!(composite.is_holiday(make_date(2025, 1, 1)));
-    assert!(composite.is_holiday(make_date(2025, 5, 26)));
+    assert!(
+        composite
+            .is_holiday(make_date(2025, 1, 1))
+            .expect("calendar lookup")
+    );
+    assert!(
+        composite
+            .is_holiday(make_date(2025, 5, 26))
+            .expect("calendar lookup")
+    );
 }
 
 #[test]

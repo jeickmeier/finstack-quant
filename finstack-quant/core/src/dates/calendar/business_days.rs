@@ -55,22 +55,27 @@ pub(crate) const MAX_BUSINESS_DAY_SEARCH_DAYS: i32 = 100;
 /// Seek the nearest business day from `date` moving in steps of `step_days` (±1),
 /// searching up to [`MAX_BUSINESS_DAY_SEARCH_DAYS`] steps using the provided `cal`.
 ///
-/// Returns `Some(date)` when found, or `None` if no business day is found within the window.
+/// Returns `Ok(Some(date))` when found, `Ok(None)` if no business day is found
+/// within the window, and the calendar's error when membership cannot be
+/// determined.
 #[inline]
 pub(crate) fn seek_business_day<C: HolidayCalendar + ?Sized>(
     mut date: Date,
     step_days: i32,
     cal: &C,
-) -> Option<Date> {
+) -> crate::Result<Option<Date>> {
     let mut searched = 0;
-    while !cal.is_business_day(date) {
-        date = date.checked_add(Duration::days(i64::from(step_days)))?;
+    while !cal.is_business_day(date)? {
+        let Some(next) = date.checked_add(Duration::days(i64::from(step_days))) else {
+            return Ok(None);
+        };
+        date = next;
         searched += 1;
         if searched > MAX_BUSINESS_DAY_SEARCH_DAYS {
-            return None;
+            return Ok(None);
         }
     }
-    Some(date)
+    Ok(Some(date))
 }
 
 /// Trait for market-specific holiday calendars.
@@ -95,20 +100,21 @@ pub(crate) fn seek_business_day<C: HolidayCalendar + ?Sized>(
 /// struct CustomCalendar;
 ///
 /// impl HolidayCalendar for CustomCalendar {
-///     fn is_holiday(&self, date: Date) -> bool {
+///     fn is_holiday(&self, date: Date) -> finstack_quant_core::Result<bool> {
 ///         // Example: Only New Year's Day
-///         date.month() == time::Month::January && date.day() == 1
+///         Ok(date.month() == time::Month::January && date.day() == 1)
 ///     }
 ///
-///     fn is_business_day(&self, date: Date) -> bool {
-///         !date.is_weekend() && !self.is_holiday(date)
+///     fn is_business_day(&self, date: Date) -> finstack_quant_core::Result<bool> {
+///         Ok(!date.is_weekend() && !self.is_holiday(date)?)
 ///     }
 /// }
 ///
 /// let cal = CustomCalendar;
 /// let new_year = Date::from_calendar_date(2025, time::Month::January, 1).expect("Valid date");
-/// assert!(cal.is_holiday(new_year));
-/// assert!(!cal.is_business_day(new_year)); // Holiday = not business day
+/// assert!(cal.is_holiday(new_year)?);
+/// assert!(!cal.is_business_day(new_year)?); // Holiday = not business day
+/// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 pub trait HolidayCalendar: Send + Sync {
     /// Returns `true` if `date` is a holiday according to this calendar.
@@ -118,7 +124,17 @@ pub trait HolidayCalendar: Send + Sync {
     /// - Some calendars intentionally ignore weekends and will return `false`
     ///   for Saturday/Sunday. This only affects `is_holiday`; use
     ///   [`HolidayCalendar::is_business_day`] for business-day logic.
-    fn is_holiday(&self, date: Date) -> bool;
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the calendar cannot determine membership for
+    /// `date` (for example missing required source data or an invalid
+    /// definition). A failure is never reported as "not a holiday".
+    ///
+    /// # Arguments
+    ///
+    /// * `date` - Calendar date to classify.
+    fn is_holiday(&self, date: Date) -> crate::Result<bool>;
 
     /// Returns `true` if the `date` is a business day according to the
     /// calendar (i.e. not weekend and not holiday).
@@ -128,21 +144,30 @@ pub trait HolidayCalendar: Send + Sync {
     /// [`DateExt::is_weekend`](crate::dates::DateExt::is_weekend)); it is
     /// independent of how the calendar labels weekends in [`Self::is_holiday`].
     ///
+    /// # Errors
+    ///
+    /// Returns an error when the calendar cannot determine membership for
+    /// `date`; a failure is never reported as a business day.
+    ///
     /// # Arguments
     ///
     /// * `date` - Calendar date to classify.
-    fn is_business_day(&self, date: Date) -> bool;
+    fn is_business_day(&self, date: Date) -> crate::Result<bool>;
 
     /// Counts business days in the half-open interval `[start, end)`.
     ///
     /// Returns zero when `start >= end`. Implementors may override this method
     /// with an equivalent optimized count.
     ///
+    /// # Errors
+    ///
+    /// Returns the first membership error for any date in the interval.
+    ///
     /// # Arguments
     ///
     /// * `start` - First date included in the count.
     /// * `end` - Boundary date excluded from the count.
-    fn count_business_days(&self, start: Date, end: Date) -> i32 {
+    fn count_business_days(&self, start: Date, end: Date) -> crate::Result<i32> {
         count_business_days_by_scan(self, start, end)
     }
 
@@ -163,15 +188,15 @@ pub trait HolidayCalendar: Send + Sync {
 }
 
 impl<T: HolidayCalendar + ?Sized> HolidayCalendar for &T {
-    fn is_holiday(&self, date: Date) -> bool {
+    fn is_holiday(&self, date: Date) -> crate::Result<bool> {
         (**self).is_holiday(date)
     }
 
-    fn is_business_day(&self, date: Date) -> bool {
+    fn is_business_day(&self, date: Date) -> crate::Result<bool> {
         (**self).is_business_day(date)
     }
 
-    fn count_business_days(&self, start: Date, end: Date) -> i32 {
+    fn count_business_days(&self, start: Date, end: Date) -> crate::Result<i32> {
         (**self).count_business_days(start, end)
     }
 
@@ -190,16 +215,16 @@ pub(super) fn count_business_days_by_scan<C: HolidayCalendar + ?Sized>(
     calendar: &C,
     start: Date,
     end: Date,
-) -> i32 {
+) -> crate::Result<i32> {
     let mut count = 0_i32;
     let mut current = start;
     while current < end {
-        if calendar.is_business_day(current) {
+        if calendar.is_business_day(current)? {
             count += 1;
         }
         current += Duration::days(1);
     }
-    count
+    Ok(count)
 }
 
 /// Basic metadata describing a holiday calendar.
@@ -351,7 +376,7 @@ pub fn adjust<C: HolidayCalendar + ?Sized>(
     conv: BusinessDayConvention,
     cal: &C,
 ) -> Result<Date, Error> {
-    if cal.is_business_day(date) {
+    if cal.is_business_day(date)? {
         return Ok(date);
     }
     let seek = |step: i32| seek_business_day(date, step, cal);
@@ -364,7 +389,7 @@ pub fn adjust<C: HolidayCalendar + ?Sized>(
         BusinessDayConvention::Preceding => (-1, false),
         BusinessDayConvention::ModifiedPreceding => (-1, true),
         BusinessDayConvention::Nearest => {
-            return match (seek(1), seek(-1)) {
+            return match (seek(1)?, seek(-1)?) {
                 (Some(f), Some(b)) => {
                     let df = (f - date).whole_days().unsigned_abs();
                     let db = (date - b).whole_days().unsigned_abs();
@@ -376,9 +401,9 @@ pub fn adjust<C: HolidayCalendar + ?Sized>(
             };
         }
     };
-    let candidate = seek(step).ok_or_else(failed)?;
+    let candidate = seek(step)?.ok_or_else(failed)?;
     if modified && candidate.month() != date.month() {
-        return seek(-step).ok_or_else(failed);
+        return seek(-step)?.ok_or_else(failed);
     }
     Ok(candidate)
 }
@@ -601,22 +626,24 @@ mod serde_tests {
     struct Jan30And31Holidays;
 
     impl HolidayCalendar for Jan29Holiday {
-        fn is_holiday(&self, date: Date) -> bool {
-            date.year() == 2025 && date.month() == Month::January && date.day() == 29
+        fn is_holiday(&self, date: Date) -> crate::Result<bool> {
+            Ok(date.year() == 2025 && date.month() == Month::January && date.day() == 29)
         }
 
-        fn is_business_day(&self, date: Date) -> bool {
-            !date.is_weekend() && !self.is_holiday(date)
+        fn is_business_day(&self, date: Date) -> crate::Result<bool> {
+            Ok(!date.is_weekend() && !self.is_holiday(date).expect("calendar lookup"))
         }
     }
 
     impl HolidayCalendar for Jan30And31Holidays {
-        fn is_holiday(&self, date: Date) -> bool {
-            date.year() == 2025 && date.month() == Month::January && matches!(date.day(), 30 | 31)
+        fn is_holiday(&self, date: Date) -> crate::Result<bool> {
+            Ok(date.year() == 2025
+                && date.month() == Month::January
+                && matches!(date.day(), 30 | 31))
         }
 
-        fn is_business_day(&self, date: Date) -> bool {
-            !date.is_weekend() && !self.is_holiday(date)
+        fn is_business_day(&self, date: Date) -> crate::Result<bool> {
+            Ok(!date.is_weekend() && !self.is_holiday(date).expect("calendar lookup"))
         }
     }
 
@@ -665,14 +692,19 @@ mod serde_tests {
         // 2025-07-04 (US Independence Day): NYSE holiday, GBLO business day.
         let july4 = date!(2025 - 07 - 04);
         let joint = calendar_by_id_strict("nyse+gblo").expect("joint");
-        assert!(!joint.is_business_day(july4));
+        assert!(!joint.is_business_day(july4).expect("calendar lookup"));
         assert!(
             calendar_by_id_strict("gblo")
                 .expect("gblo")
                 .is_business_day(july4)
+                .expect("calendar lookup")
         );
         // 2025-08-25 (UK Summer bank holiday): GBLO holiday, NYSE open.
-        assert!(!joint.is_business_day(date!(2025 - 08 - 25)));
+        assert!(
+            !joint
+                .is_business_day(date!(2025 - 08 - 25))
+                .expect("calendar lookup")
+        );
 
         let same = calendar_by_id_strict("GBLO + nyse").expect("normalized");
         assert!(std::ptr::eq(
@@ -727,9 +759,9 @@ mod serde_tests {
         let saturday = create_date(2024, Month::January, 13).unwrap();
         let sunday = create_date(2024, Month::January, 14).unwrap();
         let monday = create_date(2024, Month::January, 15).unwrap();
-        assert!(!cal.is_business_day(saturday));
-        assert!(!cal.is_business_day(sunday));
-        assert!(cal.is_business_day(monday));
+        assert!(!cal.is_business_day(saturday).expect("calendar lookup"));
+        assert!(!cal.is_business_day(sunday).expect("calendar lookup"));
+        assert!(cal.is_business_day(monday).expect("calendar lookup"));
     }
 
     #[test]

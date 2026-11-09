@@ -244,12 +244,13 @@ mod tests {
     fn context_snapshot_rejects_unregistered_custom_calendar() {
         struct CustomCalendar;
         impl HolidayCalendar for CustomCalendar {
-            fn is_holiday(&self, date: Date) -> bool {
-                date.month() == time::Month::June && date.day() == 1
+            fn is_holiday(&self, date: Date) -> crate::Result<bool> {
+                Ok(date.month() == time::Month::June && date.day() == 1)
             }
 
-            fn is_business_day(&self, date: Date) -> bool {
-                !crate::dates::DateExt::is_weekend(date) && !self.is_holiday(date)
+            fn is_business_day(&self, date: Date) -> crate::Result<bool> {
+                Ok(!crate::dates::DateExt::is_weekend(date)
+                    && !self.is_holiday(date).expect("calendar lookup"))
             }
         }
 

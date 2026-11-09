@@ -142,21 +142,23 @@ fn test_nyse_calendar_holidays() {
     // US Independence Day (July 4th)
     let independence_day = Date::from_calendar_date(2025, Month::July, 4).unwrap();
     assert!(
-        calendar.is_holiday(independence_day),
+        calendar
+            .is_holiday(independence_day)
+            .expect("calendar lookup"),
         "July 4th should be a NYSE holiday"
     );
 
     // Christmas Day
     let christmas = Date::from_calendar_date(2025, Month::December, 25).unwrap();
     assert!(
-        calendar.is_holiday(christmas),
+        calendar.is_holiday(christmas).expect("calendar lookup"),
         "December 25th should be a NYSE holiday"
     );
 
     // Regular business day
     let regular_day = Date::from_calendar_date(2025, Month::March, 10).unwrap();
     assert!(
-        !calendar.is_holiday(regular_day),
+        !calendar.is_holiday(regular_day).expect("calendar lookup"),
         "March 10, 2025 (Monday) should not be a NYSE holiday"
     );
 }
@@ -169,28 +171,28 @@ fn test_target2_calendar_holidays() {
     // New Year's Day
     let new_year = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     assert!(
-        calendar.is_holiday(new_year),
+        calendar.is_holiday(new_year).expect("calendar lookup"),
         "January 1st should be a TARGET2 holiday"
     );
 
     // Good Friday (April 18, 2025)
     let good_friday = Date::from_calendar_date(2025, Month::April, 18).unwrap();
     assert!(
-        calendar.is_holiday(good_friday),
+        calendar.is_holiday(good_friday).expect("calendar lookup"),
         "Good Friday should be a TARGET2 holiday"
     );
 
     // Easter Monday (April 21, 2025)
     let easter_monday = Date::from_calendar_date(2025, Month::April, 21).unwrap();
     assert!(
-        calendar.is_holiday(easter_monday),
+        calendar.is_holiday(easter_monday).expect("calendar lookup"),
         "Easter Monday should be a TARGET2 holiday"
     );
 
     // Regular business day
     let regular_day = Date::from_calendar_date(2025, Month::March, 10).unwrap();
     assert!(
-        !calendar.is_holiday(regular_day),
+        !calendar.is_holiday(regular_day).expect("calendar lookup"),
         "March 10, 2025 (Monday) should not be a TARGET2 holiday"
     );
 }
@@ -203,21 +205,21 @@ fn test_tokyo_calendar_holidays() {
     // New Year's Day
     let new_year = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     assert!(
-        calendar.is_holiday(new_year),
+        calendar.is_holiday(new_year).expect("calendar lookup"),
         "January 1st should be a Tokyo holiday"
     );
 
     // Coming of Age Day (2nd Monday of January - Jan 13, 2025)
     let coming_of_age = Date::from_calendar_date(2025, Month::January, 13).unwrap();
     assert!(
-        calendar.is_holiday(coming_of_age),
+        calendar.is_holiday(coming_of_age).expect("calendar lookup"),
         "Coming of Age Day should be a Tokyo holiday"
     );
 
     // Regular business day
     let regular_day = Date::from_calendar_date(2025, Month::March, 10).unwrap();
     assert!(
-        !calendar.is_holiday(regular_day),
+        !calendar.is_holiday(regular_day).expect("calendar lookup"),
         "March 10, 2025 (Monday) should not be a Tokyo holiday"
     );
 }

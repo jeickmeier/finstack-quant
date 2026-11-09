@@ -845,7 +845,7 @@ mod tests {
 
         // Saturday Jan 4 -> Monday Jan 6 (Following)
         assert!(
-            target2.is_business_day(adj_start),
+            target2.is_business_day(adj_start).expect("calendar lookup"),
             "Adjusted start should be a business day"
         );
         assert_eq!(
@@ -856,7 +856,9 @@ mod tests {
 
         // Saturday Jan 11 -> Monday Jan 13 (Following)
         assert!(
-            target2.is_business_day(adj_maturity),
+            target2
+                .is_business_day(adj_maturity)
+                .expect("calendar lookup"),
             "Adjusted maturity should be a business day"
         );
         assert_eq!(
@@ -1128,7 +1130,9 @@ mod tests {
             "Start date should be pre-adjusted to Monday"
         );
         assert!(
-            target2.is_business_day(repo.start_date),
+            target2
+                .is_business_day(repo.start_date)
+                .expect("calendar lookup"),
             "Start date should be a business day"
         );
 
@@ -1139,7 +1143,9 @@ mod tests {
             "Maturity should be next business day (Tuesday)"
         );
         assert!(
-            target2.is_business_day(repo.maturity),
+            target2
+                .is_business_day(repo.maturity)
+                .expect("calendar lookup"),
             "Maturity should be a business day"
         );
 

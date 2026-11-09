@@ -10,11 +10,11 @@ use finstack_quant_core::dates::calendar_by_id_strict;
 fn generated_calendar_constants_exist_and_work() {
     // Jan 1 is a holiday for TARGET2
     let jan1 = make_date(2025, 1, 1);
-    assert!(by_id("target2").is_holiday(jan1));
+    assert!(by_id("target2").is_holiday(jan1).expect("calendar lookup"));
 
     // Weekends are never business days (trait default)
     let sat = make_date(2025, 1, 4);
-    assert!(!by_id("usny").is_business_day(sat));
+    assert!(!by_id("usny").is_business_day(sat).expect("calendar lookup"));
 }
 
 #[test]
@@ -29,9 +29,12 @@ fn sse_published_2024_2025_closures_are_embedded() {
         make_date(2025, 6, 2),
         make_date(2025, 10, 8),
     ] {
-        assert!(by_id("sse").is_holiday(date), "missing SSE closure {date}");
         assert!(
-            !by_id("sse").is_business_day(date),
+            by_id("sse").is_holiday(date).expect("calendar lookup"),
+            "missing SSE closure {date}"
+        );
+        assert!(
+            !by_id("sse").is_business_day(date).expect("calendar lookup"),
             "SSE should be closed {date}"
         );
     }
@@ -42,23 +45,31 @@ fn holiday_rules_respect_effective_year() {
     // Juneteenth: NYSE first closed in 2022. Pre-adoption dates must NOT be
     // holidays (regression: previously every year 1970–2150 was marked).
     assert!(
-        !by_id("nyse").is_holiday(make_date(1990, 6, 19)),
+        !by_id("nyse")
+            .is_holiday(make_date(1990, 6, 19))
+            .expect("calendar lookup"),
         "Juneteenth must not be an NYSE holiday before 2022"
     );
     assert!(
-        by_id("nyse").is_holiday(make_date(2023, 6, 19)),
+        by_id("nyse")
+            .is_holiday(make_date(2023, 6, 19))
+            .expect("calendar lookup"),
         "Juneteenth 2023 (Monday) is an NYSE holiday"
     );
 
     // MLK Day (3rd Monday of January): NYSE observed from 1998.
     // 1990's 3rd Monday is Jan 15; must not be a holiday.
     assert!(
-        !by_id("nyse").is_holiday(make_date(1990, 1, 15)),
+        !by_id("nyse")
+            .is_holiday(make_date(1990, 1, 15))
+            .expect("calendar lookup"),
         "MLK Day must not be an NYSE holiday before 1998"
     );
     // 2023's 3rd Monday is Jan 16.
     assert!(
-        by_id("nyse").is_holiday(make_date(2023, 1, 16)),
+        by_id("nyse")
+            .is_holiday(make_date(2023, 1, 16))
+            .expect("calendar lookup"),
         "MLK Day 2023 is an NYSE holiday"
     );
 
@@ -66,26 +77,36 @@ fn holiday_rules_respect_effective_year() {
     // Juneteenth: 2021-06-19 was a Saturday (observed Fri 06-18), gated off
     // entirely; 2022-06-19 was a Sunday, observed Mon 06-20 — first NYSE close.
     assert!(
-        !by_id("nyse").is_holiday(make_date(2021, 6, 18)),
+        !by_id("nyse")
+            .is_holiday(make_date(2021, 6, 18))
+            .expect("calendar lookup"),
         "Juneteenth must be absent in 2021 (year before from_year=2022)"
     );
     assert!(
-        by_id("nyse").is_holiday(make_date(2022, 6, 20)),
+        by_id("nyse")
+            .is_holiday(make_date(2022, 6, 20))
+            .expect("calendar lookup"),
         "Juneteenth observed Monday 2022-06-20 is the first NYSE closure"
     );
     // MLK: 1997 3rd Monday = Jan 20 (absent); 1998 3rd Monday = Jan 19 (present).
     assert!(
-        !by_id("nyse").is_holiday(make_date(1997, 1, 20)),
+        !by_id("nyse")
+            .is_holiday(make_date(1997, 1, 20))
+            .expect("calendar lookup"),
         "MLK Day must be absent in 1997 (year before from_year=1998)"
     );
     assert!(
-        by_id("nyse").is_holiday(make_date(1998, 1, 19)),
+        by_id("nyse")
+            .is_holiday(make_date(1998, 1, 19))
+            .expect("calendar lookup"),
         "MLK Day 1998-01-19 is the first NYSE observance"
     );
 
     // Un-gated holidays remain valid historically.
     assert!(
-        by_id("nyse").is_holiday(make_date(1990, 1, 1)),
+        by_id("nyse")
+            .is_holiday(make_date(1990, 1, 1))
+            .expect("calendar lookup"),
         "New Year's Day is always an NYSE holiday"
     );
 }
@@ -95,55 +116,79 @@ fn sifma_cme_respect_effective_year_for_new_holidays() {
     // SIFMA (U.S. bond market): Juneteenth from 2022, MLK from 1998, and
     // Columbus Day (2nd Monday October, federal form) from 1971.
     assert!(
-        !by_id("sifma").is_holiday(make_date(2021, 6, 18)),
+        !by_id("sifma")
+            .is_holiday(make_date(2021, 6, 18))
+            .expect("calendar lookup"),
         "SIFMA Juneteenth must be absent before 2022"
     );
     assert!(
-        by_id("sifma").is_holiday(make_date(2022, 6, 20)),
+        by_id("sifma")
+            .is_holiday(make_date(2022, 6, 20))
+            .expect("calendar lookup"),
         "SIFMA Juneteenth observed 2022-06-20"
     );
     assert!(
-        !by_id("sifma").is_holiday(make_date(1997, 1, 20)),
+        !by_id("sifma")
+            .is_holiday(make_date(1997, 1, 20))
+            .expect("calendar lookup"),
         "SIFMA MLK Day must be absent before 1998"
     );
     assert!(
-        by_id("sifma").is_holiday(make_date(1998, 1, 19)),
+        by_id("sifma")
+            .is_holiday(make_date(1998, 1, 19))
+            .expect("calendar lookup"),
         "SIFMA MLK Day present from 1998"
     );
     assert!(
-        !by_id("sifma").is_holiday(make_date(1970, 10, 12)),
+        !by_id("sifma")
+            .is_holiday(make_date(1970, 10, 12))
+            .expect("calendar lookup"),
         "SIFMA Columbus Day must be absent before 1971"
     );
     assert!(
-        by_id("sifma").is_holiday(make_date(1971, 10, 11)),
+        by_id("sifma")
+            .is_holiday(make_date(1971, 10, 11))
+            .expect("calendar lookup"),
         "SIFMA Columbus Day present from 1971"
     );
 
     // CME: Juneteenth from 2022, MLK from 1998.
     assert!(
-        !by_id("cme").is_holiday(make_date(2021, 6, 18)),
+        !by_id("cme")
+            .is_holiday(make_date(2021, 6, 18))
+            .expect("calendar lookup"),
         "CME Juneteenth must be absent before 2022"
     );
     assert!(
-        by_id("cme").is_holiday(make_date(2022, 6, 20)),
+        by_id("cme")
+            .is_holiday(make_date(2022, 6, 20))
+            .expect("calendar lookup"),
         "CME Juneteenth observed 2022-06-20"
     );
     assert!(
-        !by_id("cme").is_holiday(make_date(1997, 1, 20)),
+        !by_id("cme")
+            .is_holiday(make_date(1997, 1, 20))
+            .expect("calendar lookup"),
         "CME MLK Day must be absent before 1998"
     );
     assert!(
-        by_id("cme").is_holiday(make_date(1998, 1, 19)),
+        by_id("cme")
+            .is_holiday(make_date(1998, 1, 19))
+            .expect("calendar lookup"),
         "CME MLK Day present from 1998"
     );
 
     // Sanity: an un-gated holiday is present historically on both calendars.
     assert!(
-        by_id("sifma").is_holiday(make_date(1990, 7, 4)),
+        by_id("sifma")
+            .is_holiday(make_date(1990, 7, 4))
+            .expect("calendar lookup"),
         "Independence Day is always a SIFMA holiday"
     );
     assert!(
-        by_id("cme").is_holiday(make_date(1990, 12, 25)),
+        by_id("cme")
+            .is_holiday(make_date(1990, 12, 25))
+            .expect("calendar lookup"),
         "Christmas is always a CME holiday"
     );
 }
@@ -153,5 +198,5 @@ fn calendar_resolver_resolves_generated_calendars() {
     let target2 = calendar_by_id_strict("target2").expect("TARGET2 should be resolvable");
 
     let jan1 = make_date(2025, 1, 1);
-    assert!(target2.is_holiday(jan1));
+    assert!(target2.is_holiday(jan1).expect("calendar lookup"));
 }

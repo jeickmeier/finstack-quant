@@ -21,9 +21,9 @@
 //! // Treat the day as a holiday if *either* market is closed.
 //! let cal_union = calendar_by_id_strict("target2+gblo")?;
 //! let jan1_2025 = create_date(2025, time::Month::January, 1)?;
-//! assert!(cal_union.is_holiday(jan1_2025));
+//! assert!(cal_union.is_holiday(jan1_2025).expect("calendar lookup"));
 //! let may26_2025 = create_date(2025, time::Month::May, 26)?;
-//! assert!(cal_union.is_holiday(may26_2025)); // U.K. spring bank holiday
+//! assert!(cal_union.is_holiday(may26_2025).expect("calendar lookup")); // U.K. spring bank holiday
 //! # Ok(())
 //! # }
 //! ```
@@ -56,20 +56,29 @@ impl<'a> CompositeCalendar<'a> {
 }
 
 impl HolidayCalendar for CompositeCalendar<'_> {
-    fn is_holiday(&self, date: Date) -> bool {
-        // Empty slice ⇒ no holidays, so return false.
-        self.calendars.iter().any(|c| c.is_holiday(date))
+    fn is_holiday(&self, date: Date) -> crate::Result<bool> {
+        // Empty slice ⇒ no holidays, so return false. Every member is
+        // evaluated so a member failure is never hidden by an earlier hit.
+        let mut holiday = false;
+        for calendar in self.calendars {
+            holiday |= calendar.is_holiday(date)?;
+        }
+        Ok(holiday)
     }
 
     /// A date is a business day only if it is one on **all** sub-calendars,
     /// so each member's own `is_business_day` (weekends included) is respected.
     ///
     /// An empty calendar list treats Saturday and Sunday as the only closed days.
-    fn is_business_day(&self, date: Date) -> bool {
+    fn is_business_day(&self, date: Date) -> crate::Result<bool> {
         if self.calendars.is_empty() {
-            return !date.is_weekend();
+            return Ok(!date.is_weekend());
         }
-        self.calendars.iter().all(|c| c.is_business_day(date))
+        let mut business = true;
+        for calendar in self.calendars {
+            business &= calendar.is_business_day(date)?;
+        }
+        Ok(business)
     }
 
     fn calendar_id(&self) -> Option<String> {
@@ -105,13 +114,13 @@ mod tests {
 
         // Date that is holiday in both calendars (New Year's Day)
         let d1 = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-        assert!(cal_union.is_holiday(d1));
+        assert!(cal_union.is_holiday(d1).expect("calendar lookup"));
 
         // Date that is holiday only in GBLO (Spring bank holiday 26-May-2025)
         let d2 = Date::from_calendar_date(2025, Month::May, 26).expect("Valid test date");
-        assert!(GBLO.is_holiday(d2));
-        assert!(!TARGET2.is_holiday(d2));
-        assert!(cal_union.is_holiday(d2));
+        assert!(GBLO.is_holiday(d2).expect("calendar lookup"));
+        assert!(!TARGET2.is_holiday(d2).expect("calendar lookup"));
+        assert!(cal_union.is_holiday(d2).expect("calendar lookup"));
     }
 
     #[test]
@@ -124,17 +133,17 @@ mod tests {
 
         // Jan 1 is a holiday in both
         let jan1 = make_date(2025, 1, 1);
-        assert!(composite.is_holiday(jan1));
+        assert!(composite.is_holiday(jan1).expect("calendar lookup"));
 
         // Spring bank holiday (May 26, 2025) is only in GBLO
         let may26 = make_date(2025, 5, 26);
-        assert!(GBLO.is_holiday(may26));
-        assert!(!TARGET2.is_holiday(may26));
-        assert!(composite.is_holiday(may26)); // Union includes it
+        assert!(GBLO.is_holiday(may26).expect("calendar lookup"));
+        assert!(!TARGET2.is_holiday(may26).expect("calendar lookup"));
+        assert!(composite.is_holiday(may26).expect("calendar lookup")); // Union includes it
 
         // Regular business day in both
         let regular_day = make_date(2025, 6, 18); // Wednesday
-        assert!(!composite.is_holiday(regular_day));
+        assert!(!composite.is_holiday(regular_day).expect("calendar lookup"));
     }
     #[test]
     fn composite_empty_calendars_union() {
@@ -143,7 +152,7 @@ mod tests {
 
         // Empty union should have no holidays
         let any_date = make_date(2025, 1, 1);
-        assert!(!composite.is_holiday(any_date));
+        assert!(!composite.is_holiday(any_date).expect("calendar lookup"));
     }
     #[test]
     fn composite_single_calendar_behaves_like_original() {
@@ -155,8 +164,11 @@ mod tests {
         // Test several dates
         for day in 1..=28 {
             let date = make_date(2025, 1, day);
-            let original = t2.is_holiday(date);
-            assert_eq!(composite_union.is_holiday(date), original);
+            let original = t2.is_holiday(date).expect("calendar lookup");
+            assert_eq!(
+                composite_union.is_holiday(date).expect("calendar lookup"),
+                original
+            );
         }
     }
 
@@ -176,11 +188,11 @@ mod tests {
 
         // Any US or EU holiday should be marked
         let us_labor_day = make_date(2025, 9, 1); // First Monday of Sept
-        assert!(composite.is_holiday(us_labor_day));
+        assert!(composite.is_holiday(us_labor_day).expect("calendar lookup"));
 
         // Christmas is a holiday everywhere
         let christmas = make_date(2025, 12, 25);
-        assert!(composite.is_holiday(christmas));
+        assert!(composite.is_holiday(christmas).expect("calendar lookup"));
     }
 
     #[test]
@@ -193,17 +205,21 @@ mod tests {
 
         // Weekends should not be business days
         let saturday = make_date(2025, 1, 4);
-        assert!(!composite.is_business_day(saturday));
+        assert!(
+            !composite
+                .is_business_day(saturday)
+                .expect("calendar lookup")
+        );
 
         let sunday = make_date(2025, 1, 5);
-        assert!(!composite.is_business_day(sunday));
+        assert!(!composite.is_business_day(sunday).expect("calendar lookup"));
 
         // Holiday should not be business day
         let holiday = make_date(2025, 1, 1);
-        assert!(!composite.is_business_day(holiday));
+        assert!(!composite.is_business_day(holiday).expect("calendar lookup"));
 
         // Regular weekday should be business day
         let weekday = make_date(2025, 1, 2);
-        assert!(composite.is_business_day(weekday));
+        assert!(composite.is_business_day(weekday).expect("calendar lookup"));
     }
 }

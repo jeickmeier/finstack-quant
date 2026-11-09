@@ -526,9 +526,9 @@ fn span_len2_cross_year() {
     let jan01 = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let jan02 = Date::from_calendar_date(2025, Month::January, 2).unwrap();
 
-    assert!(rules.is_holiday(dec31));
-    assert!(rules.is_holiday(jan01));
-    assert!(!rules.is_holiday(jan02));
+    assert!(rules.is_holiday(dec31).expect("calendar lookup"));
+    assert!(rules.is_holiday(jan01).expect("calendar lookup"));
+    assert!(!rules.is_holiday(jan02).expect("calendar lookup"));
 }
 
 #[test]
@@ -545,10 +545,10 @@ fn span_len3_cross_year() {
     let jan02 = Date::from_calendar_date(2025, Month::January, 2).unwrap();
     let jan03 = Date::from_calendar_date(2025, Month::January, 3).unwrap();
 
-    assert!(rules.is_holiday(dec31));
-    assert!(rules.is_holiday(jan01));
-    assert!(rules.is_holiday(jan02));
-    assert!(!rules.is_holiday(jan03));
+    assert!(rules.is_holiday(dec31).expect("calendar lookup"));
+    assert!(rules.is_holiday(jan01).expect("calendar lookup"));
+    assert!(rules.is_holiday(jan02).expect("calendar lookup"));
+    assert!(!rules.is_holiday(jan03).expect("calendar lookup"));
 }
 
 // Observed Edge Cases
@@ -621,9 +621,21 @@ fn rule_slice_as_holiday_calendar() {
     ];
     let rules = Calendar::new("two", "two", false, &RULES);
 
-    assert!(rules.is_holiday(make_date(2025, 1, 1)));
-    assert!(rules.is_holiday(make_date(2025, 12, 25)));
-    assert!(!rules.is_holiday(make_date(2025, 7, 4)));
+    assert!(
+        rules
+            .is_holiday(make_date(2025, 1, 1))
+            .expect("calendar lookup")
+    );
+    assert!(
+        rules
+            .is_holiday(make_date(2025, 12, 25))
+            .expect("calendar lookup")
+    );
+    assert!(
+        !rules
+            .is_holiday(make_date(2025, 7, 4))
+            .expect("calendar lookup")
+    );
 }
 
 #[test]
@@ -637,19 +649,39 @@ fn rule_multiple_rules_combine() {
     let rules = Calendar::new("four", "four", false, &RULES);
 
     // New Year
-    assert!(rules.is_holiday(make_date(2025, 1, 1)));
+    assert!(
+        rules
+            .is_holiday(make_date(2025, 1, 1))
+            .expect("calendar lookup")
+    );
 
     // Independence Day
-    assert!(rules.is_holiday(make_date(2025, 7, 4)));
+    assert!(
+        rules
+            .is_holiday(make_date(2025, 7, 4))
+            .expect("calendar lookup")
+    );
 
     // Christmas
-    assert!(rules.is_holiday(make_date(2025, 12, 25)));
+    assert!(
+        rules
+            .is_holiday(make_date(2025, 12, 25))
+            .expect("calendar lookup")
+    );
 
     // Good Friday 2025
-    assert!(rules.is_holiday(make_date(2025, 4, 18)));
+    assert!(
+        rules
+            .is_holiday(make_date(2025, 4, 18))
+            .expect("calendar lookup")
+    );
 
     // Regular day
-    assert!(!rules.is_holiday(make_date(2025, 6, 15)));
+    assert!(
+        !rules
+            .is_holiday(make_date(2025, 6, 15))
+            .expect("calendar lookup")
+    );
 }
 
 // Year-boundary observance

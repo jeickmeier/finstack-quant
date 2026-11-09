@@ -95,6 +95,6 @@ pub(super) fn year_fraction_bus252(
     if basis == 0 {
         return Err(InputError::InvalidBusBasis { basis }.into());
     }
-    let biz_days = cal.count_business_days(start, end) as f64;
+    let biz_days = f64::from(cal.count_business_days(start, end)?);
     Ok(biz_days / f64::from(basis))
 }

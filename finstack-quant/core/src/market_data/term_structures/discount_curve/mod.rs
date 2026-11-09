@@ -388,7 +388,9 @@ mod tests {
             .expect("Bus/252 curve with calendar");
 
         let brbd = calendar_by_id_strict("brbd").expect("brbd");
-        let business_days = brbd.count_business_days(base, pay);
+        let business_days = brbd
+            .count_business_days(base, pay)
+            .expect("calendar lookup");
         let t = DayCount::Bus252
             .year_fraction(
                 base,

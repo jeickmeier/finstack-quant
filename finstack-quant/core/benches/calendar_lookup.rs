@@ -25,17 +25,23 @@ fn checked_fixture(id: &str) -> (&'static dyn HolidayCalendar, Vec<Date>) {
         _ => Date::from_calendar_date(2025, Month::January, 1),
     }
     .expect("valid closure date");
-    assert!(cal.is_holiday(holiday), "{id}: expected fixed-date closure");
-    assert!(!cal.is_business_day(holiday));
+    assert!(
+        cal.is_holiday(holiday).expect("calendar lookup"),
+        "{id}: expected fixed-date closure"
+    );
+    assert!(!cal.is_business_day(holiday).expect("calendar lookup"));
     let open = Date::from_calendar_date(2025, Month::January, 15).expect("valid open date");
-    assert!(!cal.is_holiday(open), "{id}: expected ordinary weekday");
-    assert!(cal.is_business_day(open));
+    assert!(
+        !cal.is_holiday(open).expect("calendar lookup"),
+        "{id}: expected ordinary weekday"
+    );
+    assert!(cal.is_business_day(open).expect("calendar lookup"));
 
     let mut holidays = 0;
     let mut business_days = 0;
     for &date in &dates {
-        let holiday = cal.is_holiday(date);
-        let business = cal.is_business_day(date);
+        let holiday = cal.is_holiday(date).expect("calendar lookup");
+        let business = cal.is_business_day(date).expect("calendar lookup");
         assert_eq!(business, !date.is_weekend() && !holiday);
         holidays += usize::from(holiday);
         business_days += usize::from(business);
@@ -53,7 +59,8 @@ fn bench_is_holiday(c: &mut Criterion) {
             b.iter(|| {
                 let mut count = 0usize;
                 for date in &dates {
-                    count += usize::from(cal.is_holiday(black_box(*date)));
+                    count +=
+                        usize::from(cal.is_holiday(black_box(*date)).expect("calendar lookup"));
                 }
                 black_box(count)
             });
@@ -70,7 +77,10 @@ fn bench_is_business_day(c: &mut Criterion) {
             b.iter(|| {
                 let mut count = 0usize;
                 for date in &dates {
-                    count += usize::from(cal.is_business_day(black_box(*date)));
+                    count += usize::from(
+                        cal.is_business_day(black_box(*date))
+                            .expect("calendar lookup"),
+                    );
                 }
                 black_box(count)
             });

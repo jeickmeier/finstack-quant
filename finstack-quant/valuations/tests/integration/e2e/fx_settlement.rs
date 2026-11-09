@@ -420,13 +420,13 @@ fn test_resolve_calendar_returns_correct_calendar() {
 
     // NYSE should be closed on MLK Day
     assert!(
-        !nyse.is_business_day(mlk_day),
+        !nyse.is_business_day(mlk_day).expect("calendar lookup"),
         "NYSE should be closed on MLK Day"
     );
 
     // GBLO should be open on MLK Day (not a UK holiday)
     assert!(
-        gblo.is_business_day(mlk_day),
+        gblo.is_business_day(mlk_day).expect("calendar lookup"),
         "GBLO should be open on MLK Day (not a UK holiday)"
     );
 
@@ -436,14 +436,14 @@ fn test_resolve_calendar_returns_correct_calendar() {
     // Monday should be a business day in weekends-only
     let monday = create_date(2024, Month::January, 15).expect("Valid date");
     assert!(
-        weekends.is_business_day(monday),
+        weekends.is_business_day(monday).expect("calendar lookup"),
         "Weekends-only should treat Monday as business day"
     );
 
     // Saturday should not be a business day
     let saturday = create_date(2024, Month::January, 13).expect("Valid date");
     assert!(
-        !weekends.is_business_day(saturday),
+        !weekends.is_business_day(saturday).expect("calendar lookup"),
         "Weekends-only should treat Saturday as non-business day"
     );
 }

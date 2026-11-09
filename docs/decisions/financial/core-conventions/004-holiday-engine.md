@@ -1,7 +1,7 @@
 # CORE-CONVENTIONS-004: Holiday materialization, cache equivalence and date-table horizons
 
 - Decision status: **Accepted — complete holiday-engine package, 2026-11-07**.
-- Implementation status: **Observed; reconciliation pending**, scoped to `dates/calendar/{algo,rule,types,year_cache}.rs`, generated lunar/equinox tables, `core/build.rs` / `core/build/generate_calendars.rs` registry generation, and the controlling Python CSV generation/rendering steps described below. The source ledger remains explicitly Rust-only.
+- Implementation status: **Partly reconciled 2026-11-08**: item 7's fallible membership/counting contract is in place (trait methods return `Result` and callers propagate); the engine still reports missing tables and invalid rules as absence until the remaining items land, scoped to `dates/calendar/{algo,rule,types,year_cache}.rs`, generated lunar/equinox tables, `core/build.rs` / `core/build/generate_calendars.rs` registry generation, and the controlling Python CSV generation/rendering steps described below. The source ledger remains explicitly Rust-only.
 - Validation status: **Evidence inspected/located; independent qualification pending**. Documentation and independent rule/date/computus-example checks passed; production calendar tests and the astronomical generator were not executed for this review.
 - Audit date: **2026-11-05**. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; see [scope and inventory](README.md).
 

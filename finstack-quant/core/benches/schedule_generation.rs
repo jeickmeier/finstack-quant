@@ -280,12 +280,12 @@ fn bench_imm_schedules(c: &mut Criterion) {
 // Independent date scan for the benchmark's payment-date expectation.
 fn following_payment(day: Date, cal: &dyn HolidayCalendar, modified: bool) -> Date {
     let mut next = day;
-    while !cal.is_business_day(next) {
+    while !cal.is_business_day(next).expect("calendar lookup") {
         next = next.next_day().expect("next date");
     }
     if modified && next.month() != day.month() {
         let mut previous = day;
-        while !cal.is_business_day(previous) {
+        while !cal.is_business_day(previous).expect("calendar lookup") {
             previous = previous.previous_day().expect("previous date");
         }
         previous

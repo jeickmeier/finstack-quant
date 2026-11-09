@@ -314,15 +314,15 @@ mod tests {
         let monday = create_date(2024, Month::January, 15).unwrap();
 
         assert!(
-            !cal.is_business_day(saturday),
+            !cal.is_business_day(saturday).expect("calendar lookup"),
             "Saturday should not be business day"
         );
         assert!(
-            !cal.is_business_day(sunday),
+            !cal.is_business_day(sunday).expect("calendar lookup"),
             "Sunday should not be business day"
         );
         assert!(
-            cal.is_business_day(monday),
+            cal.is_business_day(monday).expect("calendar lookup"),
             "Monday should be business day (no holidays)"
         );
     }
