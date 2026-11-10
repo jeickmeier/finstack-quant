@@ -199,6 +199,18 @@ if [ "${usage_doctest:-false}" = "true" ]; then
   exec cargo test --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --doc --no-fail-fast
 fi
 ignored=""; [ "${usage_slow:-false}" = "true" ] && ignored="--run-ignored only --no-tests pass"
+if [ "${usage_slow:-false}" = "true" ]; then
+  # Ignored CCM exporters run in the slow suite; keep their generated evidence disposable.
+  export_dir="$(mktemp -d)"
+  trap 'rm -rf "$export_dir"' EXIT
+  export CCM_CASHFLOW_ACCRUAL_EXPORT="${CCM_CASHFLOW_ACCRUAL_EXPORT:-$export_dir/cashflow-accrual.json}"
+  export CCM_CASHFLOW_HISTORY_EXPORT="${CCM_CASHFLOW_HISTORY_EXPORT:-$export_dir/cashflow-history.json}"
+  export CCM_CASHFLOW_CONSUMER_EXPORT="${CCM_CASHFLOW_CONSUMER_EXPORT:-$export_dir/cashflow-consumer}"
+  export CCM_CONSUMER_EXPORT_DIR="${CCM_CONSUMER_EXPORT_DIR:-$export_dir/consumer}"
+  export CCM_CORE_WORK_EXPORT_DIR="${CCM_CORE_WORK_EXPORT_DIR:-$export_dir/core-work}"
+  export CCM_I3_WORK_EXPORT="${CCM_I3_WORK_EXPORT:-$export_dir/i3-work.json}"
+  export CCM_MODELS_EXPORT_DIR="${CCM_MODELS_EXPORT_DIR:-$export_dir/models}"
+fi
 if [ "${usage_coverage:-false}" = "true" ]; then
   cargo llvm-cov clean --workspace
   run_tests() { cargo llvm-cov nextest --no-report --remap-path-prefix "$@"; }

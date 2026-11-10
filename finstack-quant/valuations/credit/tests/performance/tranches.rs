@@ -28,6 +28,7 @@ const REFERENCE_FIXTURE: &str = "valuation_b4_tranche_reference.json";
 const GAUSSIAN_CAP_BUDGET: f64 = 2e-10;
 const STUDENT_CAP_BUDGET: f64 = 1e-12;
 const STUDENT_NODE_CAP_BUDGET: f64 = 5e-13;
+const BITWISE_REFERENCE_TARGET: &str = "aarch64-apple-darwin";
 
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -784,6 +785,13 @@ fn tranche_check_exact_reference() {
     .expect("reference fixture");
     let actual = diagnostics(&read_inputs());
     assert_eq!(reference["schema_version"], json!(1));
+    assert_eq!(
+        reference["provenance"]["rust_target"],
+        json!(BITWISE_REFERENCE_TARGET)
+    );
+    // Binary64 fingerprints are only portable on the target that captured the
+    // baseline; every target still checks the independent numerical bounds.
+    let bitwise_reference_is_local = cfg!(all(target_arch = "aarch64", target_os = "macos"));
     assert_eq!(actual["input_hash"], reference["input_hash"]);
     assert_eq!(
         array(&actual["cases"]).len(),
@@ -877,7 +885,7 @@ fn tranche_check_exact_reference() {
                             );
                         }
                     }
-                    if unchanged_projection {
+                    if unchanged_projection && bitwise_reference_is_local {
                         assert_eq!(
                             format!("{:016x}", value.to_bits()),
                             cap_pin["baseline_bits"]
@@ -902,7 +910,9 @@ fn tranche_check_exact_reference() {
                     .iter()
                     .zip(array(&reference_period["conditional"]))
                 {
-                    assert_eq!(node["conditioning_hash"], node_pin["conditioning_hash"]);
+                    if bitwise_reference_is_local {
+                        assert_eq!(node["conditioning_hash"], node_pin["conditioning_hash"]);
+                    }
                     assert_eq!(array(&node["actual_caps"]).len(), 4);
                     if strict {
                         if student {
@@ -929,7 +939,7 @@ fn tranche_check_exact_reference() {
                             }
                         }
                     }
-                    if unchanged_count_kernel {
+                    if unchanged_count_kernel && bitwise_reference_is_local {
                         for i in 0..4 {
                             assert_eq!(
                                 format!("{:016x}", number(&node["actual_caps"][i]).to_bits()),
@@ -951,7 +961,7 @@ fn tranche_check_exact_reference() {
                         );
                     }
                 }
-                if unchanged_projection {
+                if unchanged_projection && bitwise_reference_is_local {
                     for (actual_key, baseline_key) in
                         [("el", "baseline_el_bits"), ("wd", "baseline_wd_bits")]
                     {
@@ -976,7 +986,7 @@ fn tranche_check_exact_reference() {
                     scenario["name"]
                 );
             }
-            if unchanged_pv {
+            if unchanged_pv && bitwise_reference_is_local {
                 assert_eq!(
                     format!("{:016x}", number(&scenario["actual_pv"]).to_bits()),
                     expected["baseline_pv_bits"]

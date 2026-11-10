@@ -79,7 +79,9 @@ and kills it at 180 s, a runaway guard. The per-test budget is 60 s, and the
 cap tightens to it once the slow tests are measured on CI and moved out. A
 test that needs more than 60 s belongs in the slow suite: mark it
 `#[ignore = "slow: <reason>"]`, and `mise run rust-test --slow` runs it, as
-does the full tier.
+does the full tier. That task sends CCM exporter output to a fresh temporary
+directory by default and removes it when the run finishes; caller-supplied
+export paths are preserved.
 
 Each job with a Rust build has its own `Swatinem/rust-cache` key (`lint`,
 `gen-check`, `test-rust`, `test-python`, `test-wasm`), saved only on `master`,

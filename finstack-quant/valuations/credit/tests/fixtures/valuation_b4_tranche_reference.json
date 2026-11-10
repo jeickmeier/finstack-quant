@@ -8,6 +8,7 @@
     "decimal_precision": 80,
     "decimal_rounding": "outward interval bounds at every nonnegative operation",
     "gaussian_quadrature": "QUADPACK plus independently refined composite GL32; estimated uncertainty",
+    "rust_target": "aarch64-apple-darwin",
     "student_t_scope": "arithmetic under exported binary64 product-rule weights and conditional probabilities; no quadrature-bias claim",
     "conditional_node_gates": "5e-13 applies only to Student-t; Gaussian probes retain diagnostic errors and unchanged-kernel bit checks",
     "candidate_checks_are_not_before_grid_acceptance": true
