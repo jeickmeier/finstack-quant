@@ -62,7 +62,7 @@ jobs:
         run: '"HOME=$env:USERPROFILE" | Out-File -FilePath $env:GITHUB_ENV -Append'
 
       - name: Provision toolchain (mise)
-        uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
+        uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
         with:
           cache: true
           # Wheels only need the pinned stable compiler. A full `mise install`
@@ -153,7 +153,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Provision toolchain (mise)
-        uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
+        uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
         with:
           cache: true
           install_args: rust@1.97.1 node github:wasm-bindgen/wasm-pack github:wasm-bindgen/wasm-bindgen aqua:WebAssembly/binaryen
