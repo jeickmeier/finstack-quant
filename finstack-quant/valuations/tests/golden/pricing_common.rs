@@ -394,6 +394,14 @@ mod tests {
         );
     }
 
+    fn assert_close_relative(actual: f64, expected: f64, relative_tolerance: f64) {
+        let tolerance = expected.abs().max(1.0) * relative_tolerance;
+        assert!(
+            (actual - expected).abs() < tolerance,
+            "expected {expected:.15}, got {actual:.15} (tolerance {tolerance:.3e})"
+        );
+    }
+
     #[test]
     fn requested_metrics_derives_from_expected_and_excludes_npv() {
         let json = serde_json::json!({
@@ -646,16 +654,16 @@ mod tests {
                 None,
             )
             .unwrap();
-            assert_close(result.value.amount(), npv, 1e-6);
+            assert_close_relative(result.value.amount(), npv, 2e-10);
             assert_close(result.measures["z_spread"], 0.10, 1e-10);
-            assert_close(result.measures["cs01"], cs01, 1e-6);
-            assert_close(
+            assert_close_relative(result.measures["cs01"], cs01, 2e-10);
+            assert_close_relative(
                 deal.instrument_pricing_overrides
                     .market_quotes
                     .quoted_dirty_price_currency
                     .unwrap(),
                 quote,
-                1e-6,
+                2e-10,
             );
         }
     }
